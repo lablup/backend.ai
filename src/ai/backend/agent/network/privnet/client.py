@@ -18,7 +18,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, Any, cast, override
 
 from ai.backend.agent.network.caps import probe_caps
 from ai.backend.agent.network.port_forward import PortForward
@@ -249,12 +249,19 @@ class PrivNetProvisioner:
         # node) leaves the privnet on its host-local fallback. The MAC is derived from the IP
         # privnet-side, so it is not sent.
         overlay_ip = kernel_config.get("cluster_network_ip")
+        # Single-node cluster: the deterministic LOCAL address this kernel must be pinned at so its
+        # real address matches the /etc/hosts map the agent wrote. Sent alongside the overlay IP; the
+        # privnet re-validates it is within the session's LOCAL subnet. Without this the privnet takes
+        # a host-local dynamic address that need not match the map, and peer resolution is wrong.
+        # local_static_ip is an agent-added key, not part of the KernelCreationConfig TypedDict.
+        local_ip: str | None = cast(Any, kernel_config).get("local_static_ip")
         resp = await self._client.call(
             PrivNetRequest(
                 op=PrivNetOp.ATTACH_CONTAINER,
                 session_id=meta.session_id,
                 container_id=container_id,
                 ip=overlay_ip,
+                local_ip=local_ip,
             )
         )
         assigned: dict[NetworkRole, str] = {}

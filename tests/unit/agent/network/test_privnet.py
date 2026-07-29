@@ -283,6 +283,18 @@ class TestProtocol:
         resp = PrivNetResponse(ok=True, subnet="172.30.0.64/26")
         assert PrivNetResponse.decode(resp.encode()) == resp
 
+    def test_attach_local_ip_roundtrips(self) -> None:
+        # The single-node cluster LOCAL pin must survive the wire, or the privnet cannot honour it.
+        req = PrivNetRequest(
+            PrivNetOp.ATTACH_CONTAINER, "s1", container_id="c1", local_ip="172.30.0.9"
+        )
+        decoded = PrivNetRequest.decode(req.encode())
+        assert decoded == req and decoded.local_ip == "172.30.0.9"
+
+    def test_absent_local_ip_stays_none(self) -> None:
+        req = PrivNetRequest(PrivNetOp.ATTACH_CONTAINER, "s1", container_id="c1")
+        assert PrivNetRequest.decode(req.encode()).local_ip is None
+
     def test_absent_subnet_stays_none(self) -> None:
         assert PrivNetResponse.decode(PrivNetResponse(ok=True).encode()).subnet is None
 
@@ -417,6 +429,49 @@ class TestPrivNetRpc:
                     )
                 )
             assert h.backend.attach_kernel_configs == []  # rejected before building the plan
+
+    async def test_attach_pins_the_single_node_cluster_local_ip(self) -> None:
+        # The deterministic LOCAL address the agent computed for /etc/hosts must reach the backend's
+        # attach as local_static_ip, or the privnet allocates a dynamic address that does not match
+        # the map and single-node cluster peer resolution is wrong (privnet-mode only bug).
+        async with _Harness(runtime=_StubRuntime(pid=4242)) as h:
+            await h.client().call(
+                PrivNetRequest(
+                    PrivNetOp.SETUP_SESSION,
+                    "sess-pin",
+                    network_config={"backend": "bridge", "subnet": "172.30.5.0/24"},
+                )
+            )
+            await h.client().call(
+                PrivNetRequest(
+                    PrivNetOp.ATTACH_CONTAINER,
+                    "sess-pin",
+                    container_id="c1",
+                    local_ip="172.30.5.9",
+                )
+            )
+            assert h.backend.attach_kernel_configs  # attach reached the backend
+            assert h.backend.attach_kernel_configs[-1].get("local_static_ip") == "172.30.5.9"
+
+    async def test_attach_rejects_a_garbage_local_ip(self) -> None:
+        async with _Harness(runtime=_StubRuntime(pid=4242)) as h:
+            await h.client().call(
+                PrivNetRequest(
+                    PrivNetOp.SETUP_SESSION,
+                    "sess-badpin",
+                    network_config={"backend": "bridge", "subnet": "172.30.6.0/24"},
+                )
+            )
+            with pytest.raises(PrivNetClientError):
+                await h.client().call(
+                    PrivNetRequest(
+                        PrivNetOp.ATTACH_CONTAINER,
+                        "sess-badpin",
+                        container_id="c1",
+                        local_ip="not-an-ip",
+                    )
+                )
+            assert h.backend.attach_kernel_configs == []  # rejected before the plan
 
     async def test_self_member_advertises_the_validated_vtep(self) -> None:
         # It is the privnet, not the agent, that publishes membership when it runs — so the address

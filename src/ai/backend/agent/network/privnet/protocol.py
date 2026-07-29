@@ -117,6 +117,12 @@ class PrivNetRequest:
     vtep_ip: str | None = None
     ip: str | None = None
     mac: str | None = None
+    # ATTACH_CONTAINER only: the LOCAL address a single-node cluster kernel must be PINNED at, so its
+    # actual address matches the deterministic /etc/hosts layout the agent wrote (torchrun/MPI bind
+    # their rendezvous at their own hostname's address). Distinct from ``ip`` (the multi-node overlay
+    # address); a single-node session has no overlay. Opaque — the privnet validates it is within the
+    # session's own LOCAL subnet before pinning.
+    local_ip: str | None = None
     # PUBLISH_PORTS only: the (host_port, container_port, host_ip) pairing the agent's port pool
     # produced. host_ip is the interface the service is published on (None = every local address);
     # the DNAT *destination* is never sent — the privnet uses its own assigned LOCAL address (see
@@ -132,7 +138,7 @@ class PrivNetRequest:
             payload["network_config"] = self.network_config
         if self.ports is not None:
             payload["ports"] = [list(pair) for pair in self.ports]
-        for key in ("vtep_ip", "ip", "mac"):
+        for key in ("vtep_ip", "ip", "mac", "local_ip"):
             value = getattr(self, key)
             if value is not None:
                 payload[key] = value
@@ -160,7 +166,7 @@ class PrivNetRequest:
         if network_config is not None and not isinstance(network_config, dict):
             raise ProtocolError("network_config must be an object")
         fields: dict[str, str | None] = {}
-        for key in ("vtep_ip", "ip", "mac"):
+        for key in ("vtep_ip", "ip", "mac", "local_ip"):
             value = data.get(key)
             if value is not None and not isinstance(value, str):
                 raise ProtocolError(f"{key} must be a string")

@@ -466,7 +466,9 @@ class PrivNetServer:
                         await self._teardown(session_id)
                         return PrivNetResponse(ok=True)
                     case PrivNetOp.ATTACH_CONTAINER:
-                        assigned = await self._attach(session_id, req.container_id, req.ip)
+                        assigned = await self._attach(
+                            session_id, req.container_id, req.ip, req.local_ip
+                        )
                         return PrivNetResponse(ok=True, assigned=assigned)
                     case PrivNetOp.DETACH_CONTAINER:
                         await self._detach(session_id, req.container_id)
@@ -532,7 +534,11 @@ class PrivNetServer:
         await self._journal.forget_session(session_id)
 
     async def _attach(
-        self, session_id: str, container_id: str | None, overlay_ip: str | None
+        self,
+        session_id: str,
+        container_id: str | None,
+        overlay_ip: str | None,
+        local_ip: str | None = None,
     ) -> dict[str, str]:
         if container_id is None:
             raise policy.PolicyViolation("attach requires container_id")
@@ -549,6 +555,12 @@ class PrivNetServer:
             kernel_config["cluster_network_ip"] = policy.validate_overlay_ip(
                 overlay_ip, entry.meta.subnet
             )
+        if local_ip is not None:
+            # Single-node cluster pin: honour the address the agent computed for its /etc/hosts map
+            # so the container's real LOCAL address matches. Validated as a real IPv4 here; the
+            # host-local IPAM confines it to the session's own /26 (a `requested` outside it, or one
+            # already taken by a sibling, raises), so a lying agent can at worst fail its own attach.
+            kernel_config["local_static_ip"] = policy.validate_ipv4(local_ip, what="local pin ip")
         # Authoritative PID resolution from containerd — the agent's view is never trusted.
         pid = await self._runtime.container_pid(container_id)
         if pid is None:
