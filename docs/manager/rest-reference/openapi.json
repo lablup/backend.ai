@@ -837,58 +837,6 @@
         "title": "AppConfigFragmentOrderField",
         "type": "string"
       },
-      "AppConfigFragmentScope": {
-        "description": "The scopes a scoped fragment search runs at, keyed by scope kind.\n\nEach category list is OR'd internally and across categories. ``public`` is a flag rather\nthan a list: it names one global scope that owns no id. Raises if every field is empty.",
-        "properties": {
-          "domain": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/UUIDScope"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Domain ids whose fragments to search.",
-            "title": "Domain"
-          },
-          "user": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/UUIDScope"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "User ids whose fragments to search.",
-            "title": "User"
-          },
-          "public": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Search the public scope, which has no owner.",
-            "title": "Public"
-          }
-        },
-        "title": "AppConfigFragmentScope",
-        "type": "object"
-      },
       "AppConfigScopeTypeFilter": {
         "description": "Filter for the scope_type enum field.",
         "properties": {
@@ -1013,6 +961,175 @@
           }
         },
         "title": "DateTimeFilter",
+        "type": "object"
+      },
+      "AdminSearchAppConfigFragmentInput": {
+        "description": "Input for paginated app config fragment search (superadmin only).",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppConfigFragmentFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions."
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AppConfigFragmentOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifiers, applied in sequence.",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-forward page size.",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-forward start cursor.",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-backward page size.",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-backward end cursor.",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset-based: maximum number of results.",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset-based: number of results to skip.",
+            "title": "Offset"
+          }
+        },
+        "title": "AdminSearchAppConfigFragmentInput",
+        "type": "object"
+      },
+      "AppConfigFragmentScope": {
+        "description": "The scopes a scoped fragment search runs at, keyed by scope kind.\n\nEach category list is OR'd internally and across categories. ``public`` is a flag rather\nthan a list: it names one global scope that owns no id. Raises if every field is empty.",
+        "properties": {
+          "domain": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Domain ids whose fragments to search.",
+            "title": "Domain"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "User ids whose fragments to search.",
+            "title": "User"
+          },
+          "public": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Search the public scope, which has no owner.",
+            "title": "Public"
+          }
+        },
+        "title": "AppConfigFragmentScope",
         "type": "object"
       },
       "UUIDScope": {
@@ -1290,123 +1407,6 @@
           "items"
         ],
         "title": "MyUpsertAppConfigFragmentsInput",
-        "type": "object"
-      },
-      "AdminSearchAppConfigFragmentInput": {
-        "description": "Input for paginated app config fragment search (superadmin only).",
-        "properties": {
-          "filter": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AppConfigFragmentFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter conditions."
-          },
-          "order": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/AppConfigFragmentOrder"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Order specifiers, applied in sequence.",
-            "title": "Order"
-          },
-          "first": {
-            "anyOf": [
-              {
-                "minimum": 1,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Cursor-forward page size.",
-            "title": "First"
-          },
-          "after": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Cursor-forward start cursor.",
-            "title": "After"
-          },
-          "last": {
-            "anyOf": [
-              {
-                "minimum": 1,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Cursor-backward page size.",
-            "title": "Last"
-          },
-          "before": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Cursor-backward end cursor.",
-            "title": "Before"
-          },
-          "limit": {
-            "anyOf": [
-              {
-                "minimum": 1,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Offset-based: maximum number of results.",
-            "title": "Limit"
-          },
-          "offset": {
-            "anyOf": [
-              {
-                "minimum": 0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Offset-based: number of results to skip.",
-            "title": "Offset"
-          }
-        },
-        "title": "AdminSearchAppConfigFragmentInput",
         "type": "object"
       },
       "UpdateAppConfigFragmentInput": {
@@ -41513,6 +41513,35 @@
         "description": "Purge many fragments by id, with per-item partial success (auth, RBAC).\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/v2/app-config-fragments/admin/search": {
+      "post": {
+        "operationId": "v2/app-config-fragments.admin_search",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminSearchAppConfigFragmentInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search fragments across all scopes with pagination (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
     "/v2/app-config-fragments/scoped/search": {
       "post": {
         "operationId": "v2/app-config-fragments.scoped_search",
@@ -41656,35 +41685,6 @@
         },
         "parameters": [],
         "description": "Upsert many fragments at the caller's own user scope, all-or-nothing (auth).\n\n**Preconditions:**\n* User privilege required.\n"
-      }
-    },
-    "/v2/app-config-fragments/admin/search": {
-      "post": {
-        "operationId": "v2/app-config-fragments.admin_search",
-        "tags": [
-          "v2/app-config-fragments"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "security": [
-          {
-            "TokenAuth": []
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AdminSearchAppConfigFragmentInput"
-              }
-            }
-          }
-        },
-        "parameters": [],
-        "description": "Search fragments across all scopes with pagination (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/app-config-fragments/{fragment_id}": {
