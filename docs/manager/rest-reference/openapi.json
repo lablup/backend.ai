@@ -41826,7 +41826,7 @@
     },
     "/v2/app-config/my/get": {
       "post": {
-        "operationId": "v2/app-config.my_get",
+        "operationId": "v2/app-config.my_get_app_configs",
         "tags": [
           "v2/app-config"
         ],
@@ -41855,7 +41855,7 @@
     },
     "/v2/app-config/public/get": {
       "post": {
-        "operationId": "v2/app-config.public_get",
+        "operationId": "v2/app-config.public_get_app_configs",
         "tags": [
           "v2/app-config"
         ],

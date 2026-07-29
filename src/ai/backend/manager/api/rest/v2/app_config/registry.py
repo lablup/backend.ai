@@ -25,8 +25,8 @@ def register_v2_app_config_routes(
     """
     registry = RouteRegistry.create("app-config", route_deps.cors_options)
 
-    registry.add("POST", "/my/get", handler.my_get, middlewares=[auth_required])
+    registry.add("POST", "/my/get", handler.my_get_app_configs, middlewares=[auth_required])
     # Anonymous (pre-login) public read: no auth middleware.
-    registry.add("POST", "/public/get", handler.public_get)
+    registry.add("POST", "/public/get", handler.public_get_app_configs)
 
     return registry

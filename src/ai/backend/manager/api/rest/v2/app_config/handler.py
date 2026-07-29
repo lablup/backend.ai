@@ -27,7 +27,7 @@ class V2AppConfigHandler:
     def __init__(self, *, adapter: AppConfigAdapter) -> None:
         self._adapter = adapter
 
-    async def my_get(
+    async def my_get_app_configs(
         self,
         body: BodyParam[MyGetAppConfigsInput],
     ) -> APIResponse:
@@ -35,7 +35,7 @@ class V2AppConfigHandler:
         result = await self._adapter.my_get_app_configs(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def public_get(
+    async def public_get_app_configs(
         self,
         body: BodyParam[PublicGetAppConfigsInput],
     ) -> APIResponse:
