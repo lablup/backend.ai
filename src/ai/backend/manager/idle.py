@@ -252,6 +252,30 @@ class IdleCheckerHost:
         await self._valkey_stat.close()
         await self._valkey_live.close()
 
+    async def update_app_streaming_status(
+        self,
+        session_id: SessionId,
+        status: AppStreamingStatus,
+    ) -> None:
+        for checker in self._checkers:
+            await checker.update_app_streaming_status(session_id, status)
+
+    async def dispatch_session_status_event(
+        self,
+        session_id: SessionId,
+        status: SessionStatus,
+    ) -> None:
+        for checker in self._event_dispatch_checkers:
+            await checker.watch_session_status(session_id, status)
+
+    async def dispatch_session_execution_status_event(
+        self,
+        session_id: SessionId,
+        status: SessionExecutionStatus,
+    ) -> None:
+        for checker in self._event_dispatch_checkers:
+            await checker.watch_session_execution(session_id, status)
+
     async def _fetch_idle_policy(
         self, conn: SAConnection, access_key: AccessKey
     ) -> Row[Any] | None:
