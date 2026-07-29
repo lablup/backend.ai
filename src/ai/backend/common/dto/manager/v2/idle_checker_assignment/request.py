@@ -7,7 +7,6 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import (
     DateTimeFilter,
-    StringFilter,
     UUIDFilter,
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
@@ -60,7 +59,7 @@ class PurgeIdleCheckerAssignmentInput(BaseRequestModel):
 
 class IdleCheckerAssignmentFilter(BaseRequestModel):
     scope_type: ScopeTypeFilter | None = Field(default=None)
-    scope_id: StringFilter | None = Field(default=None)
+    scope_id: UUIDFilter | None = Field(default=None)
     idle_checker_id: UUIDFilter | None = Field(default=None)
     enabled: bool | None = Field(default=None)
     created_at: DateTimeFilter | None = Field(default=None)

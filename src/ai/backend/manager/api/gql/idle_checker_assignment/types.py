@@ -48,7 +48,6 @@ from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
-    StringFilter,
     UUIDFilter,
 )
 from ai.backend.manager.api.gql.decorators import (
@@ -220,7 +219,7 @@ class IdleCheckerAssignmentFilterGQL(PydanticInputMixin[IdleCheckerAssignmentFil
         description="Scope type filter.",
         default=None,
     )
-    scope_id: StringFilter | None = gql_field(description="Scope identifier filter.", default=None)
+    scope_id: UUIDFilter | None = gql_field(description="Scope identifier filter.", default=None)
     idle_checker_id: UUIDFilter | None = gql_field(
         description="Bound idle checker ID filter.",
         default=None,

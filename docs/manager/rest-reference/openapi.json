@@ -10804,7 +10804,7 @@
           "scope_id": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/StringFilter"
+                "$ref": "#/components/schemas/UUIDFilter"
               },
               {
                 "type": "null"

@@ -8074,7 +8074,7 @@ input IdleCheckerAssignmentFilter
   scopeType: IdleCheckerScopeTypeFilter = null
 
   """Scope identifier filter."""
-  scopeId: StringFilter = null
+  scopeId: UUIDFilter = null
 
   """Bound idle checker ID filter."""
   idleCheckerId: UUIDFilter = null

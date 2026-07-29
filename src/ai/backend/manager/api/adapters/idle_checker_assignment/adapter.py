@@ -207,12 +207,9 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
                     scope_types.append(ScopeType(scope_type_dto.value))
                 conditions.append(IdleCheckerAssignmentConditions.by_scope_type_in(scope_types))
         if f.scope_id is not None:
-            condition = self.convert_string_filter(
+            condition = self.convert_uuid_filter(
                 f.scope_id,
-                contains_factory=IdleCheckerAssignmentConditions.by_scope_id_contains,
                 equals_factory=IdleCheckerAssignmentConditions.by_scope_id_equals,
-                starts_with_factory=IdleCheckerAssignmentConditions.by_scope_id_starts_with,
-                ends_with_factory=IdleCheckerAssignmentConditions.by_scope_id_ends_with,
                 in_factory=IdleCheckerAssignmentConditions.by_scope_id_in,
             )
             if condition is not None:
