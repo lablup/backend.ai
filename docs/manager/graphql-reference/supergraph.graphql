@@ -9413,6 +9413,7 @@ enum KernelV2Status
   @join__type(graph: STRAWBERRY)
 {
   PENDING @join__enumValue(graph: STRAWBERRY)
+  RESERVED @join__enumValue(graph: STRAWBERRY)
   SCHEDULED @join__enumValue(graph: STRAWBERRY)
   PREPARING @join__enumValue(graph: STRAWBERRY)
   PREPARED @join__enumValue(graph: STRAWBERRY)
