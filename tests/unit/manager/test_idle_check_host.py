@@ -69,8 +69,7 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.db.engine import create_async_engine
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, create_async_engine
 from ai.backend.testutils.db import with_tables
 
 IDLE_LOGGER_NAME = "ai.backend.manager.idle"
@@ -359,12 +358,10 @@ class TestDoIdleCheck:
                     id=session_id,
                     name=f"test-session-{uuid.uuid4().hex[:8]}",
                     session_type=SessionTypes.INTERACTIVE,
-                    domain_id=domain_id,
                     domain_name=domain_name,
                     group_id=group_id,
                     user_uuid=user_uuid,
                     access_key=access_key,
-                    resource_group_id=sg_id,
                     scaling_group_name=sg_name,
                     status=SessionStatus.RUNNING,
                     status_info="test",
@@ -384,7 +381,6 @@ class TestDoIdleCheck:
                     id=kernel_id,
                     session_id=session_id,
                     scaling_group=sg_name,
-                    resource_group_id=sg_id,
                     cluster_idx=0,
                     cluster_role="main",
                     cluster_hostname=f"kernel-{uuid.uuid4().hex[:8]}",

@@ -16,8 +16,6 @@ from decimal import Decimal
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
@@ -78,9 +76,7 @@ class TestTerminatedStatusGuard:
         self,
         db: ExtendedAsyncSAEngine,
         *,
-        domain_id: DomainID,
         domain_name: str,
-        resource_group_id: ResourceGroupID,
         scaling_group_name: str,
         group_id: uuid.UUID,
         user_uuid: uuid.UUID,
@@ -91,9 +87,7 @@ class TestTerminatedStatusGuard:
     ) -> tuple[SessionId, list[KernelId]]:
         return await create_pending_session_with_kernels(
             db,
-            domain_id=domain_id,
             domain_name=domain_name,
-            resource_group_id=resource_group_id,
             scaling_group_name=scaling_group_name,
             group_id=group_id,
             user_uuid=user_uuid,
@@ -108,9 +102,7 @@ class TestTerminatedStatusGuard:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         db_source: ScheduleDBSource,
-        test_domain_id: DomainID,
         test_domain_name: str,
-        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -120,9 +112,7 @@ class TestTerminatedStatusGuard:
         """A second termination event keeps the reason and timestamps of the first."""
         _, kernel_ids = await self._create_kernels(
             db_with_cleanup,
-            domain_id=test_domain_id,
             domain_name=test_domain_name,
-            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -156,9 +146,7 @@ class TestTerminatedStatusGuard:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         db_source: ScheduleDBSource,
-        test_domain_id: DomainID,
         test_domain_name: str,
-        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -169,9 +157,7 @@ class TestTerminatedStatusGuard:
         """CANCELLED / ERROR / PENDING kernels are never moved to TERMINATED."""
         _, kernel_ids = await self._create_kernels(
             db_with_cleanup,
-            domain_id=test_domain_id,
             domain_name=test_domain_name,
-            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -196,9 +182,7 @@ class TestTerminatedStatusGuard:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         db_source: ScheduleDBSource,
-        test_domain_id: DomainID,
         test_domain_name: str,
-        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -209,9 +193,7 @@ class TestTerminatedStatusGuard:
         """The normal RUNNING / TERMINATING -> TERMINATED transition still succeeds."""
         _, kernel_ids = await self._create_kernels(
             db_with_cleanup,
-            domain_id=test_domain_id,
             domain_name=test_domain_name,
-            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -232,9 +214,7 @@ class TestTerminatedStatusGuard:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         db_source: ScheduleDBSource,
-        test_domain_id: DomainID,
         test_domain_name: str,
-        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -244,9 +224,7 @@ class TestTerminatedStatusGuard:
         """The bulk update carries the same guard: only the live kernel is updated."""
         _, kernel_ids = await self._create_kernels(
             db_with_cleanup,
-            domain_id=test_domain_id,
             domain_name=test_domain_name,
-            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
