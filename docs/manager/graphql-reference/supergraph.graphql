@@ -8195,6 +8195,8 @@ enum IdleCheckerInputType
   @join__type(graph: STRAWBERRY)
 {
   SESSION_LIFETIME @join__enumValue(graph: STRAWBERRY)
+  NETWORK_TIMEOUT @join__enumValue(graph: STRAWBERRY)
+  UTILIZATION @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -8260,13 +8262,15 @@ input IdleCheckerScopeTypeFilter
 }
 
 """
-Added in 26.8.0. Contains the settings used by an idle checker implementation. This API version exposes session-lifetime settings only.
+Added in 26.8.0. Contains the settings used by an idle checker implementation.
 """
 type IdleCheckerSpec
   @join__type(graph: STRAWBERRY)
 {
   type: IdleCheckerType!
-  sessionLifetime: SessionLifetimeIdleCheckerSpec!
+  sessionLifetime: SessionLifetimeIdleCheckerSpec
+  network: NetworkTimeoutIdleCheckerSpec
+  utilization: UtilizationIdleCheckerSpec
 }
 
 """
@@ -8277,6 +8281,12 @@ input IdleCheckerSpecInput
 {
   """Session-lifetime checker settings."""
   sessionLifetime: SessionLifetimeIdleCheckerSpecInput
+
+  """Network-timeout checker settings."""
+  network: NetworkTimeoutIdleCheckerSpecInput
+
+  """Utilization checker settings."""
+  utilization: UtilizationIdleCheckerSpecInput
 }
 
 """
@@ -8286,6 +8296,8 @@ enum IdleCheckerType
   @join__type(graph: STRAWBERRY)
 {
   SESSION_LIFETIME @join__enumValue(graph: STRAWBERRY)
+  NETWORK_TIMEOUT @join__enumValue(graph: STRAWBERRY)
+  UTILIZATION @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -13040,6 +13052,23 @@ type NetworkNode implements Node
   options: JSONString @join__field(graph: GRAPHENE)
   created_at: DateTime @join__field(graph: GRAPHENE)
   updated_at: DateTime @join__field(graph: GRAPHENE)
+}
+
+"""
+Added in 26.8.0. Configures the maximum period without active network traffic.
+"""
+type NetworkTimeoutIdleCheckerSpec
+  @join__type(graph: STRAWBERRY)
+{
+  maxNetworkInactivitySeconds: Int!
+}
+
+"""Added in 26.8.0. Supplies settings for a network-timeout checker."""
+input NetworkTimeoutIdleCheckerSpecInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Maximum network inactivity period in seconds."""
+  maxNetworkInactivitySeconds: Int!
 }
 
 """
@@ -22830,6 +22859,46 @@ input UserWeightInputItem
   Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
   """
   weight: Decimal = null
+}
+
+"""
+Added in 26.8.0. Configures how long a session may remain underutilized.
+"""
+type UtilizationIdleCheckerSpec
+  @join__type(graph: STRAWBERRY)
+{
+  maxUnderutilizedDurationSeconds: Int!
+  threshold: UtilizationIdleCheckerThreshold!
+}
+
+"""Added in 26.8.0. Supplies settings for a utilization checker."""
+input UtilizationIdleCheckerSpecInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Maximum underutilized duration in seconds."""
+  maxUnderutilizedDurationSeconds: Int!
+
+  """Preset-backed utilization threshold."""
+  threshold: UtilizationIdleCheckerThresholdInput!
+}
+
+"""Added in 26.8.0. Defines a preset-backed utilization threshold."""
+type UtilizationIdleCheckerThreshold
+  @join__type(graph: STRAWBERRY)
+{
+  presetId: UUID!
+  threshold: Decimal!
+}
+
+"""Added in 26.8.0. Supplies a preset-backed utilization threshold."""
+input UtilizationIdleCheckerThresholdInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Prometheus query preset ID."""
+  presetId: UUID!
+
+  """Underutilization threshold."""
+  threshold: Decimal!
 }
 
 """

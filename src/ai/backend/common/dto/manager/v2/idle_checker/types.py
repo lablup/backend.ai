@@ -9,10 +9,14 @@ from ai.backend.common.api_handlers import BaseRequestModel
 
 class IdleCheckerTypeDTO(StrEnum):
     SESSION_LIFETIME = "session_lifetime"
+    NETWORK_TIMEOUT = "network_timeout"
+    UTILIZATION = "utilization"
 
 
 class IdleCheckerInputTypeDTO(StrEnum):
     SESSION_LIFETIME = "session_lifetime"
+    NETWORK_TIMEOUT = "network_timeout"
+    UTILIZATION = "utilization"
 
 
 class CheckerTypeFilter(BaseRequestModel):

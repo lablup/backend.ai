@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Self
 
 from pydantic import ConfigDict, Field, model_validator
@@ -13,6 +14,7 @@ from ai.backend.common.dto.manager.v2.idle_checker.types import (
     IdleCheckerOrderField,
 )
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
+from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.types import SessionTypes
 
 
@@ -20,14 +22,33 @@ class SessionLifetimeSpecInputDTO(BaseRequestModel):
     max_lifetime_seconds: int = Field(ge=1)
 
 
+class NetworkTimeoutSpecInputDTO(BaseRequestModel):
+    max_network_inactivity_seconds: int = Field(ge=1)
+
+
+class UtilizationThresholdInputDTO(BaseRequestModel):
+    preset_id: PrometheusQueryPresetID
+    threshold: Decimal
+
+
+class UtilizationSpecInputDTO(BaseRequestModel):
+    max_underutilized_duration_seconds: int = Field(ge=1)
+    threshold: UtilizationThresholdInputDTO
+
+
 class IdleCheckerSpecInputDTO(BaseRequestModel):
     model_config = ConfigDict(extra="forbid")
 
     session_lifetime: SessionLifetimeSpecInputDTO | None = Field(default=None)
+    network: NetworkTimeoutSpecInputDTO | None = Field(default=None)
+    utilization: UtilizationSpecInputDTO | None = Field(default=None)
 
     @model_validator(mode="after")
     def _validate_exactly_one_spec(self) -> Self:
-        if self.session_lifetime is None:
+        spec_count = sum(
+            spec is not None for spec in (self.session_lifetime, self.network, self.utilization)
+        )
+        if spec_count != 1:
             raise ValueError("Exactly one idle checker specification must be provided")
         return self
 
@@ -39,6 +60,17 @@ class CreateIdleCheckerInput(BaseRequestModel):
     target_session_types: list[SessionTypes] = Field(min_length=1)
     initial_grace_period_seconds: int = Field(default=0, ge=0)
     checker_spec: IdleCheckerSpecInputDTO
+
+    @model_validator(mode="after")
+    def _validate_checker_type_matches_spec(self) -> Self:
+        matches = {
+            IdleCheckerInputTypeDTO.SESSION_LIFETIME: self.checker_spec.session_lifetime,
+            IdleCheckerInputTypeDTO.NETWORK_TIMEOUT: self.checker_spec.network,
+            IdleCheckerInputTypeDTO.UTILIZATION: self.checker_spec.utilization,
+        }
+        if matches[self.checker_type] is None:
+            raise ValueError("checker_type must match the provided idle checker specification")
+        return self
 
 
 class UpdateIdleCheckerInput(BaseRequestModel):

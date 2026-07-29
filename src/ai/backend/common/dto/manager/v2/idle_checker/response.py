@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.v2.idle_checker.types import IdleCheckerTypeDTO
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
+from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.types import SessionTypes
 
 
@@ -14,9 +16,25 @@ class SessionLifetimeSpecInfo(BaseResponseModel):
     max_lifetime_seconds: int
 
 
+class NetworkTimeoutSpecInfo(BaseResponseModel):
+    max_network_inactivity_seconds: int
+
+
+class UtilizationThresholdInfo(BaseResponseModel):
+    preset_id: PrometheusQueryPresetID
+    threshold: Decimal
+
+
+class UtilizationSpecInfo(BaseResponseModel):
+    max_underutilized_duration_seconds: int
+    threshold: UtilizationThresholdInfo
+
+
 class IdleCheckerSpecInfo(BaseResponseModel):
     type: IdleCheckerTypeDTO
-    session_lifetime: SessionLifetimeSpecInfo
+    session_lifetime: SessionLifetimeSpecInfo | None = Field(default=None)
+    network: NetworkTimeoutSpecInfo | None = Field(default=None)
+    utilization: UtilizationSpecInfo | None = Field(default=None)
 
 
 class IdleCheckerNode(BaseResponseModel):
