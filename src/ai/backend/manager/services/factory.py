@@ -1,5 +1,5 @@
 from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
@@ -465,10 +465,13 @@ def create_services(args: ServiceArgs) -> Services:
 
 def create_processors(
     args: ProcessorArgs,
-    action_monitors: list[ActionMonitor],
+    monitors: ActionMonitors,
     validators: ActionValidators,
 ) -> Processors:
     services = create_services(args.service_args)
+    # Legacy BaseAction-era packages consume the flat monitor list; packages migrated
+    # to the pure-ABC frameworks pick the per-type monitors from `monitors` instead.
+    action_monitors = monitors.legacy
     return Processors(
         agent=AgentProcessors(services.agent, action_monitors, validators),
         app_config=AppConfigProcessors(services.app_config, action_monitors),
