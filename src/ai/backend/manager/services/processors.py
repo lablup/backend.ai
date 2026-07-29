@@ -145,6 +145,12 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.group.service import GroupService
     from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
     from ai.backend.manager.services.idle_checker.service import IdleCheckerService
+    from ai.backend.manager.services.idle_checker_assignment.processors import (
+        IdleCheckerAssignmentProcessors,
+    )
+    from ai.backend.manager.services.idle_checker_assignment.service import (
+        IdleCheckerAssignmentService,
+    )
     from ai.backend.manager.services.image.processors import ImageProcessors
     from ai.backend.manager.services.image.service import ImageService
     from ai.backend.manager.services.keypair_resource_policy.processors import (
@@ -446,6 +452,7 @@ class Services:
     deployment: DeploymentService
     storage_namespace: StorageNamespaceService
     audit_log: AuditLogService
+    idle_checker_assignment: IdleCheckerAssignmentService
     scheduling_history: SchedulingHistoryService
     service_catalog: ServiceCatalogService
     template: TemplateService
@@ -517,6 +524,7 @@ class Processors(AbstractProcessorPackage):
     deployment: DeploymentProcessors
     storage_namespace: StorageNamespaceProcessors
     audit_log: AuditLogProcessors
+    idle_checker_assignment: IdleCheckerAssignmentProcessors
     scheduling_history: SchedulingHistoryProcessors
     service_catalog: ServiceCatalogProcessors
     template: TemplateProcessors
@@ -581,6 +589,7 @@ class Processors(AbstractProcessorPackage):
             *self.deployment.supported_actions(),
             *self.storage_namespace.supported_actions(),
             *self.audit_log.supported_actions(),
+            *self.idle_checker_assignment.supported_actions(),
             *self.scheduling_history.supported_actions(),
             *self.service_catalog.supported_actions(),
             *self.template.supported_actions(),

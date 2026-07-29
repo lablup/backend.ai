@@ -18,7 +18,6 @@ __all__ = (
     "IdleCheckerAssignmentNotFound",
     "IdleCheckerAssignmentScopeNotFound",
     "IdleCheckerNotFound",
-    "InvalidIdleCheckerAssignmentScopeId",
 )
 
 
@@ -47,17 +46,4 @@ class IdleCheckerAssignmentAlreadyExists(BackendAIError, web.HTTPConflict):
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.CREATE,
             error_detail=ErrorDetail.CONFLICT,
-        )
-
-
-class InvalidIdleCheckerAssignmentScopeId(BackendAIError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/invalid-idle-checker-assignment-scope-id"
-    error_title = "The scope identifier must be a UUID."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.GENERIC,
-            error_detail=ErrorDetail.BAD_REQUEST,
         )

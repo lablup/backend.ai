@@ -2730,22 +2730,22 @@ type CreateHuggingFaceRegistryPayload {
 """
 Added in 26.8.0. Binds a global idle checker to a single scope. Requires permission on the given scope (subject to RBAC).
 """
-input CreateIdleCheckerBindingInput {
+input CreateIdleCheckerAssignmentInput {
   """Scope the checker is bound to."""
   scope: IdleCheckerScopeRef!
 
   """Idle checker to bind."""
   idleCheckerId: UUID!
 
-  """Whether the binding participates in idle checking."""
+  """Whether the assignment participates in idle checking."""
   enabled: Boolean! = true
 }
 
 """
-Added in 26.8.0. Returns the created idle checker binding. The node contains the server-assigned identifier and timestamps.
+Added in 26.8.0. Returns the created idle checker assignment. The node contains the server-assigned identifier and timestamps.
 """
-type CreateIdleCheckerBindingPayload {
-  idleCheckerBinding: IdleCheckerBinding!
+type CreateIdleCheckerAssignmentPayload {
+  idleCheckerAssignment: IdleCheckerAssignment!
 }
 
 """Added in 26.8.0. Defines a reusable global idle checker specification."""
@@ -5429,9 +5429,9 @@ type IdleChecker implements Node {
 }
 
 """
-Added in 26.8.0. Represents one association between a scope and a reusable idle checker. The scope and checker are the binding's immutable identity; the enabled flag controls whether the association participates.
+Added in 26.8.0. Represents one association between a scope and a reusable idle checker. The scope and checker are the assignment's immutable identity; the enabled flag controls whether the association participates.
 """
-type IdleCheckerBinding implements Node {
+type IdleCheckerAssignment implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
@@ -5439,12 +5439,12 @@ type IdleCheckerBinding implements Node {
   scopeType: IdleCheckerScopeType!
 
   """Scope identifier, interpreted according to the scope type."""
-  scopeId: String!
+  scopeId: UUID!
 
   """ID of the bound idle checker."""
   idleCheckerId: UUID!
 
-  """Whether the binding participates in idle checking."""
+  """Whether the assignment participates in idle checking."""
   enabled: Boolean!
 
   """Creation timestamp."""
@@ -5458,37 +5458,37 @@ type IdleCheckerBinding implements Node {
 }
 
 """
-Added in 26.8.0. Provides a paginated collection of idle checker bindings. The count reports all records matching the supplied filter.
+Added in 26.8.0. Provides a paginated collection of idle checker assignments. The count reports all records matching the supplied filter.
 """
-type IdleCheckerBindingConnection {
+type IdleCheckerAssignmentConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
 
   """Contains the nodes in this connection"""
-  edges: [IdleCheckerBindingEdge!]!
+  edges: [IdleCheckerAssignmentEdge!]!
 
-  """Total number of matching idle checker bindings."""
+  """Total number of matching idle checker assignments."""
   count: Int!
 }
 
 """An edge in a connection."""
-type IdleCheckerBindingEdge {
+type IdleCheckerAssignmentEdge {
   """A cursor for use in pagination"""
   cursor: String!
 
   """The item at the end of the edge"""
-  node: IdleCheckerBinding!
+  node: IdleCheckerAssignment!
 }
 
 """
-Added in 26.8.0. Defines criteria for searching idle checker bindings. Nested logical fields can combine or negate multiple criteria.
+Added in 26.8.0. Defines criteria for searching idle checker assignments. Nested logical fields can combine or negate multiple criteria.
 """
-input IdleCheckerBindingFilter {
+input IdleCheckerAssignmentFilter {
   """Scope type filter."""
   scopeType: IdleCheckerScopeTypeFilter = null
 
   """Scope identifier filter."""
-  scopeId: StringFilter = null
+  scopeId: UUIDFilter = null
 
   """Bound idle checker ID filter."""
   idleCheckerId: UUIDFilter = null
@@ -5503,30 +5503,30 @@ input IdleCheckerBindingFilter {
   updatedAt: DateTimeFilter = null
 
   """Match all nested filters."""
-  AND: [IdleCheckerBindingFilter!] = null
+  AND: [IdleCheckerAssignmentFilter!] = null
 
   """Match any nested filter."""
-  OR: [IdleCheckerBindingFilter!] = null
+  OR: [IdleCheckerAssignmentFilter!] = null
 
   """Negate nested filters."""
-  NOT: [IdleCheckerBindingFilter!] = null
+  NOT: [IdleCheckerAssignmentFilter!] = null
 }
 
 """
-Added in 26.8.0. Defines one ordering rule for an idle checker binding search. Multiple rules are applied in the order they are supplied.
+Added in 26.8.0. Defines one ordering rule for an idle checker assignment search. Multiple rules are applied in the order they are supplied.
 """
-input IdleCheckerBindingOrderBy {
+input IdleCheckerAssignmentOrderBy {
   """Order field."""
-  field: IdleCheckerBindingOrderField!
+  field: IdleCheckerAssignmentOrderField!
 
   """Order direction."""
   direction: OrderDirection! = ASC
 }
 
 """
-Added in 26.8.0. Lists fields that can determine idle checker binding result order. Each field is paired with an ascending or descending direction.
+Added in 26.8.0. Lists fields that can determine idle checker assignment result order. Each field is paired with an ascending or descending direction.
 """
-enum IdleCheckerBindingOrderField {
+enum IdleCheckerAssignmentOrderField {
   SCOPE_TYPE
   ENABLED
   CREATED_AT
@@ -5534,9 +5534,9 @@ enum IdleCheckerBindingOrderField {
 }
 
 """
-Added in 26.8.0. Scope for the scoped idle checker binding query. All items are OR'd; the item list must not be empty.
+Added in 26.8.0. Scope for the scoped idle checker assignment query. All items are OR'd; the item list must not be empty.
 """
-input IdleCheckerBindingScope {
+input IdleCheckerAssignmentScope {
   """Scope-tagged items (OR across all items)."""
   items: [IdleCheckerScopeRef!]!
 }
@@ -5626,11 +5626,11 @@ input IdleCheckerScopeRef {
   scopeType: IdleCheckerScopeType!
 
   """Scope identifier, interpreted according to the scope type."""
-  scopeId: String!
+  scopeId: UUID!
 }
 
 """
-Added in 26.8.0. Identifies the kind of scope an idle checker binding applies to. The value determines how the scope identifier is interpreted.
+Added in 26.8.0. Identifies the kind of scope an idle checker assignment applies to. The value determines how the scope identifier is interpreted.
 """
 enum IdleCheckerScopeType {
   DOMAIN
@@ -5639,7 +5639,7 @@ enum IdleCheckerScopeType {
 }
 
 """
-Added in 26.8.0. Filters idle checker bindings by their scope type. Use either an exact value or a list of accepted values.
+Added in 26.8.0. Filters idle checker assignments by their scope type. Use either an exact value or a list of accepted values.
 """
 input IdleCheckerScopeTypeFilter {
   """Exact scope type."""
@@ -7920,17 +7920,17 @@ type Mutation {
   """
   Added in 26.8.0. Binds a global idle checker to a scope (super admin only).
   """
-  adminCreateIdleCheckerBinding(input: CreateIdleCheckerBindingInput!): CreateIdleCheckerBindingPayload!
+  adminCreateIdleCheckerAssignment(input: CreateIdleCheckerAssignmentInput!): CreateIdleCheckerAssignmentPayload!
 
   """
-  Added in 26.8.0. Updates an idle checker binding's options. Requires permission on the binding's scope (subject to RBAC).
+  Added in 26.8.0. Updates an idle checker assignment's enabled state. Requires permission on the assignment's scope (subject to RBAC).
   """
-  updateIdleCheckerBinding(input: UpdateIdleCheckerBindingInput!): UpdateIdleCheckerBindingPayload!
+  updateIdleCheckerAssignment(input: UpdateIdleCheckerAssignmentInput!): UpdateIdleCheckerAssignmentPayload!
 
   """
-  Added in 26.8.0. Permanently removes an idle checker binding. Requires permission on the binding's scope (subject to RBAC).
+  Added in 26.8.0. Permanently removes an idle checker assignment. Requires permission on the assignment's scope (subject to RBAC).
   """
-  purgeIdleCheckerBinding(input: PurgeIdleCheckerBindingInput!): PurgeIdleCheckerBindingPayload!
+  purgeIdleCheckerAssignment(input: PurgeIdleCheckerAssignmentInput!): PurgeIdleCheckerAssignmentPayload!
 
   """
   Added in 26.7.0. Register a new app config allow-list entry (super admin only).
@@ -10162,16 +10162,16 @@ type PurgeDomainPayload {
   purged: Boolean!
 }
 
-"""Added in 26.8.0. Identifies the idle checker binding to purge."""
-input PurgeIdleCheckerBindingInput {
-  """Idle checker binding ID to purge."""
+"""Added in 26.8.0. Identifies the idle checker assignment to purge."""
+input PurgeIdleCheckerAssignmentInput {
+  """Idle checker assignment ID to purge."""
   id: UUID!
 }
 
 """
-Added in 26.8.0. Confirms that an idle checker binding was permanently removed. The returned identifier refers to the deleted binding.
+Added in 26.8.0. Confirms that an idle checker assignment was permanently removed. The returned identifier refers to the deleted assignment.
 """
-type PurgeIdleCheckerBindingPayload {
+type PurgeIdleCheckerAssignmentPayload {
   id: UUID!
 }
 
@@ -10299,14 +10299,14 @@ type Query {
   adminIdleCheckers(filter: IdleCheckerFilter = null, orderBy: [IdleCheckerOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): IdleCheckerConnection!
 
   """
-  Added in 26.8.0. Searches idle checker bindings across all scopes with filtering, ordering, and pagination (super admin only).
+  Added in 26.8.0. Searches idle checker assignments across all scopes with filtering, ordering, and pagination (super admin only).
   """
-  adminIdleCheckerBindings(filter: IdleCheckerBindingFilter = null, orderBy: [IdleCheckerBindingOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): IdleCheckerBindingConnection!
+  adminIdleCheckerAssignments(filter: IdleCheckerAssignmentFilter = null, orderBy: [IdleCheckerAssignmentOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): IdleCheckerAssignmentConnection!
 
   """
-  Added in 26.8.0. Searches idle checker bindings within the given scopes. All scope items are OR'd, at least one item is required, and each item requires permission on that scope (subject to RBAC).
+  Added in 26.8.0. Searches idle checker assignments within the given scopes. All scope items are OR'd, at least one item is required, and each item requires permission on that scope (subject to RBAC).
   """
-  scopedIdleCheckerBindings(scope: IdleCheckerBindingScope!, filter: IdleCheckerBindingFilter = null, orderBy: [IdleCheckerBindingOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): IdleCheckerBindingConnection!
+  scopedIdleCheckerAssignments(scope: IdleCheckerAssignmentScope!, filter: IdleCheckerAssignmentFilter = null, orderBy: [IdleCheckerAssignmentOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): IdleCheckerAssignmentConnection!
 
   """
   Added in 26.8.0. Read the fragments written at one scope for the given config names — the current values, to inspect before editing them. Answered position by position, null where the scope holds no fragment for that name. RBAC-authorized at that scope.
@@ -14902,10 +14902,10 @@ type UpdateHuggingFaceRegistryPayload {
 }
 
 """
-Added in 26.8.0. Updates an idle checker binding's enabled state. The bound scope and checker are immutable; rebind by purging and recreating.
+Added in 26.8.0. Updates an idle checker assignment's enabled state. The bound scope and checker are immutable; rebind by purging and recreating.
 """
-input UpdateIdleCheckerBindingInput {
-  """Idle checker binding ID to update."""
+input UpdateIdleCheckerAssignmentInput {
+  """Idle checker assignment ID to update."""
   id: UUID!
 
   """New enabled state."""
@@ -14913,10 +14913,10 @@ input UpdateIdleCheckerBindingInput {
 }
 
 """
-Added in 26.8.0. Returns the idle checker binding after an update is applied. The node reflects the complete persisted state, including unchanged fields.
+Added in 26.8.0. Returns the idle checker assignment after an update is applied. The node reflects the complete persisted state, including unchanged fields.
 """
-type UpdateIdleCheckerBindingPayload {
-  idleCheckerBinding: IdleCheckerBinding!
+type UpdateIdleCheckerAssignmentPayload {
+  idleCheckerAssignment: IdleCheckerAssignment!
 }
 
 """

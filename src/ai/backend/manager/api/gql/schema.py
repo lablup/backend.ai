@@ -166,12 +166,12 @@ from .idle_checker import (
     admin_purge_idle_checker,
     admin_update_idle_checker,
 )
-from .idle_checker_binding import (
-    admin_create_idle_checker_binding,
-    admin_idle_checker_bindings,
-    purge_idle_checker_binding,
-    scoped_idle_checker_bindings,
-    update_idle_checker_binding,
+from .idle_checker_assignment import (
+    admin_create_idle_checker_assignment,
+    admin_idle_checker_assignments,
+    purge_idle_checker_assignment,
+    scoped_idle_checker_assignments,
+    update_idle_checker_assignment,
 )
 from .image import (
     admin_image_aliases,
@@ -538,8 +538,8 @@ class Query:
     app_config_fragment = app_config_fragment
     admin_app_config_fragments = admin_app_config_fragments
     admin_idle_checkers = admin_idle_checkers
-    admin_idle_checker_bindings = admin_idle_checker_bindings
-    scoped_idle_checker_bindings = scoped_idle_checker_bindings
+    admin_idle_checker_assignments = admin_idle_checker_assignments
+    scoped_idle_checker_assignments = scoped_idle_checker_assignments
     scoped_app_config_fragments_by_names = scoped_app_config_fragments_by_names
     my_app_config_fragments_by_names = my_app_config_fragments_by_names
     artifact = artifact
@@ -761,9 +761,9 @@ class Mutation:
     admin_create_idle_checker = admin_create_idle_checker
     admin_update_idle_checker = admin_update_idle_checker
     admin_purge_idle_checker = admin_purge_idle_checker
-    admin_create_idle_checker_binding = admin_create_idle_checker_binding
-    update_idle_checker_binding = update_idle_checker_binding
-    purge_idle_checker_binding = purge_idle_checker_binding
+    admin_create_idle_checker_assignment = admin_create_idle_checker_assignment
+    update_idle_checker_assignment = update_idle_checker_assignment
+    purge_idle_checker_assignment = purge_idle_checker_assignment
     admin_create_app_config_allow_list = admin_create_app_config_allow_list
     admin_purge_app_config_allow_list = admin_purge_app_config_allow_list
     admin_update_app_config_allow_list = admin_update_app_config_allow_list
