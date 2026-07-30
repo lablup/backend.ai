@@ -22,7 +22,7 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     SchedulerTypeDTO,
 )
 from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInfo
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import PreemptionOrder
 
 __all__ = (
@@ -52,7 +52,7 @@ __all__ = (
 class ResourceGroupNode(BaseResponseModel):
     """Node model representing a resource group entity."""
 
-    id: UUID = Field(description="Resource group UUID.")
+    id: ResourceGroupID = Field(description="Resource group UUID.")
     name: str = Field(description="Unique name of the resource group.")
     domain_name: str = Field(description="Domain the resource group belongs to.")
     description: str | None = Field(
@@ -99,7 +99,7 @@ class UpdateResourceGroupPayload(BaseResponseModel):
 class DeleteResourceGroupPayload(BaseResponseModel):
     """Payload for resource group deletion mutation result."""
 
-    id: str = Field(description="Name of the deleted resource group.")
+    id: ResourceGroupID = Field(description="UUID of the deleted resource group.")
 
 
 class AdminSearchResourceGroupsPayload(BaseResponseModel):
@@ -181,7 +181,7 @@ class ResourceGroupSchedulerConfigInfo(BaseResponseModel):
 class ResourceGroupDetailNode(BaseResponseModel):
     """Detail node DTO for a resource group (GQL-layer representation)."""
 
-    id: str = Field(description="Resource group name used as the relay node ID.")
+    id: ResourceGroupID = Field(description="Resource group UUID used as the relay node ID.")
     name: str = Field(description="Unique name of the resource group.")
     status: ResourceGroupStatusInfo = Field(
         description="Status information including active and public flags."

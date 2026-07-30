@@ -5718,8 +5718,8 @@ type DeleteReservoirRegistryPayload
 type DeleteResourceGroupPayload
   @join__type(graph: STRAWBERRY)
 {
-  """Name of the deleted resource group."""
-  id: String!
+  """UUID of the deleted resource group."""
+  id: UUID!
 }
 
 type DeleteResourcePreset

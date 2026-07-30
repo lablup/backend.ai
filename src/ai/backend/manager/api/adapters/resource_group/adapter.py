@@ -61,7 +61,7 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     ResourceGroupOrderField,
     SchedulerTypeDTO,
 )
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import PreemptionMode, PreemptionOrder, SlotQuantity
 from ai.backend.manager.api.adapter_options.deployment.options import (
     deployment_options_from_input,
@@ -215,8 +215,8 @@ class ResourceGroupAdapter(BaseAdapter):
     Bridges CreateResourceGroupInput / UpdateResourceGroupInput DTOs to
     ScalingGroup Processor actions and converts results back to Pydantic DTOs.
 
-    Note: ScalingGroupData uses ``name`` (str) as primary key.  Callers that
-        need an opaque identifier should use the ``name`` field instead.
+    Note: ScalingGroupData uses ``name`` (str) as primary key, while the
+        exposed ``id`` field carries the resource group UUID.
     """
 
     def __init__(
@@ -261,6 +261,27 @@ class ResourceGroupAdapter(BaseAdapter):
         return [
             self._data_to_detail_node(rg_map[name]) if name in rg_map else None for name in names
         ]
+
+    async def batch_load_by_ids(
+        self, ids: Sequence[ResourceGroupID]
+    ) -> list[ResourceGroupDetailNode | None]:
+        """Batch load resource groups by UUID for DataLoader use.
+
+        Returns ResourceGroupDetailNode items in the same order as the input ids list.
+        """
+        if not ids:
+            return []
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(ids)),
+            conditions=[ScalingGroupConditions.by_ids(ids)],
+        )
+        action_result = (
+            await self._processors.scaling_group.search_scaling_groups.wait_for_complete(
+                SearchScalingGroupsAction(querier=querier)
+            )
+        )
+        rg_map = {sg.id: sg for sg in action_result.scaling_groups}
+        return [self._data_to_detail_node(rg_map[id_]) if id_ in rg_map else None for id_ in ids]
 
     async def search(self, input: AdminSearchResourceGroupsInput) -> ResourceGroupSearchPayload:
         """Search resource groups with filters, ordering, and pagination."""
@@ -775,7 +796,7 @@ class ResourceGroupAdapter(BaseAdapter):
     def _data_to_detail_node(data: ScalingGroupData) -> ResourceGroupDetailNode:
         """Convert ScalingGroupData to ResourceGroupDetailNode DTO for GQL layer."""
         return ResourceGroupDetailNode(
-            id=data.name,
+            id=data.id,
             name=data.name,
             status=ResourceGroupStatusInfo(
                 is_active=data.status.is_active,
