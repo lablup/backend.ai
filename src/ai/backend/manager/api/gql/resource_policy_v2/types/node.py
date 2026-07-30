@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.resource_policy.response import (
     ProjectResourcePolicyNode,
     UserResourcePolicyNode,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.common_types import (
     BinarySizeInfoGQL,
     ResourceLimitEntryGQL,
@@ -60,6 +61,15 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
     max_concurrent_sessions: int = gql_field(description="Maximum concurrent sessions allowed.")
     max_pending_session_count: int | None = gql_field(
         description="Maximum pending sessions. Null means unlimited."
+    )
+    max_priority: int | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Highest scheduling priority a session created with this policy may declare."
+                " Null means uncapped."
+            ),
+        ),
     )
     max_pending_session_resource_slots: list[ResourceLimitEntryGQL] | None = gql_field(
         description="Maximum resource slots for pending sessions. Null means unlimited."
