@@ -61,13 +61,14 @@ class SessionStatus(CIStrEnum):
     CANCELLED = "CANCELLED"
 
     @classmethod
-    def kernel_awaiting_statuses(cls) -> set[SessionStatus]:
-        return {
+    @lru_cache(maxsize=1)
+    def kernel_awaiting_statuses(cls) -> frozenset[SessionStatus]:
+        return frozenset((
             cls.PREPARING,
             cls.PULLING,
             cls.CREATING,
             cls.TERMINATING,
-        }
+        ))
 
     @classmethod
     @lru_cache(maxsize=1)
@@ -117,17 +118,6 @@ class SessionStatus(CIStrEnum):
                 cls.ERROR,
             )
         )
-
-    @classmethod
-    @lru_cache(maxsize=1)
-    def preemptable_statuses(cls) -> frozenset[SessionStatus]:
-        """Return statuses that can transition to PREEMPTED.
-
-        Only RUNNING sessions are eligible preemption victims (BEP-1055).
-        Sessions still being provisioned or already terminating are never
-        marked PREEMPTED, so those source statuses are rejected.
-        """
-        return frozenset((cls.RUNNING,))
 
     @classmethod
     @lru_cache(maxsize=1)

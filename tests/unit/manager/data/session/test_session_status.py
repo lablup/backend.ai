@@ -11,21 +11,6 @@ class TestPreemptedStatus:
         assert SessionStatus("PREEMPTED") is SessionStatus.PREEMPTED
         assert SessionStatus.PREEMPTED.value == "PREEMPTED"
 
-    def test_only_running_can_transition_to_preempted(self) -> None:
-        """RUNNING -> PREEMPTED is allowed; every other source is rejected."""
-        assert SessionStatus.preemptable_statuses() == frozenset((SessionStatus.RUNNING,))
-        # Illegal sources are not eligible to be marked PREEMPTED.
-        for illegal_source in (
-            SessionStatus.PENDING,
-            SessionStatus.SCHEDULED,
-            SessionStatus.PREPARING,
-            SessionStatus.CREATING,
-            SessionStatus.TERMINATING,
-            SessionStatus.TERMINATED,
-            SessionStatus.PREEMPTED,
-        ):
-            assert illegal_source not in SessionStatus.preemptable_statuses()
-
     def test_preempted_can_transition_to_terminating(self) -> None:
         """PREEMPTED -> TERMINATING is allowed (terminate mode)."""
         assert SessionStatus.PREEMPTED in SessionStatus.terminatable_statuses()
