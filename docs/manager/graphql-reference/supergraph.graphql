@@ -5718,8 +5718,8 @@ type DeleteReservoirRegistryPayload
 type DeleteResourceGroupPayload
   @join__type(graph: STRAWBERRY)
 {
-  """Name of the deleted resource group."""
-  id: String!
+  """UUID of the deleted resource group."""
+  id: UUID!
 }
 
 type DeleteResourcePreset
@@ -16927,7 +16927,9 @@ input ResourceConfigInput
   resourceOpts: ResourceOptsInput = null
 }
 
-"""Added in 26.1.0. Resource group with structured configuration"""
+"""
+Added in 26.1.0. Resource group with structured configuration. Since 26.8.0, the node id value is the resource group UUID instead of the name.
+"""
 type ResourceGroup implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
@@ -238,7 +239,7 @@ class TestResourceGroupGQLResourceInfoResolver:
     def resource_group_gql(self) -> ResourceGroupGQL:
         """Create ResourceGroupGQL instance for testing."""
         return ResourceGroupGQL(
-            id="test-group",
+            id=uuid.uuid4(),
             name="test-group",
             status=ResourceGroupStatusGQL.from_pydantic(
                 ResourceGroupStatusInfo(is_active=True, is_public=True)
