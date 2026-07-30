@@ -297,7 +297,7 @@ class ResourcePolicyAdapter(BaseAdapter):
                 else TriState.nullify()
                 if input.max_pending_session_resource_slots is None
                 else TriState.update(
-                    self._entries_to_resource_slot_dict(input.max_pending_session_resource_slots)
+                    self._entries_to_resource_slot(input.max_pending_session_resource_slots)
                 )
             ),
             max_concurrent_sftp_sessions=(
