@@ -21056,9 +21056,9 @@ input UpdateKeypairResourcePolicyInput
   maxPendingSessionCount: Int = null
 
   """
-  Added in 26.8.0. Updated max scheduling priority. Omit to keep the current value; set to null to clear (uncapped).
+  Added in 26.8.0. Updated max scheduling priority. Set to null to clear (uncapped).
   """
-  maxPriority: Int
+  maxPriority: Int = null
 
   """Updated max pending session resource slots."""
   maxPendingSessionResourceSlots: [ResourceSlotEntryInput!] = null

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
     CreateKeypairResourcePolicyInput as CreateKeypairResourcePolicyInputDTO,
 )
@@ -144,12 +143,9 @@ class UpdateKeypairResourcePolicyInputGQL(PydanticInputMixin[UpdateKeypairResour
     max_priority: int | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
-            description=(
-                "Updated max scheduling priority."
-                " Omit to keep the current value; set to null to clear (uncapped)."
-            ),
+            description="Updated max scheduling priority. Set to null to clear (uncapped).",
         ),
-        default=SENTINEL,
+        default=UNSET,
     )
     max_pending_session_resource_slots: list[ResourceSlotEntryInputGQL] | None = gql_field(
         default=UNSET, description="Updated max pending session resource slots."
