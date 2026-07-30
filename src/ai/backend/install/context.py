@@ -1110,8 +1110,6 @@ class Context(metaclass=ABCMeta):
                 if halfstack.redis_password:
                     redis_table["password"] = halfstack.redis_password
             else:
-                if not halfstack.redis_addr:
-                    raise RuntimeError("redis_addr must be configured")
                 redis_table = tomlkit.table()
                 redis_table["addr"] = (
                     f"{halfstack.redis_addr.face.host}:{halfstack.redis_addr.face.port}"

@@ -447,7 +447,9 @@ def mark_local_images_with_missing_registry_id() -> None:
     get_images_with_blank_registry_id = sa.select(images_table).where(
         images_table.c.registry_id.is_(None)
     )
-    images_with_missing_registry_id = db_connection.execute(get_images_with_blank_registry_id)
+    images_with_missing_registry_id = db_connection.execute(
+        get_images_with_blank_registry_id
+    ).fetchall()
 
     if not images_with_missing_registry_id:
         return

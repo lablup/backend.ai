@@ -45,7 +45,6 @@ from ai.backend.storage.data.storage.types import ImportStepContext, StorageTarg
 from ai.backend.storage.errors import (
     HuggingFaceAPIError,
     HuggingFaceModelNotFoundError,
-    ObjectStorageConfigInvalidError,
     RegistryNotFoundError,
     StorageStepRequiredStepNotProvided,
 )
@@ -292,7 +291,7 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
             self._download_complete = True
 
             # Cancel and wait for progress task
-            if self._progress_task:
+            if self._progress_task is not None:
                 self._progress_task.cancel()
                 try:
                     await self._progress_task
@@ -791,11 +790,6 @@ class HuggingFaceDownloadStep(ImportStep[None]):
 
     @override
     async def execute(self, context: ImportStepContext, input_data: None) -> DownloadStepResult:
-        if not context.storage_pool:
-            raise ObjectStorageConfigInvalidError(
-                "Storage pool not configured for import operations"
-            )
-
         registry_config = self._registry_configs.get(context.registry_name)
         if not registry_config:
             raise RegistryNotFoundError(f"Unknown registry: {context.registry_name}")

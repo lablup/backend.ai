@@ -7,12 +7,13 @@ from collections import Counter, defaultdict
 from collections.abc import AsyncIterator, Collection, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from decimal import Decimal
 from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -2503,13 +2504,14 @@ class DeploymentDBSource:
         spec being deployed. No vfolder re-reads at runtime.
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
-            endpoint = await EndpointRow.get(
-                db_sess,
-                endpoint_id,
-                load_revisions=True,
-            )
-            if not endpoint:
-                raise EndpointNotFound(str(endpoint_id))
+            try:
+                endpoint = await EndpointRow.get(
+                    db_sess,
+                    endpoint_id,
+                    load_revisions=True,
+                )
+            except NoResultFound as e:
+                raise EndpointNotFound(str(endpoint_id)) from e
             active_rev = endpoint._find_active_revision()
             if active_rev is None or active_rev.model_definition is None:
                 return None
@@ -3232,7 +3234,7 @@ class DeploymentDBSource:
                 id=row.id,
                 token=row.token,
                 expires_at=row.expires_at,
-                created_at=row.created_at or datetime.now(UTC),
+                created_at=row.created_at,
             )
 
     async def delete_access_token(

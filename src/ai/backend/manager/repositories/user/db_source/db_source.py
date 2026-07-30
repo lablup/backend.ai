@@ -44,7 +44,6 @@ from ai.backend.manager.errors.user import (
     KeyPairNotFound,
     UserConflict,
     UserCreationBadRequest,
-    UserCreationFailure,
     UserModificationBadRequest,
     UserModificationFailure,
     UserNotFound,
@@ -218,9 +217,6 @@ class UserDBSource:
             )
             result = await execute_rbac_entity_creator(db_session, rbac_creator)
             row = result.row
-
-            if not row:
-                raise UserCreationFailure("Failed to create user")
             created_user = row.to_data()
 
             # Create default keypair with RBAC scope association
@@ -290,7 +286,6 @@ class UserDBSource:
         Raises:
             UserCreationBadRequest: If the domain does not exist.
             UserConflict: If email or username already exists.
-            UserCreationFailure: If user creation fails.
         """
         spec = cast(UserCreatorSpec, item.creator.spec)
 
@@ -321,9 +316,6 @@ class UserDBSource:
         )
         result = await execute_rbac_entity_creator(db_session, rbac_creator)
         row = result.row
-        if not row:
-            raise UserCreationFailure(f"Failed to create user {spec.email}")
-
         created_user = row.to_data()
 
         # Create default keypair with RBAC scope association

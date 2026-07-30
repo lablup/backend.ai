@@ -1,5 +1,7 @@
 import sys
+from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import cast
 
 import click
 from tabulate import tabulate
@@ -159,8 +161,11 @@ def list(owner_access_key: str | None, domain: str | None, group: str | None) ->
     ]
     with Session() as session:
         try:
-            resp = session.Dotfile.list_dotfiles(
-                owner_access_key=owner_access_key, domain=domain, group=group
+            resp = cast(
+                Sequence[Mapping[str, str]],
+                session.Dotfile.list_dotfiles(
+                    owner_access_key=owner_access_key, domain=domain, group=group
+                ),
             )
             if not resp:
                 print("There is no dotfiles created yet.")

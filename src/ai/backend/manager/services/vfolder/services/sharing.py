@@ -38,8 +38,6 @@ class VFolderSharingService:
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
-        if not vfolder_data:
-            raise VFolderNotFound()
         if vfolder_data.ownership_type != VFolderOwnershipType.GROUP:
             raise VFolderNotFound("Only project folders are directly sharable.")
 
@@ -68,8 +66,6 @@ class VFolderSharingService:
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
-        if not vfolder_data:
-            raise VFolderNotFound()
         if vfolder_data.ownership_type != VFolderOwnershipType.GROUP:
             raise VFolderNotFound("Only project folders are directly unsharable.")
 

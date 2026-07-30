@@ -235,7 +235,7 @@ class WebSocketProxy:
         while True:
             msg, tp = await self.upstream_buffer.get()
             try:
-                if self.up_conn and not self.up_conn.closed:
+                if not self.up_conn.closed:
                     if tp == aiohttp.WSMsgType.TEXT:
                         assert isinstance(msg, str)  # noqa: S101
                         await self.up_conn.send_str(msg)
@@ -258,5 +258,4 @@ class WebSocketProxy:
         if self.upstream_buffer_task:
             self.upstream_buffer_task.cancel()
             await self.upstream_buffer_task
-        if self.up_conn:
-            await self.up_conn.close()
+        await self.up_conn.close()

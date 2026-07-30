@@ -25,7 +25,6 @@ from ai.backend.appproxy.common.types import (
 )
 from ai.backend.appproxy.common.utils import mime_match, pydantic_api_handler
 from ai.backend.appproxy.coordinator.api.types import ConfRequestModel
-from ai.backend.appproxy.coordinator.errors import CircuitCreationError
 from ai.backend.appproxy.coordinator.models import Circuit, Token, Worker, add_circuit
 from ai.backend.appproxy.coordinator.models.utils import execute_with_txn_retry
 from ai.backend.appproxy.coordinator.types import RootContext
@@ -193,9 +192,6 @@ async def proxy(
                 _update, root_ctx.db.begin_session, db_conn
             )
         log.debug("created new circuit {}", circuit.id)
-
-    if not circuit or not worker:
-        raise CircuitCreationError("Failed to create circuit and worker.")
 
     await root_ctx.circuit_manager.initialize_circuits([circuit])
     log.debug("Circuit is set (id:{})", str(circuit.id))

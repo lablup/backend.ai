@@ -475,10 +475,6 @@ async def create_vfolder(request: web.Request) -> web.Response:
             except QuotaScopeNotFoundError:
                 if not ctx.local_config.storage_proxy.auto_quota_scope_creation:
                     raise
-                if not params["vfid"].quota_scope_id:
-                    raise InvalidAPIParameters(
-                        "quota_scope_id is required for auto quota scope creation"
-                    ) from None
                 if initial_max_size_for_quota_scope := (params["options"] or {}).get(
                     "initial_max_size_for_quota_scope"
                 ):
