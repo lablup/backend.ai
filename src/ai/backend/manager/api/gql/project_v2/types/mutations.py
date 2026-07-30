@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-import strawberry
+from strawberry import UNSET
 
 from ai.backend.common.dto.manager.v2.group.request import (
     CreateProjectInput as CreateProjectInputDTO,
@@ -40,11 +40,6 @@ from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
-# NOTE: this shadows strawberry.UNSET and makes an omitted field arrive as an explicit
-# null. Fields whose adapter clears the column on null spell out strawberry.UNSET.
-UNSET = None
-
-
 # --- Inputs ---
 
 
@@ -60,12 +55,12 @@ class CreateProjectInputGQL(PydanticInputMixin[CreateProjectInputDTO]):
 
     name: str = gql_field(description="Project name. Must be unique within the domain.")
     domain_name: str = gql_field(description="Name of the domain this project belongs to.")
-    description: str | None = gql_field(default=UNSET, description="Optional description.")
+    description: str | None = gql_field(default=None, description="Optional description.")
     integration_name: str | None = gql_field(
-        default=UNSET, description="External integration identifier."
+        default=None, description="External integration identifier."
     )
     resource_policy: str | None = gql_field(
-        default=UNSET, description="Name of the resource policy to apply."
+        default=None, description="Name of the resource policy to apply."
     )
 
 
@@ -79,13 +74,13 @@ class CreateProjectInputGQL(PydanticInputMixin[CreateProjectInputDTO]):
 class UpdateProjectInputGQL(PydanticInputMixin[UpdateProjectInputDTO]):
     """Input for updating project information."""
 
-    name: str | None = gql_field(default=UNSET, description="New project name.")
-    description: str | None = gql_field(default=strawberry.UNSET, description="New description.")
-    is_active: bool | None = gql_field(default=UNSET, description="Updated active status.")
+    name: str | None = gql_field(default=None, description="New project name.")
+    description: str | None = gql_field(default=UNSET, description="New description.")
+    is_active: bool | None = gql_field(default=None, description="Updated active status.")
     integration_name: str | None = gql_field(
-        default=strawberry.UNSET, description="New external integration identifier."
+        default=UNSET, description="New external integration identifier."
     )
-    resource_policy: str | None = gql_field(default=UNSET, description="New resource policy name.")
+    resource_policy: str | None = gql_field(default=None, description="New resource policy name.")
 
 
 # --- Payloads ---

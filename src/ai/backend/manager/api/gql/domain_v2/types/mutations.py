@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import strawberry
+from strawberry import UNSET
 
 from ai.backend.common.dto.manager.v2.domain.request import (
     CreateDomainInput as CreateDomainInputDTO,
@@ -28,11 +28,6 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticOutputMixin
 
-# NOTE: this shadows strawberry.UNSET and makes an omitted field arrive as an explicit
-# null. Fields whose adapter clears the column on null spell out strawberry.UNSET.
-UNSET = None
-
-
 # --- Inputs ---
 
 
@@ -47,13 +42,13 @@ class CreateDomainInputGQL(PydanticInputMixin[CreateDomainInputDTO]):
     """Input for creating a new domain."""
 
     name: str = gql_field(description="Domain name. Must be unique across the system.")
-    description: str | None = gql_field(default=UNSET, description="Optional description.")
+    description: str | None = gql_field(default=None, description="Optional description.")
     is_active: bool = gql_field(default=True, description="Whether the domain is active.")
     allowed_docker_registries: list[str] | None = gql_field(
-        default=UNSET, description="Allowed Docker registry URLs."
+        default=None, description="Allowed Docker registry URLs."
     )
     integration_name: str | None = gql_field(
-        default=UNSET, description="External integration identifier."
+        default=None, description="External integration identifier."
     )
 
 
@@ -67,14 +62,14 @@ class CreateDomainInputGQL(PydanticInputMixin[CreateDomainInputDTO]):
 class UpdateDomainInputGQL(PydanticInputMixin[UpdateDomainInputDTO]):
     """Input for updating domain information."""
 
-    name: str | None = gql_field(default=UNSET, description="New domain name.")
-    description: str | None = gql_field(default=strawberry.UNSET, description="New description.")
-    is_active: bool | None = gql_field(default=UNSET, description="Updated active status.")
+    name: str | None = gql_field(default=None, description="New domain name.")
+    description: str | None = gql_field(default=UNSET, description="New description.")
+    is_active: bool | None = gql_field(default=None, description="Updated active status.")
     allowed_docker_registries: list[str] | None = gql_field(
-        default=UNSET, description="New allowed Docker registry URLs."
+        default=None, description="New allowed Docker registry URLs."
     )
     integration_name: str | None = gql_field(
-        default=strawberry.UNSET, description="New external integration identifier."
+        default=UNSET, description="New external integration identifier."
     )
 
 
