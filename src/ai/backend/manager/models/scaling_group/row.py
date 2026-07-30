@@ -380,6 +380,7 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
             status=ScalingGroupStatus(
                 is_active=self.is_active if self.is_active is not None else True,
                 is_public=self.is_public,
+                is_default=self.is_default,
             ),
             metadata=ScalingGroupMetadata(
                 description=self.description or "",

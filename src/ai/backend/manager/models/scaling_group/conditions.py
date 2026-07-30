@@ -151,6 +151,13 @@ class ScalingGroupConditions:
         return inner
 
     @staticmethod
+    def by_is_default(is_default: bool) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupRow.is_default == is_default
+
+        return inner
+
+    @staticmethod
     def by_scheduler(scheduler: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ScalingGroupRow.scheduler == scheduler

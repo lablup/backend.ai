@@ -450,6 +450,7 @@ class ResourceGroupFilterGQL(PydanticInputMixin[ResourceGroupFilterDTO]):
     description: StringFilter | None = None
     is_active: bool | None = None
     is_public: bool | None = None
+    is_default: bool | None = None
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
