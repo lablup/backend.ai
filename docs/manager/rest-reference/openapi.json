@@ -20173,6 +20173,19 @@
             "description": "Filter by public status.",
             "title": "Is Public"
           },
+          "is_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by whether the resource group is the default one.",
+            "title": "Is Default"
+          },
           "AND": {
             "anyOf": [
               {
@@ -20769,6 +20782,19 @@
             "default": null,
             "description": "Whether the resource group is public. Leave null to keep existing value.",
             "title": "Is Public"
+          },
+          "is_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whether this is the default resource group. Setting it clears the flag on the previous default, since at most one resource group is the default at a time. Leave null to keep existing value.",
+            "title": "Is Default"
           },
           "description": {
             "anyOf": [

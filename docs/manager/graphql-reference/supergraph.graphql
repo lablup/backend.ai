@@ -17018,6 +17018,7 @@ input ResourceGroupFilter
   description: StringFilter = null
   isActive: Boolean = null
   isPublic: Boolean = null
+  isDefault: Boolean = null
   AND: [ResourceGroupFilter!] = null
   OR: [ResourceGroupFilter!] = null
   NOT: [ResourceGroupFilter!] = null
@@ -17107,6 +17108,11 @@ type ResourceGroupStatus
 
   """Whether the resource group is publicly accessible to all users."""
   isPublic: Boolean!
+
+  """
+  Whether this is the default resource group. At most one resource group is the default at a time; an agent registering for the first time without a resolvable resource group name falls back to it.
+  """
+  isDefault: Boolean!
 }
 
 """
@@ -21386,6 +21392,11 @@ input UpdateResourceGroupInput
   Whether the resource group is public. Leave null to keep existing value.
   """
   isPublic: Boolean = null
+
+  """
+  Added in 26.8.0. Whether this is the default resource group. Setting it clears the flag on the previous default, since at most one resource group is the default at a time. Leave null to keep existing value.
+  """
+  isDefault: Boolean = null
 
   """Human-readable description. Leave null to keep existing value."""
   description: String = null
