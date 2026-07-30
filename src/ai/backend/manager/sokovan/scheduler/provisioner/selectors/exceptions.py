@@ -102,7 +102,7 @@ class NoCompatibleAgentError(AgentSelectionError, web.HTTPNotFound):
         return ErrorCode(
             domain=ErrorDomain.AGENT,
             operation=ErrorOperation.SCHEDULE,
-            error_detail=ErrorDetail.NOT_FOUND,
+            error_detail=ErrorDetail.UNAVAILABLE,
         )
 
 
