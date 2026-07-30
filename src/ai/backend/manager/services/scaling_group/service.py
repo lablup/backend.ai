@@ -99,10 +99,6 @@ from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_id
     ResolveResourceGroupIDByNameAction,
     ResolveResourceGroupIDByNameActionResult,
 )
-from ai.backend.manager.services.scaling_group.actions.set_default import (
-    SetDefaultScalingGroupAction,
-    SetDefaultScalingGroupActionResult,
-)
 from ai.backend.manager.services.scaling_group.actions.update_allowed_domains_for_rg import (
     UpdateAllowedDomainsForResourceGroupAction,
     UpdateAllowedDomainsForResourceGroupActionResult,
@@ -222,20 +218,6 @@ class ScalingGroupService:
         """Modifies a scaling group."""
         scaling_group_data = await self._repository.update_scaling_group(action.updater)
         return ModifyScalingGroupActionResult(scaling_group=scaling_group_data)
-
-    async def set_default_scaling_group(
-        self, action: SetDefaultScalingGroupAction
-    ) -> SetDefaultScalingGroupActionResult:
-        """Designates a scaling group as the default one, or clears its default flag.
-
-        Promoting a group demotes the incumbent default in the same transaction; clearing
-        leaves the system without any default, which agent first-registration treats as
-        "no fallback group".
-        """
-        scaling_group_data = await self._repository.set_default_scaling_group(
-            action.resource_group, action.is_default
-        )
-        return SetDefaultScalingGroupActionResult(scaling_group=scaling_group_data)
 
     async def replace_default_deployment_options(
         self, action: ReplaceDefaultDeploymentOptionsAction

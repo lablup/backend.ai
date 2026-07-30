@@ -1,8 +1,6 @@
 import uuid
 from collections.abc import AsyncGenerator, Callable
-from dataclasses import dataclass
 from datetime import UTC, datetime
-from enum import StrEnum
 from typing import Any
 
 import pytest
@@ -86,22 +84,6 @@ from ai.backend.manager.repositories.scaling_group.updaters import (
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
-
-
-class _DefaultRole(StrEnum):
-    """Which of the two seeded resource groups a default-designation case acts on."""
-
-    INCUMBENT = "incumbent"
-    CHALLENGER = "challenger"
-
-
-@dataclass(frozen=True)
-class _SetDefaultCase:
-    """A single set_default_scaling_group call and the default holder it should leave behind."""
-
-    target: _DefaultRole
-    is_default: bool
-    expected_default: _DefaultRole | None
 
 
 class TestScalingGroupRepositoryDB:
@@ -753,115 +735,6 @@ class TestScalingGroupRepositoryDB:
 
         with pytest.raises(ScalingGroupNotFound):
             await scaling_group_repository.update_scaling_group(updater)
-
-    # Default Designation Tests
-
-    @pytest.fixture
-    async def default_group_names(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[dict[_DefaultRole, str], None]:
-        """Seed two resource groups, the incumbent one already marked as the default."""
-        names = {
-            _DefaultRole.INCUMBENT: f"incumbent-{uuid.uuid4().hex[:8]}",
-            _DefaultRole.CHALLENGER: f"challenger-{uuid.uuid4().hex[:8]}",
-        }
-        async with db_with_cleanup.begin_session() as db_sess:
-            for role, name in names.items():
-                db_sess.add(
-                    ScalingGroupRow(
-                        name=name,
-                        description="Test scaling group for default designation",
-                        is_active=True,
-                        is_public=True,
-                        is_default=role is _DefaultRole.INCUMBENT,
-                        created_at=datetime.now(tz=UTC),
-                        driver="static",
-                        driver_opts={},
-                        scheduler="fifo",
-                        scheduler_opts=ScalingGroupOpts(),
-                        use_host_network=False,
-                    )
-                )
-            await db_sess.flush()
-        yield names
-
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _SetDefaultCase(
-                target=_DefaultRole.CHALLENGER,
-                is_default=True,
-                expected_default=_DefaultRole.CHALLENGER,
-            ),
-            _SetDefaultCase(
-                target=_DefaultRole.INCUMBENT,
-                is_default=True,
-                expected_default=_DefaultRole.INCUMBENT,
-            ),
-            _SetDefaultCase(
-                target=_DefaultRole.INCUMBENT,
-                is_default=False,
-                expected_default=None,
-            ),
-            _SetDefaultCase(
-                target=_DefaultRole.CHALLENGER,
-                is_default=False,
-                expected_default=_DefaultRole.INCUMBENT,
-            ),
-        ],
-        ids=lambda case: f"{case.target.value}-{'set' if case.is_default else 'unset'}",
-    )
-    async def test_set_default_scaling_group_leaves_at_most_one_default(
-        self,
-        scaling_group_repository: ScalingGroupRepository,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        default_group_names: dict[_DefaultRole, str],
-        case: _SetDefaultCase,
-    ) -> None:
-        """Designating a default transfers the flag; at most one group ever holds it."""
-        target_name = default_group_names[case.target]
-
-        result = await scaling_group_repository.set_default_scaling_group(
-            ResourceGroupName(target_name), case.is_default
-        )
-
-        assert result.name == target_name
-        assert result.status.is_default is case.is_default
-        expected_default_names = (
-            set() if case.expected_default is None else {default_group_names[case.expected_default]}
-        )
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            default_names = set(
-                (
-                    await db_sess.scalars(
-                        sa.select(ScalingGroupRow.name).where(ScalingGroupRow.is_default.is_(True))
-                    )
-                ).all()
-            )
-        assert default_names == expected_default_names
-
-    async def test_set_default_scaling_group_not_found_keeps_the_incumbent(
-        self,
-        scaling_group_repository: ScalingGroupRepository,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        default_group_names: dict[_DefaultRole, str],
-    ) -> None:
-        """A missing target rolls back the transaction, so the incumbent stays the default."""
-        with pytest.raises(ScalingGroupNotFound):
-            await scaling_group_repository.set_default_scaling_group(
-                ResourceGroupName("test-sgroup-nonexistent"), True
-            )
-
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            default_names = set(
-                (
-                    await db_sess.scalars(
-                        sa.select(ScalingGroupRow.name).where(ScalingGroupRow.is_default.is_(True))
-                    )
-                ).all()
-            )
-        assert default_names == {default_group_names[_DefaultRole.INCUMBENT]}
 
     # Purge Tests
 

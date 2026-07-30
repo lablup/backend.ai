@@ -597,18 +597,6 @@ class UpdateResourceGroupInput(PydanticInputMixin[UpdateResourceGroupConfigInput
         description="Whether the resource group is public. Leave null to keep existing value.",
         default=None,
     )
-    is_default: bool | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
-            description=(
-                "Whether this is the default resource group. Setting it clears the flag on the"
-                " previous default, since at most one resource group is the default at a time."
-                " Leave null to keep existing value."
-            ),
-        ),
-        default=None,
-    )
-
     # Metadata fields (ScalingGroupMetadataUpdaterSpec)
     description: str | None = gql_field(
         description="Human-readable description. Leave null to keep existing value.", default=None

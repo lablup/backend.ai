@@ -216,40 +216,6 @@ class ScalingGroupDBSource:
                 raise ScalingGroupNotFound(f"Scaling group not found (name:{updater.pk_value})")
             return result.row.to_dataclass()
 
-    async def set_default_scaling_group(
-        self,
-        name: ResourceGroupName,
-        is_default: bool,
-    ) -> ScalingGroupData:
-        """Designate the named scaling group as the default one, or clear its default flag.
-
-        At most one row may carry ``is_default`` (partial unique index), so promoting a
-        group demotes the incumbent default in the same transaction. Clearing leaves the
-        system without any default, which is allowed.
-
-        Raises ScalingGroupNotFound if the scaling group does not exist.
-        """
-        async with self._db.begin_session() as session:
-            if is_default:
-                # Demote first: the partial unique index must never see two default rows.
-                await session.execute(
-                    sa.update(ScalingGroupRow)
-                    .where(ScalingGroupRow.is_default.is_(True))
-                    .where(ScalingGroupRow.name != name)
-                    .values(is_default=False)
-                )
-            table = ScalingGroupRow.__table__
-            update_stmt = (
-                sa.update(table)
-                .where(table.c.name == name)
-                .values(is_default=is_default)
-                .returning(*table.columns)
-            )
-            row = await session.scalar(sa.select(ScalingGroupRow).from_statement(update_stmt))
-            if row is None:
-                raise ScalingGroupNotFound(f"Scaling group not found (name:{name})")
-            return row.to_dataclass()
-
     async def replace_default_deployment_options(
         self,
         name: ResourceGroupName,

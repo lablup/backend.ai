@@ -133,9 +133,6 @@ from ai.backend.manager.services.scaling_group.actions.replace_default_deploymen
 from ai.backend.manager.services.scaling_group.actions.replace_default_session_options import (
     ReplaceDefaultSessionOptionsAction,
 )
-from ai.backend.manager.services.scaling_group.actions.set_default import (
-    SetDefaultScalingGroupAction,
-)
 from ai.backend.manager.services.scaling_group.actions.update_allowed_domains_for_rg import (
     UpdateAllowedDomainsForResourceGroupAction,
 )
@@ -668,22 +665,8 @@ class ResourceGroupAdapter(BaseAdapter):
         action_result = await self._processors.scaling_group.modify_scaling_group.wait_for_complete(
             ModifyScalingGroupAction(updater=updater)
         )
-        updated = action_result.scaling_group
-        if input.is_default is not None:
-            # is_default is a singleton flag across the table, so it cannot ride along in the
-            # single-row updater above: promoting one group has to demote the incumbent in the
-            # same transaction. Run it last so its returned row carries every other change too.
-            default_result = (
-                await self._processors.scaling_group.set_default_scaling_group.wait_for_complete(
-                    SetDefaultScalingGroupAction(
-                        resource_group=ResourceGroupName(input.resource_group_name),
-                        is_default=input.is_default,
-                    )
-                )
-            )
-            updated = default_result.scaling_group
         return UpdateResourceGroupConfigPayloadNode(
-            resource_group=self._data_to_detail_node(updated),
+            resource_group=self._data_to_detail_node(action_result.scaling_group),
         )
 
     async def purge(

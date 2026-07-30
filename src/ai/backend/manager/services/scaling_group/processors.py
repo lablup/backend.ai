@@ -84,10 +84,6 @@ from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_id
     ResolveResourceGroupIDByNameAction,
     ResolveResourceGroupIDByNameActionResult,
 )
-from ai.backend.manager.services.scaling_group.actions.set_default import (
-    SetDefaultScalingGroupAction,
-    SetDefaultScalingGroupActionResult,
-)
 from ai.backend.manager.services.scaling_group.actions.update_allowed_domains_for_rg import (
     UpdateAllowedDomainsForResourceGroupAction,
     UpdateAllowedDomainsForResourceGroupActionResult,
@@ -133,10 +129,6 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
     replace_default_session_options: ActionProcessor[
         ReplaceDefaultSessionOptionsAction,
         ReplaceDefaultSessionOptionsActionResult,
-    ]
-    set_default_scaling_group: ActionProcessor[
-        SetDefaultScalingGroupAction,
-        SetDefaultScalingGroupActionResult,
     ]
     associate_scaling_group_with_domains: ActionProcessor[
         AssociateScalingGroupWithDomainsAction, AssociateScalingGroupWithDomainsActionResult
@@ -216,9 +208,6 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
         self.replace_default_session_options = ActionProcessor(
             service.replace_default_session_options, action_monitors
         )
-        self.set_default_scaling_group = ActionProcessor(
-            service.set_default_scaling_group, action_monitors
-        )
         self.associate_scaling_group_with_domains = ActionProcessor(
             service.associate_scaling_group_with_domains, action_monitors
         )
@@ -278,7 +267,6 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
             UpdateFairShareSpecAction.spec(),
             ReplaceDefaultDeploymentOptionsAction.spec(),
             ReplaceDefaultSessionOptionsAction.spec(),
-            SetDefaultScalingGroupAction.spec(),
             AssociateScalingGroupWithDomainsAction.spec(),
             DisassociateScalingGroupWithDomainsAction.spec(),
             AssociateScalingGroupWithKeypairsAction.spec(),

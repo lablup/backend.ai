@@ -252,14 +252,6 @@ class UpdateResourceGroupConfigInput(BaseRequestModel):
         default=None,
         description="Whether the resource group is public. Leave null to keep existing value.",
     )
-    is_default: bool | None = Field(
-        default=None,
-        description=(
-            "Whether this is the default resource group. Setting it clears the flag on the"
-            " previous default, since at most one resource group is the default at a time."
-            " Leave null to keep existing value."
-        ),
-    )
     description: str | None = Field(
         default=None,
         description="Human-readable description. Leave null to keep existing value.",
