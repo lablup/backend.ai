@@ -20783,19 +20783,6 @@
             "description": "Whether the resource group is public. Leave null to keep existing value.",
             "title": "Is Public"
           },
-          "is_default": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Whether this is the default resource group. Setting it clears the flag on the previous default, since at most one resource group is the default at a time. Leave null to keep existing value.",
-            "title": "Is Default"
-          },
           "description": {
             "anyOf": [
               {
