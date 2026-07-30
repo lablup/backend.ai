@@ -134,6 +134,21 @@ class ScalingGroupRepository:
         return await self._db_source.update_scaling_group(updater)
 
     @scaling_group_repository_resilience.apply()
+    async def set_default_scaling_group(
+        self,
+        name: ResourceGroupName,
+        is_default: bool,
+    ) -> ScalingGroupData:
+        """Designate the named scaling group as the default one, or clear its default flag.
+
+        Promoting demotes the incumbent default in the same transaction, since at most one
+        scaling group may be the default.
+
+        Raises ScalingGroupNotFound if the scaling group does not exist.
+        """
+        return await self._db_source.set_default_scaling_group(name, is_default)
+
+    @scaling_group_repository_resilience.apply()
     async def replace_default_deployment_options(
         self,
         name: ResourceGroupName,

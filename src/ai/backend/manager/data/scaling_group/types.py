@@ -41,6 +41,7 @@ class ScalingGroupStatus:
 
     is_active: bool
     is_public: bool
+    is_default: bool
 
 
 @dataclass

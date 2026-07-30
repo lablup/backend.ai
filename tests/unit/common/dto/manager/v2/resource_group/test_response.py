@@ -59,7 +59,7 @@ def _make_resource_group_detail_node(name: str = "test-group") -> ResourceGroupD
     return ResourceGroupDetailNode(
         id=ResourceGroupID(uuid.uuid4()),
         name=name,
-        status=ResourceGroupStatusInfo(is_active=True, is_public=True),
+        status=ResourceGroupStatusInfo(is_active=True, is_public=True, is_default=False),
         metadata=ResourceGroupMetadataInfo(
             description="A test resource group",
             created_at=datetime(2024, 1, 1, tzinfo=UTC),

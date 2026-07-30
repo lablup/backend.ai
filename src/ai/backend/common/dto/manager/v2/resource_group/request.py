@@ -141,6 +141,9 @@ class ResourceGroupFilter(BaseRequestModel):
     description: StringFilter | None = Field(default=None, description="Filter by description.")
     is_active: bool | None = Field(default=None, description="Filter by active status.")
     is_public: bool | None = Field(default=None, description="Filter by public status.")
+    is_default: bool | None = Field(
+        default=None, description="Filter by whether the resource group is the default one."
+    )
     AND: list[ResourceGroupFilter] | None = Field(default=None, description="AND conjunction.")
     OR: list[ResourceGroupFilter] | None = Field(default=None, description="OR conjunction.")
     NOT: list[ResourceGroupFilter] | None = Field(default=None, description="NOT negation.")
@@ -248,6 +251,14 @@ class UpdateResourceGroupConfigInput(BaseRequestModel):
     is_public: bool | None = Field(
         default=None,
         description="Whether the resource group is public. Leave null to keep existing value.",
+    )
+    is_default: bool | None = Field(
+        default=None,
+        description=(
+            "Whether this is the default resource group. Setting it clears the flag on the"
+            " previous default, since at most one resource group is the default at a time."
+            " Leave null to keep existing value."
+        ),
     )
     description: str | None = Field(
         default=None,

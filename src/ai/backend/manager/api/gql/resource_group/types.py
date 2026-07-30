@@ -216,11 +216,27 @@ class PreemptionConfigGQL(PydanticOutputMixin[PreemptionConfigInfo]):
         added_version="26.2.0", description="Status information for a resource group."
     ),
     model=ResourceGroupStatusInfo,
-    all_fields=True,
     name="ResourceGroupStatus",
 )
 class ResourceGroupStatusGQL(PydanticOutputMixin[ResourceGroupStatusInfo]):
-    pass
+    """Status information for a resource group."""
+
+    is_active: bool = gql_field(
+        description="Whether the resource group is active and can accept new sessions."
+    )
+    is_public: bool = gql_field(
+        description="Whether the resource group is publicly accessible to all users."
+    )
+    is_default: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Whether this is the default resource group. At most one resource group is the"
+                " default at a time; an agent registering for the first time without a"
+                " resolvable resource group name falls back to it."
+            ),
+        )
+    )
 
 
 @gql_pydantic_type(
@@ -450,6 +466,7 @@ class ResourceGroupFilterGQL(PydanticInputMixin[ResourceGroupFilterDTO]):
     description: StringFilter | None = None
     is_active: bool | None = None
     is_public: bool | None = None
+    is_default: bool | None = None
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -578,6 +595,17 @@ class UpdateResourceGroupInput(PydanticInputMixin[UpdateResourceGroupConfigInput
     )
     is_public: bool | None = gql_field(
         description="Whether the resource group is public. Leave null to keep existing value.",
+        default=None,
+    )
+    is_default: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Whether this is the default resource group. Setting it clears the flag on the"
+                " previous default, since at most one resource group is the default at a time."
+                " Leave null to keep existing value."
+            ),
+        ),
         default=None,
     )
 
