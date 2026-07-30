@@ -21564,6 +21564,18 @@
             "default": null,
             "description": "Filter by max pending session count."
           },
+          "max_priority": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IntFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by max scheduling priority."
+          },
           "AND": {
             "anyOf": [
               {
@@ -21664,7 +21676,8 @@
           "max_containers_per_session",
           "idle_timeout",
           "max_concurrent_sftp_sessions",
-          "max_pending_session_count"
+          "max_pending_session_count",
+          "max_priority"
         ],
         "title": "KeypairResourcePolicyOrderField",
         "type": "string"
@@ -21859,6 +21872,19 @@
             "description": "Maximum number of sessions in pending state. Null means unlimited.",
             "title": "Max Pending Session Count"
           },
+          "max_priority": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Highest scheduling priority a session may declare. Null means uncapped.",
+            "title": "Max Priority"
+          },
           "max_pending_session_resource_slots": {
             "anyOf": [
               {
@@ -21988,6 +22014,22 @@
             "default": 1,
             "description": "Updated max pending sessions. Set to null to clear.",
             "title": "Max Pending Session Count"
+          },
+          "max_priority": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "$ref": "#/components/schemas/Sentinel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 1,
+            "description": "Updated max priority. Set to null to clear.",
+            "title": "Max Priority"
           },
           "max_pending_session_resource_slots": {
             "anyOf": [

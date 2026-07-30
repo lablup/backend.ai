@@ -58,6 +58,12 @@ class KeypairResourcePolicyOrders:
             return KeyPairResourcePolicyRow.max_pending_session_count.asc()
         return KeyPairResourcePolicyRow.max_pending_session_count.desc()
 
+    @staticmethod
+    def max_priority(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return KeyPairResourcePolicyRow.max_priority.asc()
+        return KeyPairResourcePolicyRow.max_priority.desc()
+
 
 class UserResourcePolicyOrders:
     """Query orders for sorting user resource policies."""

@@ -43,6 +43,7 @@ class KeyPairResourcePolicyData:
     max_concurrent_sessions: int
     max_pending_session_count: int | None
     max_pending_session_resource_slots: Any | None  # TODO: Use ResourceSlot.
+    max_priority: int | None
     max_concurrent_sftp_sessions: int
     max_containers_per_session: int
     idle_timeout: int

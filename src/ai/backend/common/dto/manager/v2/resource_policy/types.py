@@ -29,6 +29,7 @@ class KeypairResourcePolicyOrderField(StrEnum):
     IDLE_TIMEOUT = "idle_timeout"
     MAX_CONCURRENT_SFTP_SESSIONS = "max_concurrent_sftp_sessions"
     MAX_PENDING_SESSION_COUNT = "max_pending_session_count"
+    MAX_PRIORITY = "max_priority"
 
 
 class UserResourcePolicyOrderField(StrEnum):

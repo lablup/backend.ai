@@ -334,6 +334,7 @@ class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):  # type: ignor
                 max_pending_session_resource_slots=value_or_none(
                     max_pending_session_resource_slots
                 ),
+                max_priority=None,
             )
         )
 
