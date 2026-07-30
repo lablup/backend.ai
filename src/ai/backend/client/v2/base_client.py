@@ -176,9 +176,7 @@ class BackendAIAuthClient:
         extra_headers: Mapping[str, str] | None = None,
     ) -> ResponseT:
         json_body = (
-            request.model_dump(mode="json", exclude_none=True, exclude_unset=True)
-            if request is not None
-            else None
+            request.model_dump(mode="json", exclude_unset=True) if request is not None else None
         )
         data = await self._request(
             method, path, json=json_body, params=params, extra_headers=extra_headers
@@ -203,9 +201,7 @@ class BackendAIAuthClient:
         params: dict[str, str] | None = None,
     ) -> None:
         json_body = (
-            request.model_dump(mode="json", exclude_none=True, exclude_unset=True)
-            if request is not None
-            else None
+            request.model_dump(mode="json", exclude_unset=True) if request is not None else None
         )
         await self._request(method, path, json=json_body, params=params)
 
@@ -456,9 +452,7 @@ class BackendAIAnonymousClient:
         extra_headers: Mapping[str, str] | None = None,
     ) -> ResponseT:
         json_body = (
-            request.model_dump(mode="json", exclude_none=True, exclude_unset=True)
-            if request is not None
-            else None
+            request.model_dump(mode="json", exclude_unset=True) if request is not None else None
         )
         data = await self._request(
             method, path, json=json_body, params=params, extra_headers=extra_headers

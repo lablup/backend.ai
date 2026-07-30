@@ -11,11 +11,13 @@ from typing import Any
 import click
 
 from ai.backend.client.cli.v2.helpers import (
+    Unspecifiable,
     create_v2_registry,
     load_v2_config,
     parse_order_options,
     print_result,
 )
+from ai.backend.common.api_handlers import SENTINEL, Sentinel
 
 
 def _run_async(coro_fn: Any) -> None:
@@ -198,15 +200,35 @@ def get(rule_id: uuid.UUID) -> None:
 @click.option("--metric-name", default=None, type=str, help="Updated metric name.")
 @click.option("--step-size", default=None, type=int, help="Updated scale step size.")
 @click.option("--time-window", default=None, type=int, help="Updated time window in seconds.")
-@click.option("--min-threshold", default=None, type=str, help="Updated minimum threshold.")
-@click.option("--max-threshold", default=None, type=str, help="Updated maximum threshold.")
-@click.option("--min-replicas", default=None, type=int, help="Updated minimum replicas.")
-@click.option("--max-replicas", default=None, type=int, help="Updated maximum replicas.")
+@click.option(
+    "--min-threshold",
+    default=SENTINEL,
+    type=Unspecifiable(click.STRING),
+    help="Updated minimum threshold. Omit to leave it unchanged.",
+)
+@click.option(
+    "--max-threshold",
+    default=SENTINEL,
+    type=Unspecifiable(click.STRING),
+    help="Updated maximum threshold. Omit to leave it unchanged.",
+)
+@click.option(
+    "--min-replicas",
+    default=SENTINEL,
+    type=Unspecifiable(click.INT),
+    help="Updated minimum replicas. Omit to leave it unchanged.",
+)
+@click.option(
+    "--max-replicas",
+    default=SENTINEL,
+    type=Unspecifiable(click.INT),
+    help="Updated maximum replicas. Omit to leave it unchanged.",
+)
 @click.option(
     "--prometheus-query-preset-id",
-    default=None,
-    type=click.UUID,
-    help="Updated Prometheus query preset UUID (omit = no change).",
+    default=SENTINEL,
+    type=Unspecifiable(click.UUID),
+    help="Updated Prometheus query preset UUID. Omit to leave it unchanged.",
 )
 def update(
     rule_id: uuid.UUID,
@@ -214,14 +236,13 @@ def update(
     metric_name: str | None,
     step_size: int | None,
     time_window: int | None,
-    min_threshold: str | None,
-    max_threshold: str | None,
-    min_replicas: int | None,
-    max_replicas: int | None,
-    prometheus_query_preset_id: uuid.UUID | None,
+    min_threshold: str | Sentinel,
+    max_threshold: str | Sentinel,
+    min_replicas: int | Sentinel,
+    max_replicas: int | Sentinel,
+    prometheus_query_preset_id: uuid.UUID | Sentinel,
 ) -> None:
     """Update an auto-scaling rule."""
-    from ai.backend.common.api_handlers import SENTINEL
     from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
         UpdateAutoScalingRuleInput,
     )
@@ -235,13 +256,15 @@ def update(
         metric_name=metric_name,
         step_size=step_size,
         time_window=time_window,
-        min_threshold=Decimal(min_threshold) if min_threshold is not None else None,
-        max_threshold=Decimal(max_threshold) if max_threshold is not None else None,
-        min_replicas=min_replicas if min_replicas is not None else None,
-        max_replicas=max_replicas if max_replicas is not None else None,
-        prometheus_query_preset_id=(
-            prometheus_query_preset_id if prometheus_query_preset_id is not None else SENTINEL
+        min_threshold=(
+            min_threshold if isinstance(min_threshold, Sentinel) else Decimal(min_threshold)
         ),
+        max_threshold=(
+            max_threshold if isinstance(max_threshold, Sentinel) else Decimal(max_threshold)
+        ),
+        min_replicas=min_replicas,
+        max_replicas=max_replicas,
+        prometheus_query_preset_id=prometheus_query_preset_id,
     )
 
     async def _run() -> None:

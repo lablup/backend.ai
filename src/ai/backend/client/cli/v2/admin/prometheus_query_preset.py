@@ -13,10 +13,12 @@ from uuid import UUID
 import click
 
 from ai.backend.client.cli.v2.helpers import (
+    Unspecifiable,
     create_v2_registry,
     load_v2_config,
     print_result,
 )
+from ai.backend.common.api_handlers import SENTINEL, Sentinel
 
 
 @click.group()
@@ -91,19 +93,34 @@ def create(
 @click.option("--name", default=None, type=str, help="Updated name.")
 @click.option("--metric-name", default=None, type=str, help="Updated Prometheus metric name.")
 @click.option("--query-template", default=None, type=str, help="Updated PromQL template.")
-@click.option("--time-window", default=None, type=str, help="Updated time window.")
-@click.option("--description", default=None, type=str, help="Updated description.")
+@click.option(
+    "--time-window",
+    default=SENTINEL,
+    type=Unspecifiable(click.STRING),
+    help="Updated time window. Omit to leave it unchanged.",
+)
+@click.option(
+    "--description",
+    default=SENTINEL,
+    type=Unspecifiable(click.STRING),
+    help="Updated description. Omit to leave it unchanged.",
+)
 @click.option("--rank", default=None, type=int, help="Updated sort rank.")
-@click.option("--category-id", default=None, type=click.UUID, help="Updated category UUID.")
+@click.option(
+    "--category-id",
+    default=SENTINEL,
+    type=Unspecifiable(click.UUID),
+    help="Updated category UUID. Omit to leave it unchanged.",
+)
 def update(
     preset_id: UUID,
     name: str | None,
     metric_name: str | None,
     query_template: str | None,
-    time_window: str | None,
-    description: str | None,
+    time_window: str | Sentinel,
+    description: str | Sentinel,
     rank: int | None,
-    category_id: UUID | None,
+    category_id: UUID | Sentinel,
 ) -> None:
     """Update a prometheus query definition (superadmin only)."""
     from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (

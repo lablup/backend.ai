@@ -21,7 +21,13 @@ from typing import (
 from aiohttp import web
 from aiohttp.web_urldispatcher import UrlMappingMatchInfo
 from multidict import CIMultiDictProxy, MultiMapping
-from pydantic import AliasChoices, ConfigDict, RootModel
+from pydantic import (
+    AliasChoices,
+    ConfigDict,
+    RootModel,
+    SerializerFunctionWrapHandler,
+    model_serializer,
+)
 from pydantic.fields import FieldInfo
 from pydantic_core._pydantic_core import ValidationError
 
@@ -49,14 +55,36 @@ class Sentinel(enum.Enum):
 SENTINEL = Sentinel.TOKEN
 
 
-class BaseRequestModel(BackendAISchema):
+class SentinelOmittingMixin(BackendAISchema):
+    """Drops ``SENTINEL``-valued fields from the serialized output.
+
+    ``SENTINEL`` means "the caller did not mention this field", so it must not
+    reach the wire at all. Without this the enum would serialize as its member
+    value and a null would become indistinguishable from an omission, which is
+    the one thing the three-state protocol exists to keep apart.
+    """
+
+    @model_serializer(mode="wrap")
+    def _omit_sentinels(self, handler: SerializerFunctionWrapHandler) -> Any:
+        dumped = handler(self)
+        if not isinstance(dumped, dict):
+            return dumped
+        omitted: set[str] = set()
+        for name, info in type(self).model_fields.items():
+            if getattr(self, name, None) is SENTINEL:
+                omitted.add(name)
+                omitted.add(info.serialization_alias or info.alias or name)
+        return {key: value for key, value in dumped.items() if key not in omitted}
+
+
+class BaseRequestModel(SentinelOmittingMixin):
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
         validate_by_name=True,
     )
 
 
-class BaseFieldModel(BackendAISchema):
+class BaseFieldModel(SentinelOmittingMixin):
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
         validate_by_name=True,

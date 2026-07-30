@@ -7,11 +7,13 @@ import asyncio
 import click
 
 from ai.backend.client.cli.v2.helpers import (
+    Unspecifiable,
     create_v2_registry,
     load_v2_config,
     parse_order_options,
     print_result,
 )
+from ai.backend.common.api_handlers import SENTINEL, Sentinel
 
 
 @click.group(name="object-storage")
@@ -81,7 +83,12 @@ def get(storage_id: str) -> None:
 @click.option("--access-key", default=None, help="Updated access key.")
 @click.option("--secret-key", default=None, help="Updated secret key.")
 @click.option("--endpoint", default=None, help="Updated endpoint URL.")
-@click.option("--region", default=None, help="Updated region. Pass empty string to clear.")
+@click.option(
+    "--region",
+    default=SENTINEL,
+    type=Unspecifiable(click.STRING),
+    help="Updated region. Omit to leave it unchanged; pass an empty string to clear.",
+)
 def update(
     storage_id: str,
     name: str | None,
@@ -89,20 +96,15 @@ def update(
     access_key: str | None,
     secret_key: str | None,
     endpoint: str | None,
-    region: str | None,
+    region: str | Sentinel,
 ) -> None:
     """Update an existing object storage."""
     from uuid import UUID
 
-    from ai.backend.common.api_handlers import SENTINEL, Sentinel
     from ai.backend.common.dto.manager.v2.object_storage.request import UpdateObjectStorageInput
 
-    # SENTINEL means "no change", None means "clear the field".
-    # When the CLI user does not pass --region, keep SENTINEL (no change).
-    # When they pass an empty string, interpret as None (clear).
-    region_value: str | Sentinel | None = SENTINEL
-    if region is not None:
-        region_value = region if region else None
+    # An empty string is the clear-this-field spelling, which the DTO takes as None.
+    region_value = region if isinstance(region, Sentinel) else (region or None)
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())

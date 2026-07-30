@@ -9,12 +9,14 @@ import sys
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 import aiohttp
 import click
 from pydantic import TypeAdapter, ValidationError
 from yarl import URL
+
+from ai.backend.common.api_handlers import Sentinel
 
 if TYPE_CHECKING:
     from ai.backend.client.v2.v2_registry import V2ClientRegistry
@@ -128,6 +130,37 @@ async def create_v2_registry(config: V2ConnectionConfig) -> V2ClientRegistry:
         )
 
     return await V2ClientRegistry.create(client_config, auth)
+
+
+class Unspecifiable(click.ParamType):
+    """Wraps a click type so an unspecified option arrives as ``SENTINEL``.
+
+    Update DTOs distinguish three input states, and ``None`` alone cannot carry
+    them: it has to mean "clear this field" so that a dedicated flag can request
+    a null. Pair this with ``default=SENTINEL`` and the option's own absence
+    becomes a fourth-party value the handler can pass straight through.
+
+        @click.option("--description", default=SENTINEL, type=Unspecifiable(click.STRING))
+        @click.option("--clear-description", is_flag=True)
+        def update(description: str | Sentinel, clear_description: bool) -> None:
+            ...
+            description=None if clear_description else description
+
+    Without the wrapper click coerces the default through *inner* and hands the
+    handler the string ``"Sentinel.TOKEN"``.
+    """
+
+    inner: click.ParamType
+
+    def __init__(self, inner: click.ParamType) -> None:
+        self.inner = inner
+        self.name = inner.name
+
+    @override
+    def convert(self, value: Any, param: click.Parameter | None, ctx: click.Context | None) -> Any:
+        if isinstance(value, Sentinel):
+            return value
+        return self.inner.convert(value, param, ctx)
 
 
 def parse_order_options(
