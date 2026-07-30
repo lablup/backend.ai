@@ -21,9 +21,7 @@ class KeyPairResourcePolicyUpdaterSpec(UpdaterSpec["KeyPairResourcePolicyRow"]):
     max_concurrent_sessions: OptionalState[int] = field(default_factory=OptionalState.nop)
     max_containers_per_session: OptionalState[int] = field(default_factory=OptionalState.nop)
     max_pending_session_count: TriState[int] = field(default_factory=TriState.nop)
-    max_pending_session_resource_slots: TriState[dict[str, Any]] = field(
-        default_factory=TriState.nop
-    )
+    max_pending_session_resource_slots: TriState[ResourceSlot] = field(default_factory=TriState.nop)
     max_quota_scope_size: OptionalState[int] = field(default_factory=OptionalState.nop)
     max_vfolder_count: OptionalState[int] = field(default_factory=OptionalState.nop)
     max_vfolder_size: OptionalState[int] = field(default_factory=OptionalState.nop)
