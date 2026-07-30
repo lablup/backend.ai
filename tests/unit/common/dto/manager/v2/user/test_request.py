@@ -171,7 +171,6 @@ class TestUpdateUserInput:
         assert isinstance(req.full_name, Sentinel)
         assert req.description is SENTINEL
         assert isinstance(req.description, Sentinel)
-        assert req.group_ids is SENTINEL
         assert req.allowed_client_ip is SENTINEL
         assert req.main_access_key is SENTINEL
         assert req.container_uid is SENTINEL
@@ -189,6 +188,7 @@ class TestUpdateUserInput:
         assert req.need_password_change is None
         assert req.resource_policy is None
         assert req.sudo_session_enabled is None
+        assert req.group_ids is None
 
     def test_explicit_none_full_name_means_clear(self) -> None:
         req = UpdateUserInput(full_name=None)

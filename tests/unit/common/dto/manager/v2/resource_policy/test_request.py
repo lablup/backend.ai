@@ -153,15 +153,19 @@ class TestUpdateKeypairResourcePolicyInput:
 
     def test_default_sentinel_fields(self) -> None:
         req = UpdateKeypairResourcePolicyInput()
-        assert req.total_resource_slots is SENTINEL
-        assert isinstance(req.total_resource_slots, Sentinel)
         assert req.max_pending_session_count is SENTINEL
+        assert isinstance(req.max_pending_session_count, Sentinel)
         assert req.max_pending_session_resource_slots is SENTINEL
-        assert req.allowed_vfolder_hosts is SENTINEL
+
+    def test_fields_backed_by_a_non_null_column_default_to_none(self) -> None:
+        """These columns cannot hold a null, so they have no "clear me" state."""
+        req = UpdateKeypairResourcePolicyInput()
+        assert req.total_resource_slots is None
+        assert req.allowed_vfolder_hosts is None
 
     def test_sentinel_signals_clear(self) -> None:
-        req = UpdateKeypairResourcePolicyInput(total_resource_slots=SENTINEL)
-        assert req.total_resource_slots is SENTINEL
+        req = UpdateKeypairResourcePolicyInput(max_pending_session_count=SENTINEL)
+        assert req.max_pending_session_count is SENTINEL
 
     def test_none_means_no_change(self) -> None:
         req = UpdateKeypairResourcePolicyInput(total_resource_slots=None)
@@ -238,17 +242,22 @@ class TestUpdateUserResourcePolicyInput:
 
     def test_all_default_sentinel_fields(self) -> None:
         req = UpdateUserResourcePolicyInput()
-        assert req.max_vfolder_count is SENTINEL
-        assert req.max_quota_scope_size is SENTINEL
+        assert req.max_concurrent_logins is SENTINEL
 
-    def test_all_sentinel_fields_is_valid(self) -> None:
+    def test_fields_backed_by_a_non_null_column_default_to_none(self) -> None:
+        """These columns cannot hold a null, so they have no "clear me" state."""
+        req = UpdateUserResourcePolicyInput()
+        assert req.max_vfolder_count is None
+        assert req.max_quota_scope_size is None
+
+    def test_all_none_fields_is_valid(self) -> None:
         req = UpdateUserResourcePolicyInput(
-            max_vfolder_count=SENTINEL,
-            max_quota_scope_size=SENTINEL,
+            max_vfolder_count=None,
+            max_quota_scope_size=None,
             max_session_count_per_model_session=None,
             max_customized_image_count=None,
         )
-        assert req.max_vfolder_count is SENTINEL
+        assert req.max_vfolder_count is None
 
     def test_update_specific_field(self) -> None:
         req = UpdateUserResourcePolicyInput(max_session_count_per_model_session=10)
@@ -315,18 +324,20 @@ class TestCreateProjectResourcePolicyInput:
 class TestUpdateProjectResourcePolicyInput:
     """Tests for UpdateProjectResourcePolicyInput."""
 
-    def test_all_default_sentinel_fields(self) -> None:
+    def test_all_fields_default_to_none(self) -> None:
+        """Every column behind this input is non-null, so none of them can be cleared."""
         req = UpdateProjectResourcePolicyInput()
-        assert req.max_vfolder_count is SENTINEL
-        assert req.max_quota_scope_size is SENTINEL
+        assert req.max_vfolder_count is None
+        assert req.max_quota_scope_size is None
+        assert req.max_network_count is None
 
-    def test_all_sentinel_fields_is_valid(self) -> None:
+    def test_all_none_fields_is_valid(self) -> None:
         req = UpdateProjectResourcePolicyInput(
-            max_vfolder_count=SENTINEL,
-            max_quota_scope_size=SENTINEL,
+            max_vfolder_count=None,
+            max_quota_scope_size=None,
             max_network_count=None,
         )
-        assert req.max_vfolder_count is SENTINEL
+        assert req.max_vfolder_count is None
 
     def test_update_specific_field(self) -> None:
         req = UpdateProjectResourcePolicyInput(max_network_count=10)
