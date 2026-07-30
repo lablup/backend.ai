@@ -77,13 +77,16 @@ class NoAgentsInResourceGroupError(AgentSelectionError, web.HTTPServiceUnavailab
         )
 
 
-class NoCompatibleAgentError(AgentSelectionError):
+class NoCompatibleAgentError(AgentSelectionError, web.HTTPBadRequest):
     """Raised inside an exclusion filter's recorder step when no candidates
     survive it.
 
     An absolute failure: no state change (preemption included) can make the
     request placeable, so this propagates instead of becoming a
-    :class:`PlacementFailure`.
+    :class:`PlacementFailure`. What the filter rejected is a property of the
+    request — a designated agent that does not exist, an architecture no
+    agent serves — so the caller has to change the request, hence 400 rather
+    than the 503 its sibling returns when the group holds no agents at all.
     """
 
     error_type = "https://api.backend.ai/probs/no-compatible-agents"
@@ -102,7 +105,7 @@ class NoCompatibleAgentError(AgentSelectionError):
         return ErrorCode(
             domain=ErrorDomain.AGENT,
             operation=ErrorOperation.SCHEDULE,
-            error_detail=ErrorDetail.UNAVAILABLE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
 
 
