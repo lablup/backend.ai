@@ -5,6 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any
 
+from strawberry import UNSET
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.login_client_type.request import (
@@ -191,7 +192,7 @@ class CreateLoginClientTypePayloadGQL(PydanticOutputMixin[CreateLoginClientTypeP
 class UpdateLoginClientTypeInputGQL(PydanticInputMixin[UpdateLoginClientTypeInputDTO]):
     name: str | None = gql_field(default=None, description="Updated name.")
     description: str | None = gql_field(
-        default=None,
+        default=UNSET,
         description="Updated description. Pass null to clear, omit to leave unchanged.",
     )
 
