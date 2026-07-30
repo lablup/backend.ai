@@ -1,8 +1,12 @@
 """The three input states must survive serialization as three distinct wire shapes.
 
-``SENTINEL`` (omitted) must not appear on the wire at all, an explicit ``None`` must
-survive as a JSON null, and a value must survive as itself. Collapsing any two of
+A field the caller never mentioned must be absent from the body, an explicit ``None``
+must survive as a JSON null, and a value must survive as itself. Collapsing any two of
 these makes "leave this alone" and "clear this" indistinguishable to the server.
+
+``SENTINEL`` is the DTO-side default for the first state and must never be assigned by a
+caller: ``Sentinel.TOKEN`` is ``enum.auto()``, so ``mode="json"`` renders it as the
+integer ``1``, which an int-typed field re-parses as a value.
 """
 
 from __future__ import annotations
@@ -48,7 +52,7 @@ class _WireExpectation:
 @dataclass(frozen=True)
 class _StateCase:
     label: str
-    assigned: Any
+    kwargs: dict[str, Any]
     expected: _WireExpectation
 
 
@@ -60,26 +64,26 @@ class TestSentinelWireProtocol:
             if cls.model_fields[name].default is not SENTINEL
         ]
         assert offenders == [], (
-            "Sentinel-typed fields must default to SENTINEL so that an omitted field "
-            f"means 'no change': {offenders}"
+            "Sentinel-typed fields must default to SENTINEL so that a field the caller "
+            f"never mentioned means 'no change': {offenders}"
         )
 
     @pytest.mark.parametrize(
         "case",
         [
             _StateCase(
-                label="omitted",
-                assigned=SENTINEL,
+                label="unmentioned",
+                kwargs={},
                 expected=_WireExpectation(key_present=False, value=None),
             ),
             _StateCase(
                 label="explicit-null",
-                assigned=None,
+                kwargs={"field": None},
                 expected=_WireExpectation(key_present=True, value=None),
             ),
             _StateCase(
                 label="value",
-                assigned="a-value",
+                kwargs={"field": "a-value"},
                 expected=_WireExpectation(key_present=True, value="a-value"),
             ),
         ],
@@ -89,20 +93,21 @@ class TestSentinelWireProtocol:
         class _Model(BaseRequestModel):
             field: str | Sentinel | None = SENTINEL
 
-        dumped = _Model(field=case.assigned).model_dump(**_WIRE_DUMP_KWARGS)
+        dumped = _Model(**case.kwargs).model_dump(**_WIRE_DUMP_KWARGS)
         assert ("field" in dumped) is case.expected.key_present
         if case.expected.key_present:
             assert dumped["field"] == case.expected.value
 
-    def test_sentinel_never_reaches_the_wire(self) -> None:
-        class _Nested(BaseRequestModel):
-            inner: str | Sentinel | None = SENTINEL
+    def test_assigning_sentinel_leaks_it_onto_the_wire(self) -> None:
+        """Why callers omit the field instead of assigning SENTINEL.
 
-        class _Outer(BaseRequestModel):
-            nested: _Nested
-            outer: str | Sentinel | None = SENTINEL
+        An int-typed field re-parses the leaked ``1`` as a value, so a caller that
+        assigns SENTINEL to say "no change" would set the column to 1 instead.
+        """
 
-        dumped = _Outer(nested=_Nested(inner=SENTINEL), outer=SENTINEL).model_dump(
-            **_WIRE_DUMP_KWARGS
-        )
-        assert dumped == {"nested": {}}
+        class _Model(BaseRequestModel):
+            count: int | Sentinel | None = SENTINEL
+
+        leaked = _Model(count=SENTINEL).model_dump(**_WIRE_DUMP_KWARGS)
+        assert leaked == {"count": 1}
+        assert _Model.model_validate(leaked).count == 1

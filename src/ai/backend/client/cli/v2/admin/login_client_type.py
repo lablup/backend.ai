@@ -8,13 +8,11 @@ import uuid
 import click
 
 from ai.backend.client.cli.v2.helpers import (
-    Unspecifiable,
     create_v2_registry,
     load_v2_config,
     parse_order_options,
     print_result,
 )
-from ai.backend.common.api_handlers import SENTINEL, Sentinel
 
 
 @click.group()
@@ -109,26 +107,17 @@ def create(name: str, description: str | None) -> None:
 @login_client_type.command()
 @click.argument("login_client_type_id", type=click.UUID)
 @click.option("--name", default=None, type=str, help="Updated name.")
-@click.option(
-    "--description",
-    default=SENTINEL,
-    type=Unspecifiable(click.STRING),
-    help="Updated description. Omit to leave it unchanged.",
-)
-@click.option("--clear-description", is_flag=True, help="Clear the current description.")
+@click.option("--description", default=None, type=str, help="Updated description.")
 def update(
     login_client_type_id: uuid.UUID,
     name: str | None,
-    description: str | Sentinel,
-    clear_description: bool,
+    description: str | None,
 ) -> None:
     """Update a login client type (superadmin only)."""
+    from ai.backend.common.api_handlers import SENTINEL
     from ai.backend.common.dto.manager.v2.login_client_type.request import (
         UpdateLoginClientTypeInput,
     )
-
-    if clear_description and not isinstance(description, Sentinel):
-        raise click.UsageError("--description and --clear-description cannot be used together")
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -137,7 +126,9 @@ def update(
                 login_client_type_id,
                 UpdateLoginClientTypeInput(
                     name=name,
-                    description=None if clear_description else description,
+                    # description is nullable-clearable: SENTINEL keeps the stored value,
+                    # whereas a null would clear it.
+                    description=description if description is not None else SENTINEL,
                 ),
             )
             print_result(result)

@@ -13,6 +13,7 @@ from yarl import URL
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.common.api_handlers import (
+    SENTINEL,
     BaseRequestModel,
     BaseResponseModel,
     BaseRootResponseModel,
@@ -29,6 +30,38 @@ from .exceptions import (
 from .streaming_types import SSEConnection, WebSocketSession
 
 ResponseT = TypeVar("ResponseT", bound=BaseResponseModel | BaseRootResponseModel[Any])
+
+
+def _to_json_body(request: BaseRequestModel) -> Any:
+    """Serialize a request DTO for the wire, dropping every ``SENTINEL`` field.
+
+    The three input states have to stay apart: a field the caller never touched is
+    absent from the body, an explicit ``None`` survives as a JSON null so the server
+    clears the column, and a value is sent as itself. ``exclude_unset`` covers the
+    first only when the caller omitted the field; a caller that assigned ``SENTINEL``
+    outright still has it in ``model_fields_set``.
+
+    Such a ``SENTINEL`` cannot be spotted in the encoded dump alone — ``Sentinel.TOKEN``
+    is ``enum.auto()``, so ``mode="json"`` renders it as the integer ``1``, which an
+    int-typed field would re-parse as a value. So the unencoded dump is walked
+    alongside the encoded one to locate it, which also covers nested models and lists.
+    """
+
+    def strip(raw: Any, encoded: Any) -> Any:
+        if isinstance(raw, dict) and isinstance(encoded, dict):
+            return {
+                key: strip(value, encoded[key])
+                for key, value in raw.items()
+                if key in encoded and value is not SENTINEL
+            }
+        if isinstance(raw, list) and isinstance(encoded, list) and len(raw) == len(encoded):
+            return [strip(value, item) for value, item in zip(raw, encoded, strict=True)]
+        return encoded
+
+    return strip(
+        request.model_dump(exclude_unset=True),
+        request.model_dump(mode="json", exclude_unset=True),
+    )
 
 
 def _create_aiohttp_session(config: ClientConfig) -> aiohttp.ClientSession:
@@ -175,9 +208,7 @@ class BackendAIAuthClient:
         params: dict[str, str] | None = None,
         extra_headers: Mapping[str, str] | None = None,
     ) -> ResponseT:
-        json_body = (
-            request.model_dump(mode="json", exclude_unset=True) if request is not None else None
-        )
+        json_body = _to_json_body(request) if request is not None else None
         data = await self._request(
             method, path, json=json_body, params=params, extra_headers=extra_headers
         )
@@ -200,9 +231,7 @@ class BackendAIAuthClient:
         request: BaseRequestModel | None = None,
         params: dict[str, str] | None = None,
     ) -> None:
-        json_body = (
-            request.model_dump(mode="json", exclude_unset=True) if request is not None else None
-        )
+        json_body = _to_json_body(request) if request is not None else None
         await self._request(method, path, json=json_body, params=params)
 
     async def upload(
@@ -451,9 +480,7 @@ class BackendAIAnonymousClient:
         params: dict[str, str] | None = None,
         extra_headers: Mapping[str, str] | None = None,
     ) -> ResponseT:
-        json_body = (
-            request.model_dump(mode="json", exclude_unset=True) if request is not None else None
-        )
+        json_body = _to_json_body(request) if request is not None else None
         data = await self._request(
             method, path, json=json_body, params=params, extra_headers=extra_headers
         )

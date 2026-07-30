@@ -7,7 +7,6 @@ import uuid
 import click
 
 from ai.backend.client.cli.v2.helpers import (
-    Unspecifiable,
     create_v2_registry,
     load_model,
     load_v2_config,
@@ -15,7 +14,6 @@ from ai.backend.client.cli.v2.helpers import (
     print_result,
     run_async,
 )
-from ai.backend.common.api_handlers import SENTINEL, Sentinel
 from ai.backend.common.dto.manager.v2.idle_checker.types import (
     IdleCheckerInputTypeDTO,
     IdleCheckerTypeDTO,
@@ -158,12 +156,7 @@ def search(
 @idle_checker.command()
 @click.argument("idle_checker_id", type=click.UUID)
 @click.option("--name", default=None, type=str, help="Updated name.")
-@click.option(
-    "--description",
-    default=SENTINEL,
-    type=Unspecifiable(click.STRING),
-    help="Updated description. Omit to leave it unchanged.",
-)
+@click.option("--description", default=None, type=str, help="Updated description.")
 @click.option(
     "--clear-description",
     is_flag=True,
@@ -191,27 +184,30 @@ def search(
 def update(
     idle_checker_id: uuid.UUID,
     name: str | None,
-    description: str | Sentinel,
+    description: str | None,
     clear_description: bool,
     target_session_types: tuple[str, ...],
     initial_grace_period_seconds: int | None,
     checker_spec: str | None,
 ) -> None:
     """Update an idle checker."""
+    from ai.backend.common.api_handlers import SENTINEL
     from ai.backend.common.dto.manager.v2.idle_checker.request import (
         IdleCheckerSpecInputDTO,
         UpdateIdleCheckerInput,
     )
     from ai.backend.common.identifier.idle_checker import IdleCheckerID
 
-    if clear_description and not isinstance(description, Sentinel):
+    if description is not None and clear_description:
         raise click.UsageError("--description and --clear-description cannot be used together")
 
     checker_id = IdleCheckerID(idle_checker_id)
     input_ = UpdateIdleCheckerInput(
         id=checker_id,
         name=name,
-        description=None if clear_description else description,
+        description=(
+            None if clear_description else description if description is not None else SENTINEL
+        ),
         target_session_types=(
             [SessionTypes(session_type) for session_type in target_session_types]
             if target_session_types

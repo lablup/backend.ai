@@ -13,12 +13,10 @@ from uuid import UUID
 import click
 
 from ai.backend.client.cli.v2.helpers import (
-    Unspecifiable,
     create_v2_registry,
     load_v2_config,
     print_result,
 )
-from ai.backend.common.api_handlers import SENTINEL, Sentinel
 
 
 @click.group()
@@ -93,36 +91,22 @@ def create(
 @click.option("--name", default=None, type=str, help="Updated name.")
 @click.option("--metric-name", default=None, type=str, help="Updated Prometheus metric name.")
 @click.option("--query-template", default=None, type=str, help="Updated PromQL template.")
-@click.option(
-    "--time-window",
-    default=SENTINEL,
-    type=Unspecifiable(click.STRING),
-    help="Updated time window. Omit to leave it unchanged.",
-)
-@click.option(
-    "--description",
-    default=SENTINEL,
-    type=Unspecifiable(click.STRING),
-    help="Updated description. Omit to leave it unchanged.",
-)
+@click.option("--time-window", default=None, type=str, help="Updated time window.")
+@click.option("--description", default=None, type=str, help="Updated description.")
 @click.option("--rank", default=None, type=int, help="Updated sort rank.")
-@click.option(
-    "--category-id",
-    default=SENTINEL,
-    type=Unspecifiable(click.UUID),
-    help="Updated category UUID. Omit to leave it unchanged.",
-)
+@click.option("--category-id", default=None, type=click.UUID, help="Updated category UUID.")
 def update(
     preset_id: UUID,
     name: str | None,
     metric_name: str | None,
     query_template: str | None,
-    time_window: str | Sentinel,
-    description: str | Sentinel,
+    time_window: str | None,
+    description: str | None,
     rank: int | None,
-    category_id: UUID | Sentinel,
+    category_id: UUID | None,
 ) -> None:
     """Update a prometheus query definition (superadmin only)."""
+    from ai.backend.common.api_handlers import SENTINEL
     from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
         ModifyQueryDefinitionInput,
     )
@@ -136,10 +120,12 @@ def update(
                     name=name,
                     metric_name=metric_name,
                     query_template=query_template,
-                    time_window=time_window,
-                    description=description,
                     rank=rank,
-                    category_id=category_id,
+                    # These three are nullable-clearable: SENTINEL keeps the stored
+                    # value, whereas a null would clear it.
+                    time_window=time_window if time_window is not None else SENTINEL,
+                    description=description if description is not None else SENTINEL,
+                    category_id=category_id if category_id is not None else SENTINEL,
                 ),
             )
             print_result(result)
