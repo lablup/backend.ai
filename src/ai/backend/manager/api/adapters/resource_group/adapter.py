@@ -432,12 +432,12 @@ class ResourceGroupAdapter(BaseAdapter):
         )
         metadata_spec = ScalingGroupMetadataUpdaterSpec(
             description=(
-                TriState.nullify()
+                TriState.nop()
                 if input.description is SENTINEL
                 else (
-                    TriState.update(str(input.description))
-                    if input.description is not None
-                    else TriState.nop()
+                    TriState.nullify()
+                    if input.description is None
+                    else TriState.update(input.description)
                 )
             ),
         )

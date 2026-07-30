@@ -95,11 +95,11 @@ class TestUpdateResourceGroupInput:
         assert req.integration_name is SENTINEL
         assert req.resource_policy is SENTINEL
 
-    def test_sentinel_description_signals_clear(self) -> None:
+    def test_sentinel_description_means_no_change(self) -> None:
         req = UpdateResourceGroupInput(description=SENTINEL)
         assert req.description is SENTINEL
 
-    def test_none_description_means_no_change(self) -> None:
+    def test_none_description_signals_clear(self) -> None:
         req = UpdateResourceGroupInput(description=None)
         assert req.description is None
 

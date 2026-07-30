@@ -93,7 +93,7 @@ class UpdateResourceGroupInput(BaseRequestModel):
     )
     description: str | Sentinel | None = Field(
         default=SENTINEL,
-        description=("Updated description. Use SENTINEL to clear, null to keep existing value."),
+        description=("Updated description. Omit to keep the existing value, null to clear."),
     )
     is_active: bool | None = Field(
         default=None,
