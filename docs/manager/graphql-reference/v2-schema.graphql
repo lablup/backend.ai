@@ -2815,6 +2815,11 @@ input CreateKeypairResourcePolicyInput {
   """Maximum pending sessions. Null means unlimited."""
   maxPendingSessionCount: Int = null
 
+  """
+  Added in 26.8.0. Highest scheduling priority a session created with this policy may declare. Null means uncapped.
+  """
+  maxPriority: Int = null
+
   """Maximum pending session resource slots."""
   maxPendingSessionResourceSlots: [ResourceSlotEntryInput!] = null
 
@@ -6609,6 +6614,11 @@ type KeypairResourcePolicyV2 implements Node {
   """Maximum pending sessions. Null means unlimited."""
   maxPendingSessionCount: Int
 
+  """
+  Added in 26.8.0. Highest scheduling priority a session created with this policy may declare. Null means uncapped.
+  """
+  maxPriority: Int
+
   """Maximum resource slots for pending sessions. Null means unlimited."""
   maxPendingSessionResourceSlots: [ResourceLimitEntry!]
 
@@ -6660,6 +6670,9 @@ input KeypairResourcePolicyV2Filter {
   maxConcurrentSftpSessions: IntFilter = null
   maxPendingSessionCount: IntFilter = null
 
+  """Added in 26.8.0. Filter by the max scheduling priority ceiling."""
+  maxPriority: IntFilter = null
+
   """
   Added in 26.4.4. Filter policies by their assigned keypairs. A policy matches if at least one of its keypairs satisfies the conditions.
   """
@@ -6696,6 +6709,7 @@ enum KeypairResourcePolicyV2OrderField {
   IDLE_TIMEOUT
   MAX_CONCURRENT_SFTP_SESSIONS
   MAX_PENDING_SESSION_COUNT
+  MAX_PRIORITY
 }
 
 """Added in 26.4.2. Input for listing files in a virtual folder."""
@@ -15009,6 +15023,11 @@ input UpdateKeypairResourcePolicyInput {
 
   """Updated max pending sessions."""
   maxPendingSessionCount: Int = null
+
+  """
+  Added in 26.8.0. Updated max scheduling priority. Set to null to clear (uncapped).
+  """
+  maxPriority: Int = null
 
   """Updated max pending session resource slots."""
   maxPendingSessionResourceSlots: [ResourceSlotEntryInput!] = null
