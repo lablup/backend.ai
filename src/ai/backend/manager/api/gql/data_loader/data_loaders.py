@@ -13,6 +13,7 @@ from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId, ImageID, KernelId, SessionId
 from ai.backend.manager.data.permission.id import ObjectId
 
@@ -237,6 +238,22 @@ class DataLoaders:
             )
 
             dtos = await adapter.batch_load_by_names(names)
+            return [RG.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def resource_group_by_id_loader(
+        self,
+    ) -> DataLoader[ResourceGroupID, ResourceGroupGQL | None]:
+        adapter = self._adapters.resource_group
+
+        async def load_fn(ids: list[ResourceGroupID]) -> list[ResourceGroupGQL | None]:
+            from ai.backend.manager.api.gql.resource_group.types import (  # pants: no-infer-dep
+                ResourceGroupGQL as RG,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
             return [RG.from_pydantic(dto) if dto is not None else None for dto in dtos]
 
         return DataLoader(load_fn=load_fn)

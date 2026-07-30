@@ -80,6 +80,7 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     ReplaceResourceGroupDefaultSessionOptionsPayload as ReplaceResourceGroupDefaultSessionOptionsPayloadDTO,
 )
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import PreemptionOrder
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
@@ -324,13 +325,21 @@ class ResourceInfoGQL(PydanticOutputMixin[ResourceInfoNode]):
 @gql_node_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
-        description="Resource group with structured configuration",
+        description=(
+            "Resource group with structured configuration."
+            " Since 26.8.0, the node id value is the resource group UUID"
+            " instead of the name."
+        ),
     ),
     name="ResourceGroup",
 )
 class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
-    id: NodeID[str] = gql_field(
-        description="Relay-style global node identifier for the resource group"
+    id: NodeID[UUID] = gql_field(
+        description=(
+            "Relay-style global node identifier for the resource group."
+            " Since 26.8.0, the underlying value is the resource group UUID"
+            " instead of the name."
+        )
     )
     name: str = gql_field(
         description="Unique name identifying the resource group. Used as primary key and referenced by agents, sessions, and resource presets."
@@ -386,7 +395,9 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[ResourceGroupGQL | None]:
-        return await info.context.data_loaders.resource_group_loader.load_many(node_ids)
+        return await info.context.data_loaders.resource_group_by_id_loader.load_many([
+            ResourceGroupID(UUID(nid)) for nid in node_ids
+        ])
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -653,7 +664,12 @@ class CreateResourceGroupPayloadGQL(PydanticOutputMixin[CreateResourceGroupPaylo
     name="DeleteResourceGroupPayload",
 )
 class DeleteResourceGroupPayloadGQL(PydanticOutputMixin[DeleteResourceGroupPayloadDTO]):
-    id: str = gql_field(description="ID of the deleted resource group.")
+    id: UUID = gql_field(
+        description=(
+            "UUID of the deleted resource group."
+            " Since 26.8.0, the value is the UUID instead of the name."
+        )
+    )
 
 
 # Allow / Disallow types
