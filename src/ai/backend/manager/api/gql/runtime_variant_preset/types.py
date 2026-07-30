@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Annotated, Self
 from uuid import UUID
 
 import strawberry
-from strawberry import UNSET, Info
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
@@ -341,16 +341,16 @@ class CreateRuntimeVariantPresetInputGQL(PydanticInputMixin[CreateInputDTO]):
 )
 class UpdateRuntimeVariantPresetInputGQL(PydanticInputMixin[UpdateInputDTO]):
     id: UUID = gql_field(description="Preset ID.")
-    name: str | None = gql_field(default=UNSET, description="New name.")
-    description: str | None = gql_field(default=UNSET, description="New description.")
-    rank: int | None = gql_field(default=UNSET, description="New rank.")
-    preset_target: PresetTargetGQL | None = gql_field(default=UNSET, description="New target.")
-    value_type: PresetValueTypeGQL | None = gql_field(default=UNSET, description="New value type.")
-    default_value: str | None = gql_field(default=UNSET, description="New default value.")
-    key: str | None = gql_field(default=UNSET, description="New key.")
+    name: str | None = gql_field(default=None, description="New name.")
+    description: str | None = gql_field(default=None, description="New description.")
+    rank: int | None = gql_field(default=None, description="New rank.")
+    preset_target: PresetTargetGQL | None = gql_field(default=None, description="New target.")
+    value_type: PresetValueTypeGQL | None = gql_field(default=None, description="New value type.")
+    default_value: str | None = gql_field(default=None, description="New default value.")
+    key: str | None = gql_field(default=None, description="New key.")
     required: bool | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.4.4", description="New required flag."),
-        default=UNSET,
+        default=None,
     )
 
 

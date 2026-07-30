@@ -713,11 +713,11 @@ class UpdateDeploymentRevisionPresetInputGQL(PydanticInputMixin[UpdateInputDTO])
             added_version="26.4.4",
             description="New runtime variant for the preset. Omit to leave unchanged.",
         ),
-        default=UNSET,
+        default=None,
     )
-    name: str | None = gql_field(default=UNSET, description="New name.")
-    description: str | None = gql_field(default=UNSET, description="New description.")
-    rank: int | None = gql_field(default=UNSET, description="New rank.")
+    name: str | None = gql_field(default=None, description="New name.")
+    description: str | None = gql_field(default=None, description="New description.")
+    rank: int | None = gql_field(default=None, description="New rank.")
     open_to_public: bool | None = gql_field(
         default=UNSET,
         description="Default open_to_public for deployments created from this preset. "
@@ -771,42 +771,42 @@ class UpdateDeploymentRevisionPresetInputGQL(PydanticInputMixin[UpdateInputDTO])
             added_version="26.4.4",
             description="Replace resource slot allocations. Omit to leave unchanged.",
         ),
-        default=UNSET,
+        default=None,
     )
     resource_opts: list[ResourceOptsEntryInput] | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="Replace additional resource options. Omit to leave unchanged.",
         ),
-        default=UNSET,
+        default=None,
     )
     cluster_mode: ClusterModeGQL | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="New cluster topology mode. Omit to leave unchanged.",
         ),
-        default=UNSET,
+        default=None,
     )
     cluster_size: int | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="New cluster size. Omit to leave unchanged.",
         ),
-        default=UNSET,
+        default=None,
     )
     environ: list[EnvironEntryInputGQL] | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="Replace environment variables. Omit to leave unchanged.",
         ),
-        default=UNSET,
+        default=None,
     )
     preset_values: list[RuntimeVariantPresetValueEntryInputGQL] | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="Replace runtime variant preset values. Omit to leave unchanged.",
         ),
-        default=UNSET,
+        default=None,
     )
 
 

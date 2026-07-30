@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Self
 from uuid import UUID
 
 import strawberry
-from strawberry import UNSET, Info
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.resource_preset.request import (
@@ -202,16 +202,16 @@ class CreateResourcePresetPayloadGQL(PydanticOutputMixin[CreateResourcePresetPay
 )
 class UpdateResourcePresetInputGQL(PydanticInputMixin[UpdateResourcePresetInputDTO]):
     id: UUID = gql_field(description="UUID of the resource preset to update.")
-    name: str | None = gql_field(default=UNSET, description="Updated name.")
+    name: str | None = gql_field(default=None, description="Updated name.")
     resource_slots: list[ResourceSlotEntryInputGQL] | None = gql_field(
-        default=UNSET, description="Updated resource slot allocations."
+        default=None, description="Updated resource slot allocations."
     )
     shared_memory: BinarySizeInputGQL | None = gql_field(
-        default=UNSET,
+        default=None,
         description="Updated shared memory. Use null to clear.",
     )
     resource_group_name: str | None = gql_field(
-        default=UNSET,
+        default=None,
         description="Updated resource group name. Use null to make global.",
     )
 

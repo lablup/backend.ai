@@ -20860,16 +20860,16 @@ input UpdateDeploymentRevisionPresetInput
   """
   Added in 26.4.4. New runtime variant for the preset. Omit to leave unchanged.
   """
-  runtimeVariantId: UUID
+  runtimeVariantId: UUID = null
 
   """New name."""
-  name: String
+  name: String = null
 
   """New description."""
-  description: String
+  description: String = null
 
   """New rank."""
-  rank: Int
+  rank: Int = null
 
   """
   Default open_to_public for deployments created from this preset. Set to null to clear.
@@ -20910,28 +20910,28 @@ input UpdateDeploymentRevisionPresetInput
   """
   Added in 26.4.4. Replace resource slot allocations. Omit to leave unchanged.
   """
-  resourceSlots: [ResourceSlotEntryInput!]
+  resourceSlots: [ResourceSlotEntryInput!] = null
 
   """
   Added in 26.4.4. Replace additional resource options. Omit to leave unchanged.
   """
-  resourceOpts: [ResourceOptsEntryInput!]
+  resourceOpts: [ResourceOptsEntryInput!] = null
 
   """Added in 26.4.4. New cluster topology mode. Omit to leave unchanged."""
-  clusterMode: ClusterMode
+  clusterMode: ClusterMode = null
 
   """Added in 26.4.4. New cluster size. Omit to leave unchanged."""
-  clusterSize: Int
+  clusterSize: Int = null
 
   """
   Added in 26.4.4. Replace environment variables. Omit to leave unchanged.
   """
-  environ: [EnvironEntryInput!]
+  environ: [EnvironEntryInput!] = null
 
   """
   Added in 26.4.4. Replace runtime variant preset values. Omit to leave unchanged.
   """
-  presetValues: [RuntimeVariantPresetValueEntryInput!]
+  presetValues: [RuntimeVariantPresetValueEntryInput!] = null
 }
 
 """Added in 26.4.2. Update deployment revision preset payload."""
@@ -21097,7 +21097,7 @@ input UpdateLoginClientTypeInput
   @join__type(graph: STRAWBERRY)
 {
   """Updated name."""
-  name: String
+  name: String = null
 
   """Updated description. Pass null to clear, omit to leave unchanged."""
   description: String
@@ -21127,43 +21127,43 @@ input UpdateModelCardV2Input
   id: UUID!
 
   """New name."""
-  name: String
+  name: String = null
 
   """Author."""
-  author: String
+  author: String = null
 
   """Title."""
-  title: String
+  title: String = null
 
   """Version."""
-  modelVersion: String
+  modelVersion: String = null
 
   """Description."""
-  description: String
+  description: String = null
 
   """ML task."""
-  task: String
+  task: String = null
 
   """Category."""
-  category: String
+  category: String = null
 
   """Architecture."""
-  architecture: String
+  architecture: String = null
 
   """Frameworks."""
-  framework: [String!]
+  framework: [String!] = null
 
   """Labels."""
-  label: [String!]
+  label: [String!] = null
 
   """License."""
-  license: String
+  license: String = null
 
   """README content."""
-  readme: String
+  readme: String = null
 
   """Access level (public or internal)."""
-  accessLevel: ModelCardV2AccessLevel
+  accessLevel: ModelCardV2AccessLevel = null
 }
 
 """
@@ -21461,16 +21461,16 @@ input UpdateResourcePresetV2Input
   id: UUID!
 
   """Updated name."""
-  name: String
+  name: String = null
 
   """Updated resource slot allocations."""
-  resourceSlots: [ResourceSlotEntryInput!]
+  resourceSlots: [ResourceSlotEntryInput!] = null
 
   """Updated shared memory. Use null to clear."""
-  sharedMemory: BinarySizeInput
+  sharedMemory: BinarySizeInput = null
 
   """Updated resource group name. Use null to make global."""
-  resourceGroupName: String
+  resourceGroupName: String = null
 }
 
 """Added in 26.8.0. Update retention policy input."""
@@ -21588,28 +21588,28 @@ input UpdateRuntimeVariantPresetInput
   id: UUID!
 
   """New name."""
-  name: String
+  name: String = null
 
   """New description."""
-  description: String
+  description: String = null
 
   """New rank."""
-  rank: Int
+  rank: Int = null
 
   """New target."""
-  presetTarget: PresetTarget
+  presetTarget: PresetTarget = null
 
   """New value type."""
-  valueType: PresetValueType
+  valueType: PresetValueType = null
 
   """New default value."""
-  defaultValue: String
+  defaultValue: String = null
 
   """New key."""
-  key: String
+  key: String = null
 
   """Added in 26.4.4. New required flag."""
-  required: Boolean
+  required: Boolean = null
 }
 
 """Added in 26.4.2. Update preset payload."""
