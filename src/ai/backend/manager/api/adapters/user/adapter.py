@@ -531,9 +531,9 @@ class UserAdapter(BaseAdapter):
                 else TriState.from_graphql(input.integration_name)
             ),
             group_ids=(
-                OptionalState.nop()
-                if isinstance(input.group_ids, Sentinel) or input.group_ids is None
-                else OptionalState.update([str(gid) for gid in input.group_ids])
+                OptionalState.update([str(gid) for gid in input.group_ids])
+                if input.group_ids is not None
+                else OptionalState.nop()
             ),
         )
         updater: Updater[UserRow] = Updater(spec=updater_spec, pk_value=user_id)

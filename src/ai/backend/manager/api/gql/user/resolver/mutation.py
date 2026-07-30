@@ -340,9 +340,9 @@ async def admin_bulk_update_users_v2(
                 else TriState.from_graphql(dto.container_gids)
             ),
             group_ids=(
-                OptionalState.nop()
-                if isinstance(dto.group_ids, Sentinel) or dto.group_ids is None
-                else OptionalState.update([str(gid) for gid in dto.group_ids])
+                OptionalState.update([str(gid) for gid in dto.group_ids])
+                if dto.group_ids is not None
+                else OptionalState.nop()
             ),
         )
 

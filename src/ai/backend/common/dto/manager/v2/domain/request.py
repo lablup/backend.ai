@@ -70,9 +70,9 @@ class UpdateDomainInput(BaseRequestModel):
         default=None,
         description="Updated active status.",
     )
-    allowed_docker_registries: list[str] | Sentinel | None = Field(
-        default=SENTINEL,
-        description="New list of allowed Docker registry URLs. Set to null to clear.",
+    allowed_docker_registries: list[str] | None = Field(
+        default=None,
+        description="New list of allowed Docker registry URLs. Leave null to keep existing.",
     )
     integration_name: str | Sentinel | None = Field(
         default=SENTINEL,

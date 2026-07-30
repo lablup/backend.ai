@@ -9010,14 +9010,11 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New list of allowed Docker registry URLs. Set to null to clear.",
+            "default": null,
+            "description": "New list of allowed Docker registry URLs. Leave null to keep existing.",
             "title": "Allowed Docker Registries"
           },
           "integration_name": {
@@ -21963,14 +21960,11 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated resource slot limits. Set to null to clear.",
+            "default": null,
+            "description": "Updated resource slot limits. Leave null to keep existing.",
             "title": "Total Resource Slots"
           },
           "max_session_lifetime": {
@@ -22098,14 +22092,11 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated vfolder host permissions. Set to null to clear.",
+            "default": null,
+            "description": "Updated vfolder host permissions. Leave null to keep existing.",
             "title": "Allowed Vfolder Hosts"
           }
         },
@@ -22460,14 +22451,11 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max vfolder count. Use SENTINEL to clear, null to keep existing.",
+            "default": null,
+            "description": "Updated max vfolder count. Leave null to keep existing.",
             "title": "Max Vfolder Count"
           },
           "max_concurrent_logins": {
@@ -22497,15 +22485,11 @@
                 "$ref": "#/components/schemas/BinarySizeInput"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max quota scope size. Use SENTINEL to clear, null to keep existing.",
-            "title": "Max Quota Scope Size"
+            "default": null,
+            "description": "Updated max quota scope size. Leave null to keep existing."
           },
           "max_session_count_per_model_session": {
             "anyOf": [
@@ -22839,14 +22823,11 @@
                 "type": "integer"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max vfolder count. Use SENTINEL to clear, null to keep existing.",
+            "default": null,
+            "description": "Updated max vfolder count. Leave null to keep existing.",
             "title": "Max Vfolder Count"
           },
           "max_quota_scope_size": {
@@ -22855,15 +22836,11 @@
                 "$ref": "#/components/schemas/BinarySizeInput"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "Updated max quota scope size. Use SENTINEL to clear, null to keep existing.",
-            "title": "Max Quota Scope Size"
+            "default": null,
+            "description": "Updated max quota scope size. Leave null to keep existing."
           },
           "max_network_count": {
             "anyOf": [
@@ -30309,14 +30286,11 @@
                 "type": "array"
               },
               {
-                "$ref": "#/components/schemas/Sentinel"
-              },
-              {
                 "type": "null"
               }
             ],
-            "default": 1,
-            "description": "New project (group) assignments. Replaces existing assignments. Set to null to clear.",
+            "default": null,
+            "description": "New project (group) assignments. Replaces existing assignments. Leave null to keep existing.",
             "title": "Group Ids"
           },
           "allowed_client_ip": {

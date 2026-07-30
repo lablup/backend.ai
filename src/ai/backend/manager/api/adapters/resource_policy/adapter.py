@@ -267,11 +267,7 @@ class ResourcePolicyAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
             total_resource_slots=(
-                OptionalState.nop()
-                if isinstance(input.total_resource_slots, Sentinel)
-                else OptionalState.update(
-                    self._entries_to_resource_slot(input.total_resource_slots)
-                )
+                OptionalState.update(self._entries_to_resource_slot(input.total_resource_slots))
                 if input.total_resource_slots is not None
                 else OptionalState.nop()
             ),
@@ -324,11 +320,7 @@ class ResourcePolicyAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
             allowed_vfolder_hosts=(
-                OptionalState.nop()
-                if isinstance(input.allowed_vfolder_hosts, Sentinel)
-                else OptionalState.update(
-                    self._entries_to_vfolder_hosts(input.allowed_vfolder_hosts)
-                )
+                OptionalState.update(self._entries_to_vfolder_hosts(input.allowed_vfolder_hosts))
                 if input.allowed_vfolder_hosts is not None
                 else OptionalState.nop()
             ),
@@ -416,9 +408,7 @@ class ResourcePolicyAdapter(BaseAdapter):
     ) -> UpdateUserResourcePolicyPayload:
         spec = UserResourcePolicyUpdaterSpec(
             max_vfolder_count=(
-                OptionalState.nop()
-                if isinstance(input.max_vfolder_count, Sentinel)
-                else OptionalState.update(input.max_vfolder_count)
+                OptionalState.update(input.max_vfolder_count)
                 if input.max_vfolder_count is not None
                 else OptionalState.nop()
             ),
@@ -430,9 +420,7 @@ class ResourcePolicyAdapter(BaseAdapter):
                 else TriState.update(input.max_concurrent_logins)
             ),
             max_quota_scope_size=(
-                OptionalState.nop()
-                if isinstance(input.max_quota_scope_size, Sentinel)
-                else OptionalState.update(input.max_quota_scope_size.bytes)
+                OptionalState.update(input.max_quota_scope_size.bytes)
                 if isinstance(input.max_quota_scope_size, BinarySizeInput)
                 else OptionalState.nop()
             ),
@@ -526,16 +514,12 @@ class ResourcePolicyAdapter(BaseAdapter):
     ) -> UpdateProjectResourcePolicyPayload:
         spec = ProjectResourcePolicyUpdaterSpec(
             max_vfolder_count=(
-                OptionalState.nop()
-                if isinstance(input.max_vfolder_count, Sentinel)
-                else OptionalState.update(input.max_vfolder_count)
+                OptionalState.update(input.max_vfolder_count)
                 if input.max_vfolder_count is not None
                 else OptionalState.nop()
             ),
             max_quota_scope_size=(
-                OptionalState.nop()
-                if isinstance(input.max_quota_scope_size, Sentinel)
-                else OptionalState.update(input.max_quota_scope_size.bytes)
+                OptionalState.update(input.max_quota_scope_size.bytes)
                 if isinstance(input.max_quota_scope_size, BinarySizeInput)
                 else OptionalState.nop()
             ),
