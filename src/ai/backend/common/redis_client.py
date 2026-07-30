@@ -216,8 +216,8 @@ class RedisConnection(AbstractAsyncContextManager[RedisClient]):
     _socket_connect_timeout: float | None
     _keepalive_options: dict[int, int]
 
-    reader: asyncio.StreamReader | None
-    writer: asyncio.StreamWriter | None
+    _reader: asyncio.StreamReader | None
+    _writer: asyncio.StreamWriter | None
 
     def __init__(
         self,
@@ -230,8 +230,8 @@ class RedisConnection(AbstractAsyncContextManager[RedisClient]):
     ) -> None:
         self._redis_target = redis_target
         self._db = db
-        self.reader = None
-        self.writer = None
+        self._reader = None
+        self._writer = None
 
         self._socket_timeout = socket_timeout
         self._socket_connect_timeout = socket_connect_timeout
@@ -257,8 +257,8 @@ class RedisConnection(AbstractAsyncContextManager[RedisClient]):
             for opt, val in self._keepalive_options.items():
                 sock.setsockopt(socket.IPPROTO_TCP, opt, val)
 
-        self.writer = writer
-        self.reader = reader
+        self._writer = writer
+        self._reader = reader
 
         client = RedisClient(reader, writer)
 
@@ -284,9 +284,9 @@ class RedisConnection(AbstractAsyncContextManager[RedisClient]):
         return await self.connect()
 
     async def disconnect(self) -> None:
-        if self.writer is not None:
+        if self._writer is not None:
             try:
-                self.writer.close()
+                self._writer.close()
             except RuntimeError as e:
                 if str(e) == "Event loop is closed":
                     pass  # there's no more room we can do anything
