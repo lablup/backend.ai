@@ -325,7 +325,11 @@ class ResourceInfoGQL(PydanticOutputMixin[ResourceInfoNode]):
 @gql_node_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
-        description="Resource group with structured configuration",
+        description=(
+            "Resource group with structured configuration."
+            " Since 26.8.0, the node id value is the resource group UUID"
+            " instead of the name."
+        ),
     ),
     name="ResourceGroup",
 )
