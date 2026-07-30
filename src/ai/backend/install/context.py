@@ -1787,7 +1787,12 @@ class Context(metaclass=ABCMeta):
         idempotent.
         """
         harbor_url = f"http://{harbor.hostname}:{harbor.http_port}"
-        registry_name = "local-harbor"
+        # The registry name becomes the prefix of every image canonical
+        # (``{registry_name}/{image}:{tag}``) that docker pushes/pulls
+        # against, so it must be the actual reachable ``host:port`` — a bare
+        # label without a dot or colon would be parsed by docker as a Docker
+        # Hub namespace.
+        registry_name = f"{harbor.hostname}:{harbor.http_port}"
         project = "library"
         registry_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{harbor_url}/{project}"))
         fixture = {
