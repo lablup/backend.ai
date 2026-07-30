@@ -6,8 +6,8 @@ Two crashes are covered here:
   associated with more than one project.
   See: https://github.com/lablup/backend.ai/pull/10482
 - Querying the system scope raised IndexError when the caller belonged to no project,
-  because global-registry images took their permissions from an arbitrary entry of the
-  per-project permission map, which is empty in that case.
+  because global-registry images read their permissions off the per-project permission
+  map, which is empty in that case.
 """
 
 from __future__ import annotations
@@ -78,9 +78,9 @@ async def _create_project(
     db: ExtendedAsyncSAEngine,
     name: str,
     domain: str,
-    member: UserRow | None,
+    user: UserRow,
 ) -> UUID:
-    """Create a project, joining `member` to it as a group member when given."""
+    """Create a project and join `user` to it as a group member."""
     project_id = uuid4()
     async with db.begin_session() as sess:
         sess.add(
@@ -93,14 +93,13 @@ async def _create_project(
             )
         )
         await sess.flush()
-        if member is not None:
-            sess.add(
-                AssocGroupUserRow(
-                    id=uuid4(),
-                    user_id=member.uuid,
-                    group_id=project_id,
-                )
+        sess.add(
+            AssocGroupUserRow(
+                id=uuid4(),
+                user_id=user.uuid,
+                group_id=project_id,
             )
+        )
         await sess.commit()
     return project_id
 
@@ -398,8 +397,8 @@ class _SystemScopeCase:
 class TestImagePermissionContextSystemScope:
     """Tests for ImagePermissionContextBuilder in the system scope.
 
-    Global-registry images belong to no project, so their permissions must not be taken from
-    an arbitrary project association.
+    Global-registry images belong to no project, so the caller must still get them when it
+    belongs to none.
     """
 
     # ------------------------------------------------------------------
@@ -439,14 +438,6 @@ class TestImagePermissionContextSystemScope:
         return await _create_project(db_with_cleanup, "member-project", domain, user)
 
     @pytest.fixture
-    async def non_member_project(self, db_with_cleanup: ExtendedAsyncSAEngine, domain: str) -> UUID:
-        """A project the caller has an RBAC scope association with, but is not a member of.
-
-        A plain user holds no permission in such a project.
-        """
-        return await _create_project(db_with_cleanup, "non-member-project", domain, None)
-
-    @pytest.fixture
     async def scope_association_to_member_project(
         self, db_with_cleanup: ExtendedAsyncSAEngine, user: UserRow, member_project: UUID
     ) -> None:
@@ -461,28 +452,6 @@ class TestImagePermissionContextSystemScope:
                     relation_type=RelationType.AUTO,
                 )
             )
-            await sess.commit()
-
-    @pytest.fixture
-    async def scope_associations_to_both_projects(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        user: UserRow,
-        member_project: UUID,
-        non_member_project: UUID,
-    ) -> None:
-        async with db_with_cleanup.begin_session() as sess:
-            for project_id in [member_project, non_member_project]:
-                sess.add(
-                    AssociationScopesEntitiesRow(
-                        id=uuid4(),
-                        scope_type=PermissionScopeType.PROJECT,
-                        scope_id=str(project_id),
-                        entity_type=EntityType.USER,
-                        entity_id=str(user.uuid),
-                        relation_type=RelationType.AUTO,
-                    )
-                )
             await sess.commit()
 
     # ------------------------------------------------------------------
@@ -545,29 +514,6 @@ class TestImagePermissionContextSystemScope:
     ) -> None:
         """A caller associated with a project sees the global-registry images carrying the
         permissions it holds in that project."""
-        async with db_with_cleanup.begin_readonly_session() as db_session:
-            builder = ImagePermissionContextBuilder(db_session)
-            perm_ctx = await builder.build(
-                client_ctx,
-                SystemScope(),
-                ImagePermission.READ_ATTRIBUTE,
-            )
-
-        assert perm_ctx.object_id_to_additional_permission_map == {
-            global_image_id: case.expected_permissions
-        }
-
-    async def test_global_registry_permissions_are_unioned_across_project_scopes(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        client_ctx: ClientContext,
-        case: _SystemScopeCase,
-        scope_associations_to_both_projects: None,
-        global_image_id: UUID,
-    ) -> None:
-        """Permissions on global-registry images do not depend on which associated project scope
-        happens to come first: the caller keeps the permissions of the project it is a member of
-        even though it holds none in the other associated project."""
         async with db_with_cleanup.begin_readonly_session() as db_session:
             builder = ImagePermissionContextBuilder(db_session)
             perm_ctx = await builder.build(

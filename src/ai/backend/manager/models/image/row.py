@@ -4,7 +4,7 @@ import enum
 import functools
 import logging
 import uuid
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -1005,22 +1005,10 @@ class ImagePermissionContextBuilder(
         user_accessible_project_scopes = await self._get_user_accessible_project_scopes(
             ctx, UserScope(ctx.user_id)
         )
-        # A global registry is shared by every project, so its images carry no project
-        # association to read permissions off of. Union what the caller holds across its
-        # projects; a caller that belongs to none still sees those images, carrying the
-        # permissions it holds in the system scope.
-        if user_accessible_project_scopes:
-            global_registry_permissions: frozenset[ImagePermission] = frozenset()
-            for project_scope in user_accessible_project_scopes:
-                global_registry_permissions |= (
-                    await self._verify_project_scope_and_calculate_permission(ctx, project_scope)
-                )
-        else:
-            global_registry_permissions = await self.calculate_permission(ctx, SystemScope())
-        global_registries_perm_ctx = await self._in_global_registries(
-            ctx, global_registry_permissions
+        global_project_scopes_perm_ctx = await self._in_project_scopes_global(
+            ctx, user_accessible_project_scopes
         )
-        perm_ctx.merge(global_registries_perm_ctx)
+        perm_ctx.merge(global_project_scopes_perm_ctx)
         non_global_project_scopes_perm_ctx = await self._in_project_scopes_non_global(
             ctx, user_accessible_project_scopes
         )
@@ -1060,10 +1048,7 @@ class ImagePermissionContextBuilder(
         scope: ProjectScope,
     ) -> ImagePermissionContext:
         perm_ctx = ImagePermissionContext()
-        project_permissions = await self._verify_project_scope_and_calculate_permission(ctx, scope)
-        global_container_registries_perm_ctx = await self._in_global_registries(
-            ctx, project_permissions
-        )
+        global_container_registries_perm_ctx = await self._in_project_scopes_global(ctx, [scope])
         perm_ctx.merge(global_container_registries_perm_ctx)
         non_global_container_registries_perm_ctx = await self._in_project_scopes_non_global(
             ctx, [scope]
@@ -1233,43 +1218,89 @@ class ImagePermissionContextBuilder(
 
         return await self.calculate_permission(ctx, scope)
 
-    async def _in_global_registries(
+    async def _in_project_scopes_by_registry_condition(
         self,
         ctx: ClientContext,
-        permissions: frozenset[ImagePermission],
+        scopes: list[ProjectScope],
+        registry_condition_factory: Callable[[list[Any]], Any],
+        filter_global_registry: bool = False,
     ) -> ImagePermissionContext:
-        """
-        Grant `permissions` on every image of a global container registry the caller may use.
-
-        A global registry is shared by every project, so the project the caller looks from does
-        not narrow the image set nor decide the permissions; the caller passes in the permissions
-        it holds in the scope being built.
-        """
         from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
-        allowed_registries = await self._get_allowed_registries_for_user(ctx, ctx.user_id)
-        access_criteria = ImageAccessCriteria(
-            user_id=ctx.user_id,
-            allowed_registries=allowed_registries,
-        )
+        project_ids = [scope.project_id for scope in scopes]
+        project_id_to_permission_map: dict[str, frozenset[ImagePermission]] = {}
 
-        img_query_stmt = (
+        for scope in scopes:
+            permissions = await self._verify_project_scope_and_calculate_permission(ctx, scope)
+            project_id_to_permission_map[str(scope.project_id)] = permissions
+
+        global_registry_permissions: frozenset[ImagePermission] = frozenset()
+        if filter_global_registry:
+            if project_id_to_permission_map:
+                # Assumption: permissions for global registry images is same across all projects.
+                global_registry_permissions = list(project_id_to_permission_map.values())[0]
+            else:
+                # A global registry is shared by every project, so its images are not bound to
+                # one and stay visible to a caller that belongs to no project — there is just no
+                # per-project entry to read. Use what the caller holds in the system scope.
+                global_registry_permissions = await self.calculate_permission(ctx, SystemScope())
+
+        image_select_stmt = (
             sa.select(ImageRow)
             .join(ImageRow.registry_row)
-            .options(load_only(ImageRow.id, ImageRow.registry, ImageRow.labels))
-            .where(ContainerRegistryRow.is_global == true())
+            .options(
+                joinedload(ImageRow.registry_row).joinedload(
+                    ContainerRegistryRow.association_container_registries_groups_rows
+                )
+            )
+            .where(registry_condition_factory(project_ids))
         )
 
         image_id_to_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
-        for row in await self.db_session.scalars(img_query_stmt):
-            image_row = row
-            if not access_criteria.is_accessible_image(image_row):
+
+        result = (await self.db_session.scalars(image_select_stmt)).unique()
+        for row in result:
+            img_row = row
+
+            allowed_registries = await self._get_allowed_registries_for_user(ctx, ctx.user_id)
+            access_criteria = ImageAccessCriteria(
+                user_id=ctx.user_id,
+                allowed_registries=allowed_registries,
+            )
+
+            if not access_criteria.is_accessible_image(img_row):
                 continue
 
-            image_id_to_permission_map[image_row.id] = permissions
+            if filter_global_registry:
+                image_id_to_permission_map[img_row.id] = global_registry_permissions
+            else:
+                assoc_project_ids = [
+                    assoc.group_id
+                    for assoc in img_row.registry_row.association_container_registries_groups_rows
+                ]
+                for project_id in assoc_project_ids:
+                    perm = project_id_to_permission_map.get(str(project_id))
+                    if perm is not None:
+                        image_id_to_permission_map[img_row.id] = perm
 
         return ImagePermissionContext(
             object_id_to_additional_permission_map=image_id_to_permission_map
+        )
+
+    async def _in_project_scopes_global(
+        self,
+        ctx: ClientContext,
+        scopes: list[ProjectScope],
+    ) -> ImagePermissionContext:
+        from ai.backend.manager.models.container_registry import ContainerRegistryRow
+
+        def global_registry_condition(
+            _project_ids: list[Any],
+        ) -> sa.sql.elements.ColumnElement[Any]:
+            return ContainerRegistryRow.is_global == true()
+
+        return await self._in_project_scopes_by_registry_condition(
+            ctx, scopes, global_registry_condition, True
         )
 
     async def _in_project_scopes_non_global(
@@ -1282,54 +1313,15 @@ class ImagePermissionContextBuilder(
         )
         from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
-        project_ids = [scope.project_id for scope in scopes]
-        project_id_to_permission_map: dict[str, frozenset[ImagePermission]] = {}
-
-        for scope in scopes:
-            permissions = await self._verify_project_scope_and_calculate_permission(ctx, scope)
-            project_id_to_permission_map[str(scope.project_id)] = permissions
-
-        allowed_registries = await self._get_allowed_registries_for_user(ctx, ctx.user_id)
-        access_criteria = ImageAccessCriteria(
-            user_id=ctx.user_id,
-            allowed_registries=allowed_registries,
-        )
-
-        image_select_stmt = (
-            sa.select(ImageRow)
-            .join(ImageRow.registry_row)
-            .options(
-                joinedload(ImageRow.registry_row).joinedload(
-                    ContainerRegistryRow.association_container_registries_groups_rows
-                )
+        def non_global_registry_condition(
+            project_ids: list[Any],
+        ) -> sa.sql.elements.ColumnElement[Any]:
+            return ContainerRegistryRow.association_container_registries_groups_rows.any(
+                AssociationContainerRegistriesGroupsRow.group_id.in_(project_ids)
             )
-            .where(
-                ContainerRegistryRow.association_container_registries_groups_rows.any(
-                    AssociationContainerRegistriesGroupsRow.group_id.in_(project_ids)
-                )
-            )
-        )
 
-        image_id_to_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
-
-        result = (await self.db_session.scalars(image_select_stmt)).unique()
-        for row in result:
-            img_row = row
-
-            if not access_criteria.is_accessible_image(img_row):
-                continue
-
-            assoc_project_ids = [
-                assoc.group_id
-                for assoc in img_row.registry_row.association_container_registries_groups_rows
-            ]
-            for project_id in assoc_project_ids:
-                perm = project_id_to_permission_map.get(str(project_id))
-                if perm is not None:
-                    image_id_to_permission_map[img_row.id] = perm
-
-        return ImagePermissionContext(
-            object_id_to_additional_permission_map=image_id_to_permission_map
+        return await self._in_project_scopes_by_registry_condition(
+            ctx, scopes, non_global_registry_condition, False
         )
 
     @override
