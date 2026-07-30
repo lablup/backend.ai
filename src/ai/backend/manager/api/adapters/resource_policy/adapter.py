@@ -234,6 +234,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             max_session_lifetime=input.max_session_lifetime,
             max_concurrent_sessions=input.max_concurrent_sessions,
             max_pending_session_count=input.max_pending_session_count,
+            max_priority=input.max_priority,
             max_pending_session_resource_slots=(
                 self._entries_to_resource_slot(input.max_pending_session_resource_slots)
                 if input.max_pending_session_resource_slots is not None
@@ -299,6 +300,13 @@ class ResourcePolicyAdapter(BaseAdapter):
                 else TriState.update(
                     self._entries_to_resource_slot(input.max_pending_session_resource_slots)
                 )
+            ),
+            max_priority=(
+                TriState.nop()
+                if isinstance(input.max_priority, Sentinel)
+                else TriState.nullify()
+                if input.max_priority is None
+                else TriState.update(input.max_priority)
             ),
             max_concurrent_sftp_sessions=(
                 OptionalState.update(input.max_concurrent_sftp_sessions)
@@ -619,6 +627,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             max_session_lifetime=data.max_session_lifetime,
             max_concurrent_sessions=data.max_concurrent_sessions,
             max_pending_session_count=data.max_pending_session_count,
+            max_priority=data.max_priority,
             max_pending_session_resource_slots=(
                 cls._resource_slot_to_limit_entries(data.max_pending_session_resource_slots)
                 if data.max_pending_session_resource_slots is not None

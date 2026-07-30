@@ -110,6 +110,7 @@ class KeyPairResourcePolicyRow(Base):  # type: ignore[misc]
             max_session_lifetime=self.max_session_lifetime,
             max_concurrent_sessions=self.max_concurrent_sessions,
             max_pending_session_count=self.max_pending_session_count,
+            max_priority=self.max_priority,
             max_pending_session_resource_slots=self.max_pending_session_resource_slots,
             max_concurrent_sftp_sessions=self.max_concurrent_sftp_sessions,
             max_containers_per_session=self.max_containers_per_session,

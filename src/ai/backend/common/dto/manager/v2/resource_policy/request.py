@@ -75,6 +75,10 @@ class CreateKeypairResourcePolicyInput(BaseRequestModel):
         default=None,
         description="Maximum number of sessions in pending state. Null means unlimited.",
     )
+    max_priority: int | None = Field(
+        default=None,
+        description="Highest scheduling priority a session may declare. Null means uncapped.",
+    )
     max_pending_session_resource_slots: list[ResourceSlotEntryInput] | None = Field(
         default=None,
         description="Maximum resource slots occupied by pending sessions. Null means unlimited.",
@@ -124,6 +128,10 @@ class UpdateKeypairResourcePolicyInput(BaseRequestModel):
     max_pending_session_count: int | Sentinel | None = Field(
         default=SENTINEL,
         description="Updated max pending sessions. Set to null to clear.",
+    )
+    max_priority: int | Sentinel | None = Field(
+        default=SENTINEL,
+        description="Updated max priority. Set to null to clear.",
     )
     max_pending_session_resource_slots: list[ResourceSlotEntryInput] | Sentinel | None = Field(
         default=SENTINEL,
