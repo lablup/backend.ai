@@ -20495,7 +20495,7 @@
               }
             ],
             "default": 1,
-            "description": "Updated description. Use SENTINEL to clear, null to keep existing value.",
+            "description": "Updated description. Omit to keep the existing value, null to clear.",
             "title": "Description"
           },
           "is_active": {
