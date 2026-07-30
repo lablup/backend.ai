@@ -20952,7 +20952,7 @@ input UpdateDomainInput
   name: String = null
 
   """New description."""
-  description: String = null
+  description: String
 
   """Updated active status."""
   isActive: Boolean = null
@@ -20961,7 +20961,7 @@ input UpdateDomainInput
   allowedDockerRegistries: [String!] = null
 
   """New external integration identifier."""
-  integrationName: String = null
+  integrationName: String
 }
 
 """Added in 25.14.0. """
@@ -21059,15 +21059,15 @@ input UpdateKeypairResourcePolicyInput
   maxConcurrentSessions: Int = null
 
   """Updated max pending sessions."""
-  maxPendingSessionCount: Int = null
+  maxPendingSessionCount: Int
 
   """
   Added in 26.8.0. Updated max scheduling priority. Set to null to clear (uncapped).
   """
-  maxPriority: Int = null
+  maxPriority: Int
 
   """Updated max pending session resource slots."""
-  maxPendingSessionResourceSlots: [ResourceSlotEntryInput!] = null
+  maxPendingSessionResourceSlots: [ResourceSlotEntryInput!]
 
   """Updated max concurrent SFTP sessions."""
   maxConcurrentSftpSessions: Int = null
@@ -21100,7 +21100,7 @@ input UpdateLoginClientTypeInput
   name: String = null
 
   """Updated description. Pass null to clear, omit to leave unchanged."""
-  description: String = null
+  description: String
 }
 
 """Added in 26.4.2. Payload for login client type update."""
@@ -21296,13 +21296,13 @@ input UpdateProjectInput
   name: String = null
 
   """New description."""
-  description: String = null
+  description: String
 
   """Updated active status."""
   isActive: Boolean = null
 
   """New external integration identifier."""
-  integrationName: String = null
+  integrationName: String
 
   """New resource policy name."""
   resourcePolicy: String = null
@@ -21632,7 +21632,7 @@ input UpdateUserResourcePolicyInput
   """
   Added in 26.4.2. Updated maximum number of concurrent authenticated login sessions per user. Set to null to clear (unlimited). Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.
   """
-  maxConcurrentLogins: Int = null
+  maxConcurrentLogins: Int
 
   """Updated max quota scope size."""
   maxQuotaScopeSize: BinarySizeInput = null
