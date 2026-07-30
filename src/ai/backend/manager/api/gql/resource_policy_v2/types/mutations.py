@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from strawberry import UNSET
+import strawberry
 
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
     CreateKeypairResourcePolicyInput as CreateKeypairResourcePolicyInputDTO,
@@ -69,6 +69,11 @@ from .node import (
     ProjectResourcePolicyV2GQL,
     UserResourcePolicyV2GQL,
 )
+
+# NOTE: this shadows strawberry.UNSET and makes an omitted field arrive as an explicit
+# null. Fields whose adapter clears the column on null spell out strawberry.UNSET.
+UNSET = None
+
 
 # ── Keypair Resource Policy Inputs ──
 
@@ -137,17 +142,17 @@ class UpdateKeypairResourcePolicyInputGQL(PydanticInputMixin[UpdateKeypairResour
         default=UNSET, description="Updated max concurrent sessions."
     )
     max_pending_session_count: int | None = gql_field(
-        default=UNSET, description="Updated max pending sessions."
+        default=strawberry.UNSET, description="Updated max pending sessions."
     )
     max_priority: int | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Updated max scheduling priority. Set to null to clear (uncapped).",
         ),
-        default=UNSET,
+        default=strawberry.UNSET,
     )
     max_pending_session_resource_slots: list[ResourceSlotEntryInputGQL] | None = gql_field(
-        default=UNSET, description="Updated max pending session resource slots."
+        default=strawberry.UNSET, description="Updated max pending session resource slots."
     )
     max_concurrent_sftp_sessions: int | None = gql_field(
         default=UNSET, description="Updated max concurrent SFTP sessions."
@@ -218,7 +223,7 @@ class UpdateUserResourcePolicyInputGQL(PydanticInputMixin[UpdateUserResourcePoli
                 " which caps compute sessions."
             ),
         ),
-        default=UNSET,
+        default=strawberry.UNSET,
     )
     max_quota_scope_size: BinarySizeInputGQL | None = gql_field(
         default=UNSET, description="Updated max quota scope size."

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from strawberry import UNSET
+import strawberry
 
 from ai.backend.common.dto.manager.v2.group.request import (
     CreateProjectInput as CreateProjectInputDTO,
@@ -39,6 +39,11 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
+
+# NOTE: this shadows strawberry.UNSET and makes an omitted field arrive as an explicit
+# null. Fields whose adapter clears the column on null spell out strawberry.UNSET.
+UNSET = None
+
 
 # --- Inputs ---
 
@@ -75,10 +80,10 @@ class UpdateProjectInputGQL(PydanticInputMixin[UpdateProjectInputDTO]):
     """Input for updating project information."""
 
     name: str | None = gql_field(default=UNSET, description="New project name.")
-    description: str | None = gql_field(default=UNSET, description="New description.")
+    description: str | None = gql_field(default=strawberry.UNSET, description="New description.")
     is_active: bool | None = gql_field(default=UNSET, description="Updated active status.")
     integration_name: str | None = gql_field(
-        default=UNSET, description="New external integration identifier."
+        default=strawberry.UNSET, description="New external integration identifier."
     )
     resource_policy: str | None = gql_field(default=UNSET, description="New resource policy name.")
 

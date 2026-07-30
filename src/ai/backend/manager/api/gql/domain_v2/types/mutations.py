@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from strawberry import UNSET
+import strawberry
 
 from ai.backend.common.dto.manager.v2.domain.request import (
     CreateDomainInput as CreateDomainInputDTO,
@@ -27,6 +27,11 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticOutputMixin
+
+# NOTE: this shadows strawberry.UNSET and makes an omitted field arrive as an explicit
+# null. Fields whose adapter clears the column on null spell out strawberry.UNSET.
+UNSET = None
+
 
 # --- Inputs ---
 
@@ -63,13 +68,13 @@ class UpdateDomainInputGQL(PydanticInputMixin[UpdateDomainInputDTO]):
     """Input for updating domain information."""
 
     name: str | None = gql_field(default=UNSET, description="New domain name.")
-    description: str | None = gql_field(default=UNSET, description="New description.")
+    description: str | None = gql_field(default=strawberry.UNSET, description="New description.")
     is_active: bool | None = gql_field(default=UNSET, description="Updated active status.")
     allowed_docker_registries: list[str] | None = gql_field(
         default=UNSET, description="New allowed Docker registry URLs."
     )
     integration_name: str | None = gql_field(
-        default=UNSET, description="New external integration identifier."
+        default=strawberry.UNSET, description="New external integration identifier."
     )
 
 

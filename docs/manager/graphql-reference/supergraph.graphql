@@ -3999,16 +3999,16 @@ input CreateDomainInput
   name: String!
 
   """Optional description."""
-  description: String
+  description: String = null
 
   """Whether the domain is active."""
   isActive: Boolean! = true
 
   """Allowed Docker registry URLs."""
-  allowedDockerRegistries: [String!]
+  allowedDockerRegistries: [String!] = null
 
   """External integration identifier."""
-  integrationName: String
+  integrationName: String = null
 }
 
 """Added in 24.12.0."""
@@ -4205,15 +4205,15 @@ input CreateKeypairResourcePolicyInput
   idleTimeout: Int!
 
   """Maximum pending sessions. Null means unlimited."""
-  maxPendingSessionCount: Int
+  maxPendingSessionCount: Int = null
 
   """
   Added in 26.8.0. Highest scheduling priority a session created with this policy may declare. Null means uncapped.
   """
-  maxPriority: Int
+  maxPriority: Int = null
 
   """Maximum pending session resource slots."""
-  maxPendingSessionResourceSlots: [ResourceSlotEntryInput!]
+  maxPendingSessionResourceSlots: [ResourceSlotEntryInput!] = null
 
   """Maximum concurrent SFTP sessions."""
   maxConcurrentSftpSessions: Int! = 1
@@ -4426,13 +4426,13 @@ input CreateProjectInput
   domainName: String!
 
   """Optional description."""
-  description: String
+  description: String = null
 
   """External integration identifier."""
-  integrationName: String
+  integrationName: String = null
 
   """Name of the resource policy to apply."""
-  resourcePolicy: String
+  resourcePolicy: String = null
 }
 
 type CreateProjectResourcePolicy
@@ -4894,7 +4894,7 @@ input CreateUserResourcePolicyInputV2
   """
   Added in 26.4.2. Maximum number of concurrent authenticated login sessions per user. Null means unlimited. Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.
   """
-  maxConcurrentLogins: Int
+  maxConcurrentLogins: Int = null
 
   """Maximum quota scope size (e.g., '1g', '536870912')."""
   maxQuotaScopeSize: BinarySizeInput!
@@ -20949,16 +20949,16 @@ input UpdateDomainInput
   @join__type(graph: STRAWBERRY)
 {
   """New domain name."""
-  name: String
+  name: String = null
 
   """New description."""
   description: String
 
   """Updated active status."""
-  isActive: Boolean
+  isActive: Boolean = null
 
   """New allowed Docker registry URLs."""
-  allowedDockerRegistries: [String!]
+  allowedDockerRegistries: [String!] = null
 
   """New external integration identifier."""
   integrationName: String
@@ -21047,16 +21047,16 @@ input UpdateKeypairResourcePolicyInput
   @join__type(graph: STRAWBERRY)
 {
   """Updated default for unspecified."""
-  defaultForUnspecified: String
+  defaultForUnspecified: String = null
 
   """Updated resource slot limits."""
-  totalResourceSlots: [ResourceSlotEntryInput!]
+  totalResourceSlots: [ResourceSlotEntryInput!] = null
 
   """Updated max session lifetime."""
-  maxSessionLifetime: Int
+  maxSessionLifetime: Int = null
 
   """Updated max concurrent sessions."""
-  maxConcurrentSessions: Int
+  maxConcurrentSessions: Int = null
 
   """Updated max pending sessions."""
   maxPendingSessionCount: Int
@@ -21070,16 +21070,16 @@ input UpdateKeypairResourcePolicyInput
   maxPendingSessionResourceSlots: [ResourceSlotEntryInput!]
 
   """Updated max concurrent SFTP sessions."""
-  maxConcurrentSftpSessions: Int
+  maxConcurrentSftpSessions: Int = null
 
   """Updated max containers per session."""
-  maxContainersPerSession: Int
+  maxContainersPerSession: Int = null
 
   """Updated idle timeout."""
-  idleTimeout: Int
+  idleTimeout: Int = null
 
   """Updated vfolder host permissions."""
-  allowedVfolderHosts: [VFolderHostPermissionEntryInput!]
+  allowedVfolderHosts: [VFolderHostPermissionEntryInput!] = null
 }
 
 """Added in 26.4.2. Payload for keypair resource policy update mutation."""
@@ -21293,19 +21293,19 @@ input UpdateProjectInput
   @join__type(graph: STRAWBERRY)
 {
   """New project name."""
-  name: String
+  name: String = null
 
   """New description."""
   description: String
 
   """Updated active status."""
-  isActive: Boolean
+  isActive: Boolean = null
 
   """New external integration identifier."""
   integrationName: String
 
   """New resource policy name."""
-  resourcePolicy: String
+  resourcePolicy: String = null
 }
 
 """
@@ -21315,13 +21315,13 @@ input UpdateProjectResourcePolicyInput
   @join__type(graph: STRAWBERRY)
 {
   """Updated max vfolder count."""
-  maxVfolderCount: Int
+  maxVfolderCount: Int = null
 
   """Updated max quota scope size."""
-  maxQuotaScopeSize: BinarySizeInput
+  maxQuotaScopeSize: BinarySizeInput = null
 
   """Updated max network count."""
-  maxNetworkCount: Int
+  maxNetworkCount: Int = null
 }
 
 """Added in 26.4.2. Payload for project resource policy update mutation."""
@@ -21627,7 +21627,7 @@ input UpdateUserResourcePolicyInput
   @join__type(graph: STRAWBERRY)
 {
   """Updated max vfolder count."""
-  maxVfolderCount: Int
+  maxVfolderCount: Int = null
 
   """
   Added in 26.4.2. Updated maximum number of concurrent authenticated login sessions per user. Set to null to clear (unlimited). Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.
@@ -21635,13 +21635,13 @@ input UpdateUserResourcePolicyInput
   maxConcurrentLogins: Int
 
   """Updated max quota scope size."""
-  maxQuotaScopeSize: BinarySizeInput
+  maxQuotaScopeSize: BinarySizeInput = null
 
   """Updated max sessions per model session."""
-  maxSessionCountPerModelSession: Int
+  maxSessionCountPerModelSession: Int = null
 
   """Updated max customized image count."""
-  maxCustomizedImageCount: Int
+  maxCustomizedImageCount: Int = null
 }
 
 """Added in 26.4.2. Payload for user resource policy update mutation."""
