@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from strawberry import UNSET
+
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
     CreateKeypairResourcePolicyInput as CreateKeypairResourcePolicyInputDTO,
 )
@@ -67,9 +69,6 @@ from .node import (
     ProjectResourcePolicyV2GQL,
     UserResourcePolicyV2GQL,
 )
-
-UNSET = None
-
 
 # ── Keypair Resource Policy Inputs ──
 

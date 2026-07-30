@@ -716,7 +716,7 @@ class UpdateDeploymentRevisionPresetInputGQL(PydanticInputMixin[UpdateInputDTO])
         default=None,
     )
     name: str | None = gql_field(default=None, description="New name.")
-    description: str | None = gql_field(default=None, description="New description.")
+    description: str | None = gql_field(default=UNSET, description="New description.")
     rank: int | None = gql_field(default=None, description="New rank.")
     open_to_public: bool | None = gql_field(
         default=UNSET,

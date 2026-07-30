@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from strawberry import UNSET
+
 from ai.backend.common.dto.manager.v2.domain.request import (
     CreateDomainInput as CreateDomainInputDTO,
 )
@@ -25,9 +27,6 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticOutputMixin
-
-UNSET = None
-
 
 # --- Inputs ---
 

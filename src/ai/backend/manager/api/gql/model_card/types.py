@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Annotated, Self
 from uuid import UUID
 
 import strawberry
-from strawberry import Info
+from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.common import OrderDirection
@@ -444,19 +444,19 @@ class CreateModelCardInputGQL(PydanticInputMixin[CreateInputDTO]):
 class UpdateModelCardInputGQL(PydanticInputMixin[UpdateInputDTO]):
     id: UUID = gql_field(description="Model card ID.")
     name: str | None = gql_field(default=None, description="New name.")
-    author: str | None = gql_field(default=None, description="Author.")
-    title: str | None = gql_field(default=None, description="Title.")
-    model_version: str | None = gql_field(default=None, description="Version.")
-    description: str | None = gql_field(default=None, description="Description.")
-    task: str | None = gql_field(default=None, description="ML task.")
-    category: str | None = gql_field(default=None, description="Category.")
-    architecture: str | None = gql_field(default=None, description="Architecture.")
+    author: str | None = gql_field(default=UNSET, description="Author.")
+    title: str | None = gql_field(default=UNSET, description="Title.")
+    model_version: str | None = gql_field(default=UNSET, description="Version.")
+    description: str | None = gql_field(default=UNSET, description="Description.")
+    task: str | None = gql_field(default=UNSET, description="ML task.")
+    category: str | None = gql_field(default=UNSET, description="Category.")
+    architecture: str | None = gql_field(default=UNSET, description="Architecture.")
     framework: list[str] | None = gql_field(default=None, description="Frameworks.")
     label: list[str] | None = gql_field(default=None, description="Labels.")
-    license: str | None = gql_field(default=None, description="License.")
-    readme: str | None = gql_field(default=None, description="README content.")
+    license: str | None = gql_field(default=UNSET, description="License.")
+    readme: str | None = gql_field(default=UNSET, description="README content.")
     access_level: ModelCardAccessLevelGQL | None = gql_field(
-        default=None, description="Access level (public or internal)."
+        default=UNSET, description="Access level (public or internal)."
     )
 
 

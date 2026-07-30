@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from strawberry import UNSET
+
 from ai.backend.common.dto.manager.v2.group.request import (
     CreateProjectInput as CreateProjectInputDTO,
 )
@@ -37,9 +39,6 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
-
-UNSET = None
-
 
 # --- Inputs ---
 

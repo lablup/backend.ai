@@ -2684,16 +2684,16 @@ input CreateDomainInput {
   name: String!
 
   """Optional description."""
-  description: String = null
+  description: String
 
   """Whether the domain is active."""
   isActive: Boolean! = true
 
   """Allowed Docker registry URLs."""
-  allowedDockerRegistries: [String!] = null
+  allowedDockerRegistries: [String!]
 
   """External integration identifier."""
-  integrationName: String = null
+  integrationName: String
 }
 
 """Added in 26.4.2. Input for creating a file download session."""
@@ -2813,15 +2813,15 @@ input CreateKeypairResourcePolicyInput {
   idleTimeout: Int!
 
   """Maximum pending sessions. Null means unlimited."""
-  maxPendingSessionCount: Int = null
+  maxPendingSessionCount: Int
 
   """
   Added in 26.8.0. Highest scheduling priority a session created with this policy may declare. Null means uncapped.
   """
-  maxPriority: Int = null
+  maxPriority: Int
 
   """Maximum pending session resource slots."""
-  maxPendingSessionResourceSlots: [ResourceSlotEntryInput!] = null
+  maxPendingSessionResourceSlots: [ResourceSlotEntryInput!]
 
   """Maximum concurrent SFTP sessions."""
   maxConcurrentSftpSessions: Int! = 1
@@ -2977,13 +2977,13 @@ input CreateProjectInput {
   domainName: String!
 
   """Optional description."""
-  description: String = null
+  description: String
 
   """External integration identifier."""
-  integrationName: String = null
+  integrationName: String
 
   """Name of the resource policy to apply."""
-  resourcePolicy: String = null
+  resourcePolicy: String
 }
 
 """Added in 26.4.2. Input for creating a project resource policy."""
@@ -3278,7 +3278,7 @@ input CreateUserResourcePolicyInputV2 {
   """
   Added in 26.4.2. Maximum number of concurrent authenticated login sessions per user. Null means unlimited. Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.
   """
-  maxConcurrentLogins: Int = null
+  maxConcurrentLogins: Int
 
   """Maximum quota scope size (e.g., '1g', '536870912')."""
   maxQuotaScopeSize: BinarySizeInput!
@@ -14847,7 +14847,7 @@ input UpdateDeploymentRevisionPresetInput {
   name: String = null
 
   """New description."""
-  description: String = null
+  description: String
 
   """New rank."""
   rank: Int = null
@@ -14926,19 +14926,19 @@ Added in 26.4.2. Input for updating domain information. All fields optional.
 """
 input UpdateDomainInput {
   """New domain name."""
-  name: String = null
+  name: String
 
   """New description."""
-  description: String = null
+  description: String
 
   """Updated active status."""
-  isActive: Boolean = null
+  isActive: Boolean
 
   """New allowed Docker registry URLs."""
-  allowedDockerRegistries: [String!] = null
+  allowedDockerRegistries: [String!]
 
   """New external integration identifier."""
-  integrationName: String = null
+  integrationName: String
 }
 
 """Added in 25.14.0. """
@@ -15010,39 +15010,39 @@ Added in 26.4.2. Input for updating a keypair resource policy. All fields option
 """
 input UpdateKeypairResourcePolicyInput {
   """Updated default for unspecified."""
-  defaultForUnspecified: String = null
+  defaultForUnspecified: String
 
   """Updated resource slot limits."""
-  totalResourceSlots: [ResourceSlotEntryInput!] = null
+  totalResourceSlots: [ResourceSlotEntryInput!]
 
   """Updated max session lifetime."""
-  maxSessionLifetime: Int = null
+  maxSessionLifetime: Int
 
   """Updated max concurrent sessions."""
-  maxConcurrentSessions: Int = null
+  maxConcurrentSessions: Int
 
   """Updated max pending sessions."""
-  maxPendingSessionCount: Int = null
+  maxPendingSessionCount: Int
 
   """
   Added in 26.8.0. Updated max scheduling priority. Set to null to clear (uncapped).
   """
-  maxPriority: Int = null
+  maxPriority: Int
 
   """Updated max pending session resource slots."""
-  maxPendingSessionResourceSlots: [ResourceSlotEntryInput!] = null
+  maxPendingSessionResourceSlots: [ResourceSlotEntryInput!]
 
   """Updated max concurrent SFTP sessions."""
-  maxConcurrentSftpSessions: Int = null
+  maxConcurrentSftpSessions: Int
 
   """Updated max containers per session."""
-  maxContainersPerSession: Int = null
+  maxContainersPerSession: Int
 
   """Updated idle timeout."""
-  idleTimeout: Int = null
+  idleTimeout: Int
 
   """Updated vfolder host permissions."""
-  allowedVfolderHosts: [VFolderHostPermissionEntryInput!] = null
+  allowedVfolderHosts: [VFolderHostPermissionEntryInput!]
 }
 
 """Added in 26.4.2. Payload for keypair resource policy update mutation."""
@@ -15059,7 +15059,7 @@ input UpdateLoginClientTypeInput {
   name: String = null
 
   """Updated description. Pass null to clear, omit to leave unchanged."""
-  description: String = null
+  description: String
 }
 
 """Added in 26.4.2. Payload for login client type update."""
@@ -15083,25 +15083,25 @@ input UpdateModelCardV2Input {
   name: String = null
 
   """Author."""
-  author: String = null
+  author: String
 
   """Title."""
-  title: String = null
+  title: String
 
   """Version."""
-  modelVersion: String = null
+  modelVersion: String
 
   """Description."""
-  description: String = null
+  description: String
 
   """ML task."""
-  task: String = null
+  task: String
 
   """Category."""
-  category: String = null
+  category: String
 
   """Architecture."""
-  architecture: String = null
+  architecture: String
 
   """Frameworks."""
   framework: [String!] = null
@@ -15110,13 +15110,13 @@ input UpdateModelCardV2Input {
   label: [String!] = null
 
   """License."""
-  license: String = null
+  license: String
 
   """README content."""
-  readme: String = null
+  readme: String
 
   """Access level (public or internal)."""
-  accessLevel: ModelCardV2AccessLevel = null
+  accessLevel: ModelCardV2AccessLevel
 }
 
 """
@@ -15222,19 +15222,19 @@ Added in 26.4.2. Input for updating project information. All fields optional.
 """
 input UpdateProjectInput {
   """New project name."""
-  name: String = null
+  name: String
 
   """New description."""
-  description: String = null
+  description: String
 
   """Updated active status."""
-  isActive: Boolean = null
+  isActive: Boolean
 
   """New external integration identifier."""
-  integrationName: String = null
+  integrationName: String
 
   """New resource policy name."""
-  resourcePolicy: String = null
+  resourcePolicy: String
 }
 
 """
@@ -15242,13 +15242,13 @@ Added in 26.4.2. Input for updating a project resource policy. All fields option
 """
 input UpdateProjectResourcePolicyInput {
   """Updated max vfolder count."""
-  maxVfolderCount: Int = null
+  maxVfolderCount: Int
 
   """Updated max quota scope size."""
-  maxQuotaScopeSize: BinarySizeInput = null
+  maxQuotaScopeSize: BinarySizeInput
 
   """Updated max network count."""
-  maxNetworkCount: Int = null
+  maxNetworkCount: Int
 }
 
 """Added in 26.4.2. Payload for project resource policy update mutation."""
@@ -15376,10 +15376,10 @@ input UpdateResourcePresetV2Input {
   resourceSlots: [ResourceSlotEntryInput!] = null
 
   """Updated shared memory. Use null to clear."""
-  sharedMemory: BinarySizeInput = null
+  sharedMemory: BinarySizeInput
 
   """Updated resource group name. Use null to make global."""
-  resourceGroupName: String = null
+  resourceGroupName: String
 }
 
 """Added in 26.8.0. Update retention policy input."""
@@ -15480,7 +15480,7 @@ input UpdateRuntimeVariantPresetInput {
   name: String = null
 
   """New description."""
-  description: String = null
+  description: String
 
   """New rank."""
   rank: Int = null
@@ -15492,7 +15492,7 @@ input UpdateRuntimeVariantPresetInput {
   valueType: PresetValueType = null
 
   """New default value."""
-  defaultValue: String = null
+  defaultValue: String
 
   """New key."""
   key: String = null
@@ -15512,21 +15512,21 @@ Added in 26.4.2. Input for updating a user resource policy. All fields optional.
 """
 input UpdateUserResourcePolicyInput {
   """Updated max vfolder count."""
-  maxVfolderCount: Int = null
+  maxVfolderCount: Int
 
   """
   Added in 26.4.2. Updated maximum number of concurrent authenticated login sessions per user. Set to null to clear (unlimited). Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.
   """
-  maxConcurrentLogins: Int = null
+  maxConcurrentLogins: Int
 
   """Updated max quota scope size."""
-  maxQuotaScopeSize: BinarySizeInput = null
+  maxQuotaScopeSize: BinarySizeInput
 
   """Updated max sessions per model session."""
-  maxSessionCountPerModelSession: Int = null
+  maxSessionCountPerModelSession: Int
 
   """Updated max customized image count."""
-  maxCustomizedImageCount: Int = null
+  maxCustomizedImageCount: Int
 }
 
 """Added in 26.4.2. Payload for user resource policy update mutation."""
