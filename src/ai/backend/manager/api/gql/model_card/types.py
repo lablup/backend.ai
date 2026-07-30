@@ -443,7 +443,7 @@ class CreateModelCardInputGQL(PydanticInputMixin[CreateInputDTO]):
 )
 class UpdateModelCardInputGQL(PydanticInputMixin[UpdateInputDTO]):
     id: UUID = gql_field(description="Model card ID.")
-    name: str | None = gql_field(default=None, description="New name.")
+    name: str | None = gql_field(default=UNSET, description="New name.")
     author: str | None = gql_field(default=UNSET, description="Author.")
     title: str | None = gql_field(default=UNSET, description="Title.")
     model_version: str | None = gql_field(default=UNSET, description="Version.")
@@ -451,8 +451,8 @@ class UpdateModelCardInputGQL(PydanticInputMixin[UpdateInputDTO]):
     task: str | None = gql_field(default=UNSET, description="ML task.")
     category: str | None = gql_field(default=UNSET, description="Category.")
     architecture: str | None = gql_field(default=UNSET, description="Architecture.")
-    framework: list[str] | None = gql_field(default=None, description="Frameworks.")
-    label: list[str] | None = gql_field(default=None, description="Labels.")
+    framework: list[str] | None = gql_field(default=UNSET, description="Frameworks.")
+    label: list[str] | None = gql_field(default=UNSET, description="Labels.")
     license: str | None = gql_field(default=UNSET, description="License.")
     readme: str | None = gql_field(default=UNSET, description="README content.")
     access_level: ModelCardAccessLevelGQL | None = gql_field(

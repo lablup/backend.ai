@@ -202,9 +202,9 @@ class CreateResourcePresetPayloadGQL(PydanticOutputMixin[CreateResourcePresetPay
 )
 class UpdateResourcePresetInputGQL(PydanticInputMixin[UpdateResourcePresetInputDTO]):
     id: UUID = gql_field(description="UUID of the resource preset to update.")
-    name: str | None = gql_field(default=None, description="Updated name.")
+    name: str | None = gql_field(default=UNSET, description="Updated name.")
     resource_slots: list[ResourceSlotEntryInputGQL] | None = gql_field(
-        default=None, description="Updated resource slot allocations."
+        default=UNSET, description="Updated resource slot allocations."
     )
     shared_memory: BinarySizeInputGQL | None = gql_field(
         default=UNSET,

@@ -341,16 +341,16 @@ class CreateRuntimeVariantPresetInputGQL(PydanticInputMixin[CreateInputDTO]):
 )
 class UpdateRuntimeVariantPresetInputGQL(PydanticInputMixin[UpdateInputDTO]):
     id: UUID = gql_field(description="Preset ID.")
-    name: str | None = gql_field(default=None, description="New name.")
+    name: str | None = gql_field(default=UNSET, description="New name.")
     description: str | None = gql_field(default=UNSET, description="New description.")
-    rank: int | None = gql_field(default=None, description="New rank.")
-    preset_target: PresetTargetGQL | None = gql_field(default=None, description="New target.")
-    value_type: PresetValueTypeGQL | None = gql_field(default=None, description="New value type.")
+    rank: int | None = gql_field(default=UNSET, description="New rank.")
+    preset_target: PresetTargetGQL | None = gql_field(default=UNSET, description="New target.")
+    value_type: PresetValueTypeGQL | None = gql_field(default=UNSET, description="New value type.")
     default_value: str | None = gql_field(default=UNSET, description="New default value.")
-    key: str | None = gql_field(default=None, description="New key.")
+    key: str | None = gql_field(default=UNSET, description="New key.")
     required: bool | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.4.4", description="New required flag."),
-        default=None,
+        default=UNSET,
     )
 
 

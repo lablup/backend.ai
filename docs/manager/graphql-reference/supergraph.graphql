@@ -20860,16 +20860,16 @@ input UpdateDeploymentRevisionPresetInput
   """
   Added in 26.4.4. New runtime variant for the preset. Omit to leave unchanged.
   """
-  runtimeVariantId: UUID = null
+  runtimeVariantId: UUID
 
   """New name."""
-  name: String = null
+  name: String
 
   """New description."""
   description: String
 
   """New rank."""
-  rank: Int = null
+  rank: Int
 
   """
   Default open_to_public for deployments created from this preset. Set to null to clear.
@@ -20910,28 +20910,28 @@ input UpdateDeploymentRevisionPresetInput
   """
   Added in 26.4.4. Replace resource slot allocations. Omit to leave unchanged.
   """
-  resourceSlots: [ResourceSlotEntryInput!] = null
+  resourceSlots: [ResourceSlotEntryInput!]
 
   """
   Added in 26.4.4. Replace additional resource options. Omit to leave unchanged.
   """
-  resourceOpts: [ResourceOptsEntryInput!] = null
+  resourceOpts: [ResourceOptsEntryInput!]
 
   """Added in 26.4.4. New cluster topology mode. Omit to leave unchanged."""
-  clusterMode: ClusterMode = null
+  clusterMode: ClusterMode
 
   """Added in 26.4.4. New cluster size. Omit to leave unchanged."""
-  clusterSize: Int = null
+  clusterSize: Int
 
   """
   Added in 26.4.4. Replace environment variables. Omit to leave unchanged.
   """
-  environ: [EnvironEntryInput!] = null
+  environ: [EnvironEntryInput!]
 
   """
   Added in 26.4.4. Replace runtime variant preset values. Omit to leave unchanged.
   """
-  presetValues: [RuntimeVariantPresetValueEntryInput!] = null
+  presetValues: [RuntimeVariantPresetValueEntryInput!]
 }
 
 """Added in 26.4.2. Update deployment revision preset payload."""
@@ -21097,7 +21097,7 @@ input UpdateLoginClientTypeInput
   @join__type(graph: STRAWBERRY)
 {
   """Updated name."""
-  name: String = null
+  name: String
 
   """Updated description. Pass null to clear, omit to leave unchanged."""
   description: String
@@ -21127,7 +21127,7 @@ input UpdateModelCardV2Input
   id: UUID!
 
   """New name."""
-  name: String = null
+  name: String
 
   """Author."""
   author: String
@@ -21151,10 +21151,10 @@ input UpdateModelCardV2Input
   architecture: String
 
   """Frameworks."""
-  framework: [String!] = null
+  framework: [String!]
 
   """Labels."""
-  label: [String!] = null
+  label: [String!]
 
   """License."""
   license: String
@@ -21461,10 +21461,10 @@ input UpdateResourcePresetV2Input
   id: UUID!
 
   """Updated name."""
-  name: String = null
+  name: String
 
   """Updated resource slot allocations."""
-  resourceSlots: [ResourceSlotEntryInput!] = null
+  resourceSlots: [ResourceSlotEntryInput!]
 
   """Updated shared memory. Use null to clear."""
   sharedMemory: BinarySizeInput
@@ -21588,28 +21588,28 @@ input UpdateRuntimeVariantPresetInput
   id: UUID!
 
   """New name."""
-  name: String = null
+  name: String
 
   """New description."""
   description: String
 
   """New rank."""
-  rank: Int = null
+  rank: Int
 
   """New target."""
-  presetTarget: PresetTarget = null
+  presetTarget: PresetTarget
 
   """New value type."""
-  valueType: PresetValueType = null
+  valueType: PresetValueType
 
   """New default value."""
   defaultValue: String
 
   """New key."""
-  key: String = null
+  key: String
 
   """Added in 26.4.4. New required flag."""
-  required: Boolean = null
+  required: Boolean
 }
 
 """Added in 26.4.2. Update preset payload."""
