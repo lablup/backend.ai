@@ -331,6 +331,9 @@ class KeypairResourcePolicyFilter(BaseRequestModel):
     max_pending_session_count: IntFilter | None = Field(
         default=None, description="Filter by max pending session count."
     )
+    max_priority: IntFilter | None = Field(
+        default=None, description="Filter by max scheduling priority."
+    )
     AND: list[Self] | None = Field(default=None, description="Match all of the given sub-filters.")
     OR: list[Self] | None = Field(default=None, description="Match any of the given sub-filters.")
     NOT: list[Self] | None = Field(default=None, description="Negate the given sub-filters.")

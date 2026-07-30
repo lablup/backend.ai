@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
     CreateKeypairResourcePolicyInput as CreateKeypairResourcePolicyInputDTO,
 )
@@ -47,6 +48,7 @@ from ai.backend.common.dto.manager.v2.resource_policy.response import (
 from ai.backend.common.dto.manager.v2.resource_policy.response import (
     UpdateUserResourcePolicyPayload as UpdateUserResourcePolicyPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.common_types import (
     BinarySizeInputGQL,
     ResourceSlotEntryInputGQL,
@@ -95,6 +97,16 @@ class CreateKeypairResourcePolicyInputGQL(PydanticInputMixin[CreateKeypairResour
     max_pending_session_count: int | None = gql_field(
         default=UNSET, description="Maximum pending sessions. Null means unlimited."
     )
+    max_priority: int | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Highest scheduling priority a session created with this policy may declare."
+                " Null means uncapped."
+            ),
+        ),
+        default=UNSET,
+    )
     max_pending_session_resource_slots: list[ResourceSlotEntryInputGQL] | None = gql_field(
         default=UNSET, description="Maximum pending session resource slots."
     )
@@ -128,6 +140,16 @@ class UpdateKeypairResourcePolicyInputGQL(PydanticInputMixin[UpdateKeypairResour
     )
     max_pending_session_count: int | None = gql_field(
         default=UNSET, description="Updated max pending sessions."
+    )
+    max_priority: int | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Updated max scheduling priority."
+                " Omit to keep the current value; set to null to clear (uncapped)."
+            ),
+        ),
+        default=SENTINEL,
     )
     max_pending_session_resource_slots: list[ResourceSlotEntryInputGQL] | None = gql_field(
         default=UNSET, description="Updated max pending session resource slots."

@@ -732,6 +732,13 @@ class ResourcePolicyAdapter(BaseAdapter):
             )
             if cond is not None:
                 conditions.append(cond)
+        if filter.max_priority is not None:
+            cond = self.convert_int_filter(
+                filter.max_priority,
+                KeypairResourcePolicyConditions.by_max_priority,
+            )
+            if cond is not None:
+                conditions.append(cond)
         if filter.keypair is not None:
             cond = self._convert_keypair_nested_filter(filter.keypair)
             if cond is not None:
@@ -946,6 +953,8 @@ def _resolve_keypair_order(
             return KeypairResourcePolicyOrders.max_concurrent_sftp_sessions(ascending)
         case KeypairResourcePolicyOrderField.MAX_PENDING_SESSION_COUNT:
             return KeypairResourcePolicyOrders.max_pending_session_count(ascending)
+        case KeypairResourcePolicyOrderField.MAX_PRIORITY:
+            return KeypairResourcePolicyOrders.max_priority(ascending)
 
 
 def _resolve_user_order(
