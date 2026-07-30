@@ -242,7 +242,7 @@ class TestResourceGroupGQLResourceInfoResolver:
             id=uuid.uuid4(),
             name="test-group",
             status=ResourceGroupStatusGQL.from_pydantic(
-                ResourceGroupStatusInfo(is_active=True, is_public=True)
+                ResourceGroupStatusInfo(is_active=True, is_public=True, is_default=False)
             ),
             metadata=ResourceGroupMetadataGQL.from_pydantic(
                 ResourceGroupMetadataInfo(

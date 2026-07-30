@@ -340,6 +340,8 @@ class ResourceGroupAdapter(BaseAdapter):
             conditions.append(ScalingGroupConditions.by_is_active(filter_.is_active))
         if filter_.is_public is not None:
             conditions.append(ScalingGroupConditions.by_is_public(filter_.is_public))
+        if filter_.is_default is not None:
+            conditions.append(ScalingGroupConditions.by_is_default(filter_.is_default))
         if filter_.AND:
             for sub in filter_.AND:
                 conditions.extend(self._convert_filter(sub))
@@ -801,6 +803,7 @@ class ResourceGroupAdapter(BaseAdapter):
             status=ResourceGroupStatusInfo(
                 is_active=data.status.is_active,
                 is_public=data.status.is_public,
+                is_default=data.status.is_default,
             ),
             metadata=ResourceGroupMetadataInfo(
                 description=data.metadata.description or None,
