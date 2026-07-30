@@ -120,17 +120,6 @@ class SessionStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def preemptable_statuses(cls) -> frozenset[SessionStatus]:
-        """Return statuses that can transition to PREEMPTED.
-
-        Only RUNNING sessions are eligible preemption victims (BEP-1055).
-        Sessions still being provisioned or already terminating are never
-        marked PREEMPTED, so those source statuses are rejected.
-        """
-        return frozenset((cls.RUNNING,))
-
-    @classmethod
-    @lru_cache(maxsize=1)
     def preemption_victim_statuses(cls) -> frozenset[SessionStatus]:
         """Return statuses eligible as preemption victim candidates (BEP-1055).
 
