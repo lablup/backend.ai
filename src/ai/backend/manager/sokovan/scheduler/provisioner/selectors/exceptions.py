@@ -77,7 +77,7 @@ class NoAgentsInResourceGroupError(AgentSelectionError, web.HTTPServiceUnavailab
         )
 
 
-class NoCompatibleAgentError(AgentSelectionError):
+class NoCompatibleAgentError(AgentSelectionError, web.HTTPNotFound):
     """Raised inside an exclusion filter's recorder step when no candidates
     survive it.
 
