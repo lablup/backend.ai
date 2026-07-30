@@ -199,6 +199,7 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.errors.service import EndpointTokenNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
@@ -1227,6 +1228,12 @@ class DeploymentAdapter(BaseAdapter):
         image_id = input.image.id if input.image is not None else None
 
         resource_spec = None
+        if (input.cluster_config is None) != (input.resource_config is None):
+            missing = "cluster_config" if input.cluster_config is None else "resource_config"
+            raise InvalidAPIParameters(
+                f"{missing} is required alongside the one provided; "
+                "supply both to override the revision's resource spec, or neither to inherit it"
+            )
         if input.cluster_config is not None and input.resource_config is not None:
             resource_opts = (
                 {e.name: e.value for e in input.resource_config.resource_opts.entries}
