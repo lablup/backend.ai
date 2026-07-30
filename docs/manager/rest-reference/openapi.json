@@ -20173,6 +20173,19 @@
             "description": "Filter by public status.",
             "title": "Is Public"
           },
+          "is_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by whether the resource group is the default one.",
+            "title": "Is Default"
+          },
           "AND": {
             "anyOf": [
               {

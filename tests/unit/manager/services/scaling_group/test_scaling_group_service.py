@@ -129,6 +129,7 @@ class TestScalingGroupService:
             status=ScalingGroupStatus(
                 is_active=True,
                 is_public=True,
+                is_default=False,
             ),
             metadata=ScalingGroupMetadata(
                 description="Default scaling group",
@@ -263,6 +264,7 @@ class TestScalingGroupService:
                 status=ScalingGroupStatus(
                     is_active=True,
                     is_public=True,
+                    is_default=False,
                 ),
                 metadata=ScalingGroupMetadata(
                     description=f"Scaling group {i}",
@@ -697,7 +699,7 @@ class TestGetWsproxyVersion:
         return ScalingGroupData(
             id=ResourceGroupID(uuid.uuid4()),
             name="gpu-group",
-            status=ScalingGroupStatus(is_active=True, is_public=True),
+            status=ScalingGroupStatus(is_active=True, is_public=True, is_default=False),
             metadata=ScalingGroupMetadata(
                 description="GPU group",
                 created_at=datetime.now(tz=UTC),
@@ -846,7 +848,7 @@ class TestListAllowedScalingGroups:
         return ScalingGroupData(
             id=ResourceGroupID(uuid.uuid4()),
             name=name,
-            status=ScalingGroupStatus(is_active=True, is_public=is_public),
+            status=ScalingGroupStatus(is_active=True, is_public=is_public, is_default=False),
             metadata=ScalingGroupMetadata(
                 description=f"{name} group",
                 created_at=datetime.now(tz=UTC),

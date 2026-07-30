@@ -143,6 +143,13 @@ class ResourceGroupStatusInfo(BaseResponseModel):
     is_public: bool = Field(
         description="Whether the resource group is publicly accessible to all users."
     )
+    is_default: bool = Field(
+        description=(
+            "Whether this is the default resource group. At most one resource group is the"
+            " default at a time; an agent registering for the first time without a resolvable"
+            " resource group name falls back to it."
+        )
+    )
 
 
 class ResourceGroupMetadataInfo(BaseResponseModel):
