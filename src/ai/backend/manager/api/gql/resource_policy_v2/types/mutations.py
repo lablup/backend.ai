@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from strawberry import UNSET
-
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
     CreateKeypairResourcePolicyInput as CreateKeypairResourcePolicyInputDTO,
 )
@@ -69,6 +67,9 @@ from .node import (
     ProjectResourcePolicyV2GQL,
     UserResourcePolicyV2GQL,
 )
+
+UNSET = None
+
 
 # ── Keypair Resource Policy Inputs ──
 
@@ -142,10 +143,7 @@ class UpdateKeypairResourcePolicyInputGQL(PydanticInputMixin[UpdateKeypairResour
     max_priority: int | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
-            description=(
-                "Updated max scheduling priority."
-                " Omit it to keep the current value or pass null to clear (uncapped)."
-            ),
+            description="Updated max scheduling priority. Set to null to clear (uncapped).",
         ),
         default=UNSET,
     )

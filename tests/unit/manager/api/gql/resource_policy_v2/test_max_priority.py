@@ -6,7 +6,6 @@ from dataclasses import dataclass
 
 import pytest
 
-from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.manager.api.gql.base import IntFilter
 from ai.backend.manager.api.gql.resource_policy_v2.types.filters import (
     KeypairResourcePolicyV2Filter,
@@ -67,11 +66,16 @@ class TestKeypairResourcePolicyMaxPriorityCreateInput:
 
 
 class TestKeypairResourcePolicyMaxPriorityUpdateInput:
-    def test_omitted_max_priority_is_a_noop(self) -> None:
-        """An update that does not mention max_priority must not clear it."""
+    def test_omitted_max_priority_falls_back_to_the_input_type_default(self) -> None:
+        """Every optional field of this input type defaults to None rather than UNSET,
+        so an omitted field reaches the DTO as an explicit null instead of a no-op.
+        max_priority follows the sibling fields; the whole type is meant to move to
+        UNSET together.
+        """
         dto = UpdateKeypairResourcePolicyInputGQL().to_pydantic()
 
-        assert dto.max_priority is SENTINEL
+        assert dto.max_priority is None
+        assert dto.max_pending_session_count is None
 
     @pytest.mark.parametrize(
         "case",

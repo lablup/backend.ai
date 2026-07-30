@@ -2813,15 +2813,15 @@ input CreateKeypairResourcePolicyInput {
   idleTimeout: Int!
 
   """Maximum pending sessions. Null means unlimited."""
-  maxPendingSessionCount: Int
+  maxPendingSessionCount: Int = null
 
   """
   Added in 26.8.0. Highest scheduling priority a session created with this policy may declare. Null means uncapped.
   """
-  maxPriority: Int
+  maxPriority: Int = null
 
   """Maximum pending session resource slots."""
-  maxPendingSessionResourceSlots: [ResourceSlotEntryInput!]
+  maxPendingSessionResourceSlots: [ResourceSlotEntryInput!] = null
 
   """Maximum concurrent SFTP sessions."""
   maxConcurrentSftpSessions: Int! = 1
@@ -3278,7 +3278,7 @@ input CreateUserResourcePolicyInputV2 {
   """
   Added in 26.4.2. Maximum number of concurrent authenticated login sessions per user. Null means unlimited. Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.
   """
-  maxConcurrentLogins: Int
+  maxConcurrentLogins: Int = null
 
   """Maximum quota scope size (e.g., '1g', '536870912')."""
   maxQuotaScopeSize: BinarySizeInput!
@@ -15004,39 +15004,39 @@ Added in 26.4.2. Input for updating a keypair resource policy. All fields option
 """
 input UpdateKeypairResourcePolicyInput {
   """Updated default for unspecified."""
-  defaultForUnspecified: String
+  defaultForUnspecified: String = null
 
   """Updated resource slot limits."""
-  totalResourceSlots: [ResourceSlotEntryInput!]
+  totalResourceSlots: [ResourceSlotEntryInput!] = null
 
   """Updated max session lifetime."""
-  maxSessionLifetime: Int
+  maxSessionLifetime: Int = null
 
   """Updated max concurrent sessions."""
-  maxConcurrentSessions: Int
+  maxConcurrentSessions: Int = null
 
   """Updated max pending sessions."""
-  maxPendingSessionCount: Int
+  maxPendingSessionCount: Int = null
 
   """
-  Added in 26.8.0. Updated max scheduling priority. Omit it to keep the current value or pass null to clear (uncapped).
+  Added in 26.8.0. Updated max scheduling priority. Set to null to clear (uncapped).
   """
-  maxPriority: Int
+  maxPriority: Int = null
 
   """Updated max pending session resource slots."""
-  maxPendingSessionResourceSlots: [ResourceSlotEntryInput!]
+  maxPendingSessionResourceSlots: [ResourceSlotEntryInput!] = null
 
   """Updated max concurrent SFTP sessions."""
-  maxConcurrentSftpSessions: Int
+  maxConcurrentSftpSessions: Int = null
 
   """Updated max containers per session."""
-  maxContainersPerSession: Int
+  maxContainersPerSession: Int = null
 
   """Updated idle timeout."""
-  idleTimeout: Int
+  idleTimeout: Int = null
 
   """Updated vfolder host permissions."""
-  allowedVfolderHosts: [VFolderHostPermissionEntryInput!]
+  allowedVfolderHosts: [VFolderHostPermissionEntryInput!] = null
 }
 
 """Added in 26.4.2. Payload for keypair resource policy update mutation."""
@@ -15236,13 +15236,13 @@ Added in 26.4.2. Input for updating a project resource policy. All fields option
 """
 input UpdateProjectResourcePolicyInput {
   """Updated max vfolder count."""
-  maxVfolderCount: Int
+  maxVfolderCount: Int = null
 
   """Updated max quota scope size."""
-  maxQuotaScopeSize: BinarySizeInput
+  maxQuotaScopeSize: BinarySizeInput = null
 
   """Updated max network count."""
-  maxNetworkCount: Int
+  maxNetworkCount: Int = null
 }
 
 """Added in 26.4.2. Payload for project resource policy update mutation."""
@@ -15506,21 +15506,21 @@ Added in 26.4.2. Input for updating a user resource policy. All fields optional.
 """
 input UpdateUserResourcePolicyInput {
   """Updated max vfolder count."""
-  maxVfolderCount: Int
+  maxVfolderCount: Int = null
 
   """
   Added in 26.4.2. Updated maximum number of concurrent authenticated login sessions per user. Set to null to clear (unlimited). Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.
   """
-  maxConcurrentLogins: Int
+  maxConcurrentLogins: Int = null
 
   """Updated max quota scope size."""
-  maxQuotaScopeSize: BinarySizeInput
+  maxQuotaScopeSize: BinarySizeInput = null
 
   """Updated max sessions per model session."""
-  maxSessionCountPerModelSession: Int
+  maxSessionCountPerModelSession: Int = null
 
   """Updated max customized image count."""
-  maxCustomizedImageCount: Int
+  maxCustomizedImageCount: Int = null
 }
 
 """Added in 26.4.2. Payload for user resource policy update mutation."""
