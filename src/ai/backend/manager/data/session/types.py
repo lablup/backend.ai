@@ -61,13 +61,14 @@ class SessionStatus(CIStrEnum):
     CANCELLED = "CANCELLED"
 
     @classmethod
-    def kernel_awaiting_statuses(cls) -> set[SessionStatus]:
-        return {
+    @lru_cache(maxsize=1)
+    def kernel_awaiting_statuses(cls) -> frozenset[SessionStatus]:
+        return frozenset((
             cls.PREPARING,
             cls.PULLING,
             cls.CREATING,
             cls.TERMINATING,
-        }
+        ))
 
     @classmethod
     @lru_cache(maxsize=1)
