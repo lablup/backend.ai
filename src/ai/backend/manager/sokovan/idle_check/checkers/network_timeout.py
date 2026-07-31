@@ -65,7 +65,7 @@ class NetworkTimeoutChecker(IdleChecker):
             max_inactivity_seconds = network_spec.max_network_inactivity_seconds
             for session in assignment.sessions:
                 decisions.append(
-                    self._judge_session(
+                    self._decide_session_activity(
                         checker_id=assignment.definition.checker_id,
                         session_id=session.session_id,
                         expire_at=session.expire_at,
@@ -76,7 +76,7 @@ class NetworkTimeoutChecker(IdleChecker):
                 )
         return decisions
 
-    def _judge_session(
+    def _decide_session_activity(
         self,
         *,
         checker_id: IdleCheckerID,
