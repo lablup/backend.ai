@@ -43,9 +43,8 @@ Per domain: `v2/{domain}/types.py`, `request.py`, `response.py`, `__init__.py`
   The three input states must stay distinct — `SENTINEL` (omitted) keeps the stored value, an explicit
   `None` clears it, and a value sets it. The adapter maps them to `TriState.nop()` / `nullify()` / `update()`.
 - Update fields the adapter maps to `OptionalState` are not clearable; those default to `None`, which means "no change".
-- Callers must never assign `SENTINEL` themselves. Leave the field out of the constructor instead, so
-  `exclude_unset` drops it. `Sentinel.TOKEN` is `enum.auto()`, so an assigned `SENTINEL` serializes as the
-  integer `1`, which an int-typed field re-parses as a value.
+- Assigning `SENTINEL` and omitting the constructor argument are equivalent: `BaseRequestModel` discards
+  such a field from `model_fields_set`, so `exclude_unset` keeps it out of the request body either way.
 
 ## Conversion
 

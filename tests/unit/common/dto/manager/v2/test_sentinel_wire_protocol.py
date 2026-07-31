@@ -4,9 +4,9 @@ A field the caller never mentioned must be absent from the body, an explicit ``N
 must survive as a JSON null, and a value must survive as itself. Collapsing any two of
 these makes "leave this alone" and "clear this" indistinguishable to the server.
 
-``SENTINEL`` is the DTO-side default for the first state and must never be assigned by a
-caller: ``Sentinel.TOKEN`` is ``enum.auto()``, so ``mode="json"`` renders it as the
-integer ``1``, which an int-typed field re-parses as a value.
+"Never mentioned" has two spellings — omitting the constructor argument and assigning
+``SENTINEL`` — and ``BaseRequestModel`` drops the latter from ``model_fields_set`` so
+that both produce the same body.
 """
 
 from __future__ import annotations
@@ -72,8 +72,13 @@ class TestSentinelWireProtocol:
         "case",
         [
             _StateCase(
-                label="unmentioned",
+                label="argument-omitted",
                 kwargs={},
+                expected=_WireExpectation(key_present=False, value=None),
+            ),
+            _StateCase(
+                label="sentinel-assigned",
+                kwargs={"field": SENTINEL},
                 expected=_WireExpectation(key_present=False, value=None),
             ),
             _StateCase(
@@ -98,16 +103,30 @@ class TestSentinelWireProtocol:
         if case.expected.key_present:
             assert dumped["field"] == case.expected.value
 
-    def test_assigning_sentinel_leaks_it_onto_the_wire(self) -> None:
-        """Why callers omit the field instead of assigning SENTINEL.
+    def test_an_int_field_is_not_set_to_the_sentinels_enum_value(self) -> None:
+        """Why an assigned SENTINEL must not be serialized.
 
-        An int-typed field re-parses the leaked ``1`` as a value, so a caller that
-        assigns SENTINEL to say "no change" would set the column to 1 instead.
+        ``Sentinel.TOKEN`` is ``enum.auto()``, so ``mode="json"`` would render it as
+        ``1``; an int-typed field re-parses that as a value and the column would be set
+        to 1 instead of left alone.
         """
 
         class _Model(BaseRequestModel):
             count: int | Sentinel | None = SENTINEL
 
-        leaked = _Model(count=SENTINEL).model_dump(**_WIRE_DUMP_KWARGS)
-        assert leaked == {"count": 1}
-        assert _Model.model_validate(leaked).count == 1
+        dumped = _Model(count=SENTINEL).model_dump(**_WIRE_DUMP_KWARGS)
+        assert "count" not in dumped
+        assert _Model.model_validate(dumped).count is SENTINEL
+
+    def test_a_nested_model_drops_its_own_sentinels(self) -> None:
+        class _Nested(BaseRequestModel):
+            inner: str | Sentinel | None = SENTINEL
+
+        class _Outer(BaseRequestModel):
+            nested: _Nested
+            outer: str | Sentinel | None = SENTINEL
+
+        dumped = _Outer(nested=_Nested(inner=SENTINEL), outer=SENTINEL).model_dump(
+            **_WIRE_DUMP_KWARGS
+        )
+        assert dumped == {"nested": {}}
