@@ -38,6 +38,7 @@ from ai.backend.manager.repositories.permission_controller.repository import (
 )
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
+from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 
@@ -86,6 +87,7 @@ def deployment_processors(
         service=service,
         action_monitors=[],
         validators=ActionValidators(
+            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
             rbac=RBACValidators(
                 scope=ScopeActionRBACValidator(permission_controller_repo, MagicMock()),
                 single_entity=SingleEntityActionRBACValidator(

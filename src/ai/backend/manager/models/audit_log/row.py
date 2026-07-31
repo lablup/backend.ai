@@ -50,7 +50,7 @@ class AuditLogRow(Base):  # type: ignore[misc]
     action_id: Mapped[uuid.UUID] = mapped_column("action_id", GUID, nullable=False)
     request_id: Mapped[str | None] = mapped_column("request_id", sa.String, nullable=True)
     triggered_by: Mapped[str | None] = mapped_column("triggered_by", sa.String, nullable=True)
-    acted_as: Mapped[str | None] = mapped_column("acted_as", sa.String, nullable=True)
+    acted_as: Mapped[uuid.UUID | None] = mapped_column("acted_as", GUID, nullable=True)
     description: Mapped[str] = mapped_column("description", sa.String, nullable=False)
     duration: Mapped[timedelta | None] = mapped_column("duration", sa.Interval, nullable=True)
 
@@ -71,7 +71,7 @@ class AuditLogRow(Base):  # type: ignore[misc]
         entity_id: str | uuid.UUID | None = None,
         request_id: str | None = None,
         triggered_by: str | None = None,
-        acted_as: str | None = None,
+        acted_as: uuid.UUID | None = None,
         duration: timedelta | None = None,
     ) -> None:
         self.entity_type = entity_type

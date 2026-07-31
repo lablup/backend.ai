@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -20,16 +21,16 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
-from ai.backend.manager.data.sokovan import (
-    ImageConfigData,
-    KernelBindingData,
-    SessionDataForPull,
-    SessionDataForStart,
-)
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import (
     SessionLauncher,
     SessionLauncherArgs,
+)
+from ai.backend.manager.views.sokovan.image import ImageConfigData
+from ai.backend.manager.views.sokovan.lifecycle import (
+    KernelBindingData,
+    SessionDataForPull,
+    SessionDataForStart,
 )
 
 # Shared image IDs for linking kernel <-> image config in tests
@@ -140,7 +141,7 @@ def _create_kernel_binding_data(
         agent_addr="tcp://agent-1:6001",
         image=image,
         image_id=image_id,
-        architecture="x86_64",
+        architecture=ArchName("x86_64"),
         cluster_role=cluster_role,
         cluster_idx=cluster_idx,
         local_rank=0,
@@ -323,7 +324,7 @@ def _create_image_config_data(
     return ImageConfigData(
         id=image_id,
         canonical=canonical,
-        architecture="x86_64",
+        architecture=ArchName("x86_64"),
         project="stable",
         is_local=False,
         digest="sha256:abc123",

@@ -405,14 +405,27 @@ class TestCancelFreesResourceAllocations:
             )
             await db_sess.flush()
 
+            # A kernel past PENDING holds its amount in ``reserved``.
+            held = kernel_status in KernelStatus.resource_requested_statuses()
+            now = datetime.now(tzutc())
             db_sess.add(
                 ResourceAllocationRow(
-                    kernel_id=kernel_id, slot_name="cpu", requested=cpu, used=None
+                    kernel_id=kernel_id,
+                    slot_name="cpu",
+                    requested=cpu,
+                    reserved=cpu if held else Decimal(0),
+                    reserved_at=now if held else None,
+                    used=None,
                 )
             )
             db_sess.add(
                 ResourceAllocationRow(
-                    kernel_id=kernel_id, slot_name="mem", requested=mem, used=None
+                    kernel_id=kernel_id,
+                    slot_name="mem",
+                    requested=mem,
+                    reserved=mem if held else Decimal(0),
+                    reserved_at=now if held else None,
+                    used=None,
                 )
             )
             await db_sess.flush()

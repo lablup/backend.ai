@@ -48,6 +48,7 @@ from ai.backend.manager.repositories.scaling_group.creators import (
     ScalingGroupForProjectCreatorSpec,
 )
 from ai.backend.manager.repositories.scaling_group.purgers import (
+    ScalingGroupPurgerSpec,
     create_scaling_group_for_keypairs_purger,
 )
 from ai.backend.manager.repositories.scaling_group.scope_binders import (
@@ -797,7 +798,7 @@ class DeleteScalingGroup(graphene.Mutation):  # type: ignore[misc]
         graph_ctx: GraphQueryContext = info.context
 
         await graph_ctx.processors.scaling_group.purge_scaling_group.wait_for_complete(
-            PurgeScalingGroupAction(purger=Purger(row_class=ScalingGroupRow, pk_value=name))
+            PurgeScalingGroupAction(purger=Purger(spec=ScalingGroupPurgerSpec(name=name)))
         )
 
         return cls(ok=True, msg="success")

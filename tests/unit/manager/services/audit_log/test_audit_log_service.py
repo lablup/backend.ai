@@ -60,7 +60,7 @@ class TestAuditLogService:
             entity_id="session-123",
             request_id="req-456",
             triggered_by="user-789",
-            acted_as="user-789",
+            acted_as=uuid.UUID("11111111-1111-1111-1111-111111111111"),
             duration=timedelta(seconds=1),
         )
 

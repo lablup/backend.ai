@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentHistoryListResult,
+    ReplicaGroupHistoryListResult,
     RouteHistoryListResult,
 )
 from ai.backend.manager.data.kernel.types import (
@@ -16,12 +19,16 @@ from ai.backend.manager.data.kernel.types import (
 from ai.backend.manager.data.session.types import (
     SessionSchedulingHistoryListResult,
 )
+from ai.backend.manager.errors.kernel import KernelNotFound
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
 from ai.backend.manager.models.scheduling_history import (
     DeploymentHistoryRow,
     KernelSchedulingHistoryRow,
     RouteHistoryRow,
     SessionSchedulingHistoryRow,
 )
+from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     execute_batch_querier,
@@ -94,7 +101,7 @@ class SchedulingHistoryDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    # ========== Kernel History ==========
+    # ========== Kernel History (Admin) ==========
 
     async def search_kernel_history(
         self,
@@ -109,6 +116,41 @@ class SchedulingHistoryDBSource:
                 query,
                 querier,
             )
+
+            items = [row.KernelSchedulingHistoryRow.to_data() for row in result.rows]
+
+            return KernelSchedulingHistoryListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    # ========== Kernel History (Scoped) ==========
+
+    async def resolve_session_id(self, kernel_id: KernelId) -> SessionId:
+        """Return the id of the session owning ``kernel_id``.
+
+        Raises ``KernelNotFound`` when no such kernel exists.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            session_id = await db_sess.scalar(
+                sa.select(KernelRow.session_id).where(KernelRow.id == kernel_id)
+            )
+            if session_id is None:
+                raise KernelNotFound(str(kernel_id))
+            return SessionId(session_id)
+
+    async def search_kernel_scoped_history(
+        self,
+        querier: BatchQuerier,
+        scopes: Sequence[SearchScope],
+    ) -> KernelSchedulingHistoryListResult:
+        """Search kernel history whose rows match any of ``scopes`` (OR), narrowed by ``querier``."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(KernelSchedulingHistoryRow)
+
+            result = await execute_batch_querier(db_sess, query, querier, scopes=scopes)
 
             items = [row.KernelSchedulingHistoryRow.to_data() for row in result.rows]
 
@@ -160,6 +202,53 @@ class SchedulingHistoryDBSource:
             items = [row.DeploymentHistoryRow.to_data() for row in result.rows]
 
             return DeploymentHistoryListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    # ========== Replica Group History (Admin) ==========
+
+    async def admin_search_replica_group_history(
+        self,
+        querier: BatchQuerier,
+    ) -> ReplicaGroupHistoryListResult:
+        """Search replica-group history with pagination (admin API)."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ReplicaGroupHistoryRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.ReplicaGroupHistoryRow.to_data() for row in result.rows]
+
+            return ReplicaGroupHistoryListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    # ========== Replica Group History (Scoped) ==========
+
+    async def scoped_search_replica_group_history(
+        self,
+        querier: BatchQuerier,
+        scopes: Sequence[SearchScope],
+    ) -> ReplicaGroupHistoryListResult:
+        """Search replica-group history whose rows match any of ``scopes`` (OR), narrowed by ``querier``."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ReplicaGroupHistoryRow)
+
+            result = await execute_batch_querier(db_sess, query, querier, scopes=scopes)
+
+            items = [row.ReplicaGroupHistoryRow.to_data() for row in result.rows]
+
+            return ReplicaGroupHistoryListResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,

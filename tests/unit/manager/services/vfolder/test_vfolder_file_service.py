@@ -15,7 +15,7 @@ from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
 )
-from ai.backend.manager.errors.storage import VFolderInvalidParameter
+from ai.backend.manager.errors.storage import VFolderInvalidParameter, VFolderNotFound
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.services.vfolder.actions.file import (
     CreateDownloadSessionAction,
@@ -159,7 +159,7 @@ class TestCreateUploadSessionAction:
         assert "upload" in result.url
         assert result.vfolder_uuid == vfolder_uuid
 
-    async def test_inaccessible_vfolder_raises_invalid_parameter(
+    async def test_nonexistent_vfolder_raises_not_found(
         self,
         file_service: VFolderFileService,
         mock_vfolder_repository: MagicMock,
@@ -167,7 +167,7 @@ class TestCreateUploadSessionAction:
         vfolder_uuid: uuid.UUID,
         keypair_resource_policy: dict[str, str],
     ) -> None:
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=None)
+        mock_vfolder_repository.get_by_id_validated = AsyncMock(side_effect=VFolderNotFound())
 
         action = CreateUploadSessionAction(
             keypair_resource_policy=keypair_resource_policy,
@@ -176,7 +176,7 @@ class TestCreateUploadSessionAction:
             path="data/file.bin",
             size="4096",
         )
-        with pytest.raises(VFolderInvalidParameter):
+        with pytest.raises(VFolderNotFound):
             await file_service.upload_file(action)
 
     async def test_no_upload_permission_raises_error(
@@ -458,14 +458,14 @@ class TestDeleteFilesAsyncAction:
         assert result.vfolder_uuid == vfolder_uuid
         assert result.task_id is not None
 
-    async def test_inaccessible_vfolder_raises_invalid_parameter(
+    async def test_nonexistent_vfolder_raises_not_found(
         self,
         file_service: VFolderFileService,
         mock_vfolder_repository: MagicMock,
         user_uuid: uuid.UUID,
         vfolder_uuid: uuid.UUID,
     ) -> None:
-        mock_vfolder_repository.get_by_id_validated = AsyncMock(return_value=None)
+        mock_vfolder_repository.get_by_id_validated = AsyncMock(side_effect=VFolderNotFound())
 
         action = DeleteFilesAsyncAction(
             user_uuid=user_uuid,
@@ -473,7 +473,7 @@ class TestDeleteFilesAsyncAction:
             files=["file.txt"],
             recursive=False,
         )
-        with pytest.raises(VFolderInvalidParameter):
+        with pytest.raises(VFolderNotFound):
             await file_service.delete_files_async(action)
 
 

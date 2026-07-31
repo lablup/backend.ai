@@ -17,7 +17,7 @@ from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
-from ai.backend.manager.repositories.base.creator import CreatorSpec
+from ai.backend.manager.repositories.base.creator import BulkCreatorError, CreatorSpec
 from ai.backend.manager.repositories.base.integrity import (
     match_integrity_error,
     parse_integrity_error,
@@ -36,22 +36,33 @@ TRow = TypeVar("TRow", bound=Base)
 class RBACEntityCreator[TRow: Base]:
     """Creator for a single entity with scope associations for RBAC.
 
-    Creates an entity row and associates it with one or more permission scopes.
-    The primary scope is required; additional scopes are optional.
+    Creates an entity row and associates it with the permission scopes it belongs to.
+    A ``scope_ref`` of ``None`` marks the entity as GLOBAL — outside the RBAC scope
+    hierarchy — so it binds to no scope at all and its create is a plain insert.
 
     Attributes:
         spec: CreatorSpec implementation defining the row to create.
         element_type: The RBAC element type for this entity.
-        scope_ref: Primary scope reference (scope_type + scope_id) for this entity.
+        scope_ref: Primary scope reference (scope_type + scope_id) for this entity, or
+            ``None`` for a GLOBAL entity. A GLOBAL entity has no scope to associate, so
+            ``additional_scope_refs`` and ``relation_type`` do not apply to it and are
+            ignored.
         additional_scope_refs: Additional scope references for multi-scope entities.
+            Only meaningful alongside a ``scope_ref``.
         relation_type: The relation type for the scope-entity association. Defaults to AUTO.
     """
 
     spec: CreatorSpec[TRow]
     element_type: RBACElementType
-    scope_ref: RBACElementRef
+    scope_ref: RBACElementRef | None
     additional_scope_refs: Sequence[RBACElementRef] = field(default_factory=list)
     relation_type: RelationType = RelationType.AUTO
+
+    def all_scope_refs(self) -> list[RBACElementRef]:
+        """Every scope this entity binds to; empty for a GLOBAL entity (``scope_ref=None``)."""
+        if self.scope_ref is None:
+            return []
+        return [self.scope_ref, *self.additional_scope_refs]
 
 
 @dataclass
@@ -74,7 +85,9 @@ async def execute_rbac_entity_creator[TRow: Base](
     4. Insert AssociationScopesEntitiesRow (scope -> entity mapping)
 
     The AssociationScopesEntitiesRow maps the entity to its owning scope,
-    enabling scope-based entity discovery and permission inheritance.
+    enabling scope-based entity discovery and permission inheritance. A creator that
+    binds to no scope (see :attr:`RBACEntityCreator.scope_ref`) skips step 4, making
+    this a plain insert.
 
     Args:
         db_sess: Async SQLAlchemy session (must be writable).
@@ -106,7 +119,6 @@ async def execute_rbac_entity_creator[TRow: Base](
     instance_state = inspect(row)
     pk_value = instance_state.identity[0]
     entity_type = creator.element_type.to_entity_type()
-    all_scope_refs = [creator.scope_ref, *creator.additional_scope_refs]
     associations = [
         AssociationScopesEntitiesRow(
             scope_type=scope_ref.element_type.to_scope_type(),
@@ -115,11 +127,23 @@ async def execute_rbac_entity_creator[TRow: Base](
             entity_id=str(pk_value),
             relation_type=creator.relation_type,
         )
-        for scope_ref in all_scope_refs
+        for scope_ref in creator.all_scope_refs()
     ]
     await bulk_insert_on_conflict_do_nothing(db_sess, associations)
 
     return RBACEntityCreatorResult(row=row)
+
+
+@dataclass
+class RBACBulkEntityCreatorResultWithFailures[TRow: Base]:
+    """Result of a scoped bulk create that isolates each entity.
+
+    Mirrors :class:`BulkCreatorResultWithFailures`. ``errors`` index into the sequence of
+    creators handed to the executor, not into any list the caller may have derived it from.
+    """
+
+    successes: list[TRow]
+    errors: list[BulkCreatorError[TRow]]
 
 
 # =============================================================================
@@ -259,8 +283,7 @@ async def execute_rbac_entity_creators[TRow: Base](
     for creator, row in zip(creators, rows, strict=True):
         pk_value = inspect(row).identity[0]
         entity_type = creator.element_type.to_entity_type()
-        all_scope_refs = [creator.scope_ref, *creator.additional_scope_refs]
-        for scope_ref in all_scope_refs:
+        for scope_ref in creator.all_scope_refs():
             associations.append(
                 AssociationScopesEntitiesRow(
                     scope_type=scope_ref.element_type.to_scope_type(),

@@ -4,15 +4,22 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from uuid import uuid4
 
+import pytest
+from pydantic import ValidationError
+
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     DeploymentHistoryOrderField,
     OrderDirection,
+    ReplicaGroupHistoryScopeDTO,
     RouteHistoryOrderField,
     SchedulingResultType,
     SessionHistoryOrderField,
     SubStepResultInfo,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestOrderDirection:
@@ -174,3 +181,16 @@ class TestSubStepResultInfo:
         assert parsed["result"] == "success"
         assert parsed["error_code"] == "ERR"
         assert parsed["message"] == "msg"
+
+
+class TestReplicaGroupHistoryScopeDTO:
+    """A replica group is not an RBAC scope of its own, so the scope is deployment-only."""
+
+    def test_accepts_a_deployment_scope(self) -> None:
+        scope = ReplicaGroupHistoryScopeDTO(deployment=[UUIDScope(value=uuid4())])
+        assert scope.deployment is not None
+
+    @pytest.mark.parametrize("deployment", [None, []], ids=["none", "empty"])
+    def test_rejects_an_empty_scope(self, deployment: list[UUIDScope] | None) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            ReplicaGroupHistoryScopeDTO(deployment=deployment)

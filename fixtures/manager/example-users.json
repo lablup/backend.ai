@@ -57,6 +57,7 @@
             "name": "default",
             "description": "The default agent scaling group",
             "is_active": true,
+            "is_default": true,
             "driver": "static",
             "driver_opts": {},
             "scheduler": "fifo",

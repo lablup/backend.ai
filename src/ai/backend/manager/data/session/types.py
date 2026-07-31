@@ -33,6 +33,9 @@ class SessionStatus(CIStrEnum):
     # values are only meaningful inside the manager
     PENDING = "PENDING"
     DEPRIORITIZING = "DEPRIORITIZING"  # transient: lower priority and go back to PENDING
+    # holds a resource reservation (preemption plan) and waits for the
+    # victims' resources to free before becoming SCHEDULED
+    RESERVED = "RESERVED"
     # ---
     SCHEDULED = "SCHEDULED"
     PREPARING = "PREPARING"
@@ -45,9 +48,12 @@ class SessionStatus(CIStrEnum):
     RUNNING = "RUNNING"
     RESTARTING = "RESTARTING"
     RUNNING_DEGRADED = "RUNNING_DEGRADED"
-    # transient: confirmed preemption victim; after kernel cleanup it
-    # branches by PreemptionMode to TERMINATED (terminate) or PENDING (reschedule)
+    # transient: confirmed preemption victim; branches by PreemptionMode to
+    # TERMINATING (terminate) or RESCHEDULING (reschedule)
     PREEMPTED = "PREEMPTED"
+    # transient: kernels are being torn down to put the session back in the
+    # queue; becomes PENDING once they are all gone
+    RESCHEDULING = "RESCHEDULING"
     # ---
     TERMINATING = "TERMINATING"
     TERMINATED = "TERMINATED"
@@ -55,13 +61,14 @@ class SessionStatus(CIStrEnum):
     CANCELLED = "CANCELLED"
 
     @classmethod
-    def kernel_awaiting_statuses(cls) -> set[SessionStatus]:
-        return {
+    @lru_cache(maxsize=1)
+    def kernel_awaiting_statuses(cls) -> frozenset[SessionStatus]:
+        return frozenset((
             cls.PREPARING,
             cls.PULLING,
             cls.CREATING,
             cls.TERMINATING,
-        }
+        ))
 
     @classmethod
     @lru_cache(maxsize=1)
@@ -74,8 +81,10 @@ class SessionStatus(CIStrEnum):
                 cls.PENDING,
                 cls.DEPRIORITIZING,
                 cls.PREEMPTED,
+                cls.RESCHEDULING,
                 cls.TERMINATED,
                 cls.CANCELLED,
+                cls.ERROR,
             )
         )
 
@@ -112,14 +121,14 @@ class SessionStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def preemptable_statuses(cls) -> frozenset[SessionStatus]:
-        """Return statuses that can transition to PREEMPTED.
+    def preemption_victim_statuses(cls) -> frozenset[SessionStatus]:
+        """Return statuses eligible as preemption victim candidates (BEP-1055).
 
-        Only RUNNING sessions are eligible preemption victims (BEP-1055).
-        Sessions still being provisioned or already terminating are never
-        marked PREEMPTED, so those source statuses are rejected.
+        Still occupying resources and able to transition to termination —
+        strips TERMINATING, whose resources free without preemption, and
+        RESERVED, whose hold belongs to another preemption plan.
         """
-        return frozenset((cls.RUNNING,))
+        return (cls.resource_occupied_statuses() & cls.terminatable_statuses()) - {cls.RESERVED}
 
     @classmethod
     @lru_cache(maxsize=1)
@@ -167,6 +176,7 @@ class SessionData:
     id: UUID
     session_type: SessionTypes
     priority: int
+    job_priority: int
     is_preemptible: bool
     cluster_mode: ClusterMode
     cluster_size: int

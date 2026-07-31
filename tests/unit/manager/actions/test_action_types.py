@@ -58,7 +58,7 @@ class TestEntityType:
         scope_types = EntityType._scope_types()
         assert scope_types == {EntityType.USER, EntityType.PROJECT, EntityType.DOMAIN}
 
-    def test_resource_types_returns_original_nine(self) -> None:
+    def test_resource_types_returns_expected_set(self) -> None:
         resource_types = EntityType._resource_types()
         expected = {
             EntityType.VFOLDER,
@@ -66,7 +66,7 @@ class TestEntityType:
             EntityType.SESSION,
             EntityType.ARTIFACT,
             EntityType.ARTIFACT_REGISTRY,
-            EntityType.APP_CONFIG,
+            EntityType.APP_CONFIG_FRAGMENT,
             EntityType.NOTIFICATION_CHANNEL,
             EntityType.NOTIFICATION_RULE,
             EntityType.MODEL_DEPLOYMENT,

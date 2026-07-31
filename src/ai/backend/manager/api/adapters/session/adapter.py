@@ -41,6 +41,12 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
     ResourceOptsEntryInfoDTO,
     ResourceOptsInfoDTO,
 )
+from ai.backend.common.dto.manager.v2.scheduler.request import ComputeScheduleInput
+from ai.backend.common.dto.manager.v2.scheduler.response import (
+    ComputeScheduleKernelResultInfo,
+    ComputeSchedulePayload,
+    UnschedulableReasonHintInfo,
+)
 from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
     EnqueueSessionInput,
@@ -67,6 +73,7 @@ from ai.backend.common.dto.manager.v2.session.response import (
     UpdateSessionPayload,
 )
 from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum, SessionStatusFilter
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
@@ -80,10 +87,14 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
+from ai.backend.common.types import ResourceSlotEntry as DataResourceSlotEntry
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus, KernelStatusInMatchSpec
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
+from ai.backend.manager.data.session.compute_schedule import ComputeScheduleKernelResult
+from ai.backend.manager.data.session.draft import KernelResourceInput
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.kernel.conditions import KernelConditions
@@ -126,6 +137,9 @@ from ai.backend.manager.services.session.actions.batch_get_kernel_resource_alloc
 )
 from ai.backend.manager.services.session.actions.batch_get_session_resource_allocation import (
     BatchGetSessionResourceAllocationAction,
+)
+from ai.backend.manager.services.session.actions.compute_schedule import (
+    ComputeScheduleAction,
 )
 from ai.backend.manager.services.session.actions.enqueue_session import (
     EnqueueSessionAction,
@@ -298,9 +312,15 @@ class SessionAdapter(BaseAdapter):
             execution=execution_spec,
             scheduling=SessionSchedulingSpec(
                 priority=input.priority,
+                job_priority=input.job_priority,
                 is_preemptible=input.is_preemptible,
                 dependencies=input.dependencies,
                 agent_list=input.agent_list,
+                agent_selection_policy=(
+                    AgentSelectionPolicy(input.agent_selection_policy.value)
+                    if input.agent_selection_policy is not None
+                    else None
+                ),
                 attach_network=input.attach_network,
             ),
             batch=batch_spec,
@@ -317,6 +337,90 @@ class SessionAdapter(BaseAdapter):
         result = await self._processors.session.enqueue_session.wait_for_complete(action)
         return EnqueueSessionPayload(
             session=self._session_data_to_node(result.session_data),
+        )
+
+    # -------------------------------------------------------------------------
+    # Compute schedule
+    # -------------------------------------------------------------------------
+
+    async def compute_schedule(self, input: ComputeScheduleInput) -> ComputeSchedulePayload:
+        """Probe whether each kernel of a would-be session fits the target
+        resource group's nodes, without provisioning.
+
+        A self-service query: the requesting user is resolved from the request
+        context and passed as ``user_uuid``. The service resolves that user's
+        main access key from it, so the adapter supplies no access key.
+        """
+        cluster_mode = (
+            ClusterMode.MULTI_NODE
+            if input.cluster_mode == ClusterModeEnum.MULTI_NODE
+            else ClusterMode.SINGLE_NODE
+        )
+        kernels = [
+            KernelResourceInput(
+                image_id=kernel.image_id,
+                resources=tuple(
+                    DataResourceSlotEntry(
+                        resource_type=ResourceSlotName(entry.resource_type),
+                        quantity=entry.quantity,
+                    )
+                    for entry in kernel.resources
+                ),
+            )
+            for kernel in input.kernels
+        ]
+        action = ComputeScheduleAction(
+            kernels=kernels,
+            cluster_mode=cluster_mode,
+            resource_group_id=input.resource_group_id,
+            designated_agent_ids=input.designated_agent_ids,
+            agent_selection_policy=(
+                AgentSelectionPolicy(input.agent_selection_policy.value)
+                if input.agent_selection_policy is not None
+                else None
+            ),
+        )
+        result = await self._processors.session.compute_schedule.wait_for_complete(action)
+        return ComputeSchedulePayload(
+            results=[
+                self._compute_schedule_kernel_result_to_info(kernel_result)
+                for kernel_result in result.result.kernel_results
+            ],
+        )
+
+    @staticmethod
+    def _compute_schedule_kernel_result_to_info(
+        result: ComputeScheduleKernelResult,
+    ) -> ComputeScheduleKernelResultInfo:
+        """Map the internal per-kernel fitting outcome onto its response DTO."""
+        reason_hint: UnschedulableReasonHintInfo | None = None
+        hint = result.reason_hint
+        if hint is not None:
+            required_reduction = (
+                [
+                    ResourceSlotEntryInfo(
+                        resource_type=entry.resource_type,
+                        quantity=Decimal(entry.quantity),
+                    )
+                    for entry in hint.required_reduction
+                ]
+                if hint.required_reduction is not None
+                else None
+            )
+            reason_hint = UnschedulableReasonHintInfo(
+                required_reduction=required_reduction,
+            )
+        return ComputeScheduleKernelResultInfo(
+            requested_slots=[
+                ResourceSlotEntryInfo(
+                    resource_type=entry.resource_type,
+                    quantity=Decimal(entry.quantity),
+                )
+                for entry in result.requested_slots
+            ],
+            requested_architecture=result.requested_architecture,
+            success=result.success,
+            reason_hint=reason_hint,
         )
 
     # -------------------------------------------------------------------------
@@ -1004,6 +1108,7 @@ class SessionAdapter(BaseAdapter):
                 cluster_mode=data.cluster_mode.name,
                 cluster_size=data.cluster_size,
                 priority=data.priority,
+                job_priority=data.job_priority,
                 is_preemptible=data.is_preemptible,
                 tag=data.tag,
             ),

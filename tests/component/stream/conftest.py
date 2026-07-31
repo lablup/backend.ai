@@ -73,7 +73,6 @@ def stream_processors(
         repository=repo,
         registry=AsyncMock(),
         valkey_live=valkey_clients.live,
-        idle_checker_host=AsyncMock(),
         etcd=async_etcd,
     )
     return StreamProcessors(service=service, action_monitors=[])

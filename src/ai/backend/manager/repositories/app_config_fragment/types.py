@@ -9,25 +9,39 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.exception import UserNotFound
+from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
+from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.user import UserRow
 
 __all__ = (
+    "AppConfigFragmentSearchScope",
     "AppConfigScopeArguments",
-    "DomainAppConfigFragmentSearchScope",
-    "UserAppConfigFragmentSearchScope",
+    "ResolvedAppConfigScope",
 )
 
 
 @dataclass(frozen=True)
 class AppConfigScopeArguments:
+    """The scope arguments a caller supplies for a resolve — the domain, never the user.
+
+    Add new caller-supplied scope dimensions here rather than growing method signatures.
+    """
+
+    domain_id: DomainID
+
+
+@dataclass(frozen=True)
+class ResolvedAppConfigScope:
     """The principal an ``AppConfig`` is resolved for: the resolving user and its domain.
 
-    Bundles the scope-identifying arguments so they travel together (add new principal
-    dimensions here rather than growing method signatures). Plain value object — not a
+    :class:`AppConfigScopeArguments` plus the session user. Plain value object — not a
     :class:`SearchScope`.
     """
 
@@ -36,24 +50,29 @@ class AppConfigScopeArguments:
 
 
 @dataclass(frozen=True)
-class DomainAppConfigFragmentSearchScope(SearchScope):
-    """Fragments written at one domain scope (``scope_type == domain``, ``scope_id == domain_id``).
+class AppConfigFragmentSearchScope(SearchScope):
+    """The fragments written at one scope, matching the row's ``(scope_type, scope_id)``.
 
-    One scope = one item of a scoped fragment query; the repository combines multiple
-    scopes with ``OR``. ``existence_checks`` is empty by ``SearchableActionTarget``
-    convention — RBAC already gates scope reachability.
+    The owner named by ``scope_id`` is existence-checked so a search at a scope that does
+    not exist is a 404 rather than an empty page. RBAC cannot stand in for that: the scope
+    validator returns early for superadmins and when RBAC enforcement is disabled.
     """
 
-    domain_id: DomainID
+    scope_type: AppConfigScopeType
+    scope_id: AppConfigScopeID | None
+    """The scope owner — ``None`` only for ``public``, which has no owner."""
 
     @override
     def to_condition(self) -> QueryCondition:
-        domain_id = self.domain_id
+        scope_type = self.scope_type
+        scope_id = self.scope_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.and_(
-                AppConfigFragmentRow.scope_type == AppConfigScopeType.DOMAIN,
-                AppConfigFragmentRow.scope_id == str(domain_id),
+                AppConfigFragmentRow.scope_type == scope_type,
+                AppConfigFragmentRow.scope_id.is_(None)
+                if scope_id is None
+                else AppConfigFragmentRow.scope_id == scope_id,
             )
 
         return inner
@@ -61,28 +80,23 @@ class DomainAppConfigFragmentSearchScope(SearchScope):
     @property
     @override
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
-        return ()
-
-
-@dataclass(frozen=True)
-class UserAppConfigFragmentSearchScope(SearchScope):
-    """Fragments written at one user scope (``scope_type == user``, ``scope_id == user_id``)."""
-
-    user_id: UserID
-
-    @override
-    def to_condition(self) -> QueryCondition:
-        user_id = self.user_id
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.and_(
-                AppConfigFragmentRow.scope_type == AppConfigScopeType.USER,
-                AppConfigFragmentRow.scope_id == str(user_id),
-            )
-
-        return inner
-
-    @property
-    @override
-    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
-        return ()
+        match self.scope_type:
+            case AppConfigScopeType.PUBLIC:
+                # Global scope — no owner row to check.
+                return ()
+            case AppConfigScopeType.DOMAIN:
+                return [
+                    ExistenceCheck(
+                        column=DomainRow.id,
+                        value=self.scope_id,
+                        error=DomainNotFound(extra_data={"domain_id": str(self.scope_id)}),
+                    ),
+                ]
+            case AppConfigScopeType.USER:
+                return [
+                    ExistenceCheck(
+                        column=UserRow.uuid,
+                        value=self.scope_id,
+                        error=UserNotFound(extra_data={"user_id": str(self.scope_id)}),
+                    ),
+                ]

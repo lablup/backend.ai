@@ -10,8 +10,13 @@ from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.filter_specs import StringInMatchSpec, StringMatchSpec
-from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter
+from ai.backend.common.data.filter_specs import (
+    StringInMatchSpec,
+    StringMatchSpec,
+    UUIDEqualMatchSpec,
+    UUIDInMatchSpec,
+)
+from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.export import (
     AuditLogExportFilter,
     AuditLogExportOrder,
@@ -683,6 +688,14 @@ class ExportAdapter(BaseFilterAdapter):
                 if cond:
                     conditions.append(cond)
 
+        # acted_as filter (UUID)
+        if filter.acted_as is not None:
+            field = report.get_field("acted_as")
+            if field:
+                cond = self._build_uuid_condition(filter.acted_as, field)
+                if cond:
+                    conditions.append(cond)
+
         # request_id filter
         if filter.request_id is not None:
             field = report.get_field("request_id")
@@ -831,6 +844,42 @@ class ExportAdapter(BaseFilterAdapter):
             starts_with_factory=make_starts_with_factory(column),
             ends_with_factory=make_ends_with_factory(column),
             in_factory=make_in_factory(column),
+        )
+
+    def _build_uuid_condition(
+        self,
+        uuid_filter: UUIDFilter,
+        field_def: ExportFieldDef,
+    ) -> QueryCondition | None:
+        """Convert UUIDFilter to QueryCondition for the given field."""
+        column = field_def.column
+
+        def make_equals_factory(
+            col: InstrumentedAttribute[Any],
+        ) -> Callable[[UUIDEqualMatchSpec], QueryCondition]:
+            def factory(spec: UUIDEqualMatchSpec) -> QueryCondition:
+                value = spec.value
+                if spec.negated:
+                    return lambda: col != value
+                return lambda: col == value
+
+            return factory
+
+        def make_in_factory(
+            col: InstrumentedAttribute[Any],
+        ) -> Callable[[UUIDInMatchSpec], QueryCondition]:
+            def factory(spec: UUIDInMatchSpec) -> QueryCondition:
+                values = spec.values
+                if spec.negated:
+                    return lambda: ~col.in_(values)
+                return lambda: col.in_(values)
+
+            return factory
+
+        return self.convert_uuid_filter(
+            uuid_filter,
+            make_equals_factory(column),
+            make_in_factory(column),
         )
 
     def _build_datetime_conditions(

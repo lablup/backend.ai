@@ -222,7 +222,7 @@ class ReservoirVFSFileDownloader:
             self._download_complete = True
 
             # Cancel and wait for progress task
-            if self._progress_task:
+            if self._progress_task is not None:
                 self._progress_task.cancel()
                 try:
                     await self._progress_task
@@ -370,7 +370,7 @@ class ReservoirS3FileDownloadStreamReader(StreamReader):
             self._download_complete = True
 
             # Cancel and wait for progress task
-            if self._progress_task:
+            if self._progress_task is not None:
                 self._progress_task.cancel()
                 try:
                     await self._progress_task
@@ -962,7 +962,7 @@ class ReservoirDownloadStep(ImportStep[None]):
                 # Content-Type
                 object_meta = await src_s3_client.get_object_meta(key)
                 ctype = (
-                    (object_meta.content_type if object_meta else None)
+                    object_meta.content_type
                     or mimetypes.guess_type(key)[0]
                     or "application/octet-stream"
                 )

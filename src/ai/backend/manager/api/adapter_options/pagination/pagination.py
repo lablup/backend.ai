@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ai.backend.manager.api.adapter_options.cursor.cursor import decode_cursor
-from ai.backend.manager.errors.api import InvalidGraphQLParameters
+from ai.backend.manager.errors.api import InvalidCursor, InvalidGraphQLParameters
 from ai.backend.manager.models.clauses import QueryOrder
 from ai.backend.manager.repositories.base import (
     CursorBackwardPagination,
@@ -94,7 +94,10 @@ def build_pagination(
         cursor_condition = None
         if options.after is not None:
             cursor_value = decode_cursor(options.after)
-            cursor_condition = spec.forward_condition_factory(cursor_value)
+            try:
+                cursor_condition = spec.forward_condition_factory(cursor_value)
+            except ValueError as e:
+                raise InvalidCursor(f"Invalid cursor value: {options.after}") from e
         return CursorForwardPagination(
             first=options.first,
             cursor_order=spec.forward_order,
@@ -107,7 +110,10 @@ def build_pagination(
         cursor_condition = None
         if options.before is not None:
             cursor_value = decode_cursor(options.before)
-            cursor_condition = spec.backward_condition_factory(cursor_value)
+            try:
+                cursor_condition = spec.backward_condition_factory(cursor_value)
+            except ValueError as e:
+                raise InvalidCursor(f"Invalid cursor value: {options.before}") from e
         return CursorBackwardPagination(
             last=options.last,
             cursor_order=spec.backward_order,

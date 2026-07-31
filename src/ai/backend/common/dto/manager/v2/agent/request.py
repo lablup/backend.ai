@@ -14,8 +14,11 @@ from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.agent.types import (
     AgentOrderField,
     AgentStatusFilter,
+    ConflictingSessionCleanupPolicyEnum,
     OrderDirection,
 )
+from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.types import AgentId
 
 __all__ = (
     "AdminSearchAgentsInput",
@@ -23,6 +26,8 @@ __all__ = (
     "AgentOrder",
     "AgentPathParam",
     "SearchAgentsInput",
+    "UpdateAgentResourceGroupBody",
+    "UpdateAgentResourceGroupInput",
 )
 
 
@@ -98,6 +103,45 @@ class SearchAgentsInput(BaseRequestModel):
     order: list[AgentOrder] | None = None
     limit: int = Field(default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT)
     offset: int = Field(default=0, ge=0)
+
+
+class UpdateAgentResourceGroupBody(BaseRequestModel):
+    """Mutable part of an agent resource-group change.
+
+    Used directly as the REST request body, where the agent ID is supplied as a
+    URL path segment instead of a body field. ``UpdateAgentResourceGroupInput``
+    extends this with the agent ID for the GQL/adapter call path.
+    """
+
+    resource_group_id: ResourceGroupID = Field(
+        description="UUID of the target resource group to move the agent into.",
+    )
+    policy: ConflictingSessionCleanupPolicyEnum | None = Field(
+        default=None,
+        description=(
+            "How to handle sessions still running on the agent under the old "
+            "resource group. Defaults to 'terminate', which is currently the "
+            "only supported policy."
+        ),
+    )
+    force: bool = Field(
+        default=False,
+        description=(
+            "When false, the change is rejected with a conflict error if the agent "
+            "still has active sessions. When true, the group is changed anyway and "
+            "the conflicting sessions are cleaned up per the policy."
+        ),
+    )
+
+
+class UpdateAgentResourceGroupInput(UpdateAgentResourceGroupBody):
+    """Input for changing the resource group of an agent, carrying the agent ID.
+
+    Extends ``UpdateAgentResourceGroupBody`` with ``agent_id`` for the GQL
+    mutation and adapter call path.
+    """
+
+    agent_id: AgentId = Field(description="ID of the agent to move.")
 
 
 class AdminSearchAgentsInput(BaseRequestModel):

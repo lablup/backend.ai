@@ -7,34 +7,49 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.identifier.session_group import SessionGroupID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.error_log.types import ErrorLogSeverity
+from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.session_group.types import (
+    SessionGroupPlacementDirection,
+    SessionGroupPlacementEnforcement,
+)
 from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
+from ai.backend.manager.errors.user import UserPurgeFailure
 from ai.backend.manager.models.agent import AgentRow  # noqa: F401
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.error_logs import ErrorLogRow
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow, ProjectType
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow  # noqa: F401
 from ai.backend.manager.models.kernel import KernelRow  # noqa: F401
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow  # noqa: F401
-from ai.backend.manager.models.session import SessionRow  # noqa: F401
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder.row import VFolderPermissionRow, VFolderRow
 from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
@@ -48,6 +63,7 @@ from ai.backend.manager.repositories.user.purgers import (
     create_user_group_association_purger,
     create_user_keypair_purger,
     create_user_purger,
+    create_user_session_group_purger,
     create_user_vfolder_permission_purger,
 )
 from ai.backend.testutils.db import with_tables
@@ -55,6 +71,16 @@ from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+
+
+@dataclass
+class _PlacementScope:
+    domain_id: DomainID
+    domain_name: str
+    project_id: ProjectID
+    owner_user_id: UserID
+    resource_group_id: ResourceGroupID
+    resource_group_name: str
 
 
 class TestUserPurgerSpecs:
@@ -580,3 +606,190 @@ class TestUserPurgersIntegration:
                 sa.select(sa.func.count()).select_from(UserRow).where(UserRow.uuid == user_uuid)
             )
             assert count == 0
+
+
+class TestUserSessionGroupPurger:
+    """The placement groups a user owns are settled by the purge, not by the DB."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                # FK dependency order: parents before children
+                DomainRow,
+                ScalingGroupRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                SessionGroupRow,
+                SessionRow,
+                EndpointRow,
+                ReplicaGroupRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    def test_password_info(self) -> PasswordInfo:
+        return PasswordInfo(
+            password="test_password",
+            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+            rounds=100_000,
+            salt_size=32,
+        )
+
+    @pytest.fixture
+    async def scope(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_password_info: PasswordInfo,
+    ) -> _PlacementScope:
+        domain = DomainRow(
+            id=DomainID(uuid.uuid4()),
+            name=f"test-domain-{uuid.uuid4().hex[:8]}",
+            total_resource_slots=ResourceSlot(),
+            allowed_vfolder_hosts={},
+        )
+        scaling_group = ScalingGroupRow(
+            id=ResourceGroupID(uuid.uuid4()),
+            name=f"test-sg-{uuid.uuid4().hex[:8]}",
+            driver="static",
+            scheduler="fifo",
+        )
+        user_policy = UserResourcePolicyRow(
+            name=f"user-policy-{uuid.uuid4().hex[:8]}",
+            max_vfolder_count=0,
+            max_quota_scope_size=-1,
+            max_session_count_per_model_session=10,
+            max_customized_image_count=10,
+        )
+        project_policy = ProjectResourcePolicyRow(
+            name=f"project-policy-{uuid.uuid4().hex[:8]}",
+            max_vfolder_count=0,
+            max_quota_scope_size=-1,
+            max_network_count=3,
+        )
+        user = UserRow(
+            uuid=uuid.uuid4(),
+            username=f"testuser-{uuid.uuid4().hex[:8]}",
+            email=f"test-{uuid.uuid4().hex[:8]}@example.com",
+            password=test_password_info,
+            need_password_change=False,
+            status=UserStatus.ACTIVE,
+            status_info="admin-requested",
+            domain_name=domain.name,
+            role=UserRole.USER,
+            resource_policy=user_policy.name,
+        )
+        project = GroupRow(
+            id=uuid.uuid4(),
+            name=f"test-project-{uuid.uuid4().hex[:8]}",
+            domain_name=domain.name,
+            resource_policy=project_policy.name,
+        )
+
+        async with db_with_cleanup.begin_session() as session:
+            session.add_all([domain, scaling_group, user_policy, project_policy])
+            await session.flush()
+            session.add_all([user, project])
+            await session.flush()
+
+        return _PlacementScope(
+            domain_id=DomainID(domain.id),
+            domain_name=domain.name,
+            project_id=ProjectID(project.id),
+            owner_user_id=UserID(user.uuid),
+            resource_group_id=ResourceGroupID(scaling_group.id),
+            resource_group_name=scaling_group.name,
+        )
+
+    async def _add_group_with_member(
+        self,
+        db: ExtendedAsyncSAEngine,
+        scope: _PlacementScope,
+        member_status: SessionStatus,
+    ) -> SessionGroupID:
+        group_id = SessionGroupID(uuid.uuid4())
+        async with db.begin_session() as session:
+            session.add(
+                SessionGroupRow(
+                    id=group_id,
+                    domain_id=scope.domain_id,
+                    project_id=scope.project_id,
+                    owner_user_id=scope.owner_user_id,
+                    placement_direction=SessionGroupPlacementDirection.SPREAD,
+                    placement_enforcement=SessionGroupPlacementEnforcement.PREFERRED,
+                )
+            )
+            await session.flush()
+            session.add(
+                SessionRow(
+                    id=uuid.uuid4(),
+                    name=f"member-{uuid.uuid4().hex[:8]}",
+                    user_uuid=scope.owner_user_id,
+                    group_id=scope.project_id,
+                    domain_id=scope.domain_id,
+                    domain_name=scope.domain_name,
+                    resource_group_id=scope.resource_group_id,
+                    scaling_group_name=scope.resource_group_name,
+                    status=member_status,
+                    occupying_slots=ResourceSlot(),
+                    requested_slots=ResourceSlot(),
+                    vfolder_mounts=[],
+                    session_group_id=group_id,
+                )
+            )
+        return group_id
+
+    async def test_purges_groups_once_their_members_released_resources(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        scope: _PlacementScope,
+    ) -> None:
+        group_id = await self._add_group_with_member(
+            db_with_cleanup, scope, SessionStatus.TERMINATED
+        )
+
+        async with db_with_cleanup.begin_session() as session:
+            result = await execute_batch_purger(
+                session, create_user_session_group_purger(scope.owner_user_id)
+            )
+
+        assert result.deleted_count == 1
+        async with db_with_cleanup.begin_readonly_session() as session:
+            assert (
+                await session.scalar(
+                    sa.select(sa.func.count())
+                    .select_from(SessionGroupRow)
+                    .where(SessionGroupRow.id == group_id)
+                )
+            ) == 0
+
+    async def test_refuses_while_a_member_still_occupies_an_agent(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        scope: _PlacementScope,
+    ) -> None:
+        group_id = await self._add_group_with_member(db_with_cleanup, scope, SessionStatus.RUNNING)
+
+        with pytest.raises(UserPurgeFailure):
+            async with db_with_cleanup.begin_session() as session:
+                await execute_batch_purger(
+                    session, create_user_session_group_purger(scope.owner_user_id)
+                )
+
+        async with db_with_cleanup.begin_readonly_session() as session:
+            assert (
+                await session.scalar(
+                    sa.select(sa.func.count())
+                    .select_from(SessionGroupRow)
+                    .where(SessionGroupRow.id == group_id)
+                )
+            ) == 1

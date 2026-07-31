@@ -3,7 +3,7 @@
   "info": {
     "title": "Backend.AI Manager API",
     "description": "Backend.AI Manager REST API specification",
-    "version": "26.7.0",
+    "version": "26.8.0rc1",
     "contact": {
       "name": "Lablup Inc.",
       "url": "https://docs.backend.ai",
@@ -547,6 +547,201 @@
         "title": "AdminSearchAgentsInput",
         "type": "object"
       },
+      "ConflictingSessionCleanupPolicyEnum": {
+        "description": "How to clean up sessions that conflict with an agent's resource group change.",
+        "enum": [
+          "terminate",
+          "reschedule"
+        ],
+        "title": "ConflictingSessionCleanupPolicyEnum",
+        "type": "string"
+      },
+      "UpdateAgentResourceGroupBody": {
+        "description": "Mutable part of an agent resource-group change.\n\nUsed directly as the REST request body, where the agent ID is supplied as a\nURL path segment instead of a body field. ``UpdateAgentResourceGroupInput``\nextends this with the agent ID for the GQL/adapter call path.",
+        "properties": {
+          "resource_group_id": {
+            "description": "UUID of the target resource group to move the agent into.",
+            "format": "uuid",
+            "title": "Resource Group Id",
+            "type": "string"
+          },
+          "policy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConflictingSessionCleanupPolicyEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "How to handle sessions still running on the agent under the old resource group. Defaults to 'terminate', which is currently the only supported policy."
+          },
+          "force": {
+            "default": false,
+            "description": "When false, the change is rejected with a conflict error if the agent still has active sessions. When true, the group is changed anyway and the conflicting sessions are cleaned up per the policy.",
+            "title": "Force",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "resource_group_id"
+        ],
+        "title": "UpdateAgentResourceGroupBody",
+        "type": "object"
+      },
+      "BulkPurgeAppConfigFragmentInput": {
+        "description": "Input for purging many fragments (per-item partial success).",
+        "properties": {
+          "ids": {
+            "description": "Fragment ids to purge.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "BulkPurgeAppConfigFragmentInput",
+        "type": "object"
+      },
+      "AppConfigFragmentFilter": {
+        "description": "Filter for app config fragment search.",
+        "properties": {
+          "config_name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by config name."
+          },
+          "scope_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppConfigScopeTypeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by scope type."
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by creation datetime."
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by last update datetime."
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AppConfigFragmentFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match all of the given sub-filters.",
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AppConfigFragmentFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the given sub-filters.",
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AppConfigFragmentFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Negate the given sub-filters.",
+            "title": "Not"
+          }
+        },
+        "title": "AppConfigFragmentFilter",
+        "type": "object"
+      },
+      "AppConfigFragmentOrder": {
+        "description": "Order specifier for app config fragment search.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/AppConfigFragmentOrderField",
+            "description": "Field to order by."
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "ASC",
+            "description": "Order direction."
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "AppConfigFragmentOrder",
+        "type": "object"
+      },
+      "AppConfigFragmentOrderField": {
+        "enum": [
+          "config_name",
+          "scope_type",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "AppConfigFragmentOrderField",
+        "type": "string"
+      },
       "AppConfigScopeType": {
         "description": "Scope at which an app config fragment is written (BEP-1052).\n\nThe single definition shared across the data, DTO, GraphQL, and API layers.",
         "enum": [
@@ -556,6 +751,387 @@
         ],
         "title": "AppConfigScopeType",
         "type": "string"
+      },
+      "AppConfigScopeTypeFilter": {
+        "description": "Filter for the scope_type enum field.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppConfigScopeType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact scope type match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AppConfigScopeType"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided scope types.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppConfigScopeType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude exact scope type match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AppConfigScopeType"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided scope types.",
+            "title": "Not In"
+          }
+        },
+        "title": "AppConfigScopeTypeFilter",
+        "type": "object"
+      },
+      "DateTimeFilter": {
+        "description": "Filter for datetime fields supporting range and equality operations.",
+        "properties": {
+          "before": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Before this datetime (exclusive)",
+            "title": "Before"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "After this datetime (exclusive)",
+            "title": "After"
+          },
+          "equals": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact datetime match",
+            "title": "Equals"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not equal to this datetime",
+            "title": "Not Equals"
+          }
+        },
+        "title": "DateTimeFilter",
+        "type": "object"
+      },
+      "AdminSearchAppConfigFragmentInput": {
+        "description": "Input for paginated app config fragment search (superadmin only).",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppConfigFragmentFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions."
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AppConfigFragmentOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifiers, applied in sequence.",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-forward page size.",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-forward start cursor.",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-backward page size.",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-backward end cursor.",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset-based: maximum number of results.",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset-based: number of results to skip.",
+            "title": "Offset"
+          }
+        },
+        "title": "AdminSearchAppConfigFragmentInput",
+        "type": "object"
+      },
+      "AppConfigScopeRef": {
+        "description": "One app config scope: its kind, and its owner id for the kinds that have one.",
+        "properties": {
+          "scope_type": {
+            "$ref": "#/components/schemas/AppConfigScopeType",
+            "description": "Scope the fragments are written at (public | domain | user)."
+          },
+          "scope_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Scope identifier: the domain id or the user id; null for public scope.",
+            "title": "Scope Id"
+          }
+        },
+        "required": [
+          "scope_type"
+        ],
+        "title": "AppConfigScopeRef",
+        "type": "object"
+      },
+      "ScopedAppConfigFragmentsByNamesInput": {
+        "description": "Read the fragments written at one scope for the given config names.",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/AppConfigScopeRef",
+            "description": "Scope whose fragments to read."
+          },
+          "config_names": {
+            "description": "Config names whose fragments to read. Answered position by position, null where the scope holds no fragment for that name.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Config Names",
+            "type": "array"
+          }
+        },
+        "required": [
+          "scope",
+          "config_names"
+        ],
+        "title": "ScopedAppConfigFragmentsByNamesInput",
+        "type": "object"
+      },
+      "AppConfigFragmentUpsertItem": {
+        "description": "One (config_name, config) pair to upsert at the request's scope.",
+        "properties": {
+          "config_name": {
+            "description": "Registered config name.",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Config Name",
+            "type": "string"
+          },
+          "config": {
+            "additionalProperties": true,
+            "description": "The fragment's JSON config document.",
+            "title": "Config",
+            "type": "object"
+          }
+        },
+        "required": [
+          "config_name",
+          "config"
+        ],
+        "title": "AppConfigFragmentUpsertItem",
+        "type": "object"
+      },
+      "ScopedUpsertAppConfigFragmentsInput": {
+        "description": "Upsert many fragments at one scope; the scope is named once for all items.",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/AppConfigScopeRef",
+            "description": "Scope the fragments are written at."
+          },
+          "items": {
+            "description": "The (config_name, config) pairs to upsert.",
+            "items": {
+              "$ref": "#/components/schemas/AppConfigFragmentUpsertItem"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "scope",
+          "items"
+        ],
+        "title": "ScopedUpsertAppConfigFragmentsInput",
+        "type": "object"
+      },
+      "MyAppConfigFragmentsByNamesInput": {
+        "description": "Read the current user's own user-scope fragments for the given config names.",
+        "properties": {
+          "config_names": {
+            "description": "Config names whose fragments to read. Answered position by position, null where the scope holds no fragment for that name.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Config Names",
+            "type": "array"
+          }
+        },
+        "required": [
+          "config_names"
+        ],
+        "title": "MyAppConfigFragmentsByNamesInput",
+        "type": "object"
+      },
+      "MyUpsertAppConfigFragmentsInput": {
+        "description": "Upsert many fragments at the current user's own user scope.\n\nThe scope is the acting user, resolved server-side, so it carries no scope fields.",
+        "properties": {
+          "items": {
+            "description": "The (config_name, config) pairs to upsert.",
+            "items": {
+              "$ref": "#/components/schemas/AppConfigFragmentUpsertItem"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "MyUpsertAppConfigFragmentsInput",
+        "type": "object"
       },
       "CreateAppConfigAllowListInput": {
         "description": "Input for registering a new app config allow-list entry.",
@@ -724,132 +1300,6 @@
         ],
         "title": "AppConfigAllowListOrderField",
         "type": "string"
-      },
-      "AppConfigScopeTypeFilter": {
-        "description": "Filter for the scope_type enum field.",
-        "properties": {
-          "equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AppConfigScopeType"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exact scope type match."
-          },
-          "in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/AppConfigScopeType"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Match any of the provided scope types.",
-            "title": "In"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AppConfigScopeType"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exclude exact scope type match."
-          },
-          "not_in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/AppConfigScopeType"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exclude any of the provided scope types.",
-            "title": "Not In"
-          }
-        },
-        "title": "AppConfigScopeTypeFilter",
-        "type": "object"
-      },
-      "DateTimeFilter": {
-        "description": "Filter for datetime fields supporting range and equality operations.",
-        "properties": {
-          "before": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Before this datetime (exclusive)",
-            "title": "Before"
-          },
-          "after": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "After this datetime (exclusive)",
-            "title": "After"
-          },
-          "equals": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exact datetime match",
-            "title": "Equals"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Not equal to this datetime",
-            "title": "Not Equals"
-          }
-        },
-        "title": "DateTimeFilter",
-        "type": "object"
       },
       "SearchAppConfigAllowListInput": {
         "description": "Input for paginated app config allow-list search.",
@@ -4082,6 +4532,375 @@
         "title": "NullableDateTimeFilter",
         "type": "object"
       },
+      "ReplicaFilter": {
+        "description": "Filter for deployment replicas.",
+        "properties": {
+          "deployment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by deployment ID",
+            "title": "Deployment Id"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplicaStatusFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Replica status filter"
+          },
+          "health_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplicaHealthStatusFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Replica health status filter"
+          },
+          "traffic_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplicaTrafficStatusFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Replica traffic status filter"
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReplicaFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "AND conjunction",
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReplicaFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "OR conjunction",
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReplicaFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "NOT negation",
+            "title": "Not"
+          }
+        },
+        "title": "ReplicaFilter",
+        "type": "object"
+      },
+      "ReplicaHealthStatusFilter": {
+        "description": "Filter for replica health status.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RouteHealthStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact health status match"
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RouteHealthStatus"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Health status is in list",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RouteHealthStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Excludes exact health status match"
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RouteHealthStatus"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Health status is not in list",
+            "title": "Not In"
+          }
+        },
+        "title": "ReplicaHealthStatusFilter",
+        "type": "object"
+      },
+      "ReplicaNestedFilter": {
+        "description": "Filter deployments by conditions on their replicas.",
+        "properties": {
+          "some": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplicaFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Matches parents with at least one replica satisfying all conditions."
+          },
+          "every": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplicaFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Matches parents where every replica satisfies all conditions (also true when the parent has no replica)."
+          },
+          "none": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplicaFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Matches parents with no replica satisfying all conditions."
+          }
+        },
+        "title": "ReplicaNestedFilter",
+        "type": "object"
+      },
+      "ReplicaStatusFilter": {
+        "description": "Filter for replica (route) status.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RouteStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact status match"
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RouteStatus"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Status is in list",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RouteStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Excludes exact status match"
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RouteStatus"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Status is not in list",
+            "title": "Not In"
+          }
+        },
+        "title": "ReplicaStatusFilter",
+        "type": "object"
+      },
+      "ReplicaTrafficStatusFilter": {
+        "description": "Filter for replica traffic status.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RouteTrafficStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact traffic status match"
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RouteTrafficStatus"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Traffic status is in list",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RouteTrafficStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Excludes exact traffic status match"
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RouteTrafficStatus"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Traffic status is not in list",
+            "title": "Not In"
+          }
+        },
+        "title": "ReplicaTrafficStatusFilter",
+        "type": "object"
+      },
+      "RouteHealthStatus": {
+        "description": "Health check status of a route.",
+        "enum": [
+          "not_checked",
+          "healthy",
+          "unhealthy",
+          "degraded"
+        ],
+        "title": "RouteHealthStatus",
+        "type": "string"
+      },
+      "RouteStatus": {
+        "description": "Lifecycle status of a route in the deployment.",
+        "enum": [
+          "provisioning",
+          "running",
+          "terminating",
+          "terminated",
+          "failed_to_start"
+        ],
+        "title": "RouteStatus",
+        "type": "string"
+      },
+      "RouteTrafficStatus": {
+        "description": "Traffic routing status for a route.\n\nControls whether traffic should be sent to this route.\nActual traffic delivery depends on health being HEALTHY.\n\n- ACTIVE: Traffic enabled (will receive traffic when health is HEALTHY)\n- INACTIVE: Traffic disabled (will not receive traffic regardless of health)",
+        "enum": [
+          "active",
+          "inactive"
+        ],
+        "title": "RouteTrafficStatus",
+        "type": "string"
+      },
       "AdminSearchDeploymentsInput": {
         "description": "Input for searching deployments (admin, no scope).",
         "properties": {
@@ -5070,99 +5889,6 @@
         "title": "SearchAllocatedResourceSlotsInput",
         "type": "object"
       },
-      "ReplicaFilter": {
-        "description": "Filter for deployment replicas.",
-        "properties": {
-          "deployment_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by deployment ID",
-            "title": "Deployment Id"
-          },
-          "status": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ReplicaStatusFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Replica status filter"
-          },
-          "traffic_status": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ReplicaTrafficStatusFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Replica traffic status filter"
-          },
-          "AND": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/ReplicaFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "AND conjunction",
-            "title": "And"
-          },
-          "OR": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/ReplicaFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "OR conjunction",
-            "title": "Or"
-          },
-          "NOT": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/ReplicaFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "NOT negation",
-            "title": "Not"
-          }
-        },
-        "title": "ReplicaFilter",
-        "type": "object"
-      },
       "ReplicaOrder": {
         "description": "Ordering specification for deployment replicas.",
         "properties": {
@@ -5187,153 +5913,6 @@
           "id"
         ],
         "title": "ReplicaOrderField",
-        "type": "string"
-      },
-      "ReplicaStatusFilter": {
-        "description": "Filter for replica (route) status.",
-        "properties": {
-          "equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RouteStatus"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exact status match"
-          },
-          "in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RouteStatus"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Status is in list",
-            "title": "In"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RouteStatus"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Excludes exact status match"
-          },
-          "not_in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RouteStatus"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Status is not in list",
-            "title": "Not In"
-          }
-        },
-        "title": "ReplicaStatusFilter",
-        "type": "object"
-      },
-      "ReplicaTrafficStatusFilter": {
-        "description": "Filter for replica traffic status.",
-        "properties": {
-          "equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RouteTrafficStatus"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exact traffic status match"
-          },
-          "in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RouteTrafficStatus"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Traffic status is in list",
-            "title": "In"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RouteTrafficStatus"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Excludes exact traffic status match"
-          },
-          "not_in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RouteTrafficStatus"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Traffic status is not in list",
-            "title": "Not In"
-          }
-        },
-        "title": "ReplicaTrafficStatusFilter",
-        "type": "object"
-      },
-      "RouteStatus": {
-        "description": "Lifecycle status of a route in the deployment.",
-        "enum": [
-          "provisioning",
-          "running",
-          "terminating",
-          "terminated",
-          "failed_to_start"
-        ],
-        "title": "RouteStatus",
-        "type": "string"
-      },
-      "RouteTrafficStatus": {
-        "description": "Traffic routing status for a route.\n\nControls whether traffic should be sent to this route.\nActual traffic delivery depends on health being HEALTHY.\n\n- ACTIVE: Traffic enabled (will receive traffic when health is HEALTHY)\n- INACTIVE: Traffic disabled (will not receive traffic regardless of health)",
-        "enum": [
-          "active",
-          "inactive"
-        ],
-        "title": "RouteTrafficStatus",
         "type": "string"
       },
       "SearchReplicasInput": {
@@ -5521,17 +6100,6 @@
         },
         "title": "RouteFilter",
         "type": "object"
-      },
-      "RouteHealthStatus": {
-        "description": "Health check status of a route.",
-        "enum": [
-          "not_checked",
-          "healthy",
-          "unhealthy",
-          "degraded"
-        ],
-        "title": "RouteHealthStatus",
-        "type": "string"
       },
       "RouteOrder": {
         "description": "Order specification for routes.",
@@ -9709,6 +10277,1038 @@
           "id"
         ],
         "title": "DeleteHuggingFaceRegistryInput",
+        "type": "object"
+      },
+      "IdleCheckerInputTypeDTO": {
+        "enum": [
+          "session_lifetime",
+          "network_timeout",
+          "utilization"
+        ],
+        "title": "IdleCheckerInputTypeDTO",
+        "type": "string"
+      },
+      "IdleCheckerSpecInputDTO": {
+        "additionalProperties": false,
+        "properties": {
+          "session_lifetime": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionLifetimeSpecInputDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "network": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NetworkTimeoutSpecInputDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "utilization": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UtilizationSpecInputDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "title": "IdleCheckerSpecInputDTO",
+        "type": "object"
+      },
+      "NetworkTimeoutSpecInputDTO": {
+        "properties": {
+          "max_network_inactivity_seconds": {
+            "minimum": 1,
+            "title": "Max Network Inactivity Seconds",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "max_network_inactivity_seconds"
+        ],
+        "title": "NetworkTimeoutSpecInputDTO",
+        "type": "object"
+      },
+      "SessionLifetimeSpecInputDTO": {
+        "properties": {
+          "max_lifetime_seconds": {
+            "minimum": 1,
+            "title": "Max Lifetime Seconds",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "max_lifetime_seconds"
+        ],
+        "title": "SessionLifetimeSpecInputDTO",
+        "type": "object"
+      },
+      "SessionTypes": {
+        "enum": [
+          "interactive",
+          "batch",
+          "inference",
+          "system"
+        ],
+        "title": "SessionTypes",
+        "type": "string"
+      },
+      "UtilizationSpecInputDTO": {
+        "properties": {
+          "max_underutilized_duration_seconds": {
+            "minimum": 1,
+            "title": "Max Underutilized Duration Seconds",
+            "type": "integer"
+          },
+          "threshold": {
+            "$ref": "#/components/schemas/UtilizationThresholdInputDTO"
+          }
+        },
+        "required": [
+          "max_underutilized_duration_seconds",
+          "threshold"
+        ],
+        "title": "UtilizationSpecInputDTO",
+        "type": "object"
+      },
+      "UtilizationThresholdInputDTO": {
+        "properties": {
+          "preset_id": {
+            "format": "uuid",
+            "title": "Preset Id",
+            "type": "string"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Threshold"
+          }
+        },
+        "required": [
+          "preset_id",
+          "threshold"
+        ],
+        "title": "UtilizationThresholdInputDTO",
+        "type": "object"
+      },
+      "CreateIdleCheckerInput": {
+        "properties": {
+          "name": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Idle checker description.",
+            "title": "Description"
+          },
+          "checker_type": {
+            "$ref": "#/components/schemas/IdleCheckerInputTypeDTO"
+          },
+          "target_session_types": {
+            "items": {
+              "$ref": "#/components/schemas/SessionTypes"
+            },
+            "minItems": 1,
+            "title": "Target Session Types",
+            "type": "array"
+          },
+          "initial_grace_period_seconds": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Initial Grace Period Seconds",
+            "type": "integer"
+          },
+          "checker_spec": {
+            "$ref": "#/components/schemas/IdleCheckerSpecInputDTO"
+          }
+        },
+        "required": [
+          "name",
+          "checker_type",
+          "target_session_types",
+          "checker_spec"
+        ],
+        "title": "CreateIdleCheckerInput",
+        "type": "object"
+      },
+      "CheckerTypeFilter": {
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IdleCheckerTypeDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IdleCheckerTypeDTO"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "In"
+          }
+        },
+        "title": "CheckerTypeFilter",
+        "type": "object"
+      },
+      "IdleCheckerFilter": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "checker_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CheckerTypeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IdleCheckerFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IdleCheckerFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IdleCheckerFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Not"
+          }
+        },
+        "title": "IdleCheckerFilter",
+        "type": "object"
+      },
+      "IdleCheckerOrder": {
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/IdleCheckerOrderField"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "ASC"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "IdleCheckerOrder",
+        "type": "object"
+      },
+      "IdleCheckerOrderField": {
+        "enum": [
+          "name",
+          "checker_type",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "IdleCheckerOrderField",
+        "type": "string"
+      },
+      "IdleCheckerTypeDTO": {
+        "enum": [
+          "session_lifetime",
+          "network_timeout",
+          "utilization"
+        ],
+        "title": "IdleCheckerTypeDTO",
+        "type": "string"
+      },
+      "SearchIdleCheckersInput": {
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IdleCheckerFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IdleCheckerOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Offset"
+          }
+        },
+        "title": "SearchIdleCheckersInput",
+        "type": "object"
+      },
+      "UpdateIdleCheckerInput": {
+        "properties": {
+          "id": {
+            "description": "Idle checker ID to update.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/components/schemas/Sentinel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 1,
+            "description": "Updated description. Omit to leave unchanged or pass null to clear.",
+            "title": "Description"
+          },
+          "target_session_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SessionTypes"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Target Session Types"
+          },
+          "initial_grace_period_seconds": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Initial Grace Period Seconds"
+          },
+          "checker_spec": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IdleCheckerSpecInputDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "UpdateIdleCheckerInput",
+        "type": "object"
+      },
+      "IdleCheckerScopeRefDTO": {
+        "description": "A typed (scope_type, scope_id) pair referencing one scope.",
+        "properties": {
+          "scope_type": {
+            "$ref": "#/components/schemas/IdleCheckerScopeTypeDTO",
+            "description": "Kind of the scope."
+          },
+          "scope_id": {
+            "description": "Scope identifier, interpreted according to the scope type.",
+            "format": "uuid",
+            "title": "Scope Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope_type",
+          "scope_id"
+        ],
+        "title": "IdleCheckerScopeRefDTO",
+        "type": "object"
+      },
+      "IdleCheckerScopeTypeDTO": {
+        "enum": [
+          "domain",
+          "project",
+          "resource_group"
+        ],
+        "title": "IdleCheckerScopeTypeDTO",
+        "type": "string"
+      },
+      "CreateIdleCheckerAssignmentInput": {
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/IdleCheckerScopeRefDTO",
+            "description": "Scope the checker is bound to."
+          },
+          "idle_checker_id": {
+            "description": "Idle checker to bind.",
+            "format": "uuid",
+            "title": "Idle Checker Id",
+            "type": "string"
+          },
+          "enabled": {
+            "default": true,
+            "description": "Whether the assignment participates in idle checking.",
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "scope",
+          "idle_checker_id"
+        ],
+        "title": "CreateIdleCheckerAssignmentInput",
+        "type": "object"
+      },
+      "IdleCheckerAssignmentFilter": {
+        "properties": {
+          "scope_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScopeTypeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "scope_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "idle_checker_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Enabled"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IdleCheckerAssignmentFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IdleCheckerAssignmentFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IdleCheckerAssignmentFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Not"
+          }
+        },
+        "title": "IdleCheckerAssignmentFilter",
+        "type": "object"
+      },
+      "IdleCheckerAssignmentOrder": {
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/IdleCheckerAssignmentOrderField"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "ASC"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "IdleCheckerAssignmentOrder",
+        "type": "object"
+      },
+      "IdleCheckerAssignmentOrderField": {
+        "enum": [
+          "scope_type",
+          "enabled",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "IdleCheckerAssignmentOrderField",
+        "type": "string"
+      },
+      "ScopeTypeFilter": {
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IdleCheckerScopeTypeDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IdleCheckerScopeTypeDTO"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "In"
+          }
+        },
+        "title": "ScopeTypeFilter",
+        "type": "object"
+      },
+      "SearchIdleCheckerAssignmentsInput": {
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IdleCheckerAssignmentFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IdleCheckerAssignmentOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Offset"
+          }
+        },
+        "title": "SearchIdleCheckerAssignmentsInput",
+        "type": "object"
+      },
+      "IdleCheckerAssignmentScopeDTO": {
+        "description": "Scope for the scoped idle checker assignment query.\n\nAll items are OR'd. Raises an error if the item list is empty.",
+        "properties": {
+          "items": {
+            "description": "Scope-tagged items (OR across all items).",
+            "items": {
+              "$ref": "#/components/schemas/IdleCheckerScopeRefDTO"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "IdleCheckerAssignmentScopeDTO",
+        "type": "object"
+      },
+      "ScopedSearchIdleCheckerAssignmentsInput": {
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/IdleCheckerAssignmentScopeDTO",
+            "description": "Scope (OR across all items)."
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IdleCheckerAssignmentFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IdleCheckerAssignmentOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Offset"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "ScopedSearchIdleCheckerAssignmentsInput",
+        "type": "object"
+      },
+      "UpdateIdleCheckerAssignmentInput": {
+        "properties": {
+          "id": {
+            "description": "Idle checker assignment ID to update.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "enabled": {
+            "description": "New enabled state.",
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "enabled"
+        ],
+        "title": "UpdateIdleCheckerAssignmentInput",
         "type": "object"
       },
       "ImageAliasNestedFilterInputDTO": {
@@ -14911,6 +16511,7 @@
           "keypair",
           "notification_channel",
           "network",
+          "idle_checker_assignment",
           "resource_group",
           "container_registry",
           "storage_host",
@@ -14932,6 +16533,7 @@
           "project_resource_policy",
           "role",
           "audit_log",
+          "kernel:history",
           "event_log",
           "project_admin_page",
           "domain_admin_page",
@@ -18571,6 +20173,19 @@
             "description": "Filter by public status.",
             "title": "Is Public"
           },
+          "is_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by whether the resource group is the default one.",
+            "title": "Is Default"
+          },
           "AND": {
             "anyOf": [
               {
@@ -19540,7 +21155,7 @@
         "type": "object"
       },
       "MountItemInput": {
-        "description": "A single virtual folder mount specification.",
+        "description": "A single virtual folder mount specification.\n\nShared by the session enqueue input and the session-options kernel\nexecution spec (lives here to avoid a session <-> session_options\ncircular import).",
         "properties": {
           "vfolder_id": {
             "description": "Virtual folder UUID to mount.",
@@ -19949,6 +21564,18 @@
             "default": null,
             "description": "Filter by max pending session count."
           },
+          "max_priority": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IntFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by max scheduling priority."
+          },
           "AND": {
             "anyOf": [
               {
@@ -20049,7 +21676,8 @@
           "max_containers_per_session",
           "idle_timeout",
           "max_concurrent_sftp_sessions",
-          "max_pending_session_count"
+          "max_pending_session_count",
+          "max_priority"
         ],
         "title": "KeypairResourcePolicyOrderField",
         "type": "string"
@@ -20244,6 +21872,19 @@
             "description": "Maximum number of sessions in pending state. Null means unlimited.",
             "title": "Max Pending Session Count"
           },
+          "max_priority": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Highest scheduling priority a session may declare. Null means uncapped.",
+            "title": "Max Priority"
+          },
           "max_pending_session_resource_slots": {
             "anyOf": [
               {
@@ -20373,6 +22014,22 @@
             "default": 1,
             "description": "Updated max pending sessions. Set to null to clear.",
             "title": "Max Pending Session Count"
+          },
+          "max_priority": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "$ref": "#/components/schemas/Sentinel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 1,
+            "description": "Updated max priority. Set to null to clear.",
+            "title": "Max Priority"
           },
           "max_pending_session_resource_slots": {
             "anyOf": [
@@ -22220,6 +23877,265 @@
           }
         },
         "title": "AdminSearchResourceAllocationsInput",
+        "type": "object"
+      },
+      "RetentionCategory": {
+        "description": "Identifier linking a ``retention_policies`` row to its code-side cleanup\nprocedure. A pure identifier carrying no table references.\n\nThe single definition shared across the data, DTO, GraphQL, and API layers.",
+        "enum": [
+          "logs",
+          "login",
+          "reconcile_history",
+          "roles_invitations",
+          "deployments",
+          "sessions",
+          "usage_records",
+          "usage_buckets"
+        ],
+        "title": "RetentionCategory",
+        "type": "string"
+      },
+      "CreateRetentionPolicyInput": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/RetentionCategory",
+            "description": "Retention category, validated against the fixed catalog."
+          },
+          "retention_period_days": {
+            "description": "Retention period in days; records older than now - period are purged.",
+            "minimum": 1,
+            "title": "Retention Period Days",
+            "type": "integer"
+          },
+          "enabled": {
+            "default": true,
+            "description": "Whether this policy is active.",
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "category",
+          "retention_period_days"
+        ],
+        "title": "CreateRetentionPolicyInput",
+        "type": "object"
+      },
+      "RetentionPolicyFilter": {
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RetentionCategory"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by category."
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by enabled flag.",
+            "title": "Enabled"
+          }
+        },
+        "title": "RetentionPolicyFilter",
+        "type": "object"
+      },
+      "RetentionPolicyOrder": {
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/RetentionPolicyOrderField"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "ASC"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "RetentionPolicyOrder",
+        "type": "object"
+      },
+      "RetentionPolicyOrderField": {
+        "enum": [
+          "category",
+          "created_at",
+          "last_swept_at"
+        ],
+        "title": "RetentionPolicyOrderField",
+        "type": "string"
+      },
+      "SearchRetentionPoliciesInput": {
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RetentionPolicyFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RetentionPolicyOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Offset"
+          }
+        },
+        "title": "SearchRetentionPoliciesInput",
+        "type": "object"
+      },
+      "UpdateRetentionPolicyInput": {
+        "properties": {
+          "id": {
+            "description": "Retention policy ID.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RetentionCategory"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "New category, validated against the catalog; None = no change."
+          },
+          "retention_period_days": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "New retention period in days; None = no change.",
+            "title": "Retention Period Days"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Toggle enabled; None = no change.",
+            "title": "Enabled"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "UpdateRetentionPolicyInput",
         "type": "object"
       },
       "RuntimeVariantFilter": {
@@ -24531,6 +26447,521 @@
         "title": "AdminSearchSessionHistoriesInput",
         "type": "object"
       },
+      "KernelHistoryFilter": {
+        "description": "Filter conditions for kernel scheduling history search.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by history record ID"
+          },
+          "kernel_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by kernel ID"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by session ID"
+          },
+          "phase": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by scheduling phase"
+          },
+          "from_status": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by from_status values",
+            "title": "From Status"
+          },
+          "to_status": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by to_status values",
+            "title": "To Status"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SchedulingResultFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by scheduling result"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by error code"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by message"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by created_at"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by updated_at"
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/KernelHistoryFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "AND conjunction.",
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/KernelHistoryFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "OR conjunction.",
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/KernelHistoryFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "NOT negation.",
+            "title": "Not"
+          }
+        },
+        "title": "KernelHistoryFilter",
+        "type": "object"
+      },
+      "KernelHistoryOrder": {
+        "description": "Order specification for kernel scheduling history.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/KernelHistoryOrderField",
+            "description": "Field to order by"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "DESC",
+            "description": "Order direction"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "KernelHistoryOrder",
+        "type": "object"
+      },
+      "KernelHistoryOrderField": {
+        "description": "Fields available for ordering kernel scheduling history.",
+        "enum": [
+          "created_at",
+          "updated_at",
+          "phase",
+          "from_status",
+          "to_status",
+          "result",
+          "attempts"
+        ],
+        "title": "KernelHistoryOrderField",
+        "type": "string"
+      },
+      "AdminSearchKernelHistoriesInput": {
+        "description": "Input for admin search of kernel scheduling histories.",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KernelHistoryFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/KernelHistoryOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: number of items",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: after cursor",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: last N items",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: before cursor",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: maximum items",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: number to skip",
+            "title": "Offset"
+          }
+        },
+        "title": "AdminSearchKernelHistoriesInput",
+        "type": "object"
+      },
+      "KernelHistoryScopeDTO": {
+        "description": "Scope for kernel scheduling history queries.\n\nEach list is OR'd internally and across categories. Raises an error if every\nfield is empty. The scoped search is still a single-target scope action, so\nonly one item is dispatchable today; the list shape keeps the wire contract\nstable for the multi-target case.",
+        "properties": {
+          "kernel": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Kernel IDs to get history for.",
+            "title": "Kernel"
+          },
+          "session": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Session IDs to get the history of every owned kernel for.",
+            "title": "Session"
+          }
+        },
+        "title": "KernelHistoryScopeDTO",
+        "type": "object"
+      },
+      "UUIDScope": {
+        "description": "Single-UUID scope item wrapper.\n\nA thin wrapper around a UUID used as a scope item. The wrapper exists so\nthat scope-input lists stay structurally uniform with other scope item\ntypes and leave room for per-item metadata in the future.",
+        "properties": {
+          "value": {
+            "format": "uuid",
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "title": "UUIDScope",
+        "type": "object"
+      },
+      "ScopedSearchKernelHistoriesInput": {
+        "description": "Input for searching kernel scheduling histories under a non-admin scope.",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/KernelHistoryScopeDTO",
+            "description": "Scope restricting the rows returned"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KernelHistoryFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/KernelHistoryOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: number of items",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: after cursor",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: last N items",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: before cursor",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: maximum items",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: number to skip",
+            "title": "Offset"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "ScopedSearchKernelHistoriesInput",
+        "type": "object"
+      },
       "DeploymentHistoryFilter": {
         "description": "Filter for deployment history.",
         "properties": {
@@ -24772,6 +27203,503 @@
           }
         },
         "title": "AdminSearchDeploymentHistoriesInput",
+        "type": "object"
+      },
+      "ReplicaGroupHistoryCategoryType": {
+        "description": "Handler category a replica-group history row was produced by.",
+        "enum": [
+          "lifecycle",
+          "scaling"
+        ],
+        "title": "ReplicaGroupHistoryCategoryType",
+        "type": "string"
+      },
+      "ReplicaGroupHistoryFilter": {
+        "description": "Filter conditions for replica-group scheduling history search.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by history record ID"
+          },
+          "deployment_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by owning deployment ID"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReplicaGroupHistoryCategoryType"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by handler category",
+            "title": "Category"
+          },
+          "phase": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by scheduling phase"
+          },
+          "from_status": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by from_status values",
+            "title": "From Status"
+          },
+          "to_status": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by to_status values",
+            "title": "To Status"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SchedulingResultFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by scheduling result"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by error code"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by message"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by created_at"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by updated_at"
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReplicaGroupHistoryFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "AND conjunction.",
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReplicaGroupHistoryFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "OR conjunction.",
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReplicaGroupHistoryFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "NOT negation.",
+            "title": "Not"
+          }
+        },
+        "title": "ReplicaGroupHistoryFilter",
+        "type": "object"
+      },
+      "ReplicaGroupHistoryOrder": {
+        "description": "Order specification for replica-group scheduling history.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/ReplicaGroupHistoryOrderField",
+            "description": "Field to order by"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "DESC",
+            "description": "Order direction"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "ReplicaGroupHistoryOrder",
+        "type": "object"
+      },
+      "ReplicaGroupHistoryOrderField": {
+        "description": "Fields available for ordering replica-group scheduling history.",
+        "enum": [
+          "created_at",
+          "updated_at",
+          "phase",
+          "from_status",
+          "to_status",
+          "result",
+          "attempts"
+        ],
+        "title": "ReplicaGroupHistoryOrderField",
+        "type": "string"
+      },
+      "AdminSearchReplicaGroupHistoriesInput": {
+        "description": "Input for admin search of replica-group scheduling histories.",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplicaGroupHistoryFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReplicaGroupHistoryOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: number of items",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: after cursor",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: last N items",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: before cursor",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: maximum items",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: number to skip",
+            "title": "Offset"
+          }
+        },
+        "title": "AdminSearchReplicaGroupHistoriesInput",
+        "type": "object"
+      },
+      "ReplicaGroupHistoryScopeDTO": {
+        "description": "Scope for replica-group scheduling history queries.\n\nEach category list is OR'd internally and across categories. Raises an error\nif every field is empty. The scoped search is still a single-target scope\naction, so only one item is dispatchable today; the list shape keeps the wire\ncontract stable for the multi-target case.\n\nA replica group is not an RBAC scope of its own, so the history is scoped by\nthe owning deployment.",
+        "properties": {
+          "deployment": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Deployment IDs to get the history of every owned replica group for.",
+            "title": "Deployment"
+          }
+        },
+        "title": "ReplicaGroupHistoryScopeDTO",
+        "type": "object"
+      },
+      "ScopedSearchReplicaGroupHistoriesInput": {
+        "description": "Input for searching replica-group scheduling histories under a non-admin scope.",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/ReplicaGroupHistoryScopeDTO",
+            "description": "Scope restricting the rows returned"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplicaGroupHistoryFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReplicaGroupHistoryOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: number of items",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: after cursor",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: last N items",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: before cursor",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: maximum items",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: number to skip",
+            "title": "Offset"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "ScopedSearchReplicaGroupHistoriesInput",
         "type": "object"
       },
       "RouteHistoryFilter": {
@@ -25524,6 +28452,12 @@
             "title": "Priority",
             "type": "integer"
           },
+          "job_priority": {
+            "default": 0,
+            "description": "Scope-local preemption priority among the requester's own sessions (higher preempts lower; decoupled from `priority`).",
+            "title": "Job Priority",
+            "type": "integer"
+          },
           "is_preemptible": {
             "default": true,
             "description": "Whether this session can be preempted.",
@@ -25562,6 +28496,18 @@
             "default": null,
             "description": "Designated agent IDs for placement constraint.",
             "title": "Agent List"
+          },
+          "agent_selection_policy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSelectionPolicyEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "How agent_list is enforced (strict/preferred). null inherits the resource group default."
           },
           "attach_network": {
             "anyOf": [
@@ -25645,6 +28591,93 @@
           "project_id"
         ],
         "title": "EnqueueSessionInput",
+        "type": "object"
+      },
+      "ComputeScheduleKernelResourceInput": {
+        "description": "Per-kernel resource inputs for a compute-schedule request.\n\nMirrors the scheduler's ``KernelResourceInput``: the requested resource\nslots plus an optional image whose architecture and resource-group\ndefaults are resolved downstream. Results are correlated to kernels by\nlist index, so no identifier is carried here.",
+        "properties": {
+          "image_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Image to schedule this kernel against. May be null when a resource-group default supplies the image downstream.",
+            "title": "Image Id"
+          },
+          "resources": {
+            "description": "Requested resource slots (cpu, mem, accelerators) for this kernel.",
+            "items": {
+              "$ref": "#/components/schemas/ResourceSlotEntryInput"
+            },
+            "title": "Resources",
+            "type": "array"
+          }
+        },
+        "title": "ComputeScheduleKernelResourceInput",
+        "type": "object"
+      },
+      "ComputeScheduleInput": {
+        "description": "Compute a session's scheduling against a resource group without provisioning.\n\n``cluster_mode`` decides whether kernel slots are summed onto a single\nnode (SINGLE_NODE) or placed individually (MULTI_NODE).",
+        "properties": {
+          "kernels": {
+            "description": "Per-kernel resource requests to test against the resource group.",
+            "items": {
+              "$ref": "#/components/schemas/ComputeScheduleKernelResourceInput"
+            },
+            "title": "Kernels",
+            "type": "array"
+          },
+          "cluster_mode": {
+            "$ref": "#/components/schemas/ClusterModeEnum",
+            "description": "Cluster networking mode governing how kernel slots are placed."
+          },
+          "resource_group_id": {
+            "description": "Target resource group to compute the scheduling against.",
+            "format": "uuid",
+            "title": "Resource Group Id",
+            "type": "string"
+          },
+          "designated_agent_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Restrict the fitting check to these agents, with the same semantics as the scheduling path. Null means no restriction.",
+            "title": "Designated Agent Ids"
+          },
+          "agent_selection_policy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSelectionPolicyEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "How `designated_agent_ids` is enforced (STRICT fails without capacity, PREFERRED falls back). Null inherits the resource group default."
+          }
+        },
+        "required": [
+          "kernels",
+          "cluster_mode",
+          "resource_group_id"
+        ],
+        "title": "ComputeScheduleInput",
         "type": "object"
       },
       "SessionFilter": {
@@ -25818,7 +28851,9 @@
           "RESTARTING",
           "RUNNING_DEGRADED",
           "DEPRIORITIZING",
+          "RESERVED",
           "PREEMPTED",
+          "RESCHEDULING",
           "TERMINATING",
           "TERMINATED",
           "ERROR",
@@ -26126,6 +29161,7 @@
         "description": "Kernel lifecycle status values for DTO filtering.",
         "enum": [
           "PENDING",
+          "RESERVED",
           "SCHEDULED",
           "PREPARING",
           "PREPARED",
@@ -29175,6 +32211,18 @@
             ],
             "default": null,
             "description": "Filter audit logs by the user or system that triggered the action. Use this to export audit logs initiated by a specific actor."
+          },
+          "acted_as": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter audit logs by the effective/acting user UUID the action ran as (differs from triggered_by only during super-admin impersonation)."
           },
           "request_id": {
             "anyOf": [
@@ -34448,16 +37496,6 @@
         "title": "TokenRequestModel",
         "type": "object"
       },
-      "SessionTypes": {
-        "enum": [
-          "interactive",
-          "batch",
-          "inference",
-          "system"
-        ],
-        "title": "SessionTypes",
-        "type": "string"
-      },
       "CreateFromParamsRequest": {
         "description": "POST ``/`` and POST ``/_/create``",
         "properties": {
@@ -34470,6 +37508,12 @@
             "maximum": 100,
             "minimum": 0,
             "title": "Priority",
+            "type": "integer"
+          },
+          "job_priority": {
+            "default": 0,
+            "description": "Scope-local preemption priority among the requester's own sessions (higher preempts lower; decoupled from `priority`).",
+            "title": "Job Priority",
             "type": "integer"
           },
           "is_preemptible": {
@@ -34685,6 +37729,12 @@
             "maximum": 100,
             "minimum": 0,
             "title": "Priority",
+            "type": "integer"
+          },
+          "job_priority": {
+            "default": 0,
+            "description": "Scope-local preemption priority among the requester's own sessions (higher preempts lower; decoupled from `priority`).",
+            "title": "Job Priority",
             "type": "integer"
           },
           "is_preemptible": {
@@ -38678,6 +41728,44 @@
         "description": "Search agents with filters, orders, and pagination (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/agents/{agent_id}/resource-group": {
+      "patch": {
+        "operationId": "v2/agents.update_resource_group",
+        "tags": [
+          "v2/agents"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAgentResourceGroupBody"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Change an agent's resource group (superadmin only).\n\nThe agent ID comes from the URL path; the adapter merges it with the body.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
     "/v2/agents/total-resources": {
       "get": {
         "operationId": "v2/agents.get_total_resources",
@@ -38696,6 +41784,236 @@
         ],
         "parameters": [],
         "description": "Retrieve aggregate resource capacity/usage across all agents (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/app-config-fragments/bulk-delete": {
+      "post": {
+        "operationId": "v2/app-config-fragments.bulk_purge",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkPurgeAppConfigFragmentInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Purge many fragments by id, with per-item partial success (auth, RBAC).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config-fragments/admin/search": {
+      "post": {
+        "operationId": "v2/app-config-fragments.admin_search",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminSearchAppConfigFragmentInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search fragments across all scopes with pagination (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/app-config-fragments/scoped/by-names": {
+      "post": {
+        "operationId": "v2/app-config-fragments.scoped_fragments_by_names",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedAppConfigFragmentsByNamesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Read one scope's fragments for the given config names (auth, RBAC-authorized).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config-fragments/scoped/bulk-upsert": {
+      "post": {
+        "operationId": "v2/app-config-fragments.scoped_bulk_upsert",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedUpsertAppConfigFragmentsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Upsert many fragments at one scope, all-or-nothing (auth, RBAC-authorized).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config-fragments/my/by-names": {
+      "post": {
+        "operationId": "v2/app-config-fragments.my_fragments_by_names",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MyAppConfigFragmentsByNamesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Read the caller's own user-scope fragments for the given config names (auth).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config-fragments/my/bulk-upsert": {
+      "post": {
+        "operationId": "v2/app-config-fragments.my_bulk_upsert",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MyUpsertAppConfigFragmentsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Upsert many fragments at the caller's own user scope, all-or-nothing (auth).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config-fragments/{fragment_id}": {
+      "get": {
+        "operationId": "v2/app-config-fragments.get",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fragment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a fragment by id (auth required, RBAC-gated).\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/app-config-fragments.purge",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fragment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Purge a fragment by id (auth required, RBAC-gated).\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/app-config-allow-list/": {
@@ -41455,6 +44773,281 @@
         },
         "parameters": [],
         "description": "Delete a HuggingFace registry.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/idle-checkers/": {
+      "post": {
+        "operationId": "v2/idle-checkers.admin_create",
+        "tags": [
+          "v2/idle-checkers"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateIdleCheckerInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/idle-checkers/search": {
+      "post": {
+        "operationId": "v2/idle-checkers.admin_search",
+        "tags": [
+          "v2/idle-checkers"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchIdleCheckersInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/idle-checkers/{idle_checker_id}": {
+      "patch": {
+        "operationId": "v2/idle-checkers.admin_update",
+        "tags": [
+          "v2/idle-checkers"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateIdleCheckerInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "idle_checker_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/idle-checkers.admin_purge",
+        "tags": [
+          "v2/idle-checkers"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "idle_checker_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/idle-checker-assignments/": {
+      "post": {
+        "operationId": "v2/idle-checker-assignments.admin_create",
+        "tags": [
+          "v2/idle-checker-assignments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateIdleCheckerAssignmentInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Bind a global idle checker to a scope (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/idle-checker-assignments/search": {
+      "post": {
+        "operationId": "v2/idle-checker-assignments.admin_search",
+        "tags": [
+          "v2/idle-checker-assignments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchIdleCheckerAssignmentsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search idle checker assignments across all scopes (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/idle-checker-assignments/scoped/search": {
+      "post": {
+        "operationId": "v2/idle-checker-assignments.scoped_search",
+        "tags": [
+          "v2/idle-checker-assignments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedSearchIdleCheckerAssignmentsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search idle checker assignments within the given scopes (per-item RBAC).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/idle-checker-assignments/{idle_checker_assignment_id}": {
+      "patch": {
+        "operationId": "v2/idle-checker-assignments.update",
+        "tags": [
+          "v2/idle-checker-assignments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateIdleCheckerAssignmentInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "idle_checker_assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update an idle checker assignment's enabled state by id.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/idle-checker-assignments.purge",
+        "tags": [
+          "v2/idle-checker-assignments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "idle_checker_assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Permanently remove an idle checker assignment by id.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/images/search": {
@@ -46344,6 +49937,185 @@
         "description": "Search resource allocations with filters, orders, and pagination.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/retention-policies": {
+      "post": {
+        "operationId": "v2/retention-policies.admin_create",
+        "tags": [
+          "v2/retention-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRetentionPolicyInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/retention-policies/search": {
+      "post": {
+        "operationId": "v2/retention-policies.admin_search",
+        "tags": [
+          "v2/retention-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRetentionPoliciesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/retention-policies/{policy_id}": {
+      "get": {
+        "operationId": "v2/retention-policies.admin_get",
+        "tags": [
+          "v2/retention-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      },
+      "patch": {
+        "operationId": "v2/retention-policies.admin_update",
+        "tags": [
+          "v2/retention-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRetentionPolicyInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/retention-policies.admin_delete",
+        "tags": [
+          "v2/retention-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/retention-policies/{policy_id}/purge": {
+      "post": {
+        "operationId": "v2/retention-policies.admin_purge",
+        "tags": [
+          "v2/retention-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
     "/v2/runtime-variants/search": {
       "post": {
         "operationId": "v2/runtime-variants.search",
@@ -47180,6 +50952,64 @@
         "description": "Search session scheduling histories scoped to a specific session.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/scheduling-history/kernels/admin/search": {
+      "post": {
+        "operationId": "v2/scheduling-history.admin_search_kernel_history",
+        "tags": [
+          "v2/scheduling-history"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminSearchKernelHistoriesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search kernel scheduling histories with admin scope.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/scheduling-history/kernels/scoped/search": {
+      "post": {
+        "operationId": "v2/scheduling-history.scoped_search_kernel_history",
+        "tags": [
+          "v2/scheduling-history"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedSearchKernelHistoriesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search kernel scheduling histories under a non-admin scope.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/v2/scheduling-history/deployments/search": {
       "post": {
         "operationId": "v2/scheduling-history.admin_search_deployment_history",
@@ -47245,6 +51075,64 @@
           }
         ],
         "description": "Search deployment histories scoped to a specific deployment.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/scheduling-history/replica-groups/admin/search": {
+      "post": {
+        "operationId": "v2/scheduling-history.admin_search_replica_group_history",
+        "tags": [
+          "v2/scheduling-history"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminSearchReplicaGroupHistoriesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search replica-group scheduling histories with admin scope.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/scheduling-history/replica-groups/scoped/search": {
+      "post": {
+        "operationId": "v2/scheduling-history.scoped_search_replica_group_history",
+        "tags": [
+          "v2/scheduling-history"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedSearchReplicaGroupHistoriesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search replica-group scheduling histories under a non-admin scope.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/scheduling-history/routes/search": {
@@ -47370,6 +51258,35 @@
         },
         "parameters": [],
         "description": "Enqueue a new compute session.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/sessions/compute-schedule": {
+      "post": {
+        "operationId": "v2/sessions.compute_schedule",
+        "tags": [
+          "v2/sessions"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComputeScheduleInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Compute whether a would-be session fits a resource group, without provisioning.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/sessions/search": {

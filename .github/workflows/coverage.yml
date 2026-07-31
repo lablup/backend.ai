@@ -43,7 +43,7 @@ jobs:
         grep -q "127.0.0.1 node03" /etc/hosts || echo "127.0.0.1 node03" | sudo tee -a /etc/hosts
         pants test --use-coverage tests:: -- -m 'not integration' -v
     - name: Upload coverage report
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238  # v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         verbose: true

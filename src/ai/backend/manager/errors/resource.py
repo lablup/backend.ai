@@ -82,6 +82,22 @@ class ScalingGroupNotFound(ObjectNotFound):
         )
 
 
+class UnresolvableResourceGroup(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/unresolvable-resource-group"
+    error_title = (
+        "The agent's resource group could not be resolved "
+        "and no default resource group is configured."
+    )
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SCALING_GROUP,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
 class ScalingGroupSessionTypeNotAllowed(BackendAIError, web.HTTPUnprocessableEntity):
     error_type = "https://api.backend.ai/probs/scaling-group-session-type-not-allowed"
     error_title = "Scaling group does not allow this session type."

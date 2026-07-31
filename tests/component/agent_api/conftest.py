@@ -3,7 +3,7 @@ from __future__ import annotations
 import secrets
 from collections.abc import AsyncIterator
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -75,7 +75,9 @@ def agent_processors(
     scheduler_repository = SchedulerRepository(
         database_engine,
         valkey_stat=valkey_clients.stat,
+        valkey_schedule=valkey_clients.schedule,
         config_provider=config_provider,
+        storage_manager=MagicMock(),
     )
     service = AgentService(
         etcd=async_etcd,
@@ -83,6 +85,7 @@ def agent_processors(
         config_provider=config_provider,
         agent_repository=agent_repository,
         scheduler_repository=scheduler_repository,
+        scheduling_controller=AsyncMock(),
         hook_plugin_ctx=hook_plugin_ctx,
         event_producer=event_producer,
         agent_cache=agent_cache,

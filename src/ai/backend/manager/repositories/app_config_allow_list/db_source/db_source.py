@@ -95,7 +95,7 @@ class AppConfigAllowListDBSource:
             return result.row.to_data()
 
     @app_config_allow_list_db_source_resilience.apply()
-    async def search(self, querier: BatchQuerier) -> AppConfigAllowListSearchResult:
+    async def admin_search(self, querier: BatchQuerier) -> AppConfigAllowListSearchResult:
         async with self._ops.read_ops() as r:
             result = await r.batch_query_in_global(sa.select(AppConfigAllowListRow), querier)
             items = [row.AppConfigAllowListRow.to_data() for row in result.rows]

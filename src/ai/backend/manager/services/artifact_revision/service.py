@@ -301,17 +301,10 @@ class ArtifactRevisionService:
                         # We want the remote's "local" progress as our "remote" progress
                         remote_local = remote_resp.download_progress.local
 
-                        if remote_local:
-                            remote_download_progress = ArtifactRevisionDownloadProgress(
-                                progress=remote_local.progress,
-                                status=remote_local.status,
-                            )
-                        else:
-                            # Remote response exists but no local data
-                            remote_download_progress = ArtifactRevisionDownloadProgress(
-                                progress=None,
-                                status=remote_status,
-                            )
+                        remote_download_progress = ArtifactRevisionDownloadProgress(
+                            progress=remote_local.progress,
+                            status=remote_local.status,
+                        )
                     except Exception as e:
                         # If remote query fails, return remote status without progress
                         log.warning("Failed to get remote download progress {}", e)
@@ -418,9 +411,8 @@ class ArtifactRevisionService:
             volume_name: str | None = None
             if action.vfolder_id:
                 vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_id)
-                if vfolder_data:
-                    vfolder_id = VFolderID(vfolder_data.quota_scope_id, vfolder_data.id)
-                    _, volume_name = self._storage_manager.get_proxy_and_volume(vfolder_data.host)
+                vfolder_id = VFolderID(vfolder_data.quota_scope_id, vfolder_data.id)
+                _, volume_name = self._storage_manager.get_proxy_and_volume(vfolder_data.host)
 
             task_id: UUID
             match artifact.registry_type:

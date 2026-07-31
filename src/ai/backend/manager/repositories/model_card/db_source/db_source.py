@@ -193,7 +193,7 @@ class ModelCardDBSource:
             for purger in purgers:
                 # ModelCardRow uses a UUID primary key; the Purger generic type permits
                 # UUID/str/int so narrow it once for the failure record.
-                card_id = cast(UUID, purger.pk_value)
+                card_id = cast(UUID, purger.spec.pk_value())
                 try:
                     async with session.begin_nested():
                         deleted_id = await self._delete_card_in_session(session, purger, options)

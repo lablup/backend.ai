@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
+import uuid
 
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.export.request import (
     AuditLogExportCSVInput,
     AuditLogExportFilter,
@@ -249,6 +250,14 @@ class TestAuditLogExportCSVInput:
         req = AuditLogExportCSVInput(filter=f)
         assert req.filter is not None
         assert req.filter.status == ["success"]
+
+    def test_creation_with_acted_as_filter(self) -> None:
+        acted_as = uuid.uuid4()
+        f = AuditLogExportFilter(acted_as=UUIDFilter(equals=acted_as))
+        req = AuditLogExportCSVInput(filter=f)
+        assert req.filter is not None
+        assert req.filter.acted_as is not None
+        assert req.filter.acted_as.equals == acted_as
 
     def test_creation_with_order(self) -> None:
         order = [AuditLogExportOrder(field=AuditLogExportOrderField.CREATED_AT)]

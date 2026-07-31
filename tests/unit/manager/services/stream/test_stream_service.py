@@ -9,7 +9,6 @@ from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiv
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.errors.kernel import SessionNotFound
-from ai.backend.manager.idle import AppStreamingStatus, IdleCheckerHost
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.stream.repository import StreamRepository
@@ -62,10 +61,6 @@ class TestStreamService:
         return AsyncMock(spec=ValkeyLiveClient)
 
     @pytest.fixture
-    def mock_idle_checker_host(self) -> AsyncMock:
-        return AsyncMock(spec=IdleCheckerHost)
-
-    @pytest.fixture
     def mock_etcd(self) -> AsyncMock:
         return AsyncMock(spec=AsyncEtcd)
 
@@ -75,14 +70,12 @@ class TestStreamService:
         mock_repository: AsyncMock,
         mock_registry: AsyncMock,
         mock_valkey_live: AsyncMock,
-        mock_idle_checker_host: AsyncMock,
         mock_etcd: AsyncMock,
     ) -> StreamService:
         return StreamService(
             repository=mock_repository,
             registry=mock_registry,
             valkey_live=mock_valkey_live,
-            idle_checker_host=mock_idle_checker_host,
             etcd=mock_etcd,
         )
 
@@ -117,8 +110,8 @@ class TestGetStreamingSession(TestStreamService):
         result = await stream_service.get_streaming_session(action)
 
         assert isinstance(result, GetStreamingSessionActionResult)
-        assert result.session_id == str(FAKE_SESSION_ID)
-        assert result.kernel_id == str(FAKE_KERNEL_ID)
+        assert result.session_id == FAKE_SESSION_ID
+        assert result.kernel_id == FAKE_KERNEL_ID
         assert result.kernel_host == "10.0.0.1"
         assert result.agent_addr == "agent1:6001"
         assert result.repl_in_port == 2000
@@ -272,11 +265,10 @@ class TestStartServiceInStream(TestStreamService):
 
 
 class TestTrackConnection(TestStreamService):
-    async def test_track_updates_valkey_and_idle_checker(
+    async def test_track_updates_tracker_and_marker(
         self,
         stream_service: StreamService,
         mock_valkey_live: AsyncMock,
-        mock_idle_checker_host: AsyncMock,
     ) -> None:
         action = TrackConnectionAction(
             kernel_id=FAKE_KERNEL_ID,
@@ -288,20 +280,16 @@ class TestTrackConnection(TestStreamService):
         result = await stream_service.track_connection(action)
 
         assert isinstance(result, TrackConnectionActionResult)
-        assert result.kernel_id == str(FAKE_KERNEL_ID)
+        assert result.kernel_id == FAKE_KERNEL_ID
         mock_valkey_live.update_connection_tracker.assert_awaited_once_with(
-            str(FAKE_KERNEL_ID), "jupyter", "stream-001"
+            FAKE_SESSION_ID, FAKE_KERNEL_ID, "jupyter", "stream-001"
         )
-        mock_idle_checker_host.update_app_streaming_status.assert_awaited_once_with(
-            FAKE_SESSION_ID,
-            AppStreamingStatus.HAS_ACTIVE_CONNECTIONS,
-        )
+        mock_valkey_live.mark_session_active.assert_awaited_once_with(FAKE_SESSION_ID)
 
     async def test_re_registration_calls_same_methods(
         self,
         stream_service: StreamService,
         mock_valkey_live: AsyncMock,
-        mock_idle_checker_host: AsyncMock,
     ) -> None:
         action = TrackConnectionAction(
             kernel_id=FAKE_KERNEL_ID,
@@ -314,15 +302,14 @@ class TestTrackConnection(TestStreamService):
         await stream_service.track_connection(action)
 
         assert mock_valkey_live.update_connection_tracker.await_count == 2
-        assert mock_idle_checker_host.update_app_streaming_status.await_count == 2
+        assert mock_valkey_live.mark_session_active.await_count == 2
 
 
 class TestUntrackConnection(TestStreamService):
-    async def test_last_connection_triggers_no_active(
+    async def test_last_connection_refreshes_last_access_marker(
         self,
         stream_service: StreamService,
         mock_valkey_live: AsyncMock,
-        mock_idle_checker_host: AsyncMock,
     ) -> None:
         mock_valkey_live.count_active_connections.return_value = 0
         action = UntrackConnectionAction(
@@ -337,18 +324,15 @@ class TestUntrackConnection(TestStreamService):
         assert isinstance(result, UntrackConnectionActionResult)
         assert result.remaining_count == 0
         mock_valkey_live.remove_connection_tracker.assert_awaited_once_with(
-            str(FAKE_KERNEL_ID), "jupyter", "stream-001"
+            FAKE_SESSION_ID, FAKE_KERNEL_ID, "jupyter", "stream-001"
         )
-        mock_idle_checker_host.update_app_streaming_status.assert_awaited_once_with(
-            FAKE_SESSION_ID,
-            AppStreamingStatus.NO_ACTIVE_CONNECTIONS,
-        )
+        mock_valkey_live.count_active_connections.assert_awaited_once_with(FAKE_SESSION_ID)
+        mock_valkey_live.update_session_last_access.assert_awaited_once_with(FAKE_SESSION_ID)
 
-    async def test_remaining_connections_does_not_trigger_no_active(
+    async def test_remaining_connections_does_not_refresh_marker(
         self,
         stream_service: StreamService,
         mock_valkey_live: AsyncMock,
-        mock_idle_checker_host: AsyncMock,
     ) -> None:
         mock_valkey_live.count_active_connections.return_value = 3
         action = UntrackConnectionAction(
@@ -361,7 +345,8 @@ class TestUntrackConnection(TestStreamService):
         result = await stream_service.untrack_connection(action)
 
         assert result.remaining_count == 3
-        mock_idle_checker_host.update_app_streaming_status.assert_not_awaited()
+        mock_valkey_live.count_active_connections.assert_awaited_once_with(FAKE_SESSION_ID)
+        mock_valkey_live.update_session_last_access.assert_not_awaited()
 
 
 class TestGCStaleConnections(TestStreamService):
@@ -369,27 +354,21 @@ class TestGCStaleConnections(TestStreamService):
         self,
         stream_service: StreamService,
         mock_valkey_live: AsyncMock,
-        mock_idle_checker_host: AsyncMock,
         mock_etcd: AsyncMock,
     ) -> None:
         mock_etcd.get.return_value = "10m"
         mock_valkey_live.get_server_time.return_value = 1000.0
-        sid = str(FAKE_SESSION_ID)
-
         # prev_remaining=2, removed_count=2, remaining=0 → session goes idle
         mock_valkey_live.count_active_connections.side_effect = [2, 0]
         mock_valkey_live.remove_stale_connections.return_value = 2
 
-        action = GCStaleConnectionsAction(active_session_ids=[KernelId(FAKE_SESSION_ID)])
+        action = GCStaleConnectionsAction(active_session_ids=[FAKE_SESSION_ID])
 
         result = await stream_service.gc_stale_connections(action)
 
         assert isinstance(result, GCStaleConnectionsActionResult)
-        assert sid in result.removed_sessions
-        mock_idle_checker_host.update_app_streaming_status.assert_awaited_once_with(
-            SessionId(uuid.UUID(sid)),
-            AppStreamingStatus.NO_ACTIVE_CONNECTIONS,
-        )
+        assert result.inactive_session_ids == [FAKE_SESSION_ID]
+        mock_valkey_live.update_session_last_access.assert_awaited_once_with(FAKE_SESSION_ID)
 
     async def test_empty_session_ids_returns_empty(
         self,
@@ -404,7 +383,7 @@ class TestGCStaleConnections(TestStreamService):
 
         result = await stream_service.gc_stale_connections(action)
 
-        assert result.removed_sessions == []
+        assert result.inactive_session_ids == []
 
     async def test_etcd_none_uses_default_timeout(
         self,
@@ -419,21 +398,20 @@ class TestGCStaleConnections(TestStreamService):
 
         result = await stream_service.gc_stale_connections(action)
 
-        assert result.removed_sessions == []
+        assert result.inactive_session_ids == []
         mock_etcd.get.assert_awaited_once_with("config/idle/app-streaming-packet-timeout")
 
     async def test_active_to_idle_included_in_removed(
         self,
         stream_service: StreamService,
         mock_valkey_live: AsyncMock,
-        mock_idle_checker_host: AsyncMock,
         mock_etcd: AsyncMock,
     ) -> None:
         mock_etcd.get.return_value = "5m"
         mock_valkey_live.get_server_time.return_value = 2000.0
 
-        sid1 = KernelId(uuid.UUID("aaaaaaaa-0000-0000-0000-000000000001"))
-        sid2 = KernelId(uuid.UUID("aaaaaaaa-0000-0000-0000-000000000002"))
+        sid1 = SessionId(uuid.UUID("aaaaaaaa-0000-0000-0000-000000000001"))
+        sid2 = SessionId(uuid.UUID("aaaaaaaa-0000-0000-0000-000000000002"))
 
         # sid1: prev=3, remaining=0 → goes idle
         # sid2: prev=5, remaining=2 → stays active
@@ -444,5 +422,5 @@ class TestGCStaleConnections(TestStreamService):
 
         result = await stream_service.gc_stale_connections(action)
 
-        assert str(sid1) in result.removed_sessions
-        assert str(sid2) not in result.removed_sessions
+        assert sid1 in result.inactive_session_ids
+        assert sid2 not in result.inactive_session_ids

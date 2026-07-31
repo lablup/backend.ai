@@ -54,6 +54,7 @@ class TestLeaderElectionDependency:
             config_provider=mock_config_provider,
             event_producer=mock_event_producer,
             sokovan_orchestrator=mock_orchestrator,
+            retention_repository=MagicMock(),
         )
 
         async with dependency.provide(election_input) as election:
@@ -95,6 +96,7 @@ class TestLeaderElectionDependency:
             config_provider=mock_config_provider,
             event_producer=MagicMock(),
             sokovan_orchestrator=mock_orchestrator,
+            retention_repository=MagicMock(),
         )
 
         async with dependency.provide(election_input):
@@ -131,6 +133,7 @@ class TestLeaderElectionDependency:
             config_provider=mock_config_provider,
             event_producer=MagicMock(),
             sokovan_orchestrator=mock_orchestrator,
+            retention_repository=MagicMock(),
         )
 
         with pytest.raises(RuntimeError, match="test error"):

@@ -51,6 +51,7 @@ class TestSokovanOrchestratorDependency:
             deployment_repository=MagicMock(),
             replica_group_repository=MagicMock(),
             idle_checker_repository=MagicMock(),
+            metric_repository=MagicMock(),
             fair_share_repository=MagicMock(),
             resource_usage_repository=MagicMock(),
             config_provider=MagicMock(),
@@ -59,7 +60,9 @@ class TestSokovanOrchestratorDependency:
             network_plugin_ctx=MagicMock(),
             event_producer=MagicMock(),
             valkey_schedule=MagicMock(),
+            valkey_live=MagicMock(),
             valkey_stat=MagicMock(),
+            agent_selector=MagicMock(),
             scheduling_controller=MagicMock(),
             deployment_controller=MagicMock(),
             route_controller=MagicMock(),
@@ -110,6 +113,7 @@ class TestSokovanOrchestratorDependency:
         event_producer = MagicMock()
         valkey_schedule = MagicMock()
         route_controller = MagicMock()
+        agent_selector = MagicMock()
 
         dependency = SokovanOrchestratorDependency()
         sokovan_input = SokovanOrchestratorInput(
@@ -117,6 +121,7 @@ class TestSokovanOrchestratorDependency:
             deployment_repository=deployment_repo,
             replica_group_repository=MagicMock(),
             idle_checker_repository=MagicMock(),
+            metric_repository=MagicMock(),
             fair_share_repository=fair_share_repo,
             resource_usage_repository=MagicMock(),
             config_provider=config_provider,
@@ -125,7 +130,9 @@ class TestSokovanOrchestratorDependency:
             network_plugin_ctx=network_plugin_ctx,
             event_producer=event_producer,
             valkey_schedule=valkey_schedule,
+            valkey_live=MagicMock(),
             valkey_stat=MagicMock(),
+            agent_selector=agent_selector,
             scheduling_controller=MagicMock(),
             deployment_controller=MagicMock(),
             route_controller=route_controller,
@@ -144,4 +151,5 @@ class TestSokovanOrchestratorDependency:
                 agent_client_pool,
                 network_plugin_ctx,
                 valkey_schedule,
+                agent_selector,
             )

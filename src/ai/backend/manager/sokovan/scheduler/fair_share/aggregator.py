@@ -20,10 +20,10 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.fair_share import (
-    BucketDelta,
     DomainUsageBucketKey,
     ProjectUsageBucketKey,
     UsageBucketAggregationResult,
@@ -78,7 +78,8 @@ class FairShareAggregator:
     def prepare_kernel_usage_records(
         self,
         kernels: Sequence[KernelInfo],
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
+        resource_group: str,
         now: datetime,
     ) -> KernelUsagePreparationResult:
         """Prepare kernel usage records for bulk creation.
@@ -92,7 +93,8 @@ class FairShareAggregator:
 
         Args:
             kernels: Kernels to process
-            scaling_group: The scaling group name
+            resource_group_id: The resource group ID
+            resource_group: The resource group name retained for compatibility
             now: Current time from DB
 
         Returns:
@@ -102,7 +104,7 @@ class FairShareAggregator:
 
         for kernel in kernels:
             kernel_specs, observation_end = self._prepare_kernel_usage_specs(
-                kernel, scaling_group, now
+                kernel, resource_group_id, resource_group, now
             )
             if kernel_specs:
                 result.specs.extend(kernel_specs)
@@ -130,9 +132,9 @@ class FairShareAggregator:
         Returns:
             UsageBucketAggregationResult with deltas for each bucket
         """
-        user_deltas: dict[UserUsageBucketKey, BucketDelta] = defaultdict(BucketDelta)
-        project_deltas: dict[ProjectUsageBucketKey, BucketDelta] = defaultdict(BucketDelta)
-        domain_deltas: dict[DomainUsageBucketKey, BucketDelta] = defaultdict(BucketDelta)
+        user_deltas: dict[UserUsageBucketKey, ResourceSlot] = defaultdict(ResourceSlot)
+        project_deltas: dict[ProjectUsageBucketKey, ResourceSlot] = defaultdict(ResourceSlot)
+        domain_deltas: dict[DomainUsageBucketKey, ResourceSlot] = defaultdict(ResourceSlot)
 
         for spec in specs:
             # Split spec across day boundaries and aggregate
@@ -215,16 +217,15 @@ class FairShareAggregator:
         period_date: date,
         raw_slots: ResourceSlot,
         segment_seconds: int,
-        user_deltas: dict[UserUsageBucketKey, BucketDelta],
-        project_deltas: dict[ProjectUsageBucketKey, BucketDelta],
-        domain_deltas: dict[DomainUsageBucketKey, BucketDelta],
+        user_deltas: dict[UserUsageBucketKey, ResourceSlot],
+        project_deltas: dict[ProjectUsageBucketKey, ResourceSlot],
+        domain_deltas: dict[DomainUsageBucketKey, ResourceSlot],
     ) -> None:
         """Add resource usage to bucket deltas for a day.
 
-        Accumulates raw resource amounts and duration separately.
-        Slots are accumulated additively (sum of ``raw_slots`` across all
-        slices within the same bucket key) while ``duration_seconds`` tracks
-        total observation time.
+        The segment is converted to resource-seconds before accumulation.
+        Accumulating the amounts and the durations separately and multiplying
+        afterwards would give a cross product inflated by the slice count.
 
         Args:
             spec: Original spec (for entity identifiers)
@@ -235,49 +236,43 @@ class FairShareAggregator:
             project_deltas: Project deltas to update (mutated)
             domain_deltas: Domain deltas to update (mutated)
         """
+        segment_usage = self._calculate_resource_seconds(raw_slots, segment_seconds)
+
         # User bucket key
         user_key = UserUsageBucketKey(
             user_uuid=spec.user_uuid,
             project_id=spec.project_id,
             domain_name=spec.domain_name,
             resource_group=spec.resource_group,
+            resource_group_id=spec.resource_group_id,
             period_date=period_date,
         )
-        ud = user_deltas[user_key]
-        user_deltas[user_key] = BucketDelta(
-            slots=ud.slots + raw_slots,
-            duration_seconds=ud.duration_seconds + segment_seconds,
-        )
+        user_deltas[user_key] = user_deltas[user_key] + segment_usage
 
         # Project bucket key
         project_key = ProjectUsageBucketKey(
             project_id=spec.project_id,
             domain_name=spec.domain_name,
             resource_group=spec.resource_group,
+            resource_group_id=spec.resource_group_id,
             period_date=period_date,
         )
-        pd = project_deltas[project_key]
-        project_deltas[project_key] = BucketDelta(
-            slots=pd.slots + raw_slots,
-            duration_seconds=pd.duration_seconds + segment_seconds,
-        )
+        project_deltas[project_key] = project_deltas[project_key] + segment_usage
 
         # Domain bucket key
         domain_key = DomainUsageBucketKey(
             domain_name=spec.domain_name,
             resource_group=spec.resource_group,
+            resource_group_id=spec.resource_group_id,
             period_date=period_date,
         )
-        dd = domain_deltas[domain_key]
-        domain_deltas[domain_key] = BucketDelta(
-            slots=dd.slots + raw_slots,
-            duration_seconds=dd.duration_seconds + segment_seconds,
-        )
+        domain_deltas[domain_key] = domain_deltas[domain_key] + segment_usage
 
     def _prepare_kernel_usage_specs(
         self,
         kernel: KernelInfo,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
+        resource_group: str,
         now: datetime,
     ) -> tuple[list[KernelUsageRecordCreatorSpec], datetime]:
         """Prepare usage record specs for a single kernel.
@@ -291,7 +286,8 @@ class FairShareAggregator:
 
         Args:
             kernel: Kernel to process
-            scaling_group: The scaling group
+            resource_group_id: The resource group ID
+            resource_group: The resource group name retained for compatibility
             now: Current time from DB
 
         Returns:
@@ -349,7 +345,8 @@ class FairShareAggregator:
         # Generate 5-minute slices
         specs = self._generate_slice_specs(
             kernel=kernel,
-            scaling_group=scaling_group,
+            resource_group_id=resource_group_id,
+            resource_group=resource_group,
             start_time=start_time,
             end_time=end_time,
         )
@@ -368,7 +365,8 @@ class FairShareAggregator:
     def _generate_slice_specs(
         self,
         kernel: KernelInfo,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
+        resource_group: str,
         start_time: datetime,
         end_time: datetime,
     ) -> list[KernelUsageRecordCreatorSpec]:
@@ -380,7 +378,8 @@ class FairShareAggregator:
 
         Args:
             kernel: Kernel info
-            scaling_group: The scaling group
+            resource_group_id: The resource group ID
+            resource_group: The resource group name retained for compatibility
             start_time: Start of observation period
             end_time: End of observation period
 
@@ -417,7 +416,8 @@ class FairShareAggregator:
                 user_uuid=kernel.user_permission.user_uuid,
                 project_id=kernel.user_permission.group_id,
                 domain_name=kernel.user_permission.domain_name,
-                resource_group=scaling_group,
+                resource_group=resource_group,
+                resource_group_id=resource_group_id,
                 period_start=current_start,
                 period_end=current_end,
                 resource_usage=resource_seconds,

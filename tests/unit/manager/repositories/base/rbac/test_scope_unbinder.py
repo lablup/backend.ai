@@ -27,6 +27,7 @@ from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
     RBACUnbinderResult,
     execute_rbac_scope_entity_unbinder,
 )
+from ai.backend.manager.repositories.base.types import ConflictCheck
 from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:
@@ -87,6 +88,10 @@ class TestScopeEntityUnbinder(RBACScopeEntityUnbinder[ScopeUnbinderMappingRow]):
                         ScopeUnbinderMappingRow.entity_id.in_(entity_ids),
                     )
                 return stmt
+
+            @override
+            def conflict_checks(self) -> Sequence[ConflictCheck]:
+                return ()
 
         return _Spec()
 

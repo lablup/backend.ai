@@ -8,6 +8,7 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     CIStrEnum,
@@ -26,6 +27,8 @@ if TYPE_CHECKING:
 class KernelStatus(CIStrEnum):
     # values are only meaningful inside the manager
     PENDING = "PENDING"
+    # holds a resource reservation on its bound agent (preemption plan)
+    RESERVED = "RESERVED"
     # ---
     SCHEDULED = "SCHEDULED"
     PREPARING = "PREPARING"
@@ -77,12 +80,20 @@ class KernelStatus(CIStrEnum):
         Returns a set of kernel statuses that are considered as resource-occupying.
         """
         return frozenset((
+            cls.RESERVED,
             cls.SCHEDULED,
             cls.PREPARING,
             cls.PULLING,
             cls.PREPARED,
             cls.CREATING,
         ))
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def resource_holding_statuses(cls) -> frozenset[KernelStatus]:
+        """Return statuses in which the kernel holds agent resources —
+        usage already reported (occupied) or still reserved (requested)."""
+        return cls.resource_occupied_statuses() | cls.resource_requested_statuses()
 
     @classmethod
     @lru_cache(maxsize=1)
@@ -138,6 +149,7 @@ class KernelStatus(CIStrEnum):
         """
         return frozenset((
             cls.PENDING,
+            cls.RESERVED,
             cls.SCHEDULED,
             cls.PREPARING,
             cls.BUILDING,
@@ -153,6 +165,7 @@ class KernelStatus(CIStrEnum):
         """
         return frozenset((
             cls.PENDING,
+            cls.RESERVED,
             cls.SCHEDULED,
             cls.PREPARING,
             cls.BUILDING,
@@ -332,7 +345,7 @@ class KernelSchedulingPhase(StrEnum):
 class KernelSchedulingHistoryData:
     """Domain model for kernel scheduling history."""
 
-    id: UUID
+    id: KernelSchedulingHistoryID
     kernel_id: KernelId
     session_id: SessionId
 

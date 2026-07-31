@@ -12,6 +12,7 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.manager.services.fair_share.actions import (
     BulkUpsertDomainFairShareWeightAction,
     BulkUpsertDomainFairShareWeightActionResult,
@@ -47,6 +48,7 @@ class TestBulkUpsertDomainFairShareWeight:
 
         action = BulkUpsertDomainFairShareWeightAction(
             resource_group="default",
+            resource_group_id=ResourceGroupID(UUID("00000000-0000-0000-0000-000000000001")),
             inputs=[
                 DomainWeightInput(domain_name="domain1", weight=Decimal("2.0")),
                 DomainWeightInput(domain_name="domain2", weight=Decimal("3.0")),
@@ -73,6 +75,7 @@ class TestBulkUpsertDomainFairShareWeight:
         ]
         action = BulkUpsertDomainFairShareWeightAction(
             resource_group="default",
+            resource_group_id=ResourceGroupID(UUID("00000000-0000-0000-0000-000000000001")),
             inputs=inputs,
         )
 
@@ -111,6 +114,7 @@ class TestBulkUpsertProjectFairShareWeight:
 
         action = BulkUpsertProjectFairShareWeightAction(
             resource_group="default",
+            resource_group_id=ResourceGroupID(UUID("00000000-0000-0000-0000-000000000001")),
             inputs=[
                 ProjectWeightInput(
                     project_id=project_id1,
@@ -151,6 +155,7 @@ class TestBulkUpsertProjectFairShareWeight:
         ]
         action = BulkUpsertProjectFairShareWeightAction(
             resource_group="default",
+            resource_group_id=ResourceGroupID(UUID("00000000-0000-0000-0000-000000000001")),
             inputs=inputs,
         )
 
@@ -189,6 +194,7 @@ class TestBulkUpsertUserFairShareWeight:
 
         action = BulkUpsertUserFairShareWeightAction(
             resource_group="default",
+            resource_group_id=ResourceGroupID(UUID("00000000-0000-0000-0000-000000000001")),
             inputs=[
                 UserWeightInput(
                     user_uuid=user_uuid1,
@@ -231,6 +237,7 @@ class TestBulkUpsertUserFairShareWeight:
         ]
         action = BulkUpsertUserFairShareWeightAction(
             resource_group="default",
+            resource_group_id=ResourceGroupID(UUID("00000000-0000-0000-0000-000000000001")),
             inputs=inputs,
         )
 

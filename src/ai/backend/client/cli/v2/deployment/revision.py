@@ -14,6 +14,7 @@ from ai.backend.client.cli.v2.helpers import (
     load_v2_config,
     print_result,
 )
+from ai.backend.common.config import DEFAULT_SHELL
 
 
 @click.group()
@@ -33,7 +34,32 @@ def revision() -> None:
 @click.option(
     "--auto-activate", is_flag=True, default=False, help="Activate immediately after creation."
 )
-def add(deployment_id: str, config: str, preset_id: str | None, auto_activate: bool) -> None:
+@click.option(
+    "--shell",
+    "shell",
+    is_flag=False,
+    flag_value=DEFAULT_SHELL,
+    default=None,
+    type=str,
+    help=(
+        "Shell to wrap the model service command with (`[shell, '-c', command]`). "
+        f"Bare --shell uses {DEFAULT_SHELL}. Omit to keep the config/baseline as-is."
+    ),
+)
+@click.option(
+    "--no-shell",
+    is_flag=True,
+    default=False,
+    help="Disable shell wrapping.",
+)
+def add(
+    deployment_id: str,
+    config: str,
+    preset_id: str | None,
+    auto_activate: bool,
+    shell: str | None,
+    no_shell: bool,
+) -> None:
     """Add a new revision to a deployment."""
 
     from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -51,6 +77,22 @@ def add(deployment_id: str, config: str, preset_id: str | None, auto_activate: b
         data["revision_preset_id"] = preset_id
     if auto_activate:
         data.setdefault("options", {})["auto_activate"] = True
+    if no_shell and shell is not None:
+        raise click.UsageError("--shell and --no-shell are mutually exclusive.")
+    if no_shell or shell is not None:
+        # Explicit null disables shell wrapping over any baseline in the draft merge.
+        # `or {}` also normalizes containers present as explicit null in the config.
+        shell_value = None if no_shell else shell
+        model_def = data.get("model_definition") or {}
+        data["model_definition"] = model_def
+        models = model_def.get("models") or [{}]
+        model_def["models"] = models
+        for model in models:
+            if not isinstance(model, dict):
+                continue  # let DTO validation report invalid entries
+            service = model.get("service") or {}
+            model["service"] = service
+            service["shell"] = shell_value
     body = AddRevisionInput.model_validate(data)
 
     async def _run() -> None:

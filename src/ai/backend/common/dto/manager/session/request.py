@@ -15,6 +15,7 @@ from pydantic import AliasChoices, Field
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
 from ai.backend.common.defs.session import (
+    JOB_PRIORITY_DEFAULT,
     SESSION_PRIORITY_DEFAULT,
     SESSION_PRIORITY_MAX,
     SESSION_PRIORITY_MIN,
@@ -68,6 +69,13 @@ class CreateFromTemplateRequest(BaseRequestModel):
         default=SESSION_PRIORITY_DEFAULT,
         ge=SESSION_PRIORITY_MIN,
         le=SESSION_PRIORITY_MAX,
+    )
+    job_priority: int = Field(
+        default=JOB_PRIORITY_DEFAULT,
+        description=(
+            "Scope-local preemption priority among the requester's own sessions "
+            "(higher preempts lower; decoupled from `priority`)."
+        ),
     )
     is_preemptible: bool = Field(default=True)
     image: str | None = Field(
@@ -148,6 +156,13 @@ class CreateFromParamsRequest(BaseRequestModel):
         default=SESSION_PRIORITY_DEFAULT,
         ge=SESSION_PRIORITY_MIN,
         le=SESSION_PRIORITY_MAX,
+    )
+    job_priority: int = Field(
+        default=JOB_PRIORITY_DEFAULT,
+        description=(
+            "Scope-local preemption priority among the requester's own sessions "
+            "(higher preempts lower; decoupled from `priority`)."
+        ),
     )
     is_preemptible: bool = Field(default=True)
     image: str = Field(

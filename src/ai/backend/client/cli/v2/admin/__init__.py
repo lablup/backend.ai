@@ -54,9 +54,27 @@ def app_config_allow_list() -> None:
     """Admin app config allow-list commands."""
 
 
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.idle_checker:idle_checker",
+    name="idle-checker",
+)
+def idle_checker() -> None:
+    """Admin idle checker commands."""
+
+
 @admin.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.admin.deployment:deployment")
 def deployment() -> None:
     """Admin deployment commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.idle_checker_assignment:idle_checker_assignment",
+    name="idle-checker-assignment",
+)
+def idle_checker_assignment() -> None:
+    """Admin idle checker assignment commands."""
 
 
 @admin.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.admin.image:image")
@@ -230,3 +248,12 @@ def invitation() -> None:
 )
 def role_preset() -> None:
     """Admin role preset commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.retention_policy:retention_policy",
+    name="retention-policy",
+)
+def retention_policy() -> None:
+    """Admin retention policy commands."""

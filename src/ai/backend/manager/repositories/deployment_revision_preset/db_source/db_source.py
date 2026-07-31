@@ -30,6 +30,7 @@ from ai.backend.manager.repositories.deployment_revision_preset.creators import 
     PresetSlotDependency,
 )
 from ai.backend.manager.repositories.deployment_revision_preset.purgers import (
+    DeploymentRevisionPresetPurgerSpec,
     PresetResourceSlotBatchPurgerSpec,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
@@ -96,7 +97,7 @@ class DeploymentRevisionPresetDBSource:
     async def delete(self, preset_id: UUID) -> DeploymentRevisionPresetData:
         async with self._ops.write_ops() as w:
             result = await w.purge(
-                Purger(row_class=DeploymentRevisionPresetRow, pk_value=preset_id)
+                Purger(spec=DeploymentRevisionPresetPurgerSpec(preset_id=preset_id))
             )
             if result is None:
                 raise DeploymentRevisionPresetNotFound()

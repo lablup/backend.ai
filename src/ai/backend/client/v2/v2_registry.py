@@ -29,6 +29,8 @@ if TYPE_CHECKING:
     from .domains_v2.fair_share import V2FairShareClient
     from .domains_v2.gql import V2GQLClient
     from .domains_v2.huggingface_registry import V2HuggingFaceRegistryClient
+    from .domains_v2.idle_checker import V2IdleCheckerClient
+    from .domains_v2.idle_checker_assignment import V2IdleCheckerAssignmentClient
     from .domains_v2.image import V2ImageClient
     from .domains_v2.keypair import V2KeypairClient
     from .domains_v2.login_client_type import V2LoginClientTypeClient
@@ -48,6 +50,7 @@ if TYPE_CHECKING:
     from .domains_v2.resource_preset import V2ResourcePresetClient
     from .domains_v2.resource_slot import V2ResourceSlotClient
     from .domains_v2.resource_usage import V2ResourceUsageClient
+    from .domains_v2.retention_policy import V2RetentionPolicyClient
     from .domains_v2.role_invitation import V2RoleInvitationClient
     from .domains_v2.role_preset import V2RolePresetClient
     from .domains_v2.runtime_variant import V2RuntimeVariantClient
@@ -122,6 +125,12 @@ class V2ClientRegistry:
         return V2AuditLogClient(self._client)
 
     @cached_property
+    def idle_checker_assignment(self) -> V2IdleCheckerAssignmentClient:
+        from .domains_v2.idle_checker_assignment import V2IdleCheckerAssignmentClient
+
+        return V2IdleCheckerAssignmentClient(self._client)
+
+    @cached_property
     def container_registry(self) -> V2ContainerRegistryClient:
         from .domains_v2.container_registry import V2ContainerRegistryClient
 
@@ -162,6 +171,12 @@ class V2ClientRegistry:
         from .domains_v2.huggingface_registry import V2HuggingFaceRegistryClient
 
         return V2HuggingFaceRegistryClient(self._client)
+
+    @cached_property
+    def idle_checker(self) -> V2IdleCheckerClient:
+        from .domains_v2.idle_checker import V2IdleCheckerClient
+
+        return V2IdleCheckerClient(self._client)
 
     @cached_property
     def image(self) -> V2ImageClient:
@@ -308,6 +323,12 @@ class V2ClientRegistry:
         from .domains_v2.resource_usage import V2ResourceUsageClient
 
         return V2ResourceUsageClient(self._client)
+
+    @cached_property
+    def retention_policy(self) -> V2RetentionPolicyClient:
+        from .domains_v2.retention_policy import V2RetentionPolicyClient
+
+        return V2RetentionPolicyClient(self._client)
 
     @cached_property
     def scheduling_handler(self) -> V2SchedulingHandlerClient:

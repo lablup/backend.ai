@@ -6,11 +6,13 @@ from datetime import datetime, timedelta
 from typing import override
 
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, ClusterMode, MountInfoEntry, SessionTypes
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.session.base import SessionScopeAction
@@ -50,9 +52,11 @@ class SessionSchedulingSpec:
     """Scheduling constraints and preferences."""
 
     priority: int = 10
+    job_priority: int = JOB_PRIORITY_DEFAULT
     is_preemptible: bool = True
     dependencies: list[uuid.UUID] | None = None
     agent_list: list[str] | None = None
+    agent_selection_policy: AgentSelectionPolicy | None = None
     attach_network: uuid.UUID | None = None
 
 

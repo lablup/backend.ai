@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import aiodns
 import aiohttp
 import pytest
 from aioresponses import aioresponses
@@ -159,28 +158,26 @@ async def test_get_instance_ip(provider: str | None) -> None:
             ret = await ai.backend.common.identity.get_instance_ip(None)
             assert ret == random_ip
         elif provider is None:
-            mocked_ares_host_result = MagicMock()
-            mocked_ares_host_result.addresses = ["10.1.2.3"]
-            mocked_resolver = MagicMock()
 
-            async def coro_return_mocked_result(*args: Any) -> MagicMock:
-                return mocked_ares_host_result
+            async def coro_return_addrinfo(*args: Any, **kwargs: Any) -> list[Any]:
+                return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("10.1.2.3", 0))]
 
-            mocked_resolver.gethostbyname = coro_return_mocked_result
+            mocked_loop = MagicMock()
+            mocked_loop.getaddrinfo = coro_return_addrinfo
             with (
-                patch("aiodns.DNSResolver", return_value=mocked_resolver),
+                patch("asyncio.get_running_loop", return_value=mocked_loop),
                 patch("socket.gethostname", return_value="myname"),
             ):
                 ret = await ai.backend.common.identity.get_instance_ip(None)
                 assert ret == "10.1.2.3"
 
-            async def coro_raise_error(*args: Any) -> None:
-                raise aiodns.error.DNSError("domain not found")
+            async def coro_raise_error(*args: Any, **kwargs: Any) -> None:
+                raise socket.gaierror(socket.EAI_NONAME, "domain not found")
 
-            mocked_resolver = MagicMock()
-            mocked_resolver.gethostbyname = coro_raise_error
+            mocked_loop = MagicMock()
+            mocked_loop.getaddrinfo = coro_raise_error
             with (
-                patch("aiodns.DNSResolver", return_value=mocked_resolver),
+                patch("asyncio.get_running_loop", return_value=mocked_loop),
                 patch("socket.gethostname", return_value="myname"),
             ):
                 ret = await ai.backend.common.identity.get_instance_ip(None)

@@ -13,7 +13,7 @@ class MetricRepositories:
     def create(cls, args: RepositoryArgs) -> Self:
         return cls(
             repository=MetricRepository(
-                args.db,
+                db=args.db,
                 prometheus_client=args.prometheus_client,
             ),
         )

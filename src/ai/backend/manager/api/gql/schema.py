@@ -15,6 +15,7 @@ from ai.backend.manager.api.gql.extensions import (
 )
 
 from .agent import (
+    admin_update_agent_resource_group,
     agent_stats,
     agents_v2,
 )
@@ -30,6 +31,14 @@ from .app_config_definition import (
     admin_app_config_definitions,
     admin_create_app_config_definition,
     admin_purge_app_config_definition,
+)
+from .app_config_fragment import (
+    admin_app_config_fragments,
+    app_config_fragment,
+    my_app_config_fragments_by_names,
+    my_upsert_app_config_fragments,
+    scoped_app_config_fragments_by_names,
+    scoped_upsert_app_config_fragments,
 )
 from .artifact import (
     approve_artifact_revision,
@@ -150,6 +159,19 @@ from .huggingface_registry import (
     huggingface_registries,
     huggingface_registry,
     update_huggingface_registry,
+)
+from .idle_checker import (
+    admin_create_idle_checker,
+    admin_idle_checkers,
+    admin_purge_idle_checker,
+    admin_update_idle_checker,
+)
+from .idle_checker_assignment import (
+    admin_create_idle_checker_assignment,
+    admin_idle_checker_assignments,
+    purge_idle_checker_assignment,
+    scoped_idle_checker_assignments,
+    update_idle_checker_assignment,
 )
 from .image import (
     admin_image_aliases,
@@ -384,6 +406,14 @@ from .resource_usage import (
     project_usage_buckets,
     user_usage_buckets,
 )
+from .retention_policy import (
+    admin_create_retention_policy,
+    admin_delete_retention_policy,
+    admin_purge_retention_policy,
+    admin_retention_policies,
+    admin_retention_policy,
+    admin_update_retention_policy,
+)
 from .role_preset import (
     admin_bulk_add_role_preset_permissions,
     admin_bulk_remove_role_preset_permissions,
@@ -417,12 +447,16 @@ from .scheduler import (
 from .scheduling_handler import scheduling_handlers
 from .scheduling_history import (
     admin_deployment_histories,
+    admin_kernel_scheduling_histories,
+    admin_replica_group_histories,
     admin_route_histories,
     admin_session_scheduling_histories,
     deployment_histories,
     deployment_scoped_scheduling_histories,
     route_histories,
     route_scoped_scheduling_histories,
+    scoped_kernel_scheduling_histories,
+    scoped_replica_group_histories,
     session_scheduling_histories,
     session_scoped_scheduling_histories,
 )
@@ -501,6 +535,13 @@ class Query:
     agents_v2 = agents_v2
     admin_app_config_allow_list = admin_app_config_allow_list
     admin_app_config_allow_lists = admin_app_config_allow_lists
+    app_config_fragment = app_config_fragment
+    admin_app_config_fragments = admin_app_config_fragments
+    admin_idle_checkers = admin_idle_checkers
+    admin_idle_checker_assignments = admin_idle_checker_assignments
+    scoped_idle_checker_assignments = scoped_idle_checker_assignments
+    scoped_app_config_fragments_by_names = scoped_app_config_fragments_by_names
+    my_app_config_fragments_by_names = my_app_config_fragments_by_names
     artifact = artifact
     artifacts = artifacts
     artifact_revision = artifact_revision
@@ -534,8 +575,10 @@ class Query:
     admin_allowed_projects_for_resource_group_v2 = admin_allowed_projects_for_resource_group_v2
     admin_service_catalogs = admin_service_catalogs
     admin_session_scheduling_histories = admin_session_scheduling_histories
+    admin_kernel_scheduling_histories = admin_kernel_scheduling_histories
     admin_deployments = admin_deployments
     admin_deployment_histories = admin_deployment_histories
+    admin_replica_group_histories = admin_replica_group_histories
     admin_route_histories = admin_route_histories
     admin_notification_channel = admin_notification_channel
     admin_notification_channels = admin_notification_channels
@@ -618,8 +661,10 @@ class Query:
     image_scoped_aliases = image_scoped_aliases
     # Entity Scoped APIs (added in 26.2.0)
     session_scoped_scheduling_histories = session_scoped_scheduling_histories
+    scoped_kernel_scheduling_histories = scoped_kernel_scheduling_histories
     deployment_scoped_scheduling_histories = deployment_scoped_scheduling_histories
     route_scoped_scheduling_histories = route_scoped_scheduling_histories
+    scoped_replica_group_histories = scoped_replica_group_histories
     # Legacy APIs (deprecated)
     resource_groups = resource_groups
     domain_fair_share = domain_fair_share
@@ -681,6 +726,9 @@ class Query:
     # Runtime Variant APIs
     runtime_variants = runtime_variants
     runtime_variant = runtime_variant
+    # Retention Policy APIs
+    admin_retention_policies = admin_retention_policies
+    admin_retention_policy = admin_retention_policy
     # Runtime Variant Preset APIs
     runtime_variant_presets = runtime_variant_presets
     runtime_variant_preset = runtime_variant_preset
@@ -709,9 +757,18 @@ class Query:
 
 @strawberry.type
 class Mutation:
+    admin_update_agent_resource_group = admin_update_agent_resource_group
+    admin_create_idle_checker = admin_create_idle_checker
+    admin_update_idle_checker = admin_update_idle_checker
+    admin_purge_idle_checker = admin_purge_idle_checker
+    admin_create_idle_checker_assignment = admin_create_idle_checker_assignment
+    update_idle_checker_assignment = update_idle_checker_assignment
+    purge_idle_checker_assignment = purge_idle_checker_assignment
     admin_create_app_config_allow_list = admin_create_app_config_allow_list
     admin_purge_app_config_allow_list = admin_purge_app_config_allow_list
     admin_update_app_config_allow_list = admin_update_app_config_allow_list
+    scoped_upsert_app_config_fragments = scoped_upsert_app_config_fragments
+    my_upsert_app_config_fragments = my_upsert_app_config_fragments
     scan_artifacts = scan_artifacts
     scan_artifact_models = scan_artifact_models
     import_artifacts = import_artifacts
@@ -913,6 +970,11 @@ class Mutation:
     admin_update_runtime_variant = admin_update_runtime_variant
     admin_delete_runtime_variant = admin_delete_runtime_variant
     admin_delete_runtime_variants = admin_delete_runtime_variants
+    # Retention Policy mutations
+    admin_create_retention_policy = admin_create_retention_policy
+    admin_update_retention_policy = admin_update_retention_policy
+    admin_delete_retention_policy = admin_delete_retention_policy
+    admin_purge_retention_policy = admin_purge_retention_policy
     # Runtime Variant Preset mutations
     admin_create_runtime_variant_preset = admin_create_runtime_variant_preset
     admin_update_runtime_variant_preset = admin_update_runtime_variant_preset

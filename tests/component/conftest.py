@@ -132,6 +132,9 @@ from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.notification.notification_center import NotificationCenter
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
@@ -147,6 +150,7 @@ from ai.backend.manager.repositories.user_resource_policy.repository import (
 )
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
+from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     postgres_container,
@@ -738,8 +742,38 @@ async def group_fixture(
                 resource_policy=resource_policy_fixture,
             )
         )
+        virtual_scope_id = uuid.uuid4()
+        await conn.execute(
+            sa.insert(VirtualScopeRow.__table__).values(
+                id=virtual_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=group_id,
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                entity_type=EntityType.PROJECT,
+                entity_id=group_id,
+                permission_cap=None,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=group_id,
+                permission_cap=None,
+            )
+        )
     yield group_id
     async with db_engine.begin() as conn:
+        await conn.execute(
+            VirtualScopeRow.__table__.delete().where(
+                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
+                VirtualScopeRow.__table__.c.scope_id == group_id,
+            )
+        )
         await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
 
 
@@ -1294,6 +1328,7 @@ def auth_processors(
         service=service,
         action_monitors=[],
         validators=ActionValidators(
+            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
             rbac=RBACValidators(
                 scope=MagicMock(spec=ScopeActionRBACValidator),
                 single_entity=MagicMock(spec=SingleEntityActionRBACValidator),

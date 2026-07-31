@@ -1,0 +1,16 @@
+name: pr-title-prefix
+description: Extract the conventional commit prefix (scope stripped) from the PR title
+outputs:
+  prefix:
+    description: The PR title prefix with any scope stripped (empty for non-PR events)
+    value: ${{ steps.parse.outputs.prefix }}
+runs:
+  using: composite
+  steps:
+    - id: parse
+      shell: bash
+      env:
+        TITLE: ${{ github.event.pull_request.title }}
+      run: |
+        PREFIX=$(echo "$TITLE" | tr ':' '\n' | head -n 1 | sed -E 's/\([^)]+\)$//')
+        echo "prefix=$PREFIX" >> "$GITHUB_OUTPUT"

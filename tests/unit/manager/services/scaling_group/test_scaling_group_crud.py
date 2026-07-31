@@ -25,7 +25,6 @@ from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.rbac.scope_binder import (
@@ -39,6 +38,7 @@ from ai.backend.manager.repositories.scaling_group.creators import (
     ScalingGroupForKeypairsCreatorSpec,
 )
 from ai.backend.manager.repositories.scaling_group.purgers import (
+    ScalingGroupPurgerSpec,
     create_scaling_group_for_keypairs_purger,
 )
 from ai.backend.manager.repositories.scaling_group.repository import ScalingGroupRepository
@@ -111,7 +111,7 @@ async def _purge_sgroup(
     name: str,
 ) -> None:
     """Purge a scaling group via the processor."""
-    action = PurgeScalingGroupAction(purger=Purger(row_class=ScalingGroupRow, pk_value=name))
+    action = PurgeScalingGroupAction(purger=Purger(spec=ScalingGroupPurgerSpec(name=name)))
     await processors.purge_scaling_group.wait_for_complete(action)
 
 
@@ -278,7 +278,7 @@ class TestScalingGroupCRUD:
         name = f"crud-purge-{uuid.uuid4().hex[:8]}"
         await _create_sgroup(scaling_group_processors, name)
 
-        action = PurgeScalingGroupAction(purger=Purger(row_class=ScalingGroupRow, pk_value=name))
+        action = PurgeScalingGroupAction(purger=Purger(spec=ScalingGroupPurgerSpec(name=name)))
         result = await scaling_group_processors.purge_scaling_group.wait_for_complete(action)
         assert result.data.name == name
 

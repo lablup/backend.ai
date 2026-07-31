@@ -12,6 +12,7 @@ from collections.abc import (
     Sequence,
 )
 from dataclasses import dataclass
+from datetime import timedelta
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
@@ -94,6 +95,13 @@ def ensure_all_tables_registered() -> None:
         if module_info.name in _SKIP_SUBPACKAGES:
             continue
         importlib.import_module(f"ai.backend.manager.models.{module_info.name}")
+        # A domain package may keep its __init__ empty (no Row re-export) and
+        # declare its table only in ``row.py``; import it so create_all sees it.
+        if module_info.ispkg:
+            try:
+                importlib.import_module(f"ai.backend.manager.models.{module_info.name}.row")
+            except ModuleNotFoundError:
+                pass
 
 
 pgsql_connect_opts = {
@@ -607,9 +615,10 @@ class PydanticColumn[TBaseModel: BaseModel](TypeDecorator[TBaseModel]):
     impl = JSONB
     cache_ok = True
 
-    def __init__(self, schema: type[TBaseModel]) -> None:
+    def __init__(self, schema: type[TBaseModel], *, exclude_unset: bool = False) -> None:
         super().__init__()
         self._schema = schema
+        self._exclude_unset = exclude_unset
 
     @override
     def process_bind_param(
@@ -619,7 +628,7 @@ class PydanticColumn[TBaseModel: BaseModel](TypeDecorator[TBaseModel]):
     ) -> dict[str, Any] | None:
         # JSONB accepts Python objects directly, not JSON strings
         if value is not None:
-            return value.model_dump(mode="json")
+            return value.model_dump(mode="json", exclude_unset=self._exclude_unset)
         return None
 
     @override
@@ -635,7 +644,7 @@ class PydanticColumn[TBaseModel: BaseModel](TypeDecorator[TBaseModel]):
 
     @override
     def copy(self, **_kw: Any) -> Self:
-        return PydanticColumn(self._schema)  # type: ignore[return-value]
+        return PydanticColumn(self._schema, exclude_unset=self._exclude_unset)  # type: ignore[return-value]
 
 
 class PydanticListColumn[TBaseModel: BaseModel](TypeDecorator[list[TBaseModel]]):
@@ -1071,6 +1080,19 @@ async def populate_fixture(
                                 del row[col.name]
                             else:
                                 row[col.name] = None
+                if isinstance(col.type, sa.Interval):
+                    # asyncpg encodes intervals only from datetime.timedelta.
+                    # Accept a kwargs dict (e.g. {"days": 365}) or a number of
+                    # seconds in the fixture JSON.
+                    for row in rows:
+                        if col.name in row and row[col.name] is not None:
+                            value = row[col.name]
+                            if isinstance(value, timedelta):
+                                continue
+                            if isinstance(value, Mapping):
+                                row[col.name] = timedelta(**value)
+                            else:
+                                row[col.name] = timedelta(seconds=value)
                 if isinstance(col.type, EnumType):
                     for row in rows:
                         if col.name in row:

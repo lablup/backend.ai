@@ -81,7 +81,7 @@ class OperationType(enum.StrEnum):
 class EntityType(enum.StrEnum):
     """
     Deprecated for RBAC: use ``RBACElementType`` instead
-    or use ai.backend.common.entity.types.EntityType for non-RBAC-specific contexts.
+    or use ai.backend.common.data.entity.types.EntityType for non-RBAC-specific contexts.
     """
 
     # === RBAC scope/resource types (original 12) ===
@@ -118,6 +118,8 @@ class EntityType(enum.StrEnum):
     ERROR_LOG = "error_log"
     EXPORT = "export"
     GROUP = "group"
+    IDLE_CHECKER = "idle_checker"
+    IDLE_CHECKER_ASSIGNMENT = "idle_checker_assignment"
     KERNEL = "kernel"
     KEYPAIR = "keypair"
     LOGIN_CLIENT_TYPE = "login_client_type"
@@ -136,6 +138,7 @@ class EntityType(enum.StrEnum):
     PROMETHEUS_QUERY_PRESET = "prometheus_query_preset"
     PROMETHEUS_QUERY_PRESET_CATEGORY = "prometheus_query_preset_category"
     RESOURCE_PRESET = "resource_preset"
+    RETENTION_POLICY = "retention_policy"
     MODEL_CARD = "model_card"
     ROLE = "role"
     RUNTIME_VARIANT = "runtime_variant"
@@ -173,6 +176,9 @@ class EntityType(enum.StrEnum):
     SESSION_DIRECT_ACCESS = "session:direct_access"
     SESSION_HISTORY = "session:history"
     SESSION_SCOPED_HISTORY = "session:scoped_history"
+    # Kernel sub
+    KERNEL_HISTORY = "kernel:history"
+    KERNEL_SCOPED_HISTORY = "kernel:scoped_history"
     # Deployment sub
     DEPLOYMENT_REPLICA = "deployment:replica"
     DEPLOYMENT_ROUTE = "deployment:route"
@@ -185,6 +191,8 @@ class EntityType(enum.StrEnum):
     DEPLOYMENT_SCOPED_HISTORY = "deployment:scoped_history"
     DEPLOYMENT_ERROR = "deployment:error"
     DEPLOYMENT_TOKEN = "deployment:token"
+    # Replica group sub
+    REPLICA_GROUP_HISTORY = "replica_group:history"
     # Image sub
     IMAGE_ALIAS = "image:alias"
     IMAGE_TAG = "image:tag"
@@ -269,7 +277,7 @@ class EntityType(enum.StrEnum):
             cls.SESSION,
             cls.ARTIFACT,
             cls.ARTIFACT_REGISTRY,
-            cls.APP_CONFIG,
+            cls.APP_CONFIG_FRAGMENT,
             cls.NOTIFICATION_CHANNEL,
             cls.NOTIFICATION_RULE,
             cls.MODEL_DEPLOYMENT,
@@ -348,6 +356,7 @@ class ScopeType(enum.StrEnum):
 
     # === Entity-level scopes ===
     SESSION = "session"
+    KERNEL = "kernel"
     DEPLOYMENT = "deployment"
     MODEL_DEPLOYMENT = "model_deployment"
     VFOLDER = "vfolder"
@@ -358,8 +367,10 @@ class ScopeType(enum.StrEnum):
     ROLE = "role"
     ROLE_ASSIGNMENT = "role:assignment"
     NOTIFICATION_CHANNEL = "notification_channel"
+    APP_CONFIG_FRAGMENT = "app_config_fragment"
     KEYPAIR = "keypair"
     KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"
+    IDLE_CHECKER_ASSIGNMENT = "idle_checker_assignment"
 
     def to_element(self) -> RBACElementType:
         from ai.backend.common.exception import RBACTypeConversionError
@@ -396,6 +407,7 @@ class RBACElementType(enum.StrEnum):
     KEYPAIR = "keypair"
     NOTIFICATION_CHANNEL = "notification_channel"
     NETWORK = "network"
+    IDLE_CHECKER_ASSIGNMENT = "idle_checker_assignment"
     RESOURCE_GROUP = "resource_group"
     CONTAINER_REGISTRY = "container_registry"
     STORAGE_HOST = "storage_host"
@@ -419,6 +431,7 @@ class RBACElementType(enum.StrEnum):
     PROJECT_RESOURCE_POLICY = "project_resource_policy"
     ROLE = "role"
     AUDIT_LOG = "audit_log"
+    KERNEL_HISTORY = "kernel:history"
     EVENT_LOG = "event_log"
 
     # === Admin page access control ===

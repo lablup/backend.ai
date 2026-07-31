@@ -1125,20 +1125,22 @@ class TestMultipleAgentsConfigValidation:
 
         assert "duplicate" in str(exc_info.value).lower()
 
-    def test_different_scaling_groups_per_agent(self, default_raw_config: RawConfigT) -> None:
+    def test_different_initial_resource_groups_per_agent(
+        self, default_raw_config: RawConfigT
+    ) -> None:
         raw_config = {
             **default_raw_config,
             "agents": [
                 {
                     "agent": {
                         "id": "agent-1",
-                        "scaling-group": "default",
+                        "initial-resource-group-name": "default",
                     }
                 },
                 {
                     "agent": {
                         "id": "agent-2",
-                        "scaling-group": "gpu",
+                        "initial-resource-group-name": "gpu",
                     }
                 },
             ],
@@ -1146,8 +1148,22 @@ class TestMultipleAgentsConfigValidation:
         config = AgentUnifiedConfig.model_validate(raw_config)
 
         agent_configs = config.get_agent_configs()
-        assert agent_configs[0].agent.scaling_group == "default"
-        assert agent_configs[1].agent.scaling_group == "gpu"
+        assert agent_configs[0].agent.initial_resource_group_name == "default"
+        assert agent_configs[1].agent.initial_resource_group_name == "gpu"
+
+    def test_removed_scaling_group_key_fails_fast(self, default_raw_config: RawConfigT) -> None:
+        raw_config = {
+            **default_raw_config,
+            "agent": {
+                **default_raw_config["agent"],
+                "scaling-group": "default",
+            },
+        }
+
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
+            AgentUnifiedConfig.model_validate(raw_config)
+
+        assert "initial-resource-group-name" in str(exc_info.value)
 
 
 class TestResourceAllocationModes:

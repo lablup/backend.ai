@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Collection
 
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.scaling_group import (
@@ -19,6 +21,13 @@ __all__ = ("ScalingGroupConditions",)
 
 class ScalingGroupConditions:
     """Query conditions for scaling groups."""
+
+    @staticmethod
+    def by_ids(ids: Collection[ResourceGroupID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupRow.id.in_(ids)
+
+        return inner
 
     @staticmethod
     def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
@@ -142,6 +151,13 @@ class ScalingGroupConditions:
         return inner
 
     @staticmethod
+    def by_is_default(is_default: bool) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupRow.is_default == is_default
+
+        return inner
+
+    @staticmethod
     def by_scheduler(scheduler: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ScalingGroupRow.scheduler == scheduler
@@ -174,17 +190,18 @@ class ScalingGroupConditions:
         return inner
 
     @staticmethod
-    def by_cursor_forward(cursor_name: str) -> QueryCondition:
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
         """Cursor condition for forward pagination (after cursor).
 
-        Uses subquery to get created_at of the cursor row and compare.
-        ScalingGroup uses name as primary key.
+        The cursor value is the resource group UUID; a subquery fetches the
+        cursor row's created_at to compare against.
         """
+        rg_id = ResourceGroupID(uuid.UUID(cursor_id))
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             subquery = (
                 sa.select(ScalingGroupRow.created_at)
-                .where(ScalingGroupRow.name == cursor_name)
+                .where(ScalingGroupRow.id == rg_id)
                 .scalar_subquery()
             )
             return ScalingGroupRow.created_at < subquery
@@ -192,17 +209,18 @@ class ScalingGroupConditions:
         return inner
 
     @staticmethod
-    def by_cursor_backward(cursor_name: str) -> QueryCondition:
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
         """Cursor condition for backward pagination (before cursor).
 
-        Uses subquery to get created_at of the cursor row and compare.
-        ScalingGroup uses name as primary key.
+        The cursor value is the resource group UUID; a subquery fetches the
+        cursor row's created_at to compare against.
         """
+        rg_id = ResourceGroupID(uuid.UUID(cursor_id))
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             subquery = (
                 sa.select(ScalingGroupRow.created_at)
-                .where(ScalingGroupRow.name == cursor_name)
+                .where(ScalingGroupRow.id == rg_id)
                 .scalar_subquery()
             )
             return ScalingGroupRow.created_at > subquery

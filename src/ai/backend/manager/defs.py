@@ -3,7 +3,6 @@ Common definitions/constants used throughout the manager.
 """
 
 import enum
-import re
 from typing import Final
 
 from ai.backend.common.arch import CURRENT_ARCH
@@ -42,34 +41,7 @@ DEFAULT_ROLE: Final = "main"
 
 PASSWORD_PLACEHOLDER: Final = "*****"
 
-_RESERVED_VFOLDER_PATTERNS = [r"^\.[a-z0-9]+rc$", r"^\.[a-z0-9]+_profile$"]
 RESERVED_DOTFILES = [".terminfo", ".jupyter", ".ssh", ".ssh/authorized_keys", ".local", ".config"]
-RESERVED_VFOLDERS = [
-    ".terminfo",
-    ".jupyter",
-    ".tmux.conf",
-    ".ssh",
-    "/bin",
-    "/boot",
-    "/dev",
-    "/etc",
-    "/lib",
-    "/lib64",
-    "/media",
-    "/mnt",
-    "/opt",
-    "/proc",
-    "/root",
-    "/run",
-    "/sbin",
-    "/srv",
-    "/sys",
-    "/tmp",
-    "/usr",
-    "/var",
-    "/home",
-]
-RESERVED_VFOLDER_PATTERNS = [re.compile(x) for x in _RESERVED_VFOLDER_PATTERNS]
 
 # Mapping between vfolder names and their in-container paths.
 VFOLDER_DSTPATHS_MAP = {
@@ -88,7 +60,6 @@ class LockID(enum.IntEnum):
     LOCKID_CHECK_PRECOND_TIMER = 192
     LOCKID_START_TIMER = 198
     LOCKID_SCALE_TIMER = 193
-    LOCKID_LOG_CLEANUP_TIMER = 195
     LOCKID_IDLE_CHECK_TIMER = 196
     LOCKID_SESSION_STATUS_UPDATE_TIMER = 197
     # Sokovan timers for each ScheduleType
@@ -130,7 +101,17 @@ class LockID(enum.IntEnum):
     LOCKID_REPLICA_GROUP_AUTOSCALE_RECONCILE = (
         238  # For replica-group steady-state autoscale reconcile
     )
-    LOCKID_IDLE_CHECK_RECONCILE = 239  # For idle-check reconcile
+    LOCKID_IDLE_CHECK_JUDGMENT_RECONCILE = 239  # For idle-check judgment reconcile
+    LOCKID_IDLE_CHECK_SWEEP_RECONCILE = 240  # For idle-check expiry sweep reconcile
+    LOCKID_IDLE_CHECK_ASSIGNMENT_SYNC_RECONCILE = (
+        241  # For idle-check assignment synchronization reconcile
+    )
+    LOCKID_IDLE_CHECK_INITIAL_GRACE_PERIOD_RECONCILE = (
+        242  # For idle-check initial grace period reconcile
+    )
+    LOCKID_SOKOVAN_TARGET_PREEMPTED = 243  # For operations targeting PREEMPTED sessions
+    LOCKID_SOKOVAN_TARGET_RESCHEDULING = 244  # For operations targeting RESCHEDULING sessions
+    LOCKID_SOKOVAN_TARGET_RESERVED = 245  # For operations targeting RESERVED sessions
 
 
 SERVICE_MAX_RETRIES = 5  # FIXME: make configurable

@@ -16,6 +16,8 @@ from sqlalchemy.orm import joinedload, load_only, noload
 from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.user import UserID
@@ -44,7 +46,6 @@ from ai.backend.manager.errors.user import (
     KeyPairNotFound,
     UserConflict,
     UserCreationBadRequest,
-    UserCreationFailure,
     UserModificationBadRequest,
     UserModificationFailure,
     UserNotFound,
@@ -120,7 +121,11 @@ from ai.backend.manager.repositories.keypair.types import (
     KeypairResourcePolicyKeypairSearchScope,
     UserKeypairSearchScope,
 )
-from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
+from ai.backend.manager.repositories.ops.rbac.provider import (
+    EntityMembersAddition,
+    RBACOpsProvider,
+    ScopeUserMember,
+)
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 from ai.backend.manager.repositories.user.creators import UserCreateSpec, UserCreatorSpec
@@ -129,6 +134,7 @@ from ai.backend.manager.repositories.user.purgers import (
     create_user_error_log_purger,
     create_user_group_association_purger,
     create_user_keypair_purger,
+    create_user_session_group_purger,
     create_user_vfolder_permission_purger,
 )
 from ai.backend.manager.repositories.user.types import (
@@ -217,9 +223,6 @@ class UserDBSource:
             )
             result = await execute_rbac_entity_creator(db_session, rbac_creator)
             row = result.row
-
-            if not row:
-                raise UserCreationFailure("Failed to create user")
             created_user = row.to_data()
 
             # Create default keypair with RBAC scope association
@@ -289,7 +292,6 @@ class UserDBSource:
         Raises:
             UserCreationBadRequest: If the domain does not exist.
             UserConflict: If email or username already exists.
-            UserCreationFailure: If user creation fails.
         """
         spec = cast(UserCreatorSpec, item.creator.spec)
 
@@ -320,9 +322,6 @@ class UserDBSource:
         )
         result = await execute_rbac_entity_creator(db_session, rbac_creator)
         row = result.row
-        if not row:
-            raise UserCreationFailure(f"Failed to create user {spec.email}")
-
         created_user = row.to_data()
 
         # Create default keypair with RBAC scope association
@@ -373,26 +372,25 @@ class UserDBSource:
     async def assign_users_to_scope(
         self,
         user_uuid: UserID,
-        domain_name: str | None,
         project_ids: Collection[ProjectID],
     ) -> None:
-        """Grant the auto_assign roles of a new user's initial domain/project scopes.
+        """Enroll a new user in its initial project scopes.
 
-        Maps the user to the active auto_assign roles of its domain scope and
-        each given project scope. Model-store membership is handled separately
-        by :meth:`assign_user_to_model_store`. Idempotent, so it is safe to run
-        after user creation.
+        Adds the user as an entity member of each project's virtual scope and
+        grants the scope's active auto_assign roles. Model-store membership is
+        handled separately by :meth:`assign_user_to_model_store`. Idempotent, so
+        it is safe to run after user creation. Domain-scope enrollment resumes
+        once domain RBAC rows are UUID-keyed.
         """
-        async with self._rbac_ops_provider.write_ops() as rbac_write_ops:
-            if domain_name is not None:
-                await rbac_write_ops.add_users_to_scope(
-                    ScopeId(scope_type=ScopeType.DOMAIN, scope_id=domain_name),
-                    [user_uuid],
-                )
+        async with self._rbac_ops_provider.write_ops() as w:
             for project_id in project_ids:
-                await rbac_write_ops.add_users_to_scope(
-                    ScopeId(scope_type=ScopeType.PROJECT, scope_id=str(project_id)),
-                    [user_uuid],
+                scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id)
+                await w.ensure_scope(scope)
+                await w.add_entity_members(
+                    EntityMembersAddition(
+                        scope=scope,
+                        members=[ScopeUserMember(user_id=user_uuid)],
+                    )
                 )
 
     async def assign_user_to_model_store(self, user_uuid: UserID, domain_name: str | None) -> None:
@@ -410,7 +408,6 @@ class UserDBSource:
             )
         await self.assign_users_to_scope(
             user_uuid,
-            domain_name,
             [ProjectID(pid) for pid in model_store_project_ids],
         )
 
@@ -700,6 +697,9 @@ class UserDBSource:
             await execute_batch_purger(session, create_user_keypair_purger(user_uuid))
             await execute_batch_purger(session, create_user_vfolder_permission_purger(user_uuid))
             await execute_batch_purger(session, create_user_group_association_purger(user_uuid))
+            # Placement groups the user still owns: their deployments were either
+            # delegated (the groups moved with them) or deleted by now.
+            await execute_batch_purger(session, create_user_session_group_purger(user_uuid))
 
             # Finally delete the user itself with RBAC scope/permission cleanup
             # to avoid dangling association_scopes_entities and permission rows.
@@ -716,6 +716,9 @@ class UserDBSource:
             await execute_batch_purger(session, create_user_keypair_purger(user_uuid))
             await execute_batch_purger(session, create_user_vfolder_permission_purger(user_uuid))
             await execute_batch_purger(session, create_user_group_association_purger(user_uuid))
+            # Placement groups the user still owns: their deployments were either
+            # delegated (the groups moved with them) or deleted by now.
+            await execute_batch_purger(session, create_user_session_group_purger(user_uuid))
 
             # Finally delete the user itself with RBAC scope/permission cleanup
             # to avoid dangling association_scopes_entities and permission rows.
@@ -851,19 +854,6 @@ class UserDBSource:
         Delete user's all keypairs with Valkey cleanup.
         """
         async with self._db.begin() as conn:
-            ak_rows = await conn.execute(
-                sa.select(keypairs.c.access_key).where(keypairs.c.user == user_uuid),
-            )
-            if (row := ak_rows.first()) and (access_key := row.access_key):
-                # Log concurrency used only when there is at least one keypair.
-                await valkey_stat_client.delete_keypair_concurrency(
-                    access_key=access_key,
-                    is_private=False,
-                )
-                await valkey_stat_client.delete_keypair_concurrency(
-                    access_key=access_key,
-                    is_private=True,
-                )
             result = await conn.execute(
                 sa.delete(keypairs).where(keypairs.c.user == user_uuid),
             )

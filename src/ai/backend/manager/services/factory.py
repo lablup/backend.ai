@@ -1,11 +1,17 @@
 from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
 )
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
+from ai.backend.manager.services.app_config.processors import (
+    AppConfigProcessors,
+)
+from ai.backend.manager.services.app_config.service import (
+    AppConfigService,
+)
 from ai.backend.manager.services.app_config_allow_list.processors import (
     AppConfigAllowListProcessors,
 )
@@ -17,6 +23,12 @@ from ai.backend.manager.services.app_config_definition.processors import (
 )
 from ai.backend.manager.services.app_config_definition.service import (
     AppConfigDefinitionService,
+)
+from ai.backend.manager.services.app_config_fragment.processors import (
+    AppConfigFragmentProcessors,
+)
+from ai.backend.manager.services.app_config_fragment.service import (
+    AppConfigFragmentService,
 )
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
 from ai.backend.manager.services.artifact.service import ArtifactService
@@ -54,6 +66,12 @@ from ai.backend.manager.services.fair_share.processors import FairShareProcessor
 from ai.backend.manager.services.fair_share.service import FairShareService
 from ai.backend.manager.services.group.processors import GroupProcessors
 from ai.backend.manager.services.group.service import GroupService
+from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
+from ai.backend.manager.services.idle_checker.service import IdleCheckerService
+from ai.backend.manager.services.idle_checker_assignment.processors import (
+    IdleCheckerAssignmentProcessors,
+)
+from ai.backend.manager.services.idle_checker_assignment.service import IdleCheckerAssignmentService
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.image.service import ImageService
 from ai.backend.manager.services.keypair_resource_policy.processors import (
@@ -119,6 +137,8 @@ from ai.backend.manager.services.resource_slot.processors import ResourceSlotPro
 from ai.backend.manager.services.resource_slot.service import ResourceSlotService
 from ai.backend.manager.services.resource_usage.processors import ResourceUsageProcessors
 from ai.backend.manager.services.resource_usage.service import ResourceUsageService
+from ai.backend.manager.services.retention_policy.processors import RetentionPolicyProcessors
+from ai.backend.manager.services.retention_policy.service import RetentionPolicyService
 from ai.backend.manager.services.role_preset.processors import RolePresetProcessors
 from ai.backend.manager.services.role_preset.service import RolePresetService
 from ai.backend.manager.services.runtime_variant.processors import RuntimeVariantProcessors
@@ -170,12 +190,19 @@ def create_services(args: ServiceArgs) -> Services:
             args.config_provider,
             repositories.agent.repository,
             repositories.scheduler.repository,
+            args.scheduling_controller,
             args.hook_plugin_ctx,
             args.event_producer,
             args.agent_cache,
         ),
+        app_config=AppConfigService(
+            fragment_repository=repositories.app_config_fragment.repository,
+        ),
         app_config_allow_list=AppConfigAllowListService(
             repository=repositories.app_config_allow_list.repository,
+        ),
+        app_config_fragment=AppConfigFragmentService(
+            repository=repositories.app_config_fragment.repository,
         ),
         domain=DomainService(repositories.domain.repository),
         dotfile=DotfileService(
@@ -209,6 +236,7 @@ def create_services(args: ServiceArgs) -> Services:
             repositories.user.repository,
             args.scheduling_controller,
         ),
+        idle_checker=IdleCheckerService(repositories.idle_checker.repository),
         image=ImageService(
             args.agent_registry, repositories.image.repository, args.config_provider
         ),
@@ -288,6 +316,7 @@ def create_services(args: ServiceArgs) -> Services:
             repositories.resource_preset.repository,
         ),
         resource_slot=ResourceSlotService(repositories.resource_slot.repository),
+        retention_policy=RetentionPolicyService(repositories.retention_policy.repository),
         role_preset=RolePresetService(repositories.role_preset.repository),
         runtime_variant=RuntimeVariantService(
             repositories.runtime_variant.repository,
@@ -408,6 +437,7 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         storage_namespace=StorageNamespaceService(repositories.storage_namespace.repository),
         audit_log=AuditLogService(repositories.audit_log.repository),
+        idle_checker_assignment=IdleCheckerAssignmentService(repositories.idle_checker.repository),
         scheduling_history=SchedulingHistoryService(repositories.scheduling_history.repository),
         service_catalog=ServiceCatalogService(args.db),
         template=TemplateService(
@@ -424,7 +454,6 @@ def create_services(args: ServiceArgs) -> Services:
             repository=repositories.stream.repository,
             registry=args.agent_registry,
             valkey_live=args.valkey_live,
-            idle_checker_host=args.idle_checker_host,
             etcd=args.etcd,
         ),
         events=EventsService(
@@ -436,14 +465,21 @@ def create_services(args: ServiceArgs) -> Services:
 
 def create_processors(
     args: ProcessorArgs,
-    action_monitors: list[ActionMonitor],
+    monitors: ActionMonitors,
     validators: ActionValidators,
 ) -> Processors:
     services = create_services(args.service_args)
+    # Legacy BaseAction-era packages consume the flat monitor list; packages migrated
+    # to the pure-ABC frameworks pick the per-type monitors from `monitors` instead.
+    action_monitors = monitors.legacy
     return Processors(
         agent=AgentProcessors(services.agent, action_monitors, validators),
+        app_config=AppConfigProcessors(services.app_config, action_monitors),
         app_config_allow_list=AppConfigAllowListProcessors(
             services.app_config_allow_list, action_monitors
+        ),
+        app_config_fragment=AppConfigFragmentProcessors(
+            services.app_config_fragment, action_monitors, validators
         ),
         domain=DomainProcessors(services.domain, action_monitors, validators),
         dotfile=DotfileProcessors(services.dotfile, action_monitors, validators),
@@ -453,6 +489,7 @@ def create_processors(
         fair_share=FairShareProcessors(services.fair_share, action_monitors, validators),
         group=GroupProcessors(services.group, action_monitors, validators),
         user=UserProcessors(services.user, action_monitors, validators),
+        idle_checker=IdleCheckerProcessors(services.idle_checker, action_monitors),
         image=ImageProcessors(services.image, action_monitors, validators),
         container_registry=ContainerRegistryProcessors(
             services.container_registry, action_monitors, validators
@@ -487,6 +524,7 @@ def create_processors(
             services.resource_preset, action_monitors, validators
         ),
         resource_slot=ResourceSlotProcessors(services.resource_slot, action_monitors, validators),
+        retention_policy=RetentionPolicyProcessors(services.retention_policy, action_monitors),
         role_preset=RolePresetProcessors(services.role_preset, action_monitors, validators),
         runtime_variant=RuntimeVariantProcessors(
             services.runtime_variant, action_monitors, validators
@@ -535,6 +573,9 @@ def create_processors(
             services.storage_namespace, action_monitors, validators
         ),
         audit_log=AuditLogProcessors(services.audit_log, [], validators),
+        idle_checker_assignment=IdleCheckerAssignmentProcessors(
+            services.idle_checker_assignment, action_monitors, validators
+        ),
         scheduling_history=SchedulingHistoryProcessors(
             services.scheduling_history, action_monitors, validators
         ),

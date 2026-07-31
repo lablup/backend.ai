@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Callable
-from typing import cast
+from typing import Any, cast
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.export.request import (
+    AuditLogExportFilter,
     SessionExportFilter,
     SessionExportUserNestedFilter,
 )
@@ -23,6 +26,7 @@ from ai.backend.manager.repositories.base.export import (
     ReportDef,
     StreamingExportQuery,
 )
+from ai.backend.manager.repositories.export.reports.audit_log import AUDIT_LOG_REPORT
 from ai.backend.manager.repositories.export.reports.session import SESSION_REPORT
 
 # =============================================================================
@@ -656,3 +660,147 @@ class TestBuildSessionQueryUserFilter:
         compiled = str(stmt.compile(compile_kwargs={"literal_binds": True}))
         assert "EXISTS (SELECT" in compiled
         assert "users.email" in compiled
+
+
+_ACTED_AS = uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+_ACTED_AS_OTHER = uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+
+# postgresql.dialect (PGDialect) has an untyped __init__; go through Any to avoid [no-untyped-call].
+_pg_dialect_cls: Any = postgresql.dialect
+_PG_DIALECT = _pg_dialect_cls()
+
+
+class TestBuildAuditLogQueryActedAsFilter:
+    """Tests for build_audit_log_query acted_as (UUID) filtering (BA-6840).
+
+    The audit-log CSV export must support filtering by the effective actor UUID. The
+    ``audit_logs.acted_as`` column is a native ``UUID``; conditions are compiled with the
+    PostgreSQL dialect (the production target) so the ``GUID`` type renders values as
+    hyphenated UUID literals. These conditions are only exercised through the adapter,
+    not the DTO-construction test.
+    """
+
+    @pytest.fixture
+    def adapter(self) -> ExportAdapter:
+        return ExportAdapter()
+
+    @pytest.fixture
+    def build_query(
+        self,
+        adapter: ExportAdapter,
+    ) -> Callable[[AuditLogExportFilter], StreamingExportQuery]:
+        """Build an audit-log export query, holding the non-varying params constant."""
+
+        def _build(filter: AuditLogExportFilter) -> StreamingExportQuery:
+            return adapter.build_audit_log_query(
+                report=AUDIT_LOG_REPORT,
+                fields=None,
+                filter=filter,
+                order=None,
+                max_rows=1000,
+                statement_timeout_sec=60,
+            )
+
+        return _build
+
+    @pytest.fixture
+    def query_equals(
+        self,
+        build_query: Callable[[AuditLogExportFilter], StreamingExportQuery],
+    ) -> StreamingExportQuery:
+        """Filter acted_as by equality."""
+        return build_query(AuditLogExportFilter(acted_as=UUIDFilter(equals=_ACTED_AS)))
+
+    @pytest.fixture
+    def query_in(
+        self,
+        build_query: Callable[[AuditLogExportFilter], StreamingExportQuery],
+    ) -> StreamingExportQuery:
+        """Filter acted_as by set membership."""
+        return build_query(
+            AuditLogExportFilter(acted_as=UUIDFilter(in_=[_ACTED_AS, _ACTED_AS_OTHER]))
+        )
+
+    @pytest.fixture
+    def query_not_equals(
+        self,
+        build_query: Callable[[AuditLogExportFilter], StreamingExportQuery],
+    ) -> StreamingExportQuery:
+        """Filter acted_as by inequality."""
+        return build_query(AuditLogExportFilter(acted_as=UUIDFilter(not_equals=_ACTED_AS)))
+
+    @pytest.fixture
+    def query_not_in(
+        self,
+        build_query: Callable[[AuditLogExportFilter], StreamingExportQuery],
+    ) -> StreamingExportQuery:
+        """Filter acted_as by negated set membership."""
+        return build_query(
+            AuditLogExportFilter(acted_as=UUIDFilter(not_in=[_ACTED_AS, _ACTED_AS_OTHER]))
+        )
+
+    @pytest.fixture
+    def query_no_acted_as(
+        self,
+        build_query: Callable[[AuditLogExportFilter], StreamingExportQuery],
+    ) -> StreamingExportQuery:
+        """No acted_as filter set."""
+        return build_query(AuditLogExportFilter())
+
+    def test_equals_compiles_to_uuid_equality(
+        self,
+        query_equals: StreamingExportQuery,
+    ) -> None:
+        assert len(query_equals.conditions) == 1
+        condition = str(
+            query_equals.conditions[0]().compile(
+                dialect=_PG_DIALECT, compile_kwargs={"literal_binds": True}
+            )
+        )
+        assert f"audit_logs.acted_as = '{_ACTED_AS}'" in condition
+
+    def test_in_compiles_to_uuid_membership(
+        self,
+        query_in: StreamingExportQuery,
+    ) -> None:
+        assert len(query_in.conditions) == 1
+        condition = str(
+            query_in.conditions[0]().compile(
+                dialect=_PG_DIALECT, compile_kwargs={"literal_binds": True}
+            )
+        )
+        assert "audit_logs.acted_as IN (" in condition
+        assert f"'{_ACTED_AS}'" in condition
+        assert f"'{_ACTED_AS_OTHER}'" in condition
+
+    def test_not_equals_compiles_to_negated_equality(
+        self,
+        query_not_equals: StreamingExportQuery,
+    ) -> None:
+        assert len(query_not_equals.conditions) == 1
+        condition = str(
+            query_not_equals.conditions[0]().compile(
+                dialect=_PG_DIALECT, compile_kwargs={"literal_binds": True}
+            )
+        )
+        assert f"audit_logs.acted_as != '{_ACTED_AS}'" in condition
+
+    def test_not_in_compiles_to_negated_membership(
+        self,
+        query_not_in: StreamingExportQuery,
+    ) -> None:
+        assert len(query_not_in.conditions) == 1
+        condition = str(
+            query_not_in.conditions[0]().compile(
+                dialect=_PG_DIALECT, compile_kwargs={"literal_binds": True}
+            )
+        )
+        assert "audit_logs.acted_as NOT IN (" in condition
+        assert f"'{_ACTED_AS}'" in condition
+        assert f"'{_ACTED_AS_OTHER}'" in condition
+
+    def test_no_condition_when_acted_as_filter_absent(
+        self,
+        query_no_acted_as: StreamingExportQuery,
+    ) -> None:
+        assert query_no_acted_as.conditions == []

@@ -234,6 +234,10 @@ from ai.backend.manager.repositories.permission_controller.creators import (
     RoleCreatorSpec,
     UserRoleCreatorSpec,
 )
+from ai.backend.manager.repositories.permission_controller.purgers import (
+    PermissionPurgerSpec,
+    RolePurgerSpec,
+)
 from ai.backend.manager.repositories.permission_controller.types import ScopedRoleSearchScope
 from ai.backend.manager.repositories.permission_controller.updaters import (
     PermissionUpdaterSpec,
@@ -916,7 +920,7 @@ class RBACAdapter(BaseAdapter):
 
     async def purge(self, role_id: UUID) -> PurgeRolePayload:
         """Hard-delete a role from the database."""
-        purger: Purger[RoleRow] = Purger(row_class=RoleRow, pk_value=role_id)
+        purger: Purger[RoleRow] = Purger(spec=RolePurgerSpec(role_id=role_id))
         action_result = await self._processors.permission_controller.purge_role.wait_for_complete(
             PurgeRoleAction(purger=purger)
         )
@@ -926,7 +930,9 @@ class RBACAdapter(BaseAdapter):
 
     async def delete_permission(self, permission_id: UUID) -> DeletePermissionPayloadDTO:
         """Hard-delete a scoped permission."""
-        purger: Purger[PermissionRow] = Purger(row_class=PermissionRow, pk_value=permission_id)
+        purger: Purger[PermissionRow] = Purger(
+            spec=PermissionPurgerSpec(permission_id=permission_id)
+        )
         await self._processors.permission_controller.delete_permission.wait_for_complete(
             DeletePermissionAction(purger=purger)
         )
@@ -1088,7 +1094,7 @@ class RBACAdapter(BaseAdapter):
     ) -> BulkRemoveRolePermissionsPayload:
         """Bulk-delete permission rows by primary key."""
         purgers: list[Purger[PermissionRow]] = [
-            Purger(row_class=PermissionRow, pk_value=pid) for pid in input.permission_ids
+            Purger(spec=PermissionPurgerSpec(permission_id=pid)) for pid in input.permission_ids
         ]
         action_result = await self._processors.permission_controller.bulk_remove_role_permissions.wait_for_complete(
             BulkRemoveRolePermissionsAction(purgers=purgers)

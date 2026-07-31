@@ -9,11 +9,16 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.models.vfolder.row import VFolderInvitationRow, VFolderPermissionRow
+from ai.backend.manager.models.vfolder.row import (
+    VFolderInvitationRow,
+    VFolderPermissionRow,
+    VFolderRow,
+)
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
 from ai.backend.manager.repositories.base.rbac.entity_purger import (
     RBACEntityPurgerSpec,
 )
+from ai.backend.manager.repositories.base.types import ConflictCheck
 
 
 @dataclass
@@ -28,6 +33,10 @@ class VFolderInvitationBatchPurgerSpec(BatchPurgerSpec[VFolderInvitationRow]):
             VFolderInvitationRow.vfolder.in_(self.vfolder_ids)
         )
 
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
 
 @dataclass
 class VFolderPermissionBatchPurgerSpec(BatchPurgerSpec[VFolderPermissionRow]):
@@ -41,10 +50,22 @@ class VFolderPermissionBatchPurgerSpec(BatchPurgerSpec[VFolderPermissionRow]):
             VFolderPermissionRow.vfolder.in_(self.vfolder_ids)
         )
 
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
 
 @dataclass
-class VFolderPurgerSpec(RBACEntityPurgerSpec):
+class VFolderPurgerSpec(RBACEntityPurgerSpec[VFolderRow]):
     vfolder_id: UUID
+
+    @override
+    def row_class(self) -> type[VFolderRow]:
+        return VFolderRow
+
+    @override
+    def pk_value(self) -> UUID:
+        return self.vfolder_id
 
     @override
     def element_type(self) -> RBACElementType:
@@ -56,3 +77,7 @@ class VFolderPurgerSpec(RBACEntityPurgerSpec):
             element_type=self.element_type(),
             element_id=str(self.vfolder_id),
         )
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()

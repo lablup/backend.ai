@@ -46,6 +46,10 @@ from ai.backend.manager.repositories.role_preset.creators import (
     RolePermissionPresetDependentCreatorSpec,
     RolePresetCreatorSpec,
 )
+from ai.backend.manager.repositories.role_preset.purgers import (
+    RolePermissionPresetPurgerSpec,
+    RolePresetPurgerSpec,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -125,14 +129,14 @@ class RolePresetDBSource:
 
     async def purge(self, preset_id: RolePresetID) -> bool:
         async with self._ops.write_ops() as w:
-            result = await w.purge(Purger(row_class=RolePresetRow, pk_value=preset_id))
+            result = await w.purge(Purger(spec=RolePresetPurgerSpec(preset_id=preset_id)))
             return result is not None
 
     async def bulk_purge(
         self,
         ids: Sequence[RolePresetID],
     ) -> RolePresetBulkPurgeResult:
-        purgers = [Purger(row_class=RolePresetRow, pk_value=preset_id) for preset_id in ids]
+        purgers = [Purger(spec=RolePresetPurgerSpec(preset_id=preset_id)) for preset_id in ids]
         async with self._ops.write_ops() as w:
             result = await w.bulk_purge_partial(purgers)
         successes = [row.to_data() for row in result.successes]
@@ -155,7 +159,10 @@ class RolePresetDBSource:
         self,
         ids: Sequence[RolePermissionPresetID],
     ) -> RolePermissionPresetBulkRemoveResult:
-        purgers = [Purger(row_class=RolePermissionPresetRow, pk_value=perm_id) for perm_id in ids]
+        purgers = [
+            Purger(spec=RolePermissionPresetPurgerSpec(permission_preset_id=perm_id))
+            for perm_id in ids
+        ]
         async with self._ops.write_ops() as w:
             result = await w.bulk_purge_partial(purgers)
         successes = [row.to_data() for row in result.successes]

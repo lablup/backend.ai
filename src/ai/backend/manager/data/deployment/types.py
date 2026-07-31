@@ -27,6 +27,7 @@ from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.identifier.replica_group_history import ReplicaGroupHistoryID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.identifier.vfolder import VFolderUUID
@@ -101,6 +102,12 @@ class RouteStatus(enum.Enum):
     @lru_cache(maxsize=1)
     def inactive_route_statuses(cls) -> set[RouteStatus]:
         return {RouteStatus.TERMINATING, RouteStatus.TERMINATED, RouteStatus.FAILED_TO_START}
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def terminal_statuses(cls) -> set[RouteStatus]:
+        """Routes that will not transition further (TERMINATING is still in-flight)."""
+        return {RouteStatus.TERMINATED, RouteStatus.FAILED_TO_START}
 
     def is_active(self) -> bool:
         return self in self.active_route_statuses()
@@ -193,6 +200,12 @@ class ReplicaGroupLifecycle(enum.StrEnum):
     FAILED = "failed"
     DRAINING = "draining"
     DRAINED = "drained"
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def terminal_statuses(cls) -> set[ReplicaGroupLifecycle]:
+        """Replica-group lifecycles that will not transition further."""
+        return {cls.DRAINED, cls.FAILED}
 
 
 class ReplicaGroupScalingStatus(enum.StrEnum):
@@ -1332,7 +1345,7 @@ class RouteHistoryData:
 class ReplicaGroupHistoryData:
     """Domain model for replica-group history."""
 
-    id: UUID
+    id: ReplicaGroupHistoryID
     replica_group_id: ReplicaGroupID
     deployment_id: DeploymentID
 
@@ -1350,6 +1363,16 @@ class ReplicaGroupHistoryData:
     attempts: int
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass
+class ReplicaGroupHistoryListResult:
+    """Search result with pagination for replica-group history."""
+
+    items: list[ReplicaGroupHistoryData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
 
 @dataclass

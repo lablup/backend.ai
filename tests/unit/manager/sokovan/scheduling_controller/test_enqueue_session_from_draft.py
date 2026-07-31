@@ -3,8 +3,8 @@
 Wires the full draft path with mocked repository, config provider, storage
 manager, and hook plugin context so we can verify:
 
-* the repository fetch is called with the caller-supplied draft + config-
-  derived knobs,
+* the repository context fetch is called with the caller-supplied draft
+  (mount resolution included),
 * the preparer chain produces a finalized ``SessionSpec`` whose fields
   match the draft + fetched context,
 * the validator chain is invoked against the built ``SessionSpec``,
@@ -20,7 +20,6 @@ controller's draft path.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import PurePosixPath
 from typing import Any
@@ -30,30 +29,30 @@ import pytest
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.plugin.hook import PASSED, HookResult, HookResults
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
-    DefaultForUnspecified,
     MountInfoEntry,
     MountPermission,
-    ResourceSlot,
     ResourceSlotEntry,
     SessionTypes,
-    SlotName,
     SlotTypes,
+    VFolderHostPermissionMap,
     VFolderID,
     VFolderMount,
     VFolderUsageMode,
 )
 from ai.backend.manager.data.dotfile.types import DotfileBundle
-from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData, SlotTypePolicy
+from ai.backend.manager.data.resource.types import SlotTypeInfo, UserEnqueuePolicy
 from ai.backend.manager.data.session.creation import (
     ContainerUserInfo,
     ImageInfo,
@@ -63,15 +62,18 @@ from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
     KernelResourceInput,
+    ResourceSpecDraft,
     SchedulingTargetDraft,
     SessionClassificationDraft,
     SessionIdentityDraft,
     SessionNetworkDraft,
     SessionOptionsDraft,
+    SessionResourceSpecDraft,
     SessionScopeDraft,
     SessionSpecDraft,
 )
 from ai.backend.manager.data.session.options import (
+    AgentSelectionPolicy,
     DefaultSessionOptions,
     ResourceOpts,
     SessionHandlerOptions,
@@ -79,12 +81,15 @@ from ai.backend.manager.data.session.options import (
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.common import RejectedByHook
 from ai.backend.manager.models.network import NetworkType
-from ai.backend.manager.repositories.scheduler.types.session_creation import (
-    SessionSpecContextFetch,
-)
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
     SchedulingControllerArgs,
+)
+from ai.backend.manager.views.sokovan.session_creation import (
+    GlobalEnqueueInfo,
+    ResourceGroupEnqueueInfo,
+    SessionSpecContext,
+    UserEnqueueInfo,
 )
 
 
@@ -97,12 +102,6 @@ def image_id() -> ImageID:
 def draft(image_id: ImageID) -> SessionSpecDraft:
     """A minimal but valid draft that satisfies every preparer rule."""
     return SessionSpecDraft(
-        identity=SessionIdentityDraft(
-            session_id=SessionID(uuid.uuid4()),
-            creation_id="ci-1",
-            session_name="module-test-session",
-            access_key=AccessKey("AKIAIOSFODNN7EXAMPLE"),
-        ),
         scope=SessionScopeDraft(
             domain_id=DomainID(uuid.uuid4()),
             domain_name=DomainName("default"),
@@ -110,43 +109,58 @@ def draft(image_id: ImageID) -> SessionSpecDraft:
             resource_group_id=ResourceGroupID(uuid.uuid4()),
             resource_group_name=ResourceGroupName("default"),
         ),
-        classification=SessionClassificationDraft(session_type=SessionTypes.INTERACTIVE),
-        network=SessionNetworkDraft(),
-        options=SessionOptionsDraft(
-            priority=10,
-            is_preemptible=True,
-            cluster_mode=ClusterMode.SINGLE_NODE,
-            cluster_size=1,
-            scheduling_target=SchedulingTargetDraft(),
-            kernel_groups=(
-                KernelGroupDraft(
-                    role="main",
-                    replica_count=1,
-                    execution_spec=KernelExecutionSpecDraft(
-                        resource_input=KernelResourceInput(
-                            image_id=image_id,
-                            resources=(
-                                ResourceSlotEntry(resource_type="cpu", quantity=str(Decimal(2))),
-                                ResourceSlotEntry(
-                                    resource_type="mem",
-                                    quantity=str(Decimal(2 * 1024 * 1024 * 1024)),
+        resource_spec=SessionResourceSpecDraft(
+            identity=SessionIdentityDraft(
+                session_id=SessionID(uuid.uuid4()),
+                creation_id="ci-1",
+                session_name="module-test-session",
+                access_key=AccessKey("AKIAIOSFODNN7EXAMPLE"),
+            ),
+            classification=SessionClassificationDraft(session_type=SessionTypes.INTERACTIVE),
+            network=SessionNetworkDraft(),
+            resource=ResourceSpecDraft(
+                options=SessionOptionsDraft(
+                    priority=10,
+                    is_preemptible=True,
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                    scheduling_target=SchedulingTargetDraft(),
+                    kernel_groups=(
+                        KernelGroupDraft(
+                            role="main",
+                            replica_count=1,
+                            execution_spec=KernelExecutionSpecDraft(
+                                resource_input=KernelResourceInput(
+                                    image_id=image_id,
+                                    resources=(
+                                        ResourceSlotEntry(
+                                            resource_type=ResourceSlotName("cpu"),
+                                            quantity=str(Decimal(2)),
+                                        ),
+                                        ResourceSlotEntry(
+                                            resource_type=ResourceSlotName("mem"),
+                                            quantity=str(Decimal(2 * 1024 * 1024 * 1024)),
+                                        ),
+                                    ),
+                                    resource_opts=ResourceOpts(),
                                 ),
-                            ),
-                            resource_opts=ResourceOpts(),
-                        ),
-                        mounts=(
-                            MountInfoEntry(
-                                vfolder_id=VFolderUUID(
-                                    VFolderID(quota_scope_id=None, folder_id=uuid.uuid4()).folder_id
+                                mounts=(
+                                    MountInfoEntry(
+                                        vfolder_id=VFolderUUID(
+                                            VFolderID(
+                                                quota_scope_id=None, folder_id=uuid.uuid4()
+                                            ).folder_id
+                                        ),
+                                        mount_destination="/home/work/data",
+                                        mount_perm=MountPermission.READ_WRITE,
+                                    ),
                                 ),
-                                mount_destination="/home/work/data",
-                                mount_perm=MountPermission.READ_WRITE,
                             ),
                         ),
                     ),
+                    handler_options=SessionHandlerOptions(),
                 ),
             ),
-            handler_options=SessionHandlerOptions(),
         ),
     )
 
@@ -177,20 +191,13 @@ def _image_info(image_id: ImageID) -> ImageInfo:
     )
 
 
-def _keypair_policy() -> KeyPairResourcePolicyData:
-    return KeyPairResourcePolicyData(
-        name="default",
-        created_at=datetime(2026, 1, 1, tzinfo=UTC),
-        default_for_unspecified=DefaultForUnspecified.LIMITED,
-        total_resource_slots=ResourceSlot(),
-        max_session_lifetime=0,
-        max_concurrent_sessions=10,
+def _user_policy() -> UserEnqueuePolicy:
+    return UserEnqueuePolicy(
+        max_containers_per_session=4,
         max_pending_session_count=None,
         max_pending_session_resource_slots=None,
-        max_concurrent_sftp_sessions=0,
-        max_containers_per_session=4,
-        idle_timeout=0,
-        allowed_vfolder_hosts={},
+        allowed_vfolder_hosts=VFolderHostPermissionMap(),
+        max_priority=None,
     )
 
 
@@ -205,21 +212,35 @@ def _make_user() -> UserData:
     )
 
 
-def _fetch_bundle(image_id: ImageID) -> SessionSpecContextFetch:
-    return SessionSpecContextFetch(
-        resource_group_defaults=DefaultSessionOptions(),
-        resource_group_network=ScalingGroupNetworkInfo(use_host_network=False, wsproxy_addr=None),
-        container_user_info=ContainerUserInfo(uid=1000, main_gid=1000, supplementary_gids=[]),
-        image_infos={image_id: _image_info(image_id)},
-        resource_group_allow_fractional=False,
-        dotfile_data=DotfileBundle(),
-        keypair_resource_policy=_keypair_policy(),
-        known_slot_types={
-            SlotName("cpu"): SlotTypes.COUNT,
-            SlotName("mem"): SlotTypes.BYTES,
-        },
-        slot_type_policy=SlotTypePolicy(
-            enabled=frozenset({SlotName("cpu"), SlotName("mem")}),
+def _spec_context(
+    image_id: ImageID,
+    *,
+    rg_defaults: DefaultSessionOptions | None = None,
+) -> SessionSpecContext:
+    return SessionSpecContext(
+        resource_group=ResourceGroupEnqueueInfo(
+            defaults=rg_defaults if rg_defaults is not None else DefaultSessionOptions(),
+            network=ScalingGroupNetworkInfo(use_host_network=False, wsproxy_addr=None),
+            allow_fractional=False,
+            served_slot_names=frozenset({ResourceSlotName("cpu"), ResourceSlotName("mem")}),
+        ),
+        user=UserEnqueueInfo(
+            policy=_user_policy(),
+            container_user=ContainerUserInfo(uid=1000, main_gid=1000, supplementary_gids=[]),
+            dotfiles=DotfileBundle(),
+            pending_session_count=0,
+            pending_session_resource_slots={},
+            vfolder_mounts_by_role={"main": (_vfolder_mount(),)},
+        ),
+        global_info=GlobalEnqueueInfo(
+            image_infos={image_id: _image_info(image_id)},
+            slot_type_info=SlotTypeInfo(
+                types={
+                    ResourceSlotName("cpu"): SlotTypes.COUNT,
+                    ResourceSlotName("mem"): SlotTypes.BYTES,
+                },
+                required=frozenset(),
+            ),
         ),
     )
 
@@ -230,18 +251,11 @@ def _build_controller(
     hook_status: Any = PASSED,
 ) -> tuple[SchedulingController, MagicMock, MagicMock]:
     config_provider = MagicMock()
-    etcd_loader = MagicMock()
-    etcd_loader.get_vfolder_types = AsyncMock(return_value=["user"])
-    etcd_loader.get_resource_slots = AsyncMock(
-        return_value={SlotName("cpu"): SlotTypes.COUNT, SlotName("mem"): SlotTypes.BYTES}
-    )
-    config_provider.legacy_etcd_config_loader = etcd_loader
-
     storage_manager = MagicMock()
     event_producer = MagicMock()
     event_producer.broadcast_events_batch = AsyncMock()
     valkey_schedule = MagicMock()
-    valkey_schedule.mark_schedule_needed = AsyncMock()
+    valkey_schedule.mark_schedules_needed_batch = AsyncMock()
     network_plugin_ctx = MagicMock()
 
     hook_plugin_ctx = MagicMock()
@@ -263,6 +277,7 @@ def _build_controller(
             valkey_schedule=valkey_schedule,
             network_plugin_ctx=network_plugin_ctx,
             hook_plugin_ctx=hook_plugin_ctx,
+            agent_selector=MagicMock(),
         )
     )
     return controller, event_producer, hook_plugin_ctx
@@ -277,10 +292,11 @@ class TestEnqueueSessionFromDraft:
         expected_session_id = SessionID(uuid.uuid4())
 
         repository = AsyncMock()
-        repository.fetch_session_spec_contexts.return_value = _fetch_bundle(image_id)
-        repository.resolve_vfolder_mounts_by_role.return_value = {"main": (_vfolder_mount(),)}
+        repository.fetch_session_spec_context.return_value = _spec_context(image_id)
+        repository.query_accessible_resource_group_ids.return_value = frozenset({
+            draft.scope.resource_group_id
+        })
         repository.enqueue_session_from_spec.return_value = expected_session_id
-        repository.mark_scheduling_needed = AsyncMock()
 
         controller, event_producer, hook_plugin_ctx = _build_controller(repository)
 
@@ -291,25 +307,28 @@ class TestEnqueueSessionFromDraft:
 
         assert returned_id == expected_session_id
 
-        # Repository fetch got the draft
-        repository.fetch_session_spec_contexts.assert_awaited_once()
-        assert repository.fetch_session_spec_contexts.await_args.args[0] is draft
-
-        # Vfolder mounts resolved separately with the config-sourced knob
-        repository.resolve_vfolder_mounts_by_role.assert_awaited_once()
-        vfolder_call_kwargs = repository.resolve_vfolder_mounts_by_role.await_args.kwargs
-        assert vfolder_call_kwargs["allowed_vfolder_types"] == ["user"]
-        assert repository.resolve_vfolder_mounts_by_role.await_args.args[0] is draft
+        # Repository fetch got the draft (with mount resolution requested)
+        repository.fetch_session_spec_context.assert_awaited_once()
+        assert repository.fetch_session_spec_context.await_args.args[0] is draft
+        assert repository.fetch_session_spec_context.await_args.kwargs["resolve_mounts"] is True
 
         # enqueue_session_from_spec got the finalized SessionSpec
         repository.enqueue_session_from_spec.assert_awaited_once()
         enqueued_spec = repository.enqueue_session_from_spec.await_args.args[0]
         assert isinstance(enqueued_spec, SessionSpec)
-        assert enqueued_spec.identity.session_id == draft.identity.session_id
-        assert enqueued_spec.identity.session_name == draft.identity.session_name
-        assert enqueued_spec.options.cluster_size == 1
-        assert len(enqueued_spec.kernel_specs) == 1
-        kernel = enqueued_spec.kernel_specs[0]
+        assert (
+            enqueued_spec.resource_spec.identity.session_id
+            == draft.resource_spec.identity.session_id
+        )
+        assert (
+            enqueued_spec.resource_spec.identity.session_name
+            == draft.resource_spec.identity.session_name
+        )
+        assert enqueued_spec.resource_spec.options.cluster_size == 1
+        # Draft left job_priority unset → filled from the resource-group default (0).
+        assert enqueued_spec.resource_spec.options.job_priority == 0
+        assert len(enqueued_spec.resource_spec.kernel_specs) == 1
+        kernel = enqueued_spec.resource_spec.kernel_specs[0]
         assert kernel.cluster_role == "main"
         assert kernel.execution_spec.resource_input.image_id == image_id
         # vfolder mounts flowed through context → resolved on the kernel spec
@@ -326,14 +345,126 @@ class TestEnqueueSessionFromDraft:
         assert len(broadcast_batch) == 1
         assert broadcast_batch[0].session_id == expected_session_id
 
+    async def test_explicit_job_priority_flows_into_spec(
+        self,
+        draft: SessionSpecDraft,
+        image_id: ImageID,
+    ) -> None:
+        """A caller-supplied job_priority survives the preparer chain into the SessionSpec."""
+        resource = draft.resource_spec.resource
+        draft_jp = draft.model_copy(
+            update={
+                "resource_spec": draft.resource_spec.model_copy(
+                    update={
+                        "resource": resource.model_copy(
+                            update={
+                                "options": resource.options.model_copy(update={"job_priority": 50}),
+                            }
+                        ),
+                    }
+                ),
+            }
+        )
+
+        repository = AsyncMock()
+        repository.fetch_session_spec_context.return_value = _spec_context(image_id)
+        repository.query_accessible_resource_group_ids.return_value = frozenset({
+            draft_jp.scope.resource_group_id
+        })
+        repository.enqueue_session_from_spec.return_value = SessionID(uuid.uuid4())
+
+        controller, _, _ = _build_controller(repository)
+
+        with with_user(_make_user()):
+            await controller.enqueue_session_from_draft(draft_jp)
+
+        enqueued_spec = repository.enqueue_session_from_spec.await_args.args[0]
+        assert enqueued_spec.resource_spec.options.job_priority == 50
+
+    async def test_agent_selection_policy_override_beats_rg_default(
+        self,
+        draft: SessionSpecDraft,
+        image_id: ImageID,
+    ) -> None:
+        """A request-level STRICT policy survives over the RG default (PREFERRED)."""
+        resource = draft.resource_spec.resource
+        draft_strict = draft.model_copy(
+            update={
+                "resource_spec": draft.resource_spec.model_copy(
+                    update={
+                        "resource": resource.model_copy(
+                            update={
+                                "options": resource.options.model_copy(
+                                    update={
+                                        "scheduling_target": SchedulingTargetDraft(
+                                            agent_selection_policy=AgentSelectionPolicy.STRICT,
+                                        ),
+                                    }
+                                ),
+                            }
+                        ),
+                    }
+                ),
+            }
+        )
+
+        repository = AsyncMock()
+        repository.fetch_session_spec_context.return_value = _spec_context(image_id)
+        repository.query_accessible_resource_group_ids.return_value = frozenset({
+            draft_strict.scope.resource_group_id
+        })
+        repository.enqueue_session_from_spec.return_value = SessionID(uuid.uuid4())
+
+        controller, _, _ = _build_controller(repository)
+
+        with with_user(_make_user()):
+            await controller.enqueue_session_from_draft(draft_strict)
+
+        enqueued_spec = repository.enqueue_session_from_spec.await_args.args[0]
+        assert (
+            enqueued_spec.resource_spec.options.scheduling_target.agent_selection_policy
+            == AgentSelectionPolicy.STRICT
+        )
+
+    async def test_agent_selection_policy_unset_inherits_rg_default(
+        self,
+        draft: SessionSpecDraft,
+        image_id: ImageID,
+    ) -> None:
+        """An unset policy on the draft inherits the RG default."""
+        repository = AsyncMock()
+        repository.fetch_session_spec_context.return_value = _spec_context(
+            image_id,
+            rg_defaults=DefaultSessionOptions(
+                agent_selection_policy=AgentSelectionPolicy.STRICT,
+            ),
+        )
+        repository.query_accessible_resource_group_ids.return_value = frozenset({
+            draft.scope.resource_group_id
+        })
+        repository.enqueue_session_from_spec.return_value = SessionID(uuid.uuid4())
+
+        controller, _, _ = _build_controller(repository)
+
+        with with_user(_make_user()):
+            await controller.enqueue_session_from_draft(draft)
+
+        enqueued_spec = repository.enqueue_session_from_spec.await_args.args[0]
+        assert (
+            enqueued_spec.resource_spec.options.scheduling_target.agent_selection_policy
+            == AgentSelectionPolicy.STRICT
+        )
+
     async def test_pre_enqueue_hook_rejection_raises(
         self,
         draft: SessionSpecDraft,
         image_id: ImageID,
     ) -> None:
         repository = AsyncMock()
-        repository.fetch_session_spec_contexts.return_value = _fetch_bundle(image_id)
-        repository.resolve_vfolder_mounts_by_role.return_value = {"main": (_vfolder_mount(),)}
+        repository.fetch_session_spec_context.return_value = _spec_context(image_id)
+        repository.query_accessible_resource_group_ids.return_value = frozenset({
+            draft.scope.resource_group_id
+        })
         repository.enqueue_session_from_spec = AsyncMock()
 
         controller, _event_producer, _hook_plugin_ctx = _build_controller(
@@ -354,10 +485,11 @@ class TestEnqueueSessionFromDraft:
         image_id: ImageID,
     ) -> None:
         repository = AsyncMock()
-        repository.fetch_session_spec_contexts.return_value = _fetch_bundle(image_id)
-        repository.resolve_vfolder_mounts_by_role.return_value = {"main": (_vfolder_mount(),)}
+        repository.fetch_session_spec_context.return_value = _spec_context(image_id)
+        repository.query_accessible_resource_group_ids.return_value = frozenset({
+            draft.scope.resource_group_id
+        })
         repository.enqueue_session_from_spec.return_value = SessionID(uuid.uuid4())
-        repository.mark_scheduling_needed = AsyncMock()
 
         controller, _event_producer, _hook_plugin_ctx = _build_controller(repository)
 
@@ -366,4 +498,48 @@ class TestEnqueueSessionFromDraft:
             await controller.enqueue_session_from_draft(draft)
 
         enqueued_spec = repository.enqueue_session_from_spec.await_args.args[0]
-        assert enqueued_spec.network.network_type == NetworkType.VOLATILE
+        assert enqueued_spec.resource_spec.network.network_type == NetworkType.VOLATILE
+
+
+class TestResourceGroupAccessibility:
+    async def test_inaccessible_resource_group_rejected_before_fetch(
+        self,
+        draft: SessionSpecDraft,
+        image_id: ImageID,
+    ) -> None:
+        repository = AsyncMock()
+        repository.query_accessible_resource_group_ids.return_value = frozenset()
+        repository.fetch_session_spec_context.return_value = _spec_context(image_id)
+
+        controller, _event_producer, _hook_plugin_ctx = _build_controller(repository)
+
+        user = _make_user()
+        with with_user(user), pytest.raises(InvalidAPIParameters):
+            await controller.enqueue_session_from_draft(draft)
+
+        repository.fetch_session_spec_context.assert_not_called()
+        repository.enqueue_session_from_spec.assert_not_called()
+
+    async def test_access_check_uses_spec_identity_access_key(
+        self,
+        draft: SessionSpecDraft,
+        image_id: ImageID,
+    ) -> None:
+        repository = AsyncMock()
+        repository.query_accessible_resource_group_ids.return_value = frozenset({
+            draft.scope.resource_group_id
+        })
+        repository.fetch_session_spec_context.return_value = _spec_context(image_id)
+        repository.enqueue_session_from_spec.return_value = SessionID(uuid.uuid4())
+
+        controller, _event_producer, _hook_plugin_ctx = _build_controller(repository)
+
+        user = _make_user()
+        with with_user(user):
+            await controller.enqueue_session_from_draft(draft)
+
+        repository.query_accessible_resource_group_ids.assert_awaited_once()
+        assert (
+            repository.query_accessible_resource_group_ids.await_args.kwargs["access_key"]
+            == draft.resource_spec.identity.access_key
+        )

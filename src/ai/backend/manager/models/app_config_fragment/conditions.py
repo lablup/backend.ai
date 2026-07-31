@@ -9,7 +9,10 @@ from datetime import datetime
 import sqlalchemy as sa
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
+from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
@@ -73,6 +76,15 @@ class AppConfigFragmentConditions:
     by_config_name_in = staticmethod(make_string_in_factory(AppConfigFragmentRow.config_name))
 
     @staticmethod
+    def by_ids(fragment_ids: Sequence[AppConfigFragmentID]) -> QueryCondition:
+        """Fragments whose id is one of ``fragment_ids``, for batch loading by id."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigFragmentRow.id.in_(list(fragment_ids))
+
+        return inner
+
+    @staticmethod
     def by_config_names(config_names: Sequence[str]) -> QueryCondition:
         """Fragments whose ``config_name`` is one of ``config_names``.
 
@@ -118,9 +130,12 @@ class AppConfigFragmentConditions:
     # --- scope_id filter ---
 
     @staticmethod
-    def by_scope_id_equals(scope_id: str) -> QueryCondition:
+    def by_scope_id_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return AppConfigFragmentRow.scope_id == scope_id
+            condition = AppConfigFragmentRow.scope_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -136,19 +151,19 @@ class AppConfigFragmentConditions:
         return inner
 
     @staticmethod
-    def by_domain_visibility(domain: str) -> QueryCondition:
-        """The ``domain`` scope for ``domain``."""
+    def by_domain_visibility(domain_id: DomainID) -> QueryCondition:
+        """The ``domain`` scope for ``domain_id``."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.and_(
                 AppConfigFragmentRow.scope_type == AppConfigScopeType.DOMAIN,
-                AppConfigFragmentRow.scope_id == domain,
+                AppConfigFragmentRow.scope_id == domain_id,
             )
 
         return inner
 
     @staticmethod
-    def by_user_visibility(user_id: str) -> QueryCondition:
+    def by_user_visibility(user_id: UserID) -> QueryCondition:
         """The ``user`` scope for ``user_id``."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:

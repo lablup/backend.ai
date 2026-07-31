@@ -86,7 +86,7 @@ async def _make_agent(
 
 
 class TestScalingGroupQueries:
-    """Tests for get_all_scaling_groups."""
+    """Tests for get_all_resource_groups."""
 
     @pytest.fixture
     async def db_with_cleanup(
@@ -157,12 +157,12 @@ class TestScalingGroupQueries:
     ) -> None:
         """Regression for BA-5629.
 
-        ``get_all_scaling_groups()`` must return all defined resource groups,
+        ``get_all_resource_groups()`` must return all defined resource groups,
         even when they have no ALIVE, schedulable, or any agents, so that coordinator
         promotion and termination checks still visit sessions pinned there.
         """
         db_source = ScheduleDBSource(db_with_cleanup)
-        resource_group_ids = set(await db_source.get_all_scaling_groups())
+        resource_group_ids = set(await db_source.get_all_resource_groups())
 
         assert mixed_agents_scenario.schedulable in resource_group_ids
         assert mixed_agents_scenario.unschedulable in resource_group_ids

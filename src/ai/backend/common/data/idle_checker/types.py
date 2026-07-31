@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import enum
+from decimal import Decimal
 from typing import Self
 
 from pydantic import Field, model_validator
 
+from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.types import BackendAISchema
 
 
@@ -16,25 +18,61 @@ class CheckerType(enum.StrEnum):
     UTILIZATION = "utilization"
 
 
-class SessionLifetimeSpec(BackendAISchema):
-    """Config for ``CheckerType.SESSION_LIFETIME``.
+class IdleCheckPhase(enum.StrEnum):
+    NOT_CHECKED = "not_checked"
+    READY_TO_CHECK = "ready_to_check"
+    ACTIVE = "active"
+    IDLE = "idle"
+    IDLE_EXPIRED = "idle_expired"
 
-    Concrete fields (e.g. max lifetime) land with the checker-logic stories.
-    """
+
+class UtilizationThresholdEntry(BackendAISchema):
+    """One preset-backed session utilization threshold."""
+
+    preset_id: PrometheusQueryPresetID = Field(
+        description="Prometheus query preset used to evaluate utilization."
+    )
+    threshold: Decimal = Field(
+        description="Underutilization threshold compared against the preset's query result.",
+    )
+
+
+class SessionLifetimeSpec(BackendAISchema):
+    """Config for ``CheckerType.SESSION_LIFETIME``."""
+
+    max_lifetime_seconds: int = Field(
+        ge=1,
+        description=(
+            "Maximum time in seconds that a session may remain running. "
+            "This is the sole lifetime limit used by the reconciler idle checker."
+        ),
+    )
 
 
 class NetworkTimeoutSpec(BackendAISchema):
-    """Config for ``CheckerType.NETWORK_TIMEOUT``.
+    """Config for ``CheckerType.NETWORK_TIMEOUT``."""
 
-    Concrete fields land with the checker-logic stories.
-    """
+    max_network_inactivity_seconds: int = Field(
+        ge=1,
+        description=(
+            "Maximum time in seconds that an interactive session may have neither recent "
+            "network access nor an active connection."
+        ),
+    )
 
 
 class UtilizationSpec(BackendAISchema):
-    """Config for ``CheckerType.UTILIZATION``.
+    """Config for ``CheckerType.UTILIZATION``."""
 
-    Concrete fields land with the checker-logic stories.
-    """
+    max_underutilized_duration_seconds: int = Field(
+        ge=1,
+        description=(
+            "Maximum duration that the configured utilization conditions may remain satisfied."
+        ),
+    )
+    threshold: UtilizationThresholdEntry = Field(
+        description="Preset-backed utilization threshold evaluated for the session.",
+    )
 
 
 class IdleCheckerSpec(BackendAISchema):

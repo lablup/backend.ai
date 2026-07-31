@@ -23,7 +23,6 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
 )
 from ai.backend.common.dto.manager.v2.resource_group.types import (
     PreemptionModeDTO,
-    PreemptionOrderDTO,
     SchedulerTypeDTO,
 )
 from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum
@@ -36,11 +35,13 @@ from ai.backend.common.dto.manager.v2.session_options.types import (
     AgentSelectionPolicyEnum,
     FailurePolicyEnum,
 )
+from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.types import PreemptionOrder
 
 
 def _make_resource_group_node(name: str = "test-group") -> ResourceGroupNode:
     return ResourceGroupNode(
-        id=uuid.uuid4(),
+        id=ResourceGroupID(uuid.uuid4()),
         name=name,
         domain_name="default",
         description="A test resource group",
@@ -56,9 +57,9 @@ def _make_resource_group_node(name: str = "test-group") -> ResourceGroupNode:
 
 def _make_resource_group_detail_node(name: str = "test-group") -> ResourceGroupDetailNode:
     return ResourceGroupDetailNode(
-        id=name,
+        id=ResourceGroupID(uuid.uuid4()),
         name=name,
-        status=ResourceGroupStatusInfo(is_active=True, is_public=True),
+        status=ResourceGroupStatusInfo(is_active=True, is_public=True, is_default=False),
         metadata=ResourceGroupMetadataInfo(
             description="A test resource group",
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
@@ -72,7 +73,7 @@ def _make_resource_group_detail_node(name: str = "test-group") -> ResourceGroupD
             preemption=PreemptionConfigInfo(
                 enabled=False,
                 preemptible_priority=5,
-                order=PreemptionOrderDTO.OLDEST,
+                order=PreemptionOrder.OLDEST,
                 mode=PreemptionModeDTO.TERMINATE,
                 preemption_min_runtime=0.0,
             ),
@@ -169,11 +170,12 @@ class TestDeleteResourceGroupPayload:
     """Tests for DeleteResourceGroupPayload model."""
 
     def test_valid_creation(self) -> None:
-        payload = DeleteResourceGroupPayload(id="test-group")
-        assert payload.id == "test-group"
+        rg_id = ResourceGroupID(uuid.uuid4())
+        payload = DeleteResourceGroupPayload(id=rg_id)
+        assert payload.id == rg_id
 
     def test_round_trip(self) -> None:
-        payload = DeleteResourceGroupPayload(id="test-group")
+        payload = DeleteResourceGroupPayload(id=ResourceGroupID(uuid.uuid4()))
         json_data = payload.model_dump_json()
         restored = DeleteResourceGroupPayload.model_validate_json(json_data)
         assert restored.id == payload.id

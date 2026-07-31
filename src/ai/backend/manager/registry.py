@@ -30,7 +30,7 @@ from dateutil.parser import isoparse
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only, noload, selectinload
+from sqlalchemy.orm import noload, selectinload
 from typeguard import check_type
 from yarl import URL
 
@@ -45,7 +45,7 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import ModelHealthCheck
-from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
+from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import (
     CodeCompletionResp,
@@ -72,6 +72,7 @@ from ai.backend.common.identifier.domain import DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.plugin.hook import HookPluginContext
@@ -111,11 +112,13 @@ from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
     KernelResourceInput,
+    ResourceSpecDraft,
     SchedulingTargetDraft,
     SessionClassificationDraft,
     SessionIdentityDraft,
     SessionNetworkDraft,
     SessionOptionsDraft,
+    SessionResourceSpecDraft,
     SessionScopeDraft,
     SessionSpecDraft,
 )
@@ -169,8 +172,6 @@ from .models.runtime_variant.row import RuntimeVariantRow
 from .models.scaling_group import query_allowed_sgroups, scaling_groups
 from .models.session import (
     PRIVATE_SESSION_TYPES,
-    USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
-    ConcurrencyUsed,
     KernelLoadingStrategy,
     SessionRow,
     handle_session_exception,
@@ -277,7 +278,9 @@ class AgentRegistry:
         if not resources:
             return ()
         return tuple(
-            ResourceSlotEntry(resource_type=str(k), quantity=str(parse_quantity(v)))
+            ResourceSlotEntry(
+                resource_type=ResourceSlotName(str(k)), quantity=str(parse_quantity(v))
+            )
             for k, v in resources.items()
         )
 
@@ -441,6 +444,7 @@ class AgentRegistry:
         enqueue_only: bool = False,
         max_wait_seconds: int = 0,
         priority: int = SESSION_PRIORITY_DEFAULT,
+        job_priority: int = JOB_PRIORITY_DEFAULT,
         is_preemptible: bool = True,
         bootstrap_script: str | None = None,
         dependencies: list[uuid.UUID] | None = None,
@@ -584,7 +588,9 @@ class AgentRegistry:
                 starts_at = isoparse(starts_at_timestamp)
             except ValueError:
                 _td = str_to_timedelta(starts_at_timestamp)
-                starts_at = datetime.now(tzutc()) + _td
+                # Resolve the relative offset against DB time so the base
+                # point is consistent across managers (HA clock-skew safety)
+                starts_at = await self._scheduler_repository.get_db_now() + _td
 
         if cluster_size > 1:
             log.debug(" -> cluster_mode:{} (replicate)", cluster_mode)
@@ -647,6 +653,7 @@ class AgentRegistry:
                         resource_policy,
                         user_scope=user_scope,
                         priority=priority,
+                        job_priority=job_priority,
                         is_preemptible=is_preemptible,
                         cluster_mode=cluster_mode,
                         cluster_size=cluster_size,
@@ -981,6 +988,7 @@ class AgentRegistry:
         *,
         user_scope: UserScope,
         priority: int,
+        job_priority: int,
         public_sgroup_only: bool,
         cluster_mode: ClusterMode,
         cluster_size: int,
@@ -1142,12 +1150,38 @@ class AgentRegistry:
             )
 
         draft = SessionSpecDraft(
-            identity=SessionIdentityDraft(
-                session_id=SessionID(uuid.uuid4()),
-                creation_id=session_creation_id,
-                session_name=session_name,
-                access_key=access_key,
-                user_uuid=user_scope.user_uuid,
+            resource_spec=SessionResourceSpecDraft(
+                identity=SessionIdentityDraft(
+                    session_id=SessionID(uuid.uuid4()),
+                    creation_id=session_creation_id,
+                    session_name=session_name,
+                    access_key=access_key,
+                    user_uuid=user_scope.user_uuid,
+                ),
+                classification=SessionClassificationDraft(
+                    session_type=session_type,
+                    tag=session_tag,
+                ),
+                network=SessionNetworkDraft(network_id=network_id),
+                callback_url=callback_url,
+                dependencies=dependencies,
+                resource=ResourceSpecDraft(
+                    options=SessionOptionsDraft(
+                        priority=priority,
+                        job_priority=job_priority,
+                        is_preemptible=is_preemptible,
+                        cluster_mode=cluster_mode,
+                        cluster_size=cluster_size,
+                        scheduling_target=SchedulingTargetDraft(
+                            designated_agents=tuple(AgentId(a) for a in (agent_list or ())),
+                        ),
+                        kernel_groups=tuple(groups_by_role.values()),
+                        handler_options=None,
+                    ),
+                ),
+                internal_data_extras=InternalDataExtras(
+                    sudo_session_enabled=sudo_session_enabled,
+                ),
             ),
             scope=SessionScopeDraft(
                 domain_id=domain_id,
@@ -1155,27 +1189,6 @@ class AgentRegistry:
                 project_id=ProjectID(user_scope.group_id),
                 resource_group_id=resource_group_id,
                 resource_group_name=resource_group_name,
-            ),
-            classification=SessionClassificationDraft(
-                session_type=session_type,
-                tag=session_tag,
-            ),
-            network=SessionNetworkDraft(network_id=network_id),
-            callback_url=callback_url,
-            dependencies=dependencies,
-            options=SessionOptionsDraft(
-                priority=priority,
-                is_preemptible=is_preemptible,
-                cluster_mode=cluster_mode,
-                cluster_size=cluster_size,
-                scheduling_target=SchedulingTargetDraft(
-                    designated_agents=tuple(AgentId(a) for a in (agent_list or ())),
-                ),
-                kernel_groups=tuple(groups_by_role.values()),
-                handler_options=None,
-            ),
-            internal_data_extras=InternalDataExtras(
-                sudo_session_enabled=sudo_session_enabled,
             ),
         )
 
@@ -1193,6 +1206,7 @@ class AgentRegistry:
         *,
         user_scope: UserScope,
         priority: int = SESSION_PRIORITY_DEFAULT,
+        job_priority: int = JOB_PRIORITY_DEFAULT,
         is_preemptible: bool = True,
         public_sgroup_only: bool = True,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
@@ -1219,6 +1233,7 @@ class AgentRegistry:
             resource_policy=resource_policy,
             user_scope=user_scope,
             priority=priority,
+            job_priority=job_priority,
             is_preemptible=is_preemptible,
             public_sgroup_only=public_sgroup_only,
             cluster_mode=cluster_mode,
@@ -1392,47 +1407,12 @@ class AgentRegistry:
 
         return await execute_with_retry(_query)
 
-    async def update_scaling_group(self, agent_id: AgentId, scaling_group: str) -> None:
-        verified_agent_id = await self.get_instance(agent_id)
-        async with self._agent_client_pool.acquire(verified_agent_id) as client:
-            await client.update_scaling_group(scaling_group)
+    async def recalc_resource_usage(self) -> None:
+        """Reconcile normalized resource records against actual kernel state.
 
-    async def recalc_resource_usage(self, do_fullscan: bool = False) -> None:
-        async def _recalc() -> Mapping[AccessKey, ConcurrencyUsed]:
-            access_key_to_concurrency_used: dict[AccessKey, ConcurrencyUsed] = {}
-
-            async with self.db.begin_session() as db_sess:
-                # Query running containers and calculate concurrency_used per AK.
-                # Agent occupied slots are now managed by the normalized
-                # agent_resources table, so only concurrency tracking remains here.
-                session_query = (
-                    sa.select(SessionRow)
-                    .where(SessionRow.status.in_(USER_RESOURCE_OCCUPYING_SESSION_STATUSES))
-                    .options(
-                        load_only(
-                            SessionRow.id,
-                            SessionRow.access_key,
-                            SessionRow.status,
-                            SessionRow.session_type,
-                        ),
-                    )
-                )
-                async for session_row in await db_sess.stream_scalars(session_query):
-                    access_key = cast(AccessKey, session_row.access_key)
-                    if access_key not in access_key_to_concurrency_used:
-                        access_key_to_concurrency_used[access_key] = ConcurrencyUsed(access_key)
-                    if session_row.session_type in PRIVATE_SESSION_TYPES:
-                        access_key_to_concurrency_used[access_key].system_session_ids.add(
-                            session_row.id
-                        )
-                    else:
-                        access_key_to_concurrency_used[access_key].compute_session_ids.add(
-                            session_row.id
-                        )
-            return access_key_to_concurrency_used
-
-        access_key_to_concurrency_used = await execute_with_retry(_recalc)
-        await self._update_concurrency(access_key_to_concurrency_used, do_fullscan)
+        Concurrency is counted directly from the database wherever it is
+        consumed, so only the agent_resources reconciliation remains here.
+        """
         await self._reconcile_agent_resources()
 
     async def _reconcile_agent_resources(self) -> None:
@@ -1464,44 +1444,6 @@ class AgentRegistry:
                 d.tracked,
                 d.actual,
             )
-
-    async def _update_concurrency(
-        self,
-        access_key_to_concurrency_used: Mapping[AccessKey, ConcurrencyUsed],
-        do_fullscan: bool,
-    ) -> None:
-        """Update concurrency values in valkey based on the current state."""
-        # Do full scan if the entire system does not have ANY sessions/sftp-sessions
-        # to set all concurrency_used to 0
-        _do_fullscan = do_fullscan or not access_key_to_concurrency_used
-        if _do_fullscan:
-            # Convert ConcurrencyUsed objects to simple access_key -> count mapping
-            # For fullscan, we need both compute and system concurrency counts
-            access_key_to_count = {
-                str(ak): len(concurrency.compute_session_ids)
-                for ak, concurrency in access_key_to_concurrency_used.items()
-            }
-            await self.valkey_stat.update_concurrency_by_fullscan(access_key_to_count)
-        else:
-            # Update keypair resource usage for keypairs with running containers.
-            # Prepare separate maps for compute and system concurrency
-            compute_concurrency_map = {}
-            system_concurrency_map = {}
-            for concurrency in access_key_to_concurrency_used.values():
-                compute_concurrency_map[str(concurrency.access_key)] = len(
-                    concurrency.compute_session_ids
-                )
-                system_concurrency_map[str(concurrency.access_key)] = len(
-                    concurrency.system_session_ids
-                )
-
-            # Update compute concurrency
-            if compute_concurrency_map:
-                await self.valkey_stat.update_compute_concurrency_by_map(compute_concurrency_map)
-
-            # Update system concurrency
-            if system_concurrency_map:
-                await self.valkey_stat.update_system_concurrency_by_map(system_concurrency_map)
 
     async def clean_session(
         self,

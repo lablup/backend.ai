@@ -32,7 +32,7 @@ class RuntimeVariantRow(Base):  # type: ignore[misc]
     )
     default_model_definition: Mapped[ModelDefinitionDraft] = mapped_column(
         "default_model_definition",
-        PydanticColumn(ModelDefinitionDraft),
+        PydanticColumn(ModelDefinitionDraft, exclude_unset=True),
         nullable=False,
     )
 

@@ -4,6 +4,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.identifier.replica_group_history import ReplicaGroupHistoryID
 from ai.backend.manager.data.deployment.types import (
     ReplicaGroupHandlerCategory,
     ReplicaGroupHistoryData,
@@ -36,7 +37,7 @@ class ReplicaGroupHistoryRow(ReconcileHistoryMixin, Base):  # type: ignore[misc]
 
     def to_data(self) -> ReplicaGroupHistoryData:
         return ReplicaGroupHistoryData(
-            id=self.id,
+            id=ReplicaGroupHistoryID(self.id),
             replica_group_id=self.replica_group_id,
             deployment_id=self.deployment_id,
             category=self.category,

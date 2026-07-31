@@ -184,6 +184,9 @@ def keypair_get(name: str) -> None:
     "--max-pending-session-count", type=int, default=None, help="Maximum pending sessions."
 )
 @click.option(
+    "--max-priority", type=int, default=None, help="Highest priority a session may declare."
+)
+@click.option(
     "--total-resource-slots",
     type=str,
     default=None,
@@ -212,6 +215,7 @@ def keypair_create(
     max_session_lifetime: int | None,
     max_concurrent_sftp_sessions: int | None,
     max_pending_session_count: int | None,
+    max_priority: int | None,
     total_resource_slots: str | None,
     allowed_vfolder_hosts: str | None,
     json_str: str | None,
@@ -255,6 +259,8 @@ def keypair_create(
         opts["max_concurrent_sftp_sessions"] = max_concurrent_sftp_sessions
     if max_pending_session_count is not None:
         opts["max_pending_session_count"] = max_pending_session_count
+    if max_priority is not None:
+        opts["max_priority"] = max_priority
     if total_resource_slots is not None:
         opts["total_resource_slots"] = json.loads(total_resource_slots)
     if allowed_vfolder_hosts is not None:
@@ -295,6 +301,7 @@ def keypair_create(
 @click.option(
     "--max-pending-session-count", type=int, default=None, help="Updated max pending sessions."
 )
+@click.option("--max-priority", type=int, default=None, help="Updated max priority.")
 @click.option("--json", "json_str", default=None, help="Full update input as JSON string.")
 @click.option(
     "--file",
@@ -311,6 +318,7 @@ def keypair_update(
     max_session_lifetime: int | None,
     max_concurrent_sftp_sessions: int | None,
     max_pending_session_count: int | None,
+    max_priority: int | None,
     json_str: str | None,
     file_path: str | None,
 ) -> None:
@@ -328,6 +336,7 @@ def keypair_update(
         max_session_lifetime=max_session_lifetime,
         max_concurrent_sftp_sessions=max_concurrent_sftp_sessions,
         max_pending_session_count=max_pending_session_count,
+        max_priority=max_priority,
     )
 
     dto = _build_dto(UpdateKeypairResourcePolicyInput, data)

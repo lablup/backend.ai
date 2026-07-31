@@ -155,7 +155,7 @@ class ContainerRegistryRepository:
 
             if result is None:
                 raise ContainerRegistryNotFound(
-                    f"Container registry not found (id:{purger.pk_value})"
+                    f"Container registry not found (id:{purger.spec.pk_value()})"
                 )
 
             return result.row.to_dataclass()

@@ -99,6 +99,7 @@ from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
+from ai.backend.common.networking import force_threaded_dns_resolver
 from ai.backend.common.service_discovery.event_publisher import ServiceDiscoveryEventPublisher
 from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
     RedisServiceDiscovery,
@@ -1173,6 +1174,7 @@ def main(ctx: click.Context, config_path: Path | None, debug: bool, log_level: L
     """
     Start the proxy-coordinator service as a foreground process.
     """
+    force_threaded_dns_resolver()
     log_level = LogLevel.DEBUG if debug else log_level
     server_config = load_config(config_path, log_level)
 

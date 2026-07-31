@@ -46,10 +46,9 @@ class AgentEtcdDependency(DependencyProvider[AgentUnifiedConfig, AsyncEtcd]):
                 "password": setup_input.etcd.password,
             }
 
-        # Build scope prefix map (same as server.py lines 1352-1356)
+        # Build scope prefix map (same as server.py's etcd_ctx)
         scope_prefix_map = {
             ConfigScopes.GLOBAL: "",
-            ConfigScopes.SGROUP: f"sgroup/{setup_input.agent.scaling_group}",
             ConfigScopes.NODE: f"nodes/agents/{setup_input.agent.id}",
         }
 

@@ -1,19 +1,22 @@
 import asyncio
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, override
 
 import pytest
 from typeguard import TypeCheckError
 
+from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.exception import (
     BackendAISchemaValidationFailed,
     InvalidResourceSlotQuantity,
     UnknownResourceSlotType,
 )
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
+    REDIS_PASSWORD_MASK,
     BinarySize,
     DefaultForUnspecified,
     HardwareMetadata,
@@ -26,6 +29,7 @@ from ai.backend.common.types import (
     _stringify_number,
     aobject,
     check_typed_dict,
+    safe_print_redis_config,
 )
 
 
@@ -591,7 +595,11 @@ class TestResourceSlotEntryToResourceSlot:
         """Plain decimals and human-readable sizes such as ``"4g"`` for a memory
         slot are parsed with BinarySize tolerance, matching the legacy enqueue
         path, instead of raising and surfacing as a 500."""
-        entries = [ResourceSlotEntry(resource_type=case.resource_type, quantity=case.quantity)]
+        entries = [
+            ResourceSlotEntry(
+                resource_type=ResourceSlotName(case.resource_type), quantity=case.quantity
+            )
+        ]
         assert ResourceSlotEntry.inputs_to_resource_slot(entries) == ResourceSlot({
             case.resource_type: case.expected
         })
@@ -609,14 +617,16 @@ class TestResourceSlotEntryToResourceSlot:
         """A non-parseable or negative quantity is rejected with a 4xx
         ``InvalidResourceSlotQuantity`` (BackendAIError) rather than letting
         ``decimal.InvalidOperation`` propagate as an unhandled 500."""
-        entries = [ResourceSlotEntry(resource_type=resource_type, quantity=quantity)]
+        entries = [
+            ResourceSlotEntry(resource_type=ResourceSlotName(resource_type), quantity=quantity)
+        ]
         with pytest.raises(InvalidResourceSlotQuantity):
             ResourceSlotEntry.inputs_to_resource_slot(entries)
 
     def test_multiple_entries_are_merged(self) -> None:
         entries = [
-            ResourceSlotEntry(resource_type="cpu", quantity="2"),
-            ResourceSlotEntry(resource_type="mem", quantity="4g"),
+            ResourceSlotEntry(resource_type=ResourceSlotName("cpu"), quantity="2"),
+            ResourceSlotEntry(resource_type=ResourceSlotName("mem"), quantity="4g"),
         ]
         assert ResourceSlotEntry.inputs_to_resource_slot(entries) == ResourceSlot({
             "cpu": Decimal("2"),
@@ -625,3 +635,65 @@ class TestResourceSlotEntryToResourceSlot:
 
     def test_empty_entries(self) -> None:
         assert ResourceSlotEntry.inputs_to_resource_slot([]) == ResourceSlot()
+
+
+@dataclass(frozen=True)
+class _RedisMaskingCase:
+    label: str
+    raw_config: dict[str, Any]
+    leaked_secrets: list[str] = field(default_factory=list)
+    expected_mask_count: int = 0
+
+
+class TestSafePrintRedisConfig:
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _RedisMaskingCase(
+                label="no-credentials",
+                raw_config={"addr": "127.0.0.1:6379"},
+            ),
+            _RedisMaskingCase(
+                label="password",
+                raw_config={"addr": "127.0.0.1:6379", "password": "s3cr3t"},
+                leaked_secrets=["s3cr3t"],
+                expected_mask_count=1,
+            ),
+            _RedisMaskingCase(
+                label="sentinel-password",
+                raw_config={
+                    "sentinel": ["127.0.0.1:26379"],
+                    "service_name": "mymaster",
+                    "password": "s3cr3t",
+                    "sentinel_password": "s3ntin3l",
+                },
+                leaked_secrets=["s3cr3t", "s3ntin3l"],
+                expected_mask_count=2,
+            ),
+            _RedisMaskingCase(
+                label="override-configs",
+                raw_config={
+                    "addr": "127.0.0.1:6379",
+                    "password": "s3cr3t",
+                    "override_configs": {
+                        "stream": {
+                            "addr": "127.0.0.1:6380",
+                            "password": "0verr1de",
+                            "sentinel_password": "0verr1de-s3ntin3l",
+                        },
+                    },
+                },
+                leaked_secrets=["s3cr3t", "0verr1de", "0verr1de-s3ntin3l"],
+                expected_mask_count=3,
+            ),
+        ],
+        ids=lambda case: case.label,
+    )
+    def test_passwords_are_masked(self, case: _RedisMaskingCase) -> None:
+        redis_config = RedisConfig.model_validate(case.raw_config)
+        printed = safe_print_redis_config(redis_config)
+        for secret in case.leaked_secrets:
+            assert secret not in printed
+            # The helper masks a copy; the caller's config keeps its credentials.
+            assert secret in str(redis_config)
+        assert printed.count(REDIS_PASSWORD_MASK) == case.expected_mask_count

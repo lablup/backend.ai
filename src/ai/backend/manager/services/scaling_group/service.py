@@ -325,7 +325,7 @@ class ScalingGroupService:
         """
         # 1. Get existing scaling group (raises ScalingGroupNotFound if not found)
         existing_sg = await self._repository.get_scaling_group_by_name(action.resource_group)
-        existing_spec = existing_sg.fair_share_spec or FairShareScalingGroupSpec()
+        existing_spec = existing_sg.fair_share_spec
 
         # 2. Get ResourceInfo for capacity
         resource_info = await self._repository.get_resource_info(action.resource_group)

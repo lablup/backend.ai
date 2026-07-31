@@ -153,8 +153,11 @@ class AdminHandler:
             ),
         )
         if result.errors:
+            # Severity-classified logging is done by GQLExceptionMiddleware;
+            # keep a debug trace here for errors that bypass resolvers
+            # (e.g. query parse/validation errors).
             for e in result.errors:
-                log.error("ADMIN.GQL Exception: {}", e.formatted)
+                log.debug("ADMIN.GQL Exception: {}", e.formatted)
                 log.debug("{}", "".join(traceback.format_exception(e)))
         return result
 
@@ -189,10 +192,7 @@ class AdminHandler:
         params = body.parsed
         result = await self._handle_gql_common(request_ctx, params)
         if result.errors:
-            errors = []
-            for e in result.errors:
-                errors.append(e.formatted)
-                log.error("ADMIN.GQL Exception: {}", e.formatted)
+            errors = [e.formatted for e in result.errors]
             raise BackendGQLError(extra_data=errors)
         resp = GraphQLResponse(data=result.data)
         return APIResponse.build(HTTPStatus.OK, resp)

@@ -17,16 +17,25 @@ from ai.backend.common.data.filter_specs import (
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.manager.data.deployment.types import DeploymentLifecycleSubStep
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.condition_utils import make_string_in_factory
+from ai.backend.manager.models.condition_utils import make_correlated_exists, make_string_in_factory
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
     EndpointRow,
     EndpointTokenRow,
 )
+from ai.backend.manager.models.routing import RoutingRow
 
 
 class DeploymentConditions:
     """Query conditions for deployments."""
+
+    by_replica_exists = staticmethod(
+        make_correlated_exists(
+            child_row=RoutingRow,
+            correlate_row=EndpointRow,
+            join_predicate=RoutingRow.endpoint == EndpointRow.id,
+        )
+    )
 
     @staticmethod
     def by_ids(deployment_ids: Collection[DeploymentID]) -> QueryCondition:

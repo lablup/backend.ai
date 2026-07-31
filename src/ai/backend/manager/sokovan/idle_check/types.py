@@ -16,7 +16,10 @@ from ai.backend.manager.data.reconciler.types import (
 )
 from ai.backend.manager.data.session.options import HandlerPolicyResolver
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.repositories.idle_checker.types import IdleCheckBatchData
+from ai.backend.manager.repositories.idle_checker.types import (
+    IdleCheckBatchData,
+    IdleJudgmentData,
+)
 from ai.backend.manager.sokovan.reconciler.base import (
     BaseReconcilerInfo,
     BaseReconcilerKind,
@@ -27,7 +30,8 @@ from ai.backend.manager.sokovan.reconciler.base import (
 
 
 class IdleCheckCategory(BaseReconcilerCategory):
-    IDLE = "idle"
+    IDLE_CHECK = "idle_check"
+    SESSION_IDLE_CHECK = "session_idle_check"
 
 
 class IdleCheckKind(BaseReconcilerKind):
@@ -46,7 +50,8 @@ class IdleCheckReconcileInfo(BaseReconcilerInfo):
 
     @override
     def entity_ids(self) -> Sequence[UUID]:
-        return [target.session.session_id for target in self.batch.targets]
+        session_ids = (assignment.session.session_id for assignment in self.batch.assignments)
+        return list(dict.fromkeys(session_ids))
 
     @override
     def now(self) -> datetime:
@@ -79,11 +84,11 @@ class IdleCheckDecision(ReconcilerDecision):
 
 @dataclass
 class IdleCheckResult(BaseReconcilerResult):
-    idle_session_ids: list[SessionId] = field(default_factory=list)
+    judgments: list[IdleJudgmentData] = field(default_factory=list)
 
     @override
     def processed_count(self) -> int:
-        return len(self.idle_session_ids)
+        return len(self.judgments)
 
     @override
     def failed_count(self) -> int:
@@ -91,5 +96,4 @@ class IdleCheckResult(BaseReconcilerResult):
 
     @override
     def decisions(self) -> Sequence[ReconcilerDecision]:
-        # Idle output is a termination list, not per-entity retryable outcomes.
         return ()

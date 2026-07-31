@@ -8,7 +8,12 @@ from strawberry.dataloader import DataLoader
 
 from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
 from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
+from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.idle_checker import IdleCheckerID
+from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId, ImageID, KernelId, SessionId
 from ai.backend.manager.data.permission.id import ObjectId
 
@@ -21,6 +26,9 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.api.gql.app_config_definition.types import (  # pants: no-infer-dep
         AppConfigDefinitionGQL,
+    )
+    from ai.backend.manager.api.gql.app_config_fragment.types import (  # pants: no-infer-dep
+        AppConfigFragmentGQL,
     )
     from ai.backend.manager.api.gql.artifact.types import (  # pants: no-infer-dep
         ArtifactRevision,
@@ -58,6 +66,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.huggingface_registry import (  # pants: no-infer-dep
         HuggingFaceRegistry,
     )
+    from ai.backend.manager.api.gql.idle_checker.types import IdleCheckerGQL  # pants: no-infer-dep
     from ai.backend.manager.api.gql.image.types import (  # pants: no-infer-dep
         ImageV2AliasGQL,
         ImageV2GQL,
@@ -102,6 +111,7 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.api.gql.scheduling_history.types import (  # pants: no-infer-dep
         DeploymentHistory,
+        KernelSchedulingHistoryGQL,
         RouteHistory,
         SessionSchedulingHistory,
     )
@@ -167,6 +177,40 @@ class DataLoaders:
         return DataLoader(load_fn=load_fn)
 
     @cached_property
+    def app_config_fragment_loader(
+        self,
+    ) -> DataLoader[AppConfigFragmentID, AppConfigFragmentGQL | None]:
+        adapter = self._adapters.app_config_fragment
+
+        async def load_fn(
+            ids: list[AppConfigFragmentID],
+        ) -> list[AppConfigFragmentGQL | None]:
+            from ai.backend.manager.api.gql.app_config_fragment.types import (  # pants: no-infer-dep
+                AppConfigFragmentGQL as ACF,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [ACF.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def idle_checker_loader(
+        self,
+    ) -> DataLoader[IdleCheckerID, IdleCheckerGQL | None]:
+        adapter = self._adapters.idle_checker
+
+        async def load_fn(ids: list[IdleCheckerID]) -> list[IdleCheckerGQL | None]:
+            from ai.backend.manager.api.gql.idle_checker.types import (  # pants: no-infer-dep
+                IdleCheckerGQL as IC,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [IC.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
     def audit_log_loader(
         self,
     ) -> DataLoader[uuid.UUID, AuditLogV2GQL | None]:
@@ -194,6 +238,22 @@ class DataLoaders:
             )
 
             dtos = await adapter.batch_load_by_names(names)
+            return [RG.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def resource_group_by_id_loader(
+        self,
+    ) -> DataLoader[ResourceGroupID, ResourceGroupGQL | None]:
+        adapter = self._adapters.resource_group
+
+        async def load_fn(ids: list[ResourceGroupID]) -> list[ResourceGroupGQL | None]:
+            from ai.backend.manager.api.gql.resource_group.types import (  # pants: no-infer-dep
+                ResourceGroupGQL as RG,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
             return [RG.from_pydantic(dto) if dto is not None else None for dto in dtos]
 
         return DataLoader(load_fn=load_fn)
@@ -623,6 +683,22 @@ class DataLoaders:
         return DataLoader(load_fn=load_fn)
 
     @cached_property
+    def domain_by_id_loader(
+        self,
+    ) -> DataLoader[DomainID, DomainV2GQL | None]:
+        adapter = self._adapters.domain
+
+        async def load_fn(ids: list[DomainID]) -> list[DomainV2GQL | None]:
+            from ai.backend.manager.api.gql.domain_v2.types.node import (  # pants: no-infer-dep
+                DomainV2GQL as D,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [D.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
     def project_loader(
         self,
     ) -> DataLoader[uuid.UUID, ProjectV2GQL | None]:
@@ -715,6 +791,24 @@ class DataLoaders:
 
             dtos = await adapter.batch_load_session_histories_by_ids(ids)
             return [SSH.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def kernel_history_loader(
+        self,
+    ) -> DataLoader[KernelSchedulingHistoryID, KernelSchedulingHistoryGQL | None]:
+        adapter = self._adapters.scheduling_history
+
+        async def load_fn(
+            ids: list[KernelSchedulingHistoryID],
+        ) -> list[KernelSchedulingHistoryGQL | None]:
+            from ai.backend.manager.api.gql.scheduling_history.types import (  # pants: no-infer-dep
+                KernelSchedulingHistoryGQL as KSH,
+            )
+
+            dtos = await adapter.batch_load_kernel_histories_by_ids(ids)
+            return [KSH.from_pydantic(dto) if dto is not None else None for dto in dtos]
 
         return DataLoader(load_fn=load_fn)
 

@@ -6,13 +6,13 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 import pytest
+import sqlalchemy as sa
 
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
-    NetworkTimeoutSpec,
+    IdleCheckPhase,
     SessionLifetimeSpec,
-    UtilizationSpec,
 )
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.identifier.domain import DomainID
@@ -28,12 +28,20 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
+from ai.backend.manager.models.idle_checker.row import (
+    IdleCheckerBindingRow,
+    IdleCheckerRow,
+    SessionIdleCheckRow,
+)
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
+from ai.backend.manager.repositories.idle_checker.types import (
+    IdleJudgmentData,
+    SessionIdleCheckPair,
+)
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
@@ -48,25 +56,129 @@ class ScopeFixture:
 
 
 @dataclass(frozen=True)
-class SeededIdleCheckData:
-    resource_group_session_id: SessionId
-    project_session_id: SessionId
-    domain_session_id: SessionId
-    inference_session_id: SessionId
-    resource_group_checker_id: IdleCheckerID
-    project_checker_id: IdleCheckerID
-    domain_checker_id: IdleCheckerID
+class ExpiredCheckSessionData:
+    session_id: SessionId
+    first_checker_id: IdleCheckerID
+    second_checker_id: IdleCheckerID
+    first_expire_at: datetime
+    second_expire_at: datetime
 
 
 @dataclass(frozen=True)
-class PerTypeCheckerData:
-    interactive_session_id: SessionId
-    batch_session_id: SessionId
-    interactive_checker_id: IdleCheckerID
-    batch_checker_id: IdleCheckerID
+class JudgmentRows:
+    active_session_id: SessionId
+    idle_session_id: SessionId
+    not_checked_session_id: SessionId
+    ready_to_check_session_id: SessionId
+    idle_expired_session_id: SessionId
+    session_without_row_id: SessionId
+    terminated_session_id: SessionId
+    second_terminated_session_id: SessionId
+    checker_id: IdleCheckerID
 
 
-class TestFetchIdleCheckBatch:
+def _expired_check_scope_rows(
+    scope: ScopeFixture,
+) -> tuple[ProjectResourcePolicyRow, DomainRow, GroupRow, ScalingGroupRow]:
+    return (
+        ProjectResourcePolicyRow(
+            name=f"{scope.domain_name}-policy",
+            max_vfolder_count=10,
+            max_quota_scope_size=1024,
+            max_network_count=10,
+        ),
+        DomainRow(
+            id=scope.domain_id,
+            name=scope.domain_name,
+            description=None,
+            is_active=True,
+        ),
+        GroupRow(
+            id=scope.project_id,
+            name=f"{scope.domain_name}-project",
+            description=None,
+            is_active=True,
+            domain_name=scope.domain_name,
+            resource_policy=f"{scope.domain_name}-policy",
+        ),
+        ScalingGroupRow(
+            id=scope.scaling_group_id,
+            name=scope.scaling_group_name,
+            description=None,
+            is_active=True,
+            is_public=True,
+            driver="static",
+            driver_opts={},
+            scheduler="fifo",
+            use_host_network=False,
+        ),
+    )
+
+
+def _expired_check_session_row(
+    scope: ScopeFixture,
+    session_id: SessionId,
+    status: SessionStatus,
+) -> SessionRow:
+    return SessionRow(
+        id=session_id,
+        creation_id=str(session_id)[:32],
+        name=f"session-{session_id}",
+        session_type=SessionTypes.INTERACTIVE,
+        cluster_mode=ClusterMode.SINGLE_NODE,
+        cluster_size=1,
+        domain_name=scope.domain_name,
+        domain_id=scope.domain_id,
+        resource_group_id=scope.scaling_group_id,
+        group_id=scope.project_id,
+        user_uuid=uuid.uuid4(),
+        access_key=None,
+        tag=None,
+        status=status,
+        status_info=None,
+        status_data=None,
+        status_history={},
+        result=SessionResult.UNDEFINED,
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
+        terminated_at=None,
+        starts_at=datetime(2026, 1, 1, tzinfo=UTC),
+        startup_command=None,
+        callback_url=None,
+        occupying_slots=ResourceSlot({"cpu": "1"}),
+        requested_slots=ResourceSlot({"cpu": "1"}),
+        vfolder_mounts=[],
+        environ=None,
+        bootstrap_script=None,
+        use_host_network=False,
+        scaling_group_name=scope.scaling_group_name,
+    )
+
+
+def _expired_check_checker_row(checker_id: IdleCheckerID) -> IdleCheckerRow:
+    return IdleCheckerRow(
+        id=checker_id,
+        name=f"checker-{checker_id}",
+        description=None,
+        target_session_types=[SessionTypes.INTERACTIVE],
+        initial_grace_period_seconds=45,
+        spec=IdleCheckerSpec(
+            type=CheckerType.SESSION_LIFETIME,
+            session_lifetime=SessionLifetimeSpec(max_lifetime_seconds=3600),
+        ),
+    )
+
+
+def _expired_check_scope_fixture(prefix: str) -> ScopeFixture:
+    return ScopeFixture(
+        domain_name=f"{prefix}-domain",
+        domain_id=DomainID(uuid.uuid4()),
+        project_id=uuid.uuid4(),
+        scaling_group_name=f"{prefix}-sgroup",
+        scaling_group_id=ResourceGroupID(uuid.uuid4()),
+    )
+
+
+class TestFetchJudgmentBatch:
     @pytest.fixture
     async def database(
         self,
@@ -82,6 +194,7 @@ class TestFetchIdleCheckBatch:
                 SessionRow,
                 IdleCheckerRow,
                 IdleCheckerBindingRow,
+                SessionIdleCheckRow,
             ],
         ):
             yield database_connection
@@ -91,654 +204,764 @@ class TestFetchIdleCheckBatch:
         return IdleCheckerRepository(DBOpsProvider(database))
 
     @pytest.fixture
-    async def running_session_without_bindings(
+    async def judgment_rows(
         self,
         database: ExtendedAsyncSAEngine,
-        request: pytest.FixtureRequest,
-    ) -> SessionId:
-        prefix = str(request.param)
-        scope = ScopeFixture(
-            domain_name=f"{prefix}-domain",
-            domain_id=DomainID(uuid.uuid4()),
-            project_id=uuid.uuid4(),
-            scaling_group_name=f"{prefix}-sgroup",
-            scaling_group_id=ResourceGroupID(uuid.uuid4()),
-        )
-        session_id = SessionId(uuid.uuid4())
-        async with database.begin_session() as db_sess:
-            db_sess.add(
-                ProjectResourcePolicyRow(
-                    name=f"{scope.domain_name}-policy",
-                    max_vfolder_count=10,
-                    max_quota_scope_size=1024,
-                    max_network_count=10,
-                )
-            )
-            db_sess.add(
-                DomainRow(
-                    id=scope.domain_id,
-                    name=scope.domain_name,
-                    description=None,
-                    is_active=True,
-                )
-            )
-            db_sess.add(
-                GroupRow(
-                    id=scope.project_id,
-                    name=f"{scope.domain_name}-project",
-                    description=None,
-                    is_active=True,
-                    domain_name=scope.domain_name,
-                    resource_policy=f"{scope.domain_name}-policy",
-                )
-            )
-            db_sess.add(
-                ScalingGroupRow(
-                    id=scope.scaling_group_id,
-                    name=scope.scaling_group_name,
-                    description=None,
-                    is_active=True,
-                    is_public=True,
-                    driver="static",
-                    driver_opts={},
-                    scheduler="fifo",
-                    use_host_network=False,
-                )
-            )
-            db_sess.add(
-                SessionRow(
-                    id=session_id,
-                    creation_id=str(session_id)[:32],
-                    name=f"session-{session_id}",
-                    session_type=SessionTypes.INTERACTIVE,
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                    domain_name=scope.domain_name,
-                    domain_id=scope.domain_id,
-                    resource_group_id=scope.scaling_group_id,
-                    group_id=scope.project_id,
-                    user_uuid=uuid.uuid4(),
-                    access_key=None,
-                    tag=None,
-                    status=SessionStatus.RUNNING,
-                    status_info=None,
-                    status_data=None,
-                    status_history={},
-                    result=SessionResult.UNDEFINED,
-                    created_at=datetime(2026, 1, 1, tzinfo=UTC),
-                    terminated_at=None,
-                    starts_at=datetime(2026, 1, 1, tzinfo=UTC),
-                    startup_command=None,
-                    callback_url=None,
-                    occupying_slots=ResourceSlot({"cpu": "1"}),
-                    requested_slots=ResourceSlot({"cpu": "1"}),
-                    vfolder_mounts=[],
-                    environ=None,
-                    bootstrap_script=None,
-                    use_host_network=False,
-                    scaling_group_name=scope.scaling_group_name,
-                )
-            )
-        return session_id
-
-    @pytest.fixture
-    async def running_session_with_disabled_binding(
-        self,
-        database: ExtendedAsyncSAEngine,
-    ) -> SessionId:
-        scope = ScopeFixture(
-            domain_name="disabled-binding-domain",
-            domain_id=DomainID(uuid.uuid4()),
-            project_id=uuid.uuid4(),
-            scaling_group_name="disabled-binding-sgroup",
-            scaling_group_id=ResourceGroupID(uuid.uuid4()),
-        )
-        session_id = SessionId(uuid.uuid4())
+    ) -> JudgmentRows:
+        scope = _expired_check_scope_fixture("judgment")
+        active_session_id = SessionId(uuid.uuid4())
+        idle_session_id = SessionId(uuid.uuid4())
+        not_checked_session_id = SessionId(uuid.uuid4())
+        ready_to_check_session_id = SessionId(uuid.uuid4())
+        idle_expired_session_id = SessionId(uuid.uuid4())
+        session_without_row_id = SessionId(uuid.uuid4())
+        terminated_session_id = SessionId(uuid.uuid4())
+        second_terminated_session_id = SessionId(uuid.uuid4())
         checker_id = IdleCheckerID(uuid.uuid4())
+        session_specs = (
+            (active_session_id, SessionStatus.RUNNING),
+            (idle_session_id, SessionStatus.RUNNING),
+            (not_checked_session_id, SessionStatus.RUNNING),
+            (ready_to_check_session_id, SessionStatus.RUNNING),
+            (idle_expired_session_id, SessionStatus.RUNNING),
+            (session_without_row_id, SessionStatus.RUNNING),
+            (terminated_session_id, SessionStatus.TERMINATED),
+            (second_terminated_session_id, SessionStatus.TERMINATED),
+        )
+        check_specs = (
+            (active_session_id, IdleCheckPhase.ACTIVE),
+            (idle_session_id, IdleCheckPhase.IDLE),
+            (not_checked_session_id, IdleCheckPhase.NOT_CHECKED),
+            (ready_to_check_session_id, IdleCheckPhase.READY_TO_CHECK),
+            (idle_expired_session_id, IdleCheckPhase.IDLE_EXPIRED),
+            (terminated_session_id, IdleCheckPhase.ACTIVE),
+            (second_terminated_session_id, IdleCheckPhase.ACTIVE),
+        )
         async with database.begin_session() as db_sess:
-            db_sess.add(
-                ProjectResourcePolicyRow(
-                    name=f"{scope.domain_name}-policy",
-                    max_vfolder_count=10,
-                    max_quota_scope_size=1024,
-                    max_network_count=10,
-                )
-            )
-            db_sess.add(
-                DomainRow(
-                    id=scope.domain_id,
-                    name=scope.domain_name,
-                    description=None,
-                    is_active=True,
-                )
-            )
-            db_sess.add(
-                GroupRow(
-                    id=scope.project_id,
-                    name=f"{scope.domain_name}-project",
-                    description=None,
-                    is_active=True,
-                    domain_name=scope.domain_name,
-                    resource_policy=f"{scope.domain_name}-policy",
-                )
-            )
-            db_sess.add(
-                ScalingGroupRow(
-                    id=scope.scaling_group_id,
-                    name=scope.scaling_group_name,
-                    description=None,
-                    is_active=True,
-                    is_public=True,
-                    driver="static",
-                    driver_opts={},
-                    scheduler="fifo",
-                    use_host_network=False,
-                )
-            )
-            db_sess.add(
-                SessionRow(
-                    id=session_id,
-                    creation_id=str(session_id)[:32],
-                    name=f"session-{session_id}",
-                    session_type=SessionTypes.INTERACTIVE,
-                    cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
-                    domain_name=scope.domain_name,
-                    domain_id=scope.domain_id,
-                    resource_group_id=scope.scaling_group_id,
-                    group_id=scope.project_id,
-                    user_uuid=uuid.uuid4(),
-                    access_key=None,
-                    tag=None,
-                    status=SessionStatus.RUNNING,
-                    status_info=None,
-                    status_data=None,
-                    status_history={},
-                    result=SessionResult.UNDEFINED,
-                    created_at=datetime(2026, 1, 1, tzinfo=UTC),
-                    terminated_at=None,
-                    starts_at=datetime(2026, 1, 1, tzinfo=UTC),
-                    startup_command=None,
-                    callback_url=None,
-                    occupying_slots=ResourceSlot({"cpu": "1"}),
-                    requested_slots=ResourceSlot({"cpu": "1"}),
-                    vfolder_mounts=[],
-                    environ=None,
-                    bootstrap_script=None,
-                    use_host_network=False,
-                    scaling_group_name=scope.scaling_group_name,
-                )
-            )
-            db_sess.add(
-                IdleCheckerRow(
-                    id=checker_id,
-                    name=f"checker-{checker_id}",
-                    description=None,
-                    checker_type=CheckerType.SESSION_LIFETIME,
-                    target_session_types=[SessionTypes.INTERACTIVE, SessionTypes.BATCH],
-                    spec=IdleCheckerSpec(
-                        type=CheckerType.SESSION_LIFETIME,
-                        session_lifetime=SessionLifetimeSpec(),
-                    ),
-                )
-            )
+            for scope_row in _expired_check_scope_rows(scope):
+                db_sess.add(scope_row)
+            for session_id, status in session_specs:
+                db_sess.add(_expired_check_session_row(scope, session_id, status))
+            db_sess.add(_expired_check_checker_row(checker_id))
             await db_sess.flush()
             db_sess.add(
                 IdleCheckerBindingRow(
                     scope_type=ScopeType.DOMAIN.value,
                     scope_id=scope.domain_id,
                     idle_checker_id=checker_id,
-                    enabled=False,
+                    enabled=True,
+                )
+            )
+            for session_id, phase in check_specs:
+                db_sess.add(
+                    SessionIdleCheckRow(
+                        session_id=session_id,
+                        idle_checker_id=checker_id,
+                        expire_at=(
+                            None
+                            if phase in (IdleCheckPhase.NOT_CHECKED, IdleCheckPhase.READY_TO_CHECK)
+                            else datetime(2026, 2, 1, tzinfo=UTC)
+                        ),
+                        last_status=phase,
+                        last_message=f"{phase.value} judgment",
+                    )
+                )
+        return JudgmentRows(
+            active_session_id=active_session_id,
+            idle_session_id=idle_session_id,
+            not_checked_session_id=not_checked_session_id,
+            ready_to_check_session_id=ready_to_check_session_id,
+            idle_expired_session_id=idle_expired_session_id,
+            session_without_row_id=session_without_row_id,
+            terminated_session_id=terminated_session_id,
+            second_terminated_session_id=second_terminated_session_id,
+            checker_id=checker_id,
+        )
+
+    async def test_returns_ready_active_and_idle_rows(
+        self,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        batch = await repository.fetch_judgment_batch([SessionStatus.RUNNING])
+
+        pairs = {
+            (assignment.session.session_id, assignment.checker.checker_id)
+            for assignment in batch.assignments
+        }
+        assert pairs == {
+            (judgment_rows.ready_to_check_session_id, judgment_rows.checker_id),
+            (judgment_rows.active_session_id, judgment_rows.checker_id),
+            (judgment_rows.idle_session_id, judgment_rows.checker_id),
+        }
+        expire_at_by_session = {
+            assignment.session.session_id: assignment.session.expire_at
+            for assignment in batch.assignments
+        }
+        assert expire_at_by_session[judgment_rows.ready_to_check_session_id] is None
+        assert expire_at_by_session[judgment_rows.active_session_id] == datetime(
+            2026, 2, 1, tzinfo=UTC
+        )
+        assert expire_at_by_session[judgment_rows.idle_session_id] == datetime(
+            2026, 2, 1, tzinfo=UTC
+        )
+
+    async def test_excludes_non_judgment_phases(
+        self,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        batch = await repository.fetch_judgment_batch([SessionStatus.RUNNING])
+
+        session_ids = {assignment.session.session_id for assignment in batch.assignments}
+        assert judgment_rows.not_checked_session_id not in session_ids
+        assert judgment_rows.idle_expired_session_id not in session_ids
+
+    async def test_marks_not_checked_row_ready_to_check(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        pair = SessionIdleCheckPair(
+            judgment_rows.not_checked_session_id,
+            judgment_rows.checker_id,
+        )
+
+        await repository.batch_update_session_idle_check_phase(
+            [pair],
+            from_phase=IdleCheckPhase.NOT_CHECKED,
+            to_phase=IdleCheckPhase.READY_TO_CHECK,
+        )
+
+        async with database.begin_readonly_session() as db_sess:
+            row = await db_sess.get(
+                SessionIdleCheckRow,
+                (pair.session_id, pair.checker_id),
+            )
+        assert row is not None
+        assert row.last_status is IdleCheckPhase.READY_TO_CHECK
+        assert row.expire_at is None
+
+    async def test_does_not_overwrite_row_that_is_no_longer_not_checked(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        pair = SessionIdleCheckPair(
+            judgment_rows.active_session_id,
+            judgment_rows.checker_id,
+        )
+
+        await repository.batch_update_session_idle_check_phase(
+            [pair],
+            from_phase=IdleCheckPhase.NOT_CHECKED,
+            to_phase=IdleCheckPhase.READY_TO_CHECK,
+        )
+
+        async with database.begin_readonly_session() as db_sess:
+            row = await db_sess.get(
+                SessionIdleCheckRow,
+                (pair.session_id, pair.checker_id),
+            )
+        assert row is not None
+        assert row.last_status is IdleCheckPhase.ACTIVE
+
+    async def test_transitions_between_injected_phases(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        pair = SessionIdleCheckPair(
+            judgment_rows.active_session_id,
+            judgment_rows.checker_id,
+        )
+
+        await repository.batch_update_session_idle_check_phase(
+            [pair],
+            from_phase=IdleCheckPhase.ACTIVE,
+            to_phase=IdleCheckPhase.IDLE,
+        )
+
+        async with database.begin_readonly_session() as db_sess:
+            row = await db_sess.get(
+                SessionIdleCheckRow,
+                (pair.session_id, pair.checker_id),
+            )
+        assert row is not None
+        assert row.last_status is IdleCheckPhase.IDLE
+
+    async def test_marks_existing_row_when_batch_contains_missing_pair(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        existing_pair = SessionIdleCheckPair(
+            judgment_rows.not_checked_session_id,
+            judgment_rows.checker_id,
+        )
+        missing_pair = SessionIdleCheckPair(
+            SessionId(uuid.uuid4()),
+            judgment_rows.checker_id,
+        )
+
+        await repository.batch_update_session_idle_check_phase(
+            [existing_pair, missing_pair],
+            from_phase=IdleCheckPhase.NOT_CHECKED,
+            to_phase=IdleCheckPhase.READY_TO_CHECK,
+        )
+
+        async with database.begin_readonly_session() as db_sess:
+            row = await db_sess.get(
+                SessionIdleCheckRow,
+                (existing_pair.session_id, existing_pair.checker_id),
+            )
+            missing_row = await db_sess.get(
+                SessionIdleCheckRow,
+                (missing_pair.session_id, missing_pair.checker_id),
+            )
+        assert row is not None
+        assert row.last_status is IdleCheckPhase.READY_TO_CHECK
+        assert missing_row is None
+
+    async def test_fetches_only_not_checked_rows_for_initial_grace_period(
+        self,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        batch = await repository.fetch_initial_grace_period_checks([SessionStatus.RUNNING])
+
+        assert [check.pair for check in batch.checks] == [
+            SessionIdleCheckPair(
+                judgment_rows.not_checked_session_id,
+                judgment_rows.checker_id,
+            )
+        ]
+        assert batch.checks[0].initial_grace_period_seconds == 45
+
+    async def test_applies_all_judgment_batches_with_distinct_messages(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        expire_at = datetime(2026, 3, 1, tzinfo=UTC)
+        idle_expired = [
+            IdleJudgmentData(
+                session_id=judgment_rows.active_session_id,
+                checker_id=judgment_rows.checker_id,
+                status=IdleCheckPhase.IDLE_EXPIRED,
+                expire_at=expire_at,
+                message="idle expired 1",
+            ),
+            IdleJudgmentData(
+                session_id=judgment_rows.not_checked_session_id,
+                checker_id=judgment_rows.checker_id,
+                status=IdleCheckPhase.IDLE_EXPIRED,
+                expire_at=expire_at,
+                message="idle expired 2",
+            ),
+            IdleJudgmentData(
+                session_id=judgment_rows.terminated_session_id,
+                checker_id=judgment_rows.checker_id,
+                status=IdleCheckPhase.IDLE_EXPIRED,
+                expire_at=expire_at,
+                message="idle expired 3",
+            ),
+        ]
+        idle = [
+            IdleJudgmentData(
+                session_id=judgment_rows.idle_session_id,
+                checker_id=judgment_rows.checker_id,
+                status=IdleCheckPhase.IDLE,
+                expire_at=expire_at,
+                message="idle 1",
+            ),
+            IdleJudgmentData(
+                session_id=judgment_rows.ready_to_check_session_id,
+                checker_id=judgment_rows.checker_id,
+                status=IdleCheckPhase.IDLE,
+                expire_at=expire_at,
+                message="idle 2",
+            ),
+        ]
+        active = [
+            IdleJudgmentData(
+                session_id=judgment_rows.second_terminated_session_id,
+                checker_id=judgment_rows.checker_id,
+                status=IdleCheckPhase.ACTIVE,
+                expire_at=expire_at,
+                message="active 1",
+            ),
+        ]
+
+        judgments = [*idle_expired, *idle, *active]
+        await repository.batch_apply_session_idle_check_judgments(judgments)
+
+        async with database.begin_readonly_session() as db_sess:
+            for judgment in judgments:
+                row = await db_sess.get(
+                    SessionIdleCheckRow,
+                    (judgment.session_id, judgment.checker_id),
+                )
+                assert row is not None
+                assert row.last_status is judgment.status
+                assert row.expire_at == judgment.expire_at
+                assert row.last_message == judgment.message
+
+    async def test_accepts_empty_judgment_batch(
+        self,
+        repository: IdleCheckerRepository,
+    ) -> None:
+        await repository.batch_apply_session_idle_check_judgments([])
+
+    async def test_never_touches_idle_expired_row(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        await repository.batch_apply_session_idle_check_judgments([
+            IdleJudgmentData(
+                session_id=judgment_rows.idle_expired_session_id,
+                checker_id=judgment_rows.checker_id,
+                status=IdleCheckPhase.ACTIVE,
+                expire_at=datetime(2026, 3, 1, tzinfo=UTC),
+                message="activity detected",
+            )
+        ])
+
+        async with database.begin_readonly_session() as db_sess:
+            row = await db_sess.get(
+                SessionIdleCheckRow,
+                (judgment_rows.idle_expired_session_id, judgment_rows.checker_id),
+            )
+        assert row is not None
+        assert row.last_status is IdleCheckPhase.IDLE_EXPIRED
+        assert row.last_message == f"{IdleCheckPhase.IDLE_EXPIRED.value} judgment"
+        assert row.expire_at == datetime(2026, 2, 1, tzinfo=UTC)
+
+    async def test_ignores_missing_pair_without_insert(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        missing_session_id = SessionId(uuid.uuid4())
+
+        await repository.batch_apply_session_idle_check_judgments([
+            IdleJudgmentData(
+                session_id=missing_session_id,
+                checker_id=judgment_rows.checker_id,
+                status=IdleCheckPhase.ACTIVE,
+                expire_at=datetime(2026, 3, 1, tzinfo=UTC),
+                message="activity detected",
+            )
+        ])
+
+        async with database.begin_readonly_session() as db_sess:
+            row = await db_sess.get(
+                SessionIdleCheckRow,
+                (missing_session_id, judgment_rows.checker_id),
+            )
+        assert row is None
+
+    async def test_excludes_session_without_idle_check_row(
+        self,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        batch = await repository.fetch_judgment_batch([SessionStatus.RUNNING])
+
+        session_ids = {assignment.session.session_id for assignment in batch.assignments}
+        assert judgment_rows.session_without_row_id not in session_ids
+
+    async def test_excludes_sessions_not_in_target_statuses(
+        self,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        batch = await repository.fetch_judgment_batch([SessionStatus.RUNNING])
+
+        session_ids = {assignment.session.session_id for assignment in batch.assignments}
+        assert judgment_rows.terminated_session_id not in session_ids
+
+    async def test_fetches_desired_and_current_assignment_pairs(
+        self,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        assignments = await repository.fetch_session_idle_check_assignments([SessionStatus.RUNNING])
+
+        assert set(assignments.desired_pairs) == {
+            SessionIdleCheckPair(session_id, judgment_rows.checker_id)
+            for session_id in (
+                judgment_rows.active_session_id,
+                judgment_rows.idle_session_id,
+                judgment_rows.not_checked_session_id,
+                judgment_rows.ready_to_check_session_id,
+                judgment_rows.idle_expired_session_id,
+                judgment_rows.session_without_row_id,
+            )
+        }
+        assert set(assignments.current_pairs) == {
+            SessionIdleCheckPair(session_id, judgment_rows.checker_id)
+            for session_id in (
+                judgment_rows.active_session_id,
+                judgment_rows.idle_session_id,
+                judgment_rows.not_checked_session_id,
+                judgment_rows.ready_to_check_session_id,
+                judgment_rows.idle_expired_session_id,
+            )
+        }
+        assert assignments.now.tzinfo is not None
+
+    async def test_creates_missing_assignment_as_not_checked(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        pair = SessionIdleCheckPair(
+            judgment_rows.session_without_row_id,
+            judgment_rows.checker_id,
+        )
+
+        await repository.sync_session_idle_check_assignments([pair], [])
+
+        async with database.begin_readonly_session() as db_sess:
+            row = await db_sess.get(
+                SessionIdleCheckRow,
+                (pair.session_id, pair.checker_id),
+            )
+        assert row is not None
+        assert row.expire_at is None
+        assert row.last_status is IdleCheckPhase.NOT_CHECKED
+        assert row.last_message == "Not checked yet."
+
+    async def test_disabled_binding_deletes_non_expired_rows(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        async with database.begin_session() as db_sess:
+            await db_sess.execute(sa.update(IdleCheckerBindingRow).values(enabled=False))
+        assignment_snapshot = await repository.fetch_session_idle_check_assignments([
+            SessionStatus.RUNNING
+        ])
+        obsolete_pairs = set(assignment_snapshot.current_pairs) - set(
+            assignment_snapshot.desired_pairs
+        )
+
+        await repository.sync_session_idle_check_assignments([], list(obsolete_pairs))
+
+        async with database.begin_readonly_session() as db_sess:
+            non_expired_rows = (
+                await db_sess.scalars(
+                    sa.select(SessionIdleCheckRow).where(
+                        SessionIdleCheckRow.session_id.in_({
+                            judgment_rows.active_session_id,
+                            judgment_rows.idle_session_id,
+                            judgment_rows.not_checked_session_id,
+                        })
+                    )
+                )
+            ).all()
+        assert non_expired_rows == []
+
+    async def test_disabled_binding_preserves_idle_expired_row(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        async with database.begin_session() as db_sess:
+            await db_sess.execute(sa.update(IdleCheckerBindingRow).values(enabled=False))
+        assignment_snapshot = await repository.fetch_session_idle_check_assignments([
+            SessionStatus.RUNNING
+        ])
+        obsolete_pairs = set(assignment_snapshot.current_pairs) - set(
+            assignment_snapshot.desired_pairs
+        )
+
+        await repository.sync_session_idle_check_assignments([], list(obsolete_pairs))
+
+        async with database.begin_readonly_session() as db_sess:
+            expired_row = await db_sess.get(
+                SessionIdleCheckRow,
+                (
+                    judgment_rows.idle_expired_session_id,
+                    judgment_rows.checker_id,
+                ),
+            )
+        assert expired_row is not None
+        assert expired_row.last_status is IdleCheckPhase.IDLE_EXPIRED
+
+    async def test_reenabled_binding_creates_fresh_not_checked_row(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        async with database.begin_session() as db_sess:
+            await db_sess.execute(sa.update(IdleCheckerBindingRow).values(enabled=False))
+        assignment_snapshot = await repository.fetch_session_idle_check_assignments([
+            SessionStatus.RUNNING
+        ])
+        obsolete_pairs = set(assignment_snapshot.current_pairs) - set(
+            assignment_snapshot.desired_pairs
+        )
+        await repository.sync_session_idle_check_assignments([], list(obsolete_pairs))
+
+        async with database.begin_session() as db_sess:
+            await db_sess.execute(sa.update(IdleCheckerBindingRow).values(enabled=True))
+        assignment_snapshot = await repository.fetch_session_idle_check_assignments([
+            SessionStatus.RUNNING
+        ])
+        missing_pairs = set(assignment_snapshot.desired_pairs) - set(
+            assignment_snapshot.current_pairs
+        )
+
+        await repository.sync_session_idle_check_assignments(list(missing_pairs), [])
+
+        async with database.begin_readonly_session() as db_sess:
+            recreated_row = await db_sess.get(
+                SessionIdleCheckRow,
+                (
+                    judgment_rows.active_session_id,
+                    judgment_rows.checker_id,
+                ),
+            )
+        assert recreated_row is not None
+        assert recreated_row.last_status is IdleCheckPhase.NOT_CHECKED
+        assert recreated_row.expire_at is None
+
+    async def test_delete_rechecks_expired_status_after_assignment_fetch(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        pair = SessionIdleCheckPair(
+            judgment_rows.active_session_id,
+            judgment_rows.checker_id,
+        )
+        assignments = await repository.fetch_session_idle_check_assignments([SessionStatus.RUNNING])
+        assert pair in assignments.current_pairs
+        async with database.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.update(SessionIdleCheckRow)
+                .where(
+                    SessionIdleCheckRow.session_id == pair.session_id,
+                    SessionIdleCheckRow.idle_checker_id == pair.checker_id,
+                )
+                .values(last_status=IdleCheckPhase.IDLE_EXPIRED)
+            )
+
+        await repository.sync_session_idle_check_assignments([], [pair])
+
+        async with database.begin_readonly_session() as db_sess:
+            row = await db_sess.get(
+                SessionIdleCheckRow,
+                (pair.session_id, pair.checker_id),
+            )
+        assert row is not None
+        assert row.last_status is IdleCheckPhase.IDLE_EXPIRED
+
+    async def test_deletes_assignment_after_batch_boundary(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        pair_to_delete = SessionIdleCheckPair(
+            judgment_rows.active_session_id,
+            judgment_rows.checker_id,
+        )
+        pairs_to_delete = [
+            SessionIdleCheckPair(
+                SessionId(uuid.uuid4()),
+                IdleCheckerID(uuid.uuid4()),
+            )
+            for _ in range(1000)
+        ]
+        pairs_to_delete.append(pair_to_delete)
+
+        await repository.sync_session_idle_check_assignments([], pairs_to_delete)
+
+        async with database.begin_readonly_session() as db_sess:
+            row = await db_sess.get(
+                SessionIdleCheckRow,
+                (pair_to_delete.session_id, pair_to_delete.checker_id),
+            )
+        assert row is None
+
+
+class TestFetchExpiredIdleChecks:
+    @pytest.fixture
+    async def database(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                ProjectResourcePolicyRow,
+                DomainRow,
+                GroupRow,
+                ScalingGroupRow,
+                SessionRow,
+                IdleCheckerRow,
+                SessionIdleCheckRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
+        return IdleCheckerRepository(DBOpsProvider(database))
+
+    @pytest.fixture
+    async def expired_check_session(
+        self,
+        database: ExtendedAsyncSAEngine,
+    ) -> ExpiredCheckSessionData:
+        scope = _expired_check_scope_fixture("expired-check")
+        session_id = SessionId(uuid.uuid4())
+        first_checker_id = IdleCheckerID(uuid.uuid4())
+        second_checker_id = IdleCheckerID(uuid.uuid4())
+        first_expire_at = datetime(2026, 1, 1, tzinfo=UTC)
+        second_expire_at = datetime(2100, 1, 1, tzinfo=UTC)
+        async with database.begin_session() as db_sess:
+            for scope_row in _expired_check_scope_rows(scope):
+                db_sess.add(scope_row)
+            db_sess.add(_expired_check_session_row(scope, session_id, SessionStatus.RUNNING))
+            db_sess.add(_expired_check_checker_row(first_checker_id))
+            db_sess.add(_expired_check_checker_row(second_checker_id))
+            await db_sess.flush()
+            db_sess.add(
+                SessionIdleCheckRow(
+                    session_id=session_id,
+                    idle_checker_id=first_checker_id,
+                    expire_at=first_expire_at,
+                    last_status=IdleCheckPhase.IDLE_EXPIRED,
+                    last_message="Judged expired.",
+                )
+            )
+            db_sess.add(
+                SessionIdleCheckRow(
+                    session_id=session_id,
+                    idle_checker_id=second_checker_id,
+                    expire_at=second_expire_at,
+                    last_status=IdleCheckPhase.IDLE_EXPIRED,
+                    last_message="Judged expired.",
+                )
+            )
+        return ExpiredCheckSessionData(
+            session_id=session_id,
+            first_checker_id=first_checker_id,
+            second_checker_id=second_checker_id,
+            first_expire_at=first_expire_at,
+            second_expire_at=second_expire_at,
+        )
+
+    @pytest.fixture
+    async def session_with_elapsed_deadline_still_idle(
+        self,
+        database: ExtendedAsyncSAEngine,
+    ) -> SessionId:
+        scope = _expired_check_scope_fixture("elapsed-deadline-still-idle")
+        session_id = SessionId(uuid.uuid4())
+        checker_id = IdleCheckerID(uuid.uuid4())
+        async with database.begin_session() as db_sess:
+            for scope_row in _expired_check_scope_rows(scope):
+                db_sess.add(scope_row)
+            db_sess.add(_expired_check_session_row(scope, session_id, SessionStatus.RUNNING))
+            db_sess.add(_expired_check_checker_row(checker_id))
+            await db_sess.flush()
+            db_sess.add(
+                SessionIdleCheckRow(
+                    session_id=session_id,
+                    idle_checker_id=checker_id,
+                    expire_at=datetime(2026, 1, 1, tzinfo=UTC),
+                    last_status=IdleCheckPhase.IDLE,
+                    last_message="The session remains idle.",
                 )
             )
         return session_id
 
     @pytest.fixture
-    async def seeded_idle_check_data(
+    async def terminated_session_with_expired_check(
         self,
         database: ExtendedAsyncSAEngine,
-        request: pytest.FixtureRequest,
-    ) -> SeededIdleCheckData:
-        resource_group_prefix, project_prefix, domain_prefix = request.param
-        resource_group_scope = ScopeFixture(
-            domain_name=f"{resource_group_prefix}-domain",
-            domain_id=DomainID(uuid.uuid4()),
-            project_id=uuid.uuid4(),
-            scaling_group_name=f"{resource_group_prefix}-sgroup",
-            scaling_group_id=ResourceGroupID(uuid.uuid4()),
-        )
-        project_scope = ScopeFixture(
-            domain_name=f"{project_prefix}-domain",
-            domain_id=DomainID(uuid.uuid4()),
-            project_id=uuid.uuid4(),
-            scaling_group_name=f"{project_prefix}-sgroup",
-            scaling_group_id=ResourceGroupID(uuid.uuid4()),
-        )
-        domain_scope = ScopeFixture(
-            domain_name=f"{domain_prefix}-domain",
-            domain_id=DomainID(uuid.uuid4()),
-            project_id=uuid.uuid4(),
-            scaling_group_name=f"{domain_prefix}-sgroup",
-            scaling_group_id=ResourceGroupID(uuid.uuid4()),
-        )
-        scopes = (resource_group_scope, project_scope, domain_scope)
-        resource_group_session_id = SessionId(uuid.uuid4())
-        project_session_id = SessionId(uuid.uuid4())
-        domain_session_id = SessionId(uuid.uuid4())
-        inference_session_id = SessionId(uuid.uuid4())
-        session_specs = (
-            (
-                resource_group_scope,
-                resource_group_session_id,
-                datetime(2026, 1, 1, tzinfo=UTC),
-                SessionTypes.INTERACTIVE,
-            ),
-            (
-                project_scope,
-                project_session_id,
-                datetime(2026, 1, 2, tzinfo=UTC),
-                SessionTypes.INTERACTIVE,
-            ),
-            (
-                domain_scope,
-                domain_session_id,
-                datetime(2026, 1, 3, tzinfo=UTC),
-                SessionTypes.INTERACTIVE,
-            ),
-            (
-                resource_group_scope,
-                inference_session_id,
-                datetime(2026, 1, 4, tzinfo=UTC),
-                SessionTypes.INFERENCE,
-            ),
-        )
-        resource_group_checker_id = IdleCheckerID(uuid.uuid4())
-        project_checker_id = IdleCheckerID(uuid.uuid4())
-        domain_checker_id = IdleCheckerID(uuid.uuid4())
-        binding_specs = (
-            (
-                resource_group_checker_id,
-                CheckerType.SESSION_LIFETIME,
-                IdleCheckerSpec(
-                    type=CheckerType.SESSION_LIFETIME,
-                    session_lifetime=SessionLifetimeSpec(),
-                ),
-                ScopeType.RESOURCE_GROUP,
-                resource_group_scope.scaling_group_id,
-            ),
-            (
-                project_checker_id,
-                CheckerType.NETWORK_TIMEOUT,
-                IdleCheckerSpec(
-                    type=CheckerType.NETWORK_TIMEOUT,
-                    network=NetworkTimeoutSpec(),
-                ),
-                ScopeType.PROJECT,
-                project_scope.project_id,
-            ),
-            (
-                domain_checker_id,
-                CheckerType.UTILIZATION,
-                IdleCheckerSpec(
-                    type=CheckerType.UTILIZATION,
-                    utilization=UtilizationSpec(),
-                ),
-                ScopeType.DOMAIN,
-                domain_scope.domain_id,
-            ),
-        )
+    ) -> SessionId:
+        scope = _expired_check_scope_fixture("terminated")
+        session_id = SessionId(uuid.uuid4())
+        checker_id = IdleCheckerID(uuid.uuid4())
         async with database.begin_session() as db_sess:
-            for scope in scopes:
-                db_sess.add(
-                    ProjectResourcePolicyRow(
-                        name=f"{scope.domain_name}-policy",
-                        max_vfolder_count=10,
-                        max_quota_scope_size=1024,
-                        max_network_count=10,
-                    )
-                )
-                db_sess.add(
-                    DomainRow(
-                        id=scope.domain_id,
-                        name=scope.domain_name,
-                        description=None,
-                        is_active=True,
-                    )
-                )
-                db_sess.add(
-                    GroupRow(
-                        id=scope.project_id,
-                        name=f"{scope.domain_name}-project",
-                        description=None,
-                        is_active=True,
-                        domain_name=scope.domain_name,
-                        resource_policy=f"{scope.domain_name}-policy",
-                    )
-                )
-                db_sess.add(
-                    ScalingGroupRow(
-                        id=scope.scaling_group_id,
-                        name=scope.scaling_group_name,
-                        description=None,
-                        is_active=True,
-                        is_public=True,
-                        driver="static",
-                        driver_opts={},
-                        scheduler="fifo",
-                        use_host_network=False,
-                    )
-                )
-            for scope, session_id, created_at, session_type in session_specs:
-                db_sess.add(
-                    SessionRow(
-                        id=session_id,
-                        creation_id=str(session_id)[:32],
-                        name=f"session-{session_id}",
-                        session_type=session_type,
-                        cluster_mode=ClusterMode.SINGLE_NODE,
-                        cluster_size=1,
-                        domain_name=scope.domain_name,
-                        domain_id=scope.domain_id,
-                        resource_group_id=scope.scaling_group_id,
-                        group_id=scope.project_id,
-                        user_uuid=uuid.uuid4(),
-                        access_key=None,
-                        tag=None,
-                        status=SessionStatus.RUNNING,
-                        status_info=None,
-                        status_data=None,
-                        status_history={},
-                        result=SessionResult.UNDEFINED,
-                        created_at=created_at,
-                        terminated_at=None,
-                        starts_at=created_at,
-                        startup_command=None,
-                        callback_url=None,
-                        occupying_slots=ResourceSlot({"cpu": "1"}),
-                        requested_slots=ResourceSlot({"cpu": "1"}),
-                        vfolder_mounts=[],
-                        environ=None,
-                        bootstrap_script=None,
-                        use_host_network=False,
-                        scaling_group_name=scope.scaling_group_name,
-                    )
-                )
-            for checker_id, checker_type, spec, _, _ in binding_specs:
-                db_sess.add(
-                    IdleCheckerRow(
-                        id=checker_id,
-                        name=f"{checker_type.value}-{checker_id}",
-                        description=None,
-                        checker_type=checker_type,
-                        target_session_types=[SessionTypes.INTERACTIVE, SessionTypes.BATCH],
-                        spec=spec,
-                    )
-                )
+            for scope_row in _expired_check_scope_rows(scope):
+                db_sess.add(scope_row)
+            db_sess.add(_expired_check_session_row(scope, session_id, SessionStatus.TERMINATED))
+            db_sess.add(_expired_check_checker_row(checker_id))
             await db_sess.flush()
-            for checker_id, _, _, scope_type, scope_id in binding_specs:
-                db_sess.add(
-                    IdleCheckerBindingRow(
-                        scope_type=scope_type.value,
-                        scope_id=scope_id,
-                        idle_checker_id=checker_id,
-                        enabled=True,
-                    )
+            db_sess.add(
+                SessionIdleCheckRow(
+                    session_id=session_id,
+                    idle_checker_id=checker_id,
+                    expire_at=datetime(2026, 1, 1, tzinfo=UTC),
+                    last_status=IdleCheckPhase.IDLE_EXPIRED,
+                    last_message="Judged expired.",
                 )
+            )
+        return session_id
 
-        return SeededIdleCheckData(
-            resource_group_session_id=resource_group_session_id,
-            project_session_id=project_session_id,
-            domain_session_id=domain_session_id,
-            inference_session_id=inference_session_id,
-            resource_group_checker_id=resource_group_checker_id,
-            project_checker_id=project_checker_id,
-            domain_checker_id=domain_checker_id,
-        )
-
-    @pytest.mark.parametrize("running_session_without_bindings", ["empty"], indirect=True)
-    @pytest.mark.usefixtures("running_session_without_bindings")
-    async def test_returns_empty_batch_without_enabled_bindings(
+    async def test_returns_each_idle_expired_check_regardless_of_deadline(
         self,
         repository: IdleCheckerRepository,
+        expired_check_session: ExpiredCheckSessionData,
     ) -> None:
-        batch = await repository.fetch_idle_check_batch([SessionStatus.RUNNING])
+        batch = await repository.fetch_expired_idle_checks([SessionStatus.RUNNING])
+        checks_by_key = {(check.session_id, check.checker_id): check for check in batch.checks}
 
-        assert batch.targets == ()
-
-    async def test_ignores_disabled_bindings(
-        self,
-        repository: IdleCheckerRepository,
-        running_session_with_disabled_binding: SessionId,
-    ) -> None:
-        batch = await repository.fetch_idle_check_batch([SessionStatus.RUNNING])
-        target_session_ids = {target.session.session_id for target in batch.targets}
-
-        assert batch.targets == ()
-        assert running_session_with_disabled_binding not in target_session_ids
-
-    @pytest.mark.parametrize(
-        "seeded_idle_check_data",
-        [("resource-group", "project", "domain")],
-        indirect=True,
-    )
-    async def test_fetches_resource_group_scope_bound_checker(
-        self,
-        repository: IdleCheckerRepository,
-        seeded_idle_check_data: SeededIdleCheckData,
-    ) -> None:
-        batch = await repository.fetch_idle_check_batch([SessionStatus.RUNNING])
-        targets_by_session_id = {target.session.session_id: target for target in batch.targets}
-        resource_group_target = targets_by_session_id[
-            seeded_idle_check_data.resource_group_session_id
-        ]
-        checkers = resource_group_target.checkers
-
-        assert len(checkers) == 1
-        assert checkers[0].checker.checker_id == seeded_idle_check_data.resource_group_checker_id
-        assert checkers[0].scope.scope_type is ScopeType.RESOURCE_GROUP
-
-    @pytest.mark.parametrize(
-        "seeded_idle_check_data",
-        [("resource-group", "project", "domain")],
-        indirect=True,
-    )
-    async def test_fetches_project_scope_bound_checker(
-        self,
-        repository: IdleCheckerRepository,
-        seeded_idle_check_data: SeededIdleCheckData,
-    ) -> None:
-        batch = await repository.fetch_idle_check_batch([SessionStatus.RUNNING])
-        targets_by_session_id = {target.session.session_id: target for target in batch.targets}
-        project_target = targets_by_session_id[seeded_idle_check_data.project_session_id]
-        checkers = project_target.checkers
-
-        assert len(checkers) == 1
-        assert checkers[0].checker.checker_id == seeded_idle_check_data.project_checker_id
-        assert checkers[0].scope.scope_type is ScopeType.PROJECT
-
-    @pytest.mark.parametrize(
-        "seeded_idle_check_data",
-        [("resource-group", "project", "domain")],
-        indirect=True,
-    )
-    async def test_fetches_domain_scope_bound_checker(
-        self,
-        repository: IdleCheckerRepository,
-        seeded_idle_check_data: SeededIdleCheckData,
-    ) -> None:
-        batch = await repository.fetch_idle_check_batch([SessionStatus.RUNNING])
-        targets_by_session_id = {target.session.session_id: target for target in batch.targets}
-        domain_target = targets_by_session_id[seeded_idle_check_data.domain_session_id]
-        checkers = domain_target.checkers
-
-        assert len(checkers) == 1
-        assert checkers[0].checker.checker_id == seeded_idle_check_data.domain_checker_id
-        assert checkers[0].scope.scope_type is ScopeType.DOMAIN
-
-    @pytest.mark.parametrize(
-        "seeded_idle_check_data",
-        [("resource-group", "project", "domain")],
-        indirect=True,
-    )
-    async def test_excludes_inference_sessions(
-        self,
-        repository: IdleCheckerRepository,
-        seeded_idle_check_data: SeededIdleCheckData,
-    ) -> None:
-        batch = await repository.fetch_idle_check_batch([SessionStatus.RUNNING])
-        targets_by_session_id = {target.session.session_id: target for target in batch.targets}
-
-        assert set(targets_by_session_id) == {
-            seeded_idle_check_data.resource_group_session_id,
-            seeded_idle_check_data.project_session_id,
-            seeded_idle_check_data.domain_session_id,
+        assert set(checks_by_key) == {
+            (expired_check_session.session_id, expired_check_session.first_checker_id),
+            (expired_check_session.session_id, expired_check_session.second_checker_id),
         }
-        assert seeded_idle_check_data.inference_session_id not in targets_by_session_id
-
-    @pytest.fixture
-    async def per_type_checker_data(
-        self,
-        database: ExtendedAsyncSAEngine,
-    ) -> PerTypeCheckerData:
-        scope = ScopeFixture(
-            domain_name="per-type-domain",
-            domain_id=DomainID(uuid.uuid4()),
-            project_id=uuid.uuid4(),
-            scaling_group_name="per-type-sgroup",
-            scaling_group_id=ResourceGroupID(uuid.uuid4()),
-        )
-        interactive_session_id = SessionId(uuid.uuid4())
-        batch_session_id = SessionId(uuid.uuid4())
-        interactive_checker_id = IdleCheckerID(uuid.uuid4())
-        batch_checker_id = IdleCheckerID(uuid.uuid4())
-        session_specs = (
-            (interactive_session_id, SessionTypes.INTERACTIVE, datetime(2026, 1, 1, tzinfo=UTC)),
-            (batch_session_id, SessionTypes.BATCH, datetime(2026, 1, 2, tzinfo=UTC)),
-        )
-        checker_specs = (
-            (interactive_checker_id, frozenset({SessionTypes.INTERACTIVE})),
-            (batch_checker_id, frozenset({SessionTypes.BATCH})),
-        )
-        async with database.begin_session() as db_sess:
-            db_sess.add(
-                ProjectResourcePolicyRow(
-                    name=f"{scope.domain_name}-policy",
-                    max_vfolder_count=10,
-                    max_quota_scope_size=1024,
-                    max_network_count=10,
-                )
-            )
-            db_sess.add(
-                DomainRow(
-                    id=scope.domain_id,
-                    name=scope.domain_name,
-                    description=None,
-                    is_active=True,
-                )
-            )
-            db_sess.add(
-                GroupRow(
-                    id=scope.project_id,
-                    name=f"{scope.domain_name}-project",
-                    description=None,
-                    is_active=True,
-                    domain_name=scope.domain_name,
-                    resource_policy=f"{scope.domain_name}-policy",
-                )
-            )
-            db_sess.add(
-                ScalingGroupRow(
-                    id=scope.scaling_group_id,
-                    name=scope.scaling_group_name,
-                    description=None,
-                    is_active=True,
-                    is_public=True,
-                    driver="static",
-                    driver_opts={},
-                    scheduler="fifo",
-                    use_host_network=False,
-                )
-            )
-            for session_id, session_type, created_at in session_specs:
-                db_sess.add(
-                    SessionRow(
-                        id=session_id,
-                        creation_id=str(session_id)[:32],
-                        name=f"session-{session_id}",
-                        session_type=session_type,
-                        cluster_mode=ClusterMode.SINGLE_NODE,
-                        cluster_size=1,
-                        domain_name=scope.domain_name,
-                        domain_id=scope.domain_id,
-                        resource_group_id=scope.scaling_group_id,
-                        group_id=scope.project_id,
-                        user_uuid=uuid.uuid4(),
-                        access_key=None,
-                        tag=None,
-                        status=SessionStatus.RUNNING,
-                        status_info=None,
-                        status_data=None,
-                        status_history={},
-                        result=SessionResult.UNDEFINED,
-                        created_at=created_at,
-                        terminated_at=None,
-                        starts_at=created_at,
-                        startup_command=None,
-                        callback_url=None,
-                        occupying_slots=ResourceSlot({"cpu": "1"}),
-                        requested_slots=ResourceSlot({"cpu": "1"}),
-                        vfolder_mounts=[],
-                        environ=None,
-                        bootstrap_script=None,
-                        use_host_network=False,
-                        scaling_group_name=scope.scaling_group_name,
-                    )
-                )
-            for checker_id, target_types in checker_specs:
-                db_sess.add(
-                    IdleCheckerRow(
-                        id=checker_id,
-                        name=f"checker-{checker_id}",
-                        description=None,
-                        checker_type=CheckerType.SESSION_LIFETIME,
-                        target_session_types=list(target_types),
-                        spec=IdleCheckerSpec(
-                            type=CheckerType.SESSION_LIFETIME,
-                            session_lifetime=SessionLifetimeSpec(),
-                        ),
-                    )
-                )
-            await db_sess.flush()
-            for checker_id, _ in checker_specs:
-                db_sess.add(
-                    IdleCheckerBindingRow(
-                        scope_type=ScopeType.DOMAIN.value,
-                        scope_id=scope.domain_id,
-                        idle_checker_id=checker_id,
-                        enabled=True,
-                    )
-                )
-        return PerTypeCheckerData(
-            interactive_session_id=interactive_session_id,
-            batch_session_id=batch_session_id,
-            interactive_checker_id=interactive_checker_id,
-            batch_checker_id=batch_checker_id,
+        check = checks_by_key[
+            (expired_check_session.session_id, expired_check_session.first_checker_id)
+        ]
+        assert check.expire_at == expired_check_session.first_expire_at
+        assert check.last_status == IdleCheckPhase.IDLE_EXPIRED
+        assert check.last_message == "Judged expired."
+        assert (
+            checks_by_key[
+                (expired_check_session.session_id, expired_check_session.second_checker_id)
+            ].expire_at
+            == expired_check_session.second_expire_at
         )
 
-    async def test_applies_only_checkers_targeting_session_type(
+    async def test_excludes_elapsed_deadline_still_marked_idle(
         self,
         repository: IdleCheckerRepository,
-        per_type_checker_data: PerTypeCheckerData,
+        session_with_elapsed_deadline_still_idle: SessionId,
     ) -> None:
-        batch = await repository.fetch_idle_check_batch([SessionStatus.RUNNING])
-        targets_by_session_id = {target.session.session_id: target for target in batch.targets}
+        batch = await repository.fetch_expired_idle_checks([SessionStatus.RUNNING])
+        check_session_ids = {check.session_id for check in batch.checks}
 
-        interactive_target = targets_by_session_id[per_type_checker_data.interactive_session_id]
-        interactive_checker_ids = [
-            bound.checker.checker_id for bound in interactive_target.checkers
-        ]
-        assert interactive_checker_ids == [per_type_checker_data.interactive_checker_id]
+        assert batch.checks == ()
+        assert session_with_elapsed_deadline_still_idle not in check_session_ids
 
-        batch_target = targets_by_session_id[per_type_checker_data.batch_session_id]
-        batch_checker_ids = [bound.checker.checker_id for bound in batch_target.checkers]
-        assert batch_checker_ids == [per_type_checker_data.batch_checker_id]
+    async def test_excludes_sessions_not_in_target_statuses(
+        self,
+        repository: IdleCheckerRepository,
+        terminated_session_with_expired_check: SessionId,
+    ) -> None:
+        batch = await repository.fetch_expired_idle_checks([SessionStatus.RUNNING])
+        check_session_ids = {check.session_id for check in batch.checks}
+
+        assert batch.checks == ()
+        assert terminated_session_with_expired_check not in check_session_ids

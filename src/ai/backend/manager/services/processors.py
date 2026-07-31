@@ -45,6 +45,12 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.services.agent.processors import AgentProcessors
     from ai.backend.manager.services.agent.service import AgentService
+    from ai.backend.manager.services.app_config.processors import (
+        AppConfigProcessors,
+    )
+    from ai.backend.manager.services.app_config.service import (
+        AppConfigService,
+    )
     from ai.backend.manager.services.app_config_allow_list.processors import (
         AppConfigAllowListProcessors,
     )
@@ -56,6 +62,12 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.services.app_config_definition.service import (
         AppConfigDefinitionService,
+    )
+    from ai.backend.manager.services.app_config_fragment.processors import (
+        AppConfigFragmentProcessors,
+    )
+    from ai.backend.manager.services.app_config_fragment.service import (
+        AppConfigFragmentService,
     )
     from ai.backend.manager.services.artifact.processors import (
         ArtifactProcessors,
@@ -131,6 +143,14 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.services.group.processors import GroupProcessors
     from ai.backend.manager.services.group.service import GroupService
+    from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
+    from ai.backend.manager.services.idle_checker.service import IdleCheckerService
+    from ai.backend.manager.services.idle_checker_assignment.processors import (
+        IdleCheckerAssignmentProcessors,
+    )
+    from ai.backend.manager.services.idle_checker_assignment.service import (
+        IdleCheckerAssignmentService,
+    )
     from ai.backend.manager.services.image.processors import ImageProcessors
     from ai.backend.manager.services.image.service import ImageService
     from ai.backend.manager.services.keypair_resource_policy.processors import (
@@ -238,6 +258,12 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.services.resource_usage.service import (
         ResourceUsageService,
+    )
+    from ai.backend.manager.services.retention_policy.processors import (
+        RetentionPolicyProcessors,
+    )
+    from ai.backend.manager.services.retention_policy.service import (
+        RetentionPolicyService,
     )
     from ai.backend.manager.services.role_preset.processors import (
         RolePresetProcessors,
@@ -375,8 +401,10 @@ class ServiceArgs:
 @dataclass
 class Services:
     agent: AgentService
+    app_config: AppConfigService
     app_config_allow_list: AppConfigAllowListService
     app_config_definition: AppConfigDefinitionService
+    app_config_fragment: AppConfigFragmentService
     domain: DomainService
     dotfile: DotfileService
     error_log: ErrorLogService
@@ -385,6 +413,7 @@ class Services:
     fair_share: FairShareService
     group: GroupService
     user: UserService
+    idle_checker: IdleCheckerService
     image: ImageService
     container_registry: ContainerRegistryService
     vfolder: VFolderService
@@ -401,6 +430,7 @@ class Services:
     prometheus_query_preset_category: PrometheusQueryPresetCategoryService
     resource_preset: ResourcePresetService
     resource_slot: ResourceSlotService
+    retention_policy: RetentionPolicyService
     role_preset: RolePresetService
     runtime_variant: RuntimeVariantService
     runtime_variant_preset: RuntimeVariantPresetService
@@ -422,6 +452,7 @@ class Services:
     deployment: DeploymentService
     storage_namespace: StorageNamespaceService
     audit_log: AuditLogService
+    idle_checker_assignment: IdleCheckerAssignmentService
     scheduling_history: SchedulingHistoryService
     service_catalog: ServiceCatalogService
     template: TemplateService
@@ -442,8 +473,10 @@ class ProcessorArgs:
 @dataclass
 class Processors(AbstractProcessorPackage):
     agent: AgentProcessors
+    app_config: AppConfigProcessors
     app_config_allow_list: AppConfigAllowListProcessors
     app_config_definition: AppConfigDefinitionProcessors
+    app_config_fragment: AppConfigFragmentProcessors
     domain: DomainProcessors
     dotfile: DotfileProcessors
     error_log: ErrorLogProcessors
@@ -452,6 +485,7 @@ class Processors(AbstractProcessorPackage):
     fair_share: FairShareProcessors
     group: GroupProcessors
     user: UserProcessors
+    idle_checker: IdleCheckerProcessors
     image: ImageProcessors
     vfolder: VFolderProcessors
     vfolder_admin: VFolderAdminProcessors
@@ -468,6 +502,7 @@ class Processors(AbstractProcessorPackage):
     prometheus_query_preset_category: PrometheusQueryPresetCategoryProcessors
     resource_preset: ResourcePresetProcessors
     resource_slot: ResourceSlotProcessors
+    retention_policy: RetentionPolicyProcessors
     role_preset: RolePresetProcessors
     runtime_variant: RuntimeVariantProcessors
     runtime_variant_preset: RuntimeVariantPresetProcessors
@@ -489,6 +524,7 @@ class Processors(AbstractProcessorPackage):
     deployment: DeploymentProcessors
     storage_namespace: StorageNamespaceProcessors
     audit_log: AuditLogProcessors
+    idle_checker_assignment: IdleCheckerAssignmentProcessors
     scheduling_history: SchedulingHistoryProcessors
     service_catalog: ServiceCatalogProcessors
     template: TemplateProcessors
@@ -502,8 +538,10 @@ class Processors(AbstractProcessorPackage):
     def supported_actions(self) -> list[ActionSpec]:
         return [
             *self.agent.supported_actions(),
+            *self.app_config.supported_actions(),
             *self.app_config_allow_list.supported_actions(),
             *self.app_config_definition.supported_actions(),
+            *self.app_config_fragment.supported_actions(),
             *self.domain.supported_actions(),
             *self.dotfile.supported_actions(),
             *self.error_log.supported_actions(),
@@ -512,6 +550,7 @@ class Processors(AbstractProcessorPackage):
             *self.fair_share.supported_actions(),
             *self.group.supported_actions(),
             *self.user.supported_actions(),
+            *self.idle_checker.supported_actions(),
             *self.image.supported_actions(),
             *self.container_registry.supported_actions(),
             *self.vfolder.supported_actions(),
@@ -528,6 +567,7 @@ class Processors(AbstractProcessorPackage):
             *self.prometheus_query_preset_category.supported_actions(),
             *self.resource_preset.supported_actions(),
             *self.resource_slot.supported_actions(),
+            *self.retention_policy.supported_actions(),
             *self.role_preset.supported_actions(),
             *self.runtime_variant.supported_actions(),
             *self.runtime_variant_preset.supported_actions(),
@@ -549,6 +589,7 @@ class Processors(AbstractProcessorPackage):
             *self.deployment.supported_actions(),
             *self.storage_namespace.supported_actions(),
             *self.audit_log.supported_actions(),
+            *self.idle_checker_assignment.supported_actions(),
             *self.scheduling_history.supported_actions(),
             *self.service_catalog.supported_actions(),
             *self.template.supported_actions(),

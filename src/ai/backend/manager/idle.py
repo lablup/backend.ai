@@ -62,13 +62,11 @@ from ai.backend.common.types import (
     BackendAISchema,
     BinarySize,
     ResourceSlot,
-    SessionExecutionStatus,
     SessionTypes,
 )
 from ai.backend.common.utils import nmget
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.session.types import SessionStatus
 
 from .defs import DEFAULT_ROLE, LockID
 from .errors.kernel import IdlePolicyNotFound
@@ -165,11 +163,6 @@ class UtilizationResourceReport(UserDict[str, UtilizationExtraInfo]):
         return {k: v.avg_util >= v.threshold for k, v in self.data.items()}
 
 
-class AppStreamingStatus(enum.Enum):
-    NO_ACTIVE_CONNECTIONS = 0
-    HAS_ACTIVE_CONNECTIONS = 1
-
-
 class ThresholdOperator(enum.StrEnum):
     AND = "and"
     OR = "or"
@@ -199,7 +192,6 @@ class IdleCheckerHost:
         valkey_stat: ValkeyStatClient,
     ) -> None:
         self._checkers: list[BaseIdleChecker] = []
-        self._event_dispatch_checkers: list[AbstractEventDispatcherIdleChecker] = []
         self._frozen = False
         self._db = db
         self._config_provider = config_provider
@@ -217,13 +209,6 @@ class IdleCheckerHost:
             )
         self._checkers.append(checker)
 
-    def add_event_dispatch_checker(self, checker: AbstractEventDispatcherIdleChecker) -> None:
-        if self._frozen:
-            raise RuntimeError(
-                "Cannot add a new event dispatch idle checker after the idle checker host is frozen."
-            )
-        self._event_dispatch_checkers.append(checker)
-
     async def start(self) -> None:
         self._frozen = True
         raw_config = self._config_provider.config.idle.checkers
@@ -232,10 +217,6 @@ class IdleCheckerHost:
         )
         for checker in self._checkers:
             await checker.populate_config(raw_config.get(checker.name) or {})
-        for event_dispatcher_checker in self._event_dispatch_checkers:
-            await event_dispatcher_checker.populate_config(
-                raw_config.get(event_dispatcher_checker.name()) or {}
-            )
         self.timer = GlobalTimer(
             self._lock_factory(LockID.LOCKID_IDLE_CHECK_TIMER, self.check_interval),
             self._event_producer,
@@ -252,33 +233,32 @@ class IdleCheckerHost:
         await self._valkey_stat.close()
         await self._valkey_live.close()
 
-    async def update_app_streaming_status(
-        self,
-        session_id: SessionId,
-        status: AppStreamingStatus,
-    ) -> None:
-        for checker in self._checkers:
-            await checker.update_app_streaming_status(session_id, status)
-
-    async def dispatch_session_status_event(
-        self,
-        session_id: SessionId,
-        status: SessionStatus,
-    ) -> None:
-        for checker in self._event_dispatch_checkers:
-            await checker.watch_session_status(session_id, status)
-
-    async def dispatch_session_execution_status_event(
-        self,
-        session_id: SessionId,
-        status: SessionExecutionStatus,
-    ) -> None:
-        for checker in self._event_dispatch_checkers:
-            await checker.watch_session_execution(session_id, status)
+    async def _fetch_idle_policy(
+        self, conn: SAConnection, access_key: AccessKey
+    ) -> Row[Any] | None:
+        query = (
+            sa.select(
+                keypair_resource_policies.c.max_session_lifetime,
+                keypair_resource_policies.c.idle_timeout,
+            )
+            .select_from(
+                sa.join(
+                    keypairs,
+                    keypair_resource_policies,
+                    keypair_resource_policies.c.name == keypairs.c.resource_policy,
+                ),
+            )
+            .where(keypairs.c.access_key == access_key)
+        )
+        result = await conn.execute(query)
+        return result.first()
 
     async def do_idle_check(self) -> None:
         log.debug("do_idle_check(): triggered")
-        policy_cache: dict[AccessKey, Row[Any]] = {}
+        # A missing policy is cached as None so that an orphaned access key is
+        # queried and warned about only once per cycle.
+        policy_cache: dict[AccessKey | None, Row[Any] | None] = {}
+        errors: list[BaseException] = []
         async with self._db.begin_readonly() as conn:
             j = sa.join(kernels, users, kernels.c.user_uuid == users.c.uuid)
             query = (
@@ -293,6 +273,7 @@ class IdleCheckerHost:
                     kernels.c.requested_slots,
                     kernels.c.cluster_size,
                     users.c.created_at.label("user_created_at"),
+                    users.c.main_access_key,
                 )
                 .select_from(j)
                 .where(
@@ -305,29 +286,26 @@ class IdleCheckerHost:
             rows = result.fetchall()
             for kernel in rows:
                 grace_period_end = await self._grace_period_checker.get_grace_period_end(kernel)
-                policy = policy_cache.get(kernel.access_key, None)
-                if policy is None:
-                    query = (
-                        sa.select(
-                            keypair_resource_policies.c.max_session_lifetime,
-                            keypair_resource_policies.c.idle_timeout,
-                        )
-                        .select_from(
-                            sa.join(
-                                keypairs,
-                                keypair_resource_policies,
-                                keypair_resource_policies.c.name == keypairs.c.resource_policy,
-                            ),
-                        )
-                        .where(keypairs.c.access_key == kernel.access_key)
+                # The idle policy is resolved through the user's main access key,
+                # which is a real foreign key, instead of the kernel's own access
+                # key, which may be left orphaned by a keypair deletion.
+                main_access_key = cast(AccessKey | None, kernel.main_access_key)
+                if main_access_key not in policy_cache:
+                    policy = (
+                        await self._fetch_idle_policy(conn, main_access_key)
+                        if main_access_key is not None
+                        else None
                     )
-                    result = await conn.execute(query)
-                    policy = result.first()
                     if policy is None:
-                        raise IdlePolicyNotFound(
-                            f"Resource policy not found for access_key={kernel.access_key}"
+                        log.warning(
+                            "idle policy not found for main_access_key={}; "
+                            "skipping its kernels in this cycle",
+                            main_access_key,
                         )
-                    policy_cache[kernel.access_key] = policy
+                    policy_cache[main_access_key] = policy
+                policy = policy_cache[main_access_key]
+                if policy is None:
+                    continue
 
                 check_tasks = [
                     checker.check_idleness(kernel, conn, policy, grace_period_end=grace_period_end)
@@ -335,7 +313,6 @@ class IdleCheckerHost:
                 ]
                 check_results = await aiotools.gather_safe(check_tasks)
                 terminated = False
-                errors: list[BaseException] = []
                 for checker, check_result in zip(self._checkers, check_results, strict=True):
                     if isinstance(check_result, BaseExceptionGroup):
                         errors.extend(check_result.exceptions)
@@ -353,8 +330,8 @@ class IdleCheckerHost:
                         if not terminated:
                             terminated = True
                             await checker.callback_idle_session(kernel.session_id)
-                if errors:
-                    raise IdleCheckerError("idle checker(s) raise errors", errors)
+        if errors:
+            raise IdleCheckerError("idle checker(s) raise errors", errors)
 
     async def get_idle_check_report(
         self,
@@ -424,13 +401,6 @@ class AbstractIdleCheckReporter(ABC):
     @abstractmethod
     async def populate_config(self, config: Mapping[str, Any]) -> None:
         raise NotImplementedError
-
-    async def update_app_streaming_status(
-        self,
-        session_id: SessionId,
-        status: AppStreamingStatus,
-    ) -> None:
-        pass
 
     @classmethod
     def get_report_key(cls, session_id: SessionId) -> str:
@@ -586,134 +556,12 @@ class BaseIdleChecker(AbstractIdleChecker, AbstractIdleCheckReporter):
         )
 
 
-class AbstractEventDispatcherIdleChecker(ABC):
-    @classmethod
-    @abstractmethod
-    def name(cls) -> str:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def populate_config(self, raw_config: Mapping[str, Any]) -> None:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def watch_session_status(
-        self,
-        session_id: SessionId,
-        status: SessionStatus,
-    ) -> None:
-        """
-        Check the session status and update the idle checker's state accordingly.
-        This method is called when the session status changes.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    async def watch_session_execution(
-        self,
-        session_id: SessionId,
-        status: SessionExecutionStatus,
-    ) -> None:
-        """
-        Check the session status and update the idle checker's state accordingly.
-        This method is called when the session status changes.
-        """
-        raise NotImplementedError
-
-
 NETWORK_IDLE_CHECKER_NAME = "network_timeout"
 SESSION_LIFETIME_CHECKER_NAME = "session_lifetime"
 UTILIZATION_CHECKER_NAME = "utilization"
 
 
-@dataclass
-class EventDispatcherIdleCheckerInitArgs:
-    redis_live: ValkeyLiveClient
-    idle_timeout: timedelta | None = None
-
-
 DEFAULT_NETWORK_CHECKER_IDLE_TIMEOUT: Final[timedelta] = timedelta(minutes=10)
-
-
-class NetworkTimeoutEventDispatcherIdleChecker(AbstractEventDispatcherIdleChecker):
-    _redis_live: ValkeyLiveClient
-    _idle_timeout: timedelta
-
-    _config_iv = t.Dict(
-        {
-            t.Key("threshold", default=None): t.Null | tx.TimeDuration(),
-        },
-    ).allow_extra("*")
-
-    def __init__(
-        self,
-        args: EventDispatcherIdleCheckerInitArgs,
-    ) -> None:
-        self._redis_live = args.redis_live
-        self._idle_timeout = args.idle_timeout or DEFAULT_NETWORK_CHECKER_IDLE_TIMEOUT
-
-    @override
-    @classmethod
-    def name(cls) -> str:
-        return NETWORK_IDLE_CHECKER_NAME
-
-    @override
-    async def populate_config(self, raw_config: Mapping[str, Any]) -> None:
-        config = self._config_iv.check(raw_config)
-        self._idle_timeout = config["threshold"] or DEFAULT_NETWORK_CHECKER_IDLE_TIMEOUT
-
-    @override
-    async def watch_session_status(
-        self,
-        session_id: SessionId,
-        status: SessionStatus,
-    ) -> None:
-        match status:
-            case SessionStatus.RUNNING:
-                await self._update_timeout(session_id)
-
-    @override
-    async def watch_session_execution(
-        self,
-        session_id: SessionId,
-        status: SessionExecutionStatus,
-    ) -> None:
-        match status:
-            case SessionExecutionStatus.STARTED:
-                await self._disable_timeout(session_id)
-            case (
-                SessionExecutionStatus.FINISHED
-                | SessionExecutionStatus.TIMEOUT
-                | SessionExecutionStatus.CANCELED
-            ):
-                await self._update_timeout(session_id)
-
-    async def update_app_streaming_status(
-        self,
-        session_id: SessionId,
-        status: AppStreamingStatus,
-    ) -> None:
-        if status == AppStreamingStatus.HAS_ACTIVE_CONNECTIONS:
-            await self._disable_timeout(session_id)
-        elif status == AppStreamingStatus.NO_ACTIVE_CONNECTIONS:
-            await self._update_timeout(session_id)
-
-    async def _disable_timeout(self, session_id: SessionId) -> None:
-        log.debug("NetworkTimeoutIdleChecker._disable_timeout({})", session_id)
-        await self._redis_live.store_live_data(
-            f"session.{session_id}.last_access",
-            "0",
-            xx=True,
-        )
-
-    async def _update_timeout(self, session_id: SessionId) -> None:
-        log.debug("NetworkTimeoutIdleChecker._update_timeout({})", session_id)
-        timestamp = await self._redis_live.get_server_time()
-        await self._redis_live.store_live_data(
-            f"session.{session_id}.last_access",
-            f"{timestamp:.06f}",
-            ex=max(86400, int(self._idle_timeout.total_seconds() * 2)),
-        )
 
 
 class NetworkTimeoutIdleChecker(BaseIdleChecker):
@@ -1303,8 +1151,6 @@ checker_registry: Mapping[str, type[BaseIdleChecker]] = {
     UtilizationIdleChecker.name: UtilizationIdleChecker,
 }
 
-event_dispatcher_idle_checkers = (NetworkTimeoutEventDispatcherIdleChecker,)
-
 
 async def init_idle_checkers(
     db: SAEngine,
@@ -1353,11 +1199,4 @@ async def init_idle_checkers(
         log.info("Initializing idle checker: {}", checker_name)
         checker_instance = checker_cls(checker_init_args)
         checker_host.add_checker(checker_instance)
-    event_dispatcher_checker_args = EventDispatcherIdleCheckerInitArgs(
-        checker_host._valkey_live,
-    )
-    for event_dispatcher_checker_cls in event_dispatcher_idle_checkers:
-        if event_dispatcher_checker_cls.name() in enabled_checker_names:
-            event_dispatcher_checker = event_dispatcher_checker_cls(event_dispatcher_checker_args)
-            checker_host.add_event_dispatch_checker(event_dispatcher_checker)
     return checker_host

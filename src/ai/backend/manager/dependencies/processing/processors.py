@@ -8,7 +8,7 @@ from typing import override
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.factory import create_processors
 from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
@@ -19,7 +19,7 @@ class ProcessorsProviderInput:
     """Input required for Processors setup."""
 
     service_args: ServiceArgs
-    action_monitors: list[ActionMonitor]
+    action_monitors: ActionMonitors
     event_hub: EventHub
     event_fetcher: EventFetcher
     validators: ActionValidators

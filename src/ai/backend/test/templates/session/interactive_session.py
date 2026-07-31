@@ -120,7 +120,7 @@ class _BaseInteractiveSessionTemplate(WrapperTestTemplate):
             ):
                 yield
         finally:
-            if session_id:
+            if session_id is not None:
                 await self._verify_session_destruction(client_session, session_name)
 
 

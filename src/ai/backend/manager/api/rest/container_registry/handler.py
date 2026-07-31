@@ -31,12 +31,14 @@ from ai.backend.common.container_registry import (
 from ai.backend.common.dto.manager.registry.request import HarborWebhookRequestModel
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import RequestCtx
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.container_registry.creators import (
     ContainerRegistryCreatorSpec,
+)
+from ai.backend.manager.repositories.container_registry.purgers import (
+    ContainerRegistryPurgerSpec,
 )
 from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
@@ -144,7 +146,7 @@ class ContainerRegistryHandler:
 
         await self._container_registry.delete_container_registry.wait_for_complete(
             DeleteContainerRegistryAction(
-                purger=Purger(row_class=ContainerRegistryRow, pk_value=registry_id)
+                purger=Purger(spec=ContainerRegistryPurgerSpec(registry_id=registry_id))
             )
         )
         return APIResponse.no_content(HTTPStatus.NO_CONTENT)

@@ -20,7 +20,7 @@ class TestAgentConfigLoaderDependency:
         config_path.write_text("""
 [agent]
 id = "test-agent-123"
-scaling-group = "test-group"
+initial-resource-group-name = "test-group"
 backend = "docker"
 
 [etcd]
@@ -42,7 +42,7 @@ reserved-cpu = 1
 
         async with loader.provide(input_data) as config:
             assert config.agent.id == "test-agent-123"
-            assert config.agent.scaling_group == "test-group"
+            assert config.agent.initial_resource_group_name == "test-group"
             assert config.etcd.namespace == "test"
             assert config.container.scratch_root.resolve() == Path("/tmp/test").resolve()
 
@@ -56,7 +56,7 @@ reserved-cpu = 1
         config_path.write_text("""
 [agent]
 id = "original-id"
-scaling-group = "original-group"
+initial-resource-group-name = "original-group"
 backend = "docker"
 
 [etcd]
@@ -93,7 +93,7 @@ reserved-cpu = 1
         # Missing required fields
         config_path.write_text("""
 [agent]
-# Missing id and scaling-group
+# Missing required fields
 """)
 
         loader = AgentConfigLoaderDependency()
@@ -112,7 +112,7 @@ reserved-cpu = 1
         config_path.write_text("""
 [agent]
 id = "debug-test"
-scaling-group = "default"
+initial-resource-group-name = "default"
 backend = "docker"
 
 [etcd]

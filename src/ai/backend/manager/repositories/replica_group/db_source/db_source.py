@@ -13,7 +13,9 @@ import sqlalchemy as sa
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerOptions,
@@ -75,6 +77,7 @@ from ai.backend.manager.repositories.replica_group.types import (
     RevisionRouteConfig,
     ScalingReconcileFetch,
 )
+from ai.backend.manager.repositories.session_group.creators import SessionGroupCreatorSpec
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.manager.views.replica_group import (
     ReplicaGroupAutoscaleReconcileView,
@@ -201,9 +204,11 @@ class ReplicaGroupDBSource:
             group_rows: list[ReplicaGroupRow] = [row.ReplicaGroupRow for row in group_result.rows]
             group_ids = [group_row.id for group_row in group_rows]
             deployment_ids = [group_row.deployment_id for group_row in group_rows]
+            counts = await self._count_live_serving_by_revision(db_sess, group_ids)
             last_histories = await self._latest_history_by_group(db_sess, group_ids, category)
             handler_options = await self._handler_options_by_deployment(db_sess, deployment_ids)
             deployment_desired = await self._replicas_by_deployment(db_sess, deployment_ids)
+            empty = RevisionReplicaCount(live=0, serving=0)
             views = [
                 ReplicaGroupLifecycleReconcileView(
                     group_id=group_row.id,
@@ -214,6 +219,11 @@ class ReplicaGroupDBSource:
                     scaling_status=group_row.scaling_status,
                     desired_current_replica_count=group_row.desired_current_replica_count,
                     desired_target_replica_count=group_row.desired_target_replica_count,
+                    current_live_replica_count=(
+                        counts.get(group_row.id, {}).get(group_row.current_revision_id, empty).live
+                        if group_row.current_revision_id is not None
+                        else 0
+                    ),
                     deployment_desired_replica_count=deployment_desired.get(
                         group_row.deployment_id, 0
                     ),
@@ -416,6 +426,9 @@ class ReplicaGroupDBSource:
                 row.EndpointRow.id: row.EndpointRow.primary_replica_group_id
                 for row in endpoint_rows.rows
             }
+            endpoint_by_deployment = {
+                row.EndpointRow.id: row.EndpointRow for row in endpoint_rows.rows
+            }
             reuse_updaters: list[Updater[ReplicaGroupRow]] = []
             endpoint_updaters: list[Updater[EndpointRow]] = []
             for setup in setups:
@@ -432,10 +445,27 @@ class ReplicaGroupDBSource:
                     )
                     target_group_id = primary_group_id
                 else:
+                    # A fresh replica group (blue-green / canary) brings its own
+                    # session group, inheriting the endpoint's ownership scope.
+                    endpoint_row = endpoint_by_deployment.get(setup.deployment_id)
+                    if endpoint_row is None:
+                        # The deployment disappeared between the read and here;
+                        # its rollout has nothing left to point at.
+                        continue
+                    session_group = await w.create(
+                        Creator(
+                            spec=SessionGroupCreatorSpec.for_replica_group(
+                                domain_name=endpoint_row.domain,
+                                project_id=ProjectID(endpoint_row.project),
+                                owner_user_id=UserID(endpoint_row.session_owner),
+                            )
+                        )
+                    )
                     created = await w.create(
                         Creator(
                             spec=ReplicaGroupCreatorSpec(
                                 deployment_id=setup.deployment_id,
+                                session_group_id=session_group.row.id,
                                 target_revision_id=setup.target_revision_id,
                                 desired_target_replica_count=setup.desired_target_replica_count,
                                 rollout=setup.spec.rollout,

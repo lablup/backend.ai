@@ -90,10 +90,10 @@ class FairShareObserver(KernelObserver):
         1. Running kernels (terminated_at IS NULL) with starts_at set
         2. Recently terminated kernels with unobserved periods
 
-        The lookback_days is fetched from scaling_group's fair_share_spec via subquery.
+        The lookback_days is fetched from the resource group's fair_share_spec via subquery.
 
         Args:
-            resource_group_id: The id of the scaling group being processed
+            resource_group_id: The id of the resource group being processed
 
         Returns:
             QueryCondition for fair share observation targets
@@ -122,14 +122,14 @@ class FairShareObserver(KernelObserver):
         - DB write: factors + ranks (batched)
 
         Args:
-            resource_group_id: The id of the scaling group being processed
+            resource_group_id: The id of the resource group being processed
             kernels: Kernels to observe (running + recently terminated with unobserved periods)
 
         Returns:
             ObservationResult containing observed count
         """
         log.debug(
-            "[FairShareObserver] observe() called: scaling_group={}, kernel_count={}",
+            "[FairShareObserver] observe() called: resource_group={}, kernel_count={}",
             resource_group_id,
             len(kernels),
         )
@@ -138,14 +138,15 @@ class FairShareObserver(KernelObserver):
             return ObservationResult(observed_count=0)
 
         now = await self._scheduler_repository.get_db_now()
-        # Fair share records and factor queries are keyed by name.
+        # Keep the legacy name alongside the ID while name-based writes remain supported.
         resource_group_name = await self._scheduler_repository.get_resource_group_name_by_id(
             resource_group_id
         )
 
         # ===== Phase 1: Record usage =====
+        # TODO: Remove resource_group name from spec once DB schema is updated
         preparation_result = self._aggregator.prepare_kernel_usage_records(
-            kernels, resource_group_name, now
+            kernels, resource_group_id, resource_group_name, now
         )
 
         log.debug(
@@ -181,7 +182,9 @@ class FairShareObserver(KernelObserver):
         log.debug("[FairShareObserver] DB write completed")
 
         # ===== Phase 2: Calculate and update factors + ranks =====
-        await self._calculate_and_update_factors_and_ranks(resource_group_name, now.date())
+        await self._calculate_and_update_factors_and_ranks(
+            resource_group_name, resource_group_id, now.date()
+        )
 
         log.debug(
             "[FairShareObserver] Observation complete: observed_count={}",
@@ -191,28 +194,29 @@ class FairShareObserver(KernelObserver):
 
     async def _calculate_and_update_factors_and_ranks(
         self,
-        scaling_group: str,
+        resource_group: str,
+        resource_group_id: ResourceGroupID,
         today: date,
     ) -> None:
         """Calculate fair share factors and scheduling ranks, then update tables.
 
         This method batches DB operations:
-        1. READ: scaling group config + fair shares + decayed usages (single session)
+        1. READ: resource group config + fair shares + decayed usages (single session)
         2. PURE: calculate factors from usage with config
         3. PURE: calculate ranks from factors (no DB read needed)
         4. WRITE: update factors + ranks together
 
         Args:
-            scaling_group: The scaling group being processed
+            resource_group_id: The resource group ID being processed
             today: Current date for decay calculation
         """
         try:
-            log.debug("[FairShareObserver] Phase 2: calculating factors for {}", scaling_group)
+            log.debug("[FairShareObserver] Phase 2: calculating factors for {}", resource_group_id)
 
             # ===== Single batched DB read =====
             # Get all data needed for calculation in one database session
             context = await self._fair_share_repository.get_fair_share_calculation_context(
-                scaling_group, today
+                resource_group_id, today
             )
 
             log.debug(
@@ -226,7 +230,7 @@ class FairShareObserver(KernelObserver):
             if context.cluster_capacity:
                 capacity_by_slot = {sq.slot_name: sq.quantity for sq in context.cluster_capacity}
                 await self._resource_usage_repository.update_bucket_entry_capacities(
-                    scaling_group,
+                    resource_group_id,
                     capacity_by_slot,
                 )
 
@@ -260,7 +264,8 @@ class FairShareObserver(KernelObserver):
 
             # ===== Batched DB write: factors + ranks =====
             await self._fair_share_repository.bulk_update_fair_share_factors(
-                scaling_group,
+                resource_group,
+                resource_group_id,
                 calculation_result,
                 lookback_start,
                 today,
@@ -270,7 +275,7 @@ class FairShareObserver(KernelObserver):
         except Exception as e:
             log.warning(
                 "Failed to calculate fair share factors and ranks for {}: {}",
-                scaling_group,
+                resource_group_id,
                 e,
             )
             # Don't fail the observation for calculation errors

@@ -93,7 +93,7 @@ class FairShareService:
         Repository handles default value creation internally.
         """
         result = await self._repository.get_domain_fair_share(
-            resource_group=action.resource_group,
+            resource_group_id=action.resource_group_id,
             domain_name=action.domain_name,
         )
         return GetDomainFairShareActionResult(data=result)
@@ -140,7 +140,7 @@ class FairShareService:
         Repository handles default value creation internally.
         """
         result = await self._repository.get_project_fair_share(
-            resource_group=action.resource_group,
+            resource_group_id=action.resource_group_id,
             project_id=action.project_id,
         )
         return GetProjectFairShareActionResult(data=result)
@@ -187,7 +187,7 @@ class FairShareService:
         Repository handles default value creation internally.
         """
         result = await self._repository.get_user_fair_share(
-            resource_group=action.resource_group,
+            resource_group_id=action.resource_group_id,
             project_id=action.project_id,
             user_uuid=action.user_uuid,
         )
@@ -232,6 +232,7 @@ class FairShareService:
         """Upsert a domain fair share weight."""
         spec = DomainFairShareUpserterSpec(
             resource_group=action.resource_group,
+            resource_group_id=action.resource_group_id,
             domain_name=action.domain_name,
             weight=TriState.from_graphql(action.weight),
         )
@@ -245,6 +246,7 @@ class FairShareService:
         """Upsert a project fair share weight."""
         spec = ProjectFairShareUpserterSpec(
             resource_group=action.resource_group,
+            resource_group_id=action.resource_group_id,
             project_id=action.project_id,
             domain_name=action.domain_name,
             weight=TriState.from_graphql(action.weight),
@@ -259,6 +261,7 @@ class FairShareService:
         """Upsert a user fair share weight."""
         spec = UserFairShareUpserterSpec(
             resource_group=action.resource_group,
+            resource_group_id=action.resource_group_id,
             user_uuid=action.user_uuid,
             project_id=action.project_id,
             domain_name=action.domain_name,
@@ -280,6 +283,7 @@ class FairShareService:
         specs = [
             DomainFairShareBulkWeightUpserterSpec(
                 resource_group=action.resource_group,
+                resource_group_id=action.resource_group_id,
                 domain_name=input_item.domain_name,
                 weight=input_item.weight,
             )
@@ -299,6 +303,7 @@ class FairShareService:
         specs = [
             ProjectFairShareBulkWeightUpserterSpec(
                 resource_group=action.resource_group,
+                resource_group_id=action.resource_group_id,
                 project_id=input_item.project_id,
                 domain_name=input_item.domain_name,
                 weight=input_item.weight,
@@ -319,6 +324,7 @@ class FairShareService:
         specs = [
             UserFairShareBulkWeightUpserterSpec(
                 resource_group=action.resource_group,
+                resource_group_id=action.resource_group_id,
                 user_uuid=input_item.user_uuid,
                 project_id=input_item.project_id,
                 domain_name=input_item.domain_name,

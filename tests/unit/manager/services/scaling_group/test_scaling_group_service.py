@@ -129,6 +129,7 @@ class TestScalingGroupService:
             status=ScalingGroupStatus(
                 is_active=True,
                 is_public=True,
+                is_default=False,
             ),
             metadata=ScalingGroupMetadata(
                 description="Default scaling group",
@@ -155,7 +156,6 @@ class TestScalingGroupService:
                     config={},
                     agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
                     agent_selector_config={},
-                    enforce_spreading_endpoint_replica=False,
                     allow_fractional_resource_fragmentation=True,
                     route_cleanup_target_statuses=["unhealthy"],
                 ),
@@ -264,6 +264,7 @@ class TestScalingGroupService:
                 status=ScalingGroupStatus(
                     is_active=True,
                     is_public=True,
+                    is_default=False,
                 ),
                 metadata=ScalingGroupMetadata(
                     description=f"Scaling group {i}",
@@ -290,7 +291,6 @@ class TestScalingGroupService:
                         config={},
                         agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
                         agent_selector_config={},
-                        enforce_spreading_endpoint_replica=False,
                         allow_fractional_resource_fragmentation=True,
                         route_cleanup_target_statuses=["unhealthy"],
                     ),
@@ -699,7 +699,7 @@ class TestGetWsproxyVersion:
         return ScalingGroupData(
             id=ResourceGroupID(uuid.uuid4()),
             name="gpu-group",
-            status=ScalingGroupStatus(is_active=True, is_public=True),
+            status=ScalingGroupStatus(is_active=True, is_public=True, is_default=False),
             metadata=ScalingGroupMetadata(
                 description="GPU group",
                 created_at=datetime.now(tz=UTC),
@@ -718,7 +718,6 @@ class TestGetWsproxyVersion:
                     config={},
                     agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
                     agent_selector_config={},
-                    enforce_spreading_endpoint_replica=False,
                     allow_fractional_resource_fragmentation=True,
                     route_cleanup_target_statuses=["unhealthy"],
                 ),
@@ -849,7 +848,7 @@ class TestListAllowedScalingGroups:
         return ScalingGroupData(
             id=ResourceGroupID(uuid.uuid4()),
             name=name,
-            status=ScalingGroupStatus(is_active=True, is_public=is_public),
+            status=ScalingGroupStatus(is_active=True, is_public=is_public, is_default=False),
             metadata=ScalingGroupMetadata(
                 description=f"{name} group",
                 created_at=datetime.now(tz=UTC),
@@ -866,7 +865,6 @@ class TestListAllowedScalingGroups:
                     config={},
                     agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
                     agent_selector_config={},
-                    enforce_spreading_endpoint_replica=False,
                     allow_fractional_resource_fragmentation=True,
                     route_cleanup_target_statuses=["unhealthy"],
                 ),

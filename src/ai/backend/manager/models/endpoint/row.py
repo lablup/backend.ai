@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import (
+    Collection,
     Iterable,
     Sequence,
 )
@@ -629,7 +630,9 @@ class EndpointRow(Base):  # type: ignore[misc]
         target_user_uuid: UUID,
         target_access_key: AccessKey,
     ) -> None:
+        from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
         from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
+        from ai.backend.manager.models.session_group.row import SessionGroupRow
 
         endpoint_rows = await EndpointRow.list_endpoint(
             db_session,
@@ -652,6 +655,19 @@ class EndpointRow(Base):  # type: ignore[misc]
         )
         for session_row in session_rows:
             session_row.delegate_ownership(target_user_uuid, target_access_key)
+        # The placement groups of the delegated replica groups follow their
+        # members: a group's members all belong to its owner (BEP-1064).
+        await db_session.execute(
+            sa.update(SessionGroupRow)
+            .where(
+                SessionGroupRow.id.in_(
+                    sa.select(ReplicaGroupRow.session_group_id).where(
+                        ReplicaGroupRow.deployment_id.in_([row.id for row in endpoint_rows])
+                    )
+                )
+            )
+            .values(owner_user_id=target_user_uuid)
+        )
 
     @property
     def current_revision_id(self) -> DeploymentRevisionID | None:
@@ -1077,7 +1093,7 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
     async def list(
         cls,
         session: AsyncSession,
-        endpoint_status_filter: Iterable[EndpointLifecycle] = frozenset([
+        endpoint_status_filter: Collection[EndpointLifecycle] = frozenset([
             EndpointLifecycle.CREATED
         ]),
     ) -> Sequence[Self]:

@@ -36,7 +36,7 @@ Check the schema version and apply or roll back Alembic migrations for Backend.A
 |-------|---------|--------|
 | up-to-date | current == head | none |
 | behind | current behind head | upgrade (below) |
-| diverged | multiple heads | fix `down_revision` per `alembic/AGENTS.md` (no merge migrations) |
+| diverged | multiple heads | reconcile per `alembic/AGENTS.md`: repoint your own migration's `down_revision`, or add an empty merge migration when main itself has 2+ heads |
 | no revision | current empty (fresh DB) | upgrade for initial setup |
 
 ## Apply
@@ -57,7 +57,7 @@ Re-check status afterwards. **Downgrade may remove data or features — verify a
 
 | Symptom | Cause | Action |
 |---------|-------|--------|
-| Multiple heads detected | diverged migrations | fix `down_revision` per `alembic/AGENTS.md` (no merge migrations), then retry |
+| Multiple heads detected | diverged migrations | reconcile per `alembic/AGENTS.md` (repoint your own `down_revision`, or add an empty merge migration if main has 2+ heads), then retry |
 | Cannot locate revision 'X' | bad revision id / wrong config | `./py -m alembic -c <config> history`; check typo & component |
 | Foreign key constraint violation | existing data blocks the change | review the migration's data-migration logic; fix data integrity; often needs manual intervention |
 | Cannot connect (connection refused :5432) | PostgreSQL down / misconfig | `docker ps \| grep postgres`; see `/halfstack` |
@@ -73,7 +73,7 @@ Re-check status afterwards. **Downgrade may remove data or features — verify a
 
 - **After pulling code:** `git pull` → check status → upgrade → start services (`/local-dev`) → verify.
 - **After authoring a migration** (see `alembic/AGENTS.md`): review file → test upgrade → test downgrade (`--direction=downgrade --target=-1`) → re-upgrade → commit.
-- **Merge conflicts:** if status shows diverged heads, fix `down_revision` per `alembic/AGENTS.md` (never create merge migrations) before applying.
+- **Merge conflicts:** if status shows diverged heads, reconcile per `alembic/AGENTS.md` (repoint your own migration's `down_revision`, or add an empty merge migration when main itself has 2+ heads) before applying.
 
 ## Related skills
 

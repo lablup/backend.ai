@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import override
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.fair_share import (
     DomainFairShareRow,
@@ -25,6 +26,7 @@ class DomainFairShareCreatorSpec(CreatorSpec[DomainFairShareRow]):
 
     # Identity (required)
     resource_group: str
+    resource_group_id: ResourceGroupID
     domain_name: str
 
     # Spec (optional - uses Row defaults if None)
@@ -38,6 +40,7 @@ class DomainFairShareCreatorSpec(CreatorSpec[DomainFairShareRow]):
     def build_row(self) -> DomainFairShareRow:
         row = DomainFairShareRow(
             resource_group=self.resource_group,
+            resource_group_id=self.resource_group_id,
             domain_name=self.domain_name,
         )
         if self.weight is not None:
@@ -62,6 +65,7 @@ class ProjectFairShareCreatorSpec(CreatorSpec[ProjectFairShareRow]):
 
     # Identity (required)
     resource_group: str
+    resource_group_id: ResourceGroupID
     project_id: uuid.UUID
     domain_name: str
 
@@ -76,6 +80,7 @@ class ProjectFairShareCreatorSpec(CreatorSpec[ProjectFairShareRow]):
     def build_row(self) -> ProjectFairShareRow:
         row = ProjectFairShareRow(
             resource_group=self.resource_group,
+            resource_group_id=self.resource_group_id,
             project_id=self.project_id,
             domain_name=self.domain_name,
         )
@@ -101,6 +106,7 @@ class UserFairShareCreatorSpec(CreatorSpec[UserFairShareRow]):
 
     # Identity (required)
     resource_group: str
+    resource_group_id: ResourceGroupID
     user_uuid: uuid.UUID
     project_id: uuid.UUID
     domain_name: str
@@ -116,6 +122,7 @@ class UserFairShareCreatorSpec(CreatorSpec[UserFairShareRow]):
     def build_row(self) -> UserFairShareRow:
         row = UserFairShareRow(
             resource_group=self.resource_group,
+            resource_group_id=self.resource_group_id,
             user_uuid=self.user_uuid,
             project_id=self.project_id,
             domain_name=self.domain_name,

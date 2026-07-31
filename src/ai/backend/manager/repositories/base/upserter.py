@@ -12,6 +12,7 @@ from sqlalchemy.engine import CursorResult
 
 from ai.backend.manager.errors.repository import UpsertEmptyResultError
 from ai.backend.manager.models.base import Base
+from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -33,6 +34,14 @@ class UpserterSpec[TRow: Base](ABC):
     def row_class(self) -> type[TRow]:
         """Return the ORM class for table access and result reconstruction."""
         raise NotImplementedError
+
+    @property
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        """Constraint violations to map to domain errors, other than the conflict target.
+
+        Empty by default; an unmatched error raises RepositoryIntegrityError.
+        """
+        return ()
 
     @abstractmethod
     def build_insert_values(self) -> dict[str, Any]:

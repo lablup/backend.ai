@@ -10,6 +10,8 @@ from ai.backend.common.dto.manager.v2.agent.request import (
     AdminSearchAgentsInput,
     AgentFilter,
     AgentOrder,
+    UpdateAgentResourceGroupBody,
+    UpdateAgentResourceGroupInput,
 )
 from ai.backend.common.dto.manager.v2.agent.response import (
     AdminSearchAgentsPayload,
@@ -20,8 +22,13 @@ from ai.backend.common.dto.manager.v2.agent.response import (
     AgentSystemInfo,
     ComputePluginEntryDTO,
     ComputePluginsGQLDTO,
+    UpdateAgentResourceGroupPayload,
 )
-from ai.backend.common.dto.manager.v2.agent.types import AgentStatusFilter
+from ai.backend.common.dto.manager.v2.agent.types import (
+    AgentStatusFilter,
+    ConflictingSessionCleanupPolicyEnum,
+)
+from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
@@ -49,6 +56,10 @@ from ai.backend.manager.services.agent.actions.load_container_counts import (
     LoadContainerCountsAction,
 )
 from ai.backend.manager.services.agent.actions.search_agents import SearchAgentsAction
+from ai.backend.manager.services.agent.actions.update_resource_group import (
+    UpdateAgentResourceGroupAction,
+)
+from ai.backend.manager.services.agent.types import ConflictingSessionCleanupPolicy
 
 _AGENT_PAGINATION_SPEC = PaginationSpec(
     forward_order=DEFAULT_FORWARD_ORDER,
@@ -197,6 +208,53 @@ class AgentAdapter(BaseAdapter):
     @staticmethod
     def _convert_orders(order: list[AgentOrder]) -> list[QueryOrder]:
         return [resolve_order(o.field, o.direction) for o in order]
+
+    # ------------------------------------------------------------------ update
+
+    async def update_resource_group_from_body(
+        self,
+        agent_id: AgentId,
+        body: UpdateAgentResourceGroupBody,
+    ) -> UpdateAgentResourceGroupPayload:
+        """Change the resource group of an agent whose ID is carried separately.
+
+        Used by the REST handler, where the agent ID comes from the URL path
+        while the body only carries the mutable part.
+        """
+        return await self.update_resource_group(
+            UpdateAgentResourceGroupInput(
+                agent_id=agent_id,
+                resource_group_id=body.resource_group_id,
+                policy=body.policy,
+                force=body.force,
+            )
+        )
+
+    async def update_resource_group(
+        self,
+        input: UpdateAgentResourceGroupInput,
+    ) -> UpdateAgentResourceGroupPayload:
+        """Change an agent's resource group, cleaning up conflicting sessions per policy."""
+        applied_policy = input.policy or ConflictingSessionCleanupPolicyEnum.TERMINATE
+        action_result = await self._processors.agent.update_resource_group.wait_for_complete(
+            UpdateAgentResourceGroupAction(
+                agent_id=input.agent_id,
+                resource_group_id=input.resource_group_id,
+                policy=ConflictingSessionCleanupPolicy(applied_policy.value),
+                force=input.force,
+            )
+        )
+        return UpdateAgentResourceGroupPayload(
+            agent_id=action_result.agent_id,
+            resource_group_id=action_result.resource_group_id,
+            policy=applied_policy,
+            conflicting_session_ids=[
+                SessionID(sid) for sid in action_result.conflicting_session_ids
+            ],
+            terminating_session_ids=[
+                SessionID(sid) for sid in action_result.terminating_session_ids
+            ],
+        )
 
     async def get_total_resources(self) -> TotalResourceData:
         """Retrieve aggregate resource capacity/usage across all agents."""

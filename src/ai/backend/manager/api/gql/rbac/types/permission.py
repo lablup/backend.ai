@@ -239,6 +239,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
                 | RBACElementType.KEYPAIR_RESOURCE_POLICY
                 | RBACElementType.PROJECT_RESOURCE_POLICY
                 | RBACElementType.AUDIT_LOG
+                | RBACElementType.KERNEL_HISTORY
                 | RBACElementType.EVENT_LOG
                 | RBACElementType.NOTIFICATION_RULE
                 | RBACElementType.AGENT
@@ -255,6 +256,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
                 | RBACElementType.VFOLDER_DATA
                 | RBACElementType.SESSION_APP_SERVICE
                 | RBACElementType.USER_EMAIL
+                | RBACElementType.IDLE_CHECKER_ASSIGNMENT
             ):
                 return None
 

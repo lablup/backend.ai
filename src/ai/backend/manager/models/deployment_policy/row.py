@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
@@ -20,6 +19,7 @@ from ai.backend.manager.models.base import (
     Base,
     StrEnumType,
 )
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.endpoint import EndpointRow
@@ -29,7 +29,7 @@ __all__ = ("DeploymentPolicyRow",)
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class DeploymentPolicyRow(Base):  # type: ignore[misc]
+class DeploymentPolicyRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     """
     Represents a deployment policy for a deployment.
 
@@ -68,21 +68,6 @@ class DeploymentPolicyRow(Base):  # type: ignore[misc]
         pgsql.JSONB(),
         nullable=False,
         server_default="{}",
-    )
-
-    # Timestamps
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        nullable=False,
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
-        nullable=False,
     )
 
     endpoint_row: Mapped[EndpointRow | None] = relationship(

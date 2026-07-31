@@ -59,6 +59,7 @@ from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.model_card.creators import ModelCardCreatorSpec
 from ai.backend.manager.repositories.model_card.db_source.db_source import ModelCardDBSource
+from ai.backend.manager.repositories.model_card.purgers import ModelCardPurgerSpec
 from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:
@@ -418,7 +419,7 @@ class TestModelCardDelete:
         assert target.vfolder_id == sibling.vfolder_id
 
         await db_source.delete(
-            Purger(row_class=ModelCardRow, pk_value=target.id),
+            Purger(spec=ModelCardPurgerSpec(card_id=target.id)),
             case.options,
         )
 
@@ -457,9 +458,9 @@ class TestModelCardDelete:
 
         result = await db_source.bulk_delete(
             [
-                Purger(row_class=ModelCardRow, pk_value=valid_a.id),
-                Purger(row_class=ModelCardRow, pk_value=missing_id),
-                Purger(row_class=ModelCardRow, pk_value=valid_b.id),
+                Purger(spec=ModelCardPurgerSpec(card_id=valid_a.id)),
+                Purger(spec=ModelCardPurgerSpec(card_id=missing_id)),
+                Purger(spec=ModelCardPurgerSpec(card_id=valid_b.id)),
             ],
             DeleteModelCardOptions(delete_associated_vfolder=False),
         )
@@ -495,8 +496,8 @@ class TestModelCardDelete:
 
         result = await db_source.bulk_delete(
             [
-                Purger(row_class=ModelCardRow, pk_value=free_card.id),
-                Purger(row_class=ModelCardRow, pk_value=mounted_card.id),
+                Purger(spec=ModelCardPurgerSpec(card_id=free_card.id)),
+                Purger(spec=ModelCardPurgerSpec(card_id=mounted_card.id)),
             ],
             DeleteModelCardOptions(delete_associated_vfolder=True),
         )

@@ -244,6 +244,15 @@ def audit_log() -> None:
 
 @v2.group(
     cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.idle_checker_assignment:idle_checker_assignment",
+    name="idle-checker-assignment",
+)
+def idle_checker_assignment() -> None:
+    """Idle checker assignment commands."""
+
+
+@v2.group(
+    cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.scheduling_history:scheduling_history",
 )
 def scheduling_history() -> None:

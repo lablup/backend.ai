@@ -20,7 +20,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
-from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
+from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
@@ -33,6 +33,7 @@ from ai.backend.common.identifier.domain import DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.json import load_json
 from ai.backend.common.plugin.monitor import ErrorPluginContext
@@ -55,11 +56,13 @@ from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
     KernelResourceInput,
+    ResourceSpecDraft,
     SchedulingTargetDraft,
     SessionClassificationDraft,
     SessionIdentityDraft,
     SessionNetworkDraft,
     SessionOptionsDraft,
+    SessionResourceSpecDraft,
     SessionScopeDraft,
     SessionSpecDraft,
 )
@@ -116,6 +119,10 @@ from ai.backend.manager.services.session.actions.commit_session import (
 from ai.backend.manager.services.session.actions.complete import (
     CompleteAction,
     CompleteActionResult,
+)
+from ai.backend.manager.services.session.actions.compute_schedule import (
+    ComputeScheduleAction,
+    ComputeScheduleActionResult,
 )
 from ai.backend.manager.services.session.actions.convert_session_to_image import (
     ConvertSessionToImageAction,
@@ -315,6 +322,34 @@ class SessionService:
             action.user_id,
         )
         return ResolveSessionActionResult(session_id=session_id)
+
+    async def compute_schedule(self, action: ComputeScheduleAction) -> ComputeScheduleActionResult:
+        """Build a resource-only draft (one kernel group per requested
+        kernel, unique role for positional correlation) and delegate the
+        node-fitting decision to the scheduling controller.
+        """
+        kernel_groups = tuple(
+            KernelGroupDraft(
+                role=DEFAULT_ROLE if idx == 0 else f"sub{idx}",
+                replica_count=1,
+                execution_spec=KernelExecutionSpecDraft(resource_input=kernel),
+            )
+            for idx, kernel in enumerate(action.kernels)
+        )
+        draft = ResourceSpecDraft(
+            options=SessionOptionsDraft(
+                cluster_mode=action.cluster_mode,
+                cluster_size=len(action.kernels),
+                scheduling_target=SchedulingTargetDraft(
+                    designated_agents=tuple(action.designated_agent_ids or ()),
+                    agent_selection_policy=action.agent_selection_policy,
+                ),
+                kernel_groups=kernel_groups,
+            ),
+        )
+
+        result = await self._scheduling_controller.compute_schedule(action.resource_group_id, draft)
+        return ComputeScheduleActionResult(result=result)
 
     async def resolve_session_name(
         self, action: ResolveSessionNameAction
@@ -547,6 +582,7 @@ class SessionService:
         image = action.params.image
         architecture = action.params.architecture
         priority = action.params.priority
+        job_priority = action.params.job_priority
         is_preemptible = action.params.is_preemptible
         bootstrap_script = action.params.bootstrap_script
         dependencies = action.params.dependencies
@@ -593,6 +629,7 @@ class SessionService:
                 cluster_size,
                 reuse=reuse_if_exists,
                 priority=priority,
+                job_priority=job_priority,
                 is_preemptible=is_preemptible,
                 enqueue_only=enqueue_only,
                 max_wait_seconds=max_wait_seconds,
@@ -750,6 +787,7 @@ class SessionService:
         image = params["image"]
         architecture = params["architecture"]
         priority = params["priority"]
+        job_priority = params.get("job_priority", JOB_PRIORITY_DEFAULT)
         is_preemptible = params.get("is_preemptible", True)
         bootstrap_script = params["bootstrap_script"]
         dependencies = params["dependencies"]
@@ -797,6 +835,7 @@ class SessionService:
                 cluster_size,
                 reuse=reuse_if_exists,
                 priority=priority,
+                job_priority=job_priority,
                 is_preemptible=is_preemptible,
                 enqueue_only=enqueue_only,
                 max_wait_seconds=max_wait_seconds,
@@ -1577,7 +1616,9 @@ class SessionService:
         await self._session_repository.resolve_image_by_id(action.image_id)
 
         resource_entries = tuple(
-            ResourceSlotEntry(resource_type=entry.resource_type, quantity=entry.quantity)
+            ResourceSlotEntry(
+                resource_type=ResourceSlotName(entry.resource_type), quantity=entry.quantity
+            )
             for entry in action.resource.entries
         )
         resource_opts_payload: dict[str, Any] = {}
@@ -1644,12 +1685,47 @@ class SessionService:
         )
 
         draft = SessionSpecDraft(
-            identity=SessionIdentityDraft(
-                session_id=SessionID(uuid.uuid4()),
-                creation_id=secrets.token_urlsafe(16),
-                session_name=action.session_name,
-                access_key=access_key,
-                user_uuid=user_id,
+            resource_spec=SessionResourceSpecDraft(
+                identity=SessionIdentityDraft(
+                    session_id=SessionID(uuid.uuid4()),
+                    creation_id=secrets.token_urlsafe(16),
+                    session_name=action.session_name,
+                    access_key=access_key,
+                    user_uuid=user_id,
+                ),
+                classification=SessionClassificationDraft(
+                    session_type=action.session_type,
+                    tag=action.tag,
+                ),
+                network=SessionNetworkDraft(
+                    network_id=(
+                        str(action.scheduling.attach_network)
+                        if action.scheduling.attach_network is not None
+                        else None
+                    ),
+                ),
+                callback_url=callback_url,
+                dependencies=dependencies,
+                resource=ResourceSpecDraft(
+                    options=SessionOptionsDraft(
+                        priority=action.scheduling.priority or SESSION_PRIORITY_DEFAULT,
+                        job_priority=action.scheduling.job_priority,
+                        is_preemptible=action.scheduling.is_preemptible,
+                        cluster_mode=action.resource.cluster_mode,
+                        cluster_size=action.resource.cluster_size,
+                        scheduling_target=SchedulingTargetDraft(
+                            designated_agents=tuple(
+                                AgentId(a) for a in (action.scheduling.agent_list or ())
+                            ),
+                            agent_selection_policy=action.scheduling.agent_selection_policy,
+                        ),
+                        kernel_groups=kernel_groups,
+                        handler_options=None,
+                    ),
+                ),
+                internal_data_extras=InternalDataExtras(
+                    sudo_session_enabled=False,
+                ),
             ),
             scope=SessionScopeDraft(
                 domain_id=domain_id,
@@ -1657,35 +1733,6 @@ class SessionService:
                 project_id=ProjectID(action.group_id),
                 resource_group_id=resource_group_id,
                 resource_group_name=resource_group_name,
-            ),
-            classification=SessionClassificationDraft(
-                session_type=action.session_type,
-                tag=action.tag,
-            ),
-            network=SessionNetworkDraft(
-                network_id=(
-                    str(action.scheduling.attach_network)
-                    if action.scheduling.attach_network is not None
-                    else None
-                ),
-            ),
-            callback_url=callback_url,
-            dependencies=dependencies,
-            options=SessionOptionsDraft(
-                priority=action.scheduling.priority or SESSION_PRIORITY_DEFAULT,
-                is_preemptible=action.scheduling.is_preemptible,
-                cluster_mode=action.resource.cluster_mode,
-                cluster_size=action.resource.cluster_size,
-                scheduling_target=SchedulingTargetDraft(
-                    designated_agents=tuple(
-                        AgentId(a) for a in (action.scheduling.agent_list or ())
-                    ),
-                ),
-                kernel_groups=kernel_groups,
-                handler_options=None,
-            ),
-            internal_data_extras=InternalDataExtras(
-                sudo_session_enabled=False,
             ),
         )
 

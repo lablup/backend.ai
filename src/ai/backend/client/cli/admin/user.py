@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import uuid
 from collections.abc import Iterable, Sequence
+from typing import Any, cast
 
 import click
 
@@ -309,16 +310,19 @@ def add(
                     uuid.UUID(group_ref)
                     group_ids.append(group_ref)
                 except ValueError:
-                    data = session.Group.from_name(
-                        group_ref,
-                        domain_name=domain_name,
+                    matched_groups = cast(
+                        Sequence[dict[str, Any]],
+                        session.Group.from_name(
+                            group_ref,
+                            domain_name=domain_name,
+                        ),
                     )
-                    if not data:
+                    if not matched_groups:
                         # Either domain_name or group_ref may be invalid.
                         raise ValueError(
                             f"Cannot find the group {group_ref!r} in the domain {domain_name!r}"
                         ) from None
-                    group_ids.append(data[0]["id"])
+                    group_ids.append(matched_groups[0]["id"])
             data = session.User.create(
                 domain_name,
                 email,

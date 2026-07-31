@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from strawberry import UNSET
+
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
     CreateKeypairResourcePolicyInput as CreateKeypairResourcePolicyInputDTO,
 )
@@ -47,6 +49,7 @@ from ai.backend.common.dto.manager.v2.resource_policy.response import (
 from ai.backend.common.dto.manager.v2.resource_policy.response import (
     UpdateUserResourcePolicyPayload as UpdateUserResourcePolicyPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.common_types import (
     BinarySizeInputGQL,
     ResourceSlotEntryInputGQL,
@@ -66,9 +69,6 @@ from .node import (
     ProjectResourcePolicyV2GQL,
     UserResourcePolicyV2GQL,
 )
-
-UNSET = None
-
 
 # ── Keypair Resource Policy Inputs ──
 
@@ -93,10 +93,20 @@ class CreateKeypairResourcePolicyInputGQL(PydanticInputMixin[CreateKeypairResour
     max_containers_per_session: int = gql_field(description="Maximum containers per session.")
     idle_timeout: int = gql_field(description="Idle timeout in seconds.")
     max_pending_session_count: int | None = gql_field(
-        default=UNSET, description="Maximum pending sessions. Null means unlimited."
+        default=None, description="Maximum pending sessions. Null means unlimited."
+    )
+    max_priority: int | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Highest scheduling priority a session created with this policy may declare."
+                " Null means uncapped."
+            ),
+        ),
+        default=None,
     )
     max_pending_session_resource_slots: list[ResourceSlotEntryInputGQL] | None = gql_field(
-        default=UNSET, description="Maximum pending session resource slots."
+        default=None, description="Maximum pending session resource slots."
     )
     max_concurrent_sftp_sessions: int = gql_field(
         default=1, description="Maximum concurrent SFTP sessions."
@@ -115,32 +125,39 @@ class CreateKeypairResourcePolicyInputGQL(PydanticInputMixin[CreateKeypairResour
 )
 class UpdateKeypairResourcePolicyInputGQL(PydanticInputMixin[UpdateKeypairResourcePolicyInputDTO]):
     default_for_unspecified: str | None = gql_field(
-        default=UNSET, description="Updated default for unspecified."
+        default=None, description="Updated default for unspecified."
     )
     total_resource_slots: list[ResourceSlotEntryInputGQL] | None = gql_field(
-        default=UNSET, description="Updated resource slot limits."
+        default=None, description="Updated resource slot limits."
     )
     max_session_lifetime: int | None = gql_field(
-        default=UNSET, description="Updated max session lifetime."
+        default=None, description="Updated max session lifetime."
     )
     max_concurrent_sessions: int | None = gql_field(
-        default=UNSET, description="Updated max concurrent sessions."
+        default=None, description="Updated max concurrent sessions."
     )
     max_pending_session_count: int | None = gql_field(
         default=UNSET, description="Updated max pending sessions."
+    )
+    max_priority: int | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Updated max scheduling priority. Set to null to clear (uncapped).",
+        ),
+        default=UNSET,
     )
     max_pending_session_resource_slots: list[ResourceSlotEntryInputGQL] | None = gql_field(
         default=UNSET, description="Updated max pending session resource slots."
     )
     max_concurrent_sftp_sessions: int | None = gql_field(
-        default=UNSET, description="Updated max concurrent SFTP sessions."
+        default=None, description="Updated max concurrent SFTP sessions."
     )
     max_containers_per_session: int | None = gql_field(
-        default=UNSET, description="Updated max containers per session."
+        default=None, description="Updated max containers per session."
     )
-    idle_timeout: int | None = gql_field(default=UNSET, description="Updated idle timeout.")
+    idle_timeout: int | None = gql_field(default=None, description="Updated idle timeout.")
     allowed_vfolder_hosts: list[VFolderHostPermissionEntryInputGQL] | None = gql_field(
-        default=UNSET, description="Updated vfolder host permissions."
+        default=None, description="Updated vfolder host permissions."
     )
 
 
@@ -167,7 +184,7 @@ class CreateUserResourcePolicyInputGQL(PydanticInputMixin[CreateUserResourcePoli
                 " which caps compute sessions."
             ),
         ),
-        default=UNSET,
+        default=None,
     )
     max_quota_scope_size: BinarySizeInputGQL = gql_field(
         description="Maximum quota scope size (e.g., '1g', '536870912').",
@@ -189,7 +206,7 @@ class CreateUserResourcePolicyInputGQL(PydanticInputMixin[CreateUserResourcePoli
 )
 class UpdateUserResourcePolicyInputGQL(PydanticInputMixin[UpdateUserResourcePolicyInputDTO]):
     max_vfolder_count: int | None = gql_field(
-        default=UNSET, description="Updated max vfolder count."
+        default=None, description="Updated max vfolder count."
     )
     max_concurrent_logins: int | None = gql_added_field(
         BackendAIGQLMeta(
@@ -204,13 +221,13 @@ class UpdateUserResourcePolicyInputGQL(PydanticInputMixin[UpdateUserResourcePoli
         default=UNSET,
     )
     max_quota_scope_size: BinarySizeInputGQL | None = gql_field(
-        default=UNSET, description="Updated max quota scope size."
+        default=None, description="Updated max quota scope size."
     )
     max_session_count_per_model_session: int | None = gql_field(
-        default=UNSET, description="Updated max sessions per model session."
+        default=None, description="Updated max sessions per model session."
     )
     max_customized_image_count: int | None = gql_field(
-        default=UNSET, description="Updated max customized image count."
+        default=None, description="Updated max customized image count."
     )
 
 
@@ -244,13 +261,13 @@ class CreateProjectResourcePolicyInputGQL(PydanticInputMixin[CreateProjectResour
 )
 class UpdateProjectResourcePolicyInputGQL(PydanticInputMixin[UpdateProjectResourcePolicyInputDTO]):
     max_vfolder_count: int | None = gql_field(
-        default=UNSET, description="Updated max vfolder count."
+        default=None, description="Updated max vfolder count."
     )
     max_quota_scope_size: BinarySizeInputGQL | None = gql_field(
-        default=UNSET, description="Updated max quota scope size."
+        default=None, description="Updated max quota scope size."
     )
     max_network_count: int | None = gql_field(
-        default=UNSET, description="Updated max network count."
+        default=None, description="Updated max network count."
     )
 
 

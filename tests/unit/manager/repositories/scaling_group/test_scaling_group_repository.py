@@ -66,6 +66,7 @@ from ai.backend.manager.repositories.scaling_group.creators import (
     ScalingGroupForProjectCreatorSpec,
 )
 from ai.backend.manager.repositories.scaling_group.purgers import (
+    ScalingGroupPurgerSpec,
     create_scaling_group_for_keypairs_purger,
 )
 from ai.backend.manager.repositories.scaling_group.scope_binders import (
@@ -748,7 +749,7 @@ class TestScalingGroupRepositoryDB:
         sgroup_name = sample_scaling_group_for_purge
 
         # When: Purge the scaling group
-        purger = Purger(row_class=ScalingGroupRow, pk_value=sgroup_name)
+        purger = Purger(spec=ScalingGroupPurgerSpec(name=sgroup_name))
         result = await scaling_group_repository.purge_scaling_group(purger)
 
         # Then: Should return the deleted scaling group data
@@ -768,7 +769,7 @@ class TestScalingGroupRepositoryDB:
         """Test purging non-existent scaling group raises ScalingGroupNotFound"""
         # Given: A purger for non-existent scaling group with uuid-based name
         non_existent_name = f"test-sgroup-nonexistent-{uuid.uuid4().hex[:8]}"
-        purger = Purger(row_class=ScalingGroupRow, pk_value=non_existent_name)
+        purger = Purger(spec=ScalingGroupPurgerSpec(name=non_existent_name))
 
         # When/Then: Purging should raise ScalingGroupNotFound
         with pytest.raises(ScalingGroupNotFound):
@@ -784,7 +785,7 @@ class TestScalingGroupRepositoryDB:
         sgroup_name = sample_scaling_group_with_sessions_and_routes
 
         # When: Purge the scaling group
-        purger = Purger(row_class=ScalingGroupRow, pk_value=sgroup_name)
+        purger = Purger(spec=ScalingGroupPurgerSpec(name=sgroup_name))
         result = await scaling_group_repository.purge_scaling_group(purger)
 
         # Then: Should return the deleted scaling group data
@@ -1420,7 +1421,7 @@ class TestScalingGroupRepositoryDB:
         endpoint_id = sample_endpoint
         route_id = sample_route
 
-        purger = Purger(row_class=ScalingGroupRow, pk_value=sgroup_name)
+        purger = Purger(spec=ScalingGroupPurgerSpec(name=sgroup_name))
         # FK Error should not occur, and all related records should be deleted
         result = await scaling_group_repository.purge_scaling_group(purger)
 

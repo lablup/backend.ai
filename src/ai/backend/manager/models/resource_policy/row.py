@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Self
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from ai.backend.common.defs.session import SESSION_PRIORITY_MAX, SESSION_PRIORITY_MIN
 from ai.backend.common.types import (
     DefaultForUnspecified,
     ResourceSlot,
@@ -42,6 +43,14 @@ __all__: Sequence[str] = (
 
 class KeyPairResourcePolicyRow(Base):  # type: ignore[misc]
     __tablename__ = "keypair_resource_policies"
+    # A cap outside the requestable priority range is unsatisfiable: a
+    # negative one would reject every session create for the keypair.
+    __table_args__ = (
+        sa.CheckConstraint(
+            f"max_priority >= {SESSION_PRIORITY_MIN} AND max_priority <= {SESSION_PRIORITY_MAX}",
+            name="max_priority_within_session_priority_range",
+        ),
+    )
 
     name: Mapped[str] = mapped_column("name", sa.String(length=256), primary_key=True)
     created_at: Mapped[datetime | None] = mapped_column(
@@ -68,6 +77,8 @@ class KeyPairResourcePolicyRow(Base):  # type: ignore[misc]
     max_pending_session_resource_slots: Mapped[ResourceSlot | None] = mapped_column(
         "max_pending_session_resource_slots", ResourceSlotColumn(), nullable=True
     )
+    # Cap on the global scheduler priority a session may declare (NULL = no cap).
+    max_priority: Mapped[int | None] = mapped_column("max_priority", sa.Integer(), nullable=True)
     max_concurrent_sftp_sessions: Mapped[int] = mapped_column(
         "max_concurrent_sftp_sessions", sa.Integer(), nullable=False, server_default=sa.text("1")
     )
@@ -99,6 +110,7 @@ class KeyPairResourcePolicyRow(Base):  # type: ignore[misc]
             max_session_lifetime=self.max_session_lifetime,
             max_concurrent_sessions=self.max_concurrent_sessions,
             max_pending_session_count=self.max_pending_session_count,
+            max_priority=self.max_priority,
             max_pending_session_resource_slots=self.max_pending_session_resource_slots,
             max_concurrent_sftp_sessions=self.max_concurrent_sftp_sessions,
             max_containers_per_session=self.max_containers_per_session,
@@ -167,6 +179,7 @@ class UserResourcePolicyRow(Base):  # type: ignore[misc]
     def to_dataclass(self) -> UserResourcePolicyData:
         return UserResourcePolicyData(
             name=self.name,
+            created_at=self.created_at,
             max_vfolder_count=self.max_vfolder_count,
             max_quota_scope_size=self.max_quota_scope_size,
             max_session_count_per_model_session=self.max_session_count_per_model_session,
@@ -225,6 +238,7 @@ class ProjectResourcePolicyRow(Base):  # type: ignore[misc]
     def to_dataclass(self) -> ProjectResourcePolicyData:
         return ProjectResourcePolicyData(
             name=self.name,
+            created_at=self.created_at,
             max_vfolder_count=self.max_vfolder_count,
             max_quota_scope_size=self.max_quota_scope_size,
             max_network_count=self.max_network_count,

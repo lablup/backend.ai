@@ -33,11 +33,24 @@ from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     DeleteRuntimeVariantsPayload as DeleteRuntimeVariantsPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant.response import (
+    RuntimeVariantModelConfigInfo as RuntimeVariantModelConfigInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant.response import (
+    RuntimeVariantModelDefinitionInfo as RuntimeVariantModelDefinitionInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant.response import (
+    RuntimeVariantModelHealthCheckInfo as RuntimeVariantModelHealthCheckInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant.response import (
+    RuntimeVariantModelServiceConfigInfo as RuntimeVariantModelServiceConfigInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     RuntimeVariantNode as RuntimeVariantNodeDTO,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     UpdateRuntimeVariantPayload as UpdateRuntimeVariantPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -50,6 +63,10 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
     gql_pydantic_type,
 )
+from ai.backend.manager.api.gql.deployment.types.revision import (
+    ModelMetadataGQL,
+    PreStartActionGQL,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 
 
@@ -60,6 +77,79 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, Pydant
 class RuntimeVariantOrderFieldGQL(StrEnum):
     NAME = "name"
     CREATED_AT = "created_at"
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Default health-check settings stored for a runtime variant.",
+    ),
+    model=RuntimeVariantModelHealthCheckInfoDTO,
+    name="RuntimeVariantModelHealthCheck",
+)
+class RuntimeVariantModelHealthCheckGQL(PydanticOutputMixin[RuntimeVariantModelHealthCheckInfoDTO]):
+    enable: bool | None = gql_field(description="Whether health checks are enabled.")
+    interval: float | None = gql_field(description="Health-check interval in seconds.")
+    path: str | None = gql_field(description="Health-check endpoint path.")
+    max_retries: int | None = gql_field(description="Maximum number of retries.")
+    max_wait_time: float | None = gql_field(description="Maximum time to wait for a health check.")
+    expected_status_code: int | None = gql_field(description="Expected healthy HTTP status code.")
+    initial_delay: float | None = gql_field(
+        description="Initial health-check grace period in seconds."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Default model service configuration stored for a runtime variant.",
+    ),
+    model=RuntimeVariantModelServiceConfigInfoDTO,
+    name="RuntimeVariantModelServiceConfig",
+)
+class RuntimeVariantModelServiceConfigGQL(
+    PydanticOutputMixin[RuntimeVariantModelServiceConfigInfoDTO]
+):
+    pre_start_actions: list[PreStartActionGQL] | None = gql_field(
+        description="Actions to run before starting the model service."
+    )
+    command: str | None = gql_field(description="Command that starts the model service.")
+    shell: str | None = gql_field(description="Shell used to run the command.")
+    port: int | None = gql_field(description="Model service port.")
+    health_check: RuntimeVariantModelHealthCheckGQL | None = gql_field(
+        description="Default model service health-check settings."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Default model configuration stored for a runtime variant.",
+    ),
+    model=RuntimeVariantModelConfigInfoDTO,
+    name="RuntimeVariantModelConfig",
+)
+class RuntimeVariantModelConfigGQL(PydanticOutputMixin[RuntimeVariantModelConfigInfoDTO]):
+    name: str | None = gql_field(description="Default model name.")
+    model_path: str | None = gql_field(description="Default model path.")
+    service: RuntimeVariantModelServiceConfigGQL | None = gql_field(
+        description="Default model service configuration."
+    )
+    metadata: ModelMetadataGQL | None = gql_field(description="Default model metadata.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Model definition defaults stored for a runtime variant.",
+    ),
+    model=RuntimeVariantModelDefinitionInfoDTO,
+    name="RuntimeVariantModelDefinition",
+)
+class RuntimeVariantModelDefinitionGQL(PydanticOutputMixin[RuntimeVariantModelDefinitionInfoDTO]):
+    models: list[RuntimeVariantModelConfigGQL] | None = gql_field(
+        description="Default model configurations supplied by the runtime variant."
+    )
 
 
 @gql_node_type(
@@ -76,6 +166,21 @@ class RuntimeVariantGQL(PydanticNodeMixin[RuntimeVariantNodeDTO]):
     )
     description: str | None = gql_field(
         description="Human-readable description explaining the runtime engine and its typical use cases."
+    )
+    reads_vfolder_config_files: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Whether legacy model configuration files in the model vfolder participate in "
+                "revision resolution."
+            ),
+        )
+    )
+    default_model_definition: RuntimeVariantModelDefinitionGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Model definition defaults stored for this runtime variant.",
+        )
     )
     created_at: datetime = gql_field(
         description="Timestamp when this runtime variant was registered."

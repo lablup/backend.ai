@@ -64,8 +64,8 @@ class AppConfigAllowListRepository:
         return await self._db_source.get_by_id(allow_list_id)
 
     @app_config_allow_list_repository_resilience.apply()
-    async def search(self, querier: BatchQuerier) -> AppConfigAllowListSearchResult:
-        return await self._db_source.search(querier)
+    async def admin_search(self, querier: BatchQuerier) -> AppConfigAllowListSearchResult:
+        return await self._db_source.admin_search(querier)
 
     @app_config_allow_list_repository_resilience.apply()
     async def update(self, updater: Updater[AppConfigAllowListRow]) -> AppConfigAllowListData:

@@ -66,6 +66,7 @@ from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptio
 from ai.backend.common.health_checker.types import ComponentId
 from ai.backend.common.middlewares.exception import general_exception_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
+from ai.backend.common.networking import force_threaded_dns_resolver
 from ai.backend.common.web.session import (
     Session,
     extra_config_headers,
@@ -1289,6 +1290,7 @@ def main(
     debug: bool,
 ) -> None:
     """Start the webui host service as a foreground process."""
+    force_threaded_dns_resolver()
     # Delete this part when you remove --debug option
     raw_cfg = tomli.loads(Path(config_path).read_text(encoding="utf-8"))
 

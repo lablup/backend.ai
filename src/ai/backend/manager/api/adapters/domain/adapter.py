@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.v2.domain.response import (
     PurgeDomainPayload,
 )
 from ai.backend.common.dto.manager.v2.domain.types import DomainOrderField, OrderDirection
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.domain.types import DomainData, UserInfo
@@ -81,6 +82,23 @@ class DomainAdapter(BaseAdapter):
         )
         domain_map = {data.name: self._domain_data_to_node(data) for data in action_result.items}
         return [domain_map.get(name) for name in names]
+
+    async def batch_load_by_ids(self, ids: Sequence[DomainID]) -> list[DomainNode | None]:
+        """Batch load domains by UUID for DataLoader use.
+
+        Returns DomainNode DTOs in the same order as the input ids list.
+        """
+        if not ids:
+            return []
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[DomainConditions.by_ids(ids)],
+        )
+        action_result = await self._processors.domain.search_domains.wait_for_complete(
+            SearchDomainsAction(querier=querier)
+        )
+        domain_map = {data.id: self._domain_data_to_node(data) for data in action_result.items}
+        return [domain_map.get(domain_id) for domain_id in ids]
 
     async def get(self, domain_name: str) -> DomainNode:
         """Retrieve a single domain by name."""

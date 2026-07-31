@@ -1,5 +1,4 @@
 from .types import (
-    BucketDelta,
     DomainFactorResult,
     DomainFairShareData,
     DomainFairShareSearchResult,
@@ -59,6 +58,5 @@ __all__ = (
     "UserUsageBucketKey",
     "ProjectUsageBucketKey",
     "DomainUsageBucketKey",
-    "BucketDelta",
     "UsageBucketAggregationResult",
 )

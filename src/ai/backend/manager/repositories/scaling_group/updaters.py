@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, override
@@ -152,7 +151,7 @@ class ScalingGroupSchedulerConfigUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
             to_update["scheduler_opts"] = func.jsonb_set(
                 sa.literal_column("scheduler_opts"),
                 pg_array(["preemption"]),
-                cast(json.dumps(preemption_dict), JSONB),
+                cast(preemption_dict, JSONB),
             )
         return to_update
 

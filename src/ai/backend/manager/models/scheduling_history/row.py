@@ -7,6 +7,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
+from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
@@ -110,8 +111,11 @@ class SessionSchedulingHistoryRow(Base):  # type: ignore[misc]
 class KernelSchedulingHistoryRow(Base):  # type: ignore[misc]
     __tablename__ = "kernel_scheduling_history"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[KernelSchedulingHistoryID] = mapped_column(
+        "id",
+        GUID(KernelSchedulingHistoryID),
+        primary_key=True,
+        server_default=sa.text("uuid_generate_v4()"),
     )
     kernel_id: Mapped[uuid.UUID] = mapped_column("kernel_id", GUID, nullable=False, index=True)
     session_id: Mapped[uuid.UUID] = mapped_column("session_id", GUID, nullable=False, index=True)

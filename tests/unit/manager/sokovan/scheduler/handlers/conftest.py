@@ -10,12 +10,14 @@ from uuid import uuid4
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
     ClusterMode,
     KernelId,
+    PreemptionMode,
     ResourceSlot,
     SessionId,
     SessionResult,
@@ -55,8 +57,10 @@ from ai.backend.manager.data.session.types import (
     SessionNetwork,
     SessionStatus,
 )
-from ai.backend.manager.data.sokovan import (
-    ImageConfigData,
+from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
+from ai.backend.manager.views.sokovan.image import ImageConfigData
+from ai.backend.manager.views.sokovan.lifecycle import (
     KernelBindingData,
     SessionDataForPull,
     SessionDataForStart,
@@ -64,12 +68,10 @@ from ai.backend.manager.data.sokovan import (
     SessionsForStartWithImages,
     SessionWithKernels,
 )
-from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.repositories.scheduler.types.session import (
+from ai.backend.manager.views.sokovan.session import (
     TerminatingKernelData,
     TerminatingSessionData,
 )
-from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 
 # =============================================================================
 # Internal Helper Functions (not fixtures)
@@ -345,8 +347,13 @@ def _create_kernel(
 def mock_provisioner() -> AsyncMock:
     """Mock SessionProvisioner for ScheduleSessionsLifecycleHandler tests."""
     provisioner = AsyncMock()
-    provisioner.schedule_scaling_group = AsyncMock(
-        return_value=ScheduleResult(scheduled_session_ids=[], scheduling_failures=[])
+    provisioner.schedule_resource_group = AsyncMock(
+        return_value=ScheduleResult(
+            scheduled_session_ids=[],
+            scheduling_failures=[],
+            reserved_session_ids=[],
+            preemption_plan=[],
+        )
     )
     return provisioner
 
@@ -381,7 +388,19 @@ def mock_repository() -> AsyncMock:
         return_value=SessionsForStartWithImages(sessions=[], image_configs={})
     )
     repository.get_terminating_sessions_by_ids = AsyncMock(return_value=[])
+    repository.reset_kernels_to_pending_for_sessions = AsyncMock(return_value=0)
+    repository.get_resource_group_preemption_mode = AsyncMock(return_value=PreemptionMode.TERMINATE)
     return repository
+
+
+@pytest.fixture
+def mock_scheduling_controller() -> AsyncMock:
+    """Mock SchedulingController for PreemptSessionsLifecycleHandler tests."""
+    controller = AsyncMock()
+    controller.mark_sessions_for_termination = AsyncMock(return_value=None)
+    controller.mark_sessions_status = AsyncMock(return_value=[])
+    controller.mark_scheduling_needed = AsyncMock(return_value=None)
+    return controller
 
 
 # =============================================================================
@@ -484,6 +503,43 @@ def terminating_sessions_multiple() -> list[SessionWithKernels]:
 
 
 # =============================================================================
+# Pre-created Session Fixtures for PreemptSessionsLifecycleHandler
+# =============================================================================
+
+
+@pytest.fixture
+def preempted_sessions_multiple() -> list[SessionWithKernels]:
+    """Multiple PREEMPTED victims with RUNNING kernels."""
+    return [
+        _create_session(status=SessionStatus.PREEMPTED, kernel_status=KernelStatus.RUNNING),
+        _create_session(status=SessionStatus.PREEMPTED, kernel_status=KernelStatus.RUNNING),
+    ]
+
+
+# =============================================================================
+# Pre-created Session Fixtures for RescheduleSessionsLifecycleHandler
+# =============================================================================
+
+
+@pytest.fixture
+def rescheduling_session_live_kernels() -> SessionWithKernels:
+    """RESCHEDULING session whose kernels are still tearing down."""
+    return _create_session(
+        status=SessionStatus.RESCHEDULING,
+        kernel_status=KernelStatus.TERMINATING,
+    )
+
+
+@pytest.fixture
+def rescheduling_session_terminated_kernels() -> SessionWithKernels:
+    """RESCHEDULING session whose kernels are all gone (ready to requeue)."""
+    return _create_session(
+        status=SessionStatus.RESCHEDULING,
+        kernel_status=KernelStatus.TERMINATED,
+    )
+
+
+# =============================================================================
 # Pre-created Kernel Fixtures for SweepStaleKernelsKernelHandler
 # =============================================================================
 
@@ -560,6 +616,8 @@ def schedule_result_success_factory() -> Callable[..., ScheduleResult]:
         return ScheduleResult(
             scheduled_session_ids=[s.session_info.identity.id for s in sessions],
             scheduling_failures=[],
+            reserved_session_ids=[],
+            preemption_plan=[],
         )
 
     return _create
@@ -583,7 +641,7 @@ def sessions_for_pull_factory() -> Callable[..., SessionsForPullWithImages]:
                         scaling_group=s.session_info.resource.scaling_group_name or "default",
                         image="test-image:latest",
                         image_id=None,
-                        architecture=k.image.architecture or "x86_64",
+                        architecture=ArchName(k.image.architecture or "x86_64"),
                     )
                     for k in s.kernel_infos
                 ],
@@ -597,7 +655,7 @@ def sessions_for_pull_factory() -> Callable[..., SessionsForPullWithImages]:
                 _image_id: ImageConfigData(
                     id=_image_id,
                     canonical="test-image:latest",
-                    architecture="x86_64",
+                    architecture=ArchName("x86_64"),
                     project=None,
                     is_local=False,
                     digest="sha256:abc123",
@@ -634,7 +692,7 @@ def sessions_for_start_factory() -> Callable[..., SessionsForStartWithImages]:
                         scaling_group=s.session_info.resource.scaling_group_name or "default",
                         image="test-image:latest",
                         image_id=None,
-                        architecture=k.image.architecture or "x86_64",
+                        architecture=ArchName(k.image.architecture or "x86_64"),
                     )
                     for k in s.kernel_infos
                 ],
@@ -652,7 +710,7 @@ def sessions_for_start_factory() -> Callable[..., SessionsForStartWithImages]:
                 _image_id: ImageConfigData(
                     id=_image_id,
                     canonical="test-image:latest",
-                    architecture="x86_64",
+                    architecture=ArchName("x86_64"),
                     project=None,
                     is_local=False,
                     digest="sha256:abc123",

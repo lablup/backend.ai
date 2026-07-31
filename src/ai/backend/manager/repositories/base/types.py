@@ -15,6 +15,22 @@ if TYPE_CHECKING:
     from ai.backend.manager.errors.repository import RepositoryIntegrityError
 
 
+@dataclass(frozen=True)
+class ConflictCheck:
+    """Defines a conflict check for destructive-operation validation.
+
+    The inverse of ExistenceCheck: validates that no row matching the condition
+    exists before executing a destructive operation (e.g. purge).
+    Multiple checks are combined into a single query for efficiency.
+    """
+
+    condition: QueryCondition
+    """Condition selecting conflicting rows (e.g., lambda: UserRow.domain_name == name)."""
+
+    error: BackendAIError
+    """The error to raise if any conflicting row exists."""
+
+
 # Factory function that creates a cursor condition from a decoded cursor value (str or UUID)
 type CursorConditionFactory = Callable[[str], QueryCondition]
 

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
@@ -10,6 +9,7 @@ from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.schema.deployment import ReplicaGroupRolloutSpec
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
@@ -17,6 +17,7 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaGroupScalingStatus,
 )
 from ai.backend.manager.models.base import GUID, Base, PydanticColumn, StrEnumType
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 from ai.backend.manager.views.replica_group import (
     ReplicaGroupDeploySchedulingView,
     ReplicaGroupScalingSchedulingView,
@@ -56,7 +57,7 @@ def _get_target_revision_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     return foreign(ReplicaGroupRow.target_revision_id) == DeploymentRevisionRow.id
 
 
-class ReplicaGroupRow(Base):  # type: ignore[misc]
+class ReplicaGroupRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     """
     A group of replicas (routes) within a single deployment.
 
@@ -120,6 +121,20 @@ class ReplicaGroupRow(Base):  # type: ignore[misc]
         server_default=sa.text("100"),
     )
 
+    # The placement group shared by this group's route sessions (1:1 — a
+    # replica group always owns exactly one). `use_alter` keeps the FK out of
+    # the CREATE TABLE so table subsets that omit ``session_groups`` still build.
+    session_group_id: Mapped[SessionGroupID] = mapped_column(
+        "session_group_id",
+        GUID(SessionGroupID),
+        sa.ForeignKey(
+            "session_groups.id",
+            use_alter=True,
+            name="fk_replica_groups_session_group_id_session_groups",
+        ),
+        nullable=False,
+    )
+
     lifecycle: Mapped[ReplicaGroupLifecycle] = mapped_column(
         "lifecycle",
         StrEnumType(ReplicaGroupLifecycle),
@@ -137,20 +152,6 @@ class ReplicaGroupRow(Base):  # type: ignore[misc]
     rollout: Mapped[ReplicaGroupRolloutSpec] = mapped_column(
         "rollout",
         PydanticColumn(ReplicaGroupRolloutSpec),
-        nullable=False,
-    )
-
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        nullable=False,
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
         nullable=False,
     )
 

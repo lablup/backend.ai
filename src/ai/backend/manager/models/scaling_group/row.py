@@ -28,15 +28,14 @@ from sqlalchemy.orm import (
     relationship,
     selectinload,
 )
-from sqlalchemy.sql.expression import true
+from sqlalchemy.sql.expression import false, true
 
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.schema.resource_group import PreemptionConfig
 from ai.backend.common.types import (
     AgentSelectionStrategy,
     BackendAISchema,
-    PreemptionMode,
-    PreemptionOrder,
     SessionTypes,
 )
 from ai.backend.manager.data.deployment.types import DeploymentOptions
@@ -85,37 +84,6 @@ __all__: Sequence[str] = (
 )
 
 
-class PreemptionConfig(BackendAISchema):
-    model_config = ConfigDict(frozen=True)
-
-    enabled: bool = False
-    """Whether preemption is enabled for this resource group (opt-in)"""
-
-    preemptible_priority: int = 5
-    """Sessions with priority <= this value are preemptible"""
-
-    order: PreemptionOrder = PreemptionOrder.OLDEST
-    """Tie-breaking order for same-priority sessions"""
-
-    mode: PreemptionMode = PreemptionMode.TERMINATE
-    """How to preempt sessions"""
-
-    preemption_min_runtime: timedelta = timedelta(seconds=0)
-    """Minimum session runtime before it becomes preemptible (0 = disabled)"""
-
-    @field_serializer("order", mode="plain")
-    def serialize_order(self, value: PreemptionOrder) -> str:
-        return value.value
-
-    @field_serializer("mode", mode="plain")
-    def serialize_mode(self, value: PreemptionMode) -> str:
-        return value.value
-
-    @field_serializer("preemption_min_runtime", mode="plain")
-    def serialize_preemption_min_runtime(self, value: timedelta) -> float:
-        return value.total_seconds()
-
-
 class ScalingGroupOpts(BackendAISchema):
     model_config = ConfigDict(frozen=True)
 
@@ -134,8 +102,15 @@ class ScalingGroupOpts(BackendAISchema):
     agent_selection_strategy: AgentSelectionStrategy = AgentSelectionStrategy.DISPERSED
     agent_selector_config: dict[str, Any] = Field(default_factory=dict)
 
-    # Only used in the ConcentratedAgentSelector
     enforce_spreading_endpoint_replica: bool = False
+    """Deprecated: replaced by the replica group's SessionGroup placement policy (BEP-1064).
+
+    Nothing reads this field — the spreading chain it was meant to drive was
+    already dead code (BA-6135). Existing values were migrated onto each
+    replica group's SessionGroup (``true`` → ``spread`` + ``preferred``,
+    otherwise ``none``). Kept only so persisted ``scheduler_opts`` documents
+    keep round-tripping; the column and API drop in the next major.
+    """
 
     allow_fractional_resource_fragmentation: bool = True
     """If set to false, agent will refuse to start kernel when they are forced to fragment fractional resource request"""
@@ -277,6 +252,15 @@ def _get_resource_preset_join_condition() -> Any:
 
 class ScalingGroupRow(Base):  # type: ignore[misc]
     __tablename__ = "scaling_groups"
+    __table_args__ = (
+        # Partial unique index: at most one row may have is_default = true.
+        sa.Index(
+            "uq_scaling_groups_is_default",
+            "is_default",
+            unique=True,
+            postgresql_where=sa.text("is_default"),
+        ),
+    )
     name: Mapped[str] = mapped_column("name", sa.String(length=64), primary_key=True)
     id: Mapped[ResourceGroupID] = mapped_column(
         "id",
@@ -291,6 +275,13 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
     )
     is_public: Mapped[bool] = mapped_column(
         "is_public", sa.Boolean, index=True, default=True, server_default=true(), nullable=False
+    )
+    # At most one scaling group may be the default at a time. This is enforced by
+    # the partial unique index in ``__table_args__`` (a minimum of one is NOT
+    # guaranteed). To switch the default, clear the previous default before
+    # setting the new one within the same transaction.
+    is_default: Mapped[bool] = mapped_column(
+        "is_default", sa.Boolean, default=False, server_default=false(), nullable=False
     )
     created_at: Mapped[datetime | None] = mapped_column(
         "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
@@ -389,6 +380,7 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
             status=ScalingGroupStatus(
                 is_active=self.is_active if self.is_active is not None else True,
                 is_public=self.is_public,
+                is_default=self.is_default,
             ),
             metadata=ScalingGroupMetadata(
                 description=self.description or "",
@@ -411,7 +403,6 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
                     config=self.scheduler_opts.config,
                     agent_selection_strategy=self.scheduler_opts.agent_selection_strategy,
                     agent_selector_config=self.scheduler_opts.agent_selector_config,
-                    enforce_spreading_endpoint_replica=self.scheduler_opts.enforce_spreading_endpoint_replica,
                     allow_fractional_resource_fragmentation=self.scheduler_opts.allow_fractional_resource_fragmentation,
                     route_cleanup_target_statuses=self.scheduler_opts.route_cleanup_target_statuses,
                     preemption=DataPreemptionConfig(
@@ -542,7 +533,7 @@ async def query_allowed_sgroups(
     result = await db_conn.execute(query)
     from_domain = {row.scaling_group for row in result}
 
-    group_ids: Iterable[uuid.UUID] = []
+    group_ids: Sequence[uuid.UUID] = []
     match group:
         case uuid.UUID() | str():
             if group_id := await resolve_group_name_or_id(db_conn, domain_name, group):

@@ -114,8 +114,8 @@ from ai.backend.manager.types import OptionalState, TriState
 
 def _preset_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=DeploymentRevisionPresetOrders.rank(ascending=True),
-        backward_order=DeploymentRevisionPresetOrders.rank(ascending=False),
+        forward_order=DeploymentRevisionPresetOrders.created_at(ascending=False),
+        backward_order=DeploymentRevisionPresetOrders.created_at(ascending=True),
         forward_condition_factory=DeploymentRevisionPresetConditions.by_cursor_forward,
         backward_condition_factory=DeploymentRevisionPresetConditions.by_cursor_backward,
         tiebreaker_order=DeploymentRevisionPresetRow.id.asc(),

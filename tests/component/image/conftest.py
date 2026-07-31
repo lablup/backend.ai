@@ -35,6 +35,7 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.image.service import ImageService
+from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 
 
 @pytest.fixture()
@@ -53,6 +54,7 @@ def image_processors(
     mock_bulk = MagicMock(spec=BulkActionRBACValidator)
     mock_bulk.validate = AsyncMock()
     validators = ActionValidators(
+        virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
         rbac=RBACValidators(scope=mock_scope, single_entity=mock_single_entity, bulk=mock_bulk),
     )
     return ImageProcessors(service=service, action_monitors=[], validators=validators)

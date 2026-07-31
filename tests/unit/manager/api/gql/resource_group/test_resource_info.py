@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
@@ -22,10 +23,9 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
 )
 from ai.backend.common.dto.manager.v2.resource_group.types import (
     PreemptionModeDTO,
-    PreemptionOrderDTO,
     SchedulerTypeDTO,
 )
-from ai.backend.common.types import SlotQuantity
+from ai.backend.common.types import PreemptionOrder, SlotQuantity
 from ai.backend.manager.api.adapters.resource_group.adapter import (
     _normalize_quantity,
     _slot_quantities_to_resource_slot_info,
@@ -239,10 +239,10 @@ class TestResourceGroupGQLResourceInfoResolver:
     def resource_group_gql(self) -> ResourceGroupGQL:
         """Create ResourceGroupGQL instance for testing."""
         return ResourceGroupGQL(
-            id="test-group",
+            id=uuid.uuid4(),
             name="test-group",
             status=ResourceGroupStatusGQL.from_pydantic(
-                ResourceGroupStatusInfo(is_active=True, is_public=True)
+                ResourceGroupStatusInfo(is_active=True, is_public=True, is_default=False)
             ),
             metadata=ResourceGroupMetadataGQL.from_pydantic(
                 ResourceGroupMetadataInfo(
@@ -262,7 +262,7 @@ class TestResourceGroupGQLResourceInfoResolver:
                     preemption=PreemptionConfigInfo(
                         enabled=False,
                         preemptible_priority=5,
-                        order=PreemptionOrderDTO.OLDEST,
+                        order=PreemptionOrder.OLDEST,
                         mode=PreemptionModeDTO.TERMINATE,
                         preemption_min_runtime=0.0,
                     ),

@@ -30,7 +30,7 @@ from ai.backend.common.resilience import (
     RetryArgs,
     RetryPolicy,
 )
-from ai.backend.common.types import ValkeyTarget
+from ai.backend.common.types import KernelId, SessionId, ValkeyTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -54,6 +54,10 @@ _DEFAULT_EXPIRATION = 3600  # 1 hour default expiration
 _SESSION_REQUESTS_SUFFIX: Final[str] = "requests"
 _SESSION_LAST_RESPONSE_SUFFIX: Final[str] = "last_response_time"
 _AGENT_LAST_SEEN_HASH: Final[str] = "agent.last_seen"
+# Matches the legacy marker retention (1 day); safety net over the TERMINATED-event deletion.
+_SESSION_LAST_ACCESS_EXPIRATION: Final[int] = 86400
+# Sentinel meaning the session has ongoing activity; the idle checker skips judgment for it.
+_SESSION_ACTIVE_SENTINEL: Final[str] = "0"
 
 
 class ValkeyLiveClient:
@@ -192,6 +196,48 @@ class ValkeyLiveClient:
         async with self._client.client() as conn:
             return await conn.delete([key])
 
+    def _session_last_access_key(self, session_id: SessionId) -> str:
+        return f"session.{session_id}.last_access"
+
+    async def get_session_last_access_batch(
+        self,
+        session_ids: Sequence[SessionId],
+    ) -> dict[SessionId, float | None]:
+        """Get the last network access timestamps for multiple sessions."""
+        values = await self.get_multiple_live_data([
+            self._session_last_access_key(session_id) for session_id in session_ids
+        ])
+        return {
+            session_id: None if value is None else float(value)
+            for session_id, value in zip(session_ids, values, strict=True)
+        }
+
+    async def update_session_last_access(self, session_id: SessionId) -> None:
+        """Refresh the session's last network access marker with the server time."""
+        timestamp = await self.get_server_time()
+        await self.store_live_data(
+            self._session_last_access_key(session_id),
+            f"{timestamp:.06f}",
+            ex=_SESSION_LAST_ACCESS_EXPIRATION,
+        )
+
+    async def mark_session_active(self, session_id: SessionId) -> None:
+        """Write the "0" sentinel meaning the session has ongoing activity (never idle).
+
+        Only updates an existing marker (XX) so that markers of already-terminated
+        sessions are not resurrected.
+        """
+        await self.store_live_data(
+            self._session_last_access_key(session_id),
+            _SESSION_ACTIVE_SENTINEL,
+            ex=_SESSION_LAST_ACCESS_EXPIRATION,
+            xx=True,
+        )
+
+    async def delete_session_last_access(self, session_id: SessionId) -> None:
+        """Remove the session's last network access marker."""
+        await self.delete_live_data(self._session_last_access_key(session_id))
+
     @valkey_live_resilience.apply()
     async def incr_live_data(
         self,
@@ -240,7 +286,7 @@ class ValkeyLiveClient:
         return seconds + (microseconds / 10**6)
 
     @valkey_live_resilience.apply()
-    async def count_active_connections(self, session_id: str) -> int:
+    async def count_active_connections(self, session_id: SessionId) -> int:
         """Count active connections for a session."""
         async with self._client.client() as conn:
             return await conn.zcount(
@@ -248,6 +294,24 @@ class ValkeyLiveClient:
                 InfBound.NEG_INF,
                 InfBound.POS_INF,
             )
+
+    @valkey_live_resilience.apply()
+    async def count_active_connections_batch(
+        self,
+        session_ids: Sequence[SessionId],
+    ) -> dict[SessionId, int]:
+        """Count active connections for multiple sessions in one batch."""
+        if not session_ids:
+            return {}
+        batch = self._create_batch()
+        for session_id in session_ids:
+            batch.zcount(
+                self._active_app_connection_key(session_id),
+                InfBound.NEG_INF,
+                InfBound.POS_INF,
+            )
+        results = cast(list[int], await self._execute_batch(batch))
+        return dict(zip(session_ids, results, strict=True))
 
     @valkey_live_resilience.apply()
     async def add_scheduler_metadata(
@@ -281,7 +345,8 @@ class ValkeyLiveClient:
     @valkey_live_resilience.apply()
     async def update_connection_tracker(
         self,
-        session_id: str,
+        session_id: SessionId,
+        kernel_id: KernelId,
         service: str,
         stream_id: str,
     ) -> None:
@@ -289,12 +354,13 @@ class ValkeyLiveClient:
         Update connection tracker with current timestamp.
 
         :param session_id: The session ID to track connections for.
+        :param kernel_id: The kernel ID hosting the connection.
         :param service: The service name.
         :param stream_id: The stream ID.
         """
         current_time = await self.get_server_time()
         connection_id = self._active_app_connection_value(
-            kernel_id=session_id,
+            kernel_id=kernel_id,
             service=service,
             stream_id=stream_id,
         )
@@ -303,33 +369,10 @@ class ValkeyLiveClient:
             await conn.zadd(tracker_key, {connection_id: current_time})
 
     @valkey_live_resilience.apply()
-    async def update_app_connection_tracker(
-        self,
-        kernel_id: str,
-        service: str,
-        stream_id: str,
-    ) -> None:
-        """
-        Update app connection tracker for a specific kernel, service, and stream.
-
-        :param kernel_id: The kernel ID.
-        :param service: The service name.
-        :param stream_id: The stream ID.
-        """
-        tracker_key = self._active_app_connection_key(kernel_id)  # TODO: Check if this is correct
-        tracker_val = self._active_app_connection_value(
-            kernel_id=kernel_id,
-            service=service,
-            stream_id=stream_id,
-        )
-        current_time = await self.get_server_time()
-        async with self._client.client() as conn:
-            await conn.zadd(tracker_key, {tracker_val: current_time})
-
-    @valkey_live_resilience.apply()
     async def remove_connection_tracker(
         self,
-        session_id: str,
+        session_id: SessionId,
+        kernel_id: KernelId,
         service: str,
         stream_id: str,
     ) -> int:
@@ -337,13 +380,14 @@ class ValkeyLiveClient:
         Remove connection from tracker.
 
         :param session_id: The session ID to remove connection from.
+        :param kernel_id: The kernel ID hosting the connection.
         :param service: The service name.
         :param stream_id: The stream ID.
         :return: Number of connections removed.
         """
         tracker_key = self._active_app_connection_key(session_id)
         connection_id = self._active_app_connection_value(
-            kernel_id=session_id,
+            kernel_id=kernel_id,
             service=service,
             stream_id=stream_id,
         )
@@ -353,7 +397,7 @@ class ValkeyLiveClient:
     @valkey_live_resilience.apply()
     async def remove_stale_connections(
         self,
-        session_id: str,
+        session_id: SessionId,
         max_timestamp: float,
     ) -> int:
         """
@@ -553,7 +597,7 @@ class ValkeyLiveClient:
         async with self._client.client() as conn:
             return await conn.delete([key])
 
-    def _active_app_connection_key(self, session_id: str) -> str:
+    def _active_app_connection_key(self, session_id: SessionId) -> str:
         """
         Generate the key for tracking active app connections for a session.
         :param session_id: The session ID.
@@ -563,7 +607,7 @@ class ValkeyLiveClient:
 
     def _active_app_connection_value(
         self,
-        kernel_id: str,
+        kernel_id: KernelId,
         service: str,
         stream_id: str,
     ) -> str:
