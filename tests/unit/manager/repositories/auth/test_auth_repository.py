@@ -70,6 +70,7 @@ class DomainTestData:
     """Test data for domain fixture"""
 
     name: str
+    id: uuid.UUID
 
 
 @dataclass
@@ -131,8 +132,10 @@ class TestAuthRepository:
     ) -> AsyncGenerator[DomainTestData, None]:
         """Create default domain"""
         domain_name = f"domain-{uuid.uuid4()}"
+        domain_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Default domain",
                 is_active=True,
@@ -142,7 +145,7 @@ class TestAuthRepository:
             )
             db_sess.add(domain)
             await db_sess.commit()
-        yield DomainTestData(name=domain_name)
+        yield DomainTestData(name=domain_name, id=domain_id)
 
     @pytest.fixture
     async def user_resource_policy(
@@ -280,6 +283,7 @@ class TestAuthRepository:
     async def sample_group_data(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        default_domain: DomainTestData,
         sample_user_data: UserTestData,
         project_resource_policy: ResourcePolicyTestData,
     ) -> AsyncGenerator[GroupData, None]:
@@ -295,6 +299,7 @@ class TestAuthRepository:
                 description="Test Group",
                 is_active=True,
                 domain_name=sample_user_data.domain_name,
+                domain_id=default_domain.id,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 integration_id=None,

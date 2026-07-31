@@ -109,15 +109,21 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
             yield database_connection
 
     @pytest.fixture
+    def test_domain_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: uuid.UUID,
     ) -> str:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -352,6 +358,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
+        test_domain_id: uuid.UUID,
         test_project_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test group and return group ID."""
@@ -362,6 +369,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain_name,
+                domain_id=test_domain_id,
                 resource_policy=test_project_resource_policy_name,
             )
             db_sess.add(group)
@@ -524,15 +532,21 @@ class TestUpdateRouteStatusBulkWithHistory:
             yield database_connection
 
     @pytest.fixture
+    def test_domain_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: uuid.UUID,
     ) -> str:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -767,6 +781,7 @@ class TestUpdateRouteStatusBulkWithHistory:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
+        test_domain_id: uuid.UUID,
         test_project_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test group and return group ID."""
@@ -777,6 +792,7 @@ class TestUpdateRouteStatusBulkWithHistory:
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain_name,
+                domain_id=test_domain_id,
                 resource_policy=test_project_resource_policy_name,
             )
             db_sess.add(group)
@@ -974,6 +990,7 @@ class TestDeploymentHistoryMergeLogic:
         endpoint_id = DeploymentID(uuid.uuid4())
         history_id = uuid.uuid4()
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = uuid.uuid4()
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         group_id = uuid.uuid4()
         user_uuid = uuid.uuid4()
@@ -987,6 +1004,7 @@ class TestDeploymentHistoryMergeLogic:
             # Create domain
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -1068,6 +1086,7 @@ class TestDeploymentHistoryMergeLogic:
                     id=group_id,
                     name=f"test-group-{uuid.uuid4().hex[:8]}",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     resource_policy=proj_policy_name,
                 )
             )
@@ -1290,6 +1309,7 @@ class TestRouteHistoryMergeLogic:
         route_id = uuid.uuid4()
         history_id = uuid.uuid4()
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = uuid.uuid4()
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         group_id = uuid.uuid4()
         user_uuid = uuid.uuid4()
@@ -1303,6 +1323,7 @@ class TestRouteHistoryMergeLogic:
             # Create domain
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -1384,6 +1405,7 @@ class TestRouteHistoryMergeLogic:
                     id=group_id,
                     name=f"test-group-{uuid.uuid4().hex[:8]}",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     resource_policy=proj_policy_name,
                 )
             )

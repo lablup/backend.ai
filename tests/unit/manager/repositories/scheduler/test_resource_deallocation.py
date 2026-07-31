@@ -271,6 +271,7 @@ class TestForceTerminateResourceDeallocation:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
         test_domain_name: str,
         test_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
@@ -283,6 +284,7 @@ class TestForceTerminateResourceDeallocation:
                     description="Test group",
                     is_active=True,
                     domain_name=test_domain_name,
+                    domain_id=test_domain_id,
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts={},
                     resource_policy=test_resource_policy_name,
@@ -851,6 +853,7 @@ class TestBulkTerminateResourceDeallocation:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
         test_domain_name: str,
         test_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
@@ -863,6 +866,7 @@ class TestBulkTerminateResourceDeallocation:
                     description="Test group",
                     is_active=True,
                     domain_name=test_domain_name,
+                    domain_id=test_domain_id,
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts={},
                     resource_policy=test_resource_policy_name,
@@ -1308,6 +1312,7 @@ class TestNegativeValueGuard:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
         test_domain_name: str,
         test_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
@@ -1320,6 +1325,7 @@ class TestNegativeValueGuard:
                     description="Test group",
                     is_active=True,
                     domain_name=test_domain_name,
+                    domain_id=test_domain_id,
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts={},
                     resource_policy=test_resource_policy_name,

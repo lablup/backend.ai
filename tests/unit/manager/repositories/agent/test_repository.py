@@ -1126,6 +1126,7 @@ class TestAgentDBSourceKernelFiltering:
         self,
         db_with_tables: ExtendedAsyncSAEngine,
         test_domain: str,
+        test_domain_id: DomainID,
         test_resource_policy: str,
     ) -> AsyncGenerator[tuple[str, str], None]:
         """Create default group"""
@@ -1135,6 +1136,7 @@ class TestAgentDBSourceKernelFiltering:
                 id=group_id,
                 name="default-group",
                 domain_name=test_domain,
+                domain_id=test_domain_id,
                 total_resource_slots=ResourceSlot({}),
                 integration_id=None,
                 resource_policy=test_resource_policy,

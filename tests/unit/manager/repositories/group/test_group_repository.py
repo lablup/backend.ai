@@ -116,15 +116,21 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
             yield database_connection
 
     @pytest.fixture
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid.uuid4())
+
+    @pytest.fixture
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
     ) -> str:
         """Create test domain."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as session:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -426,6 +432,7 @@ class TestGroupRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: str,
+        test_domain_id: DomainID,
         default_project_resource_policy: str,
     ) -> uuid.UUID:
         """Create test group together with both an admin role and a member
@@ -447,6 +454,7 @@ class TestGroupRepository:
                 description="Test group",
                 is_active=True,
                 domain_name=test_domain,
+                domain_id=test_domain_id,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
                 integration_id="test-integration-id",
@@ -564,6 +572,7 @@ class TestGroupRepository:
                 description="Group with active kernel",
                 is_active=True,
                 domain_name=test_domain,
+                domain_id=test_domain_id,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
                 integration_id=None,
@@ -646,6 +655,7 @@ class TestGroupRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: str,
+        test_domain_id: DomainID,
         test_user: uuid.UUID,
         default_project_resource_policy: str,
         test_scaling_group: str,
@@ -662,6 +672,7 @@ class TestGroupRepository:
                 description="Group with active endpoint",
                 is_active=True,
                 domain_name=test_domain,
+                domain_id=test_domain_id,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
                 integration_id=None,
@@ -715,6 +726,7 @@ class TestGroupRepository:
                 description="Group with mounted vfolders",
                 is_active=True,
                 domain_name=test_domain,
+                domain_id=test_domain_id,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
                 integration_id=None,
@@ -815,6 +827,7 @@ class TestGroupRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: str,
+        test_domain_id: DomainID,
         default_project_resource_policy: str,
     ) -> tuple[uuid.UUID, str]:
         """Create a soft-deleted (is_active=False) group for negative-path tests."""
@@ -828,6 +841,7 @@ class TestGroupRepository:
                 description="Inactive group",
                 is_active=False,
                 domain_name=test_domain,
+                domain_id=test_domain_id,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
                 integration_id=None,
@@ -1375,15 +1389,21 @@ class TestGroupRowVFolderHostPermissionMap:
             yield database_connection
 
     @pytest.fixture
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid.uuid4())
+
+    @pytest.fixture
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
     ) -> str:
         """Create test domain."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as session:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -1423,6 +1443,7 @@ class TestGroupRowVFolderHostPermissionMap:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: str,
+        test_domain_id: DomainID,
         project_resource_policy: str,
     ) -> uuid.UUID:
         """Create a group with allowed_vfolder_hosts set."""
@@ -1435,6 +1456,7 @@ class TestGroupRowVFolderHostPermissionMap:
                 description="Test group with vfolder hosts",
                 is_active=True,
                 domain_name=test_domain,
+                domain_id=test_domain_id,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={
                     "local": ["create-vfolder", "mount-in-session"],

@@ -250,6 +250,7 @@ class TestGroupNestedSearchIntegration:
         """
         active_domain = f"active-dom-{uuid.uuid4().hex[:8]}"
         inactive_domain = f"inactive-dom-{uuid.uuid4().hex[:8]}"
+        domain_ids = {active_domain: uuid.uuid4(), inactive_domain: uuid.uuid4()}
         result: dict[str, list[uuid.UUID]] = {}
 
         async with db_with_cleanup.begin_session() as session:
@@ -258,6 +259,7 @@ class TestGroupNestedSearchIntegration:
                 (inactive_domain, False, "Archived department"),
             ]:
                 domain = DomainRow(
+                    id=domain_ids[domain_name],
                     name=domain_name,
                     description=desc,
                     is_active=is_active,
@@ -288,6 +290,7 @@ class TestGroupNestedSearchIntegration:
                     description="test project",
                     is_active=True,
                     domain_name=domain_name,
+                    domain_id=domain_ids[domain_name],
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts=VFolderHostPermissionMap(),
                     integration_id=None,
@@ -586,10 +589,12 @@ class TestGroupUserNestedSearchIntegration:
         Returns mapping with project info including user details.
         """
         domain_name = f"test-dom-{uuid.uuid4().hex[:8]}"
+        domain_id = uuid.uuid4()
         result: dict[str, dict[str, Any]] = {}
 
         async with db_with_cleanup.begin_session() as session:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -672,6 +677,7 @@ class TestGroupUserNestedSearchIntegration:
                 description="Alpha project",
                 is_active=True,
                 domain_name=domain_name,
+                domain_id=domain_id,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
                 integration_id=None,
@@ -687,6 +693,7 @@ class TestGroupUserNestedSearchIntegration:
                 description="Beta project",
                 is_active=True,
                 domain_name=domain_name,
+                domain_id=domain_id,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
                 integration_id=None,

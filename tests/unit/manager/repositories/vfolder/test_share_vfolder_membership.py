@@ -112,12 +112,19 @@ class TestShareVfolderWithUsersMembership:
             yield database_connection
 
     @pytest.fixture
+    def domain_id(self) -> UUID:
+        return uuid4()
+
+    @pytest.fixture
     async def domain_name(
-        self, db_with_cleanup: ExtendedAsyncSAEngine
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: UUID,
     ) -> AsyncGenerator[str, None]:
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=DOMAIN_NAME_FIXED,
                     description="",
                     is_active=True,
@@ -168,6 +175,7 @@ class TestShareVfolderWithUsersMembership:
     async def project(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: UUID,
         domain_name: str,
         project_resource_policy: str,
     ) -> AsyncGenerator[UUID, None]:
@@ -178,6 +186,7 @@ class TestShareVfolderWithUsersMembership:
                     id=gid,
                     name=f"proj-{gid.hex[:8]}",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     resource_policy=project_resource_policy,
                     description="",
                     is_active=True,
@@ -351,6 +360,7 @@ class TestShareVfolderWithUsersMembership:
     async def other_project(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: UUID,
         domain_name: str,
         project_resource_policy: str,
     ) -> AsyncGenerator[UUID, None]:
@@ -362,6 +372,7 @@ class TestShareVfolderWithUsersMembership:
                     id=gid,
                     name=f"other-{gid.hex[:8]}",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     resource_policy=project_resource_policy,
                     description="",
                     is_active=True,

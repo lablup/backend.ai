@@ -487,7 +487,7 @@ class TestImageRepositoryLastUsedAt:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> DomainRow:
-        domain = DomainRow(name=f"test-{uuid4()}")
+        domain = DomainRow(id=uuid4(), name=f"test-{uuid4()}")
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(domain)
             await db_sess.flush()
@@ -572,6 +572,7 @@ class TestImageRepositoryLastUsedAt:
             id=uuid4(),
             name=f"test-group-{uuid4().hex[:8]}",
             domain_name=domain.name,
+            domain_id=domain.id,
             resource_policy=group_policy.name,
         )
         async with db_with_cleanup.begin_session() as db_sess:

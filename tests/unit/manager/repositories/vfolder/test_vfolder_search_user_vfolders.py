@@ -78,6 +78,7 @@ class TestVfolderSearchUserVfolders:
     ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
         """Create two users with vfolders: user_a has 2 vfolders, user_b has 1 (all GROUP-owned)."""
         domain_name = "test-domain"
+        domain_id = uuid.uuid4()
         user_a_id = uuid.uuid4()
         user_b_id = uuid.uuid4()
         project_id = uuid.uuid4()
@@ -88,6 +89,7 @@ class TestVfolderSearchUserVfolders:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -188,6 +190,7 @@ class TestVfolderSearchUserVfolders:
                     id=project_id,
                     name="project-a",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     description="Test project-a",
                     is_active=True,
                     total_resource_slots=ResourceSlot(),
@@ -299,6 +302,7 @@ class TestVfolderSearchUserVfolders:
     ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
         """Create a user with both USER-owned and GROUP-owned vfolders."""
         domain_name = "test-domain"
+        domain_id = uuid.uuid4()
         user_id = uuid.uuid4()
         project_id = uuid.uuid4()
         user_vfolder_id = uuid.uuid4()
@@ -307,6 +311,7 @@ class TestVfolderSearchUserVfolders:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -380,6 +385,7 @@ class TestVfolderSearchUserVfolders:
                     id=project_id,
                     name="project-mixed",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     description="Test project",
                     is_active=True,
                     total_resource_slots=ResourceSlot(),
@@ -495,6 +501,7 @@ class TestVfolderSearchUserVfolders:
         - vfolder_no_access: owned by user_b, user_a has no permission
         """
         domain_name = "test-domain"
+        domain_id = uuid.uuid4()
         user_a_id = uuid.uuid4()
         user_b_id = uuid.uuid4()
         project_id = uuid.uuid4()
@@ -505,6 +512,7 @@ class TestVfolderSearchUserVfolders:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -604,6 +612,7 @@ class TestVfolderSearchUserVfolders:
                     id=project_id,
                     name="project-perm",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     description="Test project",
                     is_active=True,
                     total_resource_slots=ResourceSlot(),

@@ -211,6 +211,7 @@ class TestSessionSearchInProject:
                         id=gid,
                         name=gname,
                         domain_name=domain_name,
+                        domain_id=test_domain_id,
                         description=f"Test {gname}",
                         is_active=True,
                         total_resource_slots=ResourceSlot(),

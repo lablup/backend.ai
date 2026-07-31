@@ -198,11 +198,15 @@ async def test_group_id(db_with_cleanup: ExtendedAsyncSAEngine, test_domain: str
             )
         )
         await sess.flush()
+        domain_id = (
+            await sess.execute(sa.select(DomainRow.id).where(DomainRow.name == test_domain))
+        ).scalar_one()
         sess.add(
             GroupRow(
                 id=group_id,
                 name=f"test-grp-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain,
+                domain_id=domain_id,
                 total_resource_slots=ResourceSlot(),
                 resource_policy="default",
             )

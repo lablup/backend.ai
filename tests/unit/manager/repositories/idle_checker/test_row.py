@@ -97,6 +97,7 @@ class TestSessionIdleCheckRow:
                     description=None,
                     is_active=True,
                     domain_name="session-idle-check-domain",
+                    domain_id=domain_id,
                     resource_policy="session-idle-check-policy",
                 )
             )

@@ -150,6 +150,7 @@ class TestIdleCheckerAssignmentRepository:
                     id=project_id,
                     name=f"project-{project_id.hex[:8]}",
                     domain_name=f"domain-{domain_id.hex[:8]}",
+                    domain_id=domain_id,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=policy_name,
                 )

@@ -430,6 +430,7 @@ class TestUserNestedSearchIntegration:
         """
         active_domain = f"active-dom-{uuid.uuid4().hex[:8]}"
         inactive_domain = f"inactive-dom-{uuid.uuid4().hex[:8]}"
+        domain_ids = {active_domain: uuid.uuid4(), inactive_domain: uuid.uuid4()}
         user_active_uuid = uuid.uuid4()
         user_inactive_uuid = uuid.uuid4()
         project_alpha_id = uuid.uuid4()
@@ -443,6 +444,7 @@ class TestUserNestedSearchIntegration:
             ]:
                 session.add(
                     DomainRow(
+                        id=domain_ids[dn],
                         name=dn,
                         description=desc,
                         is_active=active,
@@ -509,6 +511,7 @@ class TestUserNestedSearchIntegration:
                         description="",
                         is_active=True,
                         domain_name=dom,
+                        domain_id=domain_ids[dom],
                         total_resource_slots=ResourceSlot(),
                         allowed_vfolder_hosts=VFolderHostPermissionMap(),
                         integration_id=None,

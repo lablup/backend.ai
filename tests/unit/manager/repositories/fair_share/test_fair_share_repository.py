@@ -137,16 +137,22 @@ class TestFairShareRepository:
         return sg_name
 
     @pytest.fixture
+    def test_domain_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group: str,
+        test_domain_id: uuid.UUID,
     ) -> str:
         """Create test domain and return domain name"""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 description="Test domain for fair share",
                 is_active=True,
@@ -171,6 +177,7 @@ class TestFairShareRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group: str,
         test_domain_name: str,
+        test_domain_id: uuid.UUID,
     ) -> uuid.UUID:
         """Create test project (group) and return its ID"""
         project_id = uuid.uuid4()
@@ -192,6 +199,7 @@ class TestFairShareRepository:
                 id=project_id,
                 name=f"test-project-{project_id.hex[:8]}",
                 domain_name=test_domain_name,
+                domain_id=test_domain_id,
                 description="Test project for fair share",
                 resource_policy=policy_name,
             )
@@ -663,6 +671,7 @@ class TestFairShareRepository:
         fair_share_repository: FairShareRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
+        test_domain_id: uuid.UUID,
     ) -> None:
         """Test upsert project fair share when scaling group does not exist.
 
@@ -688,6 +697,7 @@ class TestFairShareRepository:
                 id=project_id,
                 name=f"test-project-{project_id.hex[:8]}",
                 domain_name=test_domain_name,
+                domain_id=test_domain_id,
                 description="Test project",
                 resource_policy=policy_name,
             )
@@ -750,15 +760,21 @@ class TestFairShareRepository:
     # ==================== Regression: Non-RG-member lookup tests (BA-4682) ====================
 
     @pytest.fixture
+    def domain_not_in_rg_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
     async def domain_not_in_rg(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_not_in_rg_id: uuid.UUID,
     ) -> str:
         """Create a domain NOT associated with any scaling group."""
         domain_name = f"no-rg-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=domain_not_in_rg_id,
                 name=domain_name,
                 description="Domain not in any RG",
                 is_active=True,
@@ -776,6 +792,7 @@ class TestFairShareRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         domain_not_in_rg: str,
+        domain_not_in_rg_id: uuid.UUID,
     ) -> uuid.UUID:
         """Create a project NOT associated with any scaling group."""
         project_id = uuid.uuid4()
@@ -795,6 +812,7 @@ class TestFairShareRepository:
                 id=project_id,
                 name=f"no-rg-project-{project_id.hex[:8]}",
                 domain_name=domain_not_in_rg,
+                domain_id=domain_not_in_rg_id,
                 description="Project not in any RG",
                 resource_policy=policy_name,
             )

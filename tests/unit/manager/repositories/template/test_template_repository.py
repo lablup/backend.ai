@@ -80,13 +80,19 @@ class TestTemplateRepository:
             yield database_connection
 
     @pytest.fixture
+    def test_domain_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: uuid.UUID,
     ) -> str:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as session:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -238,6 +244,7 @@ class TestTemplateRepository:
     async def test_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: uuid.UUID,
         test_domain: str,
         test_project_resource_policy: str,
     ) -> tuple[uuid.UUID, str]:
@@ -250,6 +257,7 @@ class TestTemplateRepository:
                 description="Test group",
                 is_active=True,
                 domain_name=test_domain,
+                domain_id=test_domain_id,
                 total_resource_slots=ResourceSlot.from_user_input({"cpu": "4", "mem": "8g"}, None),
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
                 resource_policy=test_project_resource_policy,

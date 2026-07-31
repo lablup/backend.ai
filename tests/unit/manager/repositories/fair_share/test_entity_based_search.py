@@ -678,15 +678,21 @@ class TestSearchProjectFairSharesEntityBased:
         return sg_name
 
     @pytest.fixture
+    def domain_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
     async def domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         scaling_group: str,
+        domain_id: uuid.UUID,
     ) -> str:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -713,6 +719,7 @@ class TestSearchProjectFairSharesEntityBased:
         db_with_cleanup: ExtendedAsyncSAEngine,
         scaling_group: str,
         domain_name: str,
+        domain_id: uuid.UUID,
         fair_share_repository: FairShareRepository,
     ) -> uuid.UUID:
         """Create a project with fair share record."""
@@ -734,6 +741,7 @@ class TestSearchProjectFairSharesEntityBased:
                     id=project_id,
                     name=f"test-project-{project_id.hex[:8]}",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     description="Test project with record",
                     resource_policy=policy_name,
                 )
@@ -762,6 +770,7 @@ class TestSearchProjectFairSharesEntityBased:
         db_with_cleanup: ExtendedAsyncSAEngine,
         scaling_group: str,
         domain_name: str,
+        domain_id: uuid.UUID,
     ) -> uuid.UUID:
         """Create a project without fair share record."""
         project_id = uuid.uuid4()
@@ -782,6 +791,7 @@ class TestSearchProjectFairSharesEntityBased:
                     id=project_id,
                     name=f"test-project-{project_id.hex[:8]}",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     description="Test project without record",
                     resource_policy=policy_name,
                 )
@@ -945,6 +955,7 @@ class TestSearchProjectFairSharesEntityBased:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         domain_name: str,
+        domain_id: uuid.UUID,
     ) -> uuid.UUID:
         """Create a project NOT associated with any scaling group."""
         project_id = uuid.uuid4()
@@ -965,6 +976,7 @@ class TestSearchProjectFairSharesEntityBased:
                     id=project_id,
                     name=f"no-rg-project-{project_id.hex[:8]}",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     description="Project not in any RG",
                     resource_policy=policy_name,
                 )
@@ -1061,15 +1073,21 @@ class TestSearchUserFairSharesEntityBased:
         return sg_name
 
     @pytest.fixture
+    def domain_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
     async def domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         scaling_group: str,
+        domain_id: uuid.UUID,
     ) -> str:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -1088,6 +1106,7 @@ class TestSearchUserFairSharesEntityBased:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         domain_name: str,
+        domain_id: uuid.UUID,
         scaling_group: str,
     ) -> uuid.UUID:
         project_id = uuid.uuid4()
@@ -1108,6 +1127,7 @@ class TestSearchUserFairSharesEntityBased:
                     id=project_id,
                     name=f"test-project-{project_id.hex[:8]}",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     description="Test project",
                     resource_policy=policy_name,
                 )

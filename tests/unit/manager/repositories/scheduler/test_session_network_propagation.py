@@ -170,6 +170,7 @@ class TestPersistentNetworkNotRecreated:
                     id=group_id,
                     name=f"test-group-{uuid.uuid4().hex[:8]}",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=project_policy_name,
                     integration_id=None,

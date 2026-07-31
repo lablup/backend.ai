@@ -184,10 +184,16 @@ class TestResourceUsageHistoryRepository:
             db_sess.add(policy)
             await db_sess.flush()
 
+            domain_id = (
+                await db_sess.execute(
+                    sa.select(DomainRow.id).where(DomainRow.name == test_domain_name)
+                )
+            ).scalar_one()
             group = GroupRow(
                 id=project_id,
                 name=f"test-project-{project_id.hex[:8]}",
                 domain_name=test_domain_name,
+                domain_id=domain_id,
                 description="Test project for usage history",
                 resource_policy=policy_name,
             )

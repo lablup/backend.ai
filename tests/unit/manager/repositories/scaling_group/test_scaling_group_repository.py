@@ -318,12 +318,14 @@ class TestScalingGroupRepositoryDB:
         """
         test_user_uuid = uuid.uuid4()
         test_domain = f"test-domain-{uuid.uuid4().hex[:8]}"
+        test_domain_id = uuid.uuid4()
         test_group_id = uuid.uuid4()
         test_resource_policy = f"test-policy-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             # Create domain
             domain = DomainRow(
+                id=test_domain_id,
                 name=test_domain,
                 description="Test domain for cascade delete",
                 is_active=True,
@@ -378,6 +380,7 @@ class TestScalingGroupRepositoryDB:
                 is_active=True,
                 created_at=datetime.now(tz=UTC),
                 domain_name=test_domain,
+                domain_id=test_domain_id,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 resource_policy=test_resource_policy,

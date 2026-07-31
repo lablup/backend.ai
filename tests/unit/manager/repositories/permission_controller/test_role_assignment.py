@@ -154,6 +154,9 @@ class TestRoleAssignment:
                     max_network_count=3,
                 )
             )
+            domain_id = (
+                await session.execute(sa.select(DomainRow.id).where(DomainRow.name == test_domain))
+            ).scalar_one()
             session.add(
                 GroupRow(
                     id=project_id,
@@ -161,6 +164,7 @@ class TestRoleAssignment:
                     description="Test project",
                     is_active=True,
                     domain_name=test_domain,
+                    domain_id=domain_id,
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts=VFolderHostPermissionMap(),
                     integration_id=None,

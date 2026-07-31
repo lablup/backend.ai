@@ -195,6 +195,7 @@ class TestContainerRegistryRepository:
                 group = GroupRow(
                     name=f"test-group-{i}-{sample_domain.domain_name}",
                     domain_name=sample_domain.domain_name,
+                    domain_id=sample_domain.domain_id,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=resource_policy_name,
                 )
@@ -428,7 +429,8 @@ class TestContainerRegistryRepository:
         group_ids: list[str] = []
         async with db_with_cleanup.begin_session() as session:
             # Create domain
-            domain = DomainRow(name=domain_name, total_resource_slots=ResourceSlot())
+            domain_id = uuid.uuid4()
+            domain = DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot())
             session.add(domain)
 
             # Create project resource policy
@@ -447,6 +449,7 @@ class TestContainerRegistryRepository:
                 group = GroupRow(
                     name=f"test-group-for-registry-{i}-{registry_name}",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=resource_policy_name,
                 )
@@ -927,6 +930,7 @@ class TestContainerRegistryRepository:
                 group = GroupRow(
                     name=f"test-group-{i}-{sample_domain.domain_name}-assoc",
                     domain_name=sample_domain.domain_name,
+                    domain_id=sample_domain.domain_id,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=resource_policy_name,
                 )
@@ -1054,6 +1058,7 @@ class TestContainerRegistryRepository:
                 group = GroupRow(
                     name=f"test-group-{i}-{sample_domain.domain_name}-partial",
                     domain_name=sample_domain.domain_name,
+                    domain_id=sample_domain.domain_id,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=resource_policy_name,
                 )

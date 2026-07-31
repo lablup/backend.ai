@@ -191,6 +191,7 @@ class TestGroupDBSourceDeleteEndpoints:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: str,
+        test_domain_id: DomainID,
     ) -> uuid.UUID:
         """Create test group"""
         group_id = uuid.uuid4()
@@ -213,6 +214,7 @@ class TestGroupDBSourceDeleteEndpoints:
                 description="Test group",
                 is_active=True,
                 domain_name=test_domain,
+                domain_id=test_domain_id,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
                 integration_id=None,

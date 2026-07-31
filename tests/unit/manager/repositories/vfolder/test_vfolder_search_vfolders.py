@@ -74,6 +74,7 @@ class TestVfolderSearchVfolders:
     ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
         """Create two projects with vfolders: project_a has 2 vfolders, project_b has 1."""
         domain_name = "test-domain"
+        domain_id = uuid.uuid4()
         user_id = uuid.uuid4()
         project_a_id = uuid.uuid4()
         project_b_id = uuid.uuid4()
@@ -84,6 +85,7 @@ class TestVfolderSearchVfolders:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -162,6 +164,7 @@ class TestVfolderSearchVfolders:
                         id=gid,
                         name=gname,
                         domain_name=domain_name,
+                        domain_id=domain_id,
                         description=f"Test {gname}",
                         is_active=True,
                         total_resource_slots=ResourceSlot(),
@@ -216,12 +219,14 @@ class TestVfolderSearchVfolders:
     ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
         """Create domain, user, keypair, and project rows but NO vfolders."""
         domain_name = "test-domain"
+        domain_id = uuid.uuid4()
         user_id = uuid.uuid4()
         project_a_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -296,6 +301,7 @@ class TestVfolderSearchVfolders:
                     id=project_a_id,
                     name="project-a",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     description="Test project-a",
                     is_active=True,
                     total_resource_slots=ResourceSlot(),

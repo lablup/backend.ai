@@ -180,6 +180,7 @@ async def user_uuid(
 async def project_id(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
     domain_name: str,
+    domain_id: DomainID,
     project_resource_policy: str,
 ) -> AsyncGenerator[uuid.UUID, None]:
     group_id = uuid.uuid4()
@@ -189,6 +190,7 @@ async def project_id(
                 id=group_id,
                 name="test-project",
                 domain_name=domain_name,
+                domain_id=domain_id,
                 resource_policy=project_resource_policy,
             )
         )

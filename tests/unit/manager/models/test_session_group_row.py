@@ -154,6 +154,7 @@ class TestSessionGroupRow:
             id=uuid.uuid4(),
             name=f"test-group-{uuid.uuid4().hex[:8]}",
             domain_name=domain.name,
+            domain_id=domain.id,
             resource_policy=project_policy.name,
         )
 

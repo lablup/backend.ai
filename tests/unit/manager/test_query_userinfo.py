@@ -86,6 +86,7 @@ ALL_ROWS = [
 @dataclass
 class SeedData:
     domain_name: str
+    domain_id: UUID
     group_id: UUID
     group_name: str
     user_uuid: UUID
@@ -136,6 +137,7 @@ class TestQueryUserinfo:
     async def seed(self, db: ExtendedAsyncSAEngine) -> AsyncGenerator[SeedData, None]:
         """Create a normal user who is a member of a group."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = uuid.uuid4()
         group_id = uuid.uuid4()
         group_name = f"test-group-{uuid.uuid4().hex[:8]}"
         user_uuid = uuid.uuid4()
@@ -147,6 +149,7 @@ class TestQueryUserinfo:
         async with db.begin_session() as sess:
             sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     is_active=True,
                     total_resource_slots=ResourceSlot(),
@@ -206,6 +209,7 @@ class TestQueryUserinfo:
                     id=group_id,
                     name=group_name,
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     is_active=True,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=proj_policy,
@@ -225,6 +229,7 @@ class TestQueryUserinfo:
 
         yield SeedData(
             domain_name=domain_name,
+            domain_id=domain_id,
             group_id=group_id,
             group_name=group_name,
             user_uuid=user_uuid,
@@ -246,6 +251,7 @@ class TestQueryUserinfo:
                     id=uuid.uuid4(),
                     name=name,
                     domain_name=seed.domain_name,
+                    domain_id=seed.domain_id,
                     is_active=True,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=seed.proj_policy_name,
@@ -506,6 +512,7 @@ class TestQueryUserinfoFromSession:
     @pytest.fixture
     async def seed(self, db: ExtendedAsyncSAEngine) -> AsyncGenerator[SeedData, None]:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = uuid.uuid4()
         group_id = uuid.uuid4()
         group_name = f"test-group-{uuid.uuid4().hex[:8]}"
         user_uuid = uuid.uuid4()
@@ -517,6 +524,7 @@ class TestQueryUserinfoFromSession:
         async with db.begin_session() as sess:
             sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     is_active=True,
                     total_resource_slots=ResourceSlot(),
@@ -576,6 +584,7 @@ class TestQueryUserinfoFromSession:
                     id=group_id,
                     name=group_name,
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     is_active=True,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=proj_policy,
@@ -595,6 +604,7 @@ class TestQueryUserinfoFromSession:
 
         yield SeedData(
             domain_name=domain_name,
+            domain_id=domain_id,
             group_id=group_id,
             group_name=group_name,
             user_uuid=user_uuid,

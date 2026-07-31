@@ -430,6 +430,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
+        test_domain_id: DomainID,
         test_project_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test group and return group ID."""
@@ -440,6 +441,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain_name,
+                domain_id=test_domain_id,
                 resource_policy=test_project_resource_policy_name,
             )
             db_sess.add(group)
@@ -1478,15 +1480,21 @@ class TestDeploymentRevisionOperations:
             yield database_connection
 
     @pytest.fixture
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid.uuid4())
+
+    @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
     ) -> str:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -1596,6 +1604,7 @@ class TestDeploymentRevisionOperations:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
+        test_domain_id: DomainID,
         test_project_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test group and return group ID."""
@@ -1606,6 +1615,7 @@ class TestDeploymentRevisionOperations:
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain_name,
+                domain_id=test_domain_id,
                 resource_policy=test_project_resource_policy_name,
             )
             db_sess.add(group)
@@ -2237,15 +2247,21 @@ class TestDeploymentPolicyOperations:
             yield database_connection
 
     @pytest.fixture
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid.uuid4())
+
+    @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
     ) -> str:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -2355,6 +2371,7 @@ class TestDeploymentPolicyOperations:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
+        test_domain_id: DomainID,
         test_project_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test group and return group ID."""
@@ -2365,6 +2382,7 @@ class TestDeploymentPolicyOperations:
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain_name,
+                domain_id=test_domain_id,
                 resource_policy=test_project_resource_policy_name,
             )
             db_sess.add(group)
@@ -2572,13 +2590,19 @@ class TestSearchDeploymentPolicies:
             yield database_connection
 
     @pytest.fixture
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid.uuid4())
+
+    @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
     ) -> str:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -2675,6 +2699,7 @@ class TestSearchDeploymentPolicies:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
+        test_domain_id: DomainID,
         test_project_resource_policy_name: str,
     ) -> uuid.UUID:
         group_id = uuid.uuid4()
@@ -2683,6 +2708,7 @@ class TestSearchDeploymentPolicies:
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain_name,
+                domain_id=test_domain_id,
                 resource_policy=test_project_resource_policy_name,
             )
             db_sess.add(group)
@@ -2956,15 +2982,21 @@ class TestRouteOperations:
             yield database_connection
 
     @pytest.fixture
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid.uuid4())
+
+    @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
     ) -> str:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -3074,6 +3106,7 @@ class TestRouteOperations:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
+        test_domain_id: DomainID,
         test_project_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test group and return group ID."""
@@ -3084,6 +3117,7 @@ class TestRouteOperations:
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain_name,
+                domain_id=test_domain_id,
                 resource_policy=test_project_resource_policy_name,
             )
             db_sess.add(group)
@@ -3416,6 +3450,7 @@ class TestDeploymentRepositoryDuplicateName:
         """Create test domain."""
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=uuid.uuid4(),
                 name=f"test-domain-{uuid.uuid4().hex[:8]}",
                 description="Test domain",
                 is_active=True,
@@ -3477,6 +3512,7 @@ class TestDeploymentRepositoryDuplicateName:
                 id=uuid.uuid4(),
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain.name,
+                domain_id=test_domain.id,
                 description="Test group",
                 is_active=True,
                 total_resource_slots=ResourceSlot(),
@@ -3499,6 +3535,7 @@ class TestDeploymentRepositoryDuplicateName:
                 id=uuid.uuid4(),
                 name=f"different-group-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain.name,
+                domain_id=test_domain.id,
                 description="Different group",
                 is_active=True,
                 total_resource_slots=ResourceSlot(),

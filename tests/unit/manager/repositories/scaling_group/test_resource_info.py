@@ -473,6 +473,7 @@ class TestResourceInfo:
                 is_active=True,
                 created_at=datetime.now(tz=UTC),
                 domain_name=test_domain,
+                domain_id=test_domain_id,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 resource_policy=test_resource_policy,

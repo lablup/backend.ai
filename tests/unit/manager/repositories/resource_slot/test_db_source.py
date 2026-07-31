@@ -328,6 +328,7 @@ class TestAggregation:
                     id=project_id,
                     name="test-project",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     resource_policy="default",
                 )
             )
@@ -716,6 +717,7 @@ class TestComputeActualAgentResourceUsage:
                     id=project_id,
                     name="test-project",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     resource_policy="default",
                 )
             )

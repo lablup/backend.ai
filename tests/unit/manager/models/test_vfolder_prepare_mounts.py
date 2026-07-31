@@ -160,6 +160,7 @@ class TestPrepareVFolderMountsSubpathFlow:
         Yields ``(user_uuid, domain_name, group_id, vfolder_id)``.
         """
         domain_name = f"test-domain-{uuid4().hex[:8]}"
+        domain_id = uuid4()
         user_policy_name = f"test-user-pol-{uuid4().hex[:8]}"
         project_policy_name = f"test-proj-pol-{uuid4().hex[:8]}"
         user_uuid = uuid4()
@@ -168,6 +169,7 @@ class TestPrepareVFolderMountsSubpathFlow:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="",
                     is_active=True,
@@ -216,6 +218,7 @@ class TestPrepareVFolderMountsSubpathFlow:
                     description="",
                     is_active=True,
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     resource_policy=project_policy_name,
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts={"proxy:noop": ["mount-in-session"]},

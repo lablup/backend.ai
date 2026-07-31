@@ -146,10 +146,16 @@ class TestObserverCycleRouteScope:
         return uuid.uuid4().hex[:8]
 
     @pytest.fixture
-    async def domain(self, db_with_cleanup: ExtendedAsyncSAEngine, suffix: str) -> str:
+    def domain_id(self) -> UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
+    async def domain(
+        self, db_with_cleanup: ExtendedAsyncSAEngine, suffix: str, domain_id: UUID
+    ) -> str:
         name = f"d-{suffix}"
         async with db_with_cleanup.begin_session() as db_sess:
-            db_sess.add(DomainRow(name=name, total_resource_slots=ResourceSlot()))
+            db_sess.add(DomainRow(id=domain_id, name=name, total_resource_slots=ResourceSlot()))
         return name
 
     @pytest.fixture
@@ -234,6 +240,7 @@ class TestObserverCycleRouteScope:
         db_with_cleanup: ExtendedAsyncSAEngine,
         suffix: str,
         domain: str,
+        domain_id: UUID,
         project_resource_policy: str,
     ) -> UUID:
         project_id = uuid.uuid4()
@@ -243,6 +250,7 @@ class TestObserverCycleRouteScope:
                     id=project_id,
                     name=f"g-{suffix}",
                     domain_name=domain,
+                    domain_id=domain_id,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=project_resource_policy,
                 )
