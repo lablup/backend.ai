@@ -16,9 +16,9 @@ from ai.backend.manager.repositories.idle_checker.types import (
 )
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
+    IdleActivityDecision,
     IdleChecker,
     IdleCheckerContext,
-    IdleCheckerEvaluation,
 )
 from ai.backend.manager.sokovan.idle_check.types import IdleCheckReconcileInfo, IdleCheckResult
 from ai.backend.manager.sokovan.reconciler.base import ReconcilerHandler
@@ -41,34 +41,34 @@ class IdleCheckReconcileHandler(ReconcilerHandler[IdleCheckReconcileInfo, IdleCh
             checker = self._checkers.get(checker_type)
             if checker is None:
                 continue
-            evaluations = await checker.judge(
+            decisions = await checker.judge(
                 assignments,
                 context=context,
             )
-            for evaluation in evaluations:
+            for decision in decisions:
                 all_judgments.append(
-                    self._build_judgment(evaluation, current_time=context.current_time)
+                    self._build_judgment(decision, current_time=context.current_time)
                 )
         return IdleCheckResult(judgments=all_judgments)
 
     def _build_judgment(
         self,
-        evaluation: IdleCheckerEvaluation,
+        decision: IdleActivityDecision,
         *,
         current_time: datetime,
     ) -> IdleJudgmentData:
-        if evaluation.is_active:
+        if decision.is_active:
             status = IdleCheckPhase.ACTIVE
-        elif evaluation.expire_at <= current_time:
+        elif decision.expire_at <= current_time:
             status = IdleCheckPhase.IDLE_EXPIRED
         else:
             status = IdleCheckPhase.IDLE
         return IdleJudgmentData(
-            session_id=evaluation.session_id,
-            checker_id=evaluation.checker_id,
+            session_id=decision.session_id,
+            checker_id=decision.checker_id,
             status=status,
-            expire_at=evaluation.expire_at,
-            message=evaluation.message,
+            expire_at=decision.expire_at,
+            message=decision.message,
         )
 
     def _assignments_by_type(

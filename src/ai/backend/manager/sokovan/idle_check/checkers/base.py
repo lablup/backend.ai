@@ -29,8 +29,8 @@ class CheckerAssignment:
 
 
 @dataclass(frozen=True)
-class IdleCheckerEvaluation:
-    """One checker's activity evaluation before lifecycle phase resolution."""
+class IdleActivityDecision:
+    """One checker's activity decision before lifecycle phase resolution."""
 
     session_id: SessionId
     checker_id: IdleCheckerID
@@ -48,10 +48,10 @@ class IdleChecker(ABC):
         assignments: Sequence[CheckerAssignment],
         *,
         context: IdleCheckerContext,
-    ) -> Sequence[IdleCheckerEvaluation]:
+    ) -> Sequence[IdleActivityDecision]:
         """Evaluate every assignment of this type in one batched call.
 
         Implementations may batch external I/O but must not retain per-call state.
-        The reconcile handler converts evaluations into persisted lifecycle judgments.
+        The reconcile handler converts decisions into persisted lifecycle judgments.
         """
         raise NotImplementedError

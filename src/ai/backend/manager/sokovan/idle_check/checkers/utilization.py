@@ -12,9 +12,9 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
+    IdleActivityDecision,
     IdleChecker,
     IdleCheckerContext,
-    IdleCheckerEvaluation,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -34,7 +34,7 @@ class UtilizationChecker(IdleChecker):
         assignments: Sequence[CheckerAssignment],
         *,
         context: IdleCheckerContext,
-    ) -> Sequence[IdleCheckerEvaluation]:
+    ) -> Sequence[IdleActivityDecision]:
         # Unknown sessions are ignored because their utilization status cannot be determined.
         valid_assignments: list[tuple[CheckerAssignment, UtilizationSpec]] = []
         session_ids_by_preset: dict[PrometheusQueryPresetID, list[SessionId]] = {}
@@ -58,7 +58,7 @@ class UtilizationChecker(IdleChecker):
             session_ids_by_preset,
             evaluation_time=context.current_time,
         )
-        evaluations: list[IdleCheckerEvaluation] = []
+        decisions: list[IdleActivityDecision] = []
         for assignment, spec in valid_assignments:
             threshold = spec.threshold
             values = values_by_preset.get(threshold.preset_id, {})
@@ -76,8 +76,8 @@ class UtilizationChecker(IdleChecker):
                     expire_at = (
                         session.expire_at if session.expire_at is not None else refreshed_expire_at
                     )
-                evaluations.append(
-                    IdleCheckerEvaluation(
+                decisions.append(
+                    IdleActivityDecision(
                         checker_id=assignment.definition.checker_id,
                         session_id=session.session_id,
                         expire_at=expire_at,
@@ -91,4 +91,4 @@ class UtilizationChecker(IdleChecker):
                         ),
                     )
                 )
-        return evaluations
+        return decisions

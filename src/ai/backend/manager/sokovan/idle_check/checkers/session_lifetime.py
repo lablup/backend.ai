@@ -9,9 +9,9 @@ from typing import override
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
+    IdleActivityDecision,
     IdleChecker,
     IdleCheckerContext,
-    IdleCheckerEvaluation,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -26,8 +26,8 @@ class SessionLifetimeChecker(IdleChecker):
         assignments: Sequence[CheckerAssignment],
         *,
         context: IdleCheckerContext,
-    ) -> Sequence[IdleCheckerEvaluation]:
-        evaluations: list[IdleCheckerEvaluation] = []
+    ) -> Sequence[IdleActivityDecision]:
+        decisions: list[IdleActivityDecision] = []
         for assignment in assignments:
             lifetime_spec = assignment.definition.spec.session_lifetime
             if lifetime_spec is None:
@@ -47,8 +47,8 @@ class SessionLifetimeChecker(IdleChecker):
                 expires_at = session.starts_at + timedelta(
                     seconds=lifetime_spec.max_lifetime_seconds
                 )
-                evaluations.append(
-                    IdleCheckerEvaluation(
+                decisions.append(
+                    IdleActivityDecision(
                         checker_id=assignment.definition.checker_id,
                         session_id=session.session_id,
                         expire_at=expires_at,
@@ -60,4 +60,4 @@ class SessionLifetimeChecker(IdleChecker):
                         ),
                     )
                 )
-        return evaluations
+        return decisions

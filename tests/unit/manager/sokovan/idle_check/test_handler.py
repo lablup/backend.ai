@@ -26,9 +26,9 @@ from ai.backend.manager.repositories.idle_checker.types import (
 )
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
+    IdleActivityDecision,
     IdleChecker,
     IdleCheckerContext,
-    IdleCheckerEvaluation,
 )
 from ai.backend.manager.sokovan.idle_check.checkers.session_lifetime import (
     SessionLifetimeChecker,
@@ -73,7 +73,7 @@ class FakeChecker(IdleChecker):
         assignments: Sequence[CheckerAssignment],
         *,
         context: IdleCheckerContext,
-    ) -> Sequence[IdleCheckerEvaluation]:
+    ) -> Sequence[IdleActivityDecision]:
         self.judge_contexts.append(context)
         self.judge_calls.append([
             (
@@ -85,7 +85,7 @@ class FakeChecker(IdleChecker):
         if self.should_fail:
             raise InternalServerError("Fake checker failed")
         return [
-            IdleCheckerEvaluation(
+            IdleActivityDecision(
                 checker_id=assignment.definition.checker_id,
                 session_id=session.session_id,
                 expire_at=self.judgment_expire_at,

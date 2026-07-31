@@ -171,7 +171,7 @@ erDiagram
 The `spec` column is **not free-form JSON** — it holds a typed, polymorphic payload whose shape is fixed by the row's `checker_type`. Two layers express this:
 
 - **`ABCColumn` — a generic, reusable polymorphic JSONB column.** It is not idle-specific: it persists any value that satisfies a load/write contract (JSONB dict ↔ typed object) and rehydrates the typed object on read. Idle checking is its first user, but the column type is meant to back any table that stores polymorphic, validated config.
-- **`IdleCheckerABC` — the idle-specific payload the column carries.** On load it dispatches by the `checker_type` discriminator to the concrete spec (`session_lifetime` / `network_timeout` / `utilization`), and it declares the behavior contract every checker implements: how it batch-loads runtime signals and evaluates its assignments, each evaluation carrying `is_active`, the projected `expire_at`, and a message for that session.
+- **`IdleCheckerABC` — the idle-specific payload the column carries.** On load it dispatches by the `checker_type` discriminator to the concrete spec (`session_lifetime` / `network_timeout` / `utilization`), and it declares the behavior contract every checker implements: how it batch-loads runtime signals and evaluates its assignments, each decision carrying `is_active`, the projected `expire_at`, and a message for that session.
 
 Conceptually (the contract only — bodies are an implementation concern):
 
@@ -182,7 +182,7 @@ ABCColumnPayload                  # storage contract ABCColumn speaks to
 
 IdleCheckerABC(ABCColumnPayload)  # the value stored in idle_checkers.spec
   load(raw)  -> concrete spec     # dispatch by checker_type discriminator
-  judge(assignments) -> evaluations  # batched I/O -> is_active + expire_at + message
+  judge(assignments) -> decisions  # batched I/O -> is_active + expire_at + message
 ```
 
 This buys three things:
@@ -224,7 +224,7 @@ If a binding is disabled or removed, its non-expired rows are deleted. Re-enabli
 **3. Judgment stage** — runs checker implementations for eligible existing rows.
 
 - **Source** — reads `session_idle_checks` rows eligible for judgment together with their checker definitions and session data. It does not resolve scope bindings; row creation and removal belong exclusively to assignment sync.
-- **Handler** — pivots the batch by checker type and invokes each checker's batched `judge` contract. Checker-owned external reads occur behind this contract. The Handler converts each `is_active` evaluation into an `ACTIVE`, `IDLE`, or `IDLE_EXPIRED` persistence judgment using the evaluation deadline.
+- **Handler** — pivots the batch by checker type and invokes each checker's batched `judge` contract. Checker-owned external reads occur behind this contract. The Handler converts each `is_active` decision into an `ACTIVE`, `IDLE`, or `IDLE_EXPIRED` persistence judgment using the decision deadline.
 - **Applier** — applies the finalized judgment to the existing row only, updating `expire_at`, `last_status`, and `last_message`. The stage does not insert missing rows.
 
 **4. Expiry-sweep stage** — terminates sessions represented by expired judgments.
