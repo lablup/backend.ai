@@ -121,7 +121,11 @@ from ai.backend.manager.repositories.keypair.types import (
     KeypairResourcePolicyKeypairSearchScope,
     UserKeypairSearchScope,
 )
-from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
+from ai.backend.manager.repositories.ops.rbac.provider import (
+    EntityMembersAddition,
+    RBACOpsProvider,
+    ScopeUserMember,
+)
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 from ai.backend.manager.repositories.user.creators import UserCreateSpec, UserCreatorSpec

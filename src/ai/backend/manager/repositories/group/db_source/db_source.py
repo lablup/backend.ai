@@ -16,6 +16,7 @@ import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.types import EntityRef, ScopeRef
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
@@ -112,7 +113,7 @@ from ai.backend.manager.repositories.ops.rbac.provider import (
     RBACWriteOps,
     ScopeCreation,
     ScopeDeletion,
-    ScopeUserMember,
+    ScopeMember,
 )
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.role_manager import (
@@ -189,7 +190,7 @@ class GroupDBSource:
         async with self._rbac_ops_provider.write_ops() as w:
             domain_id = await self._get_domain_id(w, spec.domain_name)
             creation = ProjectScopeCreation(spec=spec, domain_id=domain_id)
-            domain_scope = ScopeRef(scope_type=_DOMAIN_SCOPE_TYPE, scope_id=domain_id)
+            domain_scope = ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=domain_id)
             return (await w.create_scope(creation, bound_scope=domain_scope)).row.to_data()
 
     async def _get_domain_id(self, w: RBACWriteOps, domain_name: str) -> DomainID:
