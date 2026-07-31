@@ -24,6 +24,7 @@ class IdleCheckPhase(enum.StrEnum):
     ACTIVE = "active"
     IDLE = "idle"
     IDLE_EXPIRED = "idle_expired"
+    EXCLUDED = "excluded"
 
 
 class UtilizationThresholdEntry(BackendAISchema):

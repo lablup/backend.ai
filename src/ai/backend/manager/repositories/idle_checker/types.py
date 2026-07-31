@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSpec, IdleCheckPhase
 from ai.backend.common.data.permission.types import ScopeType
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
+from ai.backend.common.identifier.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.models.clauses import QueryCondition
@@ -83,6 +83,22 @@ class IdleCheckBatchData:
 class SessionIdleCheckPair:
     session_id: SessionId
     checker_id: IdleCheckerID
+
+
+@dataclass(frozen=True)
+class SessionIdleCheckTarget:
+    """Sessions targeted under one assignment."""
+
+    assignment_id: IdleCheckerAssignmentID
+    session_ids: Sequence[SessionId]
+
+
+@dataclass(frozen=True)
+class SessionIdleCheckExclusionUpdate:
+    """Exclusion changes applied atomically in one transaction."""
+
+    exclusions: Sequence[SessionIdleCheckTarget] = ()
+    inclusions: Sequence[SessionIdleCheckTarget] = ()
 
 
 @dataclass(frozen=True)
