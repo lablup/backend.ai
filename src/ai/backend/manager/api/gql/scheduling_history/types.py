@@ -61,7 +61,6 @@ from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     SubStepResultInfo,
 )
 from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -158,7 +157,7 @@ class SessionSchedulingHistoryOrderField(StrEnum):
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Fields available for ordering kernel scheduling history",
     ),
     name="KernelSchedulingHistoryOrderField",
@@ -196,7 +195,7 @@ class RouteHistoryOrderField(StrEnum):
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Handler category that produced a replica-group history row",
     ),
     name="ReplicaGroupHistoryCategory",
@@ -208,7 +207,7 @@ class ReplicaGroupHistoryCategoryGQL(StrEnum):
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Fields available for ordering replica-group scheduling history",
     ),
     name="ReplicaGroupHistoryOrderField",
@@ -302,9 +301,7 @@ class SessionSchedulingHistory(PydanticNodeMixin[SessionHistoryNode]):
 
 
 @gql_node_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Kernel scheduling history record."
-    ),
+    BackendAIGQLMeta(added_version="26.8.0", description="Kernel scheduling history record."),
     name="KernelSchedulingHistory",
 )
 class KernelSchedulingHistoryGQL(PydanticNodeMixin[KernelHistoryNode]):
@@ -398,7 +395,7 @@ class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Replica-group scheduling history record.",
     ),
     name="ReplicaGroupHistory",
@@ -525,7 +522,7 @@ class SessionScope(PydanticInputMixin[SessionHistoryScopeDTO]):
             "Scope for kernel scheduling history query. "
             "All items are OR'd; raises an error if every field is empty."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
     ),
     name="KernelScope",
 )
@@ -580,7 +577,7 @@ class RouteScope(PydanticInputMixin[RouteHistoryScopeDTO]):
             "Scope for replica-group scheduling history query. "
             "All items are OR'd; raises an error if every field is empty."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
     ),
     name="ReplicaGroupHistoryScope",
 )
@@ -648,9 +645,7 @@ class SessionSchedulingHistoryOrderBy(PydanticInputMixin[SessionHistoryOrderDTO]
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(
-        description="Filter for kernel scheduling history", added_version=NEXT_RELEASE_VERSION
-    ),
+    BackendAIGQLMeta(description="Filter for kernel scheduling history", added_version="26.8.0"),
     name="KernelSchedulingHistoryFilter",
 )
 class KernelSchedulingHistoryFilterGQL(PydanticInputMixin[KernelHistoryFilterDTO]):
@@ -673,7 +668,7 @@ class KernelSchedulingHistoryFilterGQL(PydanticInputMixin[KernelHistoryFilterDTO
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Order by specification for kernel scheduling history",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
     ),
     name="KernelSchedulingHistoryOrderBy",
 )
@@ -716,7 +711,7 @@ class DeploymentHistoryOrderBy(PydanticInputMixin[DeploymentHistoryOrderDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter for replica-group scheduling history",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
     ),
     name="ReplicaGroupHistoryFilter",
 )
@@ -740,7 +735,7 @@ class ReplicaGroupHistoryFilterGQL(PydanticInputMixin[ReplicaGroupHistoryFilterD
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Order by specification for replica-group scheduling history",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
     ),
     name="ReplicaGroupHistoryOrderBy",
 )

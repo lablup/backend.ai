@@ -21,7 +21,6 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 from ai.backend.common.dto.manager.v2.rbac.response import (
     AssociationScopesEntitiesNode,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -156,14 +155,14 @@ class EntityFilter(PydanticInputMixin[EntityFilterDTO], GQLFilter):
     entity_id: StringFilter | None = None
     scope_type: RBACElementTypeFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description="Filter by the type of scope the entity is registered in.",
         ),
         default=None,
     )
     scope_id: StringFilter | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description="Filter by the id of scope the entity is registered in.",
         ),
         default=None,

@@ -15,7 +15,8 @@ Changes
 -->
 
 <!-- towncrier release notes start -->
-## 26.8.0rc1 (2026-07-29)
+
+## 26.8.0 (2026-07-31)
 
 ### Breaking Changes
 * The TUI installer no longer hardcodes the wildcard app/storage base domains; installs that pass `--fqdn-prefix` must now also pass `--app-base-domain` and `--storage-base-domain`, otherwise those hosts fall back to `--public-facing-address`. ([#12206](https://github.com/lablup/backend.ai/issues/12206))
@@ -112,6 +113,7 @@ Made the manager DB authoritative for agent-to-resource-group registration and m
 * Add a service to change an agent's resource group that also handles the sessions still running on it: it fails unless forced (so an admin can drain first), and on force it terminates those sessions before applying the change. ([#12917](https://github.com/lablup/backend.ai/issues/12917))
 * Remove the manager-to-agent `update_scaling_group` RPC push ([#12992](https://github.com/lablup/backend.ai/issues/12992))
 * Add a v2 agent resource-group change API (REST v2, GraphQL, SDK v2, CLI) that moves an agent to another resource group with a conflicting-session cleanup policy (`terminate`) and a `force` flag, returning the conflicting and terminating session lists ([#13093](https://github.com/lablup/backend.ai/issues/13093))
+* Expose the resource group `is_default` flag in the v2 API: readable on the GraphQL and REST v2 resource group status, and filterable in search. ([#13285](https://github.com/lablup/backend.ai/issues/13285))
 
 #### Session Preemption (BEP-1055)
 Added scheduler preemption: a scope-local `job_priority` axis, resource-group preemption settings, the `PREEMPTED` lifecycle state, and reserved placements that start once the victims' resources are freed.
@@ -122,6 +124,7 @@ Added scheduler preemption: a scope-local `job_priority` axis, resource-group pr
 * Load preemption victim candidates into the scheduling fetch for preemption-enabled resource groups, grouped per owner with per-agent reclaimable allocations for the preemption planner. ([#13123](https://github.com/lablup/backend.ai/issues/13123))
 * Preempted sessions are now either terminated or put back in the queue, according to the resource group's preemption mode. ([#13126](https://github.com/lablup/backend.ai/issues/13126))
 * Preempt lower-priority sessions of the same owner to admit starved pending sessions: the scheduler reserves the placement up front (RESERVED status) and starts it once the victims' resources are freed. ([#13146](https://github.com/lablup/backend.ai/issues/13146))
+* Expose a session's scope-local preemption priority (`job_priority`) on the v2 session read APIs, alongside `priority` and `is_preemptible`. ([#13239](https://github.com/lablup/backend.ai/issues/13239))
 
 #### DB Record Retention Management (BEP-1063)
 Added a general-purpose retention layer where a super admin sets a retention period per data category and a leader-cron sweep purges older records referentially safely.
@@ -191,6 +194,7 @@ Added per-request and per-keypair controls over how sessions are admitted and pr
 * Accept an optional `agent_selection_policy` in the v2 session enqueue API to override the resource group default per request ([#13082](https://github.com/lablup/backend.ai/issues/13082))
 * Enforce the `max_pending_session_resource_slots` keypair resource-policy limit at session enqueue, rejecting session creation that would exceed the pending-queue slot caps ([#13085](https://github.com/lablup/backend.ai/issues/13085))
 * Add `max_priority` to the keypair resource policy to cap the scheduler priority a user may request when creating a session ([#13125](https://github.com/lablup/backend.ai/issues/13125))
+* Allow setting `max_priority` on a keypair resource policy, which caps the scheduling priority a session may declare. ([#13283](https://github.com/lablup/backend.ai/issues/13283))
 
 #### GraphQL DataLoader Extension
 Added DataLoader-backed nested fields so related entities can be fetched in a single query instead of a follow-up round trip.
@@ -300,6 +304,15 @@ Fixed sessions stalling in intermediate states, ignored resource-group session d
 * Fix the compute-schedule dry-run reporting no schedulable agents for a resource group that has agents but no pending sessions. ([#12879](https://github.com/lablup/backend.ai/issues/12879))
 * Preserve the reserved start time of batch sessions in a new `sessions.requested_starts_at` column instead of overwriting it at the RUNNING transition, and evaluate batch reservations against DB time instead of per-server clocks ([#13081](https://github.com/lablup/backend.ai/issues/13081))
 * Return 404 instead of a silent success or a server error when the agent resource-group update targets an unknown agent or resource group ([#13102](https://github.com/lablup/backend.ai/issues/13102))
+* Return `404` instead of `502` when no agent matches the request. ([#13270](https://github.com/lablup/backend.ai/issues/13270))
+
+#### Session Preemption (BEP-1055)
+Made preemption actually usable end to end: the resource-group setting could not be saved, opting a session out was ignored, and sessions holding a reservation broke status serialization and filtering.
+
+* Fix the resource group preemption config being stored as a JSON string, which rolled back every write and left preemption impossible to enable. ([#13246](https://github.com/lablup/backend.ai/issues/13246))
+* Store the requested `is_preemptible` value on session creation so that opting out of preemption takes effect. ([#13264](https://github.com/lablup/backend.ai/issues/13264))
+* Expose `RESERVED` in the v2 session status enums so a session holding a preemption reservation resolves over GraphQL instead of failing enum serialization. ([#13235](https://github.com/lablup/backend.ai/issues/13235))
+* Expose `RESERVED` in the v2 kernel status enums so kernels holding a preemption reservation can be selected by status filters. ([#13260](https://github.com/lablup/backend.ai/issues/13260))
 
 #### Model Serving & Deployment
 Fixed model service start commands losing their shell wrapping, unreadable runtime variants, and rolling-update livelocks.
@@ -310,12 +323,13 @@ Fixed model service start commands losing their shell wrapping, unreadable runti
 * Fix rolling-update livelocks where old-revision replicas stuck in PENDING blocked scaling convergence and dead old-revision replicas were refilled against the new revision; during a rollout the old revision is now drain-only and capacity it loses hands over to the new revision immediately ([#13087](https://github.com/lablup/backend.ai/issues/13087))
 
 #### Reconciler-Based Idle Checking (BEP-1054)
-Corrected idle-check expiration timing and made the checker resilient to deleted keypairs and duplicate lifecycle events.
+Corrected idle-check expiration timing, made sessions past their lifetime actually terminate, and made the checker resilient to deleted keypairs and duplicate lifecycle events.
 
 * Fix active app connection tracking to consistently distinguish session and kernel identifiers. ([#12973](https://github.com/lablup/backend.ai/issues/12973))
 * Sweep only idle checks already judged expired. ([#13075](https://github.com/lablup/backend.ai/issues/13075))
 * Defer idle-check expiration until sessions become eligible for judgment. ([#13148](https://github.com/lablup/backend.ai/issues/13148))
 * Preserve the recorded kernel termination reason against duplicate container lifecycle events, and keep the idle checker from skipping the rest of a cycle when a session's keypair has been deleted ([#13166](https://github.com/lablup/backend.ai/issues/13166))
+* Terminate sessions that exceed the `session_lifetime` idle checker's limit. ([#13274](https://github.com/lablup/backend.ai/issues/13274))
 
 #### Storage & Virtual Folders
 Fixed vfolder purge and mount validation, the host usage scale, and GPFS quota serialization.
@@ -349,11 +363,13 @@ Closed a session-ownership privilege escalation and a keypair webapp login flaw,
 * Mask the Redis password in the agent's startup configuration log instead of printing it in plaintext ([#13141](https://github.com/lablup/backend.ai/issues/13141))
 
 #### RBAC Roles & Permissions
-Repaired role and permission data that earlier migrations left inconsistent.
+Repaired role and permission data that earlier migrations and the seeded fixtures left inconsistent.
 
 * Fix resource preset check failing for project members whose membership is recorded only in `association_scopes_entities` ([#12766](https://github.com/lablup/backend.ai/issues/12766))
 * Backfill the missing admin-page read permission for project and domain admin roles created at runtime, which an earlier migration skipped due to a role-name pattern mismatch. ([#12771](https://github.com/lablup/backend.ai/issues/12771))
 * Stop auto-assigning admin roles to users joining a scope by clearing `auto_assign` for roles whose name ends with `admin`, which the system-role backfill had wrongly enabled. ([#12809](https://github.com/lablup/backend.ai/issues/12809))
+* Seed role-to-scope bindings in `association_scopes_entities` in the example roles fixture so that auto-assign roles are actually granted when users join the seeded projects and domain ([#13244](https://github.com/lablup/backend.ai/issues/13244))
+* Disable preset-based role auto-creation by marking the role preset fixtures as soft-deleted ([#13304](https://github.com/lablup/backend.ai/issues/13304))
 
 #### Database Migration & Upgrade
 Fixed `alembic upgrade` aborting or crashing on large or long-lived deployments.
@@ -403,6 +419,10 @@ Fixed PACKAGE-mode installs leaving the deployment half-configured instead of ab
 * Fix the backport workflow silently dropping backports for commits whose message contains a quote character: the milestones result JSON (and author/label values) are now passed to the shell via environment variables instead of inline template interpolation. ([#13021](https://github.com/lablup/backend.ai/issues/13021))
 * Fix admin GQL logging to classify expected 4xx errors from async resolvers at debug level instead of ERROR, and include `extensions.code` in their error responses ([#13129](https://github.com/lablup/backend.ai/issues/13129))
 * Answer the app config fragment by-names GraphQL queries position by position, holding a name with no fragment at the scope as a null instead of dropping it. ([#13211](https://github.com/lablup/backend.ai/issues/13211))
+* Return the resource group UUID instead of the name in the `id` field of the v2 resource group read APIs ([#13275](https://github.com/lablup/backend.ai/issues/13275))
+* Fix the 500 when updating a keypair resource policy's `max_pending_session_resource_slots`. ([#13279](https://github.com/lablup/backend.ai/issues/13279))
+* Stop GraphQL update mutations from clearing fields that the client omitted; an omitted field now keeps its current value while an explicit null still clears it. ([#13290](https://github.com/lablup/backend.ai/issues/13290))
+* Fix v2 and v1 REST image APIs reporting no supported accelerators for images without an accelerator constraint, restoring the legacy `["*"]` (any accelerator) contract ([#13317](https://github.com/lablup/backend.ai/issues/13317))
 
 ### Documentation Updates
 * Add BEP-1056 for scope-linked metric catalog and dashboards. ([#12531](https://github.com/lablup/backend.ai/issues/12531))

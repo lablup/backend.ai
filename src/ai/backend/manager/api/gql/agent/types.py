@@ -31,7 +31,6 @@ from ai.backend.common.dto.manager.v2.agent.types import (
     AgentStatusEnum,
     AgentStatusFilter,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
@@ -136,7 +135,7 @@ class AgentOrderByGQL(PydanticInputMixin[AgentOrder]):
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "How to clean up sessions that conflict with an agent's resource-group change."
         ),
@@ -150,7 +149,7 @@ class ConflictingSessionCleanupPolicyGQL(StrEnum):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Input for changing the resource group of an agent.",
     ),
     name="UpdateAgentResourceGroupInput",
@@ -179,7 +178,7 @@ class UpdateAgentResourceGroupInputGQL(PydanticInputMixin[UpdateAgentResourceGro
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Result of changing the resource group of an agent.",
     ),
     model=UpdateAgentResourceGroupPayload,

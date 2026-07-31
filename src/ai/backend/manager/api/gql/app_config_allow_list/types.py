@@ -43,7 +43,6 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.types import (
     AppConfigScopeTypeFilter as AppConfigScopeTypeFilterDTO,
 )
 from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -98,7 +97,7 @@ class AppConfigAllowListGQL(PydanticNodeMixin[AppConfigAllowListNode]):
     )
     rank: int = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description=(
                 "Merge rank applied to fragments under this entry (low to high; higher wins)."
             ),
@@ -246,7 +245,7 @@ class CreateAppConfigAllowListInputGQL(PydanticInputMixin[CreateAppConfigAllowLi
     )
     rank: int | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description=(
                 "Merge rank applied to fragments under this entry (low to high; higher wins). "
                 "Defaults to the scope type's default rank (public=100, domain=200, user=300)."
@@ -273,7 +272,7 @@ class CreateAppConfigAllowListPayloadGQL(PydanticOutputMixin[CreateAppConfigAllo
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for updating an app config allow-list entry (rank only).",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
     ),
     name="UpdateAppConfigAllowListInput",
 )
@@ -290,7 +289,7 @@ class UpdateAppConfigAllowListInputGQL(PydanticInputMixin[UpdateAppConfigAllowLi
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Payload for app config allow-list entry update.",
     ),
     model=UpdateAppConfigAllowListPayloadDTO,

@@ -51,7 +51,6 @@ from ai.backend.common.dto.manager.v2.session.types import (
     ProjectSessionScope,
     SessionStatusFilter,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID, SessionId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
 from ai.backend.manager.api.gql.common.types import (
@@ -216,7 +215,7 @@ class SessionV2MetadataInfoGQL:
     priority: int = gql_field(description="Scheduling priority of the session.")
     job_priority: int = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description=(
                 "Preemption priority among the owner's own sessions. A pending "
                 "session may reclaim another session's resources only when both "
@@ -486,7 +485,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description=(
                 "Resource allocation (requested / used / allocated) computed on-demand "
                 "from the resource_allocations table. Unlike the deprecated eager "
@@ -640,13 +639,13 @@ class EnqueueSessionInputGQL(PydanticInputMixin[EnqueueSessionInputDTO]):
     )
     resource_group: str | None = gql_field(
         default=None,
-        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use resource_group_id instead. Resource group name.",
+        description="Deprecated since 26.8.0. Use resource_group_id instead. Resource group name.",
         deprecation_reason="Use resource_group_id instead.",
     )
     resource_group_id: ID | None = gql_added_field(
         BackendAIGQLMeta(
             description="Resource group UUID. Auto-selected if omitted.",
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
         ),
         default=None,
     )
@@ -679,7 +678,7 @@ class EnqueueSessionInputGQL(PydanticInputMixin[EnqueueSessionInputDTO]):
     agent_selection_policy: AgentSelectionPolicyGQL | None = gql_added_field(
         BackendAIGQLMeta(
             description=("How agent_list is enforced. null inherits the resource group default."),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
         ),
         default=None,
     )

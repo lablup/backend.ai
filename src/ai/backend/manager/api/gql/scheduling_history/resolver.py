@@ -19,7 +19,6 @@ from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     ScopedSearchKernelHistoriesInput,
     ScopedSearchReplicaGroupHistoriesInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -74,7 +73,7 @@ KernelSchedulingHistoryEdgeGQL = Edge[KernelSchedulingHistoryGQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Kernel scheduling history connection.",
     ),
     name="KernelSchedulingHistoryConnection",
@@ -106,7 +105,7 @@ ReplicaGroupHistoryEdgeGQL = Edge[ReplicaGroupHistoryGQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Replica-group scheduling history connection.",
     ),
     name="ReplicaGroupHistoryConnection",
@@ -235,7 +234,7 @@ async def session_scheduling_histories(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="List kernel scheduling history (superadmin only)",
     )
 )  # type: ignore[misc]
@@ -454,7 +453,7 @@ async def route_histories(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="List replica-group scheduling history (superadmin only)",
     )
 )  # type: ignore[misc]
@@ -641,7 +640,7 @@ async def route_scoped_scheduling_histories(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Get scheduling history for a specific kernel.",
     )
 )  # type: ignore[misc]
@@ -690,7 +689,7 @@ async def scoped_kernel_scheduling_histories(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Get scheduling history for the replica groups of a specific deployment.",
     )
 )  # type: ignore[misc]
