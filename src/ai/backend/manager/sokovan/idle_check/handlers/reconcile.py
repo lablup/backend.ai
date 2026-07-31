@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Mapping
+from datetime import datetime
 from typing import override
 
-from ai.backend.common.data.idle_checker.types import CheckerType
+from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckPhase
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
@@ -15,6 +16,7 @@ from ai.backend.manager.repositories.idle_checker.types import (
 )
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
+    IdleActivityDecision,
     IdleChecker,
     IdleCheckerContext,
 )
@@ -33,18 +35,41 @@ class IdleCheckReconcileHandler(ReconcilerHandler[IdleCheckReconcileInfo, IdleCh
     @override
     async def execute(self, reconcile_info: IdleCheckReconcileInfo) -> IdleCheckResult:
         assignments_by_type = self._assignments_by_type(reconcile_info.batch)
-        context = IdleCheckerContext(current_time=reconcile_info.current_time)
+        context = IdleCheckerContext(current_time=reconcile_info.now())
         all_judgments: list[IdleJudgmentData] = []
         for checker_type, assignments in assignments_by_type.items():
             checker = self._checkers.get(checker_type)
             if checker is None:
                 continue
-            judgments = await checker.judge(
+            decisions = await checker.judge(
                 assignments,
                 context=context,
             )
-            all_judgments.extend(judgments)
+            for decision in decisions:
+                all_judgments.append(
+                    self._build_judgment(decision, current_time=context.current_time)
+                )
         return IdleCheckResult(judgments=all_judgments)
+
+    def _build_judgment(
+        self,
+        decision: IdleActivityDecision,
+        *,
+        current_time: datetime,
+    ) -> IdleJudgmentData:
+        if decision.is_active:
+            status = IdleCheckPhase.ACTIVE
+        elif decision.expire_at <= current_time:
+            status = IdleCheckPhase.IDLE_EXPIRED
+        else:
+            status = IdleCheckPhase.IDLE
+        return IdleJudgmentData(
+            session_id=decision.session_id,
+            checker_id=decision.checker_id,
+            status=status,
+            expire_at=decision.expire_at,
+            message=decision.message,
+        )
 
     def _assignments_by_type(
         self, batch: IdleCheckBatchData

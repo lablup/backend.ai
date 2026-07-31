@@ -11,7 +11,6 @@ from pydantic import ValidationError
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
-    IdleCheckPhase,
     NetworkTimeoutSpec,
     SessionLifetimeSpec,
 )
@@ -112,22 +111,22 @@ class TestSessionLifetimeChecker:
         session = session_factory()
         assignment = assignment_factory(max_lifetime_seconds=30, sessions=(session,))
 
-        judgments = await checker.judge(
+        decisions = await checker.judge(
             (assignment,),
             context=IdleCheckerContext(
                 current_time=_BASE_TIME + timedelta(seconds=29),
             ),
         )
 
-        assert len(judgments) == 1
-        assert judgments[0].session_id == session.session_id
-        assert judgments[0].expire_at == _BASE_TIME + timedelta(seconds=30)
-        assert judgments[0].status is IdleCheckPhase.IDLE
-        assert judgments[0].message == (
+        assert len(decisions) == 1
+        assert decisions[0].session_id == session.session_id
+        assert decisions[0].expire_at == _BASE_TIME + timedelta(seconds=30)
+        assert not decisions[0].is_active
+        assert decisions[0].message == (
             "Session lifetime check: max_lifetime_seconds=30, running_seconds=29"
         )
 
-    async def test_session_at_deadline_is_expired(
+    async def test_session_at_deadline_is_idle_for_handler(
         self,
         checker: SessionLifetimeChecker,
         session_factory: SessionFactory,
@@ -136,22 +135,22 @@ class TestSessionLifetimeChecker:
         session = session_factory()
         assignment = assignment_factory(max_lifetime_seconds=30, sessions=(session,))
 
-        judgments = await checker.judge(
+        decisions = await checker.judge(
             (assignment,),
             context=IdleCheckerContext(
                 current_time=_BASE_TIME + timedelta(seconds=30),
             ),
         )
 
-        assert len(judgments) == 1
-        assert judgments[0].session_id == session.session_id
-        assert judgments[0].expire_at == _BASE_TIME + timedelta(seconds=30)
-        assert judgments[0].status is IdleCheckPhase.IDLE_EXPIRED
-        assert judgments[0].message == (
+        assert len(decisions) == 1
+        assert decisions[0].session_id == session.session_id
+        assert decisions[0].expire_at == _BASE_TIME + timedelta(seconds=30)
+        assert not decisions[0].is_active
+        assert decisions[0].message == (
             "Session lifetime check: max_lifetime_seconds=30, running_seconds=30"
         )
 
-    async def test_session_after_deadline_is_expired(
+    async def test_session_after_deadline_is_idle_for_handler(
         self,
         checker: SessionLifetimeChecker,
         session_factory: SessionFactory,
@@ -160,16 +159,16 @@ class TestSessionLifetimeChecker:
         session = session_factory()
         assignment = assignment_factory(max_lifetime_seconds=30, sessions=(session,))
 
-        judgments = await checker.judge(
+        decisions = await checker.judge(
             (assignment,),
             context=IdleCheckerContext(
                 current_time=_BASE_TIME + timedelta(seconds=31.2),
             ),
         )
 
-        assert judgments[0].expire_at == _BASE_TIME + timedelta(seconds=30)
-        assert judgments[0].status is IdleCheckPhase.IDLE_EXPIRED
-        assert judgments[0].message == (
+        assert decisions[0].expire_at == _BASE_TIME + timedelta(seconds=30)
+        assert not decisions[0].is_active
+        assert decisions[0].message == (
             "Session lifetime check: max_lifetime_seconds=30, running_seconds=31.2"
         )
 
@@ -185,11 +184,11 @@ class TestSessionLifetimeChecker:
         )
         assignment = assignment_factory(max_lifetime_seconds=30, sessions=(session,))
 
-        judgments = await checker.judge(
+        decisions = await checker.judge(
             (assignment,), context=IdleCheckerContext(current_time=_BASE_TIME)
         )
 
-        assert judgments == []
+        assert decisions == []
 
     async def test_evaluates_multiple_definitions_independently(
         self,
@@ -201,21 +200,18 @@ class TestSessionLifetimeChecker:
         short_lifetime = assignment_factory(max_lifetime_seconds=10, sessions=(session,))
         long_lifetime = assignment_factory(max_lifetime_seconds=30, sessions=(session,))
 
-        judgments = await checker.judge(
+        decisions = await checker.judge(
             (short_lifetime, long_lifetime),
             context=IdleCheckerContext(
                 current_time=_BASE_TIME + timedelta(seconds=20),
             ),
         )
 
-        assert [judgment.checker_id for judgment in judgments] == [
+        assert [decision.checker_id for decision in decisions] == [
             short_lifetime.definition.checker_id,
             long_lifetime.definition.checker_id,
         ]
-        assert [judgment.status for judgment in judgments] == [
-            IdleCheckPhase.IDLE_EXPIRED,
-            IdleCheckPhase.IDLE,
-        ]
+        assert all(not decision.is_active for decision in decisions)
 
     async def test_evaluates_every_session_in_assignment(
         self,
@@ -230,18 +226,15 @@ class TestSessionLifetimeChecker:
             sessions=(expired_session, active_session),
         )
 
-        judgments = await checker.judge(
+        decisions = await checker.judge(
             (assignment,), context=IdleCheckerContext(current_time=_BASE_TIME)
         )
 
-        assert [judgment.session_id for judgment in judgments] == [
+        assert [decision.session_id for decision in decisions] == [
             expired_session.session_id,
             active_session.session_id,
         ]
-        assert [judgment.status for judgment in judgments] == [
-            IdleCheckPhase.IDLE_EXPIRED,
-            IdleCheckPhase.IDLE,
-        ]
+        assert all(not decision.is_active for decision in decisions)
 
     async def test_skips_mismatched_spec_and_evaluates_remaining_assignments(
         self,
@@ -266,13 +259,13 @@ class TestSessionLifetimeChecker:
             sessions=(session_factory(),),
         )
 
-        judgments = await checker.judge(
+        decisions = await checker.judge(
             (mismatched_assignment, valid_assignment),
             context=IdleCheckerContext(
                 current_time=_BASE_TIME + timedelta(seconds=30),
             ),
         )
 
-        assert [judgment.checker_id for judgment in judgments] == [
+        assert [decision.checker_id for decision in decisions] == [
             valid_assignment.definition.checker_id
         ]

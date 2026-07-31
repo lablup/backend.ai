@@ -13,7 +13,6 @@ from pydantic import ValidationError
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
-    IdleCheckPhase,
     SessionLifetimeSpec,
     UtilizationSpec,
     UtilizationThresholdEntry,
@@ -126,7 +125,7 @@ class TestUtilizationChecker:
             second_preset_id: {second_session.session_id: Decimal("15")},
         }
 
-        judgments = await checker.judge(
+        decisions = await checker.judge(
             [
                 assignment_factory(
                     preset_id=first_preset_id,
@@ -142,10 +141,7 @@ class TestUtilizationChecker:
             context=IdleCheckerContext(current_time=_NOW),
         )
 
-        assert [judgment.status for judgment in judgments] == [
-            IdleCheckPhase.IDLE,
-            IdleCheckPhase.IDLE,
-        ]
+        assert all(not decision.is_active for decision in decisions)
         metric_repository.query_session_utilization_metrics.assert_awaited_once_with(
             {
                 first_preset_id: [first_session.session_id],
@@ -170,7 +166,7 @@ class TestUtilizationChecker:
             },
         }
 
-        judgments = await checker.judge(
+        decisions = await checker.judge(
             [
                 assignment_factory(
                     preset_id=preset_id,
@@ -186,10 +182,7 @@ class TestUtilizationChecker:
             context=IdleCheckerContext(current_time=_NOW),
         )
 
-        assert [judgment.status for judgment in judgments] == [
-            IdleCheckPhase.IDLE,
-            IdleCheckPhase.ACTIVE,
-        ]
+        assert [decision.is_active for decision in decisions] == [False, True]
         metric_repository.query_session_utilization_metrics.assert_awaited_once_with(
             {
                 preset_id: [first_session.session_id, second_session.session_id],
@@ -209,7 +202,7 @@ class TestUtilizationChecker:
             preset_id: {session.session_id: Decimal("9.9")},
         }
 
-        judgments = await checker.judge(
+        decisions = await checker.judge(
             [
                 assignment_factory(
                     preset_id=preset_id,
@@ -220,10 +213,10 @@ class TestUtilizationChecker:
             context=IdleCheckerContext(current_time=_NOW),
         )
 
-        assert len(judgments) == 1
-        assert judgments[0].status is IdleCheckPhase.IDLE
-        assert judgments[0].expire_at == _EXISTING_EXPIRE_AT
-        assert f"metric=[preset_id={preset_id}, value=9.9/10]" in judgments[0].message
+        assert len(decisions) == 1
+        assert not decisions[0].is_active
+        assert decisions[0].expire_at == _EXISTING_EXPIRE_AT
+        assert f"metric=[preset_id={preset_id}, value=9.9/10]" in decisions[0].message
 
     async def test_first_underutilized_result_initializes_deadline(
         self,
@@ -237,7 +230,7 @@ class TestUtilizationChecker:
             preset_id: {session.session_id: Decimal("9.9")},
         }
 
-        judgments = await checker.judge(
+        decisions = await checker.judge(
             [
                 assignment_factory(
                     preset_id=preset_id,
@@ -248,24 +241,17 @@ class TestUtilizationChecker:
             context=IdleCheckerContext(current_time=_NOW),
         )
 
-        assert len(judgments) == 1
-        assert judgments[0].status is IdleCheckPhase.IDLE
-        assert judgments[0].expire_at == _NOW + timedelta(seconds=_DURATION_SECONDS)
+        assert len(decisions) == 1
+        assert not decisions[0].is_active
+        assert decisions[0].expire_at == _NOW + timedelta(seconds=_DURATION_SECONDS)
 
-    @pytest.mark.parametrize(
-        ("expire_at", "expected_status"),
-        [
-            (_NOW + timedelta(seconds=1), IdleCheckPhase.IDLE),
-            (_NOW, IdleCheckPhase.IDLE_EXPIRED),
-        ],
-    )
+    @pytest.mark.parametrize("expire_at", [_NOW + timedelta(seconds=1), _NOW])
     async def test_existing_idle_result_preserves_deadline(
         self,
         checker: UtilizationChecker,
         metric_repository: MagicMock,
         assignment_factory: AssignmentFactory,
         expire_at: datetime,
-        expected_status: IdleCheckPhase,
     ) -> None:
         preset_id = PrometheusQueryPresetID(uuid4())
         session = _session(expire_at=expire_at)
@@ -273,7 +259,7 @@ class TestUtilizationChecker:
             preset_id: {session.session_id: Decimal("5")},
         }
 
-        judgments = await checker.judge(
+        decisions = await checker.judge(
             [
                 assignment_factory(
                     preset_id=preset_id,
@@ -284,9 +270,9 @@ class TestUtilizationChecker:
             context=IdleCheckerContext(current_time=_NOW),
         )
 
-        assert len(judgments) == 1
-        assert judgments[0].status is expected_status
-        assert judgments[0].expire_at == expire_at
+        assert len(decisions) == 1
+        assert not decisions[0].is_active
+        assert decisions[0].expire_at == expire_at
 
     @pytest.mark.parametrize("value", [Decimal("10"), Decimal("10.1")])
     async def test_threshold_or_above_returns_active_and_refreshes_deadline(
@@ -302,7 +288,7 @@ class TestUtilizationChecker:
             preset_id: {session.session_id: value},
         }
 
-        judgments = await checker.judge(
+        decisions = await checker.judge(
             [
                 assignment_factory(
                     preset_id=preset_id,
@@ -313,9 +299,9 @@ class TestUtilizationChecker:
             context=IdleCheckerContext(current_time=_NOW),
         )
 
-        assert len(judgments) == 1
-        assert judgments[0].status is IdleCheckPhase.ACTIVE
-        assert judgments[0].expire_at == _NOW + timedelta(seconds=_DURATION_SECONDS)
+        assert len(decisions) == 1
+        assert decisions[0].is_active
+        assert decisions[0].expire_at == _NOW + timedelta(seconds=_DURATION_SECONDS)
 
     async def test_missing_observation_is_ignored(
         self,
@@ -326,7 +312,7 @@ class TestUtilizationChecker:
         preset_id = PrometheusQueryPresetID(uuid4())
         metric_repository.query_session_utilization_metrics.return_value = {}
 
-        judgments = await checker.judge(
+        decisions = await checker.judge(
             [
                 assignment_factory(
                     preset_id=preset_id,
@@ -337,7 +323,7 @@ class TestUtilizationChecker:
             context=IdleCheckerContext(current_time=_NOW),
         )
 
-        assert judgments == []
+        assert decisions == []
 
     async def test_mismatched_spec_is_ignored(
         self,
@@ -357,10 +343,10 @@ class TestUtilizationChecker:
             sessions=[_session()],
         )
 
-        judgments = await checker.judge(
+        decisions = await checker.judge(
             [assignment],
             context=IdleCheckerContext(current_time=_NOW),
         )
 
-        assert judgments == []
+        assert decisions == []
         metric_repository.query_session_utilization_metrics.assert_not_awaited()

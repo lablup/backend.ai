@@ -6,11 +6,10 @@ from datetime import timedelta
 from decimal import Decimal
 from typing import override
 
-from ai.backend.common.data.idle_checker.types import IdleCheckPhase
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.repositories.idle_checker.types import IdleJudgmentData
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
+    IdleActivityDecision,
     IdleChecker,
     IdleCheckerContext,
 )
@@ -27,8 +26,8 @@ class SessionLifetimeChecker(IdleChecker):
         assignments: Sequence[CheckerAssignment],
         *,
         context: IdleCheckerContext,
-    ) -> Sequence[IdleJudgmentData]:
-        judgments: list[IdleJudgmentData] = []
+    ) -> Sequence[IdleActivityDecision]:
+        decisions: list[IdleActivityDecision] = []
         for assignment in assignments:
             lifetime_spec = assignment.definition.spec.session_lifetime
             if lifetime_spec is None:
@@ -48,16 +47,12 @@ class SessionLifetimeChecker(IdleChecker):
                 expires_at = session.starts_at + timedelta(
                     seconds=lifetime_spec.max_lifetime_seconds
                 )
-                judgments.append(
-                    IdleJudgmentData(
+                decisions.append(
+                    IdleActivityDecision(
                         checker_id=assignment.definition.checker_id,
                         session_id=session.session_id,
                         expire_at=expires_at,
-                        status=(
-                            IdleCheckPhase.IDLE_EXPIRED
-                            if context.current_time >= expires_at
-                            else IdleCheckPhase.IDLE
-                        ),
+                        is_active=False,
                         message=(
                             "Session lifetime check: "
                             f"max_lifetime_seconds={max_lifetime_seconds:f}, "
@@ -65,4 +60,4 @@ class SessionLifetimeChecker(IdleChecker):
                         ),
                     )
                 )
-        return judgments
+        return decisions
