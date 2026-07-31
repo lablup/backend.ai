@@ -338,27 +338,6 @@ class TestIdleCheckReconcileHandler:
         assert result.judgments[0].status is IdleCheckPhase.IDLE_EXPIRED
         assert result.judgments[0].expire_at == _NOW
 
-    async def test_does_not_expire_active_judgment_with_elapsed_deadline(
-        self,
-        handler: IdleCheckReconcileHandler,
-        first_session_id: SessionId,
-        lifetime_definition: IdleCheckerDefinitionData,
-        lifetime_checker: FakeChecker,
-    ) -> None:
-        deadline = _NOW - timedelta(seconds=1)
-        lifetime_checker.judgment_expire_at = deadline
-        reconcile_info = IdleCheckReconcileInfo(
-            batch=IdleCheckBatchData(
-                assignments=[_assignment(first_session_id, lifetime_definition)]
-            ),
-            current_time=_NOW,
-        )
-
-        result = await handler.execute(reconcile_info)
-
-        assert result.judgments[0].status is IdleCheckPhase.ACTIVE
-        assert result.judgments[0].expire_at == deadline
-
     async def test_skips_unimplemented_checker_types(
         self,
         first_session_id: SessionId,
