@@ -7,8 +7,8 @@ from typing import cast, override
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
 from ai.backend.common.data.entity.types import ScopeRef
-from ai.backend.common.data.entity.types import ScopeType as VirtualScopeType
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import BackendAIError, DomainNotFound, InvalidAPIParameters
 from ai.backend.common.identifier.domain import DomainID, DomainName
@@ -67,8 +67,6 @@ from ai.backend.manager.repositories.scaling_group.creators import (
     ScalingGroupForDomainCreatorSpec,
 )
 
-_DOMAIN_SCOPE_TYPE = VirtualScopeType(RBACElementType.DOMAIN.value)
-
 
 @dataclass
 class DomainScopeCreation(ScopeCreation[DomainRow]):
@@ -86,7 +84,7 @@ class DomainScopeCreation(ScopeCreation[DomainRow]):
 
     @override
     def scope_of(self, row: DomainRow) -> ScopeRef:
-        return ScopeRef(scope_type=_DOMAIN_SCOPE_TYPE, scope_id=row.id)
+        return ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=row.id)
 
     @override
     def system_roles_of(self, row: DomainRow) -> Collection[ScopeSystemRoleData]:
@@ -188,7 +186,7 @@ class DomainRepository:
                     purger=RBACEntityPurger(
                         spec=DomainPurgerSpec(domain_name=domain_name, domain_id=domain_id)
                     ),
-                    scope=ScopeRef(scope_type=_DOMAIN_SCOPE_TYPE, scope_id=domain_id),
+                    scope=ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=domain_id),
                 )
             )
             if result is None:
