@@ -7054,7 +7054,7 @@
             "name": "preset_domain_admin",
             "scope_type": "domain",
             "auto_assign": false,
-            "deleted": false,
+            "deleted": true,
             "created_at": "2025-09-12 09:51:58.265582+00",
             "updated_at": "2025-09-12 09:51:58.265582+00"
         },
@@ -7063,7 +7063,7 @@
             "name": "preset_project_admin",
             "scope_type": "project",
             "auto_assign": false,
-            "deleted": false,
+            "deleted": true,
             "created_at": "2025-09-12 09:51:58.265582+00",
             "updated_at": "2025-09-12 09:51:58.265582+00"
         },
@@ -7072,7 +7072,7 @@
             "name": "preset_project_member",
             "scope_type": "project",
             "auto_assign": true,
-            "deleted": false,
+            "deleted": true,
             "created_at": "2025-09-12 09:51:58.265582+00",
             "updated_at": "2025-09-12 09:51:58.265582+00"
         },
@@ -7081,7 +7081,7 @@
             "name": "preset_user",
             "scope_type": "user",
             "auto_assign": false,
-            "deleted": false,
+            "deleted": true,
             "created_at": "2025-09-12 09:51:58.265582+00",
             "updated_at": "2025-09-12 09:51:58.265582+00"
         }
