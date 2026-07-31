@@ -16,6 +16,36 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.4.9 (2026-07-31)
+
+### Features
+* Reject revision creation when deployment definition files are malformed. ([#13096](https://github.com/lablup/backend.ai/issues/13096))
+
+### Fixes
+* Fix PACKAGE-mode TUI installs leaving the default scaling group pointed at the placeholder wsproxy address (`:5050`) instead of the app-proxy coordinator, and make failing manager CLI steps abort the install instead of being silently ignored. ([#12872](https://github.com/lablup/backend.ai/issues/12872))
+* Fix PACKAGE-mode TUI installs leaving the app-proxy database without any tables (the schema migration silently failed with `ModuleNotFoundError`); the migration now runs through the coordinator CLI's `schema oneshot`, and a failing migration aborts the install. ([#12875](https://github.com/lablup/backend.ai/issues/12875))
+* Fix the legacy app_configs downgrade failing with a duplicate enum type error ([#12887](https://github.com/lablup/backend.ai/issues/12887))
+* Reject vfolder mount aliases set to exactly `/home/work`, which collided with the intrinsic scratch mount and made container creation fail with "Duplicate mount point" ([#12969](https://github.com/lablup/backend.ai/issues/12969))
+* Fix a native memory and file-descriptor leak in every long-running service making aiohttp client requests: since aiodns 3.2, aiohttp implicitly defaulted to the aiodns/pycares resolver, leaking one c-ares channel (native heap plus a `/dev/urandom` fd) per ephemeral client session. All service entrypoints now force aiohttp's threaded resolver at startup. ([#12985](https://github.com/lablup/backend.ai/issues/12985))
+* Reflect changed per-user container UID/GID settings in the container's `/etc/passwd` and `/etc/group` when starting sessions from committed (customized) images, instead of silently keeping the stale entries baked into the image ([#13086](https://github.com/lablup/backend.ai/issues/13086))
+* Fix rolling-update livelocks where old-revision replicas stuck in PENDING blocked scaling convergence and dead old-revision replicas were refilled against the new revision; during a rollout the old revision is now drain-only and capacity it loses hands over to the new revision immediately ([#13087](https://github.com/lablup/backend.ai/issues/13087))
+* Fix a keypair webapp login flaw where knowing an access key alone could authenticate, and stop embedding the secret key in the (now-expiring) sToken ([#13095](https://github.com/lablup/backend.ai/issues/13095))
+* Fix admin GQL logging to classify expected 4xx errors from async resolvers at debug level instead of ERROR, and include `extensions.code` in their error responses ([#13129](https://github.com/lablup/backend.ai/issues/13129))
+* Mask the Redis password in the agent's startup configuration log instead of printing it in plaintext ([#13141](https://github.com/lablup/backend.ai/issues/13141))
+* Fix spurious first-sample spikes in hook-derived utilization metrics (e.g. `cpu_util`) by applying `current_hook` at `Metric` creation ([#13144](https://github.com/lablup/backend.ai/issues/13144))
+* Preserve the recorded kernel termination reason against duplicate container lifecycle events, and keep the idle checker from skipping the rest of a cycle when a session's keypair has been deleted ([#13166](https://github.com/lablup/backend.ai/issues/13166))
+* Fix user, project and domain usage buckets being over-reported by the number of concurrently running kernels, and rebuild the affected buckets from the recorded per-kernel usage. ([#13186](https://github.com/lablup/backend.ai/issues/13186))
+* Fix the app-proxy HTTP backend dropping all but the last duplicate response header (e.g. multiple `Set-Cookie`), which prevented cookie-authenticated apps such as RStudio Server from ever signing in through the proxy (`ERR_TOO_MANY_REDIRECTS`). ([#13194](https://github.com/lablup/backend.ai/issues/13194))
+* Seed role-to-scope bindings in `association_scopes_entities` in the example roles fixture so that auto-assign roles are actually granted when users join the seeded projects and domain ([#13244](https://github.com/lablup/backend.ai/issues/13244))
+* Fix the 500 when updating a keypair resource policy's `max_pending_session_resource_slots`. ([#13279](https://github.com/lablup/backend.ai/issues/13279))
+* Stop GraphQL update mutations from clearing fields that the client omitted; an omitted field now keeps its current value while an explicit null still clears it. ([#13290](https://github.com/lablup/backend.ai/issues/13290))
+* Disable preset-based role auto-creation by marking the role preset fixtures as soft-deleted ([#13304](https://github.com/lablup/backend.ai/issues/13304))
+* Fix v2 and v1 REST image APIs reporting no supported accelerators for images without an accelerator constraint, restoring the legacy `["*"]` (any accelerator) contract ([#13317](https://github.com/lablup/backend.ai/issues/13317))
+
+### Test Updates
+* Seed `association_scopes_entities` in resource preset `check_presets` repository tests to match project membership resolution. ([#12813](https://github.com/lablup/backend.ai/issues/12813))
+
+
 ## 26.4.8 (2026-07-13)
 
 ### Breaking Changes

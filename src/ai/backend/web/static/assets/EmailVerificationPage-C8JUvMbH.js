@@ -1,3 +1,0 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/EmailVerificationView-B7osRYTX.js","assets/index-r5M52Un8.js","assets/index-CDgRDCYd.css"])))=>i.map(i=>d[i]);
-import{j as e,dA as s,r,h as o,bf as n,c_ as c}from"./index-r5M52Un8.js";import{u as l}from"./useApiEndpoint-Ck8hi9f7.js";const m=n.lazy(()=>c(()=>import("./EmailVerificationView-B7osRYTX.js"),__vite__mapDeps([0,1,2]))),E=()=>e.jsxs(e.Fragment,{children:[e.jsx(s,{}),e.jsx(r.Suspense,{fallback:null,children:e.jsx(p,{})})]}),p=()=>{"use memo";const t=o.c(2),a=l();let i;return t[0]!==a?(i=e.jsx(m,{apiEndpoint:a,active:!0}),t[0]=a,t[1]=i):i=t[1],i};export{E as default};
-//# sourceMappingURL=EmailVerificationPage-C8JUvMbH.js.map
