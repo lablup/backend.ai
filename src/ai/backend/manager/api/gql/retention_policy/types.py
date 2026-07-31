@@ -33,7 +33,6 @@ from ai.backend.common.dto.manager.v2.retention_policy.response import (
 from ai.backend.common.dto.manager.v2.retention_policy.response import (
     UpdateRetentionPolicyPayload as UpdatePayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -49,7 +48,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, Pydant
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Retention category identifying a code-side cleanup procedure.",
     ),
     name="RetentionCategory",
@@ -67,7 +66,7 @@ class RetentionCategoryGQL(StrEnum):
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Order fields for retention policies.",
     ),
     name="RetentionPolicyOrderField",
@@ -80,7 +79,7 @@ class RetentionPolicyOrderFieldGQL(StrEnum):
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="A per-category retention policy: admin-tunable cleanup settings for accumulating DB records.",
     ),
     name="RetentionPolicy",
@@ -104,7 +103,7 @@ RetentionPolicyEdge = Edge[RetentionPolicyGQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Paginated list of retention policies.",
     )
 )
@@ -117,9 +116,7 @@ class RetentionPolicyConnection(Connection[RetentionPolicyGQL]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Filter for retention policies."
-    ),
+    BackendAIGQLMeta(added_version="26.8.0", description="Filter for retention policies."),
     name="RetentionPolicyFilter",
 )
 class RetentionPolicyFilterGQL(PydanticInputMixin[FilterDTO]):
@@ -128,7 +125,7 @@ class RetentionPolicyFilterGQL(PydanticInputMixin[FilterDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Order specification."),
+    BackendAIGQLMeta(added_version="26.8.0", description="Order specification."),
     name="RetentionPolicyOrderBy",
 )
 class RetentionPolicyOrderByGQL(PydanticInputMixin[OrderDTO]):
@@ -137,9 +134,7 @@ class RetentionPolicyOrderByGQL(PydanticInputMixin[OrderDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Create retention policy input."
-    ),
+    BackendAIGQLMeta(added_version="26.8.0", description="Create retention policy input."),
     name="CreateRetentionPolicyInput",
 )
 class CreateRetentionPolicyInputGQL(PydanticInputMixin[CreateInputDTO]):
@@ -151,9 +146,7 @@ class CreateRetentionPolicyInputGQL(PydanticInputMixin[CreateInputDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Update retention policy input."
-    ),
+    BackendAIGQLMeta(added_version="26.8.0", description="Update retention policy input."),
     name="UpdateRetentionPolicyInput",
 )
 class UpdateRetentionPolicyInputGQL(PydanticInputMixin[UpdateInputDTO]):
@@ -166,9 +159,7 @@ class UpdateRetentionPolicyInputGQL(PydanticInputMixin[UpdateInputDTO]):
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Create retention policy payload."
-    ),
+    BackendAIGQLMeta(added_version="26.8.0", description="Create retention policy payload."),
     model=CreatePayloadDTO,
     name="CreateRetentionPolicyPayload",
 )
@@ -177,9 +168,7 @@ class CreateRetentionPolicyPayloadGQL(PydanticOutputMixin[CreatePayloadDTO]):
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Update retention policy payload."
-    ),
+    BackendAIGQLMeta(added_version="26.8.0", description="Update retention policy payload."),
     model=UpdatePayloadDTO,
     name="UpdateRetentionPolicyPayload",
 )
@@ -188,9 +177,7 @@ class UpdateRetentionPolicyPayloadGQL(PydanticOutputMixin[UpdatePayloadDTO]):
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Delete retention policy payload."
-    ),
+    BackendAIGQLMeta(added_version="26.8.0", description="Delete retention policy payload."),
     model=DeletePayloadDTO,
     name="DeleteRetentionPolicyPayload",
 )
@@ -199,9 +186,7 @@ class DeleteRetentionPolicyPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION, description="Purge retention policy payload."
-    ),
+    BackendAIGQLMeta(added_version="26.8.0", description="Purge retention policy payload."),
     model=PurgePayloadDTO,
     name="PurgeRetentionPolicyPayload",
 )

@@ -18,7 +18,6 @@ from ai.backend.common.dto.manager.v2.resource_usage.request import (
 from ai.backend.common.dto.manager.v2.resource_usage.response import (
     UserUsageBucketNode,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateFilter,
     OrderDirection,
@@ -107,7 +106,7 @@ class UserUsageBucketGQL(PydanticNodeMixin[UserUsageBucketNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description="The user entity this usage bucket belongs to.",
         )
     )  # type: ignore[misc]
@@ -125,7 +124,7 @@ class UserUsageBucketGQL(PydanticNodeMixin[UserUsageBucketNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description="The project entity this usage bucket belongs to.",
         )
     )  # type: ignore[misc]
@@ -143,7 +142,7 @@ class UserUsageBucketGQL(PydanticNodeMixin[UserUsageBucketNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description="The domain entity this usage bucket belongs to.",
         )
     )  # type: ignore[misc]
@@ -161,7 +160,7 @@ class UserUsageBucketGQL(PydanticNodeMixin[UserUsageBucketNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description="The resource group this usage was recorded in.",
         )
     )  # type: ignore[misc]

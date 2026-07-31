@@ -38,7 +38,6 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ReplicaOrderField,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
 )
@@ -163,7 +162,7 @@ class TrafficStatusFilter(PydanticInputMixin[ReplicaTrafficStatusFilterDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter for replica health status.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
     ),
     name="ReplicaHealthStatusFilter",
 )
@@ -191,7 +190,7 @@ class ReplicaFilter(PydanticInputMixin[ReplicaFilterDTO]):
     status: ReplicaStatusFilter | None = None
     health_status: ReplicaHealthStatusFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description="Filter by replica health status.",
         ),
         default=None,

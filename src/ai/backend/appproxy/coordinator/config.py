@@ -30,7 +30,6 @@ from ai.backend.common.configs import (
     ServiceDiscoveryConfig,
 )
 from ai.backend.common.meta import (
-    NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
     CompositeType,
     ConfigExample,
@@ -179,7 +178,7 @@ class DBConfig(BaseSchema):
                 "Useful for handling database connections closed by the server after inactivity "
                 "or by network equipment with idle timeouts."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             example=ConfigExample(local="-1", prod="3600"),
         ),
     ]
@@ -194,7 +193,7 @@ class DBConfig(BaseSchema):
                 "used in transaction blocks' errors after a Postgres connection drop or failover. "
                 "Adds a small overhead per checkout but is recommended for production."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             example=ConfigExample(local="true", prod="true"),
         ),
     ]

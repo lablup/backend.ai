@@ -53,7 +53,6 @@ from ai.backend.common.dto.manager.v2.idle_checker.types import (
     CheckerTypeFilter as CheckerTypeFilterDTO,
 )
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
@@ -73,7 +72,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Identifies the implementation used to evaluate an idle condition. "
             "The value determines how the checker specification is interpreted."
@@ -89,7 +88,7 @@ class IdleCheckerTypeGQL(StrEnum):
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Lists checker implementations accepted by create and update operations. "
             "Only implementations fully supported by this API version are exposed."
@@ -105,7 +104,7 @@ class IdleCheckerInputTypeGQL(StrEnum):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Configures the maximum lifetime of a running session. "
             "The checker expires a session after the configured duration is reached."
@@ -120,7 +119,7 @@ class SessionLifetimeIdleCheckerSpecGQL(PydanticOutputMixin[SessionLifetimeSpecI
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Configures the maximum period without active network traffic.",
     ),
     model=NetworkTimeoutSpecInfo,
@@ -134,7 +133,7 @@ class NetworkTimeoutIdleCheckerSpecGQL(PydanticOutputMixin[NetworkTimeoutSpecInf
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Defines a preset-backed utilization threshold.",
     ),
     model=UtilizationThresholdInfo,
@@ -147,7 +146,7 @@ class UtilizationIdleCheckerThresholdGQL(PydanticOutputMixin[UtilizationThreshol
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Configures how long a session may remain underutilized.",
     ),
     model=UtilizationSpecInfo,
@@ -164,7 +163,7 @@ class UtilizationIdleCheckerSpecGQL(PydanticOutputMixin[UtilizationSpecInfo]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Contains the settings used by an idle checker implementation.",
     ),
     model=IdleCheckerSpecInfo,
@@ -188,7 +187,7 @@ class IdleCheckerSpecGQL(PydanticOutputMixin[IdleCheckerSpecInfo]):
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Represents a reusable idle checker definition independent of its bindings. "
             "It includes target session types, a grace period, and typed checker settings."
@@ -232,7 +231,7 @@ IdleCheckerEdgeGQL = Edge[IdleCheckerGQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Provides a paginated collection of global idle checker definitions. "
             "The count reports all records matching the supplied filter."
@@ -250,7 +249,7 @@ class IdleCheckerConnectionGQL(Connection[IdleCheckerGQL]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Supplies settings for a session-lifetime checker. "
             "The lifetime is measured in seconds from the session's effective start."
@@ -264,7 +263,7 @@ class SessionLifetimeIdleCheckerSpecInputGQL(PydanticInputMixin[SessionLifetimeS
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Supplies settings for a network-timeout checker.",
     ),
     name="NetworkTimeoutIdleCheckerSpecInput",
@@ -277,7 +276,7 @@ class NetworkTimeoutIdleCheckerSpecInputGQL(PydanticInputMixin[NetworkTimeoutSpe
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Supplies a preset-backed utilization threshold.",
     ),
     name="UtilizationIdleCheckerThresholdInput",
@@ -289,7 +288,7 @@ class UtilizationIdleCheckerThresholdInputGQL(PydanticInputMixin[UtilizationThre
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Supplies settings for a utilization checker.",
     ),
     name="UtilizationIdleCheckerSpecInput",
@@ -305,7 +304,7 @@ class UtilizationIdleCheckerSpecInputGQL(PydanticInputMixin[UtilizationSpecInput
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Supplies the implementation-specific settings for an idle checker. "
             "Exactly one checker-specific field must be provided."
@@ -331,7 +330,7 @@ class IdleCheckerSpecInputGQL(PydanticInputMixin[IdleCheckerSpecInputDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Filters idle checkers by their implementation type. "
             "Use either an exact value or a list of accepted values."
@@ -350,7 +349,7 @@ class IdleCheckerTypeFilterGQL(PydanticInputMixin[CheckerTypeFilterDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Defines criteria for searching registered idle checkers. "
             "Nested logical fields can combine or negate multiple criteria."
@@ -379,7 +378,7 @@ class IdleCheckerFilterGQL(PydanticInputMixin[IdleCheckerFilterDTO]):
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Lists fields that can determine idle checker result order. "
             "Each field is paired with an ascending or descending direction."
@@ -396,7 +395,7 @@ class IdleCheckerOrderFieldGQL(StrEnum):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Defines one ordering rule for an idle checker search. "
             "Multiple rules are applied in the order they are supplied."
@@ -413,7 +412,7 @@ class IdleCheckerOrderByGQL(PydanticInputMixin[IdleCheckerOrderDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Defines a reusable global idle checker specification.",
     ),
     name="CreateIdleCheckerInput",
@@ -432,7 +431,7 @@ class CreateIdleCheckerInputGQL(PydanticInputMixin[CreateIdleCheckerInputDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Applies a partial update to an existing idle checker. "
             "Only fields supplied by the caller are replaced."
@@ -463,7 +462,7 @@ class UpdateIdleCheckerInputGQL(PydanticInputMixin[UpdateIdleCheckerInputDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Identifies the idle checker to purge.",
     ),
     name="PurgeIdleCheckerInput",
@@ -474,7 +473,7 @@ class PurgeIdleCheckerInputGQL(PydanticInputMixin[PurgeIdleCheckerInputDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Returns the created global idle checker definition. The node contains the "
             "server-assigned identifier and timestamps."
@@ -489,7 +488,7 @@ class CreateIdleCheckerPayloadGQL(PydanticOutputMixin[CreateIdleCheckerPayloadDT
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Returns the idle checker after an update is applied. "
             "The node reflects the complete persisted state, including unchanged fields."
@@ -504,7 +503,7 @@ class UpdateIdleCheckerPayloadGQL(PydanticOutputMixin[UpdateIdleCheckerPayloadDT
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Confirms that an idle checker was permanently removed. "
             "The returned identifier refers to the deleted checker."
