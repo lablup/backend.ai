@@ -540,7 +540,7 @@ class ImageAdapter(BaseAdapter):
         ]
         accelerators = data.accelerators
         accelerator_list = (
-            [a.strip() for a in accelerators.split(",") if a.strip()] if accelerators else []
+            [a.strip() for a in accelerators.split(",") if a.strip()] if accelerators else ["*"]
         )
         resource_limits_gql = [
             ImageResourceLimitGQLInfo(
