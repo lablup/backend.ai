@@ -28,11 +28,21 @@ from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginCont
 from ai.backend.manager.actions.bulk.validator.rbac import (
     VirtualScopeBulkActionRBACValidator,
 )
+from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
 from ai.backend.manager.actions.scope.validator.rbac import (
     VirtualScopeScopeActionRBACValidator,
+)
+from ai.backend.manager.actions.single_entity.monitor.audit_log import (
+    SingleEntityActionAuditLogMonitor,
+)
+from ai.backend.manager.actions.single_entity.monitor.prometheus import (
+    SingleEntityActionPrometheusMonitor,
+)
+from ai.backend.manager.actions.single_entity.monitor.reporter import (
+    SingleEntityActionReporterMonitor,
 )
 from ai.backend.manager.actions.single_entity.validator.rbac import (
     VirtualScopeSingleEntityActionRBACValidator,
@@ -236,7 +246,16 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         reporter_hub = ReporterHub(ReporterHubArgs(reporters=action_reporters))
         reporter_monitor = ReporterMonitor(reporter_hub)
         prometheus_monitor = PrometheusMonitor()
-        audit_log_monitor = AuditLogMonitor(setup_input.repositories.audit_log.repository)
+        audit_log_repository = setup_input.repositories.audit_log.repository
+        audit_log_monitor = AuditLogMonitor(audit_log_repository)
+        action_monitors = ActionMonitors(
+            legacy=[reporter_monitor, prometheus_monitor, audit_log_monitor],
+            single_entity=[
+                SingleEntityActionReporterMonitor(reporter_hub),
+                SingleEntityActionPrometheusMonitor(),
+                SingleEntityActionAuditLogMonitor(audit_log_repository),
+            ],
+        )
 
         ssh_key_validator = SSHKeyValidator()
 
@@ -299,7 +318,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             ProcessorsDependency(),
             ProcessorsProviderInput(
                 service_args=service_args,
-                action_monitors=[reporter_monitor, prometheus_monitor, audit_log_monitor],
+                action_monitors=action_monitors,
                 event_hub=setup_input.event_hub,
                 event_fetcher=setup_input.event_fetcher,
                 validators=ActionValidators(
