@@ -7,7 +7,6 @@ from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
     ScopedSearchIdleCheckerAssignmentsInput,
     SearchIdleCheckerAssignmentsInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -34,7 +33,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 
 @gql_root_field(  # type: ignore[misc]
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Searches idle checker assignments across all scopes with filtering, ordering, "
             "and pagination (super admin only)."
@@ -83,7 +82,7 @@ async def admin_idle_checker_assignments(
 
 @gql_root_field(  # type: ignore[misc]
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Searches idle checker assignments within the given scopes. "
             "All scope items are OR'd, at least one item is required, and each item "
@@ -134,7 +133,7 @@ async def scoped_idle_checker_assignments(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Binds a global idle checker to a scope (super admin only).",
     )
 )
@@ -149,7 +148,7 @@ async def admin_create_idle_checker_assignment(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Updates an idle checker assignment's enabled state. "
             "Requires permission on the assignment's scope (subject to RBAC)."
@@ -166,7 +165,7 @@ async def update_idle_checker_assignment(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Permanently removes an idle checker assignment. "
             "Requires permission on the assignment's scope (subject to RBAC)."

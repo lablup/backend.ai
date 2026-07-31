@@ -44,7 +44,6 @@ from ai.backend.common.dto.manager.v2.idle_checker_assignment.response import (
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.types import (
     ScopeTypeFilter as ScopeTypeFilterDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -69,7 +68,7 @@ if TYPE_CHECKING:
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Identifies the kind of scope an idle checker assignment applies to. "
             "The value determines how the scope identifier is interpreted."
@@ -85,7 +84,7 @@ class IdleCheckerScopeTypeGQL(StrEnum):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "References a single scope as a typed (scopeType, scopeId) pair. "
             "The identifier is interpreted according to the scope type."
@@ -102,7 +101,7 @@ class IdleCheckerScopeRefGQL(PydanticInputMixin[IdleCheckerScopeRefDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Scope for the scoped idle checker assignment query. "
             "All items are OR'd; the item list must not be empty."
@@ -118,7 +117,7 @@ class IdleCheckerAssignmentScopeGQL(PydanticInputMixin[IdleCheckerAssignmentScop
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Represents one association between a scope and a reusable idle checker. "
             "The scope and checker are the assignment's immutable identity; "
@@ -167,7 +166,7 @@ IdleCheckerAssignmentEdgeGQL = Edge[IdleCheckerAssignmentGQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Provides a paginated collection of idle checker assignments. "
             "The count reports all records matching the supplied filter."
@@ -185,7 +184,7 @@ class IdleCheckerAssignmentConnectionGQL(Connection[IdleCheckerAssignmentGQL]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Filters idle checker assignments by their scope type. "
             "Use either an exact value or a list of accepted values."
@@ -206,7 +205,7 @@ class IdleCheckerScopeTypeFilterGQL(PydanticInputMixin[ScopeTypeFilterDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Defines criteria for searching idle checker assignments. "
             "Nested logical fields can combine or negate multiple criteria."
@@ -240,7 +239,7 @@ class IdleCheckerAssignmentFilterGQL(PydanticInputMixin[IdleCheckerAssignmentFil
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Lists fields that can determine idle checker assignment result order. "
             "Each field is paired with an ascending or descending direction."
@@ -257,7 +256,7 @@ class IdleCheckerAssignmentOrderFieldGQL(StrEnum):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Defines one ordering rule for an idle checker assignment search. "
             "Multiple rules are applied in the order they are supplied."
@@ -274,7 +273,7 @@ class IdleCheckerAssignmentOrderByGQL(PydanticInputMixin[IdleCheckerAssignmentOr
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Binds a global idle checker to a single scope. "
             "Requires permission on the given scope (subject to RBAC)."
@@ -293,7 +292,7 @@ class CreateIdleCheckerAssignmentInputGQL(PydanticInputMixin[CreateIdleCheckerAs
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Updates an idle checker assignment's enabled state. "
             "The bound scope and checker are immutable; rebind by purging and recreating."
@@ -308,7 +307,7 @@ class UpdateIdleCheckerAssignmentInputGQL(PydanticInputMixin[UpdateIdleCheckerAs
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Identifies the idle checker assignment to purge.",
     ),
     name="PurgeIdleCheckerAssignmentInput",
@@ -319,7 +318,7 @@ class PurgeIdleCheckerAssignmentInputGQL(PydanticInputMixin[PurgeIdleCheckerAssi
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Returns the created idle checker assignment. The node contains the "
             "server-assigned identifier and timestamps."
@@ -338,7 +337,7 @@ class CreateIdleCheckerAssignmentPayloadGQL(
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Returns the idle checker assignment after an update is applied. "
             "The node reflects the complete persisted state, including unchanged fields."
@@ -357,7 +356,7 @@ class UpdateIdleCheckerAssignmentPayloadGQL(
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Confirms that an idle checker assignment was permanently removed. "
             "The returned identifier refers to the deleted assignment."

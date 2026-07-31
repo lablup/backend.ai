@@ -18,7 +18,6 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     ScopedAppConfigFragmentsByNamesInput,
 )
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -42,7 +41,7 @@ from .types import (
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Get a single app config fragment by id.",
     )
 )  # type: ignore[misc]
@@ -56,7 +55,7 @@ async def app_config_fragment(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Search app config fragments across every scope with filtering, ordering, and "
             "pagination (super admin only)."
@@ -105,7 +104,7 @@ async def admin_app_config_fragments(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Upsert many app config fragments at one scope (insert, or replace config on "
             "conflict), all-or-nothing. RBAC-authorized at that scope."
@@ -124,7 +123,7 @@ async def scoped_upsert_app_config_fragments(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Upsert many app config fragments at the current user's own user scope, all-or-nothing."
         ),
@@ -142,7 +141,7 @@ async def my_upsert_app_config_fragments(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Read the fragments written at one scope for the given config names — the current "
             "values, to inspect before editing them. Answered position by position, null "
@@ -165,7 +164,7 @@ async def scoped_app_config_fragments_by_names(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Read the current user's own user-scope fragments for the given config names, "
             "position by position, null where the scope holds no fragment for that name."

@@ -50,7 +50,6 @@ from ai.backend.common.dto.manager.v2.runtime_variant.response import (
 from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     UpdateRuntimeVariantPayload as UpdateRuntimeVariantPayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -81,7 +80,7 @@ class RuntimeVariantOrderFieldGQL(StrEnum):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Default health-check settings stored for a runtime variant.",
     ),
     model=RuntimeVariantModelHealthCheckInfoDTO,
@@ -101,7 +100,7 @@ class RuntimeVariantModelHealthCheckGQL(PydanticOutputMixin[RuntimeVariantModelH
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Default model service configuration stored for a runtime variant.",
     ),
     model=RuntimeVariantModelServiceConfigInfoDTO,
@@ -123,7 +122,7 @@ class RuntimeVariantModelServiceConfigGQL(
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Default model configuration stored for a runtime variant.",
     ),
     model=RuntimeVariantModelConfigInfoDTO,
@@ -140,7 +139,7 @@ class RuntimeVariantModelConfigGQL(PydanticOutputMixin[RuntimeVariantModelConfig
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Model definition defaults stored for a runtime variant.",
     ),
     model=RuntimeVariantModelDefinitionInfoDTO,
@@ -169,7 +168,7 @@ class RuntimeVariantGQL(PydanticNodeMixin[RuntimeVariantNodeDTO]):
     )
     reads_vfolder_config_files: bool = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description=(
                 "Whether legacy model configuration files in the model vfolder participate in "
                 "revision resolution."
@@ -178,7 +177,7 @@ class RuntimeVariantGQL(PydanticNodeMixin[RuntimeVariantNodeDTO]):
     )
     default_model_definition: RuntimeVariantModelDefinitionGQL = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description="Model definition defaults stored for this runtime variant.",
         )
     )
