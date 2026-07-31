@@ -55,7 +55,7 @@ class ImageAdapter(BaseFilterAdapter):
                 ImageResourceLimitDTO(key=rl.key, min=rl.min, max=self._convert_max(rl.max))
                 for rl in data.resource_limits
             ],
-            accelerators=data.accelerators,
+            accelerators=data.accelerators if data.accelerators else "*",
             config_digest=data.config_digest,
             is_local=data.is_local,
             created_at=data.created_at,
