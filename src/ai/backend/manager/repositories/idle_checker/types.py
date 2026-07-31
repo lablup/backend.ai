@@ -94,6 +94,14 @@ class SessionIdleCheckTarget:
 
 
 @dataclass(frozen=True)
+class AssignmentSessionMatch:
+    """One assignment's resolved checker and the sessions its check applies to."""
+
+    checker_id: IdleCheckerID
+    session_ids: frozenset[SessionId]
+
+
+@dataclass(frozen=True)
 class SessionIdleCheckExclusionUpdate:
     """Exclusion changes applied atomically in one transaction."""
 

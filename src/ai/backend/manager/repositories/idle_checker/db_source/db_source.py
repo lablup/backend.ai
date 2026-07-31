@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Collection, Sequence
 from datetime import datetime
 from itertools import batched
-from typing import Any, cast
+from typing import cast
 
 import sqlalchemy as sa
 
@@ -70,6 +70,7 @@ from ai.backend.manager.repositories.idle_checker.purgers import (
     SessionIdleCheckBatchPurgerSpec,
 )
 from ai.backend.manager.repositories.idle_checker.types import (
+    AssignmentSessionMatch,
     ExpiredIdleCheckBatchData,
     ExpiredIdleCheckData,
     IdleCheckAssignmentData,
@@ -451,9 +452,9 @@ class IdleCheckerDBSource:
         w: WriteOps,
         assignment_ids: Collection[IdleCheckerAssignmentID],
         session_ids: Collection[SessionId],
-    ) -> Sequence[sa.Row[Any]]:
-        """Fetch ``(assignment_id, idle_checker_id, session_id)`` rows where the
-        session is subject to the assignment's check (scope match, target session type)."""
+    ) -> dict[IdleCheckerAssignmentID, AssignmentSessionMatch]:
+        """Resolve, per assignment, its checker and the sessions its check applies
+        to (scope match, target session type), keyed by assignment id."""
         match_query = (
             sa.select(
                 IdleCheckerBindingRow.id.label("assignment_id"),
@@ -475,7 +476,20 @@ class IdleCheckerDBSource:
             )
         )
         querier = BatchQuerier(pagination=NoPagination())
-        return (await w.batch_query_in_global(match_query, querier)).rows
+        matched_rows = (await w.batch_query_in_global(match_query, querier)).rows
+        checker_by_assignment: dict[IdleCheckerAssignmentID, IdleCheckerID] = {}
+        sessions_by_assignment: dict[IdleCheckerAssignmentID, set[SessionId]] = {}
+        for row in matched_rows:
+            assignment_id = IdleCheckerAssignmentID(row.assignment_id)
+            checker_by_assignment[assignment_id] = cast(IdleCheckerID, row.idle_checker_id)
+            sessions_by_assignment.setdefault(assignment_id, set()).add(SessionId(row.session_id))
+        matches: dict[IdleCheckerAssignmentID, AssignmentSessionMatch] = {}
+        for assignment_id, checker_id in checker_by_assignment.items():
+            matches[assignment_id] = AssignmentSessionMatch(
+                checker_id=checker_id,
+                session_ids=frozenset(sessions_by_assignment[assignment_id]),
+            )
+        return matches
 
     async def _exclude_session_idle_checks(
         self,
@@ -493,24 +507,19 @@ class IdleCheckerDBSource:
         session_ids: set[SessionId] = set()
         for item in items:
             session_ids.update(item.session_ids)
-        matched_rows = await self._fetch_assignment_session_matches(w, assignment_ids, session_ids)
-        checker_by_assignment: dict[IdleCheckerAssignmentID, IdleCheckerID] = {}
-        matched_pairs: set[tuple[IdleCheckerAssignmentID, SessionId]] = set()
-        for row in matched_rows:
-            assignment_id = IdleCheckerAssignmentID(row.assignment_id)
-            checker_by_assignment[assignment_id] = cast(IdleCheckerID, row.idle_checker_id)
-            matched_pairs.add((assignment_id, SessionId(row.session_id)))
+        matches = await self._fetch_assignment_session_matches(w, assignment_ids, session_ids)
         mismatched_refs: list[str] = []
         for item in items:
+            match = matches.get(item.assignment_id)
             for session_id in item.session_ids:
-                if (item.assignment_id, session_id) not in matched_pairs:
+                if match is None or session_id not in match.session_ids:
                     mismatched_refs.append(f"{item.assignment_id}:{session_id}")
         if mismatched_refs:
             raise IdleCheckerExclusionTargetMismatch(", ".join(mismatched_refs))
 
         pairs: list[SessionIdleCheckPair] = []
         for item in items:
-            checker_id = checker_by_assignment[item.assignment_id]
+            checker_id = matches[item.assignment_id].checker_id
             for session_id in item.session_ids:
                 pairs.append(SessionIdleCheckPair(session_id=session_id, checker_id=checker_id))
         # ON CONFLICT cannot touch the same row twice within one statement.
