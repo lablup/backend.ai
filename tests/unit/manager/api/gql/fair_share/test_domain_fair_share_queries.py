@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
+import strawberry
 from aiohttp import web
 
 from ai.backend.common.contexts.user import with_user
@@ -34,6 +36,8 @@ from ai.backend.manager.data.fair_share import (
 from ai.backend.manager.errors.resource import DomainNotFound
 
 # Common fixtures
+
+_RESOURCE_GROUP_ID = ResourceGroupID(UUID("550e8400-e29b-41d4-a716-446655440000"))
 
 
 @pytest.fixture
@@ -101,6 +105,9 @@ def sample_domain_fair_share_data() -> DomainFairShareData:
 
 def create_mock_info(context: MagicMock) -> MagicMock:
     """Create mock strawberry.Info with context."""
+    context.adapters.fair_share.resolve_resource_group_id = AsyncMock(
+        return_value=_RESOURCE_GROUP_ID
+    )
     info = MagicMock()
     info.context = context
     return info
@@ -110,6 +117,32 @@ def create_mock_info(context: MagicMock) -> MagicMock:
 
 
 class TestAdminDomainFairShareSingleQuery:
+    async def test_v2_query_passes_resource_group_id(
+        self,
+        mock_superadmin_user: UserData,
+        sample_domain_fair_share_data: DomainFairShareData,
+    ) -> None:
+        resource_group_id = sample_domain_fair_share_data.resource_group_id
+        domain_node = FairShareAdapter._domain_data_to_dto(sample_domain_fair_share_data)
+        context = MagicMock()
+        context.adapters.fair_share.get_domain = AsyncMock(
+            return_value=GetDomainFairSharePayload(item=domain_node)
+        )
+        info = create_mock_info(context)
+
+        with with_user(mock_superadmin_user):
+            resolver_fn = cast(Any, domain_resolver.admin_domain_fair_share_v2).base_resolver
+            result = await resolver_fn(
+                info=info,
+                resource_group_id=strawberry.ID(str(resource_group_id)),
+                domain_name="test-domain",
+            )
+
+        call_arg = context.adapters.fair_share.get_domain.call_args.args[0]
+        assert call_arg.resource_group_id == resource_group_id
+        context.adapters.fair_share.resolve_resource_group_id.assert_not_awaited()
+        assert isinstance(result, DomainFairShareGQL)
+
     async def test_admin_domain_fair_share_calls_adapter_with_correct_input(
         self,
         mock_superadmin_user: UserData,
@@ -131,8 +164,11 @@ class TestAdminDomainFairShareSingleQuery:
             )
 
         context.adapters.fair_share.get_domain.assert_called_once()
+        context.adapters.fair_share.resolve_resource_group_id.assert_awaited_once_with(
+            None, "default"
+        )
         call_arg = context.adapters.fair_share.get_domain.call_args[0][0]
-        assert call_arg.resource_group == "default"
+        assert call_arg.resource_group_id == _RESOURCE_GROUP_ID
         assert call_arg.domain_name == "test-domain"
 
         assert isinstance(result, DomainFairShareGQL)

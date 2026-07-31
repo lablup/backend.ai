@@ -81,6 +81,9 @@ class TestRGProjectFairShare:
         info.context.adapters.fair_share.get_project = AsyncMock(
             return_value=GetProjectFairSharePayload(item=project_node)
         )
+        info.context.adapters.fair_share.resolve_resource_group_id = AsyncMock(
+            return_value=project_fair_share_data.resource_group_id
+        )
         return info
 
     async def test_returns_project_fair_share_when_exists(
@@ -123,7 +126,9 @@ class TestRGProjectFairShare:
                 0
             ][0]
         )
-        assert call_arg.resource_group == "custom-rg"
+        assert call_arg.resource_group_id == ResourceGroupID(
+            UUID("880e8400-e29b-41d4-a716-446655440003")
+        )
         assert call_arg.project_id == project_id
 
     @pytest.fixture
@@ -131,6 +136,9 @@ class TestRGProjectFairShare:
         """Info context where project does not exist."""
         info = MagicMock()
         info.context.adapters.fair_share.get_project = AsyncMock(side_effect=ProjectNotFound())
+        info.context.adapters.fair_share.resolve_resource_group_id = AsyncMock(
+            return_value=ResourceGroupID(UUID("550e8400-e29b-41d4-a716-446655440000"))
+        )
         return info
 
     async def test_raises_project_not_found_when_project_does_not_exist(
