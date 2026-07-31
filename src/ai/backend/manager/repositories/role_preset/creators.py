@@ -28,11 +28,13 @@ class RolePresetCreatorSpec(CreatorSpec[RolePresetRow]):
     name: str
     scope_type: ScopeType
     auto_assign: bool = False
+    name_template: str | None = None
 
     @override
     def build_row(self) -> RolePresetRow:
         return RolePresetRow(
             name=self.name,
+            name_template=self.name_template,
             scope_type=self.scope_type,
             auto_assign=self.auto_assign,
         )

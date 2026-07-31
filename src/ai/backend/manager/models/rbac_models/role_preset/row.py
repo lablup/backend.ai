@@ -31,6 +31,7 @@ class RolePresetRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         "id", GUID(RolePresetID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     name: Mapped[str] = mapped_column("name", sa.String(64), nullable=False)
+    name_template: Mapped[str | None] = mapped_column("name_template", sa.Text, nullable=True)
     scope_type: Mapped[ScopeType] = mapped_column(
         "scope_type", StrEnumType(ScopeType, length=32), nullable=False
     )
@@ -48,6 +49,7 @@ class RolePresetRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         return RolePresetData(
             id=self.id,
             name=self.name,
+            name_template=self.name_template,
             scope_type=self.scope_type.to_element(),
             auto_assign=self.auto_assign,
             deleted=self.deleted,

@@ -3,6 +3,7 @@ on top of the base write ops."""
 
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import AsyncIterator, Collection, Iterable, Mapping, Sequence
@@ -33,6 +34,7 @@ from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.identifier.virtual_scope import VirtualScopeID
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairSecrets
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
@@ -48,6 +50,7 @@ from ai.backend.manager.data.permission.types import (
 )
 from ai.backend.manager.errors.permission import VirtualScopeNotFound
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
+from ai.backend.manager.errors.role_preset import InvalidRoleNameTemplate
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow, ProjectType
@@ -109,6 +112,9 @@ from ai.backend.manager.repositories.permission_controller.creators import (
 from ai.backend.manager.repositories.permission_controller.role_manager import (
     ScopeSystemRoleData,
 )
+from ai.backend.manager.repositories.ops.rbac.role_name_template import render_role_name
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass(frozen=True)
@@ -633,11 +639,16 @@ class RBACWriteOps(WriteOps):
         presets_by_scope_type: dict[LegacyScopeType, list[RolePresetRow]] = defaultdict(list)
         for preset in preset_rows:
             presets_by_scope_type[preset.scope_type].append(preset)
+        scope_template_values: dict[ScopeRef, ScopeTemplateValue | None] = {}
+        if any(preset.name_template is not None for preset in preset_rows):
+            scope_template_values = await self._resolve_scope_template_values(scopes)
         return [
             _RoleSpec(
                 scope=scope,
                 creator=RoleCreatorSpec(
-                    name=preset.name,
+                    name=self._render_preset_role_name(
+                        preset, scope, scope_template_values.get(scope)
+                    ),
                     source=RoleSource.SYSTEM,
                     status=RoleStatus.ACTIVE,
                     auto_assign=preset.auto_assign,
@@ -647,6 +658,46 @@ class RBACWriteOps(WriteOps):
             for scope in scopes
             for preset in presets_by_scope_type[self._scope_element_type(scope).to_scope_type()]
         ]
+
+    @staticmethod
+    def _fallback_preset_role_name(scope: ScopeRef) -> str:
+        """Deterministic per-scope role name used when a preset's template cannot
+        be rendered. Built with plain string formatting — never via the template
+        engine — so scope creation cannot fail on role naming."""
+        return f"{scope.scope_type}-{scope.scope_id}-role"
+
+    def _render_preset_role_name(
+        self,
+        preset: RolePresetRow,
+        scope: ScopeRef,
+        scope_template_value: ScopeTemplateValue | None,
+    ) -> str:
+        """Render the name of a role instantiated from the preset, falling back to
+        ``{scope_type}-{scope_id}-role`` so that scope creation never fails on a
+        bad template."""
+        if preset.name_template is None:
+            return preset.name
+        if scope_template_value is None:
+            fallback = self._fallback_preset_role_name(scope)
+            log.warning(
+                "Cannot resolve scope attributes for role preset {} ({}); falling back to {}",
+                preset.id,
+                preset.name_template,
+                fallback,
+            )
+            return fallback
+        try:
+            return render_role_name(preset.name_template, scope_template_value)
+        except InvalidRoleNameTemplate as e:
+            fallback = self._fallback_preset_role_name(scope)
+            log.warning(
+                "Failed to render role name template of preset {} ({}): {}; falling back to {}",
+                preset.id,
+                preset.name_template,
+                e,
+                fallback,
+            )
+            return fallback
 
     async def _create_roles(self, specs: Sequence[_RoleSpec]) -> list[RoleRow]:
         """Create ``specs`` and the permissions they grant: one insert for each."""

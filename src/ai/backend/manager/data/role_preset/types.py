@@ -30,6 +30,7 @@ class RolePermissionPresetData:
 class RolePresetData:
     id: RolePresetID
     name: str
+    name_template: str | None
     scope_type: RBACElementType
     auto_assign: bool
     deleted: bool
