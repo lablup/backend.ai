@@ -30,7 +30,8 @@
       },
       "Table": {
         "headerBg": "#E3E3E3",
-        "headerSplitColor": "rgba(0,0,0,0.25)"
+        "headerSplitColor": "rgba(0,0,0,0.25)",
+        "rowExpandedBg": "#E3E3E3"
       }
     }
   },
