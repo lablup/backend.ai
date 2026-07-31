@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Collection, Sequence
 from datetime import datetime
 from itertools import batched
-from typing import cast
+from typing import Any, cast
 
 import sqlalchemy as sa
 
@@ -446,23 +446,15 @@ class IdleCheckerDBSource:
             await self._exclude_session_idle_checks(w, update.exclusions)
             await self._include_session_idle_checks(w, update.inclusions)
 
-    async def _exclude_session_idle_checks(
+    async def _fetch_assignment_session_matches(
         self,
         w: WriteOps,
-        items: Sequence[SessionIdleCheckTarget],
-    ) -> None:
-        """Mark each (session, checker) pair EXCLUDED, creating missing rows.
-
-        Every session must be covered by its assignment (existing binding, scope
-        match, target session type); any mismatch rejects the whole request.
-        """
-        if not items:
-            return
-        assignment_ids = {item.assignment_id for item in items}
-        session_ids: set[SessionId] = set()
-        for item in items:
-            session_ids.update(item.session_ids)
-        covered_query = (
+        assignment_ids: Collection[IdleCheckerAssignmentID],
+        session_ids: Collection[SessionId],
+    ) -> Sequence[sa.Row[Any]]:
+        """Fetch ``(assignment_id, idle_checker_id, session_id)`` rows where the
+        session is subject to the assignment's check (scope match, target session type)."""
+        match_query = (
             sa.select(
                 IdleCheckerBindingRow.id.label("assignment_id"),
                 IdleCheckerBindingRow.idle_checker_id,
@@ -483,17 +475,35 @@ class IdleCheckerDBSource:
             )
         )
         querier = BatchQuerier(pagination=NoPagination())
-        covered_rows = (await w.batch_query_in_global(covered_query, querier)).rows
+        return (await w.batch_query_in_global(match_query, querier)).rows
+
+    async def _exclude_session_idle_checks(
+        self,
+        w: WriteOps,
+        items: Sequence[SessionIdleCheckTarget],
+    ) -> None:
+        """Mark each (session, checker) pair EXCLUDED, creating missing rows.
+
+        Every session must match its assignment (existing binding, scope match,
+        target session type); any mismatch rejects the whole request.
+        """
+        if not items:
+            return
+        assignment_ids = {item.assignment_id for item in items}
+        session_ids: set[SessionId] = set()
+        for item in items:
+            session_ids.update(item.session_ids)
+        matched_rows = await self._fetch_assignment_session_matches(w, assignment_ids, session_ids)
         checker_by_assignment: dict[IdleCheckerAssignmentID, IdleCheckerID] = {}
-        covered_pairs: set[tuple[IdleCheckerAssignmentID, SessionId]] = set()
-        for row in covered_rows:
+        matched_pairs: set[tuple[IdleCheckerAssignmentID, SessionId]] = set()
+        for row in matched_rows:
             assignment_id = IdleCheckerAssignmentID(row.assignment_id)
             checker_by_assignment[assignment_id] = cast(IdleCheckerID, row.idle_checker_id)
-            covered_pairs.add((assignment_id, SessionId(row.session_id)))
+            matched_pairs.add((assignment_id, SessionId(row.session_id)))
         mismatched_refs: list[str] = []
         for item in items:
             for session_id in item.session_ids:
-                if (item.assignment_id, session_id) not in covered_pairs:
+                if (item.assignment_id, session_id) not in matched_pairs:
                     mismatched_refs.append(f"{item.assignment_id}:{session_id}")
         if mismatched_refs:
             raise IdleCheckerExclusionTargetMismatch(", ".join(mismatched_refs))
@@ -520,8 +530,10 @@ class IdleCheckerDBSource:
     ) -> None:
         """Move EXCLUDED (session, checker) pairs back to NOT_CHECKED (grace restarts).
 
-        The conditional update is the safety: pairs that do not exist or are not
-        EXCLUDED are no-ops, so no coverage validation is needed for this undo.
+        Unknown assignments are rejected. Per session the conditional update is the
+        safety: rows that do not exist or are not EXCLUDED are no-ops. Updating in
+        place (instead of delete + sync recreate) keeps the row continuously visible
+        to idle-check listing reads.
         """
         if not items:
             return
@@ -535,12 +547,15 @@ class IdleCheckerDBSource:
         for row in binding_rows:
             binding: IdleCheckerBindingRow = row.IdleCheckerBindingRow
             checker_by_assignment[IdleCheckerAssignmentID(binding.id)] = binding.idle_checker_id
+        missing_assignments = assignment_ids - checker_by_assignment.keys()
+        if missing_assignments:
+            raise IdleCheckerAssignmentNotFound(
+                ", ".join(sorted(str(assignment_id) for assignment_id in missing_assignments))
+            )
 
         pairs: list[SessionIdleCheckPair] = []
         for item in items:
-            checker_id = checker_by_assignment.get(item.assignment_id)
-            if checker_id is None:
-                continue
+            checker_id = checker_by_assignment[item.assignment_id]
             for session_id in item.session_ids:
                 pairs.append(SessionIdleCheckPair(session_id=session_id, checker_id=checker_id))
 

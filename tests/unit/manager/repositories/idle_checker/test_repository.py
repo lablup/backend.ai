@@ -26,7 +26,10 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.errors.idle_checker import IdleCheckerExclusionTargetMismatch
+from ai.backend.manager.errors.idle_checker import (
+    IdleCheckerAssignmentNotFound,
+    IdleCheckerExclusionTargetMismatch,
+)
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.idle_checker.row import (
@@ -1364,27 +1367,19 @@ class TestSessionIdleCheckExclusions:
         assert included_row is not None
         assert included_row.last_status is IdleCheckPhase.NOT_CHECKED
 
-    async def test_include_unknown_assignment_is_noop(
+    async def test_include_rejects_unknown_assignment(
         self,
-        database: ExtendedAsyncSAEngine,
         repository: IdleCheckerRepository,
         exclusion_rows: ExclusionRows,
     ) -> None:
-        await repository.batch_apply_session_idle_check_exclusions(
-            SessionIdleCheckExclusionUpdate(
-                inclusions=[
-                    SessionIdleCheckTarget(
-                        assignment_id=IdleCheckerAssignmentID(uuid.uuid4()),
-                        session_ids=(exclusion_rows.active_session_id,),
-                    )
-                ]
+        with pytest.raises(IdleCheckerAssignmentNotFound):
+            await repository.batch_apply_session_idle_check_exclusions(
+                SessionIdleCheckExclusionUpdate(
+                    inclusions=[
+                        SessionIdleCheckTarget(
+                            assignment_id=IdleCheckerAssignmentID(uuid.uuid4()),
+                            session_ids=(exclusion_rows.active_session_id,),
+                        )
+                    ]
+                )
             )
-        )
-
-        async with database.begin_readonly_session() as db_sess:
-            row = await db_sess.get(
-                SessionIdleCheckRow,
-                (exclusion_rows.active_session_id, exclusion_rows.checker_id),
-            )
-        assert row is not None
-        assert row.last_status is IdleCheckPhase.ACTIVE
