@@ -181,9 +181,9 @@ class TestIdleCheckReconcileHandler:
                     _assignment(second_session_id, lifetime_definition),
                     _assignment(second_session_id, second_lifetime_definition),
                     _assignment(second_session_id, network_definition),
-                ],
-                now=_NOW,
+                ]
             ),
+            current_time=_NOW,
         )
 
         await handler.execute(reconcile_info)
@@ -219,9 +219,9 @@ class TestIdleCheckReconcileHandler:
                     _assignment(first_session_id, lifetime_definition),
                     _assignment(first_session_id, network_definition),
                     _assignment(second_session_id, lifetime_definition),
-                ],
-                now=_NOW,
+                ]
             ),
+            current_time=_NOW,
         )
 
         result = await handler.execute(reconcile_info)
@@ -265,9 +265,9 @@ class TestIdleCheckReconcileHandler:
                 assignments=[
                     _assignment(first_session_id, lifetime_definition),
                     _assignment(first_session_id, network_definition),
-                ],
-                now=_NOW,
+                ]
             ),
+            current_time=_NOW,
         )
 
         result = await handler.execute(reconcile_info)
@@ -302,9 +302,9 @@ class TestIdleCheckReconcileHandler:
         lifetime_checker.judgment_expire_at = deadline
         reconcile_info = IdleCheckReconcileInfo(
             batch=IdleCheckBatchData(
-                assignments=[_assignment(first_session_id, lifetime_definition)],
-                now=_NOW,
+                assignments=[_assignment(first_session_id, lifetime_definition)]
             ),
+            current_time=_NOW,
         )
 
         result = await handler.execute(reconcile_info)
@@ -328,9 +328,9 @@ class TestIdleCheckReconcileHandler:
                         lifetime_definition,
                         starts_at=_NOW - timedelta(seconds=3600),
                     )
-                ],
-                now=_NOW,
+                ]
             ),
+            current_time=_NOW,
         )
 
         result = await handler.execute(reconcile_info)
@@ -349,9 +349,9 @@ class TestIdleCheckReconcileHandler:
         lifetime_checker.judgment_expire_at = deadline
         reconcile_info = IdleCheckReconcileInfo(
             batch=IdleCheckBatchData(
-                assignments=[_assignment(first_session_id, lifetime_definition)],
-                now=_NOW,
+                assignments=[_assignment(first_session_id, lifetime_definition)]
             ),
+            current_time=_NOW,
         )
 
         result = await handler.execute(reconcile_info)
@@ -373,9 +373,9 @@ class TestIdleCheckReconcileHandler:
                 assignments=[
                     _assignment(first_session_id, network_definition),
                     _assignment(first_session_id, lifetime_definition),
-                ],
-                now=_NOW,
+                ]
             ),
+            current_time=_NOW,
         )
 
         result = await handler.execute(reconcile_info)

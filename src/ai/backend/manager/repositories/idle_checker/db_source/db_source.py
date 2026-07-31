@@ -240,7 +240,6 @@ class IdleCheckerDBSource:
         )
         querier = BatchQuerier(pagination=NoPagination())
         async with self._ops.read_ops() as r:
-            now = await r.current_time()
             rows = (await r.batch_query_in_global(query, querier)).rows
         return IdleCheckBatchData(
             assignments=[
@@ -261,8 +260,7 @@ class IdleCheckerDBSource:
                     ),
                 )
                 for row in rows
-            ],
-            now=now,
+            ]
         )
 
     async def fetch_expired_idle_checks(
