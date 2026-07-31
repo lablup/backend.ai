@@ -7,7 +7,6 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.group.types import GroupData
@@ -48,7 +47,6 @@ class SearchProjectsByDomainAction(ProjectScopeAction):
 
     scope: DomainProjectSearchScope
     querier: BatchQuerier
-    _domain_id: DomainID
 
     @override
     @classmethod
@@ -61,11 +59,11 @@ class SearchProjectsByDomainAction(ProjectScopeAction):
 
     @override
     def scope_id(self) -> str:
-        return self.scope.domain_name
+        return str(self.scope.domain_id)
 
     @override
     def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.DOMAIN, str(self._domain_id))
+        return RBACElementRef(RBACElementType.DOMAIN, str(self.scope.domain_id))
 
 
 @dataclass

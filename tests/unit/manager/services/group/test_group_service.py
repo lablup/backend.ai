@@ -480,11 +480,9 @@ class TestSearchProjectsByDomain:
             )
         )
 
-        scope = DomainProjectSearchScope(domain_name="corp")
+        scope = DomainProjectSearchScope(domain_id=DomainID(uuid.uuid4()))
         querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
-        action = SearchProjectsByDomainAction(
-            scope=scope, querier=querier, _domain_id=DomainID(uuid.uuid4())
-        )
+        action = SearchProjectsByDomainAction(scope=scope, querier=querier)
 
         result = await service.search_projects_by_domain(action)
 
@@ -508,11 +506,9 @@ class TestSearchProjectsByDomain:
             )
         )
 
-        scope = DomainProjectSearchScope(domain_name="nonexistent")
+        scope = DomainProjectSearchScope(domain_id=DomainID(uuid.uuid4()))
         querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
-        action = SearchProjectsByDomainAction(
-            scope=scope, querier=querier, _domain_id=DomainID(uuid.uuid4())
-        )
+        action = SearchProjectsByDomainAction(scope=scope, querier=querier)
 
         result = await service.search_projects_by_domain(action)
 

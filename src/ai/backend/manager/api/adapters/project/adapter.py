@@ -42,7 +42,7 @@ from ai.backend.common.dto.manager.v2.group.types import (
     ProjectUserFilter,
 )
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
@@ -262,12 +262,14 @@ class ProjectAdapter(BaseAdapter):
             ],
         )
 
-    async def search_by_domain(
+    async def search_by_domain_name(
         self,
-        scope: DomainProjectSearchScope,
+        domain_name: DomainName,
         input: AdminSearchProjectsInput,
     ) -> AdminSearchGroupsPayload:
         """Search projects within a domain."""
+        domain_id = await self._resolve_domain_id(domain_name)
+        scope = DomainProjectSearchScope(domain_id=domain_id)
         conditions = self._convert_group_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
         base_conditions: list[QueryCondition] = [scope.to_condition()]
@@ -284,9 +286,8 @@ class ProjectAdapter(BaseAdapter):
             base_conditions=base_conditions,
         )
 
-        domain_id = await self._resolve_domain_id(scope.domain_name)
         action_result = await self._processors.group.search_projects_by_domain.wait_for_complete(
-            SearchProjectsByDomainAction(scope=scope, querier=querier, _domain_id=domain_id)
+            SearchProjectsByDomainAction(scope=scope, querier=querier)
         )
 
         return AdminSearchGroupsPayload(
