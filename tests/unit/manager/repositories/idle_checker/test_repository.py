@@ -305,6 +305,7 @@ class TestFetchJudgmentBatch:
         assert expire_at_by_session[judgment_rows.idle_session_id] == datetime(
             2026, 2, 1, tzinfo=UTC
         )
+        assert batch.now.tzinfo is not None
 
     async def test_excludes_non_judgment_phases(
         self,

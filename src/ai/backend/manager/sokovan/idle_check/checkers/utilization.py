@@ -5,16 +5,16 @@ from collections.abc import Sequence
 from datetime import timedelta
 from typing import override
 
-from ai.backend.common.data.idle_checker.types import IdleCheckPhase, UtilizationSpec
+from ai.backend.common.data.idle_checker.types import UtilizationSpec
 from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.repositories.idle_checker.types import IdleJudgmentData
 from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
     IdleChecker,
     IdleCheckerContext,
+    IdleCheckerEvaluation,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -34,7 +34,7 @@ class UtilizationChecker(IdleChecker):
         assignments: Sequence[CheckerAssignment],
         *,
         context: IdleCheckerContext,
-    ) -> Sequence[IdleJudgmentData]:
+    ) -> Sequence[IdleCheckerEvaluation]:
         # Unknown sessions are ignored because their utilization status cannot be determined.
         valid_assignments: list[tuple[CheckerAssignment, UtilizationSpec]] = []
         session_ids_by_preset: dict[PrometheusQueryPresetID, list[SessionId]] = {}
@@ -58,7 +58,7 @@ class UtilizationChecker(IdleChecker):
             session_ids_by_preset,
             evaluation_time=context.current_time,
         )
-        judgments: list[IdleJudgmentData] = []
+        evaluations: list[IdleCheckerEvaluation] = []
         for assignment, spec in valid_assignments:
             threshold = spec.threshold
             values = values_by_preset.get(threshold.preset_id, {})
@@ -66,27 +66,22 @@ class UtilizationChecker(IdleChecker):
                 value = values.get(session.session_id)
                 if value is None:
                     continue
-                is_idle = value < threshold.threshold
+                is_active = value >= threshold.threshold
                 refreshed_expire_at = context.current_time + timedelta(
                     seconds=spec.max_underutilized_duration_seconds
                 )
-                if is_idle:
+                if is_active:
+                    expire_at = refreshed_expire_at
+                else:
                     expire_at = (
                         session.expire_at if session.expire_at is not None else refreshed_expire_at
                     )
-                    if expire_at <= context.current_time:
-                        status = IdleCheckPhase.IDLE_EXPIRED
-                    else:
-                        status = IdleCheckPhase.IDLE
-                else:
-                    expire_at = refreshed_expire_at
-                    status = IdleCheckPhase.ACTIVE
-                judgments.append(
-                    IdleJudgmentData(
+                evaluations.append(
+                    IdleCheckerEvaluation(
                         checker_id=assignment.definition.checker_id,
                         session_id=session.session_id,
                         expire_at=expire_at,
-                        status=status,
+                        is_active=is_active,
                         message=(
                             "Utilization check: "
                             f"max_underutilized_duration_seconds="
@@ -96,4 +91,4 @@ class UtilizationChecker(IdleChecker):
                         ),
                     )
                 )
-        return judgments
+        return evaluations

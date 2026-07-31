@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Final, override
 from uuid import uuid4
 
@@ -28,11 +28,16 @@ from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
     IdleChecker,
     IdleCheckerContext,
+    IdleCheckerEvaluation,
+)
+from ai.backend.manager.sokovan.idle_check.checkers.session_lifetime import (
+    SessionLifetimeChecker,
 )
 from ai.backend.manager.sokovan.idle_check.handlers.reconcile import IdleCheckReconcileHandler
 from ai.backend.manager.sokovan.idle_check.types import IdleCheckReconcileInfo
 
 _NOW = datetime(2026, 1, 2, tzinfo=UTC)
+_DEADLINE = _NOW + timedelta(seconds=1)
 
 _SPECS: Final[dict[CheckerType, IdleCheckerSpec]] = {
     CheckerType.SESSION_LIFETIME: IdleCheckerSpec(
@@ -51,6 +56,7 @@ class FakeChecker(IdleChecker):
     judge_calls: list[list[tuple[IdleCheckerID, list[SessionId]]]]
     judge_contexts: list[IdleCheckerContext]
     should_fail: bool
+    judgment_expire_at: datetime
     _message: str
 
     def __init__(self, message: str = "idle") -> None:
@@ -58,6 +64,7 @@ class FakeChecker(IdleChecker):
         self.judge_calls = []
         self.judge_contexts = []
         self.should_fail = False
+        self.judgment_expire_at = _DEADLINE
         self._message = message
 
     @override
@@ -66,7 +73,7 @@ class FakeChecker(IdleChecker):
         assignments: Sequence[CheckerAssignment],
         *,
         context: IdleCheckerContext,
-    ) -> Sequence[IdleJudgmentData]:
+    ) -> Sequence[IdleCheckerEvaluation]:
         self.judge_contexts.append(context)
         self.judge_calls.append([
             (
@@ -78,15 +85,11 @@ class FakeChecker(IdleChecker):
         if self.should_fail:
             raise InternalServerError("Fake checker failed")
         return [
-            IdleJudgmentData(
+            IdleCheckerEvaluation(
                 checker_id=assignment.definition.checker_id,
                 session_id=session.session_id,
-                expire_at=_NOW,
-                status=(
-                    IdleCheckPhase.IDLE
-                    if session.session_id in self.idle_session_ids
-                    else IdleCheckPhase.ACTIVE
-                ),
+                expire_at=self.judgment_expire_at,
+                is_active=session.session_id not in self.idle_session_ids,
                 message=self._message,
             )
             for assignment in assignments
@@ -106,12 +109,14 @@ def _checker_definition(checker_type: CheckerType) -> IdleCheckerDefinitionData:
 def _assignment(
     session_id: SessionId,
     checker: IdleCheckerDefinitionData,
+    *,
+    starts_at: datetime | None = None,
 ) -> IdleCheckAssignmentData:
     return IdleCheckAssignmentData(
         session=IdleCheckSession(
             session_id=session_id,
             created_at=datetime(2026, 1, 1, tzinfo=UTC),
-            starts_at=None,
+            starts_at=starts_at,
             expire_at=_NOW,
         ),
         checker=checker,
@@ -176,9 +181,9 @@ class TestIdleCheckReconcileHandler:
                     _assignment(second_session_id, lifetime_definition),
                     _assignment(second_session_id, second_lifetime_definition),
                     _assignment(second_session_id, network_definition),
-                ]
+                ],
+                now=_NOW,
             ),
-            current_time=_NOW,
         )
 
         await handler.execute(reconcile_info)
@@ -214,9 +219,9 @@ class TestIdleCheckReconcileHandler:
                     _assignment(first_session_id, lifetime_definition),
                     _assignment(first_session_id, network_definition),
                     _assignment(second_session_id, lifetime_definition),
-                ]
+                ],
+                now=_NOW,
             ),
-            current_time=_NOW,
         )
 
         result = await handler.execute(reconcile_info)
@@ -225,21 +230,21 @@ class TestIdleCheckReconcileHandler:
             IdleJudgmentData(
                 checker_id=lifetime_definition.checker_id,
                 session_id=first_session_id,
-                expire_at=_NOW,
+                expire_at=_DEADLINE,
                 status=IdleCheckPhase.IDLE,
                 message="max lifetime exceeded",
             ),
             IdleJudgmentData(
                 checker_id=lifetime_definition.checker_id,
                 session_id=second_session_id,
-                expire_at=_NOW,
+                expire_at=_DEADLINE,
                 status=IdleCheckPhase.IDLE,
                 message="max lifetime exceeded",
             ),
             IdleJudgmentData(
                 checker_id=network_definition.checker_id,
                 session_id=first_session_id,
-                expire_at=_NOW,
+                expire_at=_DEADLINE,
                 status=IdleCheckPhase.IDLE,
                 message="no network activity",
             ),
@@ -260,21 +265,99 @@ class TestIdleCheckReconcileHandler:
                 assignments=[
                     _assignment(first_session_id, lifetime_definition),
                     _assignment(first_session_id, network_definition),
-                ]
+                ],
+                now=_NOW,
             ),
-            current_time=_NOW,
         )
 
         result = await handler.execute(reconcile_info)
 
         assert len(result.judgments) == 2
         assert all(judgment.status is IdleCheckPhase.ACTIVE for judgment in result.judgments)
-        assert all(judgment.expire_at == _NOW for judgment in result.judgments)
+        assert all(judgment.expire_at == _DEADLINE for judgment in result.judgments)
         expected_call = [(lifetime_definition.checker_id, [first_session_id])]
         assert lifetime_checker.judge_calls == [expected_call]
         assert network_checker.judge_calls == [
             [(network_definition.checker_id, [first_session_id])]
         ]
+
+    @pytest.mark.parametrize(
+        ("deadline", "expected_phase"),
+        [
+            (_NOW + timedelta(seconds=1), IdleCheckPhase.IDLE),
+            (_NOW, IdleCheckPhase.IDLE_EXPIRED),
+            (_NOW - timedelta(seconds=1), IdleCheckPhase.IDLE_EXPIRED),
+        ],
+    )
+    async def test_resolves_idle_phase_from_deadline(
+        self,
+        handler: IdleCheckReconcileHandler,
+        first_session_id: SessionId,
+        lifetime_definition: IdleCheckerDefinitionData,
+        lifetime_checker: FakeChecker,
+        deadline: datetime,
+        expected_phase: IdleCheckPhase,
+    ) -> None:
+        lifetime_checker.idle_session_ids = {first_session_id}
+        lifetime_checker.judgment_expire_at = deadline
+        reconcile_info = IdleCheckReconcileInfo(
+            batch=IdleCheckBatchData(
+                assignments=[_assignment(first_session_id, lifetime_definition)],
+                now=_NOW,
+            ),
+        )
+
+        result = await handler.execute(reconcile_info)
+
+        assert result.judgments[0].status is expected_phase
+        assert result.judgments[0].expire_at == deadline
+
+    async def test_resolves_session_lifetime_evaluation_at_deadline(
+        self,
+        first_session_id: SessionId,
+        lifetime_definition: IdleCheckerDefinitionData,
+    ) -> None:
+        handler = IdleCheckReconcileHandler({
+            CheckerType.SESSION_LIFETIME: SessionLifetimeChecker()
+        })
+        reconcile_info = IdleCheckReconcileInfo(
+            batch=IdleCheckBatchData(
+                assignments=[
+                    _assignment(
+                        first_session_id,
+                        lifetime_definition,
+                        starts_at=_NOW - timedelta(seconds=3600),
+                    )
+                ],
+                now=_NOW,
+            ),
+        )
+
+        result = await handler.execute(reconcile_info)
+
+        assert result.judgments[0].status is IdleCheckPhase.IDLE_EXPIRED
+        assert result.judgments[0].expire_at == _NOW
+
+    async def test_does_not_expire_active_judgment_with_elapsed_deadline(
+        self,
+        handler: IdleCheckReconcileHandler,
+        first_session_id: SessionId,
+        lifetime_definition: IdleCheckerDefinitionData,
+        lifetime_checker: FakeChecker,
+    ) -> None:
+        deadline = _NOW - timedelta(seconds=1)
+        lifetime_checker.judgment_expire_at = deadline
+        reconcile_info = IdleCheckReconcileInfo(
+            batch=IdleCheckBatchData(
+                assignments=[_assignment(first_session_id, lifetime_definition)],
+                now=_NOW,
+            ),
+        )
+
+        result = await handler.execute(reconcile_info)
+
+        assert result.judgments[0].status is IdleCheckPhase.ACTIVE
+        assert result.judgments[0].expire_at == deadline
 
     async def test_skips_unimplemented_checker_types(
         self,
@@ -290,9 +373,9 @@ class TestIdleCheckReconcileHandler:
                 assignments=[
                     _assignment(first_session_id, network_definition),
                     _assignment(first_session_id, lifetime_definition),
-                ]
+                ],
+                now=_NOW,
             ),
-            current_time=_NOW,
         )
 
         result = await handler.execute(reconcile_info)

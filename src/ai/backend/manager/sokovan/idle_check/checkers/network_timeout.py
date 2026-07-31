@@ -8,16 +8,15 @@ from datetime import UTC, datetime, timedelta
 from typing import override
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
-from ai.backend.common.data.idle_checker.types import IdleCheckPhase
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
-from ai.backend.manager.repositories.idle_checker.types import IdleJudgmentData
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
     IdleChecker,
     IdleCheckerContext,
+    IdleCheckerEvaluation,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -45,7 +44,7 @@ class NetworkTimeoutChecker(IdleChecker):
         assignments: Sequence[CheckerAssignment],
         *,
         context: IdleCheckerContext,
-    ) -> Sequence[IdleJudgmentData]:
+    ) -> Sequence[IdleCheckerEvaluation]:
         # Fetch session states in one batch to avoid repeated I/O per assignment.
         sessions: list[IdleCheckSession] = []
         for assignment in assignments:
@@ -53,7 +52,7 @@ class NetworkTimeoutChecker(IdleChecker):
         states = await self._prepare_states(sessions)
 
         # Judge each assignment in one pass, using the pre-fetched states.
-        judgments: list[IdleJudgmentData] = []
+        evaluations: list[IdleCheckerEvaluation] = []
         for assignment in assignments:
             network_spec = assignment.definition.spec.network
             if network_spec is None:
@@ -65,7 +64,7 @@ class NetworkTimeoutChecker(IdleChecker):
                 continue
             max_inactivity_seconds = network_spec.max_network_inactivity_seconds
             for session in assignment.sessions:
-                judgments.append(
+                evaluations.append(
                     self._judge_session(
                         checker_id=assignment.definition.checker_id,
                         session_id=session.session_id,
@@ -75,7 +74,7 @@ class NetworkTimeoutChecker(IdleChecker):
                         current_time=context.current_time,
                     )
                 )
-        return judgments
+        return evaluations
 
     def _judge_session(
         self,
@@ -86,14 +85,14 @@ class NetworkTimeoutChecker(IdleChecker):
         state: _NetworkIdleState,
         max_inactivity_seconds: int,
         current_time: datetime,
-    ) -> IdleJudgmentData:
+    ) -> IdleCheckerEvaluation:
         refreshed_expire_at = current_time + timedelta(seconds=max_inactivity_seconds)
         if state.last_access == _ONGOING_ACTIVITY_SENTINEL or state.active_connections > 0:
-            return IdleJudgmentData(
+            return IdleCheckerEvaluation(
                 checker_id=checker_id,
                 session_id=session_id,
                 expire_at=refreshed_expire_at,
-                status=IdleCheckPhase.ACTIVE,
+                is_active=True,
                 message=(
                     "Network activity detected: "
                     f"max_network_inactivity_seconds={max_inactivity_seconds}, "
@@ -110,16 +109,14 @@ class NetworkTimeoutChecker(IdleChecker):
                 f"inactive_seconds={(current_time - last_access_at).total_seconds():f}"
             )
         if current_time >= effective_expire_at:
-            status = IdleCheckPhase.IDLE_EXPIRED
             message = "Maximum network inactivity exceeded"
         else:
-            status = IdleCheckPhase.IDLE
             message = "No active network connection"
-        return IdleJudgmentData(
+        return IdleCheckerEvaluation(
             checker_id=checker_id,
             session_id=session_id,
             expire_at=effective_expire_at,
-            status=status,
+            is_active=False,
             message=(
                 f"{message}: "
                 f"max_network_inactivity_seconds={max_inactivity_seconds}, "

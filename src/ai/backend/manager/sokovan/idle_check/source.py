@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import override
 
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
@@ -27,4 +26,4 @@ class IdleCheckSource(
         target_statuses: IdleCheckTargetStatuses,
     ) -> IdleCheckReconcileInfo:
         batch = await self._repository.fetch_judgment_batch(target_statuses.session_statuses)
-        return IdleCheckReconcileInfo(batch=batch, current_time=datetime.now(UTC))
+        return IdleCheckReconcileInfo(batch=batch)

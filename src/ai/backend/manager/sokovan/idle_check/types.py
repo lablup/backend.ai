@@ -46,7 +46,6 @@ class IdleCheckTargetStatuses(BaseReconcilerTargetStatuses):
 @dataclass
 class IdleCheckReconcileInfo(BaseReconcilerInfo):
     batch: IdleCheckBatchData
-    current_time: datetime
 
     @override
     def entity_ids(self) -> Sequence[UUID]:
@@ -55,7 +54,7 @@ class IdleCheckReconcileInfo(BaseReconcilerInfo):
 
     @override
     def now(self) -> datetime:
-        return self.current_time
+        return self.batch.now
 
 
 @dataclass

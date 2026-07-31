@@ -77,6 +77,7 @@ class IdleCheckBatchData:
     """Handler-oriented idle-check input for one reconciler tick."""
 
     assignments: Sequence[IdleCheckAssignmentData]
+    now: datetime
 
 
 @dataclass(frozen=True)
