@@ -131,7 +131,9 @@ async def admin_update_app_config_allow_list(
     input: UpdateAppConfigAllowListInputGQL,
 ) -> UpdateAppConfigAllowListPayloadGQL | None:
     check_admin_only()
-    payload = await info.context.adapters.app_config_allow_list.admin_update(input.to_pydantic())
+    payload = await info.context.adapters.app_config_allow_list.admin_update(
+        AppConfigAllowListID(input.id), input.to_pydantic()
+    )
     return UpdateAppConfigAllowListPayloadGQL.from_pydantic(payload)
 
 
