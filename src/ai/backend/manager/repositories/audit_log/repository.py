@@ -11,7 +11,7 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogListResult
 from ai.backend.manager.models.audit_log import AuditLogRow
 from ai.backend.manager.models.scopes import SearchScope
-from ai.backend.manager.repositories.base import BatchQuerier, Creator
+from ai.backend.manager.repositories.base import BatchQuerier, BulkCreator, Creator
 
 from .db_source import AuditLogDBSource
 
@@ -46,6 +46,11 @@ class AuditLogRepository:
     @audit_log_repository_resilience.apply()
     async def create(self, creator: Creator[AuditLogRow]) -> AuditLogData:
         return await self._db_source.create(creator)
+
+    @audit_log_repository_resilience.apply()
+    async def bulk_create(self, bulk_creator: BulkCreator[AuditLogRow]) -> list[AuditLogData]:
+        """Insert multiple audit-log rows in a single bulk operation."""
+        return await self._db_source.bulk_create(bulk_creator)
 
     @audit_log_repository_resilience.apply()
     async def search(
