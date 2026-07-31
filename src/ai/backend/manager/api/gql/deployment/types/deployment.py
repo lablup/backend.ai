@@ -101,7 +101,6 @@ from ai.backend.common.dto.manager.v2.scheduling_history.request import (
 from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     ReplicaGroupHistoryScopeDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     NullableDateTimeFilter,
@@ -511,7 +510,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description=(
                 "The scheduling history of this deployment's replica groups. This is the"
                 " per-replica-group scaling status that the deprecated ``scaling_state``"
@@ -718,7 +717,7 @@ class ProjectDeploymentScopeGQL(PydanticInputMixin[ProjectDeploymentScopeDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter deployments by conditions on their replicas.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
     ),
     name="ReplicaNestedFilter",
 )
@@ -785,7 +784,7 @@ class DeploymentFilter(PydanticInputMixin[DeploymentFilterDTO]):
     )
     replicas: ReplicaNestedFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description="Filter by conditions on deployment replicas.",
         ),
         default=None,

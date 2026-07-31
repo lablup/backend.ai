@@ -26,7 +26,6 @@ from ai.backend.common.dto.manager.v2.resource_policy.request import (
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
     UserResourcePolicyOrder as UserResourcePolicyOrderDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     IntFilter,
@@ -80,7 +79,7 @@ class KeypairResourcePolicyV2Filter(PydanticInputMixin[KeypairResourcePolicyFilt
     max_pending_session_count: IntFilter | None = None
     max_priority: IntFilter | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description="Filter by the max scheduling priority ceiling.",
         ),
         default=None,

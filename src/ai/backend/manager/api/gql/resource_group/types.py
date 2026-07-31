@@ -81,7 +81,6 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     ReplaceResourceGroupDefaultSessionOptionsPayload as ReplaceResourceGroupDefaultSessionOptionsPayloadDTO,
 )
 from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import PreemptionOrder
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
@@ -190,7 +189,7 @@ class PreemptionConfigGQL(PydanticOutputMixin[PreemptionConfigInfo]):
 
     enabled: bool = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description="Whether preemption is enabled for this resource group (opt-in).",
         )
     )
@@ -203,7 +202,7 @@ class PreemptionConfigGQL(PydanticOutputMixin[PreemptionConfigInfo]):
     )
     preemption_min_runtime: float = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description=(
                 "Minimum session runtime in seconds before it becomes preemptible (0 = disabled)."
             ),
@@ -477,7 +476,7 @@ class PreemptionConfigInput(PydanticInputMixin[PreemptionConfigInputDTO]):
 
     enabled: bool = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description="Whether preemption is enabled for this resource group (opt-in). Default is false.",
         ),
         default=False,
@@ -495,7 +494,7 @@ class PreemptionConfigInput(PydanticInputMixin[PreemptionConfigInputDTO]):
     )
     preemption_min_runtime: float = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description=(
                 "Minimum session runtime in seconds before it becomes preemptible "
                 "(0 = disabled). Default is 0."

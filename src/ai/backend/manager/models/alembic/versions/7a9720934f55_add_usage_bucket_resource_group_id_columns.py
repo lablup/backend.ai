@@ -18,7 +18,7 @@ from ai.backend.manager.models.base import GUID
 
 revision = "7a9720934f55"
 down_revision = "710460cca1ed"
-# Part of: NEXT_RELEASE_VERSION
+# Part of: "26.8.0"
 branch_labels = None
 depends_on = None
 

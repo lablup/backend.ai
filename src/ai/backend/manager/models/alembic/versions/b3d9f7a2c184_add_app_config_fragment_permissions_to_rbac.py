@@ -23,7 +23,7 @@ from ai.backend.manager.models.rbac_models.migration.enums import (
 # revision identifiers, used by Alembic.
 revision = "b3d9f7a2c184"
 down_revision = "c4e1a9b73f52"
-# Part of: NEXT_RELEASE_VERSION
+# Part of: "26.8.0"
 branch_labels = None
 depends_on = None
 

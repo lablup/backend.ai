@@ -24,7 +24,7 @@ revision = "a0a28251f296"
 down_revision = "e5b71c94d2a8"
 branch_labels = None
 depends_on = None
-# Part of: NEXT_RELEASE_VERSION
+# Part of: "26.8.0"
 
 
 def upgrade() -> None:
