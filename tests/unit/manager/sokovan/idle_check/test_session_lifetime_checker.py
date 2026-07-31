@@ -127,7 +127,7 @@ class TestSessionLifetimeChecker:
             "Session lifetime check: max_lifetime_seconds=30, running_seconds=29"
         )
 
-    async def test_session_at_deadline_is_idle_until_applied(
+    async def test_session_at_deadline_is_expired(
         self,
         checker: SessionLifetimeChecker,
         session_factory: SessionFactory,
@@ -146,12 +146,12 @@ class TestSessionLifetimeChecker:
         assert len(judgments) == 1
         assert judgments[0].session_id == session.session_id
         assert judgments[0].expire_at == _BASE_TIME + timedelta(seconds=30)
-        assert judgments[0].status is IdleCheckPhase.IDLE
+        assert judgments[0].status is IdleCheckPhase.IDLE_EXPIRED
         assert judgments[0].message == (
             "Session lifetime check: max_lifetime_seconds=30, running_seconds=30"
         )
 
-    async def test_session_after_deadline_is_idle_until_applied(
+    async def test_session_after_deadline_is_expired(
         self,
         checker: SessionLifetimeChecker,
         session_factory: SessionFactory,
@@ -168,7 +168,7 @@ class TestSessionLifetimeChecker:
         )
 
         assert judgments[0].expire_at == _BASE_TIME + timedelta(seconds=30)
-        assert judgments[0].status is IdleCheckPhase.IDLE
+        assert judgments[0].status is IdleCheckPhase.IDLE_EXPIRED
         assert judgments[0].message == (
             "Session lifetime check: max_lifetime_seconds=30, running_seconds=31.2"
         )
@@ -213,7 +213,7 @@ class TestSessionLifetimeChecker:
             long_lifetime.definition.checker_id,
         ]
         assert [judgment.status for judgment in judgments] == [
-            IdleCheckPhase.IDLE,
+            IdleCheckPhase.IDLE_EXPIRED,
             IdleCheckPhase.IDLE,
         ]
 
@@ -239,7 +239,7 @@ class TestSessionLifetimeChecker:
             active_session.session_id,
         ]
         assert [judgment.status for judgment in judgments] == [
-            IdleCheckPhase.IDLE,
+            IdleCheckPhase.IDLE_EXPIRED,
             IdleCheckPhase.IDLE,
         ]
 
