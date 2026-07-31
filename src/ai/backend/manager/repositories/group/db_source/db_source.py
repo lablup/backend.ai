@@ -16,12 +16,9 @@ import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.data.entity.types import (
-    PROJECT_SCOPE_TYPE,
-    USER_ENTITY_TYPE,
-    EntityRef,
-    ScopeRef,
-)
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.types import EntityRef, ScopeRef
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.identifier.project import ProjectID

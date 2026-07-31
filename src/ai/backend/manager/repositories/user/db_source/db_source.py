@@ -16,10 +16,8 @@ from sqlalchemy.orm import joinedload, load_only, noload
 from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.data.entity.types import (
-    PROJECT_SCOPE_TYPE,
-    ScopeRef,
-)
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.user import UserID

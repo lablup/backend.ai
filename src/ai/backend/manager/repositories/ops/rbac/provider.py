@@ -13,11 +13,8 @@ from typing import override
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from ai.backend.common.data.entity.types import (
-    USER_ENTITY_TYPE,
-    EntityRef,
-    ScopeRef,
-)
+from ai.backend.common.data.entity.types import EntityRef, ScopeRef
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.data.permission.types import (
     Permission,
     RBACElementType,
