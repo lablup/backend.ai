@@ -17,10 +17,10 @@ Version Numbering
 * When releasing ``x.y.0``:
 
   * Create a new ``x.y`` branch, do all bugfix/hotfix there, and make ``x.y.z`` releases there.
+  * Add ``x.y`` to ``.github/maintained-versions.yml`` so that it starts receiving backports.
   * All fixes must be *first* implemented on the ``main`` branch and then *cherry-picked* back to ``x.y`` branches.
 
-    * When cherry-picking, use the ``-e`` option to edit the commit message.\ :raw-html-m2r:`<br>`
-      Append ``Backported-From: main`` and ``Backported-To: X.Y`` lines after one blank line at the end of the existing commit message.
+    * The cherry-pick is automated.  See `Backporting`_ below.
 
   * Change the version number of ``main`` to ``x.(y+1).0.dev0``
   * There is no strict rules about alpha/beta/rc builds yet. We will elaborate as we scale up.\ :raw-html-m2r:`<br>`
@@ -38,6 +38,95 @@ Version Numbering
     * As of 22.09, this won't be guaranteed anymore.  All server-side core component versions should **exactly match** with others, as we release them at once from the mono-repo, even for those who do not have any code changes.
 
   * The client is guaranteed to be backward-compatible with the server they share the same API specification version.
+
+
+Backporting
+===========
+
+Every change lands on ``main`` first.
+When it is merged, the ``backport`` workflow cherry-picks it to each target
+release branch and opens a backport pull request there, so backporting is not
+a manual step.
+
+Maintained versions
+-------------------
+
+``.github/maintained-versions.yml`` is the single source of truth for the
+release branches that are still maintained.
+
+.. code-block:: yaml
+
+   versions:
+     - version: "26.8"
+     - version: "26.4"
+       lts: true
+
+Every entry must have a release branch of the same name.
+A version that is not listed here receives no backport at all, so removing a
+version from the list is how a release goes out of maintenance.
+
+``lts`` marks a long-term support line, and is left out otherwise.
+Besides the backport targets below, the release workflow reads the file to
+point the installer download links at a release: the newest maintained version
+drives the ``edge`` link, and the newest LTS one the ``stable`` link that
+``scripts/install.sh`` follows.
+
+How the targets are decided
+---------------------------
+
+The backport targets of a merged pull request come from its title prefix, its
+description and its labels.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Signal
+     - Targets
+   * - ``no-backport`` label
+     - None.  It wins over everything else.
+   * - ``fix:`` title prefix
+     - Every version in ``.github/maintained-versions.yml``.
+   * - ``Backport:`` trailer
+     - The versions written in the trailer, added to the above.
+   * - any other title prefix
+     - None.
+
+Only ``fix:`` is backported by default.
+A ``feat:`` or any other prefix needs an explicit ``Backport:`` line in the
+pull request description:
+
+.. code-block:: text
+
+   Backport: 26.8, 26.4
+
+The versions may be separated by commas or spaces.
+A version that is not in the registry is ignored with a warning, and the job
+does not fail.
+
+Requesting a backport after the merge
+-------------------------------------
+
+If a target turns out to be missing after the pull request is merged, comment
+on it:
+
+.. code-block:: text
+
+   /backport 26.4
+
+The comment is accepted from the repository owners, members and collaborators,
+and only on a merged pull request.
+Any other case is answered with a comment stating the reason.
+
+The backport pull request
+-------------------------
+
+The generated pull request keeps the original title, so its ``(#N)`` suffix
+stays as the link back to the pull request the change came from, and it is set
+to auto-merge.
+When the cherry-pick conflicts the workflow stops and leaves a comment on the
+original pull request: the conflict is resolved by hand rather than by
+overwriting the release branch.
 
 
 Upgrading

@@ -91,12 +91,29 @@ pants lint --changed-since=origin/{base_branch}
    Resolves BA-XXXX
    ```
 
-3. **Create PR**
+3. **Decide backport targets** (before creating the PR — the trailer lives in the PR body)
+
+   Backporting is automatic. There is no milestone to set; the target release branches are
+   decided from the PR title prefix, the PR body and the labels.
+
+   | Situation | What to do |
+   |---|---|
+   | `fix:` PR | Nothing. Every version in `.github/maintained-versions.yml` is targeted automatically |
+   | Non-`fix:` PR that must also land on a release branch | Add a `Backport: <version>` line to the PR body — comma- or space-separated for multiple, e.g. `Backport: 26.8, 26.4` |
+   | `fix:` PR that must NOT be backported | Apply the `no-backport` label: `gh pr edit <pr_number> --add-label no-backport` |
+   | A target realized only after the merge | Comment `/backport <version>` on the merged PR |
+
+   - Valid versions are exactly the entries of `.github/maintained-versions.yml` — read that file
+     rather than guessing. A version outside the list is ignored with a warning.
+   - Adding a `Backport:` trailer or the `no-backport` label is a release decision:
+     ask the user before doing either.
+
+4. **Create PR**
    ```bash
    gh pr create --title "..." --body "..."
    ```
 
-4. **Extract PR number** from `gh pr create` output
+5. **Extract PR number** from `gh pr create` output
 
 ### Phase 5: Changelog (News Fragment)
 

@@ -42,7 +42,7 @@ When to use:
 - Docker/halfstack issues → `/halfstack`
 - Checking/applying DB migrations → `/db-migrate`
 - Running component servers directly → `/local-dev`
-- Submitting PR → `/submit`
+- Submitting PR (backport targeting) → `/submit`
 - Preparing release → `/release`
 
 Skills source: `.claude/skills/{name}/SKILL.md`
