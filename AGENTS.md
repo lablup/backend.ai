@@ -27,6 +27,7 @@ Applies to every generated artifact — docs, code comments, BEPs, PR descriptio
 - `src/ai/backend/manager/models/alembic/README.md` — Alembic migration backport strategy
 - `README.md` — Project overview and architecture
 - `proposals/README.md` — BEP (Backend.AI Enhancement Proposals)
+- `scripts/README.md` — Index of `scripts/` by when each one runs and who calls it
 
 **Skills (Invoke with `/skill-name`):**
 
