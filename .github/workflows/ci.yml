@@ -859,7 +859,10 @@ jobs:
       run: |
         pip install -U 'twine~=6.0'
     - name: Extract the release changelog
-      run: python ./scripts/extract-release-changelog.py
+      env:
+        VERSION: ${{ github.ref_name }}
+        REPOSITORY: ${{ github.repository }}
+      run: python ./scripts/extract-release-changelog.py "$VERSION" --repository "$REPOSITORY"
     - name: Determine the release type
       run: echo "IS_PRERELEASE=$(python ./scripts/determine-release-type.py "$(cat VERSION)")" >> "$GITHUB_ENV"
     - name: Download wheels
