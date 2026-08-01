@@ -33,6 +33,8 @@
   @gql_root_field(BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="..."))
   async def my_foo(...): ...
   ```
+- On a **version branch** (`YY.S`) the rule is inverted: that branch inherits a `NEXT_RELEASE_VERSION` it never releases, so write the
+  literal version the branch will ship (`added_version="26.8.3"`). CI rejects newly added `NEXT_RELEASE_VERSION` references there.
 
 ## import
 
