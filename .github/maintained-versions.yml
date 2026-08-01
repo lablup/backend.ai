@@ -1,0 +1,11 @@
+# The release versions maintained by this repository.
+#
+# Every entry must have a release branch of the same name, and every entry
+# receives the backport of a `fix:` pull request merged into `main`.
+# Add a version when its release branch is created; remove it when the version
+# reaches the end of its life.
+#
+# The comments below are for humans only and are not parsed.
+versions:
+  - "26.8"   # latest release
+  - "26.4"   # LTS
