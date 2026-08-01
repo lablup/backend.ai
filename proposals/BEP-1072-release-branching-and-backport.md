@@ -59,7 +59,7 @@ For each area, separate **✅ what already exists** from **➕ what to add**. Me
 |---|---|
 | ✅ | `backport.yml` reads the PR **milestone**, keeps only those with a branch of the same name, and fans out to every version at or above it |
 | ✅ | Current milestones are `Backlog/26.5/26.4/25.15` while `main` develops 26.8 — so `26.5` works as an accidental opt-out |
-| ➕ | Drop the milestone. Decide from the **PR title prefix + labels** and check against the version list in `.github/maintained-versions.yml` |
+| ➕ | Drop the milestone. Decide from the **PR title prefix and a `Backport:` trailer** in the description, checked against `.github/maintained-versions.yml`. No label is involved |
 | ➕ | Attempt every target in the decided set — no pre-filtering, so an inapplicable fix surfaces as a draft PR instead of a silent skip (3.(b)) |
 
 ### 2.4 Backport failure handling
@@ -104,7 +104,7 @@ For each area, separate **✅ what already exists** from **➕ what to add**. Me
 
 | # | Where | Action |
 |---|---|---|
-| 1 | `main` PR `release: <version>.0rc1` | `VERSION` → `<version>.0rc1` / freeze(`<version>.0`) + `pants fix/fmt` / **NEXT → `<next>.0`** / regenerate samples and schemas / consume towncrier (`--version <version>.0`) → create `CHANGELOG-<version>.md` / register `<version>` in `maintained-versions.yml` |
+| 1 | `main` PR `release: <version>.0rc1` | `VERSION` → `<version>.0rc1` / freeze(`<version>.0`) + `pants fix/fmt` / **NEXT → `<next>.0`** / regenerate samples and schemas / consume towncrier (`--version <version>.0`) → create `CHANGELOG-<version>.md` / register `<version>` in `maintained-versions.yml` (done by the release script from the `<version>.0rc1` target itself; `--lts` marks a long-term support line) |
 | 2 | `main` | On merge, tag the merge commit `<version>.0rc1` **and** create branch `<version>` at that same commit — **one action, no commits on the branch** |
 
 **The cut is the act of releasing rc1 from `main`, and it takes exactly one PR.** The branch inherits a state where both `VERSION` and the fragment pool are already correct, so there is nothing to touch. The rc1 tag is a common ancestor of both `main` and the version branch, and rc1 is never tagged again from the branch.
@@ -125,7 +125,7 @@ The rc period is nominally **one week** (enough for feature verification and tes
 
 | # | Action |
 |---|---|
-| 1 | Decide targets — `fix:` → every version in `maintained-versions.yml` / a `backport:<version>` label or `/backport` comment → additional targets / `no-backport` → none / any other prefix → none |
+| 1 | Decide targets — the prefix picks the default (`fix:` → every version in `maintained-versions.yml`, anything else → none) and a `Backport:` trailer in the description **replaces** it, naming particular versions or `none`. `/backport <version>` on the merged PR is the way in afterwards |
 | 2 | Cherry-pick **every** target — on success open a PR with auto-merge, on conflict open a **draft PR** + `pending:backport` |
 
 A fix that lands in an older version applies to every newer live version as well (so the bug does not come back on upgrade).
@@ -198,9 +198,9 @@ rc releases are published to PyPI like any other tag; `make-final-release` alrea
 | Work | Content |
 |---|---|
 | **Version management in CI** | New `cut-release-branch.sh` (the whole cut PR procedure, absorbing freeze/bump out of `release.sh`), a workflow that tags and branches from `merge_commit_sha` on release-PR merge, align `VERSION` on `main` |
-| **Label-based backport + triage skill** | Introduce `maintained-versions.yml`, replace target decision in `backport.yml` (keep the matrix JSON shape → downstream jobs unchanged), remove `-X theirs`, draft PR on conflict, fix trailers, `backport:<version>` and `no-backport` labels, a Claude skill that lists `pending:backport` PRs and disposes of each one — resolve the conflict, or close it with the reason the fix does not apply to that version |
+| **Registry-based backport + triage skill** | Introduce `maintained-versions.yml`, drive `backport.yml` from the merged PR (`pull_request_target` + `/backport` comment) rather than from pushed commits, decide targets from the prefix and a `Backport:` trailer, remove `-X theirs`, draft PR on conflict, drop the `Backported-*` trailers, move the edge and stable installer channel selection onto the registry, a Claude skill that lists `pending:backport` PRs and disposes of each one — resolve the conflict, or close it with the reason the fix does not apply to that version |
 | **WebUI decoupling** | Drop `webui_version` from `release.sh` so the bundle is pinned by its own PR, retarget `graphql-inspector` at `supergraph.graphql` and add a CI check that rejects newly added `NEXT_RELEASE_VERSION` references on version-branch PRs, and optionally warn when `static/version.json` lags the release version |
-| **Changelog split and script cleanup** | Per-version-branch files via a temporary towncrier config (written at the repo root so its relative `directory`/`template` paths resolve), towncrier skip guard, hardcoding and prerelease handling in `extract-release-changelog.py`, new `changelog-sync.yml`, 2 CI bugs (the edge-release regex `[0-9]{2}\.[0-9]{2}` never matches a `YY.S` branch, `X.Y.0rc1` in `check-backport-commits.py`), update `daily-workflows.rst` |
+| **Changelog split and script cleanup** | Per-version-branch files via a temporary towncrier config (written at the repo root so its relative `directory`/`template` paths resolve), towncrier skip guard, hardcoding and prerelease handling in `extract-release-changelog.py`, new `changelog-sync.yml`, update `daily-workflows.rst` |
 
 ## 4. Decision Summary
 
@@ -212,7 +212,10 @@ rc releases are published to PyPI like any other tag; `make-final-release` alrea
 | Script split | `cut-release-branch.sh` (on `main`, cut only) and `release.sh` (on a version branch, no freeze/bump) are separate; they share only the regeneration helpers |
 | `VERSION` | The version that tree **released last**. Only release commits update it, so it always matches the tag, there is no need to overwrite it at build time, and an rc claiming a final version on PyPI becomes structurally impossible |
 | `NEXT_RELEASE_VERSION` | Frozen and then bumped to the next target in the cut PR. The branch inherits `<next>.0`, which it never releases, so a version-branch PR writes the literal version it will ship — CI rejects newly added references there |
-| Backport targets | Milestone dropped. Prefix + labels + `maintained-versions.yml`. Grades and support periods are outside this BEP |
+| Backport targets | Milestone dropped. The title prefix picks the default and a `Backport:` trailer replaces it, checked against `maintained-versions.yml`. No label |
+| Registry contents | One record per live line: the version, `lts` for a long-term support one, and its `retire_after`. Grades and support periods are in scope after all — the installer channels need the grade, and a hand-maintained value for it had already gone stale |
+| Registry upkeep | `release.sh` registers a line from the `X.Y.0rc1` that cuts it and retires what is due in the same pass: an LTS line once `retire_after` has passed, a regular line as soon as any newer line exists. Whether a line is LTS is passed explicitly, never inferred |
+| Installer channels | Read from the registry too — newest maintained version for `edge`, newest LTS for `stable`, replacing a hand-set repository variable |
 | Backport scope | **Always backport to every target in the decided set**, never pre-filtered. A cherry-pick that cannot apply becomes a draft PR the skill resolves or closes with a recorded reason |
 | Backport failure | Not silently overwritten (`-X theirs` removed); left as a draft PR |
 | Changelog file | **Per version branch**. Splitting per release would leave the `.0` file holding only the post-rc delta, so the final content would never reach `main` |
@@ -228,14 +231,12 @@ rc releases are published to PyPI like any other tag; `make-final-release` alrea
 ## 5. Open Questions
 
 - **Whether rc releases keep their own release heading block** until the final release consolidates them, or write into the final block from the start. Today's `CHANGELOG.md` shows the former as the existing practice (0 rc headings survive, 9 rc tags exist).
-- **Permissions for the `/backport` comment trigger** — write access versus maintainers only.
-- **Which versions stay in `maintained-versions.yml`, and for how long** — follows from the support policy decision.
 - **Whether the WebUI bundle can eventually leave the release artifact** (a separate bundle wheel or an install-time download, both compatible with the webserver's existing `static_path`). Out of scope while the artifact must contain it, but it is the only change that removes the coupling rather than scheduling around it.
 
 ## 6. References
 
 - `.github/workflows/{backport,ci,check-version-change,timeline-check}.yml`, `.github/actions/{pr-title-prefix,detect-release-pr}`
-- `scripts/{release.sh,build-wheels.sh,freeze_release_version.py,bump_next_release_version.py,check-backport-commits.py,extract-release-changelog.py,determine-release-type.py}`
+- `scripts/{release.sh,build-wheels.sh,freeze_release_version.py,bump_next_release_version.py,extract-release-changelog.py,determine-release-type.py}`
 - `src/ai/backend/common/meta/meta.py`
 - `src/ai/backend/manager/models/alembic/README.md`
 - `docs/dev/daily-workflows.rst` — "Making a new release", "Making a new release branch"

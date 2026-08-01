@@ -956,13 +956,28 @@ jobs:
       # wheels after building them to add arch-specific tags.
       run: |
         twine upload --skip-existing dist/*.whl dist/*.tar.gz
-    - name: Extract stable release version
-      id: extract_stable_release_version
+    - name: Resolve the installer channels
+      id: channels
       run: |
-        release_version=$(awk -F'.' '{print $1"."$2}' <<< "${{ github.ref_name }}")
-        echo "RELEASE_VERSION=$release_version" >> $GITHUB_OUTPUT
+        # `main` is the authority on which versions are alive: the checked-out
+        # tag may sit on a release branch that predates the registry.
+        git fetch --depth=1 origin main
+        registry=$(git show FETCH_HEAD:.github/maintained-versions.yml)
+        series=$(awk -F'.' '{print $1"."$2}' <<< "${{ github.ref_name }}")
+        edge=$(yq -e '.versions[].version' <<< "$registry" | sort -V | tail -n 1)
+        stable=$(yq -e '.versions[] | select(.lts == true) | .version' <<< "$registry" | sort -V | tail -n 1)
+        # An LTS line is supported for a year, so neither should ever come back
+        # empty. Warn instead of failing: leaving an installer URL on the
+        # previous release beats failing a release that is otherwise complete.
+        [ -n "$edge" ] || echo "::warning::No maintained version in the registry; leaving the edge installer URL as is."
+        [ -n "$stable" ] || echo "::warning::No LTS version in the registry; leaving the stable installer URL as is."
+        {
+          echo "SERIES=$series"
+          echo "EDGE=$edge"
+          echo "STABLE=$stable"
+        } >> $GITHUB_OUTPUT
     - name: Update stable installer shorten URL
-      if: ${{ env.IS_PRERELEASE == 'false' && vars.STABLE_RELEASE == steps.extract_stable_release_version.outputs.RELEASE_VERSION }}
+      if: ${{ env.IS_PRERELEASE == 'false' && steps.channels.outputs.STABLE != '' && steps.channels.outputs.STABLE == steps.channels.outputs.SERIES }}
       run: |
         curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-stable-macos-aarch64' \
@@ -988,13 +1003,8 @@ jobs:
           -d '{
           "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-linux-x86_64"
         }'
-    - name: Extract edge release version
-      id: extract_edge_release_version
-      run: |
-        release_version=$(git branch -r | grep -E 'origin/[0-9]{2}\.[0-9]{2}$' | awk -F'/' '{print $2}' | sort -V | tail -n 1)
-        echo "RELEASE_VERSION=$release_version" >> $GITHUB_OUTPUT
     - name: Update edge installer shorten URL
-      if: ${{ startsWith(github.ref_name, steps.extract_edge_release_version.outputs.RELEASE_VERSION) }}
+      if: ${{ steps.channels.outputs.EDGE != '' && startsWith(github.ref_name, steps.channels.outputs.EDGE) }}
       run: |
         curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-edge-macos-aarch64' \

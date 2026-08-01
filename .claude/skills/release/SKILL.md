@@ -44,8 +44,16 @@ Guides the Backend.AI release process: version bump, changelog generation, and R
    - List found RC sections to user
    - These will be consolidated in Phase 3
 
-6. **Confirm with user before proceeding**
-   - Show: target version, release type, WebUI version (if any), RC sections to consolidate (if any)
+6. **For a `{major}.{minor}.0rc1` target, settle the support level**
+   - That form is the rc that cuts a new release line; the release script recognises it
+     on its own, so nothing else has to be classified by hand
+   - Ask the user whether the line is LTS (the March and September sprints are, per the
+     versioning scheme) — a year of support is a commitment and is never inferred
+   - If it is, pass `--lts` to the release script below
+
+7. **Confirm with user before proceeding**
+   - Show: target version, release type, WebUI version (if any), RC sections to consolidate (if any),
+     and for a branch cut, whether the line is LTS
    - Wait for user approval
 
 ### Phase 2: Release Script Execution
@@ -54,6 +62,12 @@ Run `scripts/release.sh` which performs these steps:
 
 ```bash
 scripts/release.sh {target_version} [webui_version]
+```
+
+When the line being cut is LTS:
+
+```bash
+scripts/release.sh --lts {target_version} [webui_version]
 ```
 
 To override the next development version (year rollover or planned sprint skip):
@@ -68,6 +82,8 @@ NEXT_DEV_VERSION={next_version} scripts/release.sh {target_version} [webui_versi
 3. Updates `VERSION` file
 4. Freezes `NEXT_RELEASE_VERSION` placeholders to the actual version (stable releases only; skipped for `rc`/`a`/`b`/`dev`/`post`)
 5. Runs `scripts/run-towncrier.py {target_version}`, which consumes the `changes/` fragments into `CHANGELOG/{major}.{minor}.md` (skipped entirely when there are no fragments)
+6. Runs `.github/scripts/update-maintained-versions.sh {target_version}`, which registers the line when the target is an `X.Y.0rc1` cut and retires the lines that are due — an LTS line once its recorded `retire_after` has passed, a regular line as soon as any newer line exists.
+   **Report its output to the user**: a retirement means that version stops receiving backports and drops out of the installer channel selection from that point on.
 6. Generates sample config files
 7. Generates API docs (OpenAPI, GraphQL schema)
 8. Runs quality checks: `pants tailor --check`, `pants check ::`

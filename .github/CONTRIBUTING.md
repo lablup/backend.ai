@@ -148,6 +148,8 @@ Once the PR number is assigned, proceed to the next step.
 
 **Tip**: If work is still in progress, you can create a Draft PR.
 
+**Backport targets**: a `fix:` PR is backported to every maintained release branch automatically — see [how backport targets are decided](https://docs.backend.ai/en/latest/dev/version-management-and-upgrades.html#backporting) to add or remove targets.
+
 ### 4. Write Changelog Fragment (Towncrier)
 
 After the PR is created and you have the **PR number**, write a changelog fragment.
