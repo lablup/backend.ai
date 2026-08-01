@@ -5,6 +5,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+from changelog_files import changelog_filename
+
+DEFAULT_REPOSITORY = 'lablup/backend.ai'
+
+
+def get_repository():
+    return os.environ.get('GITHUB_REPOSITORY', DEFAULT_REPOSITORY)
 
 def get_tag():
     gh_ref_name = os.environ.get('GITHUB_REF_NAME')
@@ -16,7 +23,7 @@ def get_tag():
 
 def get_prev_tag():
     tag = get_tag()
-    subprocess.run(['git', 'clone', '--filter=blob:none', '--no-checkout', f'https://github.com/{os.environ["GITHUB_REPOSITORY"]}.git', '.git-tmp'])
+    subprocess.run(['git', 'clone', '--filter=blob:none', '--no-checkout', f'https://github.com/{get_repository()}.git', '.git-tmp'])
     p = subprocess.run(['git', 'describe', '--abbrev=0', '--tags', tag + '^'], capture_output=True, cwd='.git-tmp')
     prev_tag = p.stdout.decode().strip()
     return prev_tag
@@ -30,17 +37,19 @@ def main():
     args = parser.parse_args()
 
     prev_tag, tag = get_prev_tag(), get_tag()
-    commitlog_url = f"https://github.com/lablup/backend.ai/compare/{prev_tag}...{tag}"
-    changelog_url = f"https://github.com/lablup/backend.ai/blob/{tag}/CHANGELOG.md"
+    repository = get_repository()
+    version = Path('./VERSION').read_text().strip()
+    changelog_name = changelog_filename(version)
+    commitlog_url = f"https://github.com/{repository}/compare/{prev_tag}...{tag}"
+    changelog_url = f"https://github.com/{repository}/blob/{tag}/{changelog_name}"
 
     print(f"Making release notes for {tag} ...", file=sys.stderr)
 
-    input_path = Path('./CHANGELOG.md')
+    input_path = Path(f'./{changelog_name}')
     output_path = Path('./CHANGELOG_RELEASE.md')
     try:
-        version = Path('./VERSION').read_text().strip()
         input_text = input_path.read_text()
-        m = re.search(rf"(?:^|\n)## {re.escape(version)}(?:[^\n]*)?\n(.*?)(?:\n## |$)", input_text, re.S)
+        m = re.search(rf"(?:^|\n)## {re.escape(version)}(?![\w.])(?:[^\n]*)?\n(.*?)(?:\n## |$)", input_text, re.S)
         if m is not None:
             content = m.group(1).strip()
             content += (
@@ -58,7 +67,7 @@ def main():
             print("--------")
             print("Successfully extracted the latest changelog to CHANGELOG_RELEASE.md", file=sys.stderr)
         else:
-            print("::error ::Could not extract the latest changelog from CHANGELOG.md", file=sys.stderr)
+            print(f"::error ::Could not extract the {version} changelog from {changelog_name}", file=sys.stderr)
             sys.exit(1)
     except IOError as e:
         print(f"::error ::Could read or write from file: {e!r}", file=sys.stderr)

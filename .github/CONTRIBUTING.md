@@ -153,7 +153,8 @@ Once the PR number is assigned, proceed to the next step.
 After the PR is created and you have the **PR number**, write a changelog fragment.
 Backend.AI uses [Towncrier](https://towncrier.readthedocs.io/) to automatically generate release notes.
 
-**Important**: These fragments are used to generate [CHANGELOG.md](/CHANGELOG.md) for each release.
+**Important**: These fragments are used to generate the changelog of the version branch
+being released, under [`CHANGELOG/`](/CHANGELOG/).
 Write clearly and concisely about what you changed and its impact, as this will be read by users and other developers.
 
 **Create Fragment File**:
