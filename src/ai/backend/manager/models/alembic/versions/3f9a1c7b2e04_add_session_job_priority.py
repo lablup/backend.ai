@@ -14,7 +14,7 @@ from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT
 # revision identifiers, used by Alembic.
 revision = "3f9a1c7b2e04"
 down_revision = "4a39641d0fc2"
-# Part of: "26.8.0"
+# Part of: 26.8.0
 branch_labels = None
 depends_on = None
 
