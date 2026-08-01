@@ -833,7 +833,8 @@ Then, by hand:
   ``v`` prefix, lightweight) and push the tag.  **Pushing the tag is what
   publishes the release**: it triggers ``ci.yml``'s ``make-final-release``, which
   builds the wheels and SCIEs and uploads them to the GitHub Release and PyPI.
-  rc tags are published the same way.
+  Later rc tags are published the same way; the ``X.Y.0rc1`` that cuts a line is
+  the one exception -- a workflow tags it, as in `Making a new release branch`_.
 
 * When making a new major release, snapshot of prior release's final DB migration history
   should be dumped. This will later help to fill out missing gaps of DB revisions when
@@ -863,10 +864,14 @@ its first rc are one action.**
   ``NEXT_RELEASE_VERSION``, the regenerated schema dumps, ``CHANGELOG/X.Y.md``,
   and the registry entry for ``X.Y``.
 
-* Tag the merge commit ``X.Y.0rc1`` **and** create the branch ``X.Y`` at that same
-  commit.  The branch therefore starts with zero commits of its own, and
-  ``X.Y.0rc1`` is a common ancestor of both branches -- never tagged again from
-  the branch.
+* Nothing is tagged or branched by hand.  On the merge, the
+  ``create-version-branch.yml`` workflow reads the ``release: X.Y.0rc1`` subject
+  of the merge commit and creates the tag ``X.Y.0rc1`` **and** the branch ``X.Y``
+  at that same commit in one push.  The branch therefore starts with zero commits
+  of its own, and ``X.Y.0rc1`` is a common ancestor of both branches -- never
+  tagged again from the branch.  A tag or branch that is already there is never
+  moved: the workflow fails instead, and cutting the line again means deleting
+  them first.
 
 * Nothing else is done to ``main``.  It keeps developing the next version, and
   the release script has already pointed ``NEXT_RELEASE_VERSION`` at it.

@@ -4,7 +4,7 @@ An index of the top-level scripts, grouped by **when they run** rather than by w
 they are about. Each row names its **caller**: a person, or the workflow / hook that
 runs it automatically.
 
-`.github/scripts/` holds the two scripts that only GitHub Actions and the release
+`.github/scripts/` holds the scripts that only GitHub Actions and the release
 script call; they are listed in the same tables.
 
 Subdirectories are summarized at the end. For the rules on keeping this index
@@ -69,6 +69,8 @@ current, see `AGENTS.md` in this directory.
 | `changelog_files.py` | Module, not a command: maps a version to its `CHANGELOG/<version>.md` | auto — imported by `run-towncrier.py`, `extract-release-changelog.py` |
 | `bump_next_release_version.py` | Advances `NEXT_RELEASE_VERSION` to the next sprint after a sprint release | auto — `release.sh` |
 | `.github/scripts/update-maintained-versions.sh` | Registers a newly cut line in `.github/maintained-versions.yml` and retires the due ones | auto — `release.sh` |
+| `.github/scripts/create-version-branch.sh` | Tags the `X.Y.0rc1` a release commit made and cuts the `X.Y` branch at that same commit | auto — `create-version-branch.yml` |
+| `.github/scripts/sync-changelog-to-main.sh` | Opens the pull request carrying a final release's `CHANGELOG/X.Y.md` back to `main` | auto — `changelog-sync.yml` |
 | `extract-release-changelog.py` | Extracts the tagged version's block for the GitHub release body | auto — `ci.yml` (release job) |
 | `determine-release-type.py` | Sets `IS_PRERELEASE` from the `VERSION` file | auto — `ci.yml` (release job) |
 | `build-wheels.sh` | Builds the platform-specific and generic wheels | auto — `ci.yml` (release job) |
