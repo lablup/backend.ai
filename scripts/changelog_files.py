@@ -8,12 +8,16 @@ pre-release blocks into the final one is a release-time editorial step.
 The root ``CHANGELOG.md`` archives the releases made before the split.
 
 Shared by ``run-towncrier.py`` (which writes the block) and
-``extract-release-changelog.py`` (which reads it back).
+``extract-release-changelog.py`` (which reads it back). Run it to ask the same
+question from a shell:
+
+    python scripts/changelog_files.py 26.8.0     # -> CHANGELOG/26.8.md
 """
 
 from __future__ import annotations
 
 import re
+import sys
 
 # PEP 440 pre-release / post-release / development-release suffixes.
 _SUFFIX_RE = re.compile(
@@ -32,3 +36,12 @@ def changelog_filename(version: str) -> str:
     if match is None:
         raise ValueError(f"Unrecognized release version: {version!r}")
     return f"{CHANGELOG_DIR}/{match.group(1)}.{match.group(2)}.md"
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        raise SystemExit(f"Usage: {sys.argv[0]} <version>")
+    try:
+        print(changelog_filename(sys.argv[1]))
+    except ValueError as e:
+        raise SystemExit(str(e)) from None

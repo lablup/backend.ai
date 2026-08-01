@@ -1,15 +1,20 @@
-import os
+"""Say whether a release version is a pre-release.
+
+Prints ``true`` or ``false``. Turning that into a CI variable is the caller's
+business:
+
+    answer=$(python scripts/determine-release-type.py "$(cat VERSION)")
+    echo "IS_PRERELEASE=$answer" >> "$GITHUB_ENV"
+"""
+
 import re
-from pathlib import Path
+import sys
 
 
 def main():
-    gh_env_file = Path(os.environ.get("GITHUB_ENV", "/dev/null"))
-    version = Path("./VERSION").read_text().strip()
+    version = sys.argv[1].strip()
     m = re.search(r"(rc\d+|a\d+|b\d+|dev\d+)$", version)
-    is_prerelease = "true" if m is not None else "false"
-    with open(gh_env_file, "a") as f:
-        f.write(f"IS_PRERELEASE={is_prerelease}\n")
+    print("true" if m is not None else "false")
 
 
 if __name__ == "__main__":
