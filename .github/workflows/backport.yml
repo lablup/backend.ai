@@ -46,7 +46,19 @@ jobs:
           COMMENT_BODY: ${{ github.event.comment.body }}
           AUTHOR_ASSOCIATION: ${{ github.event.comment.author_association }}
           PR_AUTHOR_LOGIN: ${{ github.event.pull_request.user.login }}
-        run: .github/scripts/decide-backport-targets.sh
+        run: |
+          result=$(.github/scripts/decide-backport-targets.sh \
+            --event "$EVENT_NAME" \
+            --pr "$PR_NUMBER" \
+            --title "$PR_TITLE" \
+            --body "$PR_BODY" \
+            --labels "$PR_LABELS" \
+            --base "$PR_BASE" \
+            --merge-commit "$MERGE_COMMIT" \
+            --comment-body "$COMMENT_BODY" \
+            --author-association "$AUTHOR_ASSOCIATION" \
+            --pr-author "$PR_AUTHOR_LOGIN")
+          echo "result=$result" >> "$GITHUB_OUTPUT"
 
 
   backport:
