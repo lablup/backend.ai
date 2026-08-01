@@ -17,7 +17,7 @@ Version Numbering
 * When releasing ``x.y.0``:
 
   * Create a new ``x.y`` branch, do all bugfix/hotfix there, and make ``x.y.z`` releases there.
-  * Add ``x.y`` to ``.github/maintained-versions.yml`` so that it starts receiving backports.
+  * Register ``x.y`` in ``.github/maintained-versions.yml`` so that it starts receiving backports.
   * All fixes must be *first* implemented on the ``main`` branch and then *cherry-picked* back to ``x.y`` branches.
 
     * The cherry-pick is automated.  See `Backporting`_ below.
@@ -70,6 +70,34 @@ Besides the backport targets below, the release workflow reads the file to
 point the installer download links at a release: the newest maintained version
 drives the ``edge`` link, and the newest LTS one the ``stable`` link that
 ``scripts/install.sh`` follows.
+
+Entries come and go with the release lines. ``scripts/release.sh`` calls
+``.github/scripts/update-maintained-versions.sh`` on every release, which
+registers a line only when the target is the ``X.Y.0rc1`` that cuts it, so no
+release has to be classified by hand.  Whether the line is LTS is the one thing
+that cannot be read off the version, and is given explicitly:
+
+.. code-block:: console
+
+   $ scripts/release.sh --lts 26.9.0rc1
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 80
+
+   * - Line
+     - Retired
+   * - LTS
+     - Once ``retire_after`` has passed.  Registering an LTS line records the end
+       of the same month one year on, counted from the rc that cuts it; correct
+       the date by hand if the rc period ran long.
+   * - regular
+     - As soon as any newer line is registered, LTS or not.  A regular line
+       exists to get new features out quickly, so it lives only while it is the
+       newest line there is.
+
+Whether a line is LTS is a support commitment and is given on the command line,
+never inferred.
 
 How the targets are decided
 ---------------------------
