@@ -30,7 +30,7 @@ revision = "2ec0aa5a19cf"
 down_revision = "b13d304bf1fd"
 branch_labels = None
 depends_on = None
-# Part of: "26.8.0"
+# Part of: 26.8.0
 
 
 def upgrade() -> None:

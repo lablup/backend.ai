@@ -14,7 +14,7 @@ from ai.backend.common.defs.session import SESSION_PRIORITY_MAX, SESSION_PRIORIT
 # revision identifiers, used by Alembic.
 revision = "c4e1a7f9b26d"
 down_revision = "5405ee0d8eed"
-# Part of: "26.8.0"
+# Part of: 26.8.0
 branch_labels = None
 depends_on = None
 
