@@ -111,7 +111,7 @@ fi
 
 # Assign before the loop: a `yq` failure inside `< <(...)` would go unnoticed and
 # read as "no maintained versions", the silent skip this workflow exists to remove.
-if ! registry_versions=$(yq -e '.versions[]' "$registry" 2>&1); then
+if ! registry_versions=$(yq -e '.versions[].version' "$registry" 2>&1); then
   echo "::error::'$registry' must hold a non-empty 'versions' list -- $registry_versions"
   exit 1
 fi

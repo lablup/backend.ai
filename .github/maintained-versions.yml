@@ -5,7 +5,9 @@
 # Add a version when its release branch is created; remove it when the version
 # reaches the end of its life.
 #
-# The comments below are for humans only and are not parsed.
+# `lts: true` marks a long-term support line. The newest maintained version
+# drives the edge installer channel, the newest LTS one the stable channel.
 versions:
-  - "26.8"   # latest release
-  - "26.4"   # LTS
+  - version: "26.8"
+  - version: "26.4"
+    lts: true
