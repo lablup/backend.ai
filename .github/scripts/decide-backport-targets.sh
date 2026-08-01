@@ -109,9 +109,15 @@ if [ -z "$merge_commit" ]; then
   skip_and_exit "#$pr_number has no merge commit; nothing to backport."
 fi
 
+# Assign before the loop: a `yq` failure inside `< <(...)` would go unnoticed and
+# read as "no maintained versions", the silent skip this workflow exists to remove.
+if ! registry_versions=$(yq -e '.versions[]' "$registry" 2>&1); then
+  echo "::error::'$registry' must hold a non-empty 'versions' list -- $registry_versions"
+  exit 1
+fi
 while IFS= read -r version; do
   maintained+=("$version")
-done < <(yq -o=json '.versions' "$registry" | jq -r '.[]')
+done <<< "$registry_versions"
 echo "Maintained versions: ${maintained[*]}"
 
 if [ ${#requested[@]} -gt 0 ]; then
