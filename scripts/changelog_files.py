@@ -5,7 +5,7 @@ The changelog is split per version branch: every release of the ``26.9`` branch 
 release keeps its own heading block within that file; consolidating the
 pre-release blocks into the final one is a release-time editorial step.
 
-The root ``CHANGELOG.md`` is the frozen archive of releases up to 26.8.
+The root ``CHANGELOG.md`` archives the releases made before the split.
 
 Shared by ``run-towncrier.py`` (which writes the block) and
 ``extract-release-changelog.py`` (which reads it back).

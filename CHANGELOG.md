@@ -1,7 +1,8 @@
 Changes
 =======
 
-**This file is the archive of releases up to 26.8.** From 26.9 onward:
+**This file archives the releases made before the changelog was split.** From 26.9
+onward:
 
 | Looking for | Go to |
 |---|---|

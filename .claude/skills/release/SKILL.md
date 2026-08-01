@@ -36,7 +36,7 @@ Guides the Backend.AI release process: version bump, changelog generation, and R
 4. **Locate the changelog file**
    - The changelog is split per version branch: `CHANGELOG/{major}.{minor}.md`
      (`26.9.0rc1`, `26.9.0`, and `26.9.1` all live in `CHANGELOG/26.9.md`)
-   - The root `CHANGELOG.md` is the frozen archive of releases up to 26.8 — never write to it
+   - The root `CHANGELOG.md` archives the releases made before the split — never write to it
    - The file may not exist yet; the first release of the version branch creates it
 
 5. **For final releases, check for prior RC sections**
@@ -262,5 +262,5 @@ Agent: [Runs release.sh with WebUI version, full workflow]
 - `scripts/changelog_files.py` - Version to changelog path mapping
 - `pyproject.toml` - towncrier configuration (fragment types, template)
 - `changes/` - News fragment directory
-- `CHANGELOG/` - Per-version-branch changelogs; root `CHANGELOG.md` is the 26.8-and-earlier archive
+- `CHANGELOG/` - Per-version-branch changelogs; root `CHANGELOG.md` archives the pre-split releases
 - `/submit` - For regular PR submissions (not releases)
