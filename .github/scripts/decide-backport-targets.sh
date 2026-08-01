@@ -46,6 +46,14 @@ reply_and_exit() {
   exit 0
 }
 
+# Leave the reason on the pull request and fail -- for a request that cannot be
+# carried out, so that it is not mistaken for "nothing needed backporting".
+reply_and_fail() {
+  gh pr comment "$pr_number" -b "$1"
+  echo "::error::$1"
+  exit 1
+}
+
 # Say why in the job log and stop -- for anything nobody asked for.
 skip_and_exit() {
   echo "::notice::$1"
@@ -63,14 +71,6 @@ is_maintained() {
   for version in "${maintained[@]}"; do
     [ "$version" = "$1" ] && return 0
   done
-  return 1
-}
-
-has_label() {
-  local label
-  while IFS= read -r label; do
-    [ "$label" = "$1" ] && return 0
-  done < <(tr ',' '\n' <<< "$pr_labels")
   return 1
 }
 
@@ -136,24 +136,34 @@ if [ ${#requested[@]} -gt 0 ]; then
   if [ ${#unknown[@]} -gt 0 ]; then
     echo "::warning::Ignoring '${unknown[*]}' requested on #$pr_number: not listed in $registry"
   fi
-elif has_label no-backport; then
-  echo "The 'no-backport' label is set on #$pr_number; no backport target."
 else
-  # A `fix:` pull request targets every maintained version.
-  if grep -qE '^fix(\([^)]*\))?!?:' <<< "$pr_title"; then
-    targets=("${maintained[@]}")
-  fi
-
-  # A `Backport:` trailer in the description adds targets explicitly.
+  # A `Backport:` trailer names the targets outright, whatever the prefix would
+  # have chosen: it is how a `fix:` reaches only some of the versions, or none.
   trailer=$(grep -iE '^[[:space:]]*Backport:' <<< "${pr_body//$'\r'/}" | head -n 1 | sed -E 's/^[^:]*:[[:space:]]*//; s/,/ /g')
   read -ra trailer_versions <<< "$trailer"
-  for version in "${trailer_versions[@]}"; do
-    if is_maintained "$version"; then
-      targets+=("$version")
-    else
-      echo "::warning::Ignoring '$version' in the Backport: trailer of #$pr_number: not listed in $registry"
+
+  if [ ${#trailer_versions[@]} -eq 0 ]; then
+    # No trailer: a `fix:` pull request targets every maintained version.
+    if grep -qE '^fix(\([^)]*\))?!?:' <<< "$pr_title"; then
+      targets=("${maintained[@]}")
     fi
-  done
+  elif [ ${#trailer_versions[@]} -eq 1 ] && [ "$(tr '[:upper:]' '[:lower:]' <<< "${trailer_versions[0]}")" = "none" ]; then
+    echo "The Backport: trailer of #$pr_number opts out; no backport target."
+  else
+    unknown=()
+    for version in "${trailer_versions[@]}"; do
+      if is_maintained "$version"; then
+        targets+=("$version")
+      else
+        unknown+=("$version")
+      fi
+    done
+    # Dropping the unknown ones and backporting the rest would leave a half-done
+    # job looking green. Stop, say so, and let `/backport` redo it.
+    if [ ${#unknown[@]} -gt 0 ]; then
+      reply_and_fail "The \`Backport:\` trailer names \`${unknown[*]}\`, which is not among the maintained versions \`${maintained[*]}\` (see \`$registry\`). Nothing was backported -- comment \`/backport <version>\` once the line is right."
+    fi
+  fi
 fi
 
 if [ ${#targets[@]} -gt 0 ]; then

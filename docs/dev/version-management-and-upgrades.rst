@@ -111,26 +111,27 @@ description and its labels.
 
    * - Signal
      - Targets
-   * - ``no-backport`` label
-     - None.  It wins over everything else.
-   * - ``fix:`` title prefix
-     - Every version in ``.github/maintained-versions.yml``.
    * - ``Backport:`` trailer
-     - The versions written in the trailer, added to the above.
-   * - any other title prefix
+     - Exactly the versions it names, whatever the prefix would have chosen.
+       ``Backport: none`` means no target at all.
+   * - ``fix:`` title prefix, with no trailer
+     - Every version in ``.github/maintained-versions.yml``.
+   * - any other title prefix, with no trailer
      - None.
 
-Only ``fix:`` is backported by default.
-A ``feat:`` or any other prefix needs an explicit ``Backport:`` line in the
-pull request description:
+The prefix picks the default and the trailer replaces it, so one line in the
+description covers every case: a ``feat:`` that has to reach a release branch, a
+``fix:`` that applies to only some of them, and a ``fix:`` that must not be
+backported at all.
 
 .. code-block:: text
 
    Backport: 26.8, 26.4
 
 The versions may be separated by commas or spaces.
-A version that is not in the registry is ignored with a warning, and the job
-does not fail.
+A trailer that names a version outside the registry backports nothing and fails
+the job with a comment on the pull request, rather than quietly dropping that
+target; comment ``/backport <version>`` once the line is right.
 
 Requesting a backport after the merge
 -------------------------------------

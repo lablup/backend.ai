@@ -9,7 +9,7 @@ and how it affects the users and other developers.
 **Checklist:** (if applicable)
 
 - [ ] Backport targets: a `fix:` PR goes to every version in `.github/maintained-versions.yml` automatically.
-      Write a `Backport:` line here to add one, or apply the `no-backport` label to take them all away.
+      A `Backport:` line here names the targets instead — some of them, other ones, or `none`.
 - [ ] Mention to the original issue
 - [ ] Installer updates including:
   - Fixtures for db schema changes

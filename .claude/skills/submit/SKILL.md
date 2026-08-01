@@ -96,17 +96,20 @@ pants lint --changed-since=origin/{base_branch}
    Backporting is automatic. There is no milestone to set; the target release branches are
    decided from the PR title prefix, the PR body and the labels.
 
+   The title prefix picks the default; a `Backport:` line in the PR body replaces it.
+
    | Situation | What to do |
    |---|---|
-   | `fix:` PR | Nothing. Every version in `.github/maintained-versions.yml` is targeted automatically |
-   | Non-`fix:` PR that must also land on a release branch | Add a `Backport: <version>` line to the PR body — comma- or space-separated for multiple, e.g. `Backport: 26.8, 26.4` |
-   | `fix:` PR that must NOT be backported | Apply the `no-backport` label: `gh pr edit <pr_number> --add-label no-backport` |
+   | `fix:` PR going to every maintained version | Nothing |
+   | Any PR going to particular versions | Add `Backport: 26.8, 26.4` to the PR body — comma- or space-separated |
+   | `fix:` PR that must NOT be backported | Add `Backport: none` to the PR body |
+   | Non-`fix:` PR that stays on `main` | Nothing |
    | A target realized only after the merge | Comment `/backport <version>` on the merged PR |
 
    - Valid versions are exactly the entries of `.github/maintained-versions.yml` — read that file
-     rather than guessing. A version outside the list is ignored with a warning.
-   - Adding a `Backport:` trailer or the `no-backport` label is a release decision:
-     ask the user before doing either.
+     rather than guessing. A trailer naming anything else fails the backport job and backports
+     nothing, so get it right or leave the trailer out.
+   - Writing a `Backport:` trailer is a release decision: ask the user before adding one.
 
 4. **Create PR**
    ```bash
