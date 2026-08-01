@@ -28,7 +28,7 @@ jobs:
       matrix: ${{ steps.targets.outputs.result }}
     steps:
       - name: Checkout the base revision
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           lfs: false
       - name: Decide the target branches
@@ -60,7 +60,7 @@ jobs:
     permissions:
       pull-requests: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ matrix.target_branch }}
       - name: Cherry-pick

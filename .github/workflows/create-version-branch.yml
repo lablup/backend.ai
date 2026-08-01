@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the release commit
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           lfs: false
           # Refs pushed with the workflow's own token trigger no workflow, and
