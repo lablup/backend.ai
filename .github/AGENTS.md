@@ -11,7 +11,7 @@
 - **A workflow translates its event into arguments — nothing more.** Triggers, permissions, concurrency and wiring belong in the YAML. Once a `run:` grows past a line or two, it belongs in `scripts/<verb>-<object>.sh`.
 - **One job per outcome.** Split into separate jobs only where the runner, the permissions or a matrix genuinely differ.
 - **Do not re-implement a rule that a script already owns** — version parsing, changelog file names, the maintained-version registry. Call it.
-- **Never interpolate `${{ }}` into a shell command.** Hand it over through `env:` and quote the variable. A tag name, a branch name and a comment body are all written by someone else.
+- **Never interpolate `${{ }}` into a shell command.** `env:` carries the value safely as far as the shell — from there hand it to the script as a quoted argument (`env: TAG: ${{ github.ref_name }}` → `run: scripts/foo.py "$TAG"`), so the script never learns the variable's name. A tag name, a branch name and a comment body are all written by someone else.
 - **Pin a third-party action to a commit SHA**, with a `# vN` comment beside it. `actions/*` may use a major tag.
 
 ## Where a decision goes
