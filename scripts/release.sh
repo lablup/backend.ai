@@ -45,8 +45,8 @@ else
     pants fmt ::
 fi
 
-# Update the changelog (--yes consumes news fragments without an interactive prompt)
-LOCKSET=towncrier/$(yq '.python.interpreter_constraints[0] | split("==") | .[1]' pants.toml) ./py -m towncrier --yes
+# Update the version-branch changelog (consumes news fragments without an interactive prompt)
+python3 scripts/run-towncrier.py "${TARGET_VERSION}"
 
 # Update sample config files (unmask secrets to show actual default values)
 ./backend.ai mgr config generate-sample --overwrite --unmask-secrets

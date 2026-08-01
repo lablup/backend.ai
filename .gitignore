@@ -160,6 +160,7 @@ logs/
 
 # Release artifacts
 /CHANGELOG_RELEASE.md
+/.towncrier.generated.toml
 
 # macOS specific
 .DS_Store

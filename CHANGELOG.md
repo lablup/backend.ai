@@ -1,6 +1,14 @@
 Changes
 =======
 
+**This file is the archive of releases up to 26.8.** From 26.9 onward:
+
+| Looking for | Go to |
+|---|---|
+| The full changelog of a version branch | [`CHANGELOG/`](CHANGELOG/) — one file per version branch, holding every release of that branch (`26.9.0rc1`, `26.9.0`, `26.9.1`, ...) |
+| A single release, in date order | [Releases](https://github.com/lablup/backend.ai/releases) — published automatically for every tag |
+| Which version branches are still maintained | [`.github/maintained-versions.yml`](.github/maintained-versions.yml) |
+
 <!--
     You should *NOT* be adding new change log entries to this file, this
     file is managed by towncrier. You *may* edit previous change logs to
