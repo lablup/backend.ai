@@ -23,6 +23,7 @@ Applies to every generated artifact — docs, code comments, BEPs, PR descriptio
 
 **Core Documents (Read directly):**
 - `tests/AGENTS.md` — Testing guidelines and strategies
+- `.github/AGENTS.md` — CI workflows and the helper scripts they call, in `.github/scripts/` and `scripts/`
 - `BUILDING.md` — Build system, quality enforcement, BUILD policies
 - `src/ai/backend/manager/models/alembic/README.md` — Alembic migration backport strategy
 - `README.md` — Project overview and architecture
