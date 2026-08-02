@@ -58,10 +58,15 @@ from .purger import (
 from .querier import (
     BatchQuerier,
     BatchQuerierResult,
+    BatchQueryOptions,
     Querier,
     QuerierResult,
     execute_batch_querier,
     execute_querier,
+)
+from .searcher import (
+    Searcher,
+    SearcherResult,
 )
 from .types import (
     CursorConditionFactory,
@@ -126,7 +131,11 @@ __all__ = [
     # BatchQuerier
     "BatchQuerier",
     "BatchQuerierResult",
+    "BatchQueryOptions",
     "execute_batch_querier",
+    # Searcher
+    "Searcher",
+    "SearcherResult",
     # Creator
     "CreatorSpec",
     "Creator",

@@ -39,6 +39,8 @@ from ai.backend.manager.repositories.base import (
     PurgerResult,
     Querier,
     QuerierResult,
+    Searcher,
+    SearcherResult,
     Updater,
     UpdaterResult,
     Upserter,
@@ -129,6 +131,49 @@ class ReadOps:
                 "use batch_query_in_global for an explicit unscoped global query."
             )
         return await execute_batch_querier(self._sess, query, querier, scopes)
+
+    async def search_with_scopes[TRow: Base, TData](
+        self,
+        scopes: Sequence[SearchScope],
+        searcher: Searcher[TRow, TData],
+    ) -> SearcherResult[TData]:
+        """Run a searcher restricted to the given scopes and return converted data.
+
+        Same scope rules as :meth:`batch_query_with_scopes`; the searcher carries its
+        own SELECT and row conversion, so no ORM row is returned to the caller.
+        """
+        if not scopes:
+            raise EmptySearchScopeError(
+                "search_with_scopes requires at least one scope; "
+                "use search_in_global for an explicit unscoped global search."
+            )
+        return await self._search(searcher, scopes)
+
+    async def search_in_global[TRow: Base, TData](
+        self,
+        searcher: Searcher[TRow, TData],
+    ) -> SearcherResult[TData]:
+        """Run a searcher across the entire table, with NO scope filter.
+
+        WARNING: carries the same authority requirement as
+        :meth:`batch_query_in_global` — superadmin-only endpoints or internal system
+        operations. For any request acting on behalf of a regular user, use
+        :meth:`search_with_scopes` instead.
+        """
+        return await self._search(searcher, ())
+
+    async def _search[TRow: Base, TData](
+        self,
+        searcher: Searcher[TRow, TData],
+        scopes: Sequence[SearchScope],
+    ) -> SearcherResult[TData]:
+        result = await execute_batch_querier(self._sess, searcher.build_select(), searcher, scopes)
+        return SearcherResult(
+            items=[searcher.to_data(row) for row in result.rows],
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
 
 class WriteOps(ReadOps):
