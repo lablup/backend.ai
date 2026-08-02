@@ -784,7 +784,7 @@ class PermissionDBSource:
     ) -> ScopeListResult:
         """Search all domains using BatchQuerier."""
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(DomainRow.name)
+            query = sa.select(DomainRow.id, DomainRow.name)
 
             result = await execute_batch_querier(
                 db_sess,
@@ -794,7 +794,7 @@ class PermissionDBSource:
 
             items = [
                 ScopeData(
-                    id=ScopeId(scope_type=LegacyScopeType.DOMAIN, scope_id=row.name),
+                    id=ScopeId(scope_type=LegacyScopeType.DOMAIN, scope_id=str(row.id)),
                     name=row.name,
                 )
                 for row in result.rows

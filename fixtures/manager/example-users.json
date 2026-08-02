@@ -1,6 +1,7 @@
 {
-  "domains": [
+    "domains": [
         {
+            "id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "name": "default",
             "description": "The default domain",
             "is_active": true,
@@ -86,7 +87,7 @@
             "domain_name": "default",
             "resource_policy": "default",
             "role": "superadmin",
-            "main_access_key" : null
+            "main_access_key": null
         },
         {
             "uuid": "4f13d193-f646-425a-a340-270c4d2b9860",
@@ -101,7 +102,7 @@
             "domain_name": "default",
             "resource_policy": "default",
             "role": "admin",
-            "main_access_key" : null
+            "main_access_key": null
         },
         {
             "uuid": "dfa9da54-4b28-432f-be29-c0d680c7a412",
@@ -116,7 +117,7 @@
             "domain_name": "default",
             "resource_policy": "default",
             "role": "user",
-            "main_access_key" : null
+            "main_access_key": null
         },
         {
             "uuid": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
@@ -131,7 +132,7 @@
             "domain_name": "default",
             "resource_policy": "default",
             "role": "user",
-            "main_access_key" : null
+            "main_access_key": null
         },
         {
             "uuid": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
@@ -146,7 +147,7 @@
             "domain_name": "default",
             "resource_policy": "default",
             "role": "monitor",
-            "main_access_key" : null
+            "main_access_key": null
         }
     ],
     "association_groups_users": [

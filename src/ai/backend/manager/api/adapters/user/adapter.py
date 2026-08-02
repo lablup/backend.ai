@@ -91,6 +91,7 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserStatus as UserStatusDTO,
 )
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import UserData, UserStatus
@@ -126,6 +127,7 @@ from ai.backend.manager.repositories.user.types import (
     RoleUserSearchScope,
 )
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
+from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
     CreateUserAction,
@@ -199,6 +201,12 @@ class UserAdapter(BaseAdapter):
     def __init__(self, processors: Processors, auth_config: AuthConfig) -> None:
         super().__init__(processors)
         self._auth_config = auth_config
+
+    async def _resolve_domain_id(self, domain_name: str) -> DomainID:
+        result = await self._processors.domain.get_domain.wait_for_complete(
+            GetDomainAction(domain_name=domain_name)
+        )
+        return result.data.id
 
     # ------------------------------------------------------------------ batch load (DataLoader)
 
@@ -428,8 +436,9 @@ class UserAdapter(BaseAdapter):
             integration_name=input.integration_name,
         )
         group_ids = [str(gid) for gid in input.group_ids] if input.group_ids else None
+        domain_id = await self._resolve_domain_id(spec.domain_name)
         result = await self._processors.user.create_user.wait_for_complete(
-            CreateUserAction(creator=Creator(spec=spec), group_ids=group_ids)
+            CreateUserAction(creator=Creator(spec=spec), _domain_id=domain_id, group_ids=group_ids)
         )
         return CreateUserPayload(
             user=self._user_data_to_node(result.data.user),

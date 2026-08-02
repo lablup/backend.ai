@@ -16,11 +16,13 @@ import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.types import EntityRef, ScopeRef
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import SlotName, VFolderID
@@ -47,6 +49,7 @@ from ai.backend.manager.errors.resource import (
     ProjectHasVFoldersMountedError,
     ProjectNotFound,
 )
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.group.row import (
@@ -143,6 +146,7 @@ class ProjectScopeCreation(ScopeCreation[GroupRow]):
     """Creates a project row under its domain, and the scope the project becomes."""
 
     spec: GroupCreatorSpec
+    domain_id: DomainID
 
     @override
     def creator(self) -> RBACEntityCreator[GroupRow]:
@@ -150,7 +154,7 @@ class ProjectScopeCreation(ScopeCreation[GroupRow]):
             spec=self.spec,
             element_type=RBACElementType.PROJECT,
             scope_ref=RBACElementRef(
-                element_type=RBACElementType.DOMAIN, element_id=self.spec.domain_name
+                element_type=RBACElementType.DOMAIN, element_id=str(self.domain_id)
             ),
         )
 
@@ -179,11 +183,24 @@ class GroupDBSource:
 
         Domain/resource-policy existence and name-uniqueness are enforced by the group
         row's DB constraints, mapped to domain errors via the spec's
-        integrity_error_checks.
+        integrity_error_checks. The domain scope is bound to the new project's virtual
+        scope so domain-scoped permissions reach the project's entities.
         """
-        creation = ProjectScopeCreation(spec=cast(GroupCreatorSpec, creator.spec))
+        spec = cast(GroupCreatorSpec, creator.spec)
         async with self._rbac_ops_provider.write_ops() as w:
-            return (await w.create_scope(creation)).row.to_data()
+            domain_id = await self._get_domain_id(w, spec.domain_name)
+            creation = ProjectScopeCreation(spec=spec, domain_id=domain_id)
+            domain_scope = ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=domain_id)
+            return (await w.create_scope(creation, bound_scope=domain_scope)).row.to_data()
+
+    async def _get_domain_id(self, w: RBACWriteOps, domain_name: str) -> DomainID:
+        result = await w.batch_query_in_global(
+            sa.select(DomainRow.id).where(DomainRow.name == domain_name),
+            BatchQuerier(pagination=NoPagination()),
+        )
+        if not result.rows:
+            raise DomainNotFound(f"Domain '{domain_name}' not found")
+        return DomainID(result.rows[0].id)
 
     async def modify_validated(
         self,
@@ -714,7 +731,8 @@ class GroupDBSource:
             )
 
     async def bind_user_to_project(self, user_id: UserID, project_id: ProjectID) -> None:
-        """Add a user to a project as a scope member (membership writes only).
+        """Add a user to a project as a scope member, granting the project's
+        ``auto_assign`` roles.
 
         Idempotent: adding an existing member is a no-op.
         """

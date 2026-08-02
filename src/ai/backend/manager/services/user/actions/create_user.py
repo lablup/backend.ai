@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import cast, override
 
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
@@ -29,6 +30,7 @@ __all__ = (
 @dataclass
 class CreateUserAction(UserScopeAction):
     creator: Creator[UserRow]  # spec: UserCreatorSpec
+    _domain_id: DomainID
     group_ids: list[str] | None = None
 
     @override
@@ -47,8 +49,7 @@ class CreateUserAction(UserScopeAction):
 
     @override
     def target_element(self) -> RBACElementRef:
-        spec = cast(UserCreatorSpec, self.creator.spec)
-        return RBACElementRef(RBACElementType.DOMAIN, spec.domain_name)
+        return RBACElementRef(RBACElementType.DOMAIN, str(self._domain_id))
 
 
 @dataclass

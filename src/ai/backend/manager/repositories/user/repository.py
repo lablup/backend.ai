@@ -110,10 +110,10 @@ class UserRepository:
 
     @user_repository_resilience.apply()
     async def assign_users_to_scope(
-        self, user_uuid: UserID, project_ids: Collection[ProjectID]
+        self, user_uuid: UserID, domain_name: str | None, project_ids: Collection[ProjectID]
     ) -> None:
-        """Grant the auto_assign roles of a new user's initial project scopes."""
-        await self._db_source.assign_users_to_scope(user_uuid, project_ids)
+        """Grant the auto_assign roles of a new user's initial domain/project scopes."""
+        await self._db_source.assign_users_to_scope(user_uuid, domain_name, project_ids)
 
     @user_repository_resilience.apply()
     async def assign_user_to_model_store(self, user_uuid: UserID, domain_name: str | None) -> None:

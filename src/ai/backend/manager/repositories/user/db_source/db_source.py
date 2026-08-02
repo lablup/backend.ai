@@ -16,9 +16,12 @@ from sqlalchemy.orm import joinedload, load_only, noload
 from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.exception import DomainNotFound
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey, VFolderID
@@ -95,6 +98,7 @@ from ai.backend.manager.repositories.base.creator import (
     Creator,
     execute_creator,
 )
+from ai.backend.manager.repositories.base.pagination import NoPagination
 from ai.backend.manager.repositories.base.purger import execute_batch_purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
@@ -124,6 +128,7 @@ from ai.backend.manager.repositories.keypair.types import (
 from ai.backend.manager.repositories.ops.rbac.provider import (
     EntityMembersAddition,
     RBACOpsProvider,
+    RBACWriteOps,
     ScopeUserMember,
 )
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
@@ -372,17 +377,26 @@ class UserDBSource:
     async def assign_users_to_scope(
         self,
         user_uuid: UserID,
+        domain_name: str | None,
         project_ids: Collection[ProjectID],
     ) -> None:
-        """Enroll a new user in its initial project scopes.
+        """Enroll a new user in its initial domain and project scopes.
 
-        Adds the user as an entity member of each project's virtual scope and
-        grants the scope's active auto_assign roles. Model-store membership is
-        handled separately by :meth:`assign_user_to_model_store`. Idempotent, so
-        it is safe to run after user creation. Domain-scope enrollment resumes
-        once domain RBAC rows are UUID-keyed.
+        Adds the user as an entity member of its domain's virtual scope and each
+        project's virtual scope, granting each scope's active auto_assign roles.
+        Model-store membership is handled separately by
+        :meth:`assign_user_to_model_store`. Idempotent, so it is safe to run
+        after user creation.
         """
         async with self._rbac_ops_provider.write_ops() as w:
+            if domain_name is not None:
+                domain_id = await self._get_domain_id(w, domain_name)
+                await w.add_entity_members(
+                    EntityMembersAddition(
+                        scope=ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=domain_id),
+                        members=[ScopeUserMember(user_id=user_uuid)],
+                    )
+                )
             for project_id in project_ids:
                 scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id)
                 await w.ensure_scope(scope)
@@ -408,8 +422,18 @@ class UserDBSource:
             )
         await self.assign_users_to_scope(
             user_uuid,
+            None,
             [ProjectID(pid) for pid in model_store_project_ids],
         )
+
+    async def _get_domain_id(self, w: RBACWriteOps, domain_name: str) -> DomainID:
+        result = await w.batch_query_in_global(
+            sa.select(DomainRow.id).where(DomainRow.name == domain_name),
+            BatchQuerier(pagination=NoPagination()),
+        )
+        if not result.rows:
+            raise DomainNotFound(f"Domain not found: {domain_name}")
+        return DomainID(result.rows[0].id)
 
     async def _get_model_store_project_ids(
         self, db_session: SASession, domain_name: str

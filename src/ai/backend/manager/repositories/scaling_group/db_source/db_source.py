@@ -9,6 +9,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ai.backend.common.data.permission.types import RBACElementType, RelationType
+from ai.backend.common.exception import DomainNotFound
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.data.agent.types import AgentStatus
@@ -21,6 +23,7 @@ from ai.backend.manager.data.scaling_group.types import (
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -61,6 +64,8 @@ from ai.backend.manager.repositories.base.updater import Updater, execute_update
 from ai.backend.manager.repositories.resource_slot.types import subtract_quantities
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession as SASession
+
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
@@ -83,6 +88,26 @@ class ScalingGroupDBSource:
         db: ExtendedAsyncSAEngine,
     ) -> None:
         self._db = db
+
+    async def _get_domain_id(self, session: SASession, domain_name: str) -> DomainID:
+        domain_id: DomainID | None = await session.scalar(
+            sa.select(DomainRow.id).where(DomainRow.name == domain_name)
+        )
+        if domain_id is None:
+            raise DomainNotFound(f"Domain '{domain_name}' not found")
+        return domain_id
+
+    async def _get_domain_ids_by_names(
+        self,
+        session: SASession,
+        domain_names: list[str],
+    ) -> dict[str, DomainID]:
+        if not domain_names:
+            return {}
+        rows = await session.execute(
+            sa.select(DomainRow.name, DomainRow.id).where(DomainRow.name.in_(domain_names))
+        )
+        return {row.name: row.id for row in rows}
 
     async def create_scaling_group(
         self,
@@ -497,6 +522,7 @@ class ScalingGroupDBSource:
         Returns the current list of allowed resource group names after the update.
         """
         async with self._db.begin_session_read_committed() as session:
+            domain_scope_id = str(await self._get_domain_id(session, domain_name))
             if remove:
                 await session.execute(
                     sa.delete(ScalingGroupForDomainRow).where(
@@ -508,7 +534,7 @@ class ScalingGroupDBSource:
                     sa.delete(AssociationScopesEntitiesRow).where(
                         AssociationScopesEntitiesRow.scope_type
                         == RBACElementType.DOMAIN.to_scope_type(),
-                        AssociationScopesEntitiesRow.scope_id == domain_name,
+                        AssociationScopesEntitiesRow.scope_id == domain_scope_id,
                         AssociationScopesEntitiesRow.entity_type
                         == RBACElementType.RESOURCE_GROUP.to_entity_type(),
                         AssociationScopesEntitiesRow.entity_id.in_(remove),
@@ -526,7 +552,7 @@ class ScalingGroupDBSource:
                         pg_insert(AssociationScopesEntitiesRow.__table__)
                         .values(
                             scope_type=RBACElementType.DOMAIN.to_scope_type(),
-                            scope_id=domain_name,
+                            scope_id=domain_scope_id,
                             entity_type=RBACElementType.RESOURCE_GROUP.to_entity_type(),
                             entity_id=rg_name,
                             relation_type=RelationType.AUTO,
@@ -607,6 +633,7 @@ class ScalingGroupDBSource:
         Returns the current list of allowed domain names after the update.
         """
         async with self._db.begin_session_read_committed() as session:
+            domain_ids_by_name = await self._get_domain_ids_by_names(session, [*add, *remove])
             if remove:
                 await session.execute(
                     sa.delete(ScalingGroupForDomainRow).where(
@@ -614,6 +641,9 @@ class ScalingGroupDBSource:
                         ScalingGroupForDomainRow.domain.in_(remove),
                     )
                 )
+                remove_scope_ids = [
+                    str(domain_ids_by_name[name]) for name in remove if name in domain_ids_by_name
+                ]
                 await session.execute(
                     sa.delete(AssociationScopesEntitiesRow).where(
                         AssociationScopesEntitiesRow.entity_type
@@ -621,12 +651,15 @@ class ScalingGroupDBSource:
                         AssociationScopesEntitiesRow.entity_id == resource_group_name,
                         AssociationScopesEntitiesRow.scope_type
                         == RBACElementType.DOMAIN.to_scope_type(),
-                        AssociationScopesEntitiesRow.scope_id.in_(remove),
+                        AssociationScopesEntitiesRow.scope_id.in_(remove_scope_ids),
                     )
                 )
 
             if add:
                 for domain_name in add:
+                    domain_id = domain_ids_by_name.get(domain_name)
+                    if domain_id is None:
+                        raise DomainNotFound(f"Domain '{domain_name}' not found")
                     await session.execute(
                         pg_insert(ScalingGroupForDomainRow.__table__)
                         .values(scaling_group=resource_group_name, domain=domain_name)
@@ -636,7 +669,7 @@ class ScalingGroupDBSource:
                         pg_insert(AssociationScopesEntitiesRow.__table__)
                         .values(
                             scope_type=RBACElementType.DOMAIN.to_scope_type(),
-                            scope_id=domain_name,
+                            scope_id=str(domain_id),
                             entity_type=RBACElementType.RESOURCE_GROUP.to_entity_type(),
                             entity_id=resource_group_name,
                             relation_type=RelationType.AUTO,

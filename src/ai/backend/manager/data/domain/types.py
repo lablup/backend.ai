@@ -43,7 +43,7 @@ class DomainData:
     def scope_id(self) -> ScopeId:
         return ScopeId(
             scope_type=ScopeType.DOMAIN,
-            scope_id=self.name,
+            scope_id=str(self.id),
         )
 
     def role_name(self) -> str:

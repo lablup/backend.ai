@@ -12,6 +12,7 @@ import pytest
 
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import ScalingGroupConflict
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, AgentSelectionStrategy, ResourceSlot, SessionTypes
 from ai.backend.manager.data.deployment.types import DeploymentOptions
@@ -477,6 +478,7 @@ class TestScalingGroupService:
         unbinder = ResourceGroupDomainEntityUnbinder(
             scaling_groups=["test-sgroup"],
             domain="test-domain",
+            domain_id=DomainID(uuid.uuid4()),
         )
         action = DisassociateScalingGroupWithDomainsAction(unbinder=unbinder)
         result = await scaling_group_service.disassociate_scaling_group_with_domains(action)

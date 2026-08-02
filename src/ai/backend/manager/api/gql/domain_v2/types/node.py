@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.domain.types import (
     DomainFairShareScopeDTO,
     DomainUsageScopeDTO,
 )
+from ai.backend.common.identifier.domain import DomainName
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -224,11 +225,9 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
             ProjectV2Edge,
             ProjectV2GQL,
         )
-        from ai.backend.manager.repositories.group.types import DomainProjectSearchScope
 
-        scope = DomainProjectSearchScope(domain_name=str(self.id))
-        payload = await info.context.adapters.project.search_by_domain(
-            scope=scope,
+        payload = await info.context.adapters.project.search_by_domain_name(
+            domain_name=DomainName(str(self.id)),
             input=AdminSearchProjectsInput(
                 filter=filter.to_pydantic() if filter else None,
                 order=[o.to_pydantic() for o in order_by] if order_by else None,

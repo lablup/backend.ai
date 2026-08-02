@@ -325,7 +325,12 @@ class TestDomainPurgersIntegration:
 
         async with db_with_cleanup.begin_session() as session:
             result = await execute_purger(
-                session, Purger(spec=DomainPurgerSpec(domain_name=domain_name))
+                session,
+                Purger(
+                    spec=DomainPurgerSpec(
+                        domain_name=domain_name, domain_id=sample_domain.domain_id
+                    )
+                ),
             )
             assert result is not None
             assert result.row.name == domain_name
@@ -350,7 +355,12 @@ class TestDomainPurgersIntegration:
         async with db_with_cleanup.begin_session() as session:
             with pytest.raises(DomainHasUsers):
                 await execute_purger(
-                    session, Purger(spec=DomainPurgerSpec(domain_name=domain_name))
+                    session,
+                    Purger(
+                        spec=DomainPurgerSpec(
+                            domain_name=domain_name, domain_id=sample_domain.domain_id
+                        )
+                    ),
                 )
 
         async with db_with_cleanup.begin_session() as session:
@@ -373,7 +383,12 @@ class TestDomainPurgersIntegration:
         async with db_with_cleanup.begin_session() as session:
             with pytest.raises(DomainHasGroups):
                 await execute_purger(
-                    session, Purger(spec=DomainPurgerSpec(domain_name=domain_name))
+                    session,
+                    Purger(
+                        spec=DomainPurgerSpec(
+                            domain_name=domain_name, domain_id=sample_domain.domain_id
+                        )
+                    ),
                 )
 
         async with db_with_cleanup.begin_session() as session:

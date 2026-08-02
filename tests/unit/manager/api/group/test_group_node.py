@@ -74,6 +74,11 @@ class TestCreateGroupMutation:
         ctx.processors.group.create_group.wait_for_complete = AsyncMock(
             return_value=CreateGroupActionResult(data=group_data_response, _domain_name="default")
         )
+        domain_data = MagicMock()
+        domain_data.id = uuid4()
+        ctx.processors.domain.get_domain.wait_for_complete = AsyncMock(
+            return_value=MagicMock(data=domain_data)
+        )
         # Required for privileged_mutation decorator
         ctx.user = {
             "role": UserRole.SUPERADMIN,

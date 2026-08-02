@@ -395,7 +395,7 @@ class RBACAdapter(BaseAdapter):
     def _validate_scope_id(self, scope_type: RBACElementType, scope_id: str) -> None:
         """Raise InvalidScope if scope_id is not a valid UUID for scope types that require one."""
         match scope_type:
-            case RBACElementType.USER | RBACElementType.PROJECT:
+            case RBACElementType.USER | RBACElementType.PROJECT | RBACElementType.DOMAIN:
                 try:
                     uuid.UUID(scope_id)
                 except ValueError:

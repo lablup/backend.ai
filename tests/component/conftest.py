@@ -550,7 +550,7 @@ async def database_engine(
 async def domain_fixture(
     db_engine: SAEngine,
 ) -> AsyncIterator[DomainFixtureData]:
-    """Insert a test domain and yield its identifiers."""
+    """Insert a test domain with its virtual scope and yield its identifiers."""
     domain_name = f"domain-{secrets.token_hex(6)}"
     async with db_engine.begin() as conn:
         result = await conn.execute(
@@ -565,8 +565,38 @@ async def domain_fixture(
             .returning(domains.c.id, domains.c.name)
         )
         row = result.one()
+        virtual_scope_id = uuid.uuid4()
+        await conn.execute(
+            sa.insert(VirtualScopeRow.__table__).values(
+                id=virtual_scope_id,
+                scope_type=ScopeType.DOMAIN,
+                scope_id=row.id,
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                entity_type=EntityType.DOMAIN,
+                entity_id=row.id,
+                permission_cap=None,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                scope_type=ScopeType.DOMAIN,
+                scope_id=row.id,
+                permission_cap=None,
+            )
+        )
     yield DomainFixtureData(domain_name=row.name, domain_id=row.id)
     async with db_engine.begin() as conn:
+        await conn.execute(
+            VirtualScopeRow.__table__.delete().where(
+                VirtualScopeRow.__table__.c.scope_type == ScopeType.DOMAIN,
+                VirtualScopeRow.__table__.c.scope_id == row.id,
+            )
+        )
         await conn.execute(domains.delete().where(domains.c.name == domain_name))
 
 

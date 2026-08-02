@@ -6,12 +6,16 @@ from typing import override
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.resource import DomainHasGroups, DomainHasUsers
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.repositories.base.purger import BatchPurgerSpec, PurgerSpec
+from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
+from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurgerSpec
 from ai.backend.manager.repositories.base.types import ConflictCheck
 
 
@@ -46,10 +50,11 @@ class DomainBatchPurgerSpec(BatchPurgerSpec[DomainRow]):
 
 
 @dataclass
-class DomainPurgerSpec(PurgerSpec[DomainRow]):
-    """PurgerSpec for purging a single domain."""
+class DomainPurgerSpec(RBACEntityPurgerSpec[DomainRow]):
+    """PurgerSpec for purging a single domain with its RBAC entries."""
 
     domain_name: str
+    domain_id: DomainID
 
     @override
     def row_class(self) -> type[DomainRow]:
@@ -58,6 +63,17 @@ class DomainPurgerSpec(PurgerSpec[DomainRow]):
     @override
     def pk_value(self) -> str:
         return self.domain_name
+
+    @override
+    def element_type(self) -> RBACElementType:
+        return RBACElementType.DOMAIN
+
+    @override
+    def entity_ref(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType.DOMAIN,
+            element_id=str(self.domain_id),
+        )
 
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:
