@@ -1,6 +1,8 @@
 """Deployment service for managing model deployments."""
 
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import cast
 from uuid import UUID
@@ -446,6 +448,36 @@ class DeploymentService:
 
     # ========== Deployment CRUD ==========
 
+    @asynccontextmanager
+    async def _teardown_on_revision_failure(
+        self, deployment_id: DeploymentID
+    ) -> AsyncIterator[None]:
+        """Tear the just-created endpoint down when its first revision fails.
+
+        Endpoint creation and revision creation commit separately, and only
+        ``activate_revision`` moves the endpoint out of ``PENDING``. A failure
+        in between would otherwise leave a ``PENDING`` endpoint with no
+        revision, which no lifecycle handler targets — invisible to the
+        coordinator and stuck forever.
+
+        Marking the endpoint ``DESTROYING`` hands it to the destroying handler,
+        which always ends at ``DESTROYED`` even with no revision and no routes.
+        A failure to tear down is logged and never masks the original error,
+        which is what the caller needs to see.
+        """
+        try:
+            yield
+        except Exception:
+            try:
+                await self._deployment_controller.destroy_deployment(deployment_id)
+            except Exception:
+                log.exception(
+                    "Failed to tear down deployment {} after its revision could not be created; "
+                    "it is left behind with no revision",
+                    deployment_id,
+                )
+            raise
+
     async def create_deployment(
         self, action: CreateDeploymentAction
     ) -> CreateDeploymentActionResult:
@@ -460,12 +492,13 @@ class DeploymentService:
         log.info("Creating deployment with name: {}", action.creator.metadata.name)
         deployment_info = await self._deployment_controller.create_deployment(action.creator)
         if action.creator.model_revision is not None:
-            await self._deployment_controller.add_deployment_revision(
-                deployment_id=DeploymentID(deployment_info.id),
-                revision=action.creator.model_revision,
-                requester_id=action.creator.metadata.created_user,
-                auto_activate=action.auto_activate,
-            )
+            async with self._teardown_on_revision_failure(DeploymentID(deployment_info.id)):
+                await self._deployment_controller.add_deployment_revision(
+                    deployment_id=DeploymentID(deployment_info.id),
+                    revision=action.creator.model_revision,
+                    requester_id=action.creator.metadata.created_user,
+                    auto_activate=action.auto_activate,
+                )
         updated_deployment_info = await self._deployment_repository.get_endpoint_info(
             deployment_info.id
         )
@@ -489,12 +522,13 @@ class DeploymentService:
             action.draft
         )
         deployment_info = await self._deployment_controller.create_deployment(creator)
-        await self._deployment_controller.add_deployment_revision(
-            deployment_id=DeploymentID(deployment_info.id),
-            revision=revision,
-            requester_id=creator.metadata.created_user,
-            auto_activate=True,
-        )
+        async with self._teardown_on_revision_failure(DeploymentID(deployment_info.id)):
+            await self._deployment_controller.add_deployment_revision(
+                deployment_id=DeploymentID(deployment_info.id),
+                revision=revision,
+                requester_id=creator.metadata.created_user,
+                auto_activate=True,
+            )
         # Legacy (REST v1) create re-reads through the *legacy* getter so the
         # response carries the eagerly-loaded current/deploying revision data.
         # The modern ``get_endpoint_info`` returns revision *ids* only, which
