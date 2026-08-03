@@ -8,9 +8,11 @@ from uuid import uuid4
 import pytest
 from yarl import URL
 
+from ai.backend.client.v2.auth import NoAuth
 from ai.backend.client.v2.base_client import BackendAIAnonymousClient, BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains_v2.app_config import V2AppConfigClient
+from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.dto.manager.v2.app_config.request import (
     MyGetAppConfigsInput,
@@ -159,3 +161,26 @@ class TestMergedRead:
 
         headers = mock_session.request.call_args[1]["headers"]
         assert ("Authorization" in headers) is case.signed
+
+
+class TestPreLoginCaller:
+    async def test_a_caller_holding_no_credentials_can_make_the_public_read(
+        self,
+        mock_session: MagicMock,
+    ) -> None:
+        """The pre-login case end to end: build the registry with no keypair and read.
+
+        ``NoAuth`` is what a caller has before it holds any credentials, so reaching the
+        public read through the registry with it is the contract this endpoint exists for.
+        """
+        registry = V2ClientRegistry(
+            BackendAIAuthClient(_DEFAULT_CONFIG, NoAuth(), mock_session),
+            BackendAIAnonymousClient(_DEFAULT_CONFIG, mock_session),
+        )
+
+        result = await registry.app_config.public_get_app_configs(
+            PublicGetAppConfigsInput(config_names=["theme", "menu"])
+        )
+
+        assert "Authorization" not in mock_session.request.call_args[1]["headers"]
+        assert [node.config_name for node in result.app_configs] == ["theme", "menu"]
