@@ -151,13 +151,8 @@ class AppConfigFragmentConditions:
         return inner
 
     @staticmethod
-    def by_domain_visibility(domain_id: DomainID | sa.ScalarSelect[DomainID]) -> QueryCondition:
-        """The ``domain`` scope for ``domain_id``.
-
-        Accepts a scalar subquery as well as a literal id, so a caller that only knows the
-        principal can derive the domain in the same statement (see
-        ``models.user.conditions.domain_id_of_user``).
-        """
+    def by_domain_visibility(domain_id: DomainID) -> QueryCondition:
+        """The ``domain`` scope for ``domain_id``."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.and_(

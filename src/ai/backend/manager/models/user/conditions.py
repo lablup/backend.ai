@@ -10,8 +10,6 @@ from sqlalchemy.dialects import postgresql
 
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import (
@@ -23,28 +21,7 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.user import UserRow
 
-__all__ = (
-    "UserConditions",
-    "domain_id_of_user",
-)
-
-
-def domain_id_of_user(user_id: UserID) -> sa.ScalarSelect[DomainID]:
-    """The id of the domain ``user_id`` belongs to, as a scalar subquery.
-
-    A user names its domain by name, so any filter keyed off the domain id needs the
-    lookup. Inlining it as a subquery keeps that off a separate round trip; the subquery
-    is uncorrelated, so it is evaluated once per statement.
-
-    Yields SQL ``NULL`` when the user does not exist, which makes an equality comparison
-    against it match nothing.
-    """
-    return (
-        sa.select(DomainRow.id)
-        .join(UserRow, UserRow.domain_name == DomainRow.name)
-        .where(UserRow.uuid == user_id)
-        .scalar_subquery()
-    )
+__all__ = ("UserConditions",)
 
 
 class UserConditions:
