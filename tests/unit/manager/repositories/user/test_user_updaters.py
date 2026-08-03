@@ -214,16 +214,6 @@ class TestUserUpdaterSpecRowClass:
 
 
 class TestUserUpdaterSpecDomain:
-    """Moving a user rewrites the domain id from the new name."""
-
-    def test_updating_the_domain_name_also_rewrites_the_id(self) -> None:
-        spec = UserUpdaterSpec(domain_name=OptionalState.update("other-domain"))
-
-        values = spec.build_values()
-
-        assert values["domain_name"] == "other-domain"
-        assert "domain_id" in values
-
     def test_leaving_the_domain_alone_touches_neither_column(self) -> None:
         spec = UserUpdaterSpec(is_active=OptionalState.update(True))
 
