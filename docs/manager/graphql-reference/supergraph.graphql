@@ -21685,6 +21685,11 @@ input UpdateUserV2Input
   """New domain assignment."""
   domainName: String
 
+  """
+  Added in 26.9.0. New domain assignment, by id. Mutually exclusive with `domain_name`.
+  """
+  domainId: UUID
+
   """New project (group) assignments. Replaces existing assignments."""
   groupIds: [UUID!]
 

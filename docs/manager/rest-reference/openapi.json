@@ -30335,8 +30335,22 @@
               }
             ],
             "default": null,
-            "description": "New domain assignment.",
+            "description": "New domain assignment, by name. Deprecated: use `domain_id`.",
             "title": "Domain Name"
+          },
+          "domain_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "New domain assignment, by id. Mutually exclusive with `domain_name`.",
+            "title": "Domain Id"
           },
           "group_ids": {
             "anyOf": [
@@ -33317,8 +33331,22 @@
               }
             ],
             "default": null,
-            "description": "Updated domain name",
+            "description": "Updated domain, by name. Deprecated: use domain_id",
             "title": "Domain Name"
+          },
+          "domain_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Updated domain, by id. Mutually exclusive with domain_name",
+            "title": "Domain Id"
           },
           "allowed_client_ip": {
             "anyOf": [
