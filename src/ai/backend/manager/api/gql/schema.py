@@ -21,6 +21,10 @@ from .agent import (
     agent_stats,
     agents_v2,
 )
+from .app_config import (
+    my_app_configs,
+    public_app_configs,
+)
 from .app_config_allow_list import (
     admin_app_config_allow_list,
     admin_app_config_allow_lists,
@@ -544,6 +548,7 @@ class Query:
     scoped_idle_checker_assignments = scoped_idle_checker_assignments
     scoped_app_config_fragments_by_names = scoped_app_config_fragments_by_names
     my_app_config_fragments_by_names = my_app_config_fragments_by_names
+    my_app_configs = my_app_configs
     artifact = artifact
     artifacts = artifacts
     artifact_revision = artifact_revision
@@ -1099,6 +1104,7 @@ class PublicQueries:
     """
 
     ping = ping
+    public_app_configs = public_app_configs
 
 
 # A subgraph of the same supergraph as `schema`, kept separate only so that its routing URL
