@@ -107,6 +107,7 @@ Check options with `--help`.
 - **app-config**: user(get-domain, get-user, get-merged, delete-domain, delete-user)
 - **app-config-definition**: admin(create, get, search, purge)
 - **app-config-allow-list**: admin(create, get, search, update, purge)
+- **app-config-fragment**: user(get, update, purge, bulk-purge) · my(get, update) · admin(search)
 - **idle-checker**: admin(create, search, update, purge)
 - **export**: admin(list-reports, get-report, audit-logs, keypairs, projects, sessions, sessions-by-project, users, users-by-domain) · my(keypairs, sessions)
 
