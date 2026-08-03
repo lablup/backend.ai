@@ -4932,8 +4932,13 @@ input CreateUserV2Input
   """Initial password for the user."""
   password: String!
 
-  """Domain to assign the user to."""
-  domainName: String!
+  """Domain to assign the user to, by name."""
+  domainName: String = null
+
+  """
+  Added in 26.9.0. Domain to assign the user to, by id. Mutually exclusive with `domain_name`.
+  """
+  domainId: UUID = null
 
   """If true, user must change password on first login."""
   needPasswordChange: Boolean!

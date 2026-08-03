@@ -30077,9 +30077,31 @@
             "type": "string"
           },
           "domain_name": {
-            "description": "Domain to assign the user to.",
-            "title": "Domain Name",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Domain to assign the user to, by name. Deprecated: use `domain_id`.",
+            "title": "Domain Name"
+          },
+          "domain_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Domain to assign the user to, by id. Mutually exclusive with `domain_name`.",
+            "title": "Domain Id"
           },
           "need_password_change": {
             "default": false,
@@ -30233,7 +30255,6 @@
           "email",
           "username",
           "password",
-          "domain_name",
           "status",
           "role"
         ],
@@ -33052,9 +33073,31 @@
             "type": "boolean"
           },
           "domain_name": {
-            "description": "Domain the user belongs to",
-            "title": "Domain Name",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Domain the user belongs to, by name. Deprecated: use domain_id",
+            "title": "Domain Name"
+          },
+          "domain_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Domain the user belongs to, by id. Mutually exclusive with domain_name",
+            "title": "Domain Id"
           },
           "full_name": {
             "anyOf": [
@@ -33223,8 +33266,7 @@
         "required": [
           "email",
           "username",
-          "password",
-          "domain_name"
+          "password"
         ],
         "title": "CreateUserRequest",
         "type": "object"
