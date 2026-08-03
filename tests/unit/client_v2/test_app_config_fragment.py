@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 from yarl import URL
@@ -39,12 +39,12 @@ _USER_SCOPE_ID = uuid4()
 
 
 @pytest.fixture
-def fragment_id() -> UUID:
-    return uuid4()
+def fragment_id() -> AppConfigFragmentID:
+    return AppConfigFragmentID(uuid4())
 
 
 @pytest.fixture
-def node_payload(fragment_id: UUID) -> dict[str, Any]:
+def node_payload(fragment_id: AppConfigFragmentID) -> dict[str, Any]:
     """One fragment as the server sends it, for a ``theme`` fragment at a user scope."""
     return {
         "id": str(fragment_id),
@@ -194,7 +194,7 @@ class TestGet:
         mock_session: MagicMock,
         mock_response: AsyncMock,
         node_payload: dict[str, Any],
-        fragment_id: UUID,
+        fragment_id: AppConfigFragmentID,
     ) -> None:
         mock_response.json = AsyncMock(return_value=node_payload)
 
@@ -213,7 +213,7 @@ class TestPurge:
         client: V2AppConfigFragmentClient,
         mock_session: MagicMock,
         mock_response: AsyncMock,
-        fragment_id: UUID,
+        fragment_id: AppConfigFragmentID,
     ) -> None:
         mock_response.json = AsyncMock(return_value={"id": str(fragment_id)})
 
@@ -223,7 +223,7 @@ class TestPurge:
         assert call_args[0][0] == "DELETE"
         assert str(call_args[0][1]).endswith(f"/v2/app-config-fragments/{fragment_id}")
         assert isinstance(result, PurgeAppConfigFragmentPayload)
-        assert result.id == AppConfigFragmentID(fragment_id)
+        assert result.id == fragment_id
 
 
 class TestBulkPurge:
@@ -232,9 +232,9 @@ class TestBulkPurge:
         client: V2AppConfigFragmentClient,
         mock_session: MagicMock,
         mock_response: AsyncMock,
-        fragment_id: UUID,
+        fragment_id: AppConfigFragmentID,
     ) -> None:
-        missing_id = uuid4()
+        missing_id = AppConfigFragmentID(uuid4())
         mock_response.json = AsyncMock(
             return_value={
                 "items": [str(fragment_id)],
@@ -243,17 +243,15 @@ class TestBulkPurge:
         )
 
         result = await client.bulk_purge(
-            BulkPurgeAppConfigFragmentInput(
-                ids=[AppConfigFragmentID(fragment_id), AppConfigFragmentID(missing_id)]
-            )
+            BulkPurgeAppConfigFragmentInput(ids=[fragment_id, missing_id])
         )
 
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "POST"
         assert str(call_args[0][1]).endswith("/v2/app-config-fragments/bulk-delete")
         assert isinstance(result, BulkPurgeAppConfigFragmentPayload)
-        assert result.items == [AppConfigFragmentID(fragment_id)]
-        assert [item.id for item in result.failed] == [AppConfigFragmentID(missing_id)]
+        assert result.items == [fragment_id]
+        assert [item.id for item in result.failed] == [missing_id]
 
 
 class TestAdminSearch:

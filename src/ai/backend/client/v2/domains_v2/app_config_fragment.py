@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from typing import Final
-from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
@@ -22,6 +21,7 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     SearchAppConfigFragmentPayload,
     UpsertAppConfigFragmentsPayload,
 )
+from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 
 _PATH: Final = "/v2/app-config-fragments"
 
@@ -87,7 +87,7 @@ class V2AppConfigFragmentClient(BaseDomainClient):
             response_model=UpsertAppConfigFragmentsPayload,
         )
 
-    async def get(self, app_config_fragment_id: UUID) -> AppConfigFragmentNode:
+    async def get(self, app_config_fragment_id: AppConfigFragmentID) -> AppConfigFragmentNode:
         """Get a single fragment by id."""
         return await self._client.typed_request(
             "GET",
@@ -95,7 +95,9 @@ class V2AppConfigFragmentClient(BaseDomainClient):
             response_model=AppConfigFragmentNode,
         )
 
-    async def purge(self, app_config_fragment_id: UUID) -> PurgeAppConfigFragmentPayload:
+    async def purge(
+        self, app_config_fragment_id: AppConfigFragmentID
+    ) -> PurgeAppConfigFragmentPayload:
         """Purge a single fragment by id."""
         return await self._client.typed_request(
             "DELETE",
