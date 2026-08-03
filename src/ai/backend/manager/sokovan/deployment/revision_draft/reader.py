@@ -37,6 +37,10 @@ if TYPE_CHECKING:
 
 __all__ = ("RevisionDraftReader",)
 
+# Fallback identifier for the single model entry when no layer in the merge
+# chain names one. Matches the conventional single-model definition.
+_DEFAULT_MODEL_NAME = "model"
+
 
 class RevisionDraftReader:
     """Fan out the DB + storage reads that feed the revision merge chain.
@@ -146,9 +150,23 @@ class RevisionDraftReader:
         self,
         mounts: MountMetadata,
     ) -> RevisionDraft:
-        """Build the lowest-priority model_path default draft."""
+        """Build the lowest-priority ``name`` / ``model_path`` default draft.
+
+        Both fields are required by the strict :class:`ModelConfig` that
+        ``to_resolved()`` produces at the persistence boundary, so this draft
+        supplies both. Without the ``name`` default, a variant whose
+        ``default_model_definition`` is empty — which is every variant created
+        through the API, since the write path does not expose the field — makes
+        every revision on it unresolvable. Any layer above (variant baseline,
+        preset, vfolder yaml, request) overrides these.
+        """
         model_definition = ModelDefinitionDraft(
-            models=[ModelConfigDraft(model_path=mounts.model_mount_destination)]
+            models=[
+                ModelConfigDraft(
+                    name=_DEFAULT_MODEL_NAME,
+                    model_path=mounts.model_mount_destination,
+                )
+            ]
         )
         return RevisionDraft(mounts=mounts, model_definition=model_definition)
 
