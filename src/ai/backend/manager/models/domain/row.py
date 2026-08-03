@@ -140,8 +140,6 @@ class DomainRow(CreatedAtMixin, Base):  # type: ignore[misc]
         back_populates="domain",
         foreign_keys="[SessionRow.domain_name]",
     )
-    # users now holds two foreign keys into this table, so the name-based one has to be
-    # named explicitly. See BA-7158.
     users: Mapped[list[UserRow]] = relationship(
         "UserRow",
         back_populates="domain",

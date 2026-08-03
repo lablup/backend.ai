@@ -1,12 +1,8 @@
 """add domain_id to users
 
-``users`` referenced its domain by name while almost everything that filters by
-domain keys off the id — RBAC scopes, app config fragment scopes, session and
-deployment scheduling — so every path starting from a user had to convert the
-name into an id. This adds the id alongside the name and backfills it.
-
-``domain_name`` stays for now: readers move over separately, and whether the
-name is still worth denormalizing is decided once they have.
+``users`` referenced its domain by name while nearly everything that filters by
+domain keys off the id, so every path starting from a user converted the name.
+Adds the id alongside the name and backfills it; ``domain_name`` stays.
 
 Idempotent: the column is added only if absent, and the backfill only touches
 rows whose ``domain_id`` is still NULL.

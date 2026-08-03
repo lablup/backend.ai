@@ -28,7 +28,6 @@ class UserData:
     role: UserRole
     domain_name: str
     domain_id: DomainID
-    """The id of ``domain_name``, read straight off ``users`` — no name-to-id conversion."""
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:

@@ -200,7 +200,7 @@ class UserRow(Base):  # type: ignore[misc]
         index=True,
         nullable=True,
     )
-    """Deprecated: use ``domain_id``. Readers move over in BA-7158."""
+    """Deprecated: use ``domain_id``."""
     domain_id: Mapped[DomainID | None] = mapped_column(
         "domain_id",
         GUID,
@@ -208,7 +208,6 @@ class UserRow(Base):  # type: ignore[misc]
         index=True,
         nullable=True,
     )
-    """The id of ``domain_name``, written from it on every write."""
     role: Mapped[UserRole | None] = mapped_column(
         "role", EnumValueType(UserRole), default=UserRole.USER, nullable=True
     )

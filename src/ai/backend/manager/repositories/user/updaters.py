@@ -62,7 +62,6 @@ class UserUpdaterSpec(UpdaterSpec[UserRow]):
         self.is_active.update_dict(to_update, "is_active")
         self.domain_name.update_dict(to_update, "domain_name")
         if "domain_name" in to_update:
-            # Rewritten from the new name in the same UPDATE, so the two cannot drift.
             to_update["domain_id"] = (
                 sa.select(DomainRow.id)
                 .where(DomainRow.name == to_update["domain_name"])
