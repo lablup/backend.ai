@@ -104,7 +104,7 @@ Check options with `--help`.
 - **notification**: sub channel(get, search, delete), rule(get, search, delete)
 - **prometheus-query-definition**: user(get, search, execute) · admin(create, update, delete, preview)
 - **prometheus-query-definition-category**: user(get, search) · admin(create, delete)
-- **app-config**: my(get) · public(get) — the merged view; the `public` one needs no credentials
+- **app-config**: my(get) · public(get) — the merged view; `public` is an app-config-only group for the pre-login read, needing no credentials
 - **app-config-definition**: admin(create, get, search, purge)
 - **app-config-allow-list**: admin(create, get, search, update, purge)
 - **app-config-fragment**: user(get, update, purge, bulk-purge) · my(get, update) · admin(search)
@@ -155,12 +155,11 @@ The configuration is stored in `~/.backend.ai/config.toml` and `credentials.toml
 ## Command pattern
 
 ```
-./bai [admin|my|public] {entity} [{sub-entity}] {command} [options]
+./bai [admin|my] {entity} [{sub-entity}] {command} [options]
 ```
 
 - `admin` — superadmin-only operations
 - `my` — self-service (the current user's own resources)
-- `public` — anonymous operations, usable with no credentials configured
 - Entity names are **singular** (domain, user, agent)
 - A sub-entity is a Click sub-group (revision, channel, role, etc.)
 
