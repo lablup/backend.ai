@@ -1,28 +1,31 @@
 from __future__ import annotations
 
-import uuid
 from typing import ClassVar
 
-from sqlalchemy.sql.expression import SQLColumnExpression
+from sqlalchemy.orm import Mapped, declared_attr, synonym
 
 from ai.backend.common.data.entity.types import ScopeType
+from ai.backend.common.identifier.scope import ScopeID
 
 
 class ScopeRowMixin:
     """Marks a Row as an RBAC scope source.
 
-    Declares only the schema metadata needed to query the row as a scope —
-    query builders stay in the repositories layer.
+    Adds ``scope_id`` / ``scope_name`` synonyms for the columns named by
+    ``__scope_id_column__`` / ``__scope_name_column__``, so scope rows are
+    queried uniformly regardless of their own column names.
     """
 
     __scope_type__: ClassVar[ScopeType]
+    __scope_id_column__: ClassVar[str] = "id"
+    __scope_name_column__: ClassVar[str] = "name"
 
-    @classmethod
-    def scope_id_expr(cls) -> SQLColumnExpression[uuid.UUID]:
+    @declared_attr
+    def scope_id(cls) -> Mapped[ScopeID]:
         """Column whose value is used as ``ScopeRef.scope_id``."""
-        raise NotImplementedError
+        return synonym(cls.__scope_id_column__)
 
-    @classmethod
-    def scope_name_expr(cls) -> SQLColumnExpression[str]:
-        """Expression rendering the scope's display name."""
-        raise NotImplementedError
+    @declared_attr
+    def scope_name(cls) -> Mapped[str]:
+        """Column rendering the scope's display name."""
+        return synonym(cls.__scope_name_column__)

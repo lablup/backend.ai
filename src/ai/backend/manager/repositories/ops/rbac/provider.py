@@ -244,9 +244,9 @@ class RBACWriteOps(WriteOps):
             selects.append(
                 sa.select(
                     sa.literal(str(scope_type)),
-                    row_cls.scope_id_expr(),
-                    row_cls.scope_name_expr(),
-                ).where(row_cls.scope_id_expr().in_(ids))
+                    row_cls.scope_id,
+                    row_cls.scope_name,
+                ).where(row_cls.scope_id.in_(ids))
             )
         if selects:
             result = await self._sess.execute(sa.union_all(*selects))

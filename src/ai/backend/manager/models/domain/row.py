@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import uuid
 from collections.abc import Container, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -19,7 +18,6 @@ from sqlalchemy.engine import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship
-from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common import msgpack
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
@@ -154,16 +152,6 @@ class DomainRow(ScopeRowMixin, CreatedAtMixin, Base):  # type: ignore[misc]
         back_populates="domain_row",
         primaryjoin=_get_network_join_condition,
     )
-
-    @override
-    @classmethod
-    def scope_id_expr(cls) -> SQLColumnExpression[uuid.UUID]:
-        return cls.id
-
-    @override
-    @classmethod
-    def scope_name_expr(cls) -> SQLColumnExpression[str]:
-        return cls.name
 
     def to_data(self) -> DomainData:
         return row_to_data(self)
