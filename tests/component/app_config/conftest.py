@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-import uuid
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
-from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.manager.api.adapters.app_config.adapter import AppConfigAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -60,7 +59,7 @@ def server_module_registries(
 
 @pytest.fixture()
 async def merged_fragments(
-    db_engine: SAEngine,
+    database_engine: ExtendedAsyncSAEngine,
     regular_user_fixture: UserFixtureData,
 ) -> AsyncIterator[None]:
     """Registers two config names, each named after the role it plays in the tests.
@@ -70,46 +69,40 @@ async def merged_fragments(
     anywhere, standing for a requested name nothing merges into.
     """
     config_names = ["contributed", "uncontributed"]
-    async with db_engine.begin() as conn:
-        await conn.execute(
-            sa.insert(AppConfigDefinitionRow.__table__).values([
-                {"config_name": config_name} for config_name in config_names
-            ])
-        )
-        await conn.execute(
-            sa.insert(AppConfigAllowListRow.__table__).values([
-                {
-                    "config_name": config_name,
-                    "scope_type": scope_type,
-                    "rank": scope_type.default_rank(),
-                }
-                for config_name in config_names
-                for scope_type in AppConfigScopeType
-            ])
-        )
-        await conn.execute(
-            sa.insert(AppConfigFragmentRow.__table__).values([
-                {
-                    "id": uuid.uuid4(),
-                    "config_name": "contributed",
-                    "scope_type": AppConfigScopeType.PUBLIC,
-                    "scope_id": None,
-                    "config": {"mode": "light", "lang": "en"},
-                },
-                {
-                    "id": uuid.uuid4(),
-                    "config_name": "contributed",
-                    "scope_type": AppConfigScopeType.USER,
-                    "scope_id": regular_user_fixture.user_uuid,
-                    "config": {"mode": "dark"},
-                },
-            ])
-        )
+    async with database_engine.begin_session() as sess:
+        sess.add_all([
+            AppConfigDefinitionRow(config_name=config_name) for config_name in config_names
+        ])
+        await sess.flush()
+        sess.add_all([
+            AppConfigAllowListRow(
+                config_name=config_name,
+                scope_type=scope_type,
+                rank=scope_type.default_rank(),
+            )
+            for config_name in config_names
+            for scope_type in AppConfigScopeType
+        ])
+        await sess.flush()
+        sess.add_all([
+            AppConfigFragmentRow(
+                config_name="contributed",
+                scope_type=AppConfigScopeType.PUBLIC,
+                scope_id=None,
+                config={"mode": "light", "lang": "en"},
+            ),
+            AppConfigFragmentRow(
+                config_name="contributed",
+                scope_type=AppConfigScopeType.USER,
+                scope_id=AppConfigScopeID(regular_user_fixture.user_uuid),
+                config={"mode": "dark"},
+            ),
+        ])
     yield
     # The definition cascades to its allow-list entries and their fragments.
-    async with db_engine.begin() as conn:
-        await conn.execute(
-            AppConfigDefinitionRow.__table__.delete().where(
-                AppConfigDefinitionRow.__table__.c.config_name.in_(config_names)
+    async with database_engine.begin_session() as sess:
+        await sess.execute(
+            sa.delete(AppConfigDefinitionRow).where(
+                AppConfigDefinitionRow.config_name.in_(config_names)
             )
         )
