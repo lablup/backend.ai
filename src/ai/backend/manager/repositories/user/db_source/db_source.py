@@ -849,7 +849,7 @@ class UserDBSource:
                 sa.select(VFolderRow).where(
                     sa.and_(
                         VFolderRow.user == user_uuid,
-                        VFolderRow.status.in_(vfolder_status_map[VFolderStatusSet.DELETABLE]),
+                        VFolderRow.status.in_(vfolder_status_map[VFolderStatusSet.OWNER_PURGABLE]),
                     )
                 ),
             )

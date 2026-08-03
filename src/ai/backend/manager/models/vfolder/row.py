@@ -181,6 +181,12 @@ class VFolderStatusSet(enum.StrEnum):
     INACCESSIBLE = "inaccessible"
     """Represents VFolder which is now completely removed from storage and only its record is being kept"""
 
+    OWNER_PURGABLE = "owner-purgable"
+    """Represents VFolder whose storage payload must be reclaimed when its owning
+    user or group is purged. Unlike DELETABLE, this includes folders in the trash
+    bin and folders whose previous deletion stalled or failed, since the owner row
+    is removed right after and any skipped folder becomes a permanent orphan."""
+
 
 vfolder_status_map: Final[dict[VFolderStatusSet, set[VFolderOperationStatus]]] = {
     VFolderStatusSet.ALL: {
@@ -227,6 +233,14 @@ vfolder_status_map: Final[dict[VFolderStatusSet, set[VFolderOperationStatus]]] =
     },
     VFolderStatusSet.INACCESSIBLE: {
         VFolderOperationStatus.DELETE_COMPLETE,
+    },
+    # DELETE_COMPLETE is excluded: its storage payload is already gone, so there
+    # is nothing left to reclaim on owner purge.
+    VFolderStatusSet.OWNER_PURGABLE: {
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.DELETE_PENDING,
+        VFolderOperationStatus.DELETE_ONGOING,
+        VFolderOperationStatus.DELETE_ERROR,
     },
 }
 
