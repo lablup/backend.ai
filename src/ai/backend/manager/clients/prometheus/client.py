@@ -147,6 +147,7 @@ class PrometheusClient:
         preset = MetricPreset(
             template=query_template,
             labels={"session_id": LabelMatcher.regex(session_id_pattern)},
+            group_by={"session_id"},
             window=time_window,
         )
         return await self._query_instant(preset, time=evaluation_time)
