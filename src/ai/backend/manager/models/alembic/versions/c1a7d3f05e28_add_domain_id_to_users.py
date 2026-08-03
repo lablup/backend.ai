@@ -5,7 +5,7 @@ domain keys off the id, so every path starting from a user converted the name.
 Adds the id alongside the name and backfills it; ``domain_name`` stays.
 
 Revision ID: c1a7d3f05e28
-Revises: 857c4d02c4b9
+Revises: 9fbeda8995ff
 Create Date: 2026-08-03 18:40:00.000000
 
 """
@@ -17,7 +17,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "c1a7d3f05e28"
-down_revision = "857c4d02c4b9"
+down_revision = "9fbeda8995ff"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None

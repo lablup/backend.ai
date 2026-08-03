@@ -193,6 +193,7 @@ class UserRow(Base):  # type: ignore[misc]
     integration_id: Mapped[str | None] = mapped_column(
         "integration_id", sa.String(length=512), nullable=True
     )
+    #: Deprecated: use ``domain_id``.
     domain_name: Mapped[str | None] = mapped_column(
         "domain_name",
         sa.String(length=64),
@@ -200,7 +201,6 @@ class UserRow(Base):  # type: ignore[misc]
         index=True,
         nullable=True,
     )
-    """Deprecated: use ``domain_id``."""
     domain_id: Mapped[DomainID | None] = mapped_column(
         "domain_id",
         GUID,
