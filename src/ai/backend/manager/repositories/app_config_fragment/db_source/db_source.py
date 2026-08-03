@@ -9,7 +9,6 @@ import sqlalchemy as sa
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -47,7 +46,6 @@ from ai.backend.manager.repositories.base.rbac.entity_upserter import (
     ConflictTarget,
     RBACEntityUpserter,
 )
-from ai.backend.manager.repositories.ops.base.provider import ReadOps
 from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 
 __all__ = ("AppConfigFragmentDBSource",)
@@ -212,10 +210,18 @@ class AppConfigFragmentDBSource:
             scope_visibility = [AppConfigFragmentConditions.by_public_visibility()]
             if user_id is not None:
                 scope_visibility.append(AppConfigFragmentConditions.by_user_visibility(user_id))
-                domain_id = await self._domain_id_of_user(r, user_id)
-                if domain_id is not None:
+                # A user names its domain by name while a fragment's domain scope keys off the
+                # domain id, so the id is looked up before the visibility filter is built. A
+                # user with no resolvable domain simply loses the domain overlay.
+                user = await r.query(Querier(row_class=UserRow, pk_value=user_id))
+                domain = (
+                    await r.query(Querier(row_class=DomainRow, pk_value=user.row.domain_name))
+                    if user is not None and user.row.domain_name is not None
+                    else None
+                )
+                if domain is not None:
                     scope_visibility.append(
-                        AppConfigFragmentConditions.by_domain_visibility(domain_id)
+                        AppConfigFragmentConditions.by_domain_visibility(domain.row.id)
                     )
             querier = BatchQuerier(
                 pagination=NoPagination(),
@@ -227,16 +233,3 @@ class AppConfigFragmentDBSource:
             )
             result = await r.batch_query_in_global(selector, querier)
             return [row.AppConfigFragmentRow.to_data() for row in result.rows]
-
-    @staticmethod
-    async def _domain_id_of_user(r: ReadOps, user_id: UserID) -> DomainID | None:
-        """The id of the domain ``user_id`` belongs to, or ``None`` if it has none.
-
-        A user names its domain by name while a fragment's domain scope keys off the domain
-        id, so the id has to be looked up before the visibility filter can be built.
-        """
-        user = await r.query(Querier(row_class=UserRow, pk_value=user_id))
-        if user is None or user.row.domain_name is None:
-            return None
-        domain = await r.query(Querier(row_class=DomainRow, pk_value=user.row.domain_name))
-        return domain.row.id if domain is not None else None
