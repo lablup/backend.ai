@@ -6,6 +6,8 @@ from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, override
 
+import sqlalchemy as sa
+
 from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
 from ai.backend.common.data.permission.types import RBACElementType
@@ -13,6 +15,7 @@ from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.user import UserCreationBadRequest
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.repositories.base.creator import Creator, CreatorSpec
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
@@ -111,6 +114,10 @@ class UserCreatorSpec(CreatorSpec[UserRow]):
             status=status,
             status_info=self.status_info,
             domain_name=self.domain_name,
+            # Resolved by the insert itself, so naming the domain still costs one statement.
+            domain_id=sa.select(DomainRow.id)
+            .where(DomainRow.name == self.domain_name)
+            .scalar_subquery(),
             role=UserRole(self.role) if self.role is not None else UserRole.USER,
             resource_policy=self.resource_policy if self.resource_policy is not None else "default",
             allowed_client_ip=self.allowed_client_ip,

@@ -19,6 +19,7 @@ from sqlalchemy.orm.strategy_options import _AbstractLoad
 from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
@@ -199,6 +200,16 @@ class UserRow(Base):  # type: ignore[misc]
         index=True,
         nullable=True,
     )
+    """Deprecated — filter by ``domain_id`` in new code. Readers move over in BA-7158."""
+    domain_id: Mapped[DomainID | None] = mapped_column(
+        "domain_id",
+        GUID,
+        sa.ForeignKey("domains.id"),
+        index=True,
+        nullable=True,
+    )
+    """The id of ``domain_name``, written from it so a caller filtering by domain does not
+    have to convert the name."""
     role: Mapped[UserRole | None] = mapped_column(
         "role", EnumValueType(UserRole), default=UserRole.USER, nullable=True
     )
