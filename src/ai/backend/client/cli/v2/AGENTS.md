@@ -3,12 +3,17 @@
 ## Command hierarchy
 
 ```
-./bai [admin|my] {entity} [{sub-entity}] {command} [options]
+./bai [admin|my|public] {entity} [{sub-entity}] {command} [options]
 ```
 
 - `cli/v2/{entity}/commands.py` — user-facing commands (any authenticated user)
 - `cli/v2/admin/{entity}.py` — admin-only commands (superadmin required)
 - `cli/v2/my/{entity}.py` — self-service commands (the current user's own resources)
+- `cli/v2/public/{entity}.py` — anonymous commands (no principal, no credentials)
+
+`admin`, `my`, and `public` all sit in the same slot: they name the scope a command acts
+at, never the operation. Do not fold the scope into the command name (`public-get`) — the
+operation keeps its standard name under the scope group (`public {entity} get`).
 
 ## admin / non-admin / my placement
 
@@ -29,6 +34,13 @@
 - self-service operations dealing with the current user's own resources → `my/`
 - Mapped to the server `my_`-prefixed API and the `/v2/{entity}/my/` REST endpoint (`my` is the scope qualifier, the entity comes first)
 - e.g. `./bai my keypair search`, `./bai my keypair issue`
+
+**Place anonymous operations (server `public_` prefix) in `public/{entity}.py`.**
+
+- operations that name no principal and are served without auth → `public/`
+- Mapped to the server `public_`-prefixed API and the `/v2/{entity}/public/` REST endpoint
+- These call the SDK's unauthenticated client, so they must work with no credentials configured
+- e.g. `./bai public app-config get theme`
 
 If an operation has both admin and non-admin variants (differing in behavior, not just permission), place the admin one in `admin/` and the
 non-admin one in `{entity}/commands.py`.
@@ -64,7 +76,9 @@ Only operations outside the 6-op pattern use different names:
 1. Create `cli/v2/{entity}/commands.py` holding user-facing commands + `__init__.py`
 2. Create admin-only commands `cli/v2/admin/{entity}.py`
 3. Create self-service commands `cli/v2/my/{entity}.py` (if applicable)
-4. Register the user-facing group in `cli/v2/__init__.py`
-5. Register the admin group in `cli/v2/admin/__init__.py`
-6. Register the my group in `cli/v2/my/__init__.py` (if applicable)
-7. Register the new entity and commands in the `/bai-cli` skill's Entity-Command Reference (so tests know what to run).
+4. Create anonymous commands `cli/v2/public/{entity}.py` (if applicable)
+5. Register the user-facing group in `cli/v2/__init__.py`
+6. Register the admin group in `cli/v2/admin/__init__.py`
+7. Register the my group in `cli/v2/my/__init__.py` (if applicable)
+8. Register the public group in `cli/v2/public/__init__.py` (if applicable)
+9. Register the new entity and commands in the `/bai-cli` skill's Entity-Command Reference (so tests know what to run).

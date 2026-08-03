@@ -1,4 +1,4 @@
-"""CLI commands for the merged app config (anonymous read)."""
+"""Anonymous CLI commands for the public merged app config."""
 
 from __future__ import annotations
 
@@ -14,12 +14,12 @@ from ai.backend.client.cli.v2.helpers import (
 
 @click.group()
 def app_config() -> None:
-    """App config commands."""
+    """Public app config commands."""
 
 
-@app_config.command(name="public-get")
+@app_config.command()
 @click.argument("config_names", nargs=-1, required=True)
-def public_get(config_names: tuple[str, ...]) -> None:
+def get(config_names: tuple[str, ...]) -> None:
     """Read the public merged config for CONFIG_NAMES, answered in that order.
 
     Only public fragments contribute, so this is the pre-login view: it needs no
