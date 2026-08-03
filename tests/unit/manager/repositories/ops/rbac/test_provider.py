@@ -108,6 +108,7 @@ _TEST_SCOPE_TYPE = ScopeType(PermissionScopeType.PROJECT.value)
 _TEST_ENTITY_TYPE = VirtualScopeEntityType(PermissionScopeType.PROJECT.value)
 _TEST_BOUND_SCOPE_TYPE = ScopeType("test-bound-scope")
 _TEST_MEMBER_ENTITY_TYPE = VirtualScopeEntityType(RBACElementType.USER.value)
+_TEST_MEMBER_SCOPE_TYPE = ScopeType(RBACElementType.USER.value)
 
 _USER_SCOPE_ID = str(uuid.uuid4())
 _USER_SCOPE_REF = RBACElementRef(RBACElementType.USER, _USER_SCOPE_ID)

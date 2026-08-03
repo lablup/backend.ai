@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.user.types import UserStatus
 
 
@@ -48,3 +49,11 @@ class UserData:
 class GroupMembershipData:
     group_id: uuid.UUID
     user_id: uuid.UUID
+
+
+@dataclass(frozen=True)
+class UserCreationData:
+    """A fully provisioned user and its default keypair."""
+
+    user: UserData
+    keypair: KeyPairData

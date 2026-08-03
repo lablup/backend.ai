@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import random
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
 
 from ai.backend.common.plugin.hook import HookResult, HookResults
-from ai.backend.manager.errors.auth import EmailAlreadyExistsError, UserCreationError
-from ai.backend.manager.errors.common import InternalServerError
+from ai.backend.manager.data.auth.types import UserCreationData
+from ai.backend.manager.errors.auth import EmailAlreadyExistsError
+from ai.backend.manager.errors.user import UserCreationBadRequest
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
@@ -19,10 +19,11 @@ from ai.backend.manager.services.auth.actions.signup import SignupAction
 from ai.backend.manager.services.auth.service import AuthService
 
 
-def generate_fake_keypair() -> tuple[str, str]:
-    ak = "".join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=20))
-    sk = "".join(random.choices("abcdefghijklmnopqrstuvwxyz0123456789", k=40))
-    return ak, sk
+def make_mock_keypair() -> MagicMock:
+    keypair = MagicMock()
+    keypair.access_key = "".join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=20))
+    keypair.secret_key = "".join(random.choices("abcdefghijklmnopqrstuvwxyz0123456789", k=40))
+    return keypair
 
 
 @pytest.fixture
@@ -54,7 +55,6 @@ async def test_signup_successful_with_minimal_data(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
     mock_hook_plugin_ctx: AsyncMock,
-    mocker: Any,
 ) -> None:
     """Test successful user signup with minimal data"""
     action = SignupAction(
@@ -79,26 +79,21 @@ async def test_signup_successful_with_minimal_data(
 
     mock_user = MagicMock()
     mock_user.uuid = UUID("12345678-1234-5678-1234-567812345678")
-    mock_auth_repository.create_user_with_keypair.return_value = mock_user
-
-    # Mock the generated keypair
-    ak, sk = generate_fake_keypair()
-    mocker.patch(
-        "ai.backend.manager.services.auth.service.generate_keypair",
-        return_value=(ak, sk),
+    mock_keypair = make_mock_keypair()
+    mock_auth_repository.create_user_with_keypair.return_value = UserCreationData(
+        user=mock_user, keypair=mock_keypair
     )
 
     result = await auth_service.signup(action)
 
     assert result.user_id == UUID("12345678-1234-5678-1234-567812345678")
-    assert result.access_key == ak
-    assert result.secret_key == sk
+    assert result.access_key == mock_keypair.access_key
+    assert result.secret_key == mock_keypair.secret_key
 
 
 async def test_signup_successful_with_full_data(
     mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
-    mocker: Any,
     auth_service: AuthService,
 ) -> None:
     """Test successful user signup with full data"""
@@ -124,20 +119,16 @@ async def test_signup_successful_with_full_data(
 
     mock_user = MagicMock()
     mock_user.uuid = UUID("87654321-4321-8765-4321-876543218765")
-    mock_auth_repository.create_user_with_keypair.return_value = mock_user
-
-    # Mock the generated keypair
-    ak, sk = generate_fake_keypair()
-    mocker.patch(
-        "ai.backend.manager.services.auth.service.generate_keypair",
-        return_value=(ak, sk),
+    mock_keypair = make_mock_keypair()
+    mock_auth_repository.create_user_with_keypair.return_value = UserCreationData(
+        user=mock_user, keypair=mock_keypair
     )
 
     result = await auth_service.signup(action)
 
     assert result.user_id == UUID("87654321-4321-8765-4321-876543218765")
-    assert result.access_key == ak
-    assert result.secret_key == sk
+    assert result.access_key == mock_keypair.access_key
+    assert result.secret_key == mock_keypair.secret_key
 
 
 async def test_signup_fails_when_email_already_exists(
@@ -176,7 +167,6 @@ async def test_signup_with_hook_override(
     mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
     mock_group_repository: AsyncMock,
-    mocker: Any,
     auth_service: AuthService,
 ) -> None:
     """Test signup when PRE_SIGNUP hook overrides user data"""
@@ -208,28 +198,29 @@ async def test_signup_with_hook_override(
 
     mock_auth_repository.check_email_exists.return_value = False
 
+    project_id = UUID("22222222-2222-2222-2222-222222222222")
+    mock_group_repository.project_id_by_name_in_domain.return_value = project_id
+
     # Capture the actual call to create_user_with_keypair
     mock_user = MagicMock()
     mock_user.uuid = UUID("11111111-1111-1111-1111-111111111111")
-    mock_auth_repository.create_user_with_keypair.return_value = mock_user
-
-    ak, sk = generate_fake_keypair()
-    mocker.patch(
-        "ai.backend.manager.services.auth.service.generate_keypair",
-        return_value=(ak, sk),
+    mock_keypair = make_mock_keypair()
+    mock_auth_repository.create_user_with_keypair.return_value = UserCreationData(
+        user=mock_user, keypair=mock_keypair
     )
+
     result = await auth_service.signup(action)
 
     # Verify the repository was called with modified user/keypair data
     call_args = mock_auth_repository.create_user_with_keypair.call_args
-    user_data = call_args.kwargs["user_data"]
-    keypair_data = call_args.kwargs["keypair_data"]
+    user_spec = call_args.kwargs["user_spec"]
 
-    assert user_data["full_name"] == "Modified by Hook"
-    assert user_data["description"] == "Hook modified description"
-    assert user_data["status"] == UserStatus.BEFORE_VERIFICATION
-    assert user_data["role"] == UserRole.ADMIN
-    assert keypair_data["resource_policy"] == "premium"
+    assert user_spec.full_name == "Modified by Hook"
+    assert user_spec.description == "Hook modified description"
+    assert user_spec.status == UserStatus.BEFORE_VERIFICATION
+    assert user_spec.role == UserRole.ADMIN
+    assert call_args.kwargs["keypair_resource_policy"] == "premium"
+    assert call_args.kwargs["project_ids"] == [project_id]
 
     # Verify the hook-overridden ``group`` is forwarded to the project lookup.
     mock_group_repository.project_id_by_name_in_domain.assert_called_once_with(
@@ -237,7 +228,7 @@ async def test_signup_with_hook_override(
     )
 
     assert result.user_id == mock_user.uuid
-    assert result.access_key == ak
+    assert result.access_key == mock_keypair.access_key
 
 
 async def test_signup_creation_error(
@@ -264,18 +255,17 @@ async def test_signup_creation_error(
     )
 
     mock_auth_repository.check_email_exists.return_value = False
-    mock_auth_repository.create_user_with_keypair.side_effect = UserCreationError("Database error")
+    mock_auth_repository.create_user_with_keypair.side_effect = UserCreationBadRequest(
+        "Failed to create user due to database constraint violation"
+    )
 
-    with pytest.raises(InternalServerError) as exc_info:
+    with pytest.raises(UserCreationBadRequest):
         await auth_service.signup(action)
-
-    assert "Error creating user account" in str(exc_info.value)
 
 
 async def test_signup_post_hook_notification(
     mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
-    mocker: Any,
     auth_service: AuthService,
 ) -> None:
     """Test that POST_SIGNUP hook is notified after successful signup"""
@@ -302,13 +292,11 @@ async def test_signup_post_hook_notification(
 
     mock_user = MagicMock()
     mock_user.uuid = UUID("99999999-9999-9999-9999-999999999999")
-    mock_auth_repository.create_user_with_keypair.return_value = mock_user
-
-    ak, sk = generate_fake_keypair()
-    mocker.patch(
-        "ai.backend.manager.services.auth.service.generate_keypair",
-        return_value=(ak, sk),
+    mock_keypair = make_mock_keypair()
+    mock_auth_repository.create_user_with_keypair.return_value = UserCreationData(
+        user=mock_user, keypair=mock_keypair
     )
+
     result = await auth_service.signup(action)
 
     # Verify POST_SIGNUP notification was called
