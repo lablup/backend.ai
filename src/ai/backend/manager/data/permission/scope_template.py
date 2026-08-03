@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+from dataclasses import dataclass
 
 from ai.backend.common.identifier.scope import ScopeID
 
 
-class ScopeTemplateValue(BaseModel):
+@dataclass(frozen=True)
+class ScopeTemplateValue:
     """Scope attributes exposed to templates as ``{{ scope.* }}``."""
-
-    model_config = ConfigDict(frozen=True)
 
     id: ScopeID
     name: str
