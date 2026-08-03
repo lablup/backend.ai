@@ -78,3 +78,45 @@ def update(items: str) -> None:
             await registry.close()
 
     run_async(_run)
+
+
+@app_config_fragment.command()
+@click.argument("config_names", nargs=-1, required=True)
+def purge(config_names: tuple[str, ...]) -> None:
+    """Purge my user-scope fragments for CONFIG_NAMES.
+
+    The purge endpoint is addressed by fragment id, so this reads CONFIG_NAMES at my own
+    user scope first and purges the ids that read answers with. A name I hold no fragment
+    for aborts the whole command rather than silently purging the rest, so a typo cannot
+    quietly destroy a neighbouring config.
+    """
+    from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
+        BulkPurgeAppConfigFragmentInput,
+        MyAppConfigFragmentsByNamesInput,
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            answered = await registry.app_config_fragment.my_get_app_config_fragments_by_names(
+                MyAppConfigFragmentsByNamesInput(config_names=list(config_names))
+            )
+            missing = [
+                config_name
+                for config_name, node in zip(config_names, answered.root, strict=True)
+                if node is None
+            ]
+            if missing:
+                raise click.ClickException(
+                    f"No fragment at my user scope for: {', '.join(missing)}. Nothing was purged."
+                )
+            result = await registry.app_config_fragment.bulk_purge(
+                BulkPurgeAppConfigFragmentInput(
+                    ids=[node.id for node in answered.root if node is not None]
+                )
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    run_async(_run)
