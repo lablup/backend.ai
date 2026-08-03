@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from ai.backend.common.identifier.action import ActionID
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
 
 
@@ -17,7 +18,7 @@ class AuditLogData:
     """
 
     id: uuid.UUID
-    action_id: uuid.UUID
+    action_id: ActionID
     action_kind: ActionKind | None
     entity_type: str
     operation: str

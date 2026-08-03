@@ -1,12 +1,12 @@
 from dataclasses import dataclass
 
-from ai.backend.manager.actions.bulk.validator.rbac import (
+from ai.backend.manager.actions.v2.bulk.validator.rbac import (
     VirtualScopeBulkActionRBACValidator,
 )
-from ai.backend.manager.actions.scope.validator.rbac import (
+from ai.backend.manager.actions.v2.scope.validator.rbac import (
     VirtualScopeScopeActionRBACValidator,
 )
-from ai.backend.manager.actions.single_entity.validator.rbac import (
+from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
     VirtualScopeSingleEntityActionRBACValidator,
 )
 from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
@@ -35,7 +35,7 @@ class LegacyRBACValidators:
 
 @dataclass
 class VirtualScopeRBACValidators:
-    """RBAC validators for the pure-ABC action bases (actions/{single_entity,bulk,scope})."""
+    """RBAC validators for the v2 action bases (actions/v2/{single_entity,bulk,scope})."""
 
     scope: VirtualScopeScopeActionRBACValidator
     single_entity: VirtualScopeSingleEntityActionRBACValidator

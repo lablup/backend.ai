@@ -8,6 +8,7 @@ from typing import override
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.identifier.action import ActionID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
 from ai.backend.manager.data.audit_log.types import AuditLogData
@@ -78,7 +79,7 @@ class AuditLogRow(Base):  # type: ignore[misc]
         self,
         entity_type: str,
         operation: str,
-        action_id: uuid.UUID,
+        action_id: ActionID,
         description: str,
         created_at: datetime,
         status: OperationStatus,

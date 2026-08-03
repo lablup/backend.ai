@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import override
 
+from ai.backend.common.identifier.action import ActionID
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
@@ -32,7 +33,7 @@ class AuditLogCreatorSpec(CreatorSpec[AuditLogRow]):
     ``action_kind``, so neither is something a writer can get wrong.
     """
 
-    action_id: uuid.UUID
+    action_id: ActionID
     entity_type: str
     operation: str
     created_at: datetime

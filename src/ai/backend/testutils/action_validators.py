@@ -2,13 +2,13 @@
 
 from unittest.mock import MagicMock
 
-from ai.backend.manager.actions.bulk.validator.rbac import (
+from ai.backend.manager.actions.v2.bulk.validator.rbac import (
     VirtualScopeBulkActionRBACValidator,
 )
-from ai.backend.manager.actions.scope.validator.rbac import (
+from ai.backend.manager.actions.v2.scope.validator.rbac import (
     VirtualScopeScopeActionRBACValidator,
 )
-from ai.backend.manager.actions.single_entity.validator.rbac import (
+from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
     VirtualScopeSingleEntityActionRBACValidator,
 )
 from ai.backend.manager.actions.validators.rbac import VirtualScopeRBACValidators
