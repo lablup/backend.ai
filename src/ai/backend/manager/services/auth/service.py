@@ -42,7 +42,6 @@ from ai.backend.manager.errors.common import (
 )
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import (
-    generate_keypair,
     generate_ssh_keypair,
 )
 from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
@@ -496,35 +495,24 @@ class AuthService:
                 ):
                     data[key] = val
 
-        # Create user's first access_key and secret_key.
-        ak, sk = generate_keypair()
-        resource_policy = user_data_overriden.get("resource_policy", "default")
-        kp_data = {
-            "user_id": action.email,
-            "access_key": ak,
-            "secret_key": sk,
-            "is_active": data.get("status") == UserStatus.ACTIVE,
-            "is_admin": False,
-            "resource_policy": resource_policy,
-            "rate_limit": 1000,
-            "num_queries": 0,
-        }
-
-        try:
-            user = await self._auth_repository.create_user_with_keypair(
-                user_data=data,
-                keypair_data=kp_data,
-            )
-        except UserCreationError as e:
-            raise InternalServerError("Error creating user account") from e
-
-        # Assign the new user to the default project
+        # Resolve the default project to enroll the new user in.
         group_name = user_data_overriden.get("group", DEFAULT_PROJECT_NAME)
         project_id = await self._group_repository.project_id_by_name_in_domain(
             action.domain_name, group_name
         )
-        if project_id is not None:
-            await self._user_repository.assign_project_membership(user.uuid, project_id)
+
+        resource_policy = user_data_overriden.get("resource_policy", "default")
+        try:
+            creation = await self._auth_repository.create_user_with_keypair(
+                user_data=data,
+                project_ids=[project_id] if project_id is not None else [],
+                keypair_resource_policy=resource_policy,
+                keypair_rate_limit=1000,
+            )
+        except UserCreationError as e:
+            raise InternalServerError("Error creating user account") from e
+        user = creation.user
+        keypair = creation.keypair
 
         # [Hooking point for POST_SIGNUP as one-way notification]
         # The hook handlers should accept a tuple of the user email,
@@ -538,8 +526,8 @@ class AuthService:
         )
         return SignupActionResult(
             user_id=user.uuid,
-            access_key=ak,
-            secret_key=sk,
+            access_key=keypair.access_key,
+            secret_key=keypair.secret_key,
         )
 
     async def logout(self, action: LogoutAction) -> LogoutActionResult:
