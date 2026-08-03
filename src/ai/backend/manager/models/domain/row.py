@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from collections.abc import Container, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -18,8 +19,10 @@ from sqlalchemy.engine import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship
+from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common import msgpack
+from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
@@ -33,6 +36,7 @@ from ai.backend.manager.models.base import (
     SlugType,
     VFolderHostPermissionColumn,
 )
+from ai.backend.manager.models.mixins.scope_row import ScopeRowMixin
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
@@ -91,8 +95,9 @@ def _get_network_join_condition() -> sa.ColumnElement[bool]:
     return DomainRow.name == foreign(NetworkRow.domain_name)
 
 
-class DomainRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class DomainRow(ScopeRowMixin, CreatedAtMixin, Base):  # type: ignore[misc]
     __tablename__ = "domains"
+    __scope_type__ = DOMAIN_SCOPE_TYPE
 
     name: Mapped[str] = mapped_column(
         "name", SlugType(length=64, allow_unicode=True, allow_dot=True), primary_key=True
@@ -149,6 +154,16 @@ class DomainRow(CreatedAtMixin, Base):  # type: ignore[misc]
         back_populates="domain_row",
         primaryjoin=_get_network_join_condition,
     )
+
+    @override
+    @classmethod
+    def scope_id_expr(cls) -> SQLColumnExpression[uuid.UUID]:
+        return cls.id
+
+    @override
+    @classmethod
+    def scope_name_expr(cls) -> SQLColumnExpression[str]:
+        return cls.name
 
     def to_data(self) -> DomainData:
         return row_to_data(self)

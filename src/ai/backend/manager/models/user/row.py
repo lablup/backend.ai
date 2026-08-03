@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
+    override,
 )
 from uuid import UUID
 
@@ -16,7 +17,9 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, foreign, joinedload, mapped_column, relationship, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
+from sqlalchemy.sql.expression import SQLColumnExpression
 
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
@@ -33,6 +36,7 @@ from ai.backend.manager.models.base import (
 )
 from ai.backend.manager.models.hasher import PasswordHasherFactory
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordColumn, PasswordInfo
+from ai.backend.manager.models.mixins.scope_row import ScopeRowMixin
 from ai.backend.manager.models.types import (
     QueryCondition,
     QueryOption,
@@ -144,14 +148,15 @@ def _get_main_keypair_join_condition() -> Any:
     return KeyPairRow.access_key == foreign(UserRow.main_access_key)
 
 
-class UserRow(Base):  # type: ignore[misc]
+class UserRow(ScopeRowMixin, Base):  # type: ignore[misc]
     __tablename__ = "users"
+    __scope_type__ = USER_SCOPE_TYPE
 
     uuid: Mapped[uuid_mod.UUID] = mapped_column(
         "uuid", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    username: Mapped[str | None] = mapped_column(
-        "username", sa.String(length=64), unique=True, nullable=True
+    username: Mapped[str] = mapped_column(
+        "username", sa.String(length=64), unique=True, nullable=False
     )
     email: Mapped[str] = mapped_column(
         "email", sa.String(length=64), index=True, nullable=False, unique=True
@@ -297,6 +302,16 @@ class UserRow(Base):  # type: ignore[misc]
         back_populates="user_row",
         primaryjoin=_get_role_assignments_join_condition,
     )
+
+    @override
+    @classmethod
+    def scope_id_expr(cls) -> SQLColumnExpression[UUID]:
+        return cls.uuid
+
+    @override
+    @classmethod
+    def scope_name_expr(cls) -> SQLColumnExpression[str]:
+        return cls.username
 
     @classmethod
     def load_keypairs(cls) -> _AbstractLoad:
