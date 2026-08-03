@@ -74,6 +74,7 @@ async def test_group_for_deletion(
                 description=f"Group for deletion test {group_name}",
                 is_active=True,
                 domain_name=domain_fixture.domain_name,
+                domain_id=domain_fixture.domain_id,
                 resource_policy=resource_policy_fixture,
             )
         )
@@ -140,6 +141,7 @@ async def group_with_vfolder_mounted(
                 description="Group with mounted vfolder",
                 is_active=True,
                 domain_name=domain_fixture.domain_name,
+                domain_id=domain_fixture.domain_id,
                 resource_policy=resource_policy_fixture,
             )
         )
@@ -277,6 +279,7 @@ async def group_with_active_kernel(
                 description="Group with active kernel",
                 is_active=True,
                 domain_name=domain_fixture.domain_name,
+                domain_id=domain_fixture.domain_id,
                 resource_policy=resource_policy_fixture,
             )
         )
@@ -397,6 +400,7 @@ async def group_with_active_endpoint(
                 description="Group with active endpoint",
                 is_active=True,
                 domain_name=domain_fixture.domain_name,
+                domain_id=domain_fixture.domain_id,
                 resource_policy=resource_policy_fixture,
             )
         )
@@ -511,6 +515,7 @@ async def multiple_test_groups(
                     description=f"Search test group {i}",
                     is_active=True,
                     domain_name=domain_fixture.domain_name,
+                    domain_id=domain_fixture.domain_id,
                     resource_policy=resource_policy_fixture,
                 )
             )

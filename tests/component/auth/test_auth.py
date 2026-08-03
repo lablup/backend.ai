@@ -140,6 +140,7 @@ async def signup_default_project(
                 description="Default project for signup binding test",
                 is_active=True,
                 domain_name=domain_fixture.domain_name,
+                domain_id=domain_fixture.domain_id,
                 resource_policy=resource_policy_fixture,
             )
         )
@@ -269,6 +270,7 @@ async def cross_domain_fixture(
 ) -> AsyncIterator[_CrossDomainFixtureData]:
     """Create a second domain with its own domain-admin and regular user."""
     domain_name = f"other-domain-{secrets.token_hex(6)}"
+    domain_id = uuid.uuid4()
     group_id = uuid.uuid4()
     group_name = f"other-group-{secrets.token_hex(6)}"
 
@@ -298,6 +300,7 @@ async def cross_domain_fixture(
         await conn.execute(
             sa.insert(domains).values(
                 name=domain_name,
+                id=domain_id,
                 description=f"Cross-domain test {domain_name}",
                 is_active=True,
                 total_resource_slots=ResourceSlot(),
@@ -311,6 +314,7 @@ async def cross_domain_fixture(
                 description=f"Cross-domain test group {group_name}",
                 is_active=True,
                 domain_name=domain_name,
+                domain_id=domain_id,
                 resource_policy=resource_policy_fixture,
             )
         )

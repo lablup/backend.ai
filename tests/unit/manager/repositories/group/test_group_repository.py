@@ -183,12 +183,14 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
         db_with_cleanup: ExtendedAsyncSAEngine,
         group_repository: GroupRepository,
         test_domain: str,
+        test_domain_id: DomainID,
         project_resource_policy: str,
     ) -> None:
         """Test that group creation succeeds when project_resource_policy exists."""
         spec = GroupCreatorSpec(
             name=f"test-group-{uuid.uuid4().hex[:8]}",
             domain_name=test_domain,
+            domain_id=test_domain_id,
             description="Test group",
             is_active=True,
             total_resource_slots=ResourceSlot({}),
@@ -204,16 +206,25 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
         assert result.name == spec.name
         assert result.resource_policy == project_resource_policy
 
+        # The domain_id passed in the spec is stored as-is (no repository-side resolution).
+        async with db_with_cleanup.begin_readonly_session() as session:
+            stored_domain_id = await session.scalar(
+                sa.select(GroupRow.domain_id).where(GroupRow.id == result.id)
+            )
+        assert stored_domain_id == test_domain_id
+
     async def test_create_fails_with_nonexistent_project_resource_policy(
         self,
         group_repository: GroupRepository,
         test_domain: str,
+        test_domain_id: DomainID,
     ) -> None:
         """Test that group creation fails when project_resource_policy does not exist."""
         nonexistent_policy = "nonexistent-policy"
         spec = GroupCreatorSpec(
             name=f"test-group-{uuid.uuid4().hex[:8]}",
             domain_name=test_domain,
+            domain_id=test_domain_id,
             description="Test group",
             is_active=True,
             total_resource_slots=ResourceSlot({}),
@@ -862,12 +873,14 @@ class TestGroupRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
         group_repository: GroupRepository,
         test_domain: str,
+        test_domain_id: DomainID,
         default_project_resource_policy: str,
     ) -> None:
         """Test successful group creation with valid domain and resource_policy."""
         creator_spec = GroupCreatorSpec(
             name="test-new-group",
             domain_name=test_domain,
+            domain_id=test_domain_id,
             description="Test group description",
             resource_policy=default_project_resource_policy,
         )
@@ -889,6 +902,7 @@ class TestGroupRepository:
         creator_spec = GroupCreatorSpec(
             name="test-group",
             domain_name="nonexistent-domain",
+            domain_id=DomainID(uuid.uuid4()),
             resource_policy=default_project_resource_policy,
         )
         creator = Creator(spec=creator_spec)
@@ -901,12 +915,14 @@ class TestGroupRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
         group_repository: GroupRepository,
         test_domain: str,
+        test_domain_id: DomainID,
         default_project_resource_policy: str,
     ) -> None:
         """Test group creation fails with duplicate name in same domain"""
         creator_spec = GroupCreatorSpec(
             name="duplicate-group",
             domain_name=test_domain,
+            domain_id=test_domain_id,
             resource_policy=default_project_resource_policy,
         )
 
@@ -922,12 +938,14 @@ class TestGroupRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
         group_repository: GroupRepository,
         test_domain: str,
+        test_domain_id: DomainID,
         default_project_resource_policy: str,
     ) -> None:
         """Test that creating a project creates AssociationScopesEntitiesRow for domain scope."""
         creator_spec = GroupCreatorSpec(
             name="test-rbac-group",
             domain_name=test_domain,
+            domain_id=test_domain_id,
             description="Test group for RBAC",
             resource_policy=default_project_resource_policy,
         )
@@ -961,12 +979,14 @@ class TestGroupRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
         group_repository: GroupRepository,
         test_domain: str,
+        test_domain_id: DomainID,
         default_project_resource_policy: str,
     ) -> None:
         """Project creation provisions an admin and a member SYSTEM role at its scope."""
         creator_spec = GroupCreatorSpec(
             name="test-roles-group",
             domain_name=test_domain,
+            domain_id=test_domain_id,
             description="Test group for role creation",
             resource_policy=default_project_resource_policy,
         )

@@ -584,6 +584,9 @@ async def group_fixture(
     group_id = uuid.uuid4()
     group_name = f"group-{secrets.token_hex(6)}"
     async with db_engine.begin() as conn:
+        domain_id = await conn.scalar(
+            sa.select(domains.c.id).where(domains.c.name == domain_fixture)
+        )
         await conn.execute(
             sa.insert(GroupRow.__table__).values(
                 id=group_id,
@@ -591,6 +594,7 @@ async def group_fixture(
                 description=f"Test group {group_name}",
                 is_active=True,
                 domain_name=domain_fixture,
+                domain_id=domain_id,
                 resource_policy=resource_policy_fixture,
             )
         )
