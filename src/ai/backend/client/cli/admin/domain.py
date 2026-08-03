@@ -6,7 +6,7 @@ import click
 from ai.backend.cli.interaction import ask_yn
 from ai.backend.cli.params import BoolExprType, CommaSeparatedListType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
-from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.extensions import output_option, pass_ctx_obj
 from ai.backend.client.cli.pretty import print_info
 from ai.backend.client.cli.types import CLIContext
 
@@ -22,6 +22,7 @@ def domain() -> None:
 
 @domain.command()
 @pass_ctx_obj
+@output_option
 @click.argument("name", type=str)
 def info(ctx: CLIContext, name: str) -> None:
     """
@@ -42,6 +43,7 @@ def info(ctx: CLIContext, name: str) -> None:
 
 @domain.command()
 @pass_ctx_obj
+@output_option
 def list(ctx: CLIContext) -> None:
     """
     List and manage domains.
@@ -61,6 +63,7 @@ def list(ctx: CLIContext) -> None:
 
 @domain.command()
 @pass_ctx_obj
+@output_option
 @click.argument("name", type=str, metavar="NAME")
 @click.option("-d", "--description", type=str, default="", help="Description of new domain")
 @click.option("--inactive", is_flag=True, help="New domain will be inactive.")
@@ -136,6 +139,7 @@ def add(
 
 @domain.command()
 @pass_ctx_obj
+@output_option
 @click.argument("name", type=str, metavar="NAME")
 @click.option(
     "--new-name",
@@ -231,6 +235,7 @@ def update(
 
 @domain.command()
 @pass_ctx_obj
+@output_option
 @click.argument("name", type=str, metavar="NAME")
 def delete(ctx: CLIContext, name: str) -> None:
     """
@@ -267,6 +272,7 @@ def delete(ctx: CLIContext, name: str) -> None:
 
 @domain.command()
 @pass_ctx_obj
+@output_option
 @click.argument("name", type=str, metavar="NAME")
 def purge(ctx: CLIContext, name: str) -> None:
     """

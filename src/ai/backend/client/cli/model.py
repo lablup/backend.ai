@@ -16,7 +16,7 @@ from ai.backend.client.output.fields import vfolder_fields
 from ai.backend.client.output.types import FieldSpec
 from ai.backend.client.session import Session
 
-from .extensions import pass_ctx_obj
+from .extensions import output_option, pass_ctx_obj
 from .pretty import print_done
 from .types import CLIContext
 
@@ -28,6 +28,7 @@ def model() -> None:
 
 @model.command()
 @pass_ctx_obj
+@output_option
 @click.option("--filter", "filter_", default=None, help="Set the query filter expression.")
 @click.option("--order", default=None, help="Set the query ordering expression.")
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
@@ -59,6 +60,7 @@ def list(
 
 @model.command()
 @pass_ctx_obj
+@output_option
 @click.argument("model_name", metavar="MODEL", type=str)
 def info(ctx: CLIContext, model_name: str) -> None:
     """
@@ -94,6 +96,7 @@ def info(ctx: CLIContext, model_name: str) -> None:
 
 @model.command()
 @pass_ctx_obj
+@output_option
 @click.argument("name", type=str)
 @click.argument("host", type=str, default=None)
 @click.option(
@@ -190,6 +193,7 @@ def create(
 
 @model.command()
 @pass_ctx_obj
+@output_option
 @click.argument("model_name", metavar="MODEL", type=str)
 def rm(ctx: CLIContext, model_name: str) -> None:
     """
@@ -211,6 +215,7 @@ def rm(ctx: CLIContext, model_name: str) -> None:
 
 @model.command()
 @pass_ctx_obj
+@output_option
 @click.argument("model_name", metavar="MODEL", type=str)
 @click.argument("filenames", type=Path, nargs=-1)
 @click.argument("model_version", metavar="MODEL_VER", type=str)
@@ -282,6 +287,7 @@ def upload(
 
 @model.command()
 @pass_ctx_obj
+@output_option
 @click.argument("model_name", type=str)
 @click.argument("filenames", type=Path, nargs=-1)
 @click.argument("model_version", metavar="MODEL_VER", type=str)

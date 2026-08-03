@@ -5,7 +5,7 @@ import sys
 import click
 
 from ai.backend.cli.types import ExitCode
-from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.extensions import output_option, pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.output.fields import agent_fields
 from ai.backend.client.session import Session
@@ -22,6 +22,7 @@ def agent() -> None:
 
 @agent.command()
 @pass_ctx_obj
+@output_option
 @click.argument("agent_id")
 def info(ctx: CLIContext, agent_id: str) -> None:
     """
@@ -51,6 +52,7 @@ def info(ctx: CLIContext, agent_id: str) -> None:
 
 @agent.command()
 @pass_ctx_obj
+@output_option
 @click.option(
     "-s", "--status", type=str, default="ALIVE", help="Filter agents by the given status."
 )
@@ -122,6 +124,7 @@ def watcher() -> None:
 
 @watcher.command()
 @pass_ctx_obj
+@output_option
 @click.argument("agent", type=str)
 def status(ctx: CLIContext, agent: str) -> None:
     """
@@ -142,6 +145,7 @@ def status(ctx: CLIContext, agent: str) -> None:
 
 @watcher.command()
 @pass_ctx_obj
+@output_option
 @click.argument("agent", type=str)
 def agent_start(ctx: CLIContext, agent: str) -> None:
     """
@@ -162,6 +166,7 @@ def agent_start(ctx: CLIContext, agent: str) -> None:
 
 @watcher.command()
 @pass_ctx_obj
+@output_option
 @click.argument("agent", type=str)
 def agent_stop(ctx: CLIContext, agent: str) -> None:
     """
@@ -182,6 +187,7 @@ def agent_stop(ctx: CLIContext, agent: str) -> None:
 
 @watcher.command()
 @pass_ctx_obj
+@output_option
 @click.argument("agent", type=str)
 def agent_restart(ctx: CLIContext, agent: str) -> None:
     """

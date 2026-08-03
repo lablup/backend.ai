@@ -8,7 +8,7 @@ import click
 
 from ai.backend.cli.params import ByteSizeParamType
 from ai.backend.cli.types import ExitCode
-from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.extensions import output_option, pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
 from ai.backend.common.types import QuotaScopeType
 
@@ -81,6 +81,7 @@ def _get_qsid_from_identifier(
 
 @quota_scope.command()
 @pass_ctx_obj
+@output_option
 @click.argument("host", type=str)
 @click.argument("identifier", type=str)
 @click.option(
@@ -145,6 +146,7 @@ def get(
 
 @quota_scope.command(name="set")
 @pass_ctx_obj
+@output_option
 @click.argument("host", type=str)
 @click.argument("identifier", type=str)
 @click.argument("limit_bytes", type=ByteSizeParamType())
@@ -206,6 +208,7 @@ def set_(
 
 @quota_scope.command()
 @pass_ctx_obj
+@output_option
 @click.argument("host", type=str)
 @click.argument("identifier", type=str)
 @click.option(

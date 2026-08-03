@@ -7,7 +7,7 @@ import pytest
 from click.testing import CliRunner
 
 from ai.backend.cli.types import CliContextInfo, ExitCode
-from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.extensions import output_option, pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
 
 
@@ -23,6 +23,7 @@ def sample_cli() -> click.Group:
 
     @root.command()
     @pass_ctx_obj
+    @output_option
     def show(ctx: CLIContext) -> None:
         click.echo(ctx.output_mode.value)
 
@@ -56,6 +57,8 @@ def test_output_is_accepted_at_any_level(
 def test_command_owning_the_name_keeps_its_own_output(
     runner: CliRunner, sample_cli: click.Group
 ) -> None:
+    """A command declaring its own `--output` is not given `output_option`, so its meaning
+    (a destination path, as in `admin export`) survives alongside the root-level flag."""
     result = runner.invoke(sample_cli, ["--output=json", "export", "-o", "out.csv"])
     assert result.exit_code == ExitCode.OK
     assert result.output.strip() == "json out.csv"

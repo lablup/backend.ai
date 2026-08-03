@@ -51,18 +51,39 @@ def _override_output_mode(
     return value
 
 
-def _make_output_option() -> click.Option:
-    return click.Option(
-        ["--output"],
-        type=click.Choice([OutputMode.JSON.value, OutputMode.CONSOLE.value]),
-        default=None,
-        expose_value=False,
-        callback=_override_output_mode,
-        help="Set the output style of the command results.",
-    )
+# Accepts `--output` on the command itself, in addition to the root-level `--output`; the
+# command-level value wins. Apply it next to `pass_ctx_obj`, which is what supplies the
+# `CLIContext` the value is read through -- without that context the option does nothing.
+#
+# Do NOT apply it to a command that already declares its own `--output` (`admin export
+# -o/--output PATH` names a destination file); the two would collide and Click would leave
+# one of them dead in its long-option table with no error.
+#
+# It belongs on commands, never on groups: a group renders no result to format, while the
+# root keeps its own `--output` because that one configures the whole invocation.
+#
+# Wearing it buys formatting of *error* output, which every `pass_ctx_obj` command gets.
+# Whether the *result* is formatted depends on the command rendering through
+# `ctx.output.print_*` rather than `print()`/`tabulate` -- 71 of the 154 do today, and
+# converting the rest is #1925.
+output_option = click.option(
+    "--output",
+    type=click.Choice([OutputMode.JSON.value, OutputMode.CONSOLE.value]),
+    default=None,
+    expose_value=False,
+    callback=_override_output_mode,
+    help="Set the output style of this command's result, overriding the root-level one.",
+)
 
 
 def pass_ctx_obj[**P, T](f: Callable[Concatenate[CLIContext, P], T]) -> Callable[P, T]:
+    """
+    Pass the :class:`CLIContext` as the first argument of the decorated command callback.
+
+    Pair it with :data:`output_option` on commands that should accept ``--output``; that
+    option reads the mode through the context this decorator supplies.
+    """
+
     def new_func(*args: P.args, **kwargs: P.kwargs) -> T:
         obj = get_current_context().obj
         match obj:
@@ -74,15 +95,4 @@ def pass_ctx_obj[**P, T](f: Callable[Concatenate[CLIContext, P], T]) -> Callable
                 raise RuntimeError("Invalid Context from client command")
         return inner
 
-    wrapped = update_wrapper(new_func, f)
-    # `--output` is attached here rather than on each command because this decorator is
-    # applied after every `@click.option` of the command but before `@group.command()`
-    # consumes `__click_params__` -- the one point that sees the command's full param
-    # list. Commands that already own the name (`admin export -o/--output PATH`) keep it.
-    # Click reverses `__click_params__`, so inserting at the front renders it last.
-    holder: Any = wrapped
-    params: list[click.Parameter] = getattr(holder, "__click_params__", [])
-    if not any(param.name == "output" for param in params):
-        params.insert(0, _make_output_option())
-    holder.__click_params__ = params
-    return wrapped
+    return update_wrapper(new_func, f)
