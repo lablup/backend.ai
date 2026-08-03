@@ -46,7 +46,7 @@ def get(config_names: tuple[str, ...]) -> None:
     run_async(_run)
 
 
-@app_config_fragment.command(name="bulk-upsert")
+@app_config_fragment.command()
 @click.option(
     "--items",
     required=True,
@@ -55,8 +55,12 @@ def get(config_names: tuple[str, ...]) -> None:
         "holding it."
     ),
 )
-def bulk_upsert(items: str) -> None:
-    """Upsert many fragments at my own user scope, all-or-nothing."""
+def update(items: str) -> None:
+    """Write the given configs' fragments at my own user scope, all-or-nothing.
+
+    Each item replaces my fragment for its config name, or creates it when I hold none.
+    Every item lands or none does.
+    """
     from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
         MyUpsertAppConfigFragmentsInput,
     )

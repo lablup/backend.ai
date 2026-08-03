@@ -105,7 +105,7 @@ def get(
     run_async(_run)
 
 
-@app_config_fragment.command(name="bulk-upsert")
+@app_config_fragment.command()
 @click.option(
     "--scope-type",
     required=True,
@@ -126,8 +126,12 @@ def get(
         "holding it."
     ),
 )
-def bulk_upsert(scope_type: str, scope_id: uuid.UUID | None, items: str) -> None:
-    """Upsert many fragments at one scope, all-or-nothing."""
+def update(scope_type: str, scope_id: uuid.UUID | None, items: str) -> None:
+    """Write the given configs' fragments at one scope, all-or-nothing.
+
+    Each item replaces the scope's fragment for its config name, or creates it when the
+    scope holds none. Every item lands or none does.
+    """
     from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
         AppConfigScopeRef,
         ScopedUpsertAppConfigFragmentsInput,
