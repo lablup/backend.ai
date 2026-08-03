@@ -1100,6 +1100,16 @@ async def webapp_ctx(
     )
     cors.add(app.router.add_route("POST", "/func/{path:auth/signup}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:auth/signout}", manager_web_handler))
+    # The manager serves these two without auth so a client can read config before it holds
+    # credentials. Proxying them through `manager_web_handler` would defeat that: it demands a
+    # browser session and answers 401 before the request ever leaves the webserver. Exact paths
+    # rather than a prefix, so widening the anonymous surface stays a deliberate edit.
+    cors.add(
+        app.router.add_route("POST", "/func/{path:admin/gql/strawberry/public}", anon_web_handler)
+    )
+    cors.add(
+        app.router.add_route("POST", "/func/{path:v2/app-config/public/get}", anon_web_handler)
+    )
     cors.add(
         app.router.add_route("GET", "/func/{path:stream/kernel/_/events}", manager_web_handler)
     )
