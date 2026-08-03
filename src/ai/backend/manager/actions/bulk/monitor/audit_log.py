@@ -9,7 +9,7 @@ from ai.backend.manager.actions.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.bulk.monitor.base import BulkActionMonitor
 from ai.backend.manager.actions.bulk.result import BulkActionProcessResult
 from ai.backend.manager.actions.types import BLANK_ID
-from ai.backend.manager.repositories.audit_log.creators import AuditLogCreatorSpec
+from ai.backend.manager.repositories.audit_log.creators import BulkAuditLogCreatorSpec
 from ai.backend.manager.repositories.audit_log.repository import AuditLogRepository
 from ai.backend.manager.repositories.base import BulkCreator
 
@@ -42,14 +42,14 @@ class BulkActionAuditLogMonitor(BulkActionMonitor):
         request_id = current_request_id() or BLANK_ID
         bulk_creator = BulkCreator(
             specs=[
-                AuditLogCreatorSpec(
+                BulkAuditLogCreatorSpec(
                     action_id=meta.action_id,
                     entity_type=action.entity_type(),
                     operation=action.operation_type(),
                     created_at=meta.started_at,
                     description=meta.description,
                     status=meta.status,
-                    entity_id=str(entity_id),
+                    entity_id=entity_id,
                     request_id=request_id,
                     triggered_by=str(trigger.user_id) if trigger else None,
                     acted_as=acting.user_id if acting else None,

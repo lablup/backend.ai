@@ -18,6 +18,18 @@ class OperationStatus(enum.StrEnum):
     RUNNING = "running"
 
 
+class ActionKind(enum.StrEnum):
+    """The shape of an action's target, recorded on every audit row."""
+
+    SINGLE_ENTITY = "single_entity"
+    BULK = "bulk"
+    SCOPE = "scope"
+    GLOBAL = "global"
+    LOOKUP = "lookup"
+    # Still on the legacy ``BaseAction`` base, which declares no shape.
+    UNKNOWN = "unknown"
+
+
 class ActionOperationType(enum.StrEnum):
     GET = "get"
     SEARCH = "search"

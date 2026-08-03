@@ -4,19 +4,29 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from ai.backend.manager.actions.types import OperationStatus
+from ai.backend.manager.actions.types import ActionKind, OperationStatus
 
 
 @dataclass
 class AuditLogData:
+    """One audit record, mirroring the row.
+
+    ``action_kind`` says which shape wrote it, so only the target columns belonging
+    to that shape are set. Writers use the per-shape creator specs, which is where
+    that invariant is enforced.
+    """
+
     id: uuid.UUID
     action_id: uuid.UUID
+    action_kind: ActionKind | None
     entity_type: str
     operation: str
     created_at: datetime
     description: str
     status: OperationStatus
     entity_id: str | None
+    lookup_kind: str | None
+    lookup_key: str | None
     request_id: str | None
     triggered_by: str | None
     acted_as: uuid.UUID | None

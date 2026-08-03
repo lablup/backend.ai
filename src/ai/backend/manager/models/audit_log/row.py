@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.actions.types import OperationStatus
+from ai.backend.manager.actions.types import ActionKind, OperationStatus
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.models.base import (
     GUID,
@@ -23,10 +23,19 @@ __all__ = ("AuditLogRow",)
 
 
 class AuditLogRow(Base):  # type: ignore[misc]
+    """One audit record. ``action_kind`` says which shape wrote it; the target columns
+    carry what that shape has. NULL ``action_kind`` means the row predates the column.
+    """
+
     __tablename__ = "audit_logs"
+    __table_args__ = (sa.Index("ix_audit_logs_lookup", "lookup_kind", "lookup_key"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+
+    action_kind: Mapped[ActionKind | None] = mapped_column(
+        "action_kind", StrEnumType(ActionKind), nullable=True
     )
 
     entity_type: Mapped[str] = mapped_column("entity_type", sa.String, index=True, nullable=False)
@@ -38,6 +47,11 @@ class AuditLogRow(Base):  # type: ignore[misc]
         nullable=True,
         index=True,
     )
+
+    # Plain indexed columns, not JSON: a lookup's key is the only thing identifying its
+    # row, so it has to be filterable with the same string conditions as everything else.
+    lookup_kind: Mapped[str | None] = mapped_column("lookup_kind", sa.String, nullable=True)
+    lookup_key: Mapped[str | None] = mapped_column("lookup_key", sa.String, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
@@ -68,7 +82,10 @@ class AuditLogRow(Base):  # type: ignore[misc]
         description: str,
         created_at: datetime,
         status: OperationStatus,
+        action_kind: ActionKind | None = None,
         entity_id: str | uuid.UUID | None = None,
+        lookup_kind: str | None = None,
+        lookup_key: str | None = None,
         request_id: str | None = None,
         triggered_by: str | None = None,
         acted_as: uuid.UUID | None = None,
@@ -77,7 +94,10 @@ class AuditLogRow(Base):  # type: ignore[misc]
         self.entity_type = entity_type
         self.operation = operation
         self.action_id = action_id
+        self.action_kind = action_kind
         self.entity_id = str(entity_id) if isinstance(entity_id, uuid.UUID) else entity_id
+        self.lookup_kind = lookup_kind
+        self.lookup_key = lookup_key
         self.request_id = request_id
         self.triggered_by = triggered_by
         self.acted_as = acted_as
@@ -93,7 +113,10 @@ class AuditLogRow(Base):  # type: ignore[misc]
             f"entity_type: {self.entity_type}, "
             f"operation: {self.operation}, "
             f"created_at: {self.created_at}, "
+            f"action_kind: {self.action_kind}, "
             f"entity_id: {self.entity_id}, "
+            f"lookup_kind: {self.lookup_kind}, "
+            f"lookup_key: {self.lookup_key}, "
             f"action_id: {self.action_id}, "
             f"request_id: {self.request_id}, "
             f"triggered_by: {self.triggered_by}, "
@@ -112,12 +135,15 @@ class AuditLogRow(Base):  # type: ignore[misc]
         return AuditLogData(
             id=self.id,
             action_id=self.action_id,
+            action_kind=self.action_kind,
             entity_type=self.entity_type,
             operation=self.operation,
             created_at=self.created_at,
             description=self.description,
             status=self.status,
             entity_id=self.entity_id,
+            lookup_kind=self.lookup_kind,
+            lookup_key=self.lookup_key,
             request_id=self.request_id,
             triggered_by=self.triggered_by,
             acted_as=self.acted_as,

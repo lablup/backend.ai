@@ -9,7 +9,9 @@ from ai.backend.manager.actions.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.actions.single_entity.monitor.base import SingleEntityActionMonitor
 from ai.backend.manager.actions.single_entity.result import SingleEntityActionProcessResult
 from ai.backend.manager.actions.types import BLANK_ID
-from ai.backend.manager.repositories.audit_log.creators import AuditLogCreatorSpec
+from ai.backend.manager.repositories.audit_log.creators import (
+    SingleEntityAuditLogCreatorSpec,
+)
 from ai.backend.manager.repositories.audit_log.repository import AuditLogRepository
 from ai.backend.manager.repositories.base import Creator
 
@@ -40,14 +42,14 @@ class SingleEntityActionAuditLogMonitor(SingleEntityActionMonitor):
         acting = current_user()
         meta = result.meta
         creator = Creator(
-            spec=AuditLogCreatorSpec(
+            spec=SingleEntityAuditLogCreatorSpec(
                 action_id=meta.action_id,
                 entity_type=action.entity_type(),
                 operation=action.operation_type(),
                 created_at=meta.started_at,
                 description=meta.description,
                 status=meta.status,
-                entity_id=str(meta.entity_id),
+                entity_id=meta.entity_id,
                 request_id=current_request_id() or BLANK_ID,
                 triggered_by=str(trigger.user_id) if trigger else None,
                 acted_as=acting.user_id if acting else None,

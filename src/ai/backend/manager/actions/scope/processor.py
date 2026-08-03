@@ -4,11 +4,13 @@ from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
 
 from ai.backend.common.exception import BackendAIError, ErrorCode
+from ai.backend.common.identifier.entity import EntityID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.scope.base import BaseScopeAction
 from ai.backend.manager.actions.scope.monitor import ScopeActionMonitor
 from ai.backend.manager.actions.scope.result import (
+    BaseScopeActionResult,
     ScopeActionProcessResult,
     ScopeActionResultMeta,
 )
@@ -20,7 +22,7 @@ __all__ = ("ScopeActionProcessor",)
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class ScopeActionProcessor[TAction: BaseScopeAction, TResult]:
+class ScopeActionProcessor[TAction: BaseScopeAction, TResult: BaseScopeActionResult]:
     """Validate, run monitors around, then execute a scope action.
 
     Each registered validator runs first. The action function then executes within a
@@ -70,6 +72,7 @@ class ScopeActionProcessor[TAction: BaseScopeAction, TResult]:
         status = OperationStatus.UNKNOWN
         description = "unknown"
         error_code: ErrorCode | None = None
+        entity_ids: Sequence[EntityID] = []
 
         await self._prepare_monitors(action, trigger_meta)
         try:
@@ -87,6 +90,7 @@ class ScopeActionProcessor[TAction: BaseScopeAction, TResult]:
             error_code = ErrorCode.default()
             raise
         else:
+            entity_ids = result.entity_ids()
             status = OperationStatus.SUCCESS
             description = "Success"
             return result
@@ -95,6 +99,7 @@ class ScopeActionProcessor[TAction: BaseScopeAction, TResult]:
             meta = ScopeActionResultMeta(
                 action_id=action_id,
                 scope_targets=action.scope_targets(),
+                entity_ids=entity_ids,
                 status=status,
                 description=description,
                 started_at=started_at,
