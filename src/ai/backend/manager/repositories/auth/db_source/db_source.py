@@ -35,9 +35,9 @@ from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     GroupMembershipNotFoundError,
     LoginSessionNotFoundError,
-    UserCreationError,
 )
 from ai.backend.manager.errors.common import InternalServerError
+from ai.backend.manager.errors.user import UserCreationBadRequest
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
@@ -55,11 +55,10 @@ from ai.backend.manager.models.user import (
     users,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.auth.creators import SignupUserCreatorSpec
 from ai.backend.manager.repositories.base.pagination import NoPagination
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.ops.rbac.provider import FullUserCreation, RBACOpsProvider
-from ai.backend.manager.repositories.user.creators import UserScopeCreation
+from ai.backend.manager.repositories.user.creators import UserCreatorSpec, UserScopeCreation
 
 auth_db_source_resilience = Resilience(
     policies=[
@@ -139,7 +138,7 @@ class AuthDBSource:
     @auth_db_source_resilience.apply()
     async def insert_user_with_keypair(
         self,
-        user_data: dict[str, Any],
+        user_spec: UserCreatorSpec,
         project_ids: Collection[ProjectID],
         *,
         keypair_resource_policy: str,
@@ -148,18 +147,17 @@ class AuthDBSource:
         """Provision a signup user in one transaction: the row, its default keypair,
         and its domain/project (model-store included) scope enrollments."""
         async with self._rbac_ops_provider.write_ops() as w:
-            domain_name = user_data["domain_name"]
             domain_result = await w.batch_query_in_global(
-                sa.select(DomainRow.id).where(DomainRow.name == domain_name),
+                sa.select(DomainRow.id).where(DomainRow.name == user_spec.domain_name),
                 BatchQuerier(pagination=NoPagination()),
             )
             if not domain_result.rows:
-                raise UserCreationError(f"Domain '{domain_name}' does not exist")
+                raise UserCreationBadRequest(f"Domain '{user_spec.domain_name}' does not exist.")
             domain_id = DomainID(domain_result.rows[0].id)
 
             result = await w.create_full_user(
                 FullUserCreation(
-                    creation=UserScopeCreation(spec=SignupUserCreatorSpec(user_data)),
+                    creation=UserScopeCreation(spec=user_spec),
                     domain_id=domain_id,
                     project_ids=project_ids,
                     keypair_resource_policy=keypair_resource_policy,

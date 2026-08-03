@@ -65,6 +65,7 @@ class UserCreatorSpec(CreatorSpec[UserRow]):
     description: str | None = None
     is_active: bool | None = None
     status: UserStatus | None = None
+    status_info: str | None = None
     role: str | None = None
     allowed_client_ip: list[str] | None = None
     totp_activated: bool | None = None
@@ -108,6 +109,7 @@ class UserCreatorSpec(CreatorSpec[UserRow]):
             full_name=self.full_name,
             description=self.description,
             status=status,
+            status_info=self.status_info,
             domain_name=self.domain_name,
             role=UserRole(self.role) if self.role is not None else UserRole.USER,
             resource_policy=self.resource_policy if self.resource_policy is not None else "default",

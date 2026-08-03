@@ -1,6 +1,5 @@
 from collections.abc import Collection
 from datetime import datetime
-from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -32,6 +31,7 @@ from ai.backend.manager.repositories.auth.db_source.db_source import (
     LoginSessionCreationResult,
 )
 from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 
 auth_repository_resilience = Resilience(
     policies=[
@@ -57,14 +57,14 @@ class AuthRepository:
     @auth_repository_resilience.apply()
     async def create_user_with_keypair(
         self,
-        user_data: dict[str, Any],
+        user_spec: UserCreatorSpec,
         project_ids: Collection[ProjectID],
         *,
         keypair_resource_policy: str,
         keypair_rate_limit: int,
     ) -> UserCreationData:
         return await self._db_source.insert_user_with_keypair(
-            user_data,
+            user_spec,
             project_ids,
             keypair_resource_policy=keypair_resource_policy,
             keypair_rate_limit=keypair_rate_limit,

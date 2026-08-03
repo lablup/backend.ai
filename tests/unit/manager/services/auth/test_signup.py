@@ -8,8 +8,8 @@ import pytest
 
 from ai.backend.common.plugin.hook import HookResult, HookResults
 from ai.backend.manager.data.auth.types import UserCreationData
-from ai.backend.manager.errors.auth import EmailAlreadyExistsError, UserCreationError
-from ai.backend.manager.errors.common import InternalServerError
+from ai.backend.manager.errors.auth import EmailAlreadyExistsError
+from ai.backend.manager.errors.user import UserCreationBadRequest
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
@@ -213,12 +213,12 @@ async def test_signup_with_hook_override(
 
     # Verify the repository was called with modified user/keypair data
     call_args = mock_auth_repository.create_user_with_keypair.call_args
-    user_data = call_args.kwargs["user_data"]
+    user_spec = call_args.kwargs["user_spec"]
 
-    assert user_data["full_name"] == "Modified by Hook"
-    assert user_data["description"] == "Hook modified description"
-    assert user_data["status"] == UserStatus.BEFORE_VERIFICATION
-    assert user_data["role"] == UserRole.ADMIN
+    assert user_spec.full_name == "Modified by Hook"
+    assert user_spec.description == "Hook modified description"
+    assert user_spec.status == UserStatus.BEFORE_VERIFICATION
+    assert user_spec.role == UserRole.ADMIN
     assert call_args.kwargs["keypair_resource_policy"] == "premium"
     assert call_args.kwargs["project_ids"] == [project_id]
 
@@ -255,12 +255,12 @@ async def test_signup_creation_error(
     )
 
     mock_auth_repository.check_email_exists.return_value = False
-    mock_auth_repository.create_user_with_keypair.side_effect = UserCreationError("Database error")
+    mock_auth_repository.create_user_with_keypair.side_effect = UserCreationBadRequest(
+        "Failed to create user due to database constraint violation"
+    )
 
-    with pytest.raises(InternalServerError) as exc_info:
+    with pytest.raises(UserCreationBadRequest):
         await auth_service.signup(action)
-
-    assert "Error creating user account" in str(exc_info.value)
 
 
 async def test_signup_post_hook_notification(
