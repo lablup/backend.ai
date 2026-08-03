@@ -24,7 +24,6 @@ from ai.backend.common.dto.manager.v2.app_config.request import (
 )
 
 if TYPE_CHECKING:
-    from tests.component.app_config.conftest import SeededConfigs
     from tests.component.conftest import ServerInfo, UserFixtureData
 
 
@@ -60,24 +59,24 @@ class TestAnonymousReach:
     async def test_public_read_answers_a_caller_with_no_credentials(
         self,
         anonymous_v2_registry: V2ClientRegistry,
-        merged_fragments: SeededConfigs,
+        merged_fragments: None,
     ) -> None:
         """The route carries no auth middleware, so the request must reach the handler."""
         result = await anonymous_v2_registry.app_config.public_get_app_configs(
-            PublicGetAppConfigsInput(config_names=[merged_fragments.contributed])
+            PublicGetAppConfigsInput(config_names=["contributed"])
         )
 
-        assert [node.config_name for node in result.app_configs] == [merged_fragments.contributed]
+        assert [node.config_name for node in result.app_configs] == ["contributed"]
 
     async def test_authenticated_read_rejects_the_same_caller(
         self,
         anonymous_v2_registry: V2ClientRegistry,
-        merged_fragments: SeededConfigs,
+        merged_fragments: None,
     ) -> None:
         """Its sibling route is still gated — the public one is the only way in unauthenticated."""
         with pytest.raises(AuthenticationError):
             await anonymous_v2_registry.app_config.my_get_app_configs(
-                MyGetAppConfigsInput(config_names=[merged_fragments.contributed])
+                MyGetAppConfigsInput(config_names=["contributed"])
             )
 
 
@@ -85,10 +84,10 @@ class TestPrincipalDecidesTheMerge:
     async def test_the_authenticated_read_carries_the_callers_own_overlay(
         self,
         user_v2_registry: V2ClientRegistry,
-        merged_fragments: SeededConfigs,
+        merged_fragments: None,
     ) -> None:
         result = await user_v2_registry.app_config.my_get_app_configs(
-            MyGetAppConfigsInput(config_names=[merged_fragments.contributed])
+            MyGetAppConfigsInput(config_names=["contributed"])
         )
 
         merged = result.app_configs[0]
@@ -98,10 +97,10 @@ class TestPrincipalDecidesTheMerge:
     async def test_the_public_read_sees_only_public_over_the_same_data(
         self,
         anonymous_v2_registry: V2ClientRegistry,
-        merged_fragments: SeededConfigs,
+        merged_fragments: None,
     ) -> None:
         result = await anonymous_v2_registry.app_config.public_get_app_configs(
-            PublicGetAppConfigsInput(config_names=[merged_fragments.contributed])
+            PublicGetAppConfigsInput(config_names=["contributed"])
         )
 
         merged = result.app_configs[0]
@@ -113,18 +112,16 @@ class TestPayloadShape:
     async def test_an_uncontributed_name_serializes_as_an_empty_merge(
         self,
         user_v2_registry: V2ClientRegistry,
-        merged_fragments: SeededConfigs,
+        merged_fragments: None,
     ) -> None:
         """A name nothing contributes to holds its place instead of failing the response."""
         result = await user_v2_registry.app_config.my_get_app_configs(
-            MyGetAppConfigsInput(
-                config_names=[merged_fragments.contributed, merged_fragments.uncontributed]
-            )
+            MyGetAppConfigsInput(config_names=["contributed", "uncontributed"])
         )
 
         assert [node.config_name for node in result.app_configs] == [
-            merged_fragments.contributed,
-            merged_fragments.uncontributed,
+            "contributed",
+            "uncontributed",
         ]
         uncontributed = result.app_configs[1]
         assert uncontributed.merged_config == {}

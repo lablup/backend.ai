@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
@@ -29,20 +28,6 @@ from ai.backend.manager.services.app_config.service import AppConfigService
 
 if TYPE_CHECKING:
     from tests.component.conftest import UserFixtureData
-
-_CONTRIBUTED = "theme"
-_UNCONTRIBUTED = "menu"
-
-
-@dataclass(frozen=True)
-class SeededConfigs:
-    """What ``merged_fragments`` put in the database, for the tests to ask about."""
-
-    contributed: str
-    """Allow-listed at every scope, with a public fragment the caller's own overrides."""
-
-    uncontributed: str
-    """Registered and allow-listed, but carrying no fragment at any scope."""
 
 
 @pytest.fixture()
@@ -77,9 +62,14 @@ def server_module_registries(
 async def merged_fragments(
     db_engine: SAEngine,
     regular_user_fixture: UserFixtureData,
-) -> AsyncIterator[SeededConfigs]:
-    """One config name two scopes contribute to, and one nothing contributes to."""
-    config_names = [_CONTRIBUTED, _UNCONTRIBUTED]
+) -> AsyncIterator[None]:
+    """Registers two config names, each named after the role it plays in the tests.
+
+    ``contributed`` is allow-listed at every scope and holds a public fragment the caller's
+    own overrides; ``uncontributed`` is registered and allow-listed but holds no fragment
+    anywhere, standing for a requested name nothing merges into.
+    """
+    config_names = ["contributed", "uncontributed"]
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.insert(AppConfigDefinitionRow.__table__).values([
@@ -101,21 +91,21 @@ async def merged_fragments(
             sa.insert(AppConfigFragmentRow.__table__).values([
                 {
                     "id": uuid.uuid4(),
-                    "config_name": _CONTRIBUTED,
+                    "config_name": "contributed",
                     "scope_type": AppConfigScopeType.PUBLIC,
                     "scope_id": None,
                     "config": {"mode": "light", "lang": "en"},
                 },
                 {
                     "id": uuid.uuid4(),
-                    "config_name": _CONTRIBUTED,
+                    "config_name": "contributed",
                     "scope_type": AppConfigScopeType.USER,
                     "scope_id": regular_user_fixture.user_uuid,
                     "config": {"mode": "dark"},
                 },
             ])
         )
-    yield SeededConfigs(contributed=_CONTRIBUTED, uncontributed=_UNCONTRIBUTED)
+    yield
     # The definition cascades to its allow-list entries and their fragments.
     async with db_engine.begin() as conn:
         await conn.execute(
