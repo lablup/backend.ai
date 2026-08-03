@@ -16,8 +16,10 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, foreign, joinedload, mapped_column, relationship, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
+from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -150,8 +152,8 @@ class UserRow(Base):  # type: ignore[misc]
     uuid: Mapped[uuid_mod.UUID] = mapped_column(
         "uuid", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    username: Mapped[str | None] = mapped_column(
-        "username", sa.String(length=64), unique=True, nullable=True
+    username: Mapped[str] = mapped_column(
+        "username", sa.String(length=64), unique=True, nullable=False
     )
     email: Mapped[str] = mapped_column(
         "email", sa.String(length=64), index=True, nullable=False, unique=True
@@ -297,6 +299,14 @@ class UserRow(Base):  # type: ignore[misc]
         back_populates="user_row",
         primaryjoin=_get_role_assignments_join_condition,
     )
+
+    @classmethod
+    def scope_id_expr(cls) -> SQLColumnExpression[ScopeID]:
+        return cls.uuid
+
+    @classmethod
+    def scope_name_expr(cls) -> SQLColumnExpression[str]:
+        return cls.username
 
     @classmethod
     def load_keypairs(cls) -> _AbstractLoad:

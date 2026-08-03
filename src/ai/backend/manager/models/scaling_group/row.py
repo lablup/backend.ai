@@ -28,10 +28,11 @@ from sqlalchemy.orm import (
     relationship,
     selectinload,
 )
-from sqlalchemy.sql.expression import false, true
+from sqlalchemy.sql.expression import SQLColumnExpression, false, true
 
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.common.schema.resource_group import PreemptionConfig
 from ai.backend.common.types import (
     AgentSelectionStrategy,
@@ -358,6 +359,14 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
         back_populates="scaling_group_row",
         primaryjoin=_get_resource_preset_join_condition,
     )
+
+    @classmethod
+    def scope_id_expr(cls) -> SQLColumnExpression[ScopeID]:
+        return cls.id
+
+    @classmethod
+    def scope_name_expr(cls) -> SQLColumnExpression[str]:
+        return cls.name
 
     def to_dataclass(self) -> ScalingGroupData:
         """Convert Row to domain model data."""

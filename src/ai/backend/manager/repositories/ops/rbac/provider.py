@@ -8,31 +8,34 @@ from collections import defaultdict
 from collections.abc import AsyncIterator, Collection, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import override
+from typing import ClassVar, Protocol, override
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-from ai.backend.common.data.entity.types import EntityRef, ScopeRef
+from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_SCOPE_TYPE
+from ai.backend.common.data.entity.types import EntityRef, ScopeRef, ScopeType
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE
 from ai.backend.common.data.permission.types import (
     Permission,
     RBACElementType,
     RelationType,
-    ScopeType,
 )
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import RBACTypeConversionError, UnreachableError
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.role_preset import RolePresetID
+from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.identifier.virtual_scope import VirtualScopeID
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairSecrets
 from ai.backend.manager.data.permission.id import ScopeId
+from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     EntityType,
@@ -58,6 +61,7 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
 from ai.backend.manager.models.user import UserRow, UserStatus
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
@@ -213,8 +217,74 @@ class ScopeBatchDeletion[TRow: Base]:
     scopes: Sequence[ScopeRef]
 
 
+class ScopeSource(Protocol):
+    """A Row queryable as an RBAC scope: its scope-id and display-name expressions."""
+
+    @classmethod
+    def scope_id_expr(cls) -> SQLColumnExpression[ScopeID]:
+        """Column whose value is used as ``ScopeRef.scope_id``."""
+        ...
+
+    @classmethod
+    def scope_name_expr(cls) -> SQLColumnExpression[str]:
+        """Expression rendering the scope's display name."""
+        ...
+
+
 class RBACWriteOps(WriteOps):
     """Base write ops plus RBAC scope-associated creation and virtual-scope writes."""
+
+    _scope_rows: ClassVar[Mapping[ScopeType, type[ScopeSource]]] = {
+        DOMAIN_SCOPE_TYPE: DomainRow,
+        PROJECT_SCOPE_TYPE: GroupRow,
+        RESOURCE_GROUP_SCOPE_TYPE: ScalingGroupRow,
+        USER_SCOPE_TYPE: UserRow,
+    }
+
+    async def _resolve_scope_template_values(
+        self, scopes: Collection[ScopeRef]
+    ) -> dict[ScopeRef, ScopeTemplateValue | None]:
+        """Resolve the scope attributes exposed to role name templates with a
+        single UNION ALL query over the registered scope rows.
+
+        Scopes of unregistered types or whose row is gone map to None.
+        """
+        names: dict[ScopeRef, str | None] = dict.fromkeys(scopes)
+        ids_by_type: dict[ScopeType, list[ScopeID]] = defaultdict(list)
+        for s in scopes:
+            ids_by_type[s.scope_type].append(s.scope_id)
+        selects: list[sa.Select[tuple[str, ScopeID, str]]] = []
+        for scope_type, ids in ids_by_type.items():
+            row_cls = self._scope_rows.get(scope_type)
+            if row_cls is None:
+                continue
+            selects.append(
+                sa.select(
+                    sa.literal(str(scope_type)),
+                    row_cls.scope_id_expr(),
+                    row_cls.scope_name_expr(),
+                ).where(row_cls.scope_id_expr().in_(ids))
+            )
+        if selects:
+            result = await self._sess.execute(sa.union_all(*selects))
+            for scope_type_value, scope_id, scope_name in result.tuples():
+                ref = ScopeRef(
+                    scope_type=ScopeType(scope_type_value),
+                    scope_id=scope_id,
+                )
+                names[ref] = scope_name
+        return {
+            scope: (
+                ScopeTemplateValue(
+                    id=scope.scope_id,
+                    name=name,
+                    type=str(scope.scope_type),
+                )
+                if name is not None
+                else None
+            )
+            for scope, name in names.items()
+        }
 
     # -- Virtual-scope helpers ----------------------------------------------------
 
@@ -560,7 +630,7 @@ class RBACWriteOps(WriteOps):
             operations_by_preset[preset_permission.role_preset_id][
                 preset_permission.entity_type.to_element()
             ].append(preset_permission.operation)
-        presets_by_scope_type: dict[ScopeType, list[RolePresetRow]] = defaultdict(list)
+        presets_by_scope_type: dict[LegacyScopeType, list[RolePresetRow]] = defaultdict(list)
         for preset in preset_rows:
             presets_by_scope_type[preset.scope_type].append(preset)
         return [
