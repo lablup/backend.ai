@@ -224,7 +224,7 @@ class TestAppConfigService:
         duplicate_name_fragments: list[AppConfigFragmentData],
     ) -> None:
         # A config_name repeated in the request must be repeated in the output — each
-        # position resolves independently, never collapsed into a single entry.
+        # position is merged independently, never collapsed into a single entry.
         result = await service.get_app_configs(
             GetAppConfigsAction(config_names=["theme", "theme"], user_id=_USER_ID)
         )
@@ -250,7 +250,7 @@ class TestAppConfigService:
         two_name_fragments: list[AppConfigFragmentData],
     ) -> None:
         # "unknown" contributes nothing, so the call fails as a whole — the names that did
-        # resolve are not returned alongside it.
+        # contribute are not returned alongside it.
         with pytest.raises(AppConfigFragmentNotFound):
             await service.get_app_configs(
                 GetAppConfigsAction(config_names=["theme", "menu", "unknown"], user_id=_USER_ID)
