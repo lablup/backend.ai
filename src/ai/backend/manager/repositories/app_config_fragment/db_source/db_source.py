@@ -9,6 +9,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -27,9 +28,7 @@ from ai.backend.manager.errors.app_config import (
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
-from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.scopes import SearchScope
-from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
     AppConfigFragmentPurgerSpec,
 )
@@ -185,14 +184,14 @@ class AppConfigFragmentDBSource:
 
     @app_config_fragment_db_source_resilience.apply()
     async def list_visible_fragments_bulk(
-        self, config_names: list[str], user_id: UserID | None
+        self, config_names: list[str], user_id: UserID | None, domain_id: DomainID | None
     ) -> list[AppConfigFragmentData]:
         """Visible fragments for several ``config_names``, ordered by ascending ``rank``.
 
         ``public`` always contributes; a ``user_id`` additionally admits that user's own
-        overlay and its domain's, while ``user_id=None`` (anonymous) sees only ``public``.
-        Rank-ordered so the caller can group by name and deep-merge each name's fragments
-        in order.
+        overlay and a ``domain_id`` its domain's, while naming neither (anonymous) sees only
+        ``public``. Both come from the session, so neither is looked up here. Rank-ordered so
+        the caller can group by name and deep-merge each name's fragments in order.
         """
         if not config_names:
             return []
@@ -209,18 +208,8 @@ class AppConfigFragmentDBSource:
             scope_visibility = [AppConfigFragmentConditions.by_public_visibility()]
             if user_id is not None:
                 scope_visibility.append(AppConfigFragmentConditions.by_user_visibility(user_id))
-                # A user names its domain by name while a fragment's domain scope keys off the
-                # id, so the id is looked up first; no resolvable domain means no overlay.
-                user = await r.query(Querier(row_class=UserRow, pk_value=user_id))
-                domain = (
-                    await r.query(Querier(row_class=DomainRow, pk_value=user.row.domain_name))
-                    if user is not None and user.row.domain_name is not None
-                    else None
-                )
-                if domain is not None:
-                    scope_visibility.append(
-                        AppConfigFragmentConditions.by_domain_visibility(domain.row.id)
-                    )
+            if domain_id is not None:
+                scope_visibility.append(AppConfigFragmentConditions.by_domain_visibility(domain_id))
             querier = BatchQuerier(
                 pagination=NoPagination(),
                 conditions=[

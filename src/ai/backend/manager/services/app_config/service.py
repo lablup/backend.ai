@@ -52,11 +52,11 @@ class AppConfigService:
         """Get the merged ``AppConfig`` for each of ``config_names``.
 
         One entry per requested name, in request order; a repeated name is repeated in the
-        output. Without a ``user_id`` only ``public`` fragments contribute. A name nothing
+        output. Without a principal only ``public`` fragments contribute. A name nothing
         contributes to yields an empty merge rather than failing the whole call.
         """
         fragments = await self._fragment_repository.list_visible_fragments_bulk(
-            action.config_names, action.user_id
+            action.config_names, action.user_id, action.domain_id
         )
         app_configs: list[AppConfigData] = []
         for config_name in action.config_names:

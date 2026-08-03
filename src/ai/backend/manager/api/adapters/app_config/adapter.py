@@ -30,7 +30,11 @@ class AppConfigAdapter(BaseAdapter):
             # ``auth_required`` guarantees a session on this route, so this is never hit.
             raise UnreachableError("User context is not available")
         action_result = await self._processors.app_config.get_app_configs.wait_for_complete(
-            GetAppConfigsAction(config_names=input.config_names, user_id=UserID(me.user_id))
+            GetAppConfigsAction(
+                config_names=input.config_names,
+                user_id=UserID(me.user_id),
+                domain_id=me.domain_id,
+            )
         )
         return GetAppConfigsPayload(
             app_configs=[

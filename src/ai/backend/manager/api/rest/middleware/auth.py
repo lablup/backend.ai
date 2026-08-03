@@ -54,6 +54,7 @@ from ai.backend.manager.errors.auth import (
     UserNotFound,
 )
 from ai.backend.manager.errors.common import GenericForbidden, InternalServerError, RejectedByHook
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.resource_policy import (
     keypair_resource_policies,
@@ -487,15 +488,23 @@ async def _query_cred_by_access_key(
         if keypair_row is None:
             return None, None
 
-        j = users.join(
-            user_resource_policies,
-            users.c.resource_policy == user_resource_policies.c.name,
-        ).join(
-            keypairs,
-            users.c.uuid == keypairs.c.user,
+        j = (
+            users.join(
+                user_resource_policies,
+                users.c.resource_policy == user_resource_policies.c.name,
+            )
+            .join(
+                keypairs,
+                users.c.uuid == keypairs.c.user,
+            )
+            # A user names its domain, so the id comes from here rather than a later lookup.
+            .join(
+                DomainRow.__table__,
+                users.c.domain_name == DomainRow.__table__.c.name,
+            )
         )
         query = (
-            sa.select(users, user_resource_policies)
+            sa.select(users, user_resource_policies, DomainRow.__table__.c.id.label("domain_id"))
             .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
             .select_from(j)
             .where(keypairs.c.access_key == access_key)
@@ -542,6 +551,7 @@ def _populate_auth_result(
         col.name: user_mapping[f"user_resource_policies_{col.name}"]
         for col in user_resource_policies.c
     }
+    auth_result["user"]["domain_id"] = user_mapping["domain_id"]
     auth_result["user"]["id"] = keypair_mapping["keypairs_user_id"]  # legacy
     auth_result["is_superadmin"] = auth_result["user"]["role"] == "superadmin"
 
@@ -652,25 +662,29 @@ async def _authenticate_via_hook(
 async def _load_user_data(db: ExtendedAsyncSAEngine, user_id: UserID) -> UserData:
     """Load a user's ``UserData`` by UUID (impersonation target). Raises if not found."""
 
-    async def _query() -> UserRow | None:
+    async def _query() -> sa.Row[Any] | None:
         async with db.begin_readonly_session_read_committed() as session:
-            row: UserRow | None = await session.scalar(
-                sa.select(UserRow).where(UserRow.uuid == user_id)
+            result = await session.execute(
+                sa.select(UserRow, DomainRow.id.label("domain_id"))
+                .join(DomainRow, UserRow.domain_name == DomainRow.name)
+                .where(UserRow.uuid == user_id)
             )
-            return row
+            return result.first()
 
     row = await execute_with_retry(_query)
     if row is None:
         raise UserNotFound("Impersonation target user not found")
-    if row.role is None or row.domain_name is None:
+    user_row: UserRow = row.UserRow
+    if user_row.role is None or user_row.domain_name is None:
         raise InternalServerError(f"Impersonation target user is misconfigured (user_id={user_id})")
     return UserData(
-        user_id=row.uuid,
+        user_id=user_row.uuid,
         is_authorized=True,
-        is_admin=row.role in (UserRole.ADMIN, UserRole.SUPERADMIN),
-        is_superadmin=row.role == UserRole.SUPERADMIN,
-        role=row.role,
-        domain_name=row.domain_name,
+        is_admin=user_row.role in (UserRole.ADMIN, UserRole.SUPERADMIN),
+        is_superadmin=user_row.role == UserRole.SUPERADMIN,
+        role=user_row.role,
+        domain_name=user_row.domain_name,
+        domain_id=row.domain_id,
     )
 
 
@@ -686,6 +700,7 @@ def _authenticated_user(request: web.Request) -> UserData | None:
         is_superadmin=request.get("is_superadmin", False),
         role=UserRole(user["role"]),
         domain_name=user["domain_name"],
+        domain_id=user["domain_id"],
     )
 
 

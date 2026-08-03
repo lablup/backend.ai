@@ -614,16 +614,18 @@ class TestVisibilityConditions:
 
 
 class TestApplicableFragments:
-    async def test_a_user_with_no_domain_row_still_sees_public_and_its_own(
+    async def test_naming_no_domain_drops_the_overlay(
         self,
         repository: AppConfigFragmentRepository,
         scope_owners: None,
         fragments_across_scopes: list[AppConfigFragmentData],
     ) -> None:
-        # An unresolvable domain drops the overlay rather than widening the query.
+        # A caller whose session carries no domain gets public and its own, never a
+        # domain's — the absent domain narrows the query rather than widening it.
         applicable = await repository.list_visible_fragments_bulk(
             ["theme"],
             UserID(uuid.uuid4()),
+            None,
         )
         expected = [
             f
@@ -641,6 +643,7 @@ class TestApplicableFragments:
         applicable = await repository.list_visible_fragments_bulk(
             ["theme"],
             _USER_ID,
+            _DOMAIN_ID,
         )
         # public + the caller's domain + the caller's own user fragment, ordered by the
         # allow-list entries' ranks (scope-type defaults: public < domain < user).
@@ -670,6 +673,7 @@ class TestApplicableFragments:
         applicable = await repository.list_visible_fragments_bulk(
             ["unregistered"],
             _USER_ID,
+            _DOMAIN_ID,
         )
         assert applicable == []
 
@@ -682,6 +686,7 @@ class TestApplicableFragments:
         applicable = await repository.list_visible_fragments_bulk(
             ["theme", "menu"],
             _USER_ID,
+            _DOMAIN_ID,
         )
         # public + the caller's domain + the caller's own user fragment, for both names.
         expected = {
@@ -710,6 +715,7 @@ class TestApplicableFragments:
         applicable = await repository.list_visible_fragments_bulk(
             [],
             _USER_ID,
+            _DOMAIN_ID,
         )
         assert applicable == []
 

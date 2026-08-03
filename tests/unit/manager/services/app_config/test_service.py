@@ -13,6 +13,7 @@ import pytest
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
 from ai.backend.manager.repositories.app_config_fragment.repository import (
@@ -22,6 +23,7 @@ from ai.backend.manager.services.app_config.actions.get import GetAppConfigsActi
 from ai.backend.manager.services.app_config.service import AppConfigService
 
 _USER_ID = UserID(uuid.uuid4())
+_DOMAIN_ID = DomainID(uuid.uuid4())
 
 # The same owner seen as a fragment's scope_id, which is polymorphic over scope kinds.
 _USER_SCOPE_ID = AppConfigScopeID(_USER_ID)
@@ -164,7 +166,7 @@ class TestAppConfigService:
         deep_merge_fragments: list[AppConfigFragmentData],
     ) -> None:
         result = await service.get_app_configs(
-            GetAppConfigsAction(config_names=["theme"], user_id=_USER_ID)
+            GetAppConfigsAction(config_names=["theme"], user_id=_USER_ID, domain_id=_DOMAIN_ID)
         )
 
         assert [c.config_name for c in result.app_configs] == ["theme"]
@@ -178,11 +180,11 @@ class TestAppConfigService:
     ) -> None:
         # The acting user is the whole scope, so a caller cannot name someone else's config.
         result = await service.get_app_configs(
-            GetAppConfigsAction(config_names=["theme"], user_id=_USER_ID)
+            GetAppConfigsAction(config_names=["theme"], user_id=_USER_ID, domain_id=_DOMAIN_ID)
         )
 
         mock_fragment_repository.list_visible_fragments_bulk.assert_called_once_with(
-            ["theme"], _USER_ID
+            ["theme"], _USER_ID, _DOMAIN_ID
         )
         assert result.scope_id() == str(_USER_ID)
 
@@ -270,5 +272,5 @@ class TestAppConfigService:
         assert result.app_configs[0].config == {"theme": "light", "lang": "en"}
         assert result._user_id is None
         mock_fragment_repository.list_visible_fragments_bulk.assert_called_once_with(
-            ["theme"], None
+            ["theme"], None, None
         )
