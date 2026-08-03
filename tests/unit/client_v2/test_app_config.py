@@ -38,8 +38,8 @@ def payload_json() -> dict[str, Any]:
     """The merged answer as the server sends it: one merged name, one nothing contributed to."""
     return {
         "app_configs": [
-            {"config_name": "theme", "merged_config": {"mode": "dark"}},
-            {"config_name": "menu", "merged_config": {}},
+            {"config_name": "theme", "config": {"mode": "dark"}},
+            {"config_name": "menu", "config": {}},
         ]
     }
 
@@ -117,8 +117,8 @@ class TestMergedRead:
         )
 
         merged, uncontributed = result.app_configs
-        assert merged.merged_config == {"mode": "dark"}
-        assert uncontributed.merged_config == {}
+        assert merged.config == {"mode": "dark"}
+        assert uncontributed.config == {}
 
     async def test_only_the_authenticated_read_is_signed(
         self,
