@@ -15,6 +15,7 @@ import pytest
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
 from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.domain.types import DomainData, UserInfo
 from ai.backend.manager.errors.resource import (
@@ -466,11 +467,11 @@ class TestCreateDomainNode:
 
         user_info = _make_user_info()
         creator = _make_creator("node-domain")
-        scaling_groups = ["sg-1", "sg-2"]
+        scaling_group_ids = [ResourceGroupID(uuid.uuid4()), ResourceGroupID(uuid.uuid4())]
         action = CreateDomainNodeAction(
             user_info=user_info,
             creator=creator,
-            scaling_groups=scaling_groups,
+            scaling_group_ids=scaling_group_ids,
         )
 
         result = await service.create_domain_node(action)
@@ -478,7 +479,7 @@ class TestCreateDomainNode:
         mock_repository.create_domain_node_with_permissions.assert_called_once_with(
             creator,
             user_info,
-            scaling_groups,
+            scaling_group_ids,
         )
         assert result.domain_data.name == "node-domain"
 
@@ -491,7 +492,7 @@ class TestCreateDomainNode:
         action = CreateDomainNodeAction(
             user_info=_make_user_info(),
             creator=creator,
-            scaling_groups=["sg-1"],
+            scaling_group_ids=[ResourceGroupID(uuid.uuid4())],
         )
 
         with pytest.raises(InvalidAPIParameters):
@@ -526,7 +527,7 @@ class TestCreateDomainNode:
         action = CreateDomainNodeAction(
             user_info=user_info,
             creator=creator,
-            scaling_groups=None,
+            scaling_group_ids=None,
         )
 
         result = await service.create_domain_node(action)
@@ -560,13 +561,13 @@ class TestModifyDomainNode:
 
         user_info = _make_user_info()
         updater = MagicMock()
-        sgroups_to_add = {"sg-new"}
-        sgroups_to_remove = {"sg-old"}
+        sgroup_ids_to_add = {ResourceGroupID(uuid.uuid4())}
+        sgroup_ids_to_remove = {ResourceGroupID(uuid.uuid4())}
         action = ModifyDomainNodeAction(
             user_info=user_info,
             updater=updater,
-            sgroups_to_add=sgroups_to_add,
-            sgroups_to_remove=sgroups_to_remove,
+            sgroup_ids_to_add=sgroup_ids_to_add,
+            sgroup_ids_to_remove=sgroup_ids_to_remove,
         )
 
         result = await service.modify_domain_node(action)
@@ -574,8 +575,8 @@ class TestModifyDomainNode:
         mock_repository.modify_domain_node_with_permissions.assert_called_once_with(
             updater,
             user_info,
-            sgroups_to_add,
-            sgroups_to_remove,
+            sgroup_ids_to_add,
+            sgroup_ids_to_remove,
         )
         assert result.domain_data.name == "mod-node"
 
@@ -585,11 +586,12 @@ class TestModifyDomainNode:
         mock_repository: MagicMock,
     ) -> None:
         updater = MagicMock()
+        sg_overlap = ResourceGroupID(uuid.uuid4())
         action = ModifyDomainNodeAction(
             user_info=_make_user_info(),
             updater=updater,
-            sgroups_to_add={"sg-overlap", "sg-ok"},
-            sgroups_to_remove={"sg-overlap"},
+            sgroup_ids_to_add={sg_overlap, ResourceGroupID(uuid.uuid4())},
+            sgroup_ids_to_remove={sg_overlap},
         )
 
         with pytest.raises(InvalidAPIParameters):
@@ -610,8 +612,8 @@ class TestModifyDomainNode:
         action = ModifyDomainNodeAction(
             user_info=user_info,
             updater=updater,
-            sgroups_to_add=None,
-            sgroups_to_remove=None,
+            sgroup_ids_to_add=None,
+            sgroup_ids_to_remove=None,
         )
 
         result = await service.modify_domain_node(action)
@@ -636,8 +638,8 @@ class TestModifyDomainNode:
         action = ModifyDomainNodeAction(
             user_info=_make_user_info(),
             updater=updater,
-            sgroups_to_add={"sg-1"},
-            sgroups_to_remove=None,
+            sgroup_ids_to_add={ResourceGroupID(uuid.uuid4())},
+            sgroup_ids_to_remove=None,
         )
 
         await service.modify_domain_node(action)

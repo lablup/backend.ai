@@ -6,6 +6,8 @@ from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.exception import ScalingGroupConflict
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
@@ -69,14 +71,14 @@ class ScalingGroupCreatorSpec(CreatorSpec[ScalingGroupRow]):
 class ScalingGroupForDomainCreatorSpec(CreatorSpec[ScalingGroupForDomainRow]):
     """CreatorSpec for associating a scaling group with a domain."""
 
-    scaling_group: str
-    domain: str
+    scaling_group_id: ResourceGroupID
+    domain_id: DomainID
 
     @override
     def build_row(self) -> ScalingGroupForDomainRow:
         return ScalingGroupForDomainRow(
-            scaling_group=self.scaling_group,
-            domain=self.domain,
+            scaling_group_id=self.scaling_group_id,
+            domain_id=self.domain_id,
         )
 
 
@@ -84,13 +86,13 @@ class ScalingGroupForDomainCreatorSpec(CreatorSpec[ScalingGroupForDomainRow]):
 class ScalingGroupForKeypairsCreatorSpec(CreatorSpec[ScalingGroupForKeypairsRow]):
     """CreatorSpec for associating a scaling group with a keypair."""
 
-    scaling_group: str
+    scaling_group_id: ResourceGroupID
     access_key: AccessKey
 
     @override
     def build_row(self) -> ScalingGroupForKeypairsRow:
         return ScalingGroupForKeypairsRow(
-            scaling_group=self.scaling_group,
+            scaling_group_id=self.scaling_group_id,
             access_key=self.access_key,
         )
 
@@ -99,12 +101,12 @@ class ScalingGroupForKeypairsCreatorSpec(CreatorSpec[ScalingGroupForKeypairsRow]
 class ScalingGroupForProjectCreatorSpec(CreatorSpec[ScalingGroupForProjectRow]):
     """CreatorSpec for associating a scaling group with a project (user group)."""
 
-    scaling_group: str
+    scaling_group_id: ResourceGroupID
     project: UUID
 
     @override
     def build_row(self) -> ScalingGroupForProjectRow:
         return ScalingGroupForProjectRow(
-            scaling_group=self.scaling_group,
+            scaling_group_id=self.scaling_group_id,
             group=self.project,
         )

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.domain.types import (
@@ -16,7 +17,7 @@ from ai.backend.manager.services.domain.actions.base import DomainAction
 class CreateDomainNodeAction(DomainAction):
     user_info: UserInfo
     creator: Creator[DomainRow]
-    scaling_groups: list[str] | None = None
+    scaling_group_ids: list[ResourceGroupID] | None = None
 
     @override
     def entity_id(self) -> str | None:

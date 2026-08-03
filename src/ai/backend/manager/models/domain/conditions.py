@@ -16,7 +16,7 @@ from ai.backend.manager.models.condition_utils import (
     make_string_in_factory,
 )
 from ai.backend.manager.models.group.row import GroupRow
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
+from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, ScalingGroupRow
 from ai.backend.manager.models.user import UserRow
 
 from .row import DomainRow
@@ -250,8 +250,13 @@ class DomainConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.exists(
                 sa.select(1)
-                .where(ScalingGroupForDomainRow.domain == DomainRow.name)
-                .where(ScalingGroupForDomainRow.scaling_group == resource_group)
+                .where(ScalingGroupForDomainRow.domain_id == DomainRow.id)
+                .where(
+                    ScalingGroupForDomainRow.scaling_group_id
+                    == sa.select(ScalingGroupRow.id)
+                    .where(ScalingGroupRow.name == resource_group)
+                    .scalar_subquery()
+                )
             )
 
         return inner

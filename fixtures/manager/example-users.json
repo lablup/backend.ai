@@ -55,6 +55,7 @@
     ],
     "scaling_groups": [
         {
+            "id": "4d1e9b32-90c7-5b32-8f0e-6f470b8ed24a",
             "name": "default",
             "description": "The default agent scaling group",
             "is_active": true,
@@ -69,8 +70,8 @@
     ],
     "sgroups_for_domains": [
         {
-            "scaling_group": "default",
-            "domain": "default"
+            "scaling_group_id": "4d1e9b32-90c7-5b32-8f0e-6f470b8ed24a",
+            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9"
         }
     ],
     "users": [

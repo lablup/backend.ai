@@ -198,6 +198,7 @@ class TestCheckPresetsOccupiedSlots:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
+        test_domain_id: DomainID,
         test_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[str, None]:
         """Create test scaling group and return scaling group name"""
@@ -224,8 +225,8 @@ class TestCheckPresetsOccupiedSlots:
             # Associate scaling group with domain
             await db_sess.execute(
                 sa.insert(sgroups_for_domains).values(
-                    scaling_group=sg_name,
-                    domain=test_domain_name,
+                    scaling_group_id=test_scaling_group_id,
+                    domain_id=test_domain_id,
                 )
             )
             await db_sess.flush()
@@ -1282,15 +1283,25 @@ class TestCheckPresetsZeroValues:
             yield database_connection
 
     @pytest.fixture
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid.uuid4())
+
+    @pytest.fixture
+    def test_scaling_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid.uuid4())
+
+    @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
     ) -> AsyncGenerator[str, None]:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-zero-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 total_resource_slots=ResourceSlot({
                     "cpu": Decimal("1000"),
@@ -1310,12 +1321,15 @@ class TestCheckPresetsZeroValues:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
+        test_domain_id: DomainID,
+        test_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[str, None]:
         """Create test scaling group and return scaling group name."""
         sg_name = f"test-sgroup-zero-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             sg = ScalingGroupRow(
+                id=test_scaling_group_id,
                 name=sg_name,
                 driver="test-driver",
                 scheduler="fifo",
@@ -1334,8 +1348,8 @@ class TestCheckPresetsZeroValues:
             # Associate scaling group with domain
             await db_sess.execute(
                 sa.insert(sgroups_for_domains).values(
-                    scaling_group=sg_name,
-                    domain=test_domain_name,
+                    scaling_group_id=test_scaling_group_id,
+                    domain_id=test_domain_id,
                 )
             )
             await db_sess.flush()

@@ -548,9 +548,14 @@ async def scaling_group_fixture(
 ) -> AsyncIterator[ResourceGroupName]:
     """Insert a scaling group and its domain association; yield the name."""
     sgroup_name = ResourceGroupName(f"sgroup-{secrets.token_hex(6)}")
+    sgroup_id = uuid.uuid4()
     async with db_engine.begin() as conn:
+        domain_id = (
+            await conn.execute(sa.select(domains.c.id).where(domains.c.name == domain_fixture))
+        ).scalar_one()
         await conn.execute(
             sa.insert(scaling_groups).values(
+                id=sgroup_id,
                 name=sgroup_name,
                 description=f"Test scaling group {sgroup_name}",
                 is_active=True,
@@ -562,14 +567,14 @@ async def scaling_group_fixture(
         )
         await conn.execute(
             sa.insert(sgroups_for_domains).values(
-                scaling_group=sgroup_name,
-                domain=domain_fixture,
+                scaling_group_id=sgroup_id,
+                domain_id=domain_id,
             )
         )
     yield sgroup_name
     async with db_engine.begin() as conn:
         await conn.execute(
-            sgroups_for_domains.delete().where(sgroups_for_domains.c.scaling_group == sgroup_name)
+            sgroups_for_domains.delete().where(sgroups_for_domains.c.scaling_group_id == sgroup_id)
         )
         await conn.execute(scaling_groups.delete().where(scaling_groups.c.name == sgroup_name))
 

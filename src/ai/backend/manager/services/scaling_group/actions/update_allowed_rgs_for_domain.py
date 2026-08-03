@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import override
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 
@@ -14,8 +15,8 @@ class UpdateAllowedResourceGroupsForDomainAction(ScalingGroupDomainAction):
     """Action to atomically add/remove allowed resource groups for a domain."""
 
     domain_name: str
-    add: list[str] = field(default_factory=list)
-    remove: list[str] = field(default_factory=list)
+    add: list[ResourceGroupID] = field(default_factory=list)
+    remove: list[ResourceGroupID] = field(default_factory=list)
 
     @override
     @classmethod

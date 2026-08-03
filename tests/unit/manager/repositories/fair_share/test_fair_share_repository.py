@@ -12,6 +12,7 @@ from decimal import Decimal
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.errors.resource import DomainNotFound
@@ -144,9 +145,11 @@ class TestFairShareRepository:
     ) -> str:
         """Create test domain and return domain name"""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = DomainID(uuid.uuid4())
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain for fair share",
                 is_active=True,
@@ -159,7 +162,7 @@ class TestFairShareRepository:
 
             # Associate domain with scaling group
             db_sess.add(
-                ScalingGroupForDomainRow(scaling_group=test_scaling_group, domain=domain_name)
+                ScalingGroupForDomainRow(scaling_group_id=RESOURCE_GROUP_ID, domain_id=domain_id)
             )
             await db_sess.commit()
 
@@ -200,7 +203,7 @@ class TestFairShareRepository:
 
             # Associate project with scaling group
             db_sess.add(
-                ScalingGroupForProjectRow(scaling_group=test_scaling_group, group=project_id)
+                ScalingGroupForProjectRow(scaling_group_id=RESOURCE_GROUP_ID, group=project_id)
             )
             await db_sess.commit()
 

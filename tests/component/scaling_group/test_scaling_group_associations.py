@@ -39,9 +39,11 @@ async def private_sgroup_for_visibility(
 ) -> AsyncIterator[str]:
     """Insert a private (is_public=False) scaling group with domain association; yield name."""
     name = f"private-vis-{secrets.token_hex(8)}"
+    sgroup_id = uuid.uuid4()
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.insert(scaling_groups).values(
+                id=sgroup_id,
                 name=name,
                 description=f"Private visibility test sgroup {name}",
                 is_active=True,
@@ -54,14 +56,14 @@ async def private_sgroup_for_visibility(
         )
         await conn.execute(
             sa.insert(sgroups_for_domains).values(
-                scaling_group=name,
-                domain=domain_fixture.domain_name,
+                scaling_group_id=sgroup_id,
+                domain_id=domain_fixture.domain_id,
             )
         )
     yield name
     async with db_engine.begin() as conn:
         await conn.execute(
-            sgroups_for_domains.delete().where(sgroups_for_domains.c.scaling_group == name)
+            sgroups_for_domains.delete().where(sgroups_for_domains.c.scaling_group_id == sgroup_id)
         )
         await conn.execute(scaling_groups.delete().where(scaling_groups.c.name == name))
 

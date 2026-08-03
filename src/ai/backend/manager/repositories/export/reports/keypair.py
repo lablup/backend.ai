@@ -65,7 +65,7 @@ SGROUP_FOR_KEYPAIR_JOIN = JoinDef(
 )
 RESOURCE_GROUP_JOIN = JoinDef(
     table=ScalingGroupRow.__table__,
-    condition=ScalingGroupForKeypairsRow.scaling_group == ScalingGroupRow.name,
+    condition=ScalingGroupForKeypairsRow.scaling_group_id == ScalingGroupRow.id,
 )
 RESOURCE_GROUP_JOINS = (SGROUP_FOR_KEYPAIR_JOIN, RESOURCE_GROUP_JOIN)
 

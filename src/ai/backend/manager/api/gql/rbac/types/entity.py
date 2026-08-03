@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     AssociationScopesEntitiesNode,
 )
 from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -75,7 +76,9 @@ async def _load_rbac_element(
         case RBACElementType.MODEL_DEPLOYMENT:
             return await data_loaders.deployment_loader.load(uuid.UUID(element_id))
         case RBACElementType.RESOURCE_GROUP:
-            return await data_loaders.resource_group_loader.load(element_id)
+            return await data_loaders.resource_group_by_id_loader.load(
+                ResourceGroupID(uuid.UUID(element_id))
+            )
         case RBACElementType.NOTIFICATION_CHANNEL:
             return await data_loaders.notification_channel_loader.load(uuid.UUID(element_id))
         case RBACElementType.NOTIFICATION_RULE:

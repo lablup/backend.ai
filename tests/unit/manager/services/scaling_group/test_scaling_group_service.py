@@ -447,15 +447,20 @@ class TestScalingGroupService:
         """Test associating a scaling group with domains"""
         mock_repository.associate_scaling_group_with_domains = AsyncMock(return_value=None)
 
+        scaling_group_id = ResourceGroupID(uuid.uuid4())
+        domain_id = DomainID(uuid.uuid4())
+
         binder: RBACScopeBinder[ScalingGroupForDomainRow] = RBACScopeBinder(
             pairs=[
                 RBACScopeBindingPair(
                     spec=ScalingGroupForDomainCreatorSpec(
-                        scaling_group="test-sgroup",
-                        domain="test-domain",
+                        scaling_group_id=scaling_group_id,
+                        domain_id=domain_id,
                     ),
-                    entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, "test-sgroup"),
-                    scope_ref=RBACElementRef(RBACElementType.DOMAIN, "test-domain"),
+                    entity_ref=RBACElementRef(
+                        RBACElementType.RESOURCE_GROUP, str(scaling_group_id)
+                    ),
+                    scope_ref=RBACElementRef(RBACElementType.DOMAIN, str(domain_id)),
                 )
             ]
         )
@@ -476,8 +481,7 @@ class TestScalingGroupService:
         mock_repository.disassociate_scaling_group_with_domains = AsyncMock(return_value=None)
 
         unbinder = ResourceGroupDomainEntityUnbinder(
-            scaling_groups=["test-sgroup"],
-            domain="test-domain",
+            scaling_group_ids=[ResourceGroupID(uuid.uuid4())],
             domain_id=DomainID(uuid.uuid4()),
         )
         action = DisassociateScalingGroupWithDomainsAction(unbinder=unbinder)
@@ -496,13 +500,13 @@ class TestScalingGroupService:
         """Test associating a scaling group with keypairs"""
         mock_repository.associate_scaling_group_with_keypairs = AsyncMock(return_value=None)
 
-        scaling_group_name = "test-scaling-group"
+        scaling_group_id = ResourceGroupID(uuid.uuid4())
         access_key = AccessKey("AKTEST1234567890")
 
         bulk_creator: BulkCreator[ScalingGroupForKeypairsRow] = BulkCreator(
             specs=[
                 ScalingGroupForKeypairsCreatorSpec(
-                    scaling_group=scaling_group_name,
+                    scaling_group_id=scaling_group_id,
                     access_key=access_key,
                 )
             ]
@@ -521,11 +525,11 @@ class TestScalingGroupService:
         """Test disassociating a scaling group from keypairs"""
         mock_repository.disassociate_scaling_group_with_keypairs = AsyncMock(return_value=None)
 
-        scaling_group_name = "test-scaling-group"
+        scaling_group_id = ResourceGroupID(uuid.uuid4())
         access_key = AccessKey("AKTEST1234567890")
 
         purger: BatchPurger[ScalingGroupForKeypairsRow] = create_scaling_group_for_keypairs_purger(
-            scaling_group=scaling_group_name,
+            scaling_group_id=scaling_group_id,
             access_key=access_key,
         )
         action = DisassociateScalingGroupWithKeypairsAction(purger=purger)
@@ -544,17 +548,19 @@ class TestScalingGroupService:
         """Test associating a scaling group with user groups (projects)"""
         mock_repository.associate_scaling_group_with_user_groups = AsyncMock(return_value=None)
 
-        scaling_group_name = "test-scaling-group"
+        scaling_group_id = ResourceGroupID(uuid.uuid4())
         project_id = uuid.uuid4()
 
         binder: RBACScopeBinder[ScalingGroupForProjectRow] = RBACScopeBinder(
             pairs=[
                 RBACScopeBindingPair(
                     spec=ScalingGroupForProjectCreatorSpec(
-                        scaling_group=scaling_group_name,
+                        scaling_group_id=scaling_group_id,
                         project=project_id,
                     ),
-                    entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, scaling_group_name),
+                    entity_ref=RBACElementRef(
+                        RBACElementType.RESOURCE_GROUP, str(scaling_group_id)
+                    ),
                     scope_ref=RBACElementRef(RBACElementType.PROJECT, str(project_id)),
                 )
             ]
@@ -573,11 +579,11 @@ class TestScalingGroupService:
         """Test disassociating a scaling group from a user group (project)"""
         mock_repository.disassociate_scaling_group_with_user_groups = AsyncMock(return_value=None)
 
-        scaling_group_name = "test-scaling-group"
+        scaling_group_id = ResourceGroupID(uuid.uuid4())
         project_id = uuid.uuid4()
 
         unbinder = ResourceGroupProjectEntityUnbinder(
-            scaling_groups=[scaling_group_name],
+            scaling_group_ids=[scaling_group_id],
             project=project_id,
         )
         action = DisassociateScalingGroupWithUserGroupsAction(unbinder=unbinder)

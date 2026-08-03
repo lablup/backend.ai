@@ -20,6 +20,7 @@ from decimal import Decimal
 import pytest
 
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
@@ -150,9 +151,11 @@ class TestSearchDomainFairSharesEntityBased:
     ) -> str:
         """Create a domain with fair share record."""
         domain_name = f"domain-with-record-{uuid.uuid4().hex[:8]}"
+        domain_id = DomainID(uuid.uuid4())
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Domain with fair share record",
                     is_active=True,
@@ -162,7 +165,9 @@ class TestSearchDomainFairSharesEntityBased:
                 )
             )
             await db_sess.flush()
-            db_sess.add(ScalingGroupForDomainRow(scaling_group=scaling_group, domain=domain_name))
+            db_sess.add(
+                ScalingGroupForDomainRow(scaling_group_id=RESOURCE_GROUP_ID, domain_id=domain_id)
+            )
             await db_sess.commit()
 
         await fair_share_repository.create_domain_fair_share(
@@ -185,9 +190,11 @@ class TestSearchDomainFairSharesEntityBased:
     ) -> str:
         """Create a domain without fair share record."""
         domain_name = f"domain-no-record-{uuid.uuid4().hex[:8]}"
+        domain_id = DomainID(uuid.uuid4())
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Domain without fair share record",
                     is_active=True,
@@ -197,7 +204,9 @@ class TestSearchDomainFairSharesEntityBased:
                 )
             )
             await db_sess.flush()
-            db_sess.add(ScalingGroupForDomainRow(scaling_group=scaling_group, domain=domain_name))
+            db_sess.add(
+                ScalingGroupForDomainRow(scaling_group_id=RESOURCE_GROUP_ID, domain_id=domain_id)
+            )
             await db_sess.commit()
         return domain_name
 
@@ -260,9 +269,11 @@ class TestSearchDomainFairSharesEntityBased:
                         wsproxy_addr=None,
                     )
                 )
-            for domain_name in [domain1, domain2]:
+            domain_ids = [DomainID(uuid.uuid4()), DomainID(uuid.uuid4())]
+            for domain_id, domain_name in zip(domain_ids, [domain1, domain2], strict=True):
                 db_sess.add(
                     DomainRow(
+                        id=domain_id,
                         name=domain_name,
                         description=f"Test {domain_name}",
                         is_active=True,
@@ -272,8 +283,16 @@ class TestSearchDomainFairSharesEntityBased:
                     )
                 )
             await db_sess.flush()
-            db_sess.add(ScalingGroupForDomainRow(scaling_group=rg1, domain=domain1))
-            db_sess.add(ScalingGroupForDomainRow(scaling_group=rg2, domain=domain2))
+            db_sess.add(
+                ScalingGroupForDomainRow(
+                    scaling_group_id=resource_group_ids[0], domain_id=domain_ids[0]
+                )
+            )
+            db_sess.add(
+                ScalingGroupForDomainRow(
+                    scaling_group_id=resource_group_ids[1], domain_id=domain_ids[1]
+                )
+            )
             await db_sess.commit()
 
         return self.TwoScalingGroupsFixture(
@@ -296,8 +315,10 @@ class TestSearchDomainFairSharesEntityBased:
 
         async with db_with_cleanup.begin_session() as db_sess:
             for name in domain_names:
+                domain_id = DomainID(uuid.uuid4())
                 db_sess.add(
                     DomainRow(
+                        id=domain_id,
                         name=name,
                         description=f"Test {name}",
                         is_active=True,
@@ -307,7 +328,11 @@ class TestSearchDomainFairSharesEntityBased:
                     )
                 )
                 await db_sess.flush()
-                db_sess.add(ScalingGroupForDomainRow(scaling_group=scaling_group, domain=name))
+                db_sess.add(
+                    ScalingGroupForDomainRow(
+                        scaling_group_id=RESOURCE_GROUP_ID, domain_id=domain_id
+                    )
+                )
             await db_sess.commit()
 
         for name in domain_names[:2]:
@@ -508,7 +533,7 @@ class TestSearchDomainFairSharesEntityBased:
 
         Regression: Non-RG conditions reference DomainFairShareRow.domain_name (LEFT JOIN'd),
         which is NULL for entities without records, causing SQL to exclude them.
-        RG conditions reference ScalingGroupForDomainRow.domain (INNER JOIN'd), which is never NULL.
+        RG conditions reference ScalingGroupForDomainRow.domain_id (INNER JOIN'd), which is never NULL.
         """
         scope = DomainFairShareSearchScope(resource_group_id=RESOURCE_GROUP_ID)
         querier = BatchQuerier(
@@ -684,9 +709,11 @@ class TestSearchProjectFairSharesEntityBased:
         scaling_group: str,
     ) -> str:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = DomainID(uuid.uuid4())
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -696,7 +723,9 @@ class TestSearchProjectFairSharesEntityBased:
                 )
             )
             await db_sess.flush()
-            db_sess.add(ScalingGroupForDomainRow(scaling_group=scaling_group, domain=domain_name))
+            db_sess.add(
+                ScalingGroupForDomainRow(scaling_group_id=RESOURCE_GROUP_ID, domain_id=domain_id)
+            )
             await db_sess.commit()
         return domain_name
 
@@ -740,7 +769,9 @@ class TestSearchProjectFairSharesEntityBased:
             )
             await db_sess.flush()
 
-            db_sess.add(ScalingGroupForProjectRow(scaling_group=scaling_group, group=project_id))
+            db_sess.add(
+                ScalingGroupForProjectRow(scaling_group_id=RESOURCE_GROUP_ID, group=project_id)
+            )
             await db_sess.commit()
 
         await fair_share_repository.create_project_fair_share(
@@ -788,7 +819,9 @@ class TestSearchProjectFairSharesEntityBased:
             )
             await db_sess.flush()
 
-            db_sess.add(ScalingGroupForProjectRow(scaling_group=scaling_group, group=project_id))
+            db_sess.add(
+                ScalingGroupForProjectRow(scaling_group_id=RESOURCE_GROUP_ID, group=project_id)
+            )
             await db_sess.commit()
         return project_id
 
@@ -1067,9 +1100,11 @@ class TestSearchUserFairSharesEntityBased:
         scaling_group: str,
     ) -> str:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = DomainID(uuid.uuid4())
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -1079,7 +1114,9 @@ class TestSearchUserFairSharesEntityBased:
                 )
             )
             await db_sess.flush()
-            db_sess.add(ScalingGroupForDomainRow(scaling_group=scaling_group, domain=domain_name))
+            db_sess.add(
+                ScalingGroupForDomainRow(scaling_group_id=RESOURCE_GROUP_ID, domain_id=domain_id)
+            )
             await db_sess.commit()
         return domain_name
 
@@ -1114,7 +1151,9 @@ class TestSearchUserFairSharesEntityBased:
             )
             await db_sess.flush()
 
-            db_sess.add(ScalingGroupForProjectRow(scaling_group=scaling_group, group=project_id))
+            db_sess.add(
+                ScalingGroupForProjectRow(scaling_group_id=RESOURCE_GROUP_ID, group=project_id)
+            )
             await db_sess.commit()
         return project_id
 
