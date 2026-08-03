@@ -41,6 +41,7 @@ from ai.backend.common.dto.manager.v2.image.types import (
     ImageResourceLimitGQLInfo,
     ImageTagInfo,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
@@ -279,6 +280,15 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
     registry_id: uuid.UUID = gql_field(
         description="UUID of the container registry where this image is stored."
     )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Whether this image is installed on at least one agent.",
+        )
+    )  # type: ignore[misc]
+    async def installed(self, info: Info[StrawberryGQLContext]) -> bool:
+        return await info.context.data_loaders.image_installed_loader.load(ImageID(self.id))
 
     @gql_added_field(
         BackendAIGQLMeta(

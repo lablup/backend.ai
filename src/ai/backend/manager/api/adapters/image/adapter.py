@@ -66,6 +66,9 @@ from ai.backend.manager.repositories.image.updaters import ImageUpdaterSpec
 from ai.backend.manager.services.image.actions.alias_image import AliasImageByIdAction
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
 from ai.backend.manager.services.image.actions.forget_image import ForgetImageByIdAction
+from ai.backend.manager.services.image.actions.get_image_installed_agents import (
+    GetImageInstalledAgentsAction,
+)
 from ai.backend.manager.services.image.actions.purge_images import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.search_aliases import SearchAliasesAction
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
@@ -122,6 +125,14 @@ class ImageAdapter(BaseAdapter):
             ImageID(item.id): self._data_to_dto(item) for item in action_result.data
         }
         return [image_map.get(image_id) for image_id in image_ids]
+
+    async def batch_load_installed_status(self, image_ids: Sequence[ImageID]) -> list[bool]:
+        if not image_ids:
+            return []
+        action_result = await self._processors.image.get_image_installed_agents.wait_for_complete(
+            GetImageInstalledAgentsAction(image_ids=list(image_ids))
+        )
+        return [bool(action_result.data.get(image_id)) for image_id in image_ids]
 
     async def batch_load_aliases_by_ids(
         self, alias_ids: Sequence[uuid.UUID]

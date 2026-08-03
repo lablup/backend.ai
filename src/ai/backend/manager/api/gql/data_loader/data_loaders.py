@@ -570,6 +570,15 @@ class DataLoaders:
         return DataLoader(load_fn=load_fn)
 
     @cached_property
+    def image_installed_loader(self) -> DataLoader[ImageID, bool]:
+        adapter = self._adapters.image
+
+        async def load_fn(image_ids: list[ImageID]) -> list[bool]:
+            return await adapter.batch_load_installed_status(image_ids)
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
     def kernel_loader(
         self,
     ) -> DataLoader[KernelId, KernelV2GQL | None]:
