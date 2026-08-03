@@ -446,17 +446,20 @@ class IdleCheckerDBSource:
         # ON CONFLICT cannot touch the same row twice within one statement.
         unique_session_ids = list(dict.fromkeys(target.session_ids))
         async with self._ops.write_ops() as w:
+            # validate binding exists for the assignment_id
             binding_result = await w.query(
                 Querier(row_class=IdleCheckerBindingRow, pk_value=target.assignment_id)
             )
             if binding_result is None:
                 raise IdleCheckerAssignmentNotFound(str(target.assignment_id))
             binding = binding_result.row
+            # validate checker exists for the binding's idle_checker_id
             checker_result = await w.query(
                 Querier(row_class=IdleCheckerRow, pk_value=binding.idle_checker_id)
             )
             if checker_result is None:
                 raise IdleCheckerNotFound(str(binding.idle_checker_id))
+            # validate that all session_ids are covered by the binding's scope and the checker's target_session_types
             covered_query = sa.select(SessionRow.id).where(
                 SessionRow.id.in_(unique_session_ids),
                 SessionRow.session_type.in_(checker_result.row.target_session_types),
