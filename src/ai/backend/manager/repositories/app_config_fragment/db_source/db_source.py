@@ -187,14 +187,15 @@ class AppConfigFragmentDBSource:
 
     @app_config_fragment_db_source_resilience.apply()
     async def list_visible_fragments_bulk(
-        self, config_names: list[str], user_id: UserID | None = None
+        self, config_names: list[str], user_id: UserID | None
     ) -> list[AppConfigFragmentData]:
         """Visible fragments for several ``config_names`` in one query, ordered by ascending ``rank``.
 
         ``public`` always contributes; a ``user_id`` additionally admits that user's own
         overlay and its domain's, while ``user_id=None`` (anonymous) sees only ``public``.
-        Rank-ordered so the caller can group by name and deep-merge each name's fragments in
-        order.
+        Not defaulted — naming no principal is the anonymous read, which the caller states
+        rather than falls into. Rank-ordered so the caller can group by name and deep-merge
+        each name's fragments in order.
         """
         if not config_names:
             return []

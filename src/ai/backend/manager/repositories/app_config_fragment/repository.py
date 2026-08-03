@@ -92,6 +92,6 @@ class AppConfigFragmentRepository:
 
     @app_config_fragment_repository_resilience.apply()
     async def list_visible_fragments_bulk(
-        self, config_names: list[str], user_id: UserID | None = None
+        self, config_names: list[str], user_id: UserID | None
     ) -> list[AppConfigFragmentData]:
         return await self._db_source.list_visible_fragments_bulk(config_names, user_id)
