@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.dto.manager.v2.app_config.request import (
     MyGetAppConfigsInput,
     PublicGetAppConfigsInput,
@@ -19,13 +16,8 @@ from ai.backend.common.dto.manager.v2.app_config.response import (
     AppConfigNode,
     GetAppConfigsPayload,
 )
-from ai.backend.common.dto.manager.v2.app_config_fragment.response import AppConfigFragmentNode
-from ai.backend.common.identifier.app_config import AppConfigScopeID
-from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.manager.api.gql.app_config import resolver
 from ai.backend.manager.api.gql.app_config.types import AppConfigGQL
-
-_NOW = datetime(2026, 1, 1, tzinfo=UTC)
 
 
 @dataclass(frozen=True)
@@ -39,44 +31,12 @@ class _MergedReadCase:
 
 
 @pytest.fixture
-def public_fragment() -> AppConfigFragmentNode:
-    return AppConfigFragmentNode(
-        id=AppConfigFragmentID(uuid.uuid4()),
-        config_name="theme",
-        scope_type=AppConfigScopeType.PUBLIC,
-        scope_id=None,
-        config={"color": "light"},
-        created_at=_NOW,
-        updated_at=_NOW,
-    )
-
-
-@pytest.fixture
-def user_fragment() -> AppConfigFragmentNode:
-    return AppConfigFragmentNode(
-        id=AppConfigFragmentID(uuid.uuid4()),
-        config_name="theme",
-        scope_type=AppConfigScopeType.USER,
-        scope_id=AppConfigScopeID(uuid.uuid4()),
-        config={"color": "dark"},
-        created_at=_NOW,
-        updated_at=_NOW,
-    )
-
-
-@pytest.fixture
-def payload(
-    public_fragment: AppConfigFragmentNode, user_fragment: AppConfigFragmentNode
-) -> GetAppConfigsPayload:
-    """One merged name that two fragments contributed to, and one nothing contributed to."""
+def payload() -> GetAppConfigsPayload:
+    """One merged name, and one nothing contributed to."""
     return GetAppConfigsPayload(
         app_configs=[
-            AppConfigNode(
-                config_name="theme",
-                merged_config={"color": "dark"},
-                fragments=[public_fragment, user_fragment],
-            ),
-            AppConfigNode(config_name="menu", merged_config={}, fragments=[]),
+            AppConfigNode(config_name="theme", merged_config={"color": "dark"}),
+            AppConfigNode(config_name="menu", merged_config={}),
         ]
     )
 
@@ -93,35 +53,19 @@ def info(case: _MergedReadCase, payload: GetAppConfigsPayload) -> MagicMock:
 
 
 class TestAppConfigGQL:
-    def test_from_pydantic_converts_the_nested_fragments_in_order(
-        self,
-        public_fragment: AppConfigFragmentNode,
-        user_fragment: AppConfigFragmentNode,
-    ) -> None:
-        node = AppConfigNode(
-            config_name="theme",
-            merged_config={"color": "dark"},
-            fragments=[public_fragment, user_fragment],
+    def test_from_pydantic_maps_the_merge(self) -> None:
+        gql = AppConfigGQL.from_pydantic(
+            AppConfigNode(config_name="theme", merged_config={"color": "dark"})
         )
-
-        gql = AppConfigGQL.from_pydantic(node)
 
         assert gql.config_name == "theme"
         assert cast(dict[str, Any], gql.merged_config) == {"color": "dark"}
-        assert [f.id for f in gql.fragments] == [str(public_fragment.id), str(user_fragment.id)]
-        assert [f.scope_type for f in gql.fragments] == [
-            AppConfigScopeType.PUBLIC,
-            AppConfigScopeType.USER,
-        ]
 
     def test_from_pydantic_keeps_an_uncontributed_name_as_an_empty_merge(self) -> None:
-        gql = AppConfigGQL.from_pydantic(
-            AppConfigNode(config_name="menu", merged_config={}, fragments=[])
-        )
+        gql = AppConfigGQL.from_pydantic(AppConfigNode(config_name="menu", merged_config={}))
 
         assert gql.config_name == "menu"
         assert cast(dict[str, Any], gql.merged_config) == {}
-        assert gql.fragments == []
 
 
 @pytest.mark.parametrize(
@@ -161,6 +105,4 @@ class TestMergedReadResolvers:
 
         assert [node.config_name for node in result] == ["theme", "menu"]
         assert cast(dict[str, Any], result[0].merged_config) == {"color": "dark"}
-        assert len(result[0].fragments) == 2
         assert cast(dict[str, Any], result[1].merged_config) == {}
-        assert result[1].fragments == []

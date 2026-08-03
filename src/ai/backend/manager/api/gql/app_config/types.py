@@ -6,7 +6,6 @@ from strawberry.scalars import JSON
 
 from ai.backend.common.dto.manager.v2.app_config.response import AppConfigNode
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.app_config_fragment.types import AppConfigFragmentGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -33,9 +32,7 @@ class AppConfigGQL(PydanticOutputMixin[AppConfigNode]):
     merged_config: JSON = gql_field(
         description=(
             "Deep-merged config in ascending allow-list rank order. Empty when nothing "
-            "visible to the caller contributes, or when every contributing fragment was empty."
+            "visible to the caller contributes, or when every contributing fragment was "
+            "empty. Query `myAppConfigFragmentsByNames` for the per-scope values behind it."
         )
-    )
-    fragments: list[AppConfigFragmentGQL] = gql_field(
-        description="The fragments that contributed, in ascending allow-list rank order."
     )
