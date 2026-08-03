@@ -53,6 +53,15 @@ v2.add_command(my)
 
 @v2.group(
     cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.app_config:app_config",
+    name="app-config",
+)
+def app_config() -> None:
+    """App config commands."""
+
+
+@v2.group(
+    cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.app_config_fragment:app_config_fragment",
     name="app-config-fragment",
 )
