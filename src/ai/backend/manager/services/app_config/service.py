@@ -64,7 +64,6 @@ class AppConfigService:
             app_configs.append(
                 AppConfigData(
                     config_name=config_name,
-                    fragments=visible,
                     merged_config=_merge_configs(visible),
                 )
             )

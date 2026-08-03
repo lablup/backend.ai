@@ -168,7 +168,6 @@ class TestAppConfigService:
         )
 
         assert [c.config_name for c in result.app_configs] == ["theme"]
-        assert result.app_configs[0].fragments == deep_merge_fragments
         assert result.app_configs[0].merged_config == {"theme": "dark", "lang": "en"}
 
     async def test_get_scopes_the_query_to_the_injected_user(
@@ -243,7 +242,6 @@ class TestAppConfigService:
 
         assert [c.config_name for c in result.app_configs] == ["unknown"]
         assert result.app_configs[0].merged_config == {}
-        assert result.app_configs[0].fragments == []
 
     async def test_get_keeps_the_merged_names_alongside_an_absent_one(
         self,
@@ -259,7 +257,6 @@ class TestAppConfigService:
         assert result.app_configs[0].merged_config == {"theme": "dark", "lang": "en"}
         assert result.app_configs[1].merged_config == {"items": ["a"]}
         assert result.app_configs[2].merged_config == {}
-        assert result.app_configs[2].fragments == []
 
     async def test_get_without_an_injected_user_merges_public_fragments_only(
         self,
