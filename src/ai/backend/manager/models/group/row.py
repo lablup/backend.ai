@@ -29,9 +29,10 @@ from sqlalchemy.orm import (
     selectinload,
 )
 from sqlalchemy.orm.strategy_options import _AbstractLoad
+from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common import msgpack
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.group.types import GroupData, ProjectType
@@ -50,7 +51,6 @@ from ai.backend.manager.models.base import (
     StructuredJSONColumn,
     VFolderHostPermissionColumn,
 )
-from ai.backend.manager.models.mixins.scope_row import ScopeMixin
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -162,9 +162,8 @@ class AssocGroupUserRow(Base):  # type: ignore[misc]
 association_groups_users = AssocGroupUserRow.__table__
 
 
-class GroupRow(ScopeMixin, Base):  # type: ignore[misc]
+class GroupRow(Base):  # type: ignore[misc]
     __tablename__ = "groups"
-    __scope_type__ = PROJECT_SCOPE_TYPE
     __table_args__ = (
         sa.UniqueConstraint("name", "domain_name", name="uq_groups_name_domain_name"),
     )
@@ -258,6 +257,14 @@ class GroupRow(ScopeMixin, Base):  # type: ignore[misc]
         back_populates="group_row",
         primaryjoin=_get_association_container_registries_groups_join_condition,
     )
+
+    @classmethod
+    def scope_id_expr(cls) -> SQLColumnExpression[ScopeID]:
+        return cls.id
+
+    @classmethod
+    def scope_name_expr(cls) -> SQLColumnExpression[str]:
+        return cls.name
 
     def to_data(self) -> GroupData:
         return GroupData(

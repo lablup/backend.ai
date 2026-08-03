@@ -8,11 +8,12 @@ from collections import defaultdict
 from collections.abc import AsyncIterator, Collection, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import ClassVar, override
+from typing import ClassVar, Protocol, override
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
@@ -51,7 +52,6 @@ from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair_data
-from ai.backend.manager.models.mixins.scope_row import ScopeMixin
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -217,10 +217,24 @@ class ScopeBatchDeletion[TRow: Base]:
     scopes: Sequence[ScopeRef]
 
 
+class ScopeSource(Protocol):
+    """A Row queryable as an RBAC scope: its scope-id and display-name expressions."""
+
+    @classmethod
+    def scope_id_expr(cls) -> SQLColumnExpression[ScopeID]:
+        """Column whose value is used as ``ScopeRef.scope_id``."""
+        ...
+
+    @classmethod
+    def scope_name_expr(cls) -> SQLColumnExpression[str]:
+        """Expression rendering the scope's display name."""
+        ...
+
+
 class RBACWriteOps(WriteOps):
     """Base write ops plus RBAC scope-associated creation and virtual-scope writes."""
 
-    _scope_rows: ClassVar[Mapping[ScopeType, type[ScopeMixin]]] = {
+    _scope_rows: ClassVar[Mapping[ScopeType, type[ScopeSource]]] = {
         DOMAIN_SCOPE_TYPE: DomainRow,
         PROJECT_SCOPE_TYPE: GroupRow,
         RESOURCE_GROUP_SCOPE_TYPE: ScalingGroupRow,
@@ -247,9 +261,9 @@ class RBACWriteOps(WriteOps):
             selects.append(
                 sa.select(
                     sa.literal(str(scope_type)),
-                    row_cls.scope_id,
-                    row_cls.scope_name,
-                ).where(row_cls.scope_id.in_(ids))
+                    row_cls.scope_id_expr(),
+                    row_cls.scope_name_expr(),
+                ).where(row_cls.scope_id_expr().in_(ids))
             )
         if selects:
             result = await self._sess.execute(sa.union_all(*selects))

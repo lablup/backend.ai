@@ -28,11 +28,11 @@ from sqlalchemy.orm import (
     relationship,
     selectinload,
 )
-from sqlalchemy.sql.expression import false, true
+from sqlalchemy.sql.expression import SQLColumnExpression, false, true
 
-from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_SCOPE_TYPE
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.common.schema.resource_group import PreemptionConfig
 from ai.backend.common.types import (
     AgentSelectionStrategy,
@@ -49,7 +49,6 @@ from ai.backend.manager.models.base import (
     PydanticColumn,
 )
 from ai.backend.manager.models.group import resolve_group_name_or_id, resolve_groups
-from ai.backend.manager.models.mixins.scope_row import ScopeMixin
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -252,9 +251,8 @@ def _get_resource_preset_join_condition() -> Any:
     return ScalingGroupRow.name == foreign(ResourcePresetRow.scaling_group_name)
 
 
-class ScalingGroupRow(ScopeMixin, Base):  # type: ignore[misc]
+class ScalingGroupRow(Base):  # type: ignore[misc]
     __tablename__ = "scaling_groups"
-    __scope_type__ = RESOURCE_GROUP_SCOPE_TYPE
     __table_args__ = (
         # Partial unique index: at most one row may have is_default = true.
         sa.Index(
@@ -361,6 +359,14 @@ class ScalingGroupRow(ScopeMixin, Base):  # type: ignore[misc]
         back_populates="scaling_group_row",
         primaryjoin=_get_resource_preset_join_condition,
     )
+
+    @classmethod
+    def scope_id_expr(cls) -> SQLColumnExpression[ScopeID]:
+        return cls.id
+
+    @classmethod
+    def scope_name_expr(cls) -> SQLColumnExpression[str]:
+        return cls.name
 
     def to_dataclass(self) -> ScalingGroupData:
         """Convert Row to domain model data."""
