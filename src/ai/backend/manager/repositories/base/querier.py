@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -96,6 +96,18 @@ async def execute_querier[TRow: Base](
 # =============================================================================
 
 
+class BatchQueryOptions(Protocol):
+    """The filtering, ordering, and pagination options a batch query reads.
+
+    Both :class:`BatchQuerier` and :class:`Searcher` satisfy this, so a batch query
+    runs against either while the two remain separate classes.
+    """
+
+    pagination: QueryPagination
+    conditions: list[QueryCondition]
+    orders: list[QueryOrder]
+
+
 @dataclass
 class BatchQuerier:
     """Bundles query conditions, orders, and pagination for batch repository queries."""
@@ -151,7 +163,7 @@ async def _validate_scope(
 
 def _apply_batch_querier(
     query: sa.sql.Select[Any],
-    querier: BatchQuerier,
+    querier: BatchQueryOptions,
     or_conditions: Sequence[QueryCondition],
 ) -> _QueryPair:
     """Apply query conditions, orders, and pagination to a SQLAlchemy select statement.
@@ -195,7 +207,7 @@ def _apply_batch_querier(
 async def execute_batch_querier(
     db_sess: SASession,
     query: sa.sql.Select[Any],
-    querier: BatchQuerier,
+    querier: BatchQueryOptions,
     scopes: Sequence[SearchScope] = (),
 ) -> BatchQuerierResult[Row[Any]]:
     """Execute query with batch querier and return rows with total_count and pagination info.
