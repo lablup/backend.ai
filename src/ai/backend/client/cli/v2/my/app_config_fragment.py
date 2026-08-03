@@ -21,10 +21,14 @@ def app_config_fragment() -> None:
     """My app config fragment commands."""
 
 
-@app_config_fragment.command(name="by-names")
+@app_config_fragment.command()
 @click.argument("config_names", nargs=-1, required=True)
-def by_names(config_names: tuple[str, ...]) -> None:
-    """Read my user-scope fragments for CONFIG_NAMES, answered in that order."""
+def get(config_names: tuple[str, ...]) -> None:
+    """Read my user-scope fragments for CONFIG_NAMES, answered in that order.
+
+    A name my scope holds no fragment for is answered as null, so the result lines up
+    position by position with CONFIG_NAMES.
+    """
     from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
         MyAppConfigFragmentsByNamesInput,
     )
