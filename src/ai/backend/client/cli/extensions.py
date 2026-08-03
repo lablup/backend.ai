@@ -43,8 +43,6 @@ def pass_ctx_obj[**P, T](f: Callable[Concatenate[CLIContext, P], T]) -> Callable
     def new_func(*args: P.args, **kwargs: P.kwargs) -> T:
         obj = get_current_context().obj
         match obj:
-            case CLIContext():
-                inner = f(obj, *args, **kwargs)
             case CliContextInfo(info=info):
                 inner = f(set_client_config(info), *args, **kwargs)
             case _:

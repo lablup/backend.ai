@@ -1,12 +1,6 @@
-import warnings
-from pathlib import Path
-
 import click
 
 from ai.backend.cli.extensions import ExtendedCommandGroup
-
-# Read version directly from file to avoid heavy ai.backend.client import
-__version__ = (Path(__file__).parent.parent / "VERSION").read_text().strip()
 
 
 @click.group(
@@ -15,43 +9,13 @@ __version__ = (Path(__file__).parent.parent / "VERSION").read_text().strip()
         "help_option_names": ["-h", "--help"],
     },
 )
-@click.option(
-    "--skip-sslcert-validation",
-    help="Skip SSL certificate validation for all API requests.",
-    is_flag=True,
-)
-@click.option(
-    "--output",
-    type=click.Choice(["json", "console"]),
-    default="console",
-    help="Set the output style of the command results.",
-)
-@click.version_option(version=__version__)
-@click.pass_context
-def main(ctx: click.Context, skip_sslcert_validation: bool, output: str) -> None:
+def main() -> None:
     """
-    Backend.AI command line interface.
+    Anchor for the ``backendai_cli_v10`` entry point registered under the ``_`` key.
+
+    Importing this module imports the ``ai.backend.client.cli`` package, whose
+    ``__init__`` registers every client command group onto ``ai.backend.cli.main:main``.
+    That import side effect is the entry point's only purpose: ``ai.backend.cli.loader``
+    copies just ``.commands`` off the loaded group and drops its params and callback,
+    so anything declared here would never run.
     """
-    from ai.backend.client.cli.types import CLIContext, OutputMode
-    from ai.backend.client.config import APIConfig, set_config
-    from ai.backend.client.output import get_output_handler
-
-    from .announcement import announce
-
-    config = APIConfig(
-        skip_sslcert_validation=skip_sslcert_validation,
-        announcement_handler=announce,
-    )
-    set_config(config)
-
-    output_mode = OutputMode(output)
-    cli_ctx = CLIContext(
-        api_config=config,
-        output_mode=output_mode,
-    )
-    cli_ctx.output = get_output_handler(cli_ctx, output_mode)
-    ctx.obj = cli_ctx
-
-    from .pretty import show_warning
-
-    warnings.showwarning = show_warning
