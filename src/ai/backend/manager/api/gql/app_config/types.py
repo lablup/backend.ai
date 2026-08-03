@@ -28,11 +28,13 @@ __all__ = ("AppConfigGQL",)
     name="AppConfig",
 )
 class AppConfigGQL(PydanticOutputMixin[AppConfigNode]):
-    config_name: str = gql_field(description="Config name this merged view is for.")
-    merged_config: JSON = gql_field(
+    config_name: str = gql_field(description="Config name this view is for.")
+    # Strawberry surfaces the Pydantic field's description, not this one — keep them in step
+    # so the SDL and the DTO cannot drift apart.
+    config: JSON = gql_field(
         description=(
-            "Deep-merged config in ascending allow-list rank order. Empty when nothing "
-            "visible to the caller contributes, or when every contributing fragment was "
-            "empty. Query `myAppConfigFragmentsByNames` for the per-scope values behind it."
+            "Every fragment visible to the caller, deep-merged in ascending allow-list rank "
+            "order. Empty when nothing visible contributes, or when everything that did was "
+            "empty. Read the fragment API for the per-scope values behind it."
         )
     )
