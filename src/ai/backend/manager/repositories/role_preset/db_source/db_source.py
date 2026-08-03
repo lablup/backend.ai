@@ -41,7 +41,7 @@ from ai.backend.manager.repositories.base import (
     Querier,
 )
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 from ai.backend.manager.repositories.role_preset.creators import (
     RolePermissionPresetDependentCreatorSpec,
     RolePresetCreatorSpec,
@@ -50,14 +50,15 @@ from ai.backend.manager.repositories.role_preset.purgers import (
     RolePermissionPresetPurgerSpec,
     RolePresetPurgerSpec,
 )
+from ai.backend.manager.repositories.role_preset.updaters import RolePresetUpdaterSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class RolePresetDBSource:
-    _ops: DBOpsProvider
+    _ops: RBACOpsProvider
 
-    def __init__(self, ops_provider: DBOpsProvider) -> None:
+    def __init__(self, ops_provider: RBACOpsProvider) -> None:
         self._ops = ops_provider
 
     async def create(
@@ -66,6 +67,8 @@ class RolePresetDBSource:
         permission_creator_specs: Sequence[RolePermissionPresetDependentCreatorSpec],
     ) -> RolePresetData:
         async with self._ops.write_ops() as w:
+            if creator_spec.name_template is not None:
+                w.validate_role_name_template(creator_spec.name_template)
             created = await w.create(Creator(spec=creator_spec))
             preset_row = created.row
             if permission_creator_specs:
@@ -112,6 +115,9 @@ class RolePresetDBSource:
         updater: Updater[RolePresetRow],
     ) -> RolePresetData:
         async with self._ops.write_ops() as w:
+            spec = updater.spec
+            if isinstance(spec, RolePresetUpdaterSpec) and spec.name_template.is_update():
+                w.validate_role_name_template(spec.name_template.value())
             result = await w.update(updater)
             if result is None:
                 raise RolePresetNotFound(f"Role preset with ID {updater.pk_value} not found.")

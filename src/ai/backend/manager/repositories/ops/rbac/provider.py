@@ -3,7 +3,9 @@ on top of the base write ops."""
 
 from __future__ import annotations
 
+import dataclasses
 import logging
+import uuid
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import AsyncIterator, Collection, Iterable, Mapping, Sequence
@@ -12,8 +14,11 @@ from dataclasses import dataclass
 from typing import ClassVar, Protocol, override
 from uuid import UUID
 
+import jinja2
+import jinja2.sandbox
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
@@ -112,9 +117,11 @@ from ai.backend.manager.repositories.permission_controller.creators import (
 from ai.backend.manager.repositories.permission_controller.role_manager import (
     ScopeSystemRoleData,
 )
-from ai.backend.manager.repositories.ops.rbac.role_name_template import render_role_name
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+# Rendered names are stored in ``roles.name`` (sa.String(64)).
+MAX_ROLE_NAME_LENGTH = 64
 
 
 @dataclass(frozen=True)
@@ -247,6 +254,12 @@ class RBACWriteOps(WriteOps):
         USER_SCOPE_TYPE: UserRow,
     }
 
+    def __init__(self, sess: SASession) -> None:
+        super().__init__(sess)
+        self._template_env = jinja2.sandbox.ImmutableSandboxedEnvironment(
+            undefined=jinja2.StrictUndefined,
+        )
+
     async def _resolve_scope_template_values(
         self, scopes: Collection[ScopeRef]
     ) -> dict[ScopeRef, ScopeTemplateValue | None]:
@@ -291,6 +304,36 @@ class RBACWriteOps(WriteOps):
             )
             for scope, name in names.items()
         }
+
+    def _render_role_name(self, template: str, scope: ScopeTemplateValue) -> str:
+        """Render a role name from a preset's ``name_template`` (e.g.
+        ``{{scope.type}}-{{scope.name}}-member``), raising :class:`InvalidRoleNameTemplate`
+        on syntax errors, undefined variables, or an unusable result."""
+        try:
+            rendered = self._template_env.from_string(template).render(
+                scope=dataclasses.asdict(scope),
+            )
+        except jinja2.TemplateError as e:
+            raise InvalidRoleNameTemplate(f"Failed to render role name template: {e}") from e
+        rendered = rendered.strip()
+        if not rendered:
+            raise InvalidRoleNameTemplate("Role name template rendered to an empty string.")
+        if len(rendered) > MAX_ROLE_NAME_LENGTH:
+            raise InvalidRoleNameTemplate(
+                f"Rendered role name exceeds {MAX_ROLE_NAME_LENGTH} characters: {rendered!r}"
+            )
+        return rendered
+
+    def validate_role_name_template(self, template: str) -> None:
+        """Validate a preset's ``name_template`` by rendering it against
+        representative dummy values, so syntax errors and undefined variables
+        are rejected before the preset is stored."""
+        dummy = ScopeTemplateValue(
+            id=uuid.UUID(int=0),
+            name="name",
+            type="user",
+        )
+        self._render_role_name(template, dummy)
 
     # -- Virtual-scope helpers ----------------------------------------------------
 
@@ -687,7 +730,7 @@ class RBACWriteOps(WriteOps):
             )
             return fallback
         try:
-            return render_role_name(preset.name_template, scope_template_value)
+            return self._render_role_name(preset.name_template, scope_template_value)
         except InvalidRoleNameTemplate as e:
             fallback = self._fallback_preset_role_name(scope)
             log.warning(

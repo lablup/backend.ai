@@ -24,10 +24,7 @@ from ai.backend.manager.repositories.base import (
     BulkCreator,
 )
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.ops import DBOpsProvider
-from ai.backend.manager.repositories.ops.rbac.role_name_template import (
-    validate_role_name_template,
-)
+from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 from ai.backend.manager.repositories.role_preset.creators import (
     RolePermissionPresetDependentCreatorSpec,
     RolePresetCreatorSpec,
@@ -35,7 +32,6 @@ from ai.backend.manager.repositories.role_preset.creators import (
 from ai.backend.manager.repositories.role_preset.db_source.db_source import (
     RolePresetDBSource,
 )
-from ai.backend.manager.repositories.role_preset.updaters import RolePresetUpdaterSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -43,7 +39,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class RolePresetRepository:
     _db_source: RolePresetDBSource
 
-    def __init__(self, ops_provider: DBOpsProvider) -> None:
+    def __init__(self, ops_provider: RBACOpsProvider) -> None:
         self._db_source = RolePresetDBSource(ops_provider)
 
     async def create(
@@ -51,8 +47,6 @@ class RolePresetRepository:
         creator_spec: RolePresetCreatorSpec,
         permission_creator_specs: Sequence[RolePermissionPresetDependentCreatorSpec],
     ) -> RolePresetData:
-        if creator_spec.name_template is not None:
-            validate_role_name_template(creator_spec.name_template)
         return await self._db_source.create(creator_spec, permission_creator_specs)
 
     async def role_preset(self, preset_id: RolePresetID) -> RolePresetData:
@@ -71,9 +65,6 @@ class RolePresetRepository:
         return await self._db_source.search_permission_presets(querier)
 
     async def update(self, updater: Updater[RolePresetRow]) -> RolePresetData:
-        spec = updater.spec
-        if isinstance(spec, RolePresetUpdaterSpec) and spec.name_template.is_update():
-            validate_role_name_template(spec.name_template.value())
         return await self._db_source.update(updater)
 
     async def bulk_update(
