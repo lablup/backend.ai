@@ -590,6 +590,44 @@
         "title": "UpdateAgentResourceGroupBody",
         "type": "object"
       },
+      "MyGetAppConfigsInput": {
+        "description": "Input for the acting user's merged AppConfigs; the scope comes from the session.",
+        "properties": {
+          "config_names": {
+            "description": "Config names to get the merged view for.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Config Names",
+            "type": "array"
+          }
+        },
+        "required": [
+          "config_names"
+        ],
+        "title": "MyGetAppConfigsInput",
+        "type": "object"
+      },
+      "PublicGetAppConfigsInput": {
+        "description": "Input for the anonymous, pre-login read, where only public fragments contribute.",
+        "properties": {
+          "config_names": {
+            "description": "Config names to get the merged public view for.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Config Names",
+            "type": "array"
+          }
+        },
+        "required": [
+          "config_names"
+        ],
+        "title": "PublicGetAppConfigsInput",
+        "type": "object"
+      },
       "BulkPurgeAppConfigFragmentInput": {
         "description": "Input for purging many fragments (per-item partial success).",
         "properties": {
@@ -41784,6 +41822,59 @@
         ],
         "parameters": [],
         "description": "Retrieve aggregate resource capacity/usage across all agents (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/app-config/my/get": {
+      "post": {
+        "operationId": "v2/app-config.my_get_app_configs",
+        "tags": [
+          "v2/app-config"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MyGetAppConfigsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Get the acting user's merged AppConfigs (auth required).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config/public/get": {
+      "post": {
+        "operationId": "v2/app-config.public_get_app_configs",
+        "tags": [
+          "v2/app-config"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicGetAppConfigsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Get merged AppConfigs from public fragments only (anonymous)."
       }
     },
     "/v2/app-config-fragments/bulk-delete": {

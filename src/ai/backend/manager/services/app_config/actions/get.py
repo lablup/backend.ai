@@ -4,11 +4,11 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config.types import AppConfigData
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.repositories.app_config_fragment.types import AppConfigScopeArguments
 from ai.backend.manager.services.app_config.actions.base import (
     AppConfigScopeAction,
     AppConfigScopeActionResult,
@@ -16,17 +16,17 @@ from ai.backend.manager.services.app_config.actions.base import (
 
 
 @dataclass
-class ResolveAppConfigsAction(AppConfigScopeAction):
-    """Resolve the merged ``AppConfig`` for each of ``config_names``.
+class GetAppConfigsAction(AppConfigScopeAction):
+    """Get the merged ``AppConfig`` for each of ``config_names``.
 
-    ``scope_arguments`` is the caller's to name; ``user_id`` is not — the handler fills it
-    from the session, so a resolve is only ever for the acting user. Either half unset is the
-    anonymous, pre-login read.
+    Neither ``user_id`` nor ``domain_id`` is caller-supplied — the adapter fills both from
+    the session, so a get is only ever for the acting user. Unset is the anonymous, pre-login
+    read.
     """
 
     config_names: list[str]
-    scope_arguments: AppConfigScopeArguments | None = None
     user_id: UserID | None = None
+    domain_id: DomainID | None = None
 
     @override
     @classmethod
@@ -47,7 +47,7 @@ class ResolveAppConfigsAction(AppConfigScopeAction):
 
 
 @dataclass
-class ResolveAppConfigsActionResult(AppConfigScopeActionResult):
+class GetAppConfigsActionResult(AppConfigScopeActionResult):
     app_configs: list[AppConfigData]
     _user_id: UserID | None
 

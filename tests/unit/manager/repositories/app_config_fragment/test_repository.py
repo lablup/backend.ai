@@ -53,7 +53,6 @@ from ai.backend.manager.repositories.app_config_fragment.repository import (
 )
 from ai.backend.manager.repositories.app_config_fragment.types import (
     AppConfigFragmentSearchScope,
-    ResolvedAppConfigScope,
 )
 from ai.backend.manager.repositories.app_config_fragment.upserters import (
     AppConfigFragmentUpserterSpec,
@@ -615,14 +614,36 @@ class TestVisibilityConditions:
 
 
 class TestApplicableFragments:
+    async def test_naming_no_domain_drops_the_overlay(
+        self,
+        repository: AppConfigFragmentRepository,
+        scope_owners: None,
+        fragments_across_scopes: list[AppConfigFragmentData],
+    ) -> None:
+        # A caller whose session carries no domain gets public and its own, never a
+        # domain's — the absent domain narrows the query rather than widening it.
+        applicable = await repository.list_visible_fragments_bulk(
+            ["theme"],
+            UserID(uuid.uuid4()),
+            None,
+        )
+        expected = [
+            f
+            for f in fragments_across_scopes
+            if f.config_name == "theme" and f.scope_type is AppConfigScopeType.PUBLIC
+        ]
+        assert [f.id for f in applicable] == [f.id for f in expected]
+
     async def test_one_query_returns_public_domain_user_rank_ordered(
         self,
         repository: AppConfigFragmentRepository,
+        scope_owners: None,
         fragments_across_scopes: list[AppConfigFragmentData],
     ) -> None:
         applicable = await repository.list_visible_fragments_bulk(
             ["theme"],
-            ResolvedAppConfigScope(domain_id=_DOMAIN_ID, user_id=_USER_ID),
+            _USER_ID,
+            _DOMAIN_ID,
         )
         # public + the caller's domain + the caller's own user fragment, ordered by the
         # allow-list entries' ranks (scope-type defaults: public < domain < user).
@@ -646,22 +667,26 @@ class TestApplicableFragments:
     async def test_unknown_config_name_returns_empty(
         self,
         repository: AppConfigFragmentRepository,
+        scope_owners: None,
         fragments_across_scopes: list[AppConfigFragmentData],
     ) -> None:
         applicable = await repository.list_visible_fragments_bulk(
             ["unregistered"],
-            ResolvedAppConfigScope(domain_id=_DOMAIN_ID, user_id=_USER_ID),
+            _USER_ID,
+            _DOMAIN_ID,
         )
         assert applicable == []
 
     async def test_bulk_returns_visible_fragments_for_all_names_ordered(
         self,
         repository: AppConfigFragmentRepository,
+        scope_owners: None,
         fragments_across_scopes: list[AppConfigFragmentData],
     ) -> None:
         applicable = await repository.list_visible_fragments_bulk(
             ["theme", "menu"],
-            ResolvedAppConfigScope(domain_id=_DOMAIN_ID, user_id=_USER_ID),
+            _USER_ID,
+            _DOMAIN_ID,
         )
         # public + the caller's domain + the caller's own user fragment, for both names.
         expected = {
@@ -684,11 +709,13 @@ class TestApplicableFragments:
     async def test_bulk_empty_names_returns_empty(
         self,
         repository: AppConfigFragmentRepository,
+        scope_owners: None,
         fragments_across_scopes: list[AppConfigFragmentData],
     ) -> None:
         applicable = await repository.list_visible_fragments_bulk(
             [],
-            ResolvedAppConfigScope(domain_id=_DOMAIN_ID, user_id=_USER_ID),
+            _USER_ID,
+            _DOMAIN_ID,
         )
         assert applicable == []
 
