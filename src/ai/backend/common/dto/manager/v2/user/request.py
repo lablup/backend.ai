@@ -5,9 +5,10 @@ Shared between Client SDK and Manager API.
 
 from __future__ import annotations
 
+from typing import Self
 from uuid import UUID
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
@@ -28,6 +29,7 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserStatus,
     UserStatusFilter,
 )
+from ai.backend.common.identifier.domain import DomainID
 
 __all__ = (
     "AdminSearchUsersInput",
@@ -139,7 +141,11 @@ class UpdateUserInput(BaseRequestModel):
     )
     domain_name: str | None = Field(
         default=None,
-        description="New domain assignment.",
+        description="New domain assignment, by name. Deprecated: use `domain_id`.",
+    )
+    domain_id: DomainID | None = Field(
+        default=None,
+        description="New domain assignment, by id. Mutually exclusive with `domain_name`.",
     )
     group_ids: list[UUID] | Sentinel | None = Field(
         default=SENTINEL,
@@ -190,6 +196,15 @@ class UpdateUserInput(BaseRequestModel):
         if isinstance(v, str) and len(v) > 512:
             raise ValueError("integration_name must be at most 512 characters")
         return v
+
+    @model_validator(mode="after")
+    def _check_one_domain_reference(self) -> Self:
+        if self.domain_name is not None and self.domain_id is not None:
+            raise ValueError(
+                "Specify either domain_name or domain_id, not both: the two may name "
+                "different domains."
+            )
+        return self
 
 
 class DeleteUserInput(BaseRequestModel):

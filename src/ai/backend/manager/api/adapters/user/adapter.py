@@ -494,6 +494,11 @@ class UserAdapter(BaseAdapter):
                 if input.domain_name is not None
                 else OptionalState.nop()
             ),
+            domain_id=(
+                OptionalState.update(input.domain_id)
+                if input.domain_id is not None
+                else OptionalState.nop()
+            ),
             role=(
                 OptionalState.update(UserRoleModel(input.role))
                 if input.role is not None

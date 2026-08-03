@@ -5,12 +5,14 @@ Shared between Client SDK and Manager API.
 
 from __future__ import annotations
 
+from typing import Self
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.identifier.domain import DomainID
 
 from .types import OrderDirection, UserOrderField, UserRole, UserStatus
 
@@ -65,7 +67,12 @@ class UpdateUserRequest(BaseRequestModel):
     description: str | None = Field(default=None, description="Updated description")
     status: UserStatus | None = Field(default=None, description="Updated user status")
     role: UserRole | None = Field(default=None, description="Updated user role")
-    domain_name: str | None = Field(default=None, description="Updated domain name")
+    domain_name: str | None = Field(
+        default=None, description="Updated domain, by name. Deprecated: use domain_id"
+    )
+    domain_id: DomainID | None = Field(
+        default=None, description="Updated domain, by id. Mutually exclusive with domain_name"
+    )
     allowed_client_ip: list[str] | None = Field(
         default=None, description="Updated allowed client IPs"
     )
@@ -81,6 +88,15 @@ class UpdateUserRequest(BaseRequestModel):
         default=None, description="Updated container additional GIDs"
     )
     group_ids: list[str] | None = Field(default=None, description="Updated group IDs")
+
+    @model_validator(mode="after")
+    def _check_one_domain_reference(self) -> Self:
+        if self.domain_name is not None and self.domain_id is not None:
+            raise ValueError(
+                "Specify either domain_name or domain_id, not both: the two may name "
+                "different domains."
+            )
+        return self
 
 
 class UserFilter(BaseRequestModel):

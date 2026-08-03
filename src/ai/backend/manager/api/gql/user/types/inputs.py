@@ -39,6 +39,7 @@ from ai.backend.common.dto.manager.v2.user.request import (
 from ai.backend.common.dto.manager.v2.user.request import (
     UpdateUserInput as UpdateUserInputDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -134,6 +135,13 @@ class UpdateUserV2InputGQL(PydanticInputMixin[UpdateUserInputDTO]):
     status: UserStatusEnumGQL | None = gql_field(description="New account status.", default=UNSET)
     role: UserRoleEnumGQL | None = gql_field(description="New user role.", default=UNSET)
     domain_name: str | None = gql_field(description="New domain assignment.", default=UNSET)
+    domain_id: UUID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="New domain assignment, by id. Mutually exclusive with `domain_name`.",
+        ),
+        default=UNSET,
+    )
     group_ids: list[UUID] | None = gql_field(
         description="New project (group) assignments. Replaces existing assignments.", default=UNSET
     )

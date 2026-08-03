@@ -299,6 +299,11 @@ async def admin_bulk_update_users_v2(
                 if dto.domain_name is not None
                 else OptionalState.nop()
             ),
+            domain_id=(
+                OptionalState.update(dto.domain_id)
+                if dto.domain_id is not None
+                else OptionalState.nop()
+            ),
             role=(
                 OptionalState.update(UserRole(dto.role))
                 if dto.role is not None
