@@ -15,7 +15,7 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     AppConfigFragmentNode,
-    AppConfigFragmentsByNamesResponse,
+    AppConfigFragmentsByNamesPayload,
     BulkPurgeAppConfigFragmentPayload,
     PurgeAppConfigFragmentPayload,
     SearchAppConfigFragmentPayload,
@@ -38,7 +38,7 @@ class V2AppConfigFragmentClient(BaseDomainClient):
     async def scoped_get_app_config_fragments_by_names(
         self,
         request: ScopedAppConfigFragmentsByNamesInput,
-    ) -> AppConfigFragmentsByNamesResponse:
+    ) -> AppConfigFragmentsByNamesPayload:
         """Read one scope's fragments for the given config names.
 
         The answer holds one entry per requested name, in the order they were given, and
@@ -48,7 +48,7 @@ class V2AppConfigFragmentClient(BaseDomainClient):
             "POST",
             f"{_PATH}/scoped/by-names",
             request=request,
-            response_model=AppConfigFragmentsByNamesResponse,
+            response_model=AppConfigFragmentsByNamesPayload,
         )
 
     async def scoped_bulk_upsert_app_config_fragments(
@@ -66,13 +66,13 @@ class V2AppConfigFragmentClient(BaseDomainClient):
     async def my_get_app_config_fragments_by_names(
         self,
         request: MyAppConfigFragmentsByNamesInput,
-    ) -> AppConfigFragmentsByNamesResponse:
+    ) -> AppConfigFragmentsByNamesPayload:
         """Read the caller's own user-scope fragments for the given config names."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/my/by-names",
             request=request,
-            response_model=AppConfigFragmentsByNamesResponse,
+            response_model=AppConfigFragmentsByNamesPayload,
         )
 
     async def my_bulk_upsert_app_config_fragments(

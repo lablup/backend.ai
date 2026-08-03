@@ -16,7 +16,7 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     ScopedUpsertAppConfigFragmentsInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
-    AppConfigFragmentsByNamesResponse,
+    AppConfigFragmentsByNamesPayload,
 )
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.logging import BraceStyleAdapter
@@ -77,7 +77,7 @@ class V2AppConfigFragmentHandler:
         """Read one scope's fragments for the given config names (auth, RBAC-authorized)."""
         nodes = await self._adapter.scoped_app_config_fragments_by_names(body.parsed)
         return APIResponse.build(
-            status_code=HTTPStatus.OK, response_model=AppConfigFragmentsByNamesResponse(nodes)
+            status_code=HTTPStatus.OK, response_model=AppConfigFragmentsByNamesPayload(nodes)
         )
 
     async def my_fragments_by_names(
@@ -87,7 +87,7 @@ class V2AppConfigFragmentHandler:
         """Read the caller's own user-scope fragments for the given config names (auth)."""
         nodes = await self._adapter.my_app_config_fragments_by_names(body.parsed)
         return APIResponse.build(
-            status_code=HTTPStatus.OK, response_model=AppConfigFragmentsByNamesResponse(nodes)
+            status_code=HTTPStatus.OK, response_model=AppConfigFragmentsByNamesPayload(nodes)
         )
 
     async def scoped_bulk_upsert(

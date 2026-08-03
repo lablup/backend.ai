@@ -15,7 +15,7 @@ from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 __all__ = (
     "AppConfigFragmentBulkErrorInfo",
     "AppConfigFragmentNode",
-    "AppConfigFragmentsByNamesResponse",
+    "AppConfigFragmentsByNamesPayload",
     "BulkPurgeAppConfigFragmentPayload",
     "PurgeAppConfigFragmentPayload",
     "SearchAppConfigFragmentPayload",
@@ -37,7 +37,7 @@ class AppConfigFragmentNode(BaseResponseModel):
     updated_at: datetime = Field(description="Last update timestamp (UTC).")
 
 
-class AppConfigFragmentsByNamesResponse(BaseRootResponseModel[list[AppConfigFragmentNode | None]]):
+class AppConfigFragmentsByNamesPayload(BaseRootResponseModel[list[AppConfigFragmentNode | None]]):
     """One entry per requested config name, null where the scope holds no fragment for it."""
 
 

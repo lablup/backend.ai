@@ -23,7 +23,7 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     AppConfigFragmentNode,
-    AppConfigFragmentsByNamesResponse,
+    AppConfigFragmentsByNamesPayload,
     BulkPurgeAppConfigFragmentPayload,
     PurgeAppConfigFragmentPayload,
     SearchAppConfigFragmentPayload,
@@ -106,7 +106,7 @@ class TestScopedByNames:
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "POST"
         assert str(call_args[0][1]).endswith("/v2/app-config-fragments/scoped/by-names")
-        assert isinstance(result, AppConfigFragmentsByNamesResponse)
+        assert isinstance(result, AppConfigFragmentsByNamesPayload)
         assert [node.config_name if node is not None else None for node in result.root] == [
             "theme",
             None,
@@ -159,7 +159,7 @@ class TestMyByNames:
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "POST"
         assert str(call_args[0][1]).endswith("/v2/app-config-fragments/my/by-names")
-        assert isinstance(result, AppConfigFragmentsByNamesResponse)
+        assert isinstance(result, AppConfigFragmentsByNamesPayload)
         assert len(result.root) == 1
 
 
