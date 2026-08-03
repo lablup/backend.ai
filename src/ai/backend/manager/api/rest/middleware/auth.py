@@ -700,7 +700,7 @@ def _authenticated_user(request: web.Request) -> UserData | None:
         is_superadmin=request.get("is_superadmin", False),
         role=UserRole(user["role"]),
         domain_name=user["domain_name"],
-        domain_id=user.get("domain_id"),
+        domain_id=user["domain_id"],
     )
 
 
