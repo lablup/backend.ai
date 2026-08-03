@@ -293,13 +293,26 @@ class UserDBSource:
                         f"Username '{new_username}' is already taken by another user."
                     )
 
-            # Move both domain columns together, from whichever one the request named
+            # Check if new domain_name exists
             new_domain_name = updater_spec.domain_name.optional_value()
+            if new_domain_name and new_domain_name != current_user.domain_name:
+                domain_exists = await self._check_domain_exists(session, new_domain_name)
+                if not domain_exists:
+                    raise UserModificationBadRequest(f"Domain '{new_domain_name}' does not exist.")
+
+            # Until domain_name goes away, fill in whichever column the request did not name
             new_domain_id = updater_spec.domain_id.optional_value()
-            if new_domain_name is not None or new_domain_id is not None:
-                to_update["domain_name"], to_update["domain_id"] = await self._resolve_domain(
-                    session, domain_name=new_domain_name, domain_id=new_domain_id
+            if new_domain_name is not None:
+                to_update["domain_id"] = await session.scalar(
+                    sa.select(DomainRow.id).where(DomainRow.name == new_domain_name)
                 )
+            elif new_domain_id is not None:
+                domain_name = await session.scalar(
+                    sa.select(DomainRow.name).where(DomainRow.id == new_domain_id)
+                )
+                if domain_name is None:
+                    raise UserModificationBadRequest(f"Domain '{new_domain_id}' does not exist.")
+                to_update["domain_name"] = domain_name
 
             # Check if new resource_policy exists
             new_resource_policy = updater_spec.resource_policy.optional_value()
@@ -404,13 +417,26 @@ class UserDBSource:
                     f"Username '{new_username}' is already taken by another user."
                 )
 
-        # Move both domain columns together, from whichever one the request named
+        # Check if new domain_name exists
         new_domain_name = updater_spec.domain_name.optional_value()
+        if new_domain_name and new_domain_name != current_user.domain_name:
+            domain_exists = await self._check_domain_exists(session, new_domain_name)
+            if not domain_exists:
+                raise UserModificationBadRequest(f"Domain '{new_domain_name}' does not exist.")
+
+        # Until domain_name goes away, fill in whichever column the request did not name
         new_domain_id = updater_spec.domain_id.optional_value()
-        if new_domain_name is not None or new_domain_id is not None:
-            to_update["domain_name"], to_update["domain_id"] = await self._resolve_domain(
-                session, domain_name=new_domain_name, domain_id=new_domain_id
+        if new_domain_name is not None:
+            to_update["domain_id"] = await session.scalar(
+                sa.select(DomainRow.id).where(DomainRow.name == new_domain_name)
             )
+        elif new_domain_id is not None:
+            domain_name = await session.scalar(
+                sa.select(DomainRow.name).where(DomainRow.id == new_domain_id)
+            )
+            if domain_name is None:
+                raise UserModificationBadRequest(f"Domain '{new_domain_id}' does not exist.")
+            to_update["domain_name"] = domain_name
 
         # Check if new resource_policy exists
         new_resource_policy = updater_spec.resource_policy.optional_value()
@@ -672,29 +698,12 @@ class UserDBSource:
             )
             return result.rowcount
 
-    async def _resolve_domain(
-        self,
-        session: SASession | AsyncConnection,
-        *,
-        domain_name: str | None,
-        domain_id: DomainID | None,
-    ) -> tuple[str, DomainID]:
-        """The (name, id) pair of the domain addressed by whichever of the two was given.
-
-        ``users`` keys its domain by both, so an update naming one has to write the other
-        alongside it or the two columns come to name different domains.
-        """
-        query = sa.select(DomainRow.name, DomainRow.id)
-        if domain_name is not None:
-            query = query.where(DomainRow.name == domain_name)
-            addressed = f"Domain '{domain_name}'"
-        else:
-            query = query.where(DomainRow.id == domain_id)
-            addressed = f"Domain '{domain_id}'"
-        row = (await session.execute(query)).first()
-        if row is None:
-            raise UserModificationBadRequest(f"{addressed} does not exist.")
-        return row.name, DomainID(row.id)
+    async def _check_domain_exists(
+        self, session: SASession | AsyncConnection, domain_name: str
+    ) -> bool:
+        query = sa.select(DomainRow.name).where(DomainRow.name == domain_name)
+        result = await session.scalar(query)
+        return result is not None
 
     async def _check_resource_policy_exists(
         self, session: SASession | AsyncConnection, policy_name: str
