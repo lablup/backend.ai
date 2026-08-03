@@ -16,6 +16,7 @@ from ai.backend.client.cli.v2.helpers import (
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AppConfigFragmentUpsertItem,
+    AppConfigScopeRef,
 )
 from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
@@ -26,12 +27,35 @@ def app_config_fragment() -> None:
     """App config fragment commands."""
 
 
+def _resolve_scope(scope_type: str, scope_id: uuid.UUID | None) -> AppConfigScopeRef:
+    """The scope the request acts at, rejecting a scope-id that does not match its kind.
+
+    ``public`` is one global scope owning no id, while ``domain`` and ``user`` are each
+    identified by their owner. The server rejects a mismatch too, but only after the request
+    is on the wire, and as a validation error rather than a usage message.
+    """
+    resolved_type = AppConfigScopeType(scope_type)
+    match resolved_type:
+        case AppConfigScopeType.PUBLIC:
+            if scope_id is not None:
+                raise click.UsageError(
+                    "--scope-id must be omitted for the public scope, which has no owner."
+                )
+            return AppConfigScopeRef(scope_type=resolved_type, scope_id=None)
+        case AppConfigScopeType.DOMAIN | AppConfigScopeType.USER:
+            if scope_id is None:
+                raise click.UsageError(
+                    f"--scope-id is required for the {resolved_type.value} scope."
+                )
+            return AppConfigScopeRef(scope_type=resolved_type, scope_id=AppConfigScopeID(scope_id))
+
+
 @app_config_fragment.command()
 @click.option(
     "--scope-type",
-    default=None,
+    required=True,
     type=click.Choice([scope_type.value for scope_type in AppConfigScopeType]),
-    help="Scope whose fragments to read (public | domain | user). Required with CONFIG_NAMES.",
+    help="Scope whose fragments to read (public | domain | user).",
 )
 @click.option(
     "--scope-id",
@@ -39,66 +63,27 @@ def app_config_fragment() -> None:
     type=click.UUID,
     help="Domain id or user id; omit for the public scope.",
 )
-@click.option(
-    "--id",
-    "fragment_id",
-    default=None,
-    type=click.UUID,
-    help="Read a single fragment by its id instead of by config name.",
-)
-@click.argument("config_names", nargs=-1)
-def get(
-    scope_type: str | None,
-    scope_id: uuid.UUID | None,
-    fragment_id: uuid.UUID | None,
-    config_names: tuple[str, ...],
-) -> None:
+@click.argument("config_names", nargs=-1, required=True)
+def get(scope_type: str, scope_id: uuid.UUID | None, config_names: tuple[str, ...]) -> None:
     """Read one scope's fragments for CONFIG_NAMES, answered in that order.
 
     A name the scope holds no fragment for is answered as null, so the result lines up
-    position by position with CONFIG_NAMES. Pass --id to read a single fragment by id
-    instead; config names are how a caller normally addresses a fragment, ids come back
-    from a previous read or an admin search.
+    position by position with CONFIG_NAMES. Only fragments written at this scope are
+    answered — scopes do not inherit from one another.
     """
-    if fragment_id is not None:
-        if config_names or scope_type is not None or scope_id is not None:
-            raise click.UsageError(
-                "--id reads one fragment by id; it takes neither CONFIG_NAMES nor scope options."
-            )
-    else:
-        if not config_names:
-            raise click.UsageError(
-                "Pass CONFIG_NAMES to read by config name, or --id to read one fragment by id."
-            )
-        if scope_type is None:
-            raise click.UsageError("--scope-type is required when reading by config name.")
+    scope = _resolve_scope(scope_type, scope_id)
 
     async def _run() -> None:
         from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
-            AppConfigScopeRef,
             ScopedAppConfigFragmentsByNamesInput,
         )
 
         registry = await create_v2_registry(load_v2_config())
         try:
-            if fragment_id is not None:
-                print_result(
-                    await registry.app_config_fragment.get(AppConfigFragmentID(fragment_id))
-                )
-            else:
-                print_result(
-                    await registry.app_config_fragment.scoped_get_app_config_fragments_by_names(
-                        ScopedAppConfigFragmentsByNamesInput(
-                            scope=AppConfigScopeRef(
-                                scope_type=AppConfigScopeType(scope_type),
-                                scope_id=(
-                                    AppConfigScopeID(scope_id) if scope_id is not None else None
-                                ),
-                            ),
-                            config_names=list(config_names),
-                        )
-                    )
-                )
+            result = await registry.app_config_fragment.scoped_get_app_config_fragments_by_names(
+                ScopedAppConfigFragmentsByNamesInput(scope=scope, config_names=list(config_names))
+            )
+            print_result(result)
         finally:
             await registry.close()
 
@@ -133,23 +118,17 @@ def update(scope_type: str, scope_id: uuid.UUID | None, items: str) -> None:
     scope holds none. Every item lands or none does.
     """
     from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
-        AppConfigScopeRef,
         ScopedUpsertAppConfigFragmentsInput,
     )
 
+    scope = _resolve_scope(scope_type, scope_id)
     parsed_items = load_model(items, list[AppConfigFragmentUpsertItem])
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.app_config_fragment.scoped_bulk_upsert_app_config_fragments(
-                ScopedUpsertAppConfigFragmentsInput(
-                    scope=AppConfigScopeRef(
-                        scope_type=AppConfigScopeType(scope_type),
-                        scope_id=AppConfigScopeID(scope_id) if scope_id is not None else None,
-                    ),
-                    items=parsed_items,
-                )
+                ScopedUpsertAppConfigFragmentsInput(scope=scope, items=parsed_items)
             )
             print_result(result)
         finally:
@@ -180,7 +159,7 @@ def purge(fragment_id: uuid.UUID) -> None:
     run_async(_run)
 
 
-@app_config_fragment.command(name="bulk-delete")
+@app_config_fragment.command(name="bulk-purge")
 @click.option(
     "--id",
     "ids",
@@ -189,7 +168,7 @@ def purge(fragment_id: uuid.UUID) -> None:
     type=click.UUID,
     help="Fragment id to purge. Repeat for more.",
 )
-def bulk_delete(ids: tuple[uuid.UUID, ...]) -> None:
+def bulk_purge(ids: tuple[uuid.UUID, ...]) -> None:
     """Purge many fragments by id, reporting each item's outcome."""
     from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
         BulkPurgeAppConfigFragmentInput,
