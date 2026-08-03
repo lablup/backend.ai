@@ -209,6 +209,8 @@ class UserDBSource:
         if not domains.rows:
             raise UserCreationBadRequest(f"Domain '{spec.domain_name}' does not exist.")
         domain_id = DomainID(domains.rows[0].id)
+        # Until domain_name goes away, the row carries both columns
+        spec.domain_id = domain_id
 
         duplicate_query = sa.select(UserRow.uuid).where(
             sa.or_(UserRow.email == spec.email, UserRow.username == spec.username)
