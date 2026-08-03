@@ -33,6 +33,7 @@ from ai.backend.common.data.permission.types import (
 )
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.common.identifier.virtual_scope import VirtualScopeID
@@ -195,6 +196,7 @@ def _make_user_data(user_id: uuid.UUID, *, is_superadmin: bool) -> UserData:
         is_superadmin=is_superadmin,
         role=UserRole.SUPERADMIN if is_superadmin else UserRole.USER,
         domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
     )
 
 

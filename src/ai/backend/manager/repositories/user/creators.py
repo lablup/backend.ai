@@ -114,7 +114,7 @@ class UserCreatorSpec(CreatorSpec[UserRow]):
             status=status,
             status_info=self.status_info,
             domain_name=self.domain_name,
-            # Resolved by the insert itself, so naming the domain still costs one statement.
+            # Resolved by the insert itself, so the two columns cannot drift.
             domain_id=sa.select(DomainRow.id)
             .where(DomainRow.name == self.domain_name)
             .scalar_subquery(),
