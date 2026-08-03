@@ -187,13 +187,12 @@ class AppConfigFragmentDBSource:
     async def list_visible_fragments_bulk(
         self, config_names: list[str], user_id: UserID | None
     ) -> list[AppConfigFragmentData]:
-        """Visible fragments for several ``config_names`` in one query, ordered by ascending ``rank``.
+        """Visible fragments for several ``config_names``, ordered by ascending ``rank``.
 
         ``public`` always contributes; a ``user_id`` additionally admits that user's own
         overlay and its domain's, while ``user_id=None`` (anonymous) sees only ``public``.
-        Not defaulted — naming no principal is the anonymous read, which the caller states
-        rather than falls into. Rank-ordered so the caller can group by name and deep-merge
-        each name's fragments in order.
+        Rank-ordered so the caller can group by name and deep-merge each name's fragments
+        in order.
         """
         if not config_names:
             return []
@@ -211,8 +210,7 @@ class AppConfigFragmentDBSource:
             if user_id is not None:
                 scope_visibility.append(AppConfigFragmentConditions.by_user_visibility(user_id))
                 # A user names its domain by name while a fragment's domain scope keys off the
-                # domain id, so the id is looked up before the visibility filter is built. A
-                # user with no resolvable domain simply loses the domain overlay.
+                # id, so the id is looked up first; no resolvable domain means no overlay.
                 user = await r.query(Querier(row_class=UserRow, pk_value=user_id))
                 domain = (
                     await r.query(Querier(row_class=DomainRow, pk_value=user.row.domain_name))

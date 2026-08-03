@@ -620,8 +620,7 @@ class TestApplicableFragments:
         scope_owners: None,
         fragments_across_scopes: list[AppConfigFragmentData],
     ) -> None:
-        # The domain id is resolved from the user before the filter is built; when that
-        # resolves to nothing the domain overlay drops out instead of widening the query.
+        # An unresolvable domain drops the overlay rather than widening the query.
         applicable = await repository.list_visible_fragments_bulk(
             ["theme"],
             UserID(uuid.uuid4()),

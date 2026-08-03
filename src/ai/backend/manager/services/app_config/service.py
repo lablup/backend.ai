@@ -49,12 +49,11 @@ class AppConfigService:
         self._fragment_repository = fragment_repository
 
     async def get_app_configs(self, action: GetAppConfigsAction) -> GetAppConfigsActionResult:
-        """Get the merged ``AppConfig`` for each of ``config_names`` in a single query.
+        """Get the merged ``AppConfig`` for each of ``config_names``.
 
         One entry per requested name, in request order; a repeated name is repeated in the
-        output. Without a ``user_id`` this is the anonymous, pre-login read — only ``public``
-        fragments contribute. A name nothing contributes to yields an empty merge rather than
-        failing, so one such name never withholds the names that did merge.
+        output. Without a ``user_id`` only ``public`` fragments contribute. A name nothing
+        contributes to yields an empty merge rather than failing the whole call.
         """
         fragments = await self._fragment_repository.list_visible_fragments_bulk(
             action.config_names, action.user_id

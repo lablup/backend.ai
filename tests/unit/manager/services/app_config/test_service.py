@@ -177,8 +177,7 @@ class TestAppConfigService:
         mock_fragment_repository: MagicMock,
         deep_merge_fragments: list[AppConfigFragmentData],
     ) -> None:
-        # The acting user is the whole scope — the domain overlay is derived from it in the
-        # query, so a caller has no way to name someone else's config.
+        # The acting user is the whole scope, so a caller cannot name someone else's config.
         result = await service.get_app_configs(
             GetAppConfigsAction(config_names=["theme"], user_id=_USER_ID)
         )
@@ -251,8 +250,7 @@ class TestAppConfigService:
         service: AppConfigService,
         two_name_fragments: list[AppConfigFragmentData],
     ) -> None:
-        # "unknown" contributes nothing, but that must not withhold the names that did
-        # merge — every requested name still gets its entry, in request order.
+        # "unknown" contributes nothing, but that must not withhold the names that did merge.
         result = await service.get_app_configs(
             GetAppConfigsAction(config_names=["theme", "menu", "unknown"], user_id=_USER_ID)
         )
@@ -269,8 +267,7 @@ class TestAppConfigService:
         mock_fragment_repository: MagicMock,
         public_only_fragments: list[AppConfigFragmentData],
     ) -> None:
-        # Naming no user is the anonymous, pre-login read: only public fragments are queried,
-        # and the result is attributable to no user.
+        # Naming no user is the anonymous, pre-login read: only public fragments are queried.
         result = await service.get_app_configs(GetAppConfigsAction(config_names=["theme"]))
 
         assert result.app_configs[0].merged_config == {"theme": "light", "lang": "en"}

@@ -29,10 +29,7 @@ class AppConfigAdapter(BaseAdapter):
     # --- merged AppConfig read ---
 
     async def my_get_app_configs(self, input: MyGetAppConfigsInput) -> GetAppConfigsPayload:
-        """The acting user's merged AppConfigs.
-
-        Calls ``current_user()`` internally — the caller does not pass a scope.
-        """
+        """The acting user's merged AppConfigs; the scope comes from the session, not the caller."""
         me = current_user()
         if me is None:
             # ``auth_required`` guarantees a session on this route, so this is never hit.
@@ -47,7 +44,7 @@ class AppConfigAdapter(BaseAdapter):
         )
 
     async def public_get_app_configs(self, input: PublicGetAppConfigsInput) -> GetAppConfigsPayload:
-        # Naming no principal is what makes this the anonymous read: only public contributes.
+        """Merged AppConfigs from public fragments only; naming no principal is what makes it anonymous."""
         action_result = await self._processors.app_config.get_app_configs.wait_for_complete(
             GetAppConfigsAction(config_names=input.config_names)
         )
@@ -57,7 +54,7 @@ class AppConfigAdapter(BaseAdapter):
             ]
         )
 
-    # --- guards / converters ---
+    # --- converters ---
 
     @staticmethod
     def _fragment_to_node(data: AppConfigFragmentData) -> AppConfigFragmentNode:

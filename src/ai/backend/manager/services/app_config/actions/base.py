@@ -7,7 +7,7 @@ from ai.backend.manager.actions.action.scope import BaseScopeAction, BaseScopeAc
 
 
 class AppConfigScopeAction(BaseScopeAction):
-    """Base for scope-level merged app config actions (get)."""
+    """Base for scope-level merged app config actions."""
 
     @override
     @classmethod
