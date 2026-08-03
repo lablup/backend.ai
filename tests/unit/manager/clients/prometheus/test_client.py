@@ -254,7 +254,7 @@ class TestQueryInstant:
         first_session_id = SessionId(uuid4())
         second_session_id = SessionId(uuid4())
         query_template = (
-            'min by (session_id) (backendai_container_utilization{{value_type="current",'
+            'min by ({group_by}) (backendai_container_utilization{{value_type="current",'
             'container_metric_name="cpu_used",{labels}}})'
         )
 
