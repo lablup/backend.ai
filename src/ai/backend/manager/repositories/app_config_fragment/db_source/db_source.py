@@ -28,6 +28,7 @@ from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowLi
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.models.user.conditions import domain_id_of_user
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
     AppConfigFragmentPurgerSpec,
 )
@@ -197,7 +198,7 @@ class AppConfigFragmentDBSource:
         scope_visibility = [AppConfigFragmentConditions.by_public_visibility()]
         if user_id is not None:
             scope_visibility += [
-                AppConfigFragmentConditions.by_domain_visibility_of_user(user_id),
+                AppConfigFragmentConditions.by_domain_visibility(domain_id_of_user(user_id)),
                 AppConfigFragmentConditions.by_user_visibility(user_id),
             ]
         querier = BatchQuerier(

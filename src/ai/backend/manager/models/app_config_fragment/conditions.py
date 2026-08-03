@@ -11,12 +11,11 @@ import sqlalchemy as sa
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
-from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.user import UserRow
 
 __all__ = ("AppConfigFragmentConditions",)
 
@@ -152,20 +151,15 @@ class AppConfigFragmentConditions:
         return inner
 
     @staticmethod
-    def by_domain_visibility_of_user(user_id: UserID) -> QueryCondition:
-        """The ``domain`` scope of the domain ``user_id`` belongs to.
+    def by_domain_visibility(domain_id: DomainID | sa.ScalarSelect[DomainID]) -> QueryCondition:
+        """The ``domain`` scope for ``domain_id``.
 
-        A user names its domain by name, while a fragment's domain scope keys off the domain
-        id, so the id is looked up in a subquery rather than by a separate round trip.
+        Accepts a scalar subquery as well as a literal id, so a caller that only knows the
+        principal can derive the domain in the same statement (see
+        ``models.user.conditions.domain_id_of_user``).
         """
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            domain_id = (
-                sa.select(DomainRow.id)
-                .join(UserRow, UserRow.domain_name == DomainRow.name)
-                .where(UserRow.uuid == user_id)
-                .scalar_subquery()
-            )
             return sa.and_(
                 AppConfigFragmentRow.scope_type == AppConfigScopeType.DOMAIN,
                 AppConfigFragmentRow.scope_id == domain_id,

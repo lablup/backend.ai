@@ -44,6 +44,7 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.conditions import domain_id_of_user
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
     AppConfigFragmentPurgerSpec,
@@ -576,17 +577,15 @@ class TestVisibilityConditions:
         }
         assert {item.id for item in result.items} == expected
 
-    async def test_domain_visibility_of_user_selects_only_that_user_s_domain(
+    async def test_domain_visibility_selects_only_that_domain(
         self,
         repository: AppConfigFragmentRepository,
-        scope_owners: None,
         fragments_across_scopes: list[AppConfigFragmentData],
     ) -> None:
-        # The domain is never named directly — it is derived from the user's own domain.
         result = await repository.admin_search(
             BatchQuerier(
                 pagination=OffsetPagination(limit=10, offset=0),
-                conditions=[AppConfigFragmentConditions.by_domain_visibility_of_user(_USER_ID)],
+                conditions=[AppConfigFragmentConditions.by_domain_visibility(_DOMAIN_ID)],
             )
         )
         expected = {
@@ -595,6 +594,49 @@ class TestVisibilityConditions:
             if f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_SCOPE_ID
         }
         assert {item.id for item in result.items} == expected
+
+    async def test_domain_visibility_accepts_the_domain_derived_from_a_user(
+        self,
+        repository: AppConfigFragmentRepository,
+        scope_owners: None,
+        fragments_across_scopes: list[AppConfigFragmentData],
+    ) -> None:
+        # The same filter, fed the subquery form instead of a literal id — the caller names
+        # only the principal and the domain is derived in the same statement.
+        result = await repository.admin_search(
+            BatchQuerier(
+                pagination=OffsetPagination(limit=10, offset=0),
+                conditions=[
+                    AppConfigFragmentConditions.by_domain_visibility(domain_id_of_user(_USER_ID))
+                ],
+            )
+        )
+        expected = {
+            f.id
+            for f in fragments_across_scopes
+            if f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_SCOPE_ID
+        }
+        assert {item.id for item in result.items} == expected
+
+    async def test_domain_visibility_of_an_unknown_user_matches_nothing(
+        self,
+        repository: AppConfigFragmentRepository,
+        scope_owners: None,
+        fragments_across_scopes: list[AppConfigFragmentData],
+    ) -> None:
+        # The derivation yields SQL NULL for a user that does not exist, so the domain half
+        # of a visibility filter drops out instead of widening.
+        result = await repository.admin_search(
+            BatchQuerier(
+                pagination=OffsetPagination(limit=10, offset=0),
+                conditions=[
+                    AppConfigFragmentConditions.by_domain_visibility(
+                        domain_id_of_user(UserID(uuid.uuid4()))
+                    )
+                ],
+            )
+        )
+        assert result.items == []
 
     async def test_user_visibility_selects_only_that_user(
         self,
