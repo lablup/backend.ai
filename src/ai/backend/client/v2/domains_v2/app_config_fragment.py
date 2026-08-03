@@ -35,7 +35,7 @@ class V2AppConfigFragmentClient(BaseDomainClient):
     call is RBAC-gated at the scope it acts on.
     """
 
-    # ------------------------------------------------------------------ Scoped
+    # --- Scoped ---
 
     async def scoped_get_app_config_fragments_by_names(
         self,
@@ -65,7 +65,7 @@ class V2AppConfigFragmentClient(BaseDomainClient):
             response_model=UpsertAppConfigFragmentsPayload,
         )
 
-    # ------------------------------------------------------------------ Self-service
+    # --- Self-service ---
 
     async def my_get_app_config_fragments_by_names(
         self,
@@ -91,7 +91,7 @@ class V2AppConfigFragmentClient(BaseDomainClient):
             response_model=UpsertAppConfigFragmentsPayload,
         )
 
-    # ------------------------------------------------------------------ By id
+    # --- By id ---
 
     async def get(self, app_config_fragment_id: AppConfigFragmentID) -> AppConfigFragmentNode:
         """Get a single fragment by id."""
@@ -123,7 +123,7 @@ class V2AppConfigFragmentClient(BaseDomainClient):
             response_model=BulkPurgeAppConfigFragmentPayload,
         )
 
-    # ------------------------------------------------------------------ Admin
+    # --- Admin ---
 
     async def admin_search(
         self,
