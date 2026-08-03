@@ -18,6 +18,7 @@ from sqlalchemy.orm import Mapped, foreign, joinedload, mapped_column, relations
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -195,6 +196,11 @@ class UserRow(Base):  # type: ignore[misc]
         sa.String(length=64),
         sa.ForeignKey("domains.name"),
         index=True,
+        nullable=True,
+    )
+    domain_id: Mapped[DomainID | None] = mapped_column(
+        "domain_id",
+        GUID(DomainID),
         nullable=True,
     )
     role: Mapped[UserRole | None] = mapped_column(

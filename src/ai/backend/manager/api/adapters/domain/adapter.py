@@ -107,6 +107,13 @@ class DomainAdapter(BaseAdapter):
         )
         return self._domain_data_to_node(action_result.data)
 
+    async def resolve_domain_id(self, domain_name: str) -> DomainID:
+        """Resolve a domain name to its DomainID (raises if the domain does not exist)."""
+        action_result = await self._processors.domain.get_domain.wait_for_complete(
+            GetDomainAction(domain_name=domain_name)
+        )
+        return action_result.data.id
+
     async def admin_search(
         self,
         input: AdminSearchDomainsInput,

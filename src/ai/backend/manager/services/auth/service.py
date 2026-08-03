@@ -496,6 +496,11 @@ class AuthService:
                 ):
                     data[key] = val
 
+        # Resolve after hook overrides so domain_id matches the final domain_name.
+        data["domain_id"] = await self._auth_repository.get_domain_id_by_name(
+            str(data["domain_name"])
+        )
+
         # Create user's first access_key and secret_key.
         ak, sk = generate_keypair()
         resource_policy = user_data_overriden.get("resource_policy", "default")

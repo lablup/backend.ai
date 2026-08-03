@@ -41,7 +41,7 @@ from ai.backend.common.dto.manager.v2.group.types import (
     ProjectTypeFilter,
     ProjectUserFilter,
 )
-from ai.backend.common.exception import UnreachableError
+from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters, UnreachableError
 from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -169,15 +169,21 @@ class ProjectAdapter(BaseAdapter):
 
     async def admin_create(self, input: CreateProjectInput) -> ProjectPayload:
         """Create a new project (superadmin only)."""
+        try:
+            domain_id = await self._resolve_domain_id(input.domain_name)
+        except DomainNotFound as e:
+            raise InvalidAPIParameters(
+                f"Cannot create group: Domain '{input.domain_name}' does not exist"
+            ) from e
         spec = GroupCreatorSpec(
             name=input.name,
             domain_name=input.domain_name,
+            domain_id=domain_id,
             type=DataProjectType(input.type.value) if input.type else None,
             description=input.description,
             integration_name=input.integration_name,
             resource_policy=input.resource_policy,
         )
-        domain_id = await self._resolve_domain_id(input.domain_name)
         result = await self._processors.group.create_group.wait_for_complete(
             CreateGroupAction(
                 creator=Creator(spec=spec),

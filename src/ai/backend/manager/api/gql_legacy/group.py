@@ -609,6 +609,7 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
                 spec=GroupCreatorSpec(
                     name=name,
                     domain_name=self.domain_name,
+                    domain_id=domain_id,
                     type=type_val,
                     description=description_val,
                     is_active=is_active_val,
@@ -639,7 +640,9 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
         required=False, default_value={}, description="Added in 24.03.0"
     )
 
-    def to_action(self, group_id: uuid.UUID) -> ModifyGroupAction:
+    def to_action(
+        self, group_id: uuid.UUID, domain_id: DomainID | None = None
+    ) -> ModifyGroupAction:
         spec = GroupUpdaterSpec(
             name=OptionalState[str].from_graphql(
                 self.name,
@@ -647,6 +650,7 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
             domain_name=OptionalState[str].from_graphql(
                 self.domain_name,
             ),
+            domain_id=OptionalState[DomainID].from_nullable(domain_id),
             description=TriState[str].from_graphql(
                 self.description,
             ),
@@ -750,7 +754,14 @@ class ModifyGroup(graphene.Mutation):  # type: ignore[misc]
     ) -> ModifyGroup:
         graph_ctx: GraphQueryContext = info.context
 
-        action = props.to_action(gid)
+        domain_id: DomainID | None = None
+        if props.domain_name is not Undefined and props.domain_name is not None:
+            domain_id = (
+                await graph_ctx.processors.domain.get_domain.wait_for_complete(
+                    GetDomainAction(domain_name=str(props.domain_name))
+                )
+            ).data.id
+        action = props.to_action(gid, domain_id)
         res = await graph_ctx.processors.group.modify_group.wait_for_complete(action)
         return cls(
             ok=True,

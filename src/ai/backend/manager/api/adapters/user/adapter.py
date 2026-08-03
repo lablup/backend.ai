@@ -90,12 +90,13 @@ from ai.backend.common.dto.manager.v2.user.types import (
 from ai.backend.common.dto.manager.v2.user.types import (
     UserStatus as UserStatusDTO,
 )
-from ai.backend.common.exception import UnreachableError
+from ai.backend.common.exception import DomainNotFound, UnreachableError
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.data.user.types import UserStatus as DataUserStatus
+from ai.backend.manager.errors.user import UserCreationBadRequest, UserModificationBadRequest
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.group.conditions import GroupConditions
@@ -416,12 +417,17 @@ class UserAdapter(BaseAdapter):
             rounds=self._auth_config.password_hash_rounds,
             salt_size=self._auth_config.password_hash_salt_size,
         )
+        try:
+            domain_id = await self._resolve_domain_id(input.domain_name)
+        except DomainNotFound as e:
+            raise UserCreationBadRequest(f"Domain '{input.domain_name}' does not exist.") from e
         spec = UserCreatorSpec(
             email=input.email,
             username=input.username,
             password=password_info,
             need_password_change=input.need_password_change,
             domain_name=input.domain_name,
+            domain_id=domain_id,
             full_name=input.full_name,
             description=input.description,
             status=UserStatus(input.status),
@@ -436,7 +442,6 @@ class UserAdapter(BaseAdapter):
             integration_name=input.integration_name,
         )
         group_ids = [str(gid) for gid in input.group_ids] if input.group_ids else None
-        domain_id = await self._resolve_domain_id(spec.domain_name)
         result = await self._processors.user.create_user.wait_for_complete(
             CreateUserAction(creator=Creator(spec=spec), _domain_id=domain_id, group_ids=group_ids)
         )
@@ -447,6 +452,14 @@ class UserAdapter(BaseAdapter):
 
     async def modify_user_by_id(self, user_id: UUID, input: UpdateUserInput) -> UpdateUserPayload:
         """Update a user by UUID."""
+        new_domain_id: DomainID | None = None
+        if input.domain_name is not None:
+            try:
+                new_domain_id = await self._resolve_domain_id(input.domain_name)
+            except DomainNotFound as e:
+                raise UserModificationBadRequest(
+                    f"Domain '{input.domain_name}' does not exist."
+                ) from e
         updater_spec = UserUpdaterSpec(
             username=(
                 OptionalState.update(input.username)
@@ -492,6 +505,11 @@ class UserAdapter(BaseAdapter):
             domain_name=(
                 OptionalState.update(input.domain_name)
                 if input.domain_name is not None
+                else OptionalState.nop()
+            ),
+            domain_id=(
+                OptionalState.update(new_domain_id)
+                if new_domain_id is not None
                 else OptionalState.nop()
             ),
             role=(

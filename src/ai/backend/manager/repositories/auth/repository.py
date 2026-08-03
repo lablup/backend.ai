@@ -4,6 +4,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -48,6 +49,10 @@ class AuthRepository:
     @auth_repository_resilience.apply()
     async def check_email_exists(self, email: str) -> bool:
         return await self._db_source.verify_email_exists(email)
+
+    @auth_repository_resilience.apply()
+    async def get_domain_id_by_name(self, domain_name: str) -> DomainID | None:
+        return await self._db_source.fetch_domain_id_by_name(domain_name)
 
     @auth_repository_resilience.apply()
     async def create_user_with_keypair(

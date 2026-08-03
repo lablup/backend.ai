@@ -27,12 +27,15 @@ from ai.backend.common.dto.manager.user import (
     UpdateUserRequest,
     UpdateUserResponse,
 )
+from ai.backend.common.exception import DomainNotFound
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.user.types import UserInfoContext
 from ai.backend.manager.data.user.types import UserStatus as ManagerUserStatus
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.dto.user_request import GetUserPathParam, UpdateUserPathParam
+from ai.backend.manager.errors.user import UserCreationBadRequest, UserModificationBadRequest
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
@@ -87,6 +90,16 @@ class UserHandler:
             salt_size=self._config_provider.config.auth.password_hash_salt_size,
         )
 
+        try:
+            domain_data = (
+                await self._domain.get_domain.wait_for_complete(
+                    GetDomainAction(domain_name=body.parsed.domain_name)
+                )
+            ).data
+        except DomainNotFound as e:
+            raise UserCreationBadRequest(
+                f"Domain '{body.parsed.domain_name}' does not exist."
+            ) from e
         creator = Creator(
             spec=UserCreatorSpec(
                 email=body.parsed.email,
@@ -94,6 +107,7 @@ class UserHandler:
                 password=password_info,
                 need_password_change=body.parsed.need_password_change,
                 domain_name=body.parsed.domain_name,
+                domain_id=domain_data.id,
                 full_name=body.parsed.full_name,
                 description=body.parsed.description,
                 status=ManagerUserStatus(body.parsed.status.value)
@@ -110,11 +124,6 @@ class UserHandler:
             )
         )
 
-        domain_data = (
-            await self._domain.get_domain.wait_for_complete(
-                GetDomainAction(domain_name=body.parsed.domain_name)
-            )
-        ).data
         action_result = await self._user.create_user.wait_for_complete(
             CreateUserAction(
                 creator=creator,
@@ -197,7 +206,20 @@ class UserHandler:
                 salt_size=self._config_provider.config.auth.password_hash_salt_size,
             )
 
-        updater = self._adapter.build_updater(body.parsed, email, password_info)
+        new_domain_id: DomainID | None = None
+        if body.parsed.domain_name is not None:
+            try:
+                new_domain_id = (
+                    await self._domain.get_domain.wait_for_complete(
+                        GetDomainAction(domain_name=body.parsed.domain_name)
+                    )
+                ).data.id
+            except DomainNotFound as e:
+                raise UserModificationBadRequest(
+                    f"Domain '{body.parsed.domain_name}' does not exist."
+                ) from e
+
+        updater = self._adapter.build_updater(body.parsed, email, password_info, new_domain_id)
 
         action_result = await self._user.modify_user.wait_for_complete(
             ModifyUserAction(user_uuid=path.parsed.user_id, email=email, updater=updater)

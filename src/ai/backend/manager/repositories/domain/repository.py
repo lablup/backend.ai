@@ -132,7 +132,7 @@ class DomainRepository:
             data = creation_result.row.to_data()
 
             # Create model-store group for the domain
-            await self._create_model_store_group(w, spec.name)
+            await self._create_model_store_group(w, spec.name, data.id)
 
             return data
 
@@ -261,7 +261,9 @@ class DomainRepository:
             await session.commit()
             return result.row.to_data()
 
-    async def _create_model_store_group(self, w: RBACWriteOps, domain_name: str) -> None:
+    async def _create_model_store_group(
+        self, w: RBACWriteOps, domain_name: str, domain_id: DomainID
+    ) -> None:
         """
         Private method to create model-store group for a domain.
         """
@@ -279,6 +281,7 @@ class DomainRepository:
                 spec=GroupCreatorSpec(
                     name="model-store",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     description="Model Store",
                     resource_policy="default",
                     type=ProjectType.MODEL_STORE,

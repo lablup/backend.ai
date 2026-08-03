@@ -36,6 +36,7 @@
             "description": "The default user group",
             "is_active": true,
             "domain_name": "default",
+            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
             "total_resource_slots": {},
             "allowed_vfolder_hosts": {},
@@ -47,6 +48,7 @@
             "description": "model store project",
             "is_active": true,
             "domain_name": "default",
+            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
             "total_resource_slots": {},
             "allowed_vfolder_hosts": {},
@@ -85,6 +87,7 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
             "role": "superadmin",
             "main_access_key": null
@@ -100,6 +103,7 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
             "role": "admin",
             "main_access_key": null
@@ -115,6 +119,7 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
             "role": "user",
             "main_access_key": null
@@ -130,6 +135,7 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
             "role": "user",
             "main_access_key": null
@@ -145,6 +151,7 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
             "role": "monitor",
             "main_access_key": null

@@ -31,6 +31,7 @@ from sqlalchemy.orm import (
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common import msgpack
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.group.types import GroupData, ProjectType
@@ -191,6 +192,11 @@ class GroupRow(Base):  # type: ignore[misc]
         sa.ForeignKey("domains.name", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
         index=True,
+    )
+    domain_id: Mapped[DomainID] = mapped_column(
+        "domain_id",
+        GUID(DomainID),
+        nullable=False,
     )
     # TODO: separate resource-related fields with new domain resource policy table when needed.
     total_resource_slots: Mapped[ResourceSlot] = mapped_column(
