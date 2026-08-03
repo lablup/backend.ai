@@ -213,7 +213,7 @@ class DomainRepository:
             creation_result = await w.create_scope(DomainScopeCreation(spec=spec))
             domain_row = creation_result.row
 
-            if scaling_group_ids is not None:
+            if scaling_group_ids:
                 await w.bulk_create(
                     BulkCreator(
                         specs=[
@@ -247,7 +247,7 @@ class DomainRepository:
             if domain_id is None:
                 raise DomainNotFound(f"Domain not found (id:{domain_name})")
 
-            if sgroup_ids_to_add is not None:
+            if sgroup_ids_to_add:
                 await session.execute(
                     sa.insert(ScalingGroupForDomainRow),
                     [
@@ -256,7 +256,7 @@ class DomainRepository:
                     ],
                 )
 
-            if sgroup_ids_to_remove is not None:
+            if sgroup_ids_to_remove:
                 await session.execute(
                     sa.delete(ScalingGroupForDomainRow).where(
                         (ScalingGroupForDomainRow.domain_id == domain_id)
