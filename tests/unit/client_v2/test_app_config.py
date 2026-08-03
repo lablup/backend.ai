@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4
 
 import pytest
 from yarl import URL
@@ -13,7 +12,6 @@ from ai.backend.client.v2.base_client import BackendAIAnonymousClient, BackendAI
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains_v2.app_config import V2AppConfigClient
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.dto.manager.v2.app_config.request import (
     MyGetAppConfigsInput,
     PublicGetAppConfigsInput,
@@ -40,31 +38,8 @@ def payload_json() -> dict[str, Any]:
     """The merged answer as the server sends it: one merged name, one nothing contributed to."""
     return {
         "app_configs": [
-            {
-                "config_name": "theme",
-                "merged_config": {"mode": "dark"},
-                "fragments": [
-                    {
-                        "id": str(uuid4()),
-                        "config_name": "theme",
-                        "scope_type": AppConfigScopeType.PUBLIC.value,
-                        "scope_id": None,
-                        "config": {"mode": "light"},
-                        "created_at": "2026-01-01T00:00:00+00:00",
-                        "updated_at": "2026-01-01T00:00:00+00:00",
-                    },
-                    {
-                        "id": str(uuid4()),
-                        "config_name": "theme",
-                        "scope_type": AppConfigScopeType.USER.value,
-                        "scope_id": str(uuid4()),
-                        "config": {"mode": "dark"},
-                        "created_at": "2026-01-02T00:00:00+00:00",
-                        "updated_at": "2026-01-02T00:00:00+00:00",
-                    },
-                ],
-            },
-            {"config_name": "menu", "merged_config": {}, "fragments": []},
+            {"config_name": "theme", "merged_config": {"mode": "dark"}},
+            {"config_name": "menu", "merged_config": {}},
         ]
     }
 
@@ -132,7 +107,7 @@ class TestMergedRead:
         assert isinstance(result, GetAppConfigsPayload)
         assert [node.config_name for node in result.app_configs] == ["theme", "menu"]
 
-    async def test_returns_the_merge_and_its_contributing_fragments(
+    async def test_returns_the_merge_for_each_requested_name(
         self,
         case: _MergedReadCase,
         client: V2AppConfigClient,
@@ -143,12 +118,7 @@ class TestMergedRead:
 
         merged, uncontributed = result.app_configs
         assert merged.merged_config == {"mode": "dark"}
-        assert [f.scope_type for f in merged.fragments] == [
-            AppConfigScopeType.PUBLIC,
-            AppConfigScopeType.USER,
-        ]
         assert uncontributed.merged_config == {}
-        assert uncontributed.fragments == []
 
     async def test_only_the_authenticated_read_is_signed(
         self,
