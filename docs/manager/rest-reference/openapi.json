@@ -1171,6 +1171,25 @@
         "title": "MyUpsertAppConfigFragmentsInput",
         "type": "object"
       },
+      "MyPurgeAppConfigFragmentsByNamesInput": {
+        "description": "Purge the current user's own user-scope fragments for the given config names.",
+        "properties": {
+          "config_names": {
+            "description": "Config names whose fragments to purge. All-or-nothing: a name the scope holds no fragment for purges nothing and is reported as not found.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Config Names",
+            "type": "array"
+          }
+        },
+        "required": [
+          "config_names"
+        ],
+        "title": "MyPurgeAppConfigFragmentsByNamesInput",
+        "type": "object"
+      },
       "CreateAppConfigAllowListInput": {
         "description": "Input for registering a new app config allow-list entry.",
         "properties": {
@@ -42064,6 +42083,35 @@
         },
         "parameters": [],
         "description": "Upsert many fragments at the caller's own user scope, all-or-nothing (auth).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config-fragments/my/bulk-delete": {
+      "post": {
+        "operationId": "v2/app-config-fragments.my_bulk_purge",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MyPurgeAppConfigFragmentsByNamesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Purge the caller's own user-scope fragments by config name, all-or-nothing (auth).\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/app-config-fragments/{fragment_id}": {
