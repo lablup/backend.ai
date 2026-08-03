@@ -30,6 +30,7 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.sql.expression import false, true
 
+from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_SCOPE_TYPE
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.schema.resource_group import PreemptionConfig
@@ -48,6 +49,7 @@ from ai.backend.manager.models.base import (
     PydanticColumn,
 )
 from ai.backend.manager.models.group import resolve_group_name_or_id, resolve_groups
+from ai.backend.manager.models.mixins.scope_row import ScopeRowMixin
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -250,8 +252,9 @@ def _get_resource_preset_join_condition() -> Any:
     return ScalingGroupRow.name == foreign(ResourcePresetRow.scaling_group_name)
 
 
-class ScalingGroupRow(Base):  # type: ignore[misc]
+class ScalingGroupRow(ScopeRowMixin, Base):  # type: ignore[misc]
     __tablename__ = "scaling_groups"
+    __scope_type__ = RESOURCE_GROUP_SCOPE_TYPE
     __table_args__ = (
         # Partial unique index: at most one row may have is_default = true.
         sa.Index(

@@ -15,6 +15,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_SCOPE_TYPE
 from ai.backend.common.data.entity.types import (
     EntityRef,
     ScopeRef,
@@ -33,6 +34,7 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.types import RBACElementRef
@@ -61,7 +63,7 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
+from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, ScalingGroupRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
@@ -1354,6 +1356,8 @@ class _ScopeNameSeed:
     domain_name: str
     project_ref: ScopeRef
     project_name: str
+    resource_group_ref: ScopeRef
+    resource_group_name: str
     user_ref: ScopeRef
     username: str
 
@@ -1368,6 +1372,7 @@ async def scope_name_seed(
         [
             # FK dependency order: parents before children
             DomainRow,
+            ScalingGroupRow,
             UserResourcePolicyRow,
             ProjectResourcePolicyRow,
             KeyPairResourcePolicyRow,
@@ -1379,13 +1384,21 @@ async def scope_name_seed(
         unique = uuid.uuid4().hex[:8]
         domain_id = uuid.uuid4()
         project_id = uuid.uuid4()
+        resource_group_id = ResourceGroupID(uuid.uuid4())
         user_id = uuid.uuid4()
         domain_name = f"dom-{unique}"
         project_name = f"proj-{unique}"
+        resource_group_name = f"rg-{unique}"
         username = f"user-{unique}"
         async with database_connection.begin_session() as db_sess:
             db_sess.add_all([
                 DomainRow(name=domain_name, id=domain_id),
+                ScalingGroupRow(
+                    id=resource_group_id,
+                    name=resource_group_name,
+                    driver="static",
+                    scheduler="fifo",
+                ),
                 UserResourcePolicyRow(
                     name=f"urp-{unique}",
                     max_vfolder_count=0,
@@ -1421,6 +1434,10 @@ async def scope_name_seed(
             domain_name=domain_name,
             project_ref=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
             project_name=project_name,
+            resource_group_ref=ScopeRef(
+                scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=resource_group_id
+            ),
+            resource_group_name=resource_group_name,
             user_ref=ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=user_id),
             username=username,
         )
@@ -1435,9 +1452,10 @@ class TestResolveScopeTemplateValues:
         provider: RBACOpsProvider,
         scope_name_seed: _ScopeNameSeed,
     ) -> None:
-        """Domain and project resolve to their name, a user to its username."""
+        """Domain, project, and resource group resolve to their name, a user to its
+        username."""
         seed = scope_name_seed
-        refs = [seed.domain_ref, seed.project_ref, seed.user_ref]
+        refs = [seed.domain_ref, seed.project_ref, seed.resource_group_ref, seed.user_ref]
 
         async with provider.write_ops() as w:
             result = await w._resolve_scope_template_values(refs)
@@ -1448,6 +1466,11 @@ class TestResolveScopeTemplateValues:
             ),
             seed.project_ref: ScopeTemplateValue(
                 id=seed.project_ref.scope_id, name=seed.project_name, type="project"
+            ),
+            seed.resource_group_ref: ScopeTemplateValue(
+                id=seed.resource_group_ref.scope_id,
+                name=seed.resource_group_name,
+                type="resource_group",
             ),
             seed.user_ref: ScopeTemplateValue(
                 id=seed.user_ref.scope_id, name=seed.username, type="user"
