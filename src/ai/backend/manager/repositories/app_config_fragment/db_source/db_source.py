@@ -153,6 +153,48 @@ class AppConfigFragmentDBSource:
             return AppConfigFragmentBulkResult(succeeded=succeeded, failed=failed)
 
     @app_config_fragment_db_source_resilience.apply()
+    async def purge_by_config_names(
+        self,
+        scope: SearchScope,
+        config_names: Sequence[str],
+    ) -> list[AppConfigFragmentData]:
+        """Purge one scope's fragments for ``config_names``, all-or-nothing.
+
+        A scope holds at most one fragment per config name, so the names resolve to ids inside
+        the purging transaction and each row is unbound from its scope as a purge by id is. A
+        name the scope holds no fragment for raises before anything is deleted, so a typo
+        cannot take a neighbouring config with it.
+        """
+        # A name repeated in the request still names one fragment.
+        requested = list(dict.fromkeys(config_names))
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[AppConfigFragmentConditions.by_config_names(requested)],
+        )
+        async with self._rbac_ops_provider.write_ops() as w:
+            found = await w.batch_query_with_scopes(
+                sa.select(AppConfigFragmentRow), querier, [scope]
+            )
+            rows = {
+                row.AppConfigFragmentRow.config_name: row.AppConfigFragmentRow for row in found.rows
+            }
+            missing = [config_name for config_name in requested if config_name not in rows]
+            if missing:
+                raise AppConfigFragmentNotFound(
+                    f"No app config fragment at this scope for: {', '.join(missing)}"
+                )
+            purged: list[AppConfigFragmentData] = []
+            for config_name in requested:
+                fragment_id = AppConfigFragmentID(rows[config_name].id)
+                result = await w.purge_scoped(
+                    RBACEntityPurger(spec=AppConfigFragmentPurgerSpec(fragment_id=fragment_id))
+                )
+                if result is None:
+                    raise AppConfigFragmentNotFound(f"App config fragment {fragment_id} not found")
+                purged.append(result.row.to_data())
+            return purged
+
+    @app_config_fragment_db_source_resilience.apply()
     async def admin_search(self, querier: BatchQuerier) -> AppConfigFragmentSearchResult:
         """Superadmin/internal path: query across all fragments with no scope filter."""
         async with self._rbac_ops_provider.read_ops() as r:

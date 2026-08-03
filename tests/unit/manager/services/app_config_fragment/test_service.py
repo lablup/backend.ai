@@ -52,6 +52,9 @@ from ai.backend.manager.services.app_config_fragment.actions.get import (
 from ai.backend.manager.services.app_config_fragment.actions.purge import (
     PurgeAppConfigFragmentAction,
 )
+from ai.backend.manager.services.app_config_fragment.actions.purge_by_names import (
+    PurgeAppConfigFragmentsByNamesAction,
+)
 from ai.backend.manager.services.app_config_fragment.actions.scoped_search import (
     ScopedSearchAppConfigFragmentAction,
 )
@@ -289,6 +292,50 @@ class TestAppConfigFragmentService:
 
         assert result.fragment == fragment
         mock_repository.purge.assert_called_once_with(purger_spec)
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _RBACScopeCase(
+                scope_type=AppConfigScopeType.PUBLIC,
+                scope_id=None,
+                expected_scope_type=ScopeType.GLOBAL,
+                expected_scope_id="",
+            ),
+            _RBACScopeCase(
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id=_DOMAIN_SCOPE_ID,
+                expected_scope_type=ScopeType.DOMAIN,
+                expected_scope_id=str(_DOMAIN_ID),
+            ),
+            _RBACScopeCase(
+                scope_type=AppConfigScopeType.USER,
+                scope_id=_USER_SCOPE_ID,
+                expected_scope_type=ScopeType.USER,
+                expected_scope_id=str(_USER_ID),
+            ),
+        ],
+        ids=lambda case: case.scope_type.value,
+    )
+    async def test_purge_by_names_passes_the_names_through_and_reports_its_scope(
+        self,
+        service: AppConfigFragmentService,
+        mock_repository: MagicMock,
+        scoped_fragment: AppConfigFragmentData,
+        case: _RBACScopeCase,
+    ) -> None:
+        mock_repository.purge_by_config_names = AsyncMock(return_value=[scoped_fragment])
+        scope = AppConfigFragmentSearchScope(scope_type=case.scope_type, scope_id=case.scope_id)
+
+        result = await service.purge_by_names(
+            PurgeAppConfigFragmentsByNamesAction(scope=scope, config_names=["theme"])
+        )
+
+        assert result.fragments == [scoped_fragment]
+        # The result reports the RBAC scope the purge was authorized at.
+        assert result.scope_type() == case.expected_scope_type
+        assert result.scope_id() == case.expected_scope_id
+        mock_repository.purge_by_config_names.assert_called_once_with(scope, ["theme"])
 
     # --- bulk ---
 

@@ -27,6 +27,7 @@ __all__ = (
     "AppConfigScopeRef",
     "BulkPurgeAppConfigFragmentInput",
     "MyAppConfigFragmentsByNamesInput",
+    "MyPurgeAppConfigFragmentsByNamesInput",
     "MyUpsertAppConfigFragmentsInput",
     "ScopedAppConfigFragmentsByNamesInput",
     "ScopedSearchAppConfigFragmentInput",
@@ -76,6 +77,18 @@ class MyAppConfigFragmentsByNamesInput(BaseRequestModel):
         description=(
             "Config names whose fragments to read. Answered position by position, null "
             "where the scope holds no fragment for that name."
+        ),
+    )
+
+
+class MyPurgeAppConfigFragmentsByNamesInput(BaseRequestModel):
+    """Purge the current user's own user-scope fragments for the given config names."""
+
+    config_names: list[str] = Field(
+        min_length=1,
+        description=(
+            "Config names whose fragments to purge. All-or-nothing: a name the scope holds "
+            "no fragment for purges nothing and is reported as not found."
         ),
     )
 

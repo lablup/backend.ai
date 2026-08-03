@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AppConfigFragmentUpsertItem,
     AppConfigScopeRef,
     BulkPurgeAppConfigFragmentInput,
+    MyPurgeAppConfigFragmentsByNamesInput,
     MyUpsertAppConfigFragmentsInput,
     ScopedAppConfigFragmentsByNamesInput,
     ScopedUpsertAppConfigFragmentsInput,
@@ -150,6 +151,20 @@ class TestAppConfigFragmentsByNamesInput:
                 "scope_id": None,
                 "config_names": ["theme"],
             })
+
+
+class TestMyPurgeAppConfigFragmentsByNamesInput:
+    """The self-service purge names configs, not ids, and carries no scope."""
+
+    def test_config_names_alone_are_a_complete_body(self) -> None:
+        req = MyPurgeAppConfigFragmentsByNamesInput(config_names=["theme"])
+
+        assert req.config_names == ["theme"]
+        assert not hasattr(req, "scope_type")
+
+    def test_an_empty_batch_is_rejected(self) -> None:
+        with pytest.raises(BackendAISchemaValidationFailed):
+            MyPurgeAppConfigFragmentsByNamesInput.model_validate({"config_names": []})
 
 
 class TestBulkPurgeAppConfigFragmentInput:

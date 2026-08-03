@@ -17,6 +17,7 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AppConfigScopeRef,
     BulkPurgeAppConfigFragmentInput,
     MyAppConfigFragmentsByNamesInput,
+    MyPurgeAppConfigFragmentsByNamesInput,
     MyUpsertAppConfigFragmentsInput,
     ScopedAppConfigFragmentsByNamesInput,
     ScopedUpsertAppConfigFragmentsInput,
@@ -26,6 +27,7 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     AppConfigFragmentsByNamesPayload,
     BulkPurgeAppConfigFragmentPayload,
     PurgeAppConfigFragmentPayload,
+    PurgeAppConfigFragmentsByNamesPayload,
     SearchAppConfigFragmentPayload,
     UpsertAppConfigFragmentsPayload,
 )
@@ -185,6 +187,27 @@ class TestMyBulkUpsert:
         assert call_args[0][0] == "POST"
         assert str(call_args[0][1]).endswith("/v2/app-config-fragments/my/bulk-upsert")
         assert isinstance(result, UpsertAppConfigFragmentsPayload)
+
+
+class TestMyPurgeByNames:
+    async def test_happy_path(
+        self,
+        client: V2AppConfigFragmentClient,
+        mock_session: MagicMock,
+        mock_response: AsyncMock,
+        fragment_id: AppConfigFragmentID,
+    ) -> None:
+        mock_response.json = AsyncMock(return_value={"items": [str(fragment_id)]})
+
+        result = await client.my_purge_app_config_fragments_by_names(
+            MyPurgeAppConfigFragmentsByNamesInput(config_names=["theme"])
+        )
+
+        call_args = mock_session.request.call_args
+        assert call_args[0][0] == "POST"
+        assert str(call_args[0][1]).endswith("/v2/app-config-fragments/my/bulk-delete")
+        assert isinstance(result, PurgeAppConfigFragmentsByNamesPayload)
+        assert result.items == [fragment_id]
 
 
 class TestGet:
