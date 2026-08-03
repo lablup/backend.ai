@@ -16,19 +16,17 @@ from ai.backend.manager.data.app_config.types import AppConfigData
 class TestAppConfigAdapterConverters:
     def test_app_config_to_node_maps_the_merge(self) -> None:
         node = AppConfigAdapter._app_config_to_node(
-            AppConfigData(config_name="theme", merged_config={"color": "dark"})
+            AppConfigData(config_name="theme", config={"color": "dark"})
         )
 
         assert node.config_name == "theme"
-        assert node.merged_config == {"color": "dark"}
+        assert node.config == {"color": "dark"}
 
     def test_app_config_to_node_keeps_an_empty_merge(self) -> None:
-        node = AppConfigAdapter._app_config_to_node(
-            AppConfigData(config_name="menu", merged_config={})
-        )
+        node = AppConfigAdapter._app_config_to_node(AppConfigData(config_name="menu", config={}))
 
         assert node.config_name == "menu"
-        assert node.merged_config == {}
+        assert node.config == {}
 
 
 class TestGetAppConfigsInputs:

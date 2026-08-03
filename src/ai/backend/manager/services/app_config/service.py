@@ -64,7 +64,7 @@ class AppConfigService:
             app_configs.append(
                 AppConfigData(
                     config_name=config_name,
-                    merged_config=_merge_configs(visible),
+                    config=_merge_configs(visible),
                 )
             )
         return GetAppConfigsActionResult(app_configs=app_configs, _user_id=action.user_id)

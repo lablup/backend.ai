@@ -168,7 +168,7 @@ class TestAppConfigService:
         )
 
         assert [c.config_name for c in result.app_configs] == ["theme"]
-        assert result.app_configs[0].merged_config == {"theme": "dark", "lang": "en"}
+        assert result.app_configs[0].config == {"theme": "dark", "lang": "en"}
 
     async def test_get_scopes_the_query_to_the_injected_user(
         self,
@@ -196,7 +196,7 @@ class TestAppConfigService:
         )
 
         # The user's shorter nav list fully replaces public's — no trailing "about"/"contact".
-        assert result.app_configs[0].merged_config == {
+        assert result.app_configs[0].config == {
             "nav": ["dashboard"],
             "theme": {"light": True, "dark": True},
         }
@@ -212,8 +212,8 @@ class TestAppConfigService:
 
         # One AppConfigData per requested name, in request order.
         assert [c.config_name for c in result.app_configs] == ["theme", "menu"]
-        assert result.app_configs[0].merged_config == {"theme": "dark", "lang": "en"}
-        assert result.app_configs[1].merged_config == {"items": ["a"]}
+        assert result.app_configs[0].config == {"theme": "dark", "lang": "en"}
+        assert result.app_configs[1].config == {"items": ["a"]}
 
     async def test_get_repeats_duplicate_config_names_in_output(
         self,
@@ -227,8 +227,8 @@ class TestAppConfigService:
         )
 
         assert [c.config_name for c in result.app_configs] == ["theme", "theme"]
-        assert result.app_configs[0].merged_config == {"theme": "dark"}
-        assert result.app_configs[1].merged_config == {"theme": "dark"}
+        assert result.app_configs[0].config == {"theme": "dark"}
+        assert result.app_configs[1].config == {"theme": "dark"}
 
     async def test_get_without_matching_fragments_returns_an_empty_merge(
         self,
@@ -241,7 +241,7 @@ class TestAppConfigService:
         )
 
         assert [c.config_name for c in result.app_configs] == ["unknown"]
-        assert result.app_configs[0].merged_config == {}
+        assert result.app_configs[0].config == {}
 
     async def test_get_keeps_the_merged_names_alongside_an_absent_one(
         self,
@@ -254,9 +254,9 @@ class TestAppConfigService:
         )
 
         assert [c.config_name for c in result.app_configs] == ["theme", "menu", "unknown"]
-        assert result.app_configs[0].merged_config == {"theme": "dark", "lang": "en"}
-        assert result.app_configs[1].merged_config == {"items": ["a"]}
-        assert result.app_configs[2].merged_config == {}
+        assert result.app_configs[0].config == {"theme": "dark", "lang": "en"}
+        assert result.app_configs[1].config == {"items": ["a"]}
+        assert result.app_configs[2].config == {}
 
     async def test_get_without_an_injected_user_merges_public_fragments_only(
         self,
@@ -267,7 +267,7 @@ class TestAppConfigService:
         # Naming no user is the anonymous, pre-login read: only public fragments are queried.
         result = await service.get_app_configs(GetAppConfigsAction(config_names=["theme"]))
 
-        assert result.app_configs[0].merged_config == {"theme": "light", "lang": "en"}
+        assert result.app_configs[0].config == {"theme": "light", "lang": "en"}
         assert result._user_id is None
         mock_fragment_repository.list_visible_fragments_bulk.assert_called_once_with(
             ["theme"], None

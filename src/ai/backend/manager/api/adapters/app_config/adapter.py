@@ -55,5 +55,5 @@ class AppConfigAdapter(BaseAdapter):
     def _app_config_to_node(data: AppConfigData) -> AppConfigNode:
         return AppConfigNode(
             config_name=data.config_name,
-            merged_config=data.merged_config,
+            config=data.config,
         )
