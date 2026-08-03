@@ -36,7 +36,13 @@ class CreateUserRequest(BaseRequestModel):
     need_password_change: bool = Field(
         default=False, description="Whether user needs to change password on first login"
     )
-    domain_name: str = Field(description="Domain the user belongs to")
+    domain_name: str | None = Field(
+        default=None, description="Domain the user belongs to, by name. Deprecated: use domain_id"
+    )
+    domain_id: DomainID | None = Field(
+        default=None,
+        description="Domain the user belongs to, by id. Mutually exclusive with domain_name",
+    )
     full_name: str | None = Field(default=None, description="Full name of the user")
     description: str | None = Field(default=None, description="User description")
     status: UserStatus | None = Field(default=None, description="User account status")
@@ -53,6 +59,12 @@ class CreateUserRequest(BaseRequestModel):
     container_main_gid: int | None = Field(default=None, description="Container main GID")
     container_gids: list[int] | None = Field(default=None, description="Container additional GIDs")
     group_ids: list[str] | None = Field(default=None, description="Group IDs to assign the user to")
+
+    @model_validator(mode="after")
+    def _check_one_domain_reference(self) -> Self:
+        if (self.domain_name is None) == (self.domain_id is None):
+            raise ValueError("Specify exactly one of domain_name or domain_id.")
+        return self
 
 
 class UpdateUserRequest(BaseRequestModel):

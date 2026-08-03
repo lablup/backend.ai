@@ -113,6 +113,7 @@ def _build_bulk_create_user_action(
             password=password_info,
             need_password_change=dto.need_password_change,
             domain_name=dto.domain_name,
+            domain_id=dto.domain_id,
             full_name=dto.full_name,
             description=dto.description,
             status=UserStatus(dto.status),

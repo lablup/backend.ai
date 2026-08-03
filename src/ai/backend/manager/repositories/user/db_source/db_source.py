@@ -202,6 +202,16 @@ class UserDBSource:
         enrollments) within the caller's write ops transaction."""
         spec = cast(UserCreatorSpec, creator.spec)
 
+        # Until domain_name goes away, fill in whichever column the request did not name
+        if spec.domain_name is None:
+            domain_names = await w.batch_query_in_global(
+                sa.select(DomainRow.name).where(DomainRow.id == spec.domain_id),
+                BatchQuerier(pagination=NoPagination()),
+            )
+            if not domain_names.rows:
+                raise UserCreationBadRequest(f"Domain '{spec.domain_id}' does not exist.")
+            spec.domain_name = domain_names.rows[0].name
+
         domain_query = sa.select(DomainRow.id).where(DomainRow.name == spec.domain_name)
         domains = await w.batch_query_in_global(
             domain_query, BatchQuerier(pagination=NoPagination())

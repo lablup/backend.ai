@@ -422,6 +422,7 @@ class UserAdapter(BaseAdapter):
             password=password_info,
             need_password_change=input.need_password_change,
             domain_name=input.domain_name,
+            domain_id=input.domain_id,
             full_name=input.full_name,
             description=input.description,
             status=UserStatus(input.status),
@@ -436,7 +437,11 @@ class UserAdapter(BaseAdapter):
             integration_name=input.integration_name,
         )
         group_ids = [str(gid) for gid in input.group_ids] if input.group_ids else None
-        domain_id = await self._resolve_domain_id(spec.domain_name)
+        domain_id = (
+            input.domain_id
+            if input.domain_id is not None
+            else await self._resolve_domain_id(cast(str, input.domain_name))
+        )
         result = await self._processors.user.create_user.wait_for_complete(
             CreateUserAction(creator=Creator(spec=spec), _domain_id=domain_id, group_ids=group_ids)
         )

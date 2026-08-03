@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, cast
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.user import (
@@ -94,6 +94,7 @@ class UserHandler:
                 password=password_info,
                 need_password_change=body.parsed.need_password_change,
                 domain_name=body.parsed.domain_name,
+                domain_id=body.parsed.domain_id,
                 full_name=body.parsed.full_name,
                 description=body.parsed.description,
                 status=ManagerUserStatus(body.parsed.status.value)
@@ -110,15 +111,17 @@ class UserHandler:
             )
         )
 
-        domain_data = (
-            await self._domain.get_domain.wait_for_complete(
-                GetDomainAction(domain_name=body.parsed.domain_name)
-            )
-        ).data
+        domain_id = body.parsed.domain_id
+        if domain_id is None:
+            domain_id = (
+                await self._domain.get_domain.wait_for_complete(
+                    GetDomainAction(domain_name=cast(str, body.parsed.domain_name))
+                )
+            ).data.id
         action_result = await self._user.create_user.wait_for_complete(
             CreateUserAction(
                 creator=creator,
-                _domain_id=domain_data.id,
+                _domain_id=domain_id,
                 group_ids=body.parsed.group_ids,
             )
         )

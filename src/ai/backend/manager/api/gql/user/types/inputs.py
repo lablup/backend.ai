@@ -66,7 +66,16 @@ class CreateUserInputGQL(PydanticInputMixin[CreateUserInputDTO]):
     email: str = gql_field(description="User's email address. Must be unique across the system.")
     username: str = gql_field(description="Unique username for login.")
     password: str = gql_field(description="Initial password for the user.")
-    domain_name: str = gql_field(description="Domain to assign the user to.")
+    domain_name: str | None = gql_field(
+        description="Domain to assign the user to, by name.", default=None
+    )
+    domain_id: UUID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Domain to assign the user to, by id. Mutually exclusive with `domain_name`.",
+        ),
+        default=None,
+    )
     need_password_change: bool = gql_field(
         description="If true, user must change password on first login."
     )

@@ -58,7 +58,14 @@ class CreateUserInput(BaseRequestModel):
     email: str = Field(description="User's email address. Must be unique across the system.")
     username: str = Field(description="Unique username for login.")
     password: str = Field(description="Initial password for the user.")
-    domain_name: str = Field(description="Domain to assign the user to.")
+    domain_name: str | None = Field(
+        default=None,
+        description="Domain to assign the user to, by name. Deprecated: use `domain_id`.",
+    )
+    domain_id: DomainID | None = Field(
+        default=None,
+        description="Domain to assign the user to, by id. Mutually exclusive with `domain_name`.",
+    )
     need_password_change: bool = Field(
         default=False,
         description="If true, user must change password on first login.",
@@ -110,6 +117,12 @@ class CreateUserInput(BaseRequestModel):
         max_length=512,
         description="External system integration identifier.",
     )
+
+    @model_validator(mode="after")
+    def _check_one_domain_reference(self) -> Self:
+        if (self.domain_name is None) == (self.domain_id is None):
+            raise ValueError("Specify exactly one of domain_name or domain_id.")
+        return self
 
 
 class UpdateUserInput(BaseRequestModel):
