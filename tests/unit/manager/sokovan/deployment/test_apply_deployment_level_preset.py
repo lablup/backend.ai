@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -37,6 +37,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
 )
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
     DeploymentRevisionPresetRepository,
 )
@@ -306,3 +307,42 @@ class TestApplyDeploymentLevelPreset:
 
         assert resolved.policy is not None
         assert isinstance(resolved.policy.strategy_spec, RollingUpdateSpec)
+
+
+class TestPresetFallbackGuards:
+    """Both fallbacks below are unreachable through today's schema — the columns
+    are NOT NULL and the enum has two members — but neither is enforced in code,
+    so a schema change would surface as an IntegrityError or an
+    UnboundLocalError rather than a domain error."""
+
+    async def test_null_preset_replica_count_falls_back_to_system_default(
+        self,
+        deployment_controller: DeploymentController,
+        mock_preset_repository: MagicMock,
+    ) -> None:
+        preset_id = DeploymentPresetID(uuid.uuid4())
+        mock_preset_repository.get_by_id = AsyncMock(
+            return_value=_make_preset(replica_count=cast(int, None))
+        )
+        creator = _make_creator(preset_id=preset_id)
+
+        resolved = await deployment_controller._apply_deployment_level_preset(creator)
+
+        assert resolved.replica_spec is not None
+        assert resolved.replica_spec.replica_count == 1
+
+    async def test_unsupported_preset_strategy_raises_a_domain_error(
+        self,
+        deployment_controller: DeploymentController,
+        mock_preset_repository: MagicMock,
+    ) -> None:
+        preset_id = DeploymentPresetID(uuid.uuid4())
+        mock_preset_repository.get_by_id = AsyncMock(
+            return_value=_make_preset(
+                deployment_strategy=cast(DeploymentStrategy, "recreate"),
+            )
+        )
+        creator = _make_creator(preset_id=preset_id)
+
+        with pytest.raises(InvalidAPIParameters):
+            await deployment_controller._apply_deployment_level_preset(creator)

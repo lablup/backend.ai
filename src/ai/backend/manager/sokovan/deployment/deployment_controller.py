@@ -774,7 +774,7 @@ class DeploymentController:
         if resolved_replica_spec is None:
             preset_replica = (
                 preset_data.replica_count
-                if preset_data is not None
+                if preset_data is not None and preset_data.replica_count is not None
                 else self._DEFAULT_REPLICA_COUNT
             )
             resolved_replica_spec = ReplicaSpec(replica_count=preset_replica)
@@ -804,7 +804,12 @@ class DeploymentController:
     def _build_policy_from_preset(
         preset_data: DeploymentRevisionPresetData,
     ) -> DeploymentPolicyConfig:
-        """Reconstruct a DeploymentPolicyConfig from preset-stored strategy fields."""
+        """Reconstruct a DeploymentPolicyConfig from preset-stored strategy fields.
+
+        Raises:
+            InvalidAPIParameters: If the preset carries a strategy this
+                method does not know how to build a spec for.
+        """
         spec_dict = preset_data.deployment_strategy_spec
         strategy_spec: RollingUpdateSpec | BlueGreenSpec
         match preset_data.deployment_strategy:
@@ -817,6 +822,13 @@ class DeploymentController:
             case DeploymentStrategy.BLUE_GREEN:
                 strategy_spec = (
                     BlueGreenSpec.model_validate(spec_dict) if spec_dict else BlueGreenSpec()
+                )
+            case unsupported:
+                # Without this arm ``strategy_spec`` stays unbound and the
+                # caller gets an UnboundLocalError instead of a domain error.
+                raise InvalidAPIParameters(
+                    f"Revision preset {preset_data.id} carries an unsupported "
+                    f"deployment strategy: {unsupported}"
                 )
         return DeploymentPolicyConfig(
             strategy=preset_data.deployment_strategy,
