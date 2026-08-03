@@ -8,51 +8,14 @@ tests and is not re-asserted here.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING
-
 import pytest
-import yarl
 
-from ai.backend.client.v2.auth import HMACAuth, NoAuth
-from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.exceptions import AuthenticationError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.dto.manager.v2.app_config.request import (
     MyGetAppConfigsInput,
     PublicGetAppConfigsInput,
 )
-
-if TYPE_CHECKING:
-    from tests.component.conftest import ServerInfo, UserFixtureData
-
-
-@pytest.fixture()
-async def user_v2_registry(
-    server: ServerInfo,
-    regular_user_fixture: UserFixtureData,
-) -> AsyncIterator[V2ClientRegistry]:
-    registry = await V2ClientRegistry.create(
-        ClientConfig(endpoint=yarl.URL(server.url)),
-        HMACAuth(
-            access_key=regular_user_fixture.keypair.access_key,
-            secret_key=regular_user_fixture.keypair.secret_key,
-        ),
-    )
-    try:
-        yield registry
-    finally:
-        await registry.close()
-
-
-@pytest.fixture()
-async def anonymous_v2_registry(server: ServerInfo) -> AsyncIterator[V2ClientRegistry]:
-    """A caller that holds no credentials at all — the pre-login client."""
-    registry = await V2ClientRegistry.create(ClientConfig(endpoint=yarl.URL(server.url)), NoAuth())
-    try:
-        yield registry
-    finally:
-        await registry.close()
 
 
 class TestAnonymousReach:
