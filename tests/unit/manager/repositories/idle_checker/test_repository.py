@@ -44,7 +44,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.repositories.idle_checker.types import (
     IdleJudgmentData,
-    SessionIdleCheckExclusionUpdate,
     SessionIdleCheckPair,
     SessionIdleCheckTarget,
 )
@@ -1090,14 +1089,10 @@ class TestSessionIdleCheckExclusions:
             exclusion_rows.rowless_session_id,
         )
 
-        await repository.batch_apply_session_idle_check_exclusions(
-            SessionIdleCheckExclusionUpdate(
-                exclusions=[
-                    SessionIdleCheckTarget(
-                        assignment_id=exclusion_rows.assignment_id,
-                        session_ids=session_ids,
-                    )
-                ]
+        await repository.exclude_session_idle_checks(
+            SessionIdleCheckTarget(
+                assignment_id=exclusion_rows.assignment_id,
+                session_ids=session_ids,
             )
         )
 
@@ -1117,17 +1112,10 @@ class TestSessionIdleCheckExclusions:
         repository: IdleCheckerRepository,
         exclusion_rows: ExclusionRows,
     ) -> None:
-        await repository.batch_apply_session_idle_check_exclusions(
-            SessionIdleCheckExclusionUpdate(
-                exclusions=[
-                    SessionIdleCheckTarget(
-                        assignment_id=exclusion_rows.assignment_id,
-                        session_ids=(
-                            exclusion_rows.active_session_id,
-                            exclusion_rows.active_session_id,
-                        ),
-                    )
-                ]
+        await repository.exclude_session_idle_checks(
+            SessionIdleCheckTarget(
+                assignment_id=exclusion_rows.assignment_id,
+                session_ids=(exclusion_rows.active_session_id, exclusion_rows.active_session_id),
             )
         )
 
@@ -1144,17 +1132,13 @@ class TestSessionIdleCheckExclusions:
         repository: IdleCheckerRepository,
         exclusion_rows: ExclusionRows,
     ) -> None:
-        await repository.batch_apply_session_idle_check_exclusions(
-            SessionIdleCheckExclusionUpdate(
-                exclusions=[
-                    SessionIdleCheckTarget(
-                        assignment_id=exclusion_rows.assignment_id,
-                        session_ids=(
-                            exclusion_rows.active_session_id,
-                            exclusion_rows.idle_expired_session_id,
-                        ),
-                    )
-                ]
+        await repository.exclude_session_idle_checks(
+            SessionIdleCheckTarget(
+                assignment_id=exclusion_rows.assignment_id,
+                session_ids=(
+                    exclusion_rows.active_session_id,
+                    exclusion_rows.idle_expired_session_id,
+                ),
             )
         )
 
@@ -1170,14 +1154,10 @@ class TestSessionIdleCheckExclusions:
         repository: IdleCheckerRepository,
         exclusion_rows: ExclusionRows,
     ) -> None:
-        await repository.batch_apply_session_idle_check_exclusions(
-            SessionIdleCheckExclusionUpdate(
-                exclusions=[
-                    SessionIdleCheckTarget(
-                        assignment_id=exclusion_rows.assignment_id,
-                        session_ids=(exclusion_rows.active_session_id,),
-                    )
-                ]
+        await repository.exclude_session_idle_checks(
+            SessionIdleCheckTarget(
+                assignment_id=exclusion_rows.assignment_id,
+                session_ids=(exclusion_rows.active_session_id,),
             )
         )
 
@@ -1193,25 +1173,17 @@ class TestSessionIdleCheckExclusions:
         repository: IdleCheckerRepository,
         exclusion_rows: ExclusionRows,
     ) -> None:
-        await repository.batch_apply_session_idle_check_exclusions(
-            SessionIdleCheckExclusionUpdate(
-                exclusions=[
-                    SessionIdleCheckTarget(
-                        assignment_id=exclusion_rows.assignment_id,
-                        session_ids=(exclusion_rows.active_session_id,),
-                    )
-                ]
+        await repository.exclude_session_idle_checks(
+            SessionIdleCheckTarget(
+                assignment_id=exclusion_rows.assignment_id,
+                session_ids=(exclusion_rows.active_session_id,),
             )
         )
 
-        await repository.batch_apply_session_idle_check_exclusions(
-            SessionIdleCheckExclusionUpdate(
-                inclusions=[
-                    SessionIdleCheckTarget(
-                        assignment_id=exclusion_rows.assignment_id,
-                        session_ids=(exclusion_rows.active_session_id,),
-                    )
-                ]
+        await repository.include_session_idle_checks(
+            SessionIdleCheckTarget(
+                assignment_id=exclusion_rows.assignment_id,
+                session_ids=(exclusion_rows.active_session_id,),
             )
         )
 
@@ -1231,14 +1203,10 @@ class TestSessionIdleCheckExclusions:
         repository: IdleCheckerRepository,
         exclusion_rows: ExclusionRows,
     ) -> None:
-        await repository.batch_apply_session_idle_check_exclusions(
-            SessionIdleCheckExclusionUpdate(
-                inclusions=[
-                    SessionIdleCheckTarget(
-                        assignment_id=exclusion_rows.assignment_id,
-                        session_ids=(exclusion_rows.idle_expired_session_id,),
-                    )
-                ]
+        await repository.include_session_idle_checks(
+            SessionIdleCheckTarget(
+                assignment_id=exclusion_rows.assignment_id,
+                session_ids=(exclusion_rows.idle_expired_session_id,),
             )
         )
 
@@ -1258,17 +1226,13 @@ class TestSessionIdleCheckExclusions:
         exclusion_rows: ExclusionRows,
     ) -> None:
         with pytest.raises(IdleCheckerExclusionTargetMismatch):
-            await repository.batch_apply_session_idle_check_exclusions(
-                SessionIdleCheckExclusionUpdate(
-                    exclusions=[
-                        SessionIdleCheckTarget(
-                            assignment_id=exclusion_rows.assignment_id,
-                            session_ids=(
-                                exclusion_rows.active_session_id,
-                                exclusion_rows.foreign_session_id,
-                            ),
-                        )
-                    ]
+            await repository.exclude_session_idle_checks(
+                SessionIdleCheckTarget(
+                    assignment_id=exclusion_rows.assignment_id,
+                    session_ids=(
+                        exclusion_rows.active_session_id,
+                        exclusion_rows.foreign_session_id,
+                    ),
                 )
             )
 
@@ -1291,14 +1255,10 @@ class TestSessionIdleCheckExclusions:
         exclusion_rows: ExclusionRows,
     ) -> None:
         with pytest.raises(IdleCheckerExclusionTargetMismatch):
-            await repository.batch_apply_session_idle_check_exclusions(
-                SessionIdleCheckExclusionUpdate(
-                    exclusions=[
-                        SessionIdleCheckTarget(
-                            assignment_id=exclusion_rows.assignment_id,
-                            session_ids=(exclusion_rows.batch_session_id,),
-                        )
-                    ]
+            await repository.exclude_session_idle_checks(
+                SessionIdleCheckTarget(
+                    assignment_id=exclusion_rows.assignment_id,
+                    session_ids=(exclusion_rows.batch_session_id,),
                 )
             )
 
@@ -1307,65 +1267,41 @@ class TestSessionIdleCheckExclusions:
         repository: IdleCheckerRepository,
         exclusion_rows: ExclusionRows,
     ) -> None:
-        with pytest.raises(IdleCheckerExclusionTargetMismatch):
-            await repository.batch_apply_session_idle_check_exclusions(
-                SessionIdleCheckExclusionUpdate(
-                    exclusions=[
-                        SessionIdleCheckTarget(
-                            assignment_id=IdleCheckerAssignmentID(uuid.uuid4()),
-                            session_ids=(exclusion_rows.active_session_id,),
-                        )
-                    ]
+        with pytest.raises(IdleCheckerAssignmentNotFound):
+            await repository.exclude_session_idle_checks(
+                SessionIdleCheckTarget(
+                    assignment_id=IdleCheckerAssignmentID(uuid.uuid4()),
+                    session_ids=(exclusion_rows.active_session_id,),
                 )
             )
 
-    async def test_mixed_exclusions_and_inclusions_in_one_call(
+    async def test_exclude_then_include_voids_pending_expiry(
         self,
         database: ExtendedAsyncSAEngine,
         repository: IdleCheckerRepository,
         exclusion_rows: ExclusionRows,
     ) -> None:
-        await repository.batch_apply_session_idle_check_exclusions(
-            SessionIdleCheckExclusionUpdate(
-                exclusions=[
-                    SessionIdleCheckTarget(
-                        assignment_id=exclusion_rows.assignment_id,
-                        session_ids=(exclusion_rows.idle_expired_session_id,),
-                    )
-                ]
+        await repository.exclude_session_idle_checks(
+            SessionIdleCheckTarget(
+                assignment_id=exclusion_rows.assignment_id,
+                session_ids=(exclusion_rows.idle_expired_session_id,),
             )
         )
-
-        await repository.batch_apply_session_idle_check_exclusions(
-            SessionIdleCheckExclusionUpdate(
-                exclusions=[
-                    SessionIdleCheckTarget(
-                        assignment_id=exclusion_rows.assignment_id,
-                        session_ids=(exclusion_rows.active_session_id,),
-                    )
-                ],
-                inclusions=[
-                    SessionIdleCheckTarget(
-                        assignment_id=exclusion_rows.assignment_id,
-                        session_ids=(exclusion_rows.idle_expired_session_id,),
-                    )
-                ],
+        await repository.include_session_idle_checks(
+            SessionIdleCheckTarget(
+                assignment_id=exclusion_rows.assignment_id,
+                session_ids=(exclusion_rows.idle_expired_session_id,),
             )
         )
 
         async with database.begin_readonly_session() as db_sess:
-            excluded_row = await db_sess.get(
-                SessionIdleCheckRow,
-                (exclusion_rows.active_session_id, exclusion_rows.checker_id),
-            )
-            included_row = await db_sess.get(
+            row = await db_sess.get(
                 SessionIdleCheckRow,
                 (exclusion_rows.idle_expired_session_id, exclusion_rows.checker_id),
             )
-        assert excluded_row is not None
-        assert excluded_row.last_status is IdleCheckPhase.EXCLUDED
-        assert included_row is not None
-        assert included_row.last_status is IdleCheckPhase.NOT_CHECKED
+        assert row is not None
+        assert row.last_status is IdleCheckPhase.NOT_CHECKED
+        assert row.expire_at is None
 
     async def test_include_rejects_unknown_assignment(
         self,
@@ -1373,13 +1309,9 @@ class TestSessionIdleCheckExclusions:
         exclusion_rows: ExclusionRows,
     ) -> None:
         with pytest.raises(IdleCheckerAssignmentNotFound):
-            await repository.batch_apply_session_idle_check_exclusions(
-                SessionIdleCheckExclusionUpdate(
-                    inclusions=[
-                        SessionIdleCheckTarget(
-                            assignment_id=IdleCheckerAssignmentID(uuid.uuid4()),
-                            session_ids=(exclusion_rows.active_session_id,),
-                        )
-                    ]
+            await repository.include_session_idle_checks(
+                SessionIdleCheckTarget(
+                    assignment_id=IdleCheckerAssignmentID(uuid.uuid4()),
+                    session_ids=(exclusion_rows.active_session_id,),
                 )
             )

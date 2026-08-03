@@ -16,7 +16,7 @@ from ai.backend.common.data.idle_checker.types import (
 )
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
+from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.common.types import SearchResult
@@ -70,7 +70,6 @@ from ai.backend.manager.repositories.idle_checker.purgers import (
     SessionIdleCheckBatchPurgerSpec,
 )
 from ai.backend.manager.repositories.idle_checker.types import (
-    AssignmentSessionMatch,
     ExpiredIdleCheckBatchData,
     ExpiredIdleCheckData,
     IdleCheckAssignmentData,
@@ -80,9 +79,9 @@ from ai.backend.manager.repositories.idle_checker.types import (
     InitialGracePeriodBatchData,
     InitialGracePeriodCheckData,
     SessionIdleCheckAssignmentData,
-    SessionIdleCheckExclusionUpdate,
     SessionIdleCheckPair,
     SessionIdleCheckTarget,
+    SessionSearchScope,
 )
 from ai.backend.manager.repositories.idle_checker.updaters import (
     SessionIdleCheckJudgmentBatchUpdaterSpec,
@@ -91,7 +90,7 @@ from ai.backend.manager.repositories.idle_checker.updaters import (
 from ai.backend.manager.repositories.idle_checker.upserters import (
     SessionIdleCheckExclusionUpserterSpec,
 )
-from ai.backend.manager.repositories.ops import DBOpsProvider, WriteOps
+from ai.backend.manager.repositories.ops import DBOpsProvider
 
 _ASSIGNMENT_DELETE_BATCH_SIZE = 1000
 _IDLE_CHECK_UPDATE_BATCH_SIZE = 1000
@@ -438,150 +437,88 @@ class IdleCheckerDBSource:
                         )
                     )
 
-    async def batch_apply_session_idle_check_exclusions(
+    async def exclude_session_idle_checks(
         self,
-        update: SessionIdleCheckExclusionUpdate,
+        target: SessionIdleCheckTarget,
     ) -> None:
-        """Apply exclusions and inclusions in a single transaction."""
-        async with self._ops.write_ops() as w:
-            await self._exclude_session_idle_checks(w, update.exclusions)
-            await self._include_session_idle_checks(w, update.inclusions)
-
-    async def _fetch_assignment_session_matches(
-        self,
-        w: WriteOps,
-        assignment_ids: Collection[IdleCheckerAssignmentID],
-        session_ids: Collection[SessionId],
-    ) -> dict[IdleCheckerAssignmentID, AssignmentSessionMatch]:
-        """Resolve, per assignment, its checker and the sessions its check applies
-        to (scope match, target session type), keyed by assignment id."""
-        match_query = (
-            sa.select(
-                IdleCheckerBindingRow.id.label("assignment_id"),
-                IdleCheckerBindingRow.idle_checker_id,
-                SessionRow.id.label("session_id"),
-            )
-            .select_from(IdleCheckerBindingRow)
-            .join(SessionRow, self._binding_covers_session())
-            .join(
-                IdleCheckerRow,
-                sa.and_(
-                    IdleCheckerRow.id == IdleCheckerBindingRow.idle_checker_id,
-                    SessionRow.session_type == sa.any_(IdleCheckerRow.target_session_types),
-                ),
-            )
-            .where(
-                IdleCheckerBindingRow.id.in_(assignment_ids),
-                SessionRow.id.in_(session_ids),
-            )
-        )
-        querier = BatchQuerier(pagination=NoPagination())
-        matched_rows = (await w.batch_query_in_global(match_query, querier)).rows
-        checker_by_assignment: dict[IdleCheckerAssignmentID, IdleCheckerID] = {}
-        sessions_by_assignment: dict[IdleCheckerAssignmentID, set[SessionId]] = {}
-        for row in matched_rows:
-            assignment_id = IdleCheckerAssignmentID(row.assignment_id)
-            checker_by_assignment[assignment_id] = cast(IdleCheckerID, row.idle_checker_id)
-            sessions_by_assignment.setdefault(assignment_id, set()).add(SessionId(row.session_id))
-        matches: dict[IdleCheckerAssignmentID, AssignmentSessionMatch] = {}
-        for assignment_id, checker_id in checker_by_assignment.items():
-            matches[assignment_id] = AssignmentSessionMatch(
-                checker_id=checker_id,
-                session_ids=frozenset(sessions_by_assignment[assignment_id]),
-            )
-        return matches
-
-    async def _exclude_session_idle_checks(
-        self,
-        w: WriteOps,
-        items: Sequence[SessionIdleCheckTarget],
-    ) -> None:
-        """Mark each (session, checker) pair EXCLUDED, creating missing rows.
-
-        Every session must match its assignment (existing binding, scope match,
-        target session type); any mismatch rejects the whole request.
-        """
-        if not items:
-            return
-        assignment_ids = {item.assignment_id for item in items}
-        session_ids: set[SessionId] = set()
-        for item in items:
-            session_ids.update(item.session_ids)
-        matches = await self._fetch_assignment_session_matches(w, assignment_ids, session_ids)
-        mismatched_refs: list[str] = []
-        for item in items:
-            match = matches.get(item.assignment_id)
-            for session_id in item.session_ids:
-                if match is None or session_id not in match.session_ids:
-                    mismatched_refs.append(f"{item.assignment_id}:{session_id}")
-        if mismatched_refs:
-            raise IdleCheckerExclusionTargetMismatch(", ".join(mismatched_refs))
-
-        pairs: list[SessionIdleCheckPair] = []
-        for item in items:
-            checker_id = matches[item.assignment_id].checker_id
-            for session_id in item.session_ids:
-                pairs.append(SessionIdleCheckPair(session_id=session_id, checker_id=checker_id))
+        """Mark the assignment's sessions EXCLUDED (rows created if missing).
+        Any session not covered by the assignment rejects the whole request."""
         # ON CONFLICT cannot touch the same row twice within one statement.
-        deduped_pairs = list(dict.fromkeys(pairs))
-        for pair_batch in batched(deduped_pairs, _IDLE_CHECK_UPDATE_BATCH_SIZE):
-            await w.bulk_upsert(
-                BulkUpserter(
-                    specs=[SessionIdleCheckExclusionUpserterSpec(pair) for pair in pair_batch]
-                ),
-                index_elements=["session_id", "idle_checker_id"],
+        unique_session_ids = list(dict.fromkeys(target.session_ids))
+        async with self._ops.write_ops() as w:
+            binding_result = await w.query(
+                Querier(row_class=IdleCheckerBindingRow, pk_value=target.assignment_id)
             )
-
-    async def _include_session_idle_checks(
-        self,
-        w: WriteOps,
-        items: Sequence[SessionIdleCheckTarget],
-    ) -> None:
-        """Move EXCLUDED (session, checker) pairs back to NOT_CHECKED (grace restarts).
-
-        Unknown assignments are rejected. Per session the conditional update is the
-        safety: rows that do not exist or are not EXCLUDED are no-ops. Updating in
-        place (instead of delete + sync recreate) keeps the row continuously visible
-        to idle-check listing reads.
-        """
-        if not items:
-            return
-        assignment_ids = {item.assignment_id for item in items}
-        binding_query = sa.select(IdleCheckerBindingRow).where(
-            IdleCheckerBindingRow.id.in_(assignment_ids)
-        )
-        querier = BatchQuerier(pagination=NoPagination())
-        binding_rows = (await w.batch_query_in_global(binding_query, querier)).rows
-        checker_by_assignment: dict[IdleCheckerAssignmentID, IdleCheckerID] = {}
-        for row in binding_rows:
-            binding: IdleCheckerBindingRow = row.IdleCheckerBindingRow
-            checker_by_assignment[IdleCheckerAssignmentID(binding.id)] = binding.idle_checker_id
-        missing_assignments = assignment_ids - checker_by_assignment.keys()
-        if missing_assignments:
-            raise IdleCheckerAssignmentNotFound(
-                ", ".join(sorted(str(assignment_id) for assignment_id in missing_assignments))
+            if binding_result is None:
+                raise IdleCheckerAssignmentNotFound(str(target.assignment_id))
+            binding = binding_result.row
+            checker_result = await w.query(
+                Querier(row_class=IdleCheckerRow, pk_value=binding.idle_checker_id)
             )
+            if checker_result is None:
+                raise IdleCheckerNotFound(str(binding.idle_checker_id))
+            covered_query = sa.select(SessionRow.id).where(
+                SessionRow.id.in_(unique_session_ids),
+                SessionRow.session_type.in_(checker_result.row.target_session_types),
+            )
+            scope = SessionSearchScope(
+                scope_type=ScopeType(binding.scope_type),
+                scope_id=binding.scope_id,
+            )
+            querier = BatchQuerier(pagination=NoPagination())
+            covered_rows = (await w.batch_query_with_scopes(covered_query, querier, [scope])).rows
+            covered_ids: set[SessionId] = set()
+            for row in covered_rows:
+                covered_ids.add(SessionId(row.id))
+            mismatched_refs: list[str] = []
+            for session_id in unique_session_ids:
+                if session_id not in covered_ids:
+                    mismatched_refs.append(str(session_id))
+            if mismatched_refs:
+                raise IdleCheckerExclusionTargetMismatch(", ".join(mismatched_refs))
 
-        pairs: list[SessionIdleCheckPair] = []
-        for item in items:
-            checker_id = checker_by_assignment[item.assignment_id]
-            for session_id in item.session_ids:
+            checker_id = binding.idle_checker_id
+            pairs: list[SessionIdleCheckPair] = []
+            for session_id in unique_session_ids:
                 pairs.append(SessionIdleCheckPair(session_id=session_id, checker_id=checker_id))
-
-        for pair_batch in batched(pairs, _IDLE_CHECK_UPDATE_BATCH_SIZE):
-            pair_values = [(pair.session_id, pair.checker_id) for pair in pair_batch]
-            await w.batch_update(
-                BatchUpdater(
-                    spec=SessionIdleCheckPhaseBatchUpdaterSpec(
-                        to_phase=IdleCheckPhase.NOT_CHECKED,
-                        message="Not checked yet.",
+            for pair_batch in batched(pairs, _IDLE_CHECK_UPDATE_BATCH_SIZE):
+                await w.bulk_upsert(
+                    BulkUpserter(
+                        specs=[SessionIdleCheckExclusionUpserterSpec(pair) for pair in pair_batch]
                     ),
-                    conditions=[
-                        SessionIdleCheckConditions.by_pairs(pair_values),
-                        SessionIdleCheckConditions.by_status_equals(IdleCheckPhase.EXCLUDED),
-                    ],
+                    index_elements=["session_id", "idle_checker_id"],
                 )
+
+    async def include_session_idle_checks(
+        self,
+        target: SessionIdleCheckTarget,
+    ) -> None:
+        """Return EXCLUDED pairs to NOT_CHECKED (grace restarts).
+        Rows that do not exist or are not EXCLUDED are no-ops."""
+        unique_session_ids = list(dict.fromkeys(target.session_ids))
+        async with self._ops.write_ops() as w:
+            binding_result = await w.query(
+                Querier(row_class=IdleCheckerBindingRow, pk_value=target.assignment_id)
             )
+            if binding_result is None:
+                raise IdleCheckerAssignmentNotFound(str(target.assignment_id))
+            checker_id = binding_result.row.idle_checker_id
+            pair_values: list[tuple[SessionId, IdleCheckerID]] = []
+            for session_id in unique_session_ids:
+                pair_values.append((session_id, checker_id))
+            for pair_batch in batched(pair_values, _IDLE_CHECK_UPDATE_BATCH_SIZE):
+                await w.batch_update(
+                    BatchUpdater(
+                        spec=SessionIdleCheckPhaseBatchUpdaterSpec(
+                            to_phase=IdleCheckPhase.NOT_CHECKED,
+                            message="Not checked yet.",
+                        ),
+                        conditions=[
+                            SessionIdleCheckConditions.by_pairs(list(pair_batch)),
+                            SessionIdleCheckConditions.by_status_equals(IdleCheckPhase.EXCLUDED),
+                        ],
+                    )
+                )
 
     async def batch_update_session_idle_check_phase(
         self,

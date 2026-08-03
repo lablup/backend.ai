@@ -18,6 +18,7 @@ from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow
 from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.session.row import SessionRow
 
 
 @dataclass(frozen=True)
@@ -94,19 +95,38 @@ class SessionIdleCheckTarget:
 
 
 @dataclass(frozen=True)
-class AssignmentSessionMatch:
-    """One assignment's resolved checker and the sessions its check applies to."""
+class SessionSearchScope(SearchScope):
+    """Sessions inside one bound ``(scope_type, scope_id)``; unmapped scope types
+    cover no sessions."""
 
-    checker_id: IdleCheckerID
-    session_ids: frozenset[SessionId]
+    scope_type: ScopeType
+    scope_id: uuid.UUID
 
+    @override
+    def to_condition(self) -> QueryCondition:
+        scope_id = self.scope_id
+        column: sa.orm.attributes.InstrumentedAttribute[Any] | None
+        match self.scope_type:
+            case ScopeType.RESOURCE_GROUP:
+                column = SessionRow.resource_group_id
+            case ScopeType.PROJECT:
+                column = SessionRow.group_id
+            case ScopeType.DOMAIN:
+                column = SessionRow.domain_id
+            case _:
+                column = None
 
-@dataclass(frozen=True)
-class SessionIdleCheckExclusionUpdate:
-    """Exclusion changes applied atomically in one transaction."""
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if column is None:
+                return sa.false()
+            return column == scope_id
 
-    exclusions: Sequence[SessionIdleCheckTarget] = ()
-    inclusions: Sequence[SessionIdleCheckTarget] = ()
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return ()
 
 
 @dataclass(frozen=True)

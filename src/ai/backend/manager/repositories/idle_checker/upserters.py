@@ -11,11 +11,8 @@ from ai.backend.manager.repositories.idle_checker.types import SessionIdleCheckP
 
 @dataclass
 class SessionIdleCheckExclusionUpserterSpec(UpserterSpec[SessionIdleCheckRow]):
-    """Mark one (session, checker) pair EXCLUDED, creating the row if absent.
-
-    Conflict target: (session_id, idle_checker_id). Any prior phase — including
-    IDLE_EXPIRED — is overwritten; a pending expiry is voided by clearing expire_at.
-    """
+    """Upsert one (session, checker) pair to EXCLUDED; overwrites any prior phase
+    and clears a pending expire_at."""
 
     pair: SessionIdleCheckPair
 
