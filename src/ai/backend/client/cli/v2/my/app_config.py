@@ -23,8 +23,8 @@ def get(config_names: tuple[str, ...]) -> None:
     """Read my merged config for CONFIG_NAMES, answered in that order.
 
     Public, my domain's and my own fragments are deep-merged by allow-list rank, so this is
-    the config as it applies to me. ``fragments`` in the answer holds the ones that
-    contributed, in that same order, to show where each value came from.
+    the config as it applies to me. Only the merge is answered — read
+    ``my app-config-fragment get`` for the per-scope values behind it.
 
     A name nothing visible to me contributes to is answered with an empty merge rather than
     dropped, so the result lines up position by position with CONFIG_NAMES.
