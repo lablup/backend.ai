@@ -151,6 +151,7 @@ async def session_info(
             id=group_id,
             name=group_name,
             domain_name=domain_name,
+            domain_id=domain_id,
             total_resource_slots=ResourceSlot(),
             resource_policy=resource_policy_name,
         )

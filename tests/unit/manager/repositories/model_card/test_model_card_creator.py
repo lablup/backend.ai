@@ -103,6 +103,7 @@ class TestModelCardCreatorResourceRequirements:
     ) -> DomainRow:
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=uuid.uuid4(),
                 name=f"test-domain-{uuid.uuid4().hex[:8]}",
                 description="Test domain",
                 is_active=True,
@@ -191,6 +192,7 @@ class TestModelCardCreatorResourceRequirements:
                 description="Test group",
                 is_active=True,
                 domain_name=test_domain.name,
+                domain_id=test_domain.id,
                 resource_policy=test_project_resource_policy.name,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},

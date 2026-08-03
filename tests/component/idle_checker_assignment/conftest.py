@@ -186,6 +186,7 @@ async def assignment_seed(
                 id=project_id,
                 name=f"icb-project-{project_id.hex[:8]}",
                 domain_name=domain_name,
+                domain_id=domain_id,
                 total_resource_slots=ResourceSlot(),
                 resource_policy=policy_name,
             )
@@ -195,6 +196,7 @@ async def assignment_seed(
                 id=other_project_id,
                 name=f"icb-project-{other_project_id.hex[:8]}",
                 domain_name=domain_name,
+                domain_id=domain_id,
                 total_resource_slots=ResourceSlot(),
                 resource_policy=policy_name,
             )

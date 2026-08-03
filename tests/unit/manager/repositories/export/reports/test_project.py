@@ -54,6 +54,7 @@ _MAPPER_ROWS = [AgentRow]
 class _ProjectWithRgAndRegistry:
     project_id: uuid.UUID
     domain_name: str
+    domain_id: uuid.UUID
     rg_name: str
     registry_id: uuid.UUID
 
@@ -765,6 +766,7 @@ class TestProjectExportExecuteStreamingDB:
     ) -> AsyncGenerator[_ProjectWithRgAndRegistry, None]:
         """Create a project associated with a scaling group and a container registry."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = uuid.uuid4()
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
         project_id = uuid.uuid4()
         rg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
@@ -773,6 +775,7 @@ class TestProjectExportExecuteStreamingDB:
         async with db_engine.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="",
                     is_active=True,
@@ -798,6 +801,7 @@ class TestProjectExportExecuteStreamingDB:
                     id=project_id,
                     name="test-project",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     resource_policy=policy_name,
                 )
             )
@@ -843,6 +847,7 @@ class TestProjectExportExecuteStreamingDB:
         yield _ProjectWithRgAndRegistry(
             project_id=project_id,
             domain_name=domain_name,
+            domain_id=domain_id,
             rg_name=rg_name,
             registry_id=registry_id,
         )
@@ -977,6 +982,7 @@ class TestProjectExportExecuteStreamingDB:
                     id=project_id2,
                     name="project-no-registry",
                     domain_name=project_with_rg_and_registry.domain_name,
+                    domain_id=project_with_rg_and_registry.domain_id,
                     resource_policy=policy_name2,
                 )
             )
@@ -1037,6 +1043,7 @@ class TestGlobalContainerRegistryExport:
         unassociated_project_id: has no explicit registry association (only the global registry applies)
         """
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = uuid.uuid4()
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
         project_id = uuid.uuid4()
         unassociated_project_id = uuid.uuid4()
@@ -1046,6 +1053,7 @@ class TestGlobalContainerRegistryExport:
         async with db_engine.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="",
                     is_active=True,
@@ -1067,6 +1075,7 @@ class TestGlobalContainerRegistryExport:
                     id=project_id,
                     name="test-project",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     resource_policy=policy_name,
                 )
             )
@@ -1075,6 +1084,7 @@ class TestGlobalContainerRegistryExport:
                     id=unassociated_project_id,
                     name="test-project-unassociated",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     resource_policy=policy_name,
                 )
             )

@@ -172,6 +172,7 @@ class TestReconcileAgentResources:
                     id=project_id,
                     name="test-project",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     resource_policy="default",
                 )
             )
@@ -574,6 +575,7 @@ class TestOrphanedAllocationCleanup:
                     id=project_id,
                     name="test-project",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     resource_policy="default",
                 )
             )
@@ -1046,6 +1048,7 @@ class TestTerminalSessionKernelReconciliation:
                     id=project_id,
                     name="test-project",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     resource_policy="default",
                 )
             )

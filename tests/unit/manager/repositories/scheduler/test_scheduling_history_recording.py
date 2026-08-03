@@ -102,15 +102,21 @@ class TestEnqueueSessionSchedulingHistory:
             yield database_connection
 
     @pytest.fixture
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid.uuid4())
+
+    @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
     ) -> AsyncGenerator[str, None]:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 total_resource_slots=ResourceSlot({
                     "cpu": Decimal("1000"),
@@ -272,6 +278,7 @@ class TestEnqueueSessionSchedulingHistory:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
         test_domain_name: str,
         test_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
@@ -285,6 +292,7 @@ class TestEnqueueSessionSchedulingHistory:
                 description="Test group",
                 is_active=True,
                 domain_name=test_domain_name,
+                domain_id=test_domain_id,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 resource_policy=test_resource_policy_name,
@@ -531,6 +539,7 @@ class TestMarkTerminatingSchedulingHistory:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
         test_domain_name: str,
         test_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
@@ -544,6 +553,7 @@ class TestMarkTerminatingSchedulingHistory:
                 description="Test group",
                 is_active=True,
                 domain_name=test_domain_name,
+                domain_id=test_domain_id,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 resource_policy=test_resource_policy_name,

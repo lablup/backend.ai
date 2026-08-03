@@ -12,6 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common.exception import BackendAIError, UserNotFound
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -35,6 +36,7 @@ from ai.backend.manager.errors.auth import (
     UserCreationError,
 )
 from ai.backend.manager.errors.common import InternalServerError
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
@@ -123,6 +125,13 @@ class AuthDBSource:
                     extra_msg="No such project or you are not the member of it."
                 )
         return GroupMembershipData(group_id=group_id, user_id=user_id)
+
+    @auth_db_source_resilience.apply()
+    async def fetch_domain_id_by_name(self, domain_name: str) -> DomainID | None:
+        """Resolve a domain name to its UUID; None if the domain does not exist."""
+        async with self._db.begin_readonly_read_committed() as conn:
+            result = await conn.scalar(sa.select(DomainRow.id).where(DomainRow.name == domain_name))
+            return DomainID(result) if result is not None else None
 
     @auth_db_source_resilience.apply()
     async def verify_email_exists(self, email: str) -> bool:

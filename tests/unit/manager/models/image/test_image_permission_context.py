@@ -46,6 +46,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
 
 DOMAIN_NAME = "test-domain"
+DOMAIN_ID = uuid4()
 REGISTRY_URL = "https://cr.test.io"
 REGISTRY_NAME = "cr.test.io"
 USER_RESOURCE_POLICY_NAME = "test-user-policy"
@@ -79,6 +80,7 @@ class TestImagePermissionContextNonGlobalRegistry:
                     id=project_id,
                     name=name,
                     domain_name=domain,
+                    domain_id=DOMAIN_ID,
                     is_active=True,
                     resource_policy=PROJECT_RESOURCE_POLICY_NAME,
                 )
@@ -148,6 +150,7 @@ class TestImagePermissionContextNonGlobalRegistry:
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
                 DomainRow(
+                    id=DOMAIN_ID,
                     name=DOMAIN_NAME,
                     is_active=True,
                     total_resource_slots=ResourceSlot(),

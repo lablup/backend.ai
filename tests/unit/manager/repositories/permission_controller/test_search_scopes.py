@@ -9,6 +9,7 @@ import uuid
 from collections.abc import AsyncGenerator
 
 import pytest
+import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
@@ -413,6 +414,9 @@ class TestSearchProjectScopes:
 
         async with db_with_scope_tables.begin_session() as db_sess:
             project_names = ["project-alpha", "project-beta", "project-gamma"]
+            domain_id = (
+                await db_sess.execute(sa.select(DomainRow.id).where(DomainRow.name == domain_name))
+            ).scalar_one()
 
             for name in project_names:
                 project_id = uuid.uuid4()
@@ -422,6 +426,7 @@ class TestSearchProjectScopes:
                     description=f"Test project: {name}",
                     is_active=True,
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     total_resource_slots=ResourceSlot({}),
                     resource_policy=policy_name,
                 )
@@ -442,6 +447,9 @@ class TestSearchProjectScopes:
         project_ids: list[uuid.UUID] = []
 
         async with db_with_scope_tables.begin_session() as db_sess:
+            domain_id = (
+                await db_sess.execute(sa.select(DomainRow.id).where(DomainRow.name == domain_name))
+            ).scalar_one()
             for i in range(15):
                 project_id = uuid.uuid4()
                 project = GroupRow(
@@ -450,6 +458,7 @@ class TestSearchProjectScopes:
                     description=f"Test project {i}",
                     is_active=True,
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     total_resource_slots=ResourceSlot({}),
                     resource_policy=policy_name,
                 )

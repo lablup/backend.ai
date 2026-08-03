@@ -211,7 +211,7 @@ class TestDoIdleCheck:
 
     @pytest.fixture
     async def group_id(self, db: ExtendedAsyncSAEngine, domain: tuple[DomainID, str]) -> uuid.UUID:
-        _, domain_name = domain
+        domain_id, domain_name = domain
         project_policy_name = f"test-proj-policy-{uuid.uuid4().hex[:8]}"
         gid = uuid.uuid4()
         async with db.begin_session() as db_sess:
@@ -229,6 +229,7 @@ class TestDoIdleCheck:
                     id=gid,
                     name=f"test-group-{uuid.uuid4().hex[:8]}",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     total_resource_slots=ResourceSlot({
                         "cpu": Decimal("500"),
                         "mem": Decimal("524288"),

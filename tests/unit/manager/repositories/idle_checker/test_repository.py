@@ -99,6 +99,7 @@ def _expired_check_scope_rows(
             description=None,
             is_active=True,
             domain_name=scope.domain_name,
+            domain_id=scope.domain_id,
             resource_policy=f"{scope.domain_name}-policy",
         ),
         ScalingGroupRow(

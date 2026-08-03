@@ -95,15 +95,21 @@ class TestEnsureQuotaScopeAccessibleByUser:
             yield database_connection
 
     @pytest.fixture
+    def test_domain_id(self) -> UUID:
+        return uuid4()
+
+    @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: UUID,
     ) -> AsyncGenerator[str, None]:
         """Create test domain and return domain name"""
         domain_name = f"test-domain-{uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 description="Test domain for quota scope",
                 is_active=True,
@@ -299,6 +305,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
+        test_domain_id: UUID,
         test_project_resource_policy_name: str,
     ) -> AsyncGenerator[UUID, None]:
         """Create test group and return group UUID"""
@@ -309,6 +316,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
                 id=group_uuid,
                 name=f"test_group_{group_uuid.hex[:8]}",
                 domain_name=test_domain_name,
+                domain_id=test_domain_id,
                 resource_policy=test_project_resource_policy_name,
                 description="",
                 is_active=True,
@@ -411,6 +419,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
         db_with_cleanup: ExtendedAsyncSAEngine,
         regular_user: UUID,
         test_domain_name: str,
+        test_domain_id: UUID,
         test_project_resource_policy_name: str,
     ) -> AsyncGenerator[UUID, None]:
         """Insert a separate group in the same domain plus an ASE row for regular_user."""
@@ -421,6 +430,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
                     id=other_group_id,
                     name=f"other_group_{other_group_id.hex[:8]}",
                     domain_name=test_domain_name,
+                    domain_id=test_domain_id,
                     resource_policy=test_project_resource_policy_name,
                     description="",
                     is_active=True,

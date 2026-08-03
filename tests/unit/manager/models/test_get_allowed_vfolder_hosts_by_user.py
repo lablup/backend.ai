@@ -104,13 +104,18 @@ class TestGetAllowedVFolderHostsByUserMembership:
             yield database_connection
 
     @pytest.fixture
+    def domain_id(self) -> UUID:
+        return uuid4()
+
+    @pytest.fixture
     async def domain_name(
-        self, db_with_cleanup: ExtendedAsyncSAEngine
+        self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: UUID
     ) -> AsyncGenerator[str, None]:
         name = f"test-domain-{uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=name,
                     description="",
                     is_active=True,
@@ -188,6 +193,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         domain_name: str,
+        domain_id: UUID,
         project_resource_policy: str,
     ) -> AsyncGenerator[UUID, None]:
         gid = uuid4()
@@ -197,6 +203,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
                     id=gid,
                     name=f"group-a-{gid.hex[:8]}",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     resource_policy=project_resource_policy,
                     description="",
                     is_active=True,
@@ -213,6 +220,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         domain_name: str,
+        domain_id: UUID,
         project_resource_policy: str,
     ) -> AsyncGenerator[UUID, None]:
         gid = uuid4()
@@ -222,6 +230,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
                     id=gid,
                     name=f"group-b-{gid.hex[:8]}",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     resource_policy=project_resource_policy,
                     description="",
                     is_active=True,

@@ -12,8 +12,10 @@ from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.user.request import DeleteUserInput, PurgeUserInput
 from ai.backend.common.exception import InvalidIpAddressValue, UnreachableError
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import ReadableCIDR
+from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -92,9 +94,10 @@ async def admin_create_user_v2(
     return CreateUserPayloadGQL.from_pydantic(payload)
 
 
-def _build_bulk_create_user_action(
+async def _build_bulk_create_user_action(
     input: BulkCreateUserV2InputGQL,
     auth_config: AuthConfig,
+    domain_adapter: DomainAdapter,
 ) -> BulkCreateUserAction:
     """Build a BulkCreateUserAction from a bulk-create GraphQL input."""
     items: list[UserCreateSpec] = []
@@ -106,6 +109,7 @@ def _build_bulk_create_user_action(
             rounds=auth_config.password_hash_rounds,
             salt_size=auth_config.password_hash_salt_size,
         )
+        domain_id = await domain_adapter.resolve_domain_id(dto.domain_name)
 
         spec = UserCreatorSpec(
             email=dto.email,
@@ -113,6 +117,7 @@ def _build_bulk_create_user_action(
             password=password_info,
             need_password_change=dto.need_password_change,
             domain_name=dto.domain_name,
+            domain_id=domain_id,
             full_name=dto.full_name,
             description=dto.description,
             status=UserStatus(dto.status),
@@ -158,7 +163,9 @@ async def admin_bulk_create_users_v2(
     """
     check_admin_only()
     ctx = info.context
-    action = _build_bulk_create_user_action(input, ctx.config_provider.config.auth)
+    action = await _build_bulk_create_user_action(
+        input, ctx.config_provider.config.auth, ctx.adapters.domain
+    )
     payload = await ctx.adapters.user.bulk_create_users(action)
     return BulkCreateUsersV2PayloadGQL.from_pydantic(payload)
 
@@ -188,7 +195,9 @@ async def admin_bulk_create_users_with_keypair_v2(
     """
     check_admin_only()
     ctx = info.context
-    action = _build_bulk_create_user_action(input, ctx.config_provider.config.auth)
+    action = await _build_bulk_create_user_action(
+        input, ctx.config_provider.config.auth, ctx.adapters.domain
+    )
     payload = await ctx.adapters.user.bulk_create_users_with_keypair(action)
     return BulkCreateUsersWithKeypairV2PayloadGQL.from_pydantic(payload)
 
@@ -252,6 +261,10 @@ async def admin_bulk_update_users_v2(
     for user_item in input.users:
         dto = user_item.input.to_pydantic()
 
+        new_domain_id: DomainID | None = None
+        if dto.domain_name is not None:
+            new_domain_id = await ctx.adapters.domain.resolve_domain_id(dto.domain_name)
+
         updater_spec = UserUpdaterSpec(
             username=(
                 OptionalState.update(dto.username)
@@ -297,6 +310,11 @@ async def admin_bulk_update_users_v2(
             domain_name=(
                 OptionalState.update(dto.domain_name)
                 if dto.domain_name is not None
+                else OptionalState.nop()
+            ),
+            domain_id=(
+                OptionalState.update(new_domain_id)
+                if new_domain_id is not None
                 else OptionalState.nop()
             ),
             role=(

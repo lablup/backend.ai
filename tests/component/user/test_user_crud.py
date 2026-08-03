@@ -413,6 +413,7 @@ class TestUserCreateAutoAssignRoles:
                     description="Model Store",
                     is_active=True,
                     domain_name=domain_fixture.domain_name,
+                    domain_id=domain_fixture.domain_id,
                     resource_policy=resource_policy_fixture,
                     type=ProjectType.MODEL_STORE,
                 )

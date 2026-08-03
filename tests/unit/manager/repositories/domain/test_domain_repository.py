@@ -189,8 +189,10 @@ class TestDomainRepository:
         self, db_with_default_resource_policies: ExtendedAsyncSAEngine
     ) -> AsyncGenerator[DomainData, None]:
         """Create a sample domain for testing."""
+        domain_id = uuid.uuid4()
         async with db_with_default_resource_policies.begin() as conn:
             domain_data = {
+                "id": domain_id,
                 "name": "sample-domain",
                 "description": "Sample domain for testing",
                 "is_active": True,
@@ -217,6 +219,7 @@ class TestDomainRepository:
                 "name": "model-store",
                 "description": "Model store group for sample-domain",
                 "domain_name": "sample-domain",
+                "domain_id": domain_id,
                 "is_active": True,
                 "created_at": datetime.now(tz=UTC),
                 "modified_at": datetime.now(tz=UTC),
@@ -308,8 +311,10 @@ class TestDomainRepository:
     ) -> str:
         """Create an inactive domain with a group for purge testing."""
         domain_name = f"domain-with-group-{uuid.uuid4().hex[:8]}"
+        domain_id = uuid.uuid4()
         async with db_with_default_resource_policies.begin_session() as session:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain with groups",
                 is_active=False,
@@ -327,6 +332,7 @@ class TestDomainRepository:
                 description="Test group",
                 is_active=True,
                 domain_name=domain_name,
+                domain_id=domain_id,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
                 integration_id=None,
@@ -382,6 +388,7 @@ class TestDomainRepository:
                 description="Test group",
                 is_active=True,
                 domain_name=domain_name,
+                domain_id=domain_id,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
                 integration_id=None,

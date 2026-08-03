@@ -33,7 +33,7 @@ import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.identifier.domain import DomainName
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.types import BinarySize, QuotaScopeID, ResourceSlot
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -142,15 +142,21 @@ class TestAutoMountVFolderResolution:
             yield database_connection
 
     @pytest.fixture
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid4())
+
+    @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
     ) -> str:
         """Create a test domain that allows mounting on the noop host."""
         domain_name = f"test-domain-{uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=test_domain_id,
                     name=domain_name,
                     description="",
                     is_active=True,
@@ -233,6 +239,7 @@ class TestAutoMountVFolderResolution:
     async def test_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
         test_domain_name: str,
         test_project_resource_policy_name: str,
     ) -> UUID:
@@ -246,6 +253,7 @@ class TestAutoMountVFolderResolution:
                     description="",
                     is_active=True,
                     domain_name=test_domain_name,
+                    domain_id=test_domain_id,
                     resource_policy=test_project_resource_policy_name,
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts={NOOP_VFOLDER_HOST: ["mount-in-session"]},

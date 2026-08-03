@@ -9,6 +9,7 @@ from uuid import UUID
 
 from ai.backend.common.data.permission.types import EntityType, RelationType, ScopeType
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.errors.repository import (
     ForeignKeyViolationError,
@@ -28,6 +29,7 @@ class GroupCreatorSpec(CreatorSpec[GroupRow]):
 
     name: str
     domain_name: str
+    domain_id: DomainID | None = None
     type: ProjectType | None = None
     description: str | None = None
     is_active: bool | None = None
@@ -70,6 +72,7 @@ class GroupCreatorSpec(CreatorSpec[GroupRow]):
         return GroupRow(
             name=self.name,
             domain_name=self.domain_name,
+            domain_id=self.domain_id,
             type=self.type or ProjectType.GENERAL,
             description=self.description,
             is_active=self.is_active if self.is_active is not None else True,

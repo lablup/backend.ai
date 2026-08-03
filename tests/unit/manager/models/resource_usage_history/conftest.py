@@ -63,13 +63,19 @@ async def database_with_usage_tables(
 
 
 @pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
+@pytest.fixture
 async def domain_name(
     database_with_usage_tables: ExtendedAsyncSAEngine,
+    domain_id: uuid.UUID,
 ) -> AsyncGenerator[str, None]:
     """Create DomainRow and return its name."""
     name = "test-domain"
     async with database_with_usage_tables.begin_session() as db_sess:
-        db_sess.add(DomainRow(name=name))
+        db_sess.add(DomainRow(id=domain_id, name=name))
     yield name
 
 
@@ -172,6 +178,7 @@ async def user_uuid(
 async def project_id(
     database_with_usage_tables: ExtendedAsyncSAEngine,
     domain_name: str,
+    domain_id: uuid.UUID,
     project_resource_policy: str,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create GroupRow and return its ID."""
@@ -182,6 +189,7 @@ async def project_id(
                 id=group_id,
                 name="test-project",
                 domain_name=domain_name,
+                domain_id=domain_id,
                 resource_policy=project_resource_policy,
             )
         )

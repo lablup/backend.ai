@@ -410,6 +410,7 @@ class TestDomainNestedSearchIntegration:
         """
         domain_alpha = f"domain-alpha-{uuid.uuid4().hex[:8]}"
         domain_beta = f"domain-beta-{uuid.uuid4().hex[:8]}"
+        domain_ids = {domain_alpha: uuid.uuid4(), domain_beta: uuid.uuid4()}
         result: dict[str, dict[str, str]] = {}
 
         async with db_with_cleanup.begin_session() as session:
@@ -418,6 +419,7 @@ class TestDomainNestedSearchIntegration:
                 (domain_beta, False, "Archived department"),
             ]:
                 domain = DomainRow(
+                    id=domain_ids[domain_name],
                     name=domain_name,
                     description=desc,
                     is_active=is_active,
@@ -485,6 +487,7 @@ class TestDomainNestedSearchIntegration:
                     description="test project",
                     is_active=proj_active,
                     domain_name=domain_name,
+                    domain_id=domain_ids[domain_name],
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts=VFolderHostPermissionMap(),
                     integration_id=None,

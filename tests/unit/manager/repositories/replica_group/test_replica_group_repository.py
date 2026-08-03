@@ -194,11 +194,13 @@ class TestReplicaGroupRepository:
         project_policy_name = f"test-proj-policy-{uuid.uuid4().hex[:8]}"
         user_uuid = uuid.uuid4()
         group_id = uuid.uuid4()
+        domain_id = uuid.uuid4()
         endpoint_id = DeploymentID(uuid.uuid4())
 
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -255,6 +257,7 @@ class TestReplicaGroupRepository:
                     id=group_id,
                     name=f"test-group-{uuid.uuid4().hex[:8]}",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     resource_policy=project_policy_name,
                 )
             )

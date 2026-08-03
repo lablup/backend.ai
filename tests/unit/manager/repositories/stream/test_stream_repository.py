@@ -328,6 +328,7 @@ class TestStreamRepository:
                     description="",
                     is_active=True,
                     domain_name=domain_name,
+                    domain_id=test_domain_id,
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts={},
                     resource_policy=project_resource_policy.name,

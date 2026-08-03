@@ -66,14 +66,20 @@ class TestResolveGroupNameOrId:
         return policy_name
 
     @pytest.fixture
+    def test_domain_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: uuid.UUID,
     ) -> str:
         """Create a test domain."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as session:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -92,6 +98,7 @@ class TestResolveGroupNameOrId:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: str,
+        test_domain_id: uuid.UUID,
         test_resource_policy: str,
     ) -> uuid.UUID:
         """Create a test group and return its UUID."""
@@ -103,6 +110,7 @@ class TestResolveGroupNameOrId:
                 description="Test group",
                 is_active=True,
                 domain_name=test_domain,
+                domain_id=test_domain_id,
                 total_resource_slots=ResourceSlot.from_user_input({"cpu": "2", "mem": "4g"}, None),
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
                 integration_id=None,

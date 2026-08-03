@@ -108,13 +108,19 @@ class TestVFolderOwnershipTransferRBACCleanup:
         return VfolderRepository(db=db_with_cleanup)
 
     @pytest.fixture
+    def test_domain_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: uuid.UUID,
     ) -> str:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -195,6 +201,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
     async def test_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: uuid.UUID,
         test_domain_name: str,
         test_project_resource_policy_name: str,
     ) -> uuid.UUID:
@@ -204,6 +211,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 id=group_uuid,
                 name=f"test-group-{group_uuid.hex[:8]}",
                 domain_name=test_domain_name,
+                domain_id=test_domain_id,
                 description="Test group",
                 is_active=True,
                 total_resource_slots=ResourceSlot(),

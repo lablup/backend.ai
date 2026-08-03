@@ -264,6 +264,7 @@ class TestModelCardDelete:
                 description="Test group",
                 is_active=True,
                 domain_name=test_domain.name,
+                domain_id=test_domain.id,
                 resource_policy=test_project_resource_policy.name,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},

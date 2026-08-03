@@ -170,6 +170,7 @@ class TestPerProjectRegistryQuotaRepository:
             group = GroupRow(
                 name=f"test-group-{str(uuid.uuid4())[:8]}",
                 domain_name=sample_domain.domain_name,
+                domain_id=sample_domain.domain_id,
                 total_resource_slots=ResourceSlot(),
                 resource_policy=sample_resource_policy,
                 container_registry={
@@ -209,6 +210,7 @@ class TestPerProjectRegistryQuotaRepository:
             group = GroupRow(
                 name=f"test-group-no-reg-{str(uuid.uuid4())[:8]}",
                 domain_name=sample_domain.domain_name,
+                domain_id=sample_domain.domain_id,
                 total_resource_slots=ResourceSlot(),
                 resource_policy=sample_resource_policy,
                 container_registry=None,
@@ -232,6 +234,7 @@ class TestPerProjectRegistryQuotaRepository:
             group = GroupRow(
                 name=f"test-group-invalid-{str(uuid.uuid4())[:8]}",
                 domain_name=sample_domain.domain_name,
+                domain_id=sample_domain.domain_id,
                 total_resource_slots=ResourceSlot(),
                 resource_policy=sample_resource_policy,
                 container_registry={},
@@ -255,6 +258,7 @@ class TestPerProjectRegistryQuotaRepository:
             group = GroupRow(
                 name=f"test-group-orphan-{str(uuid.uuid4())[:8]}",
                 domain_name=sample_domain.domain_name,
+                domain_id=sample_domain.domain_id,
                 total_resource_slots=ResourceSlot(),
                 resource_policy=sample_resource_policy,
                 container_registry={
@@ -294,6 +298,7 @@ class TestPerProjectRegistryQuotaRepository:
             group = GroupRow(
                 name=f"test-group-minimal-{str(uuid.uuid4())[:8]}",
                 domain_name=sample_domain.domain_name,
+                domain_id=sample_domain.domain_id,
                 total_resource_slots=ResourceSlot(),
                 resource_policy=sample_resource_policy,
                 container_registry={

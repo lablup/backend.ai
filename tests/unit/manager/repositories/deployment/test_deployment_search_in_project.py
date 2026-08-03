@@ -108,6 +108,7 @@ class TestEndpointSearchInProject:
     ) -> AsyncGenerator[TestData, None]:
         """Create two projects with endpoints: 2 in project A, 1 in project B."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = uuid.uuid4()
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         user_policy_name = f"test-upolicy-{uuid.uuid4().hex[:8]}"
         project_policy_name = f"test-ppolicy-{uuid.uuid4().hex[:8]}"
@@ -119,7 +120,9 @@ class TestEndpointSearchInProject:
 
         async with db_with_cleanup.begin_session() as db_sess:
             # Domain
-            db_sess.add(DomainRow(name=domain_name, total_resource_slots=ResourceSlot()))
+            db_sess.add(
+                DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot())
+            )
             await db_sess.flush()
 
             # Scaling group
@@ -179,6 +182,7 @@ class TestEndpointSearchInProject:
                     id=project_a_id,
                     name=f"project-a-{uuid.uuid4().hex[:8]}",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=project_policy_name,
                 )
@@ -188,6 +192,7 @@ class TestEndpointSearchInProject:
                     id=project_b_id,
                     name=f"project-b-{uuid.uuid4().hex[:8]}",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=project_policy_name,
                 )

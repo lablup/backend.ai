@@ -147,6 +147,7 @@ class TestReplicaGroupHistoryRepository:
         project, scaling group and user the endpoint points at.
         """
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = uuid.uuid4()
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         user_policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
         project_policy_name = f"test-proj-policy-{uuid.uuid4().hex[:8]}"
@@ -165,6 +166,7 @@ class TestReplicaGroupHistoryRepository:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -226,6 +228,7 @@ class TestReplicaGroupHistoryRepository:
                     id=project_id,
                     name=f"test-group-{uuid.uuid4().hex[:8]}",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     resource_policy=project_policy_name,
                 )
             )

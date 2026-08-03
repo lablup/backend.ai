@@ -201,6 +201,7 @@ async def model_store_project_fixture(
                 description="Test MODEL_STORE project",
                 is_active=True,
                 domain_name=domain_fixture.domain_name,
+                domain_id=domain_fixture.domain_id,
                 resource_policy=resource_policy_fixture,
                 type=ProjectType.MODEL_STORE,
             )
@@ -259,6 +260,7 @@ async def second_project_fixture(
                 description="Second MODEL_STORE project",
                 is_active=True,
                 domain_name=domain_fixture.domain_name,
+                domain_id=domain_fixture.domain_id,
                 resource_policy=resource_policy_fixture,
                 type=ProjectType.MODEL_STORE,
             )

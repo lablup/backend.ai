@@ -91,10 +91,16 @@ class TestLegacyExtraMountsHydration:
         return uuid.uuid4().hex[:8]
 
     @pytest.fixture
-    async def domain_name(self, db_with_cleanup: ExtendedAsyncSAEngine, suffix: str) -> str:
+    def domain_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
+    async def domain_name(
+        self, db_with_cleanup: ExtendedAsyncSAEngine, suffix: str, domain_id: uuid.UUID
+    ) -> str:
         name = f"d-{suffix}"
         async with db_with_cleanup.begin_session() as db_sess:
-            db_sess.add(DomainRow(name=name, total_resource_slots=ResourceSlot()))
+            db_sess.add(DomainRow(id=domain_id, name=name, total_resource_slots=ResourceSlot()))
         return name
 
     @pytest.fixture
@@ -179,6 +185,7 @@ class TestLegacyExtraMountsHydration:
         db_with_cleanup: ExtendedAsyncSAEngine,
         suffix: str,
         domain_name: str,
+        domain_id: uuid.UUID,
         project_resource_policy_name: str,
     ) -> uuid.UUID:
         project_uuid = uuid.uuid4()
@@ -188,6 +195,7 @@ class TestLegacyExtraMountsHydration:
                     id=project_uuid,
                     name=f"g-{suffix}",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=project_resource_policy_name,
                 )

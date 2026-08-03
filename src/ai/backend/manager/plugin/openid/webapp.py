@@ -29,6 +29,7 @@ from ai.backend.common.cron import LocalCron, PeriodicTask
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.types import CORSOptions, WebMiddleware
 from ai.backend.manager.data.permission.types import EntityType, RelationType, ScopeType
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair, generate_ssh_keypair
@@ -187,6 +188,9 @@ async def create_user_if_not_exists(
 
         if not user:
             # Create a user.
+            domain_id = await dbsess.scalar(
+                sa.select(DomainRow.id).where(DomainRow.name == user_data["domain_name"])
+            )
             user = UserRow(
                 username=user_data["username"],
                 email=user_data["email"],
@@ -197,6 +201,7 @@ async def create_user_if_not_exists(
                 status=user_data["status"],
                 status_info=user_data["status_info"],
                 domain_name=user_data["domain_name"],
+                domain_id=domain_id,
                 role=user_data["role"],
                 resource_policy=user_data["resource_policy"],
             )

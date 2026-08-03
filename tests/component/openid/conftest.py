@@ -409,8 +409,9 @@ async def seed_data(
     require (domain, resource policies, group).
     Yields the database_engine for convenience.
     """
+    domain_id = uuid.uuid4()
     async with database_engine.begin_session() as sess:
-        sess.add(DomainRow(name="default", total_resource_slots=ResourceSlot({})))
+        sess.add(DomainRow(id=domain_id, name="default", total_resource_slots=ResourceSlot({})))
         sess.add(
             UserResourcePolicyRow(
                 name="default",
@@ -447,6 +448,7 @@ async def seed_data(
         project = GroupRow(
             name="default",
             domain_name="default",
+            domain_id=domain_id,
             total_resource_slots=ResourceSlot({}),
             resource_policy="default",
         )

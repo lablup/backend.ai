@@ -288,6 +288,7 @@ class TestKernelTermination:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
         test_domain_name: str,
         test_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
@@ -299,6 +300,7 @@ class TestKernelTermination:
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain_name,
+                domain_id=test_domain_id,
                 total_resource_slots=ResourceSlot({
                     "cpu": Decimal("500"),
                     "mem": Decimal("524288"),

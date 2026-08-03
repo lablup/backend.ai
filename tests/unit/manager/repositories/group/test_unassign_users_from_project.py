@@ -95,14 +95,20 @@ class TestUnassignUsersFromProject:
             yield database_connection
 
     @pytest.fixture
+    def test_domain_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: uuid.UUID,
     ) -> str:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as session:
             session.add(
                 DomainRow(
+                    id=test_domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -140,6 +146,7 @@ class TestUnassignUsersFromProject:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: str,
+        test_domain_id: uuid.UUID,
     ) -> uuid.UUID:
         project_id = uuid.uuid4()
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
@@ -159,6 +166,7 @@ class TestUnassignUsersFromProject:
                     description="Test project",
                     is_active=True,
                     domain_name=test_domain,
+                    domain_id=test_domain_id,
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts=VFolderHostPermissionMap(),
                     integration_id=None,

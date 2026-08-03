@@ -280,6 +280,7 @@ class TestUserRepository:
                 description="Test group",
                 is_active=True,
                 domain_name=sample_domain.domain_name,
+                domain_id=sample_domain.domain_id,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 integration_id=None,
@@ -384,6 +385,7 @@ class TestUserRepository:
     async def test_create_user_validated_success(
         self,
         user_repository: UserRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         sample_domain: DomainFixtureData,
         user_resource_policy: str,
         default_keypair_resource_policy: str,
@@ -400,6 +402,7 @@ class TestUserRepository:
             description="New User Description",
             status=UserStatus.ACTIVE,
             domain_name=sample_domain.domain_name,
+            domain_id=sample_domain.domain_id,
             role=UserRole.USER,
             resource_policy=user_resource_policy,
             allowed_client_ip=None,
@@ -422,6 +425,13 @@ class TestUserRepository:
         assert result.user.role == spec.role
         assert result.keypair is not None
         assert result.keypair.access_key is not None
+
+        # Dual-write: the caller-provided domain_id is stored alongside domain_name (expand phase)
+        async with db_with_cleanup.begin_session() as session:
+            stored_domain_id = await session.scalar(
+                sa.select(UserRow.domain_id).where(UserRow.email == spec.email)
+            )
+        assert stored_domain_id == sample_domain.domain_id
 
     @pytest.fixture
     async def user_scope_presets(self, db_with_cleanup: ExtendedAsyncSAEngine) -> tuple[str, str]:
@@ -620,6 +630,7 @@ class TestUserRepository:
                 description="Model Store Project",
                 is_active=True,
                 domain_name=sample_domain.domain_name,
+                domain_id=sample_domain.domain_id,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 integration_id=None,

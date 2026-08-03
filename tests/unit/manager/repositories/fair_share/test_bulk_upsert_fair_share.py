@@ -427,6 +427,7 @@ class TestBulkUpsertProjectFairShare:
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
         rg_id = ResourceGroupID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = uuid.uuid4()
         project_ids = [uuid.uuid4() for _ in range(3)]
 
         async with db_with_cleanup.begin_session() as db_sess:
@@ -443,6 +444,7 @@ class TestBulkUpsertProjectFairShare:
             db_sess.add(sg)
 
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -467,6 +469,7 @@ class TestBulkUpsertProjectFairShare:
                     id=pid,
                     name=f"test-project-{pid.hex[:8]}",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     description="Test project",
                     resource_policy=policy_name,
                     total_resource_slots=ResourceSlot(),
@@ -491,6 +494,7 @@ class TestBulkUpsertProjectFairShare:
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
         rg_id = ResourceGroupID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = uuid.uuid4()
         project_ids = [uuid.uuid4() for _ in range(3)]
         existing_weights = {pid: Decimal("1.0") for pid in project_ids}
 
@@ -508,6 +512,7 @@ class TestBulkUpsertProjectFairShare:
             db_sess.add(sg)
 
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -532,6 +537,7 @@ class TestBulkUpsertProjectFairShare:
                     id=pid,
                     name=f"test-project-{pid.hex[:8]}",
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     description="Test project",
                     resource_policy=policy_name,
                     total_resource_slots=ResourceSlot(),
@@ -677,6 +683,7 @@ class TestBulkUpsertUserFairShare:
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
         rg_id = ResourceGroupID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = uuid.uuid4()
         project_id = uuid.uuid4()
         user_uuids = [uuid.uuid4() for _ in range(3)]
 
@@ -694,6 +701,7 @@ class TestBulkUpsertUserFairShare:
             db_sess.add(sg)
 
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -727,6 +735,7 @@ class TestBulkUpsertUserFairShare:
                 id=project_id,
                 name=f"test-project-{project_id.hex[:8]}",
                 domain_name=domain_name,
+                domain_id=domain_id,
                 description="Test project",
                 resource_policy=project_policy_name,
             )
@@ -773,6 +782,7 @@ class TestBulkUpsertUserFairShare:
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
         rg_id = ResourceGroupID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = uuid.uuid4()
         project_id = uuid.uuid4()
         user_uuids = [uuid.uuid4() for _ in range(3)]
         existing_weights = {uid: Decimal("1.0") for uid in user_uuids}
@@ -791,6 +801,7 @@ class TestBulkUpsertUserFairShare:
             db_sess.add(sg)
 
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -824,6 +835,7 @@ class TestBulkUpsertUserFairShare:
                 id=project_id,
                 name=f"test-project-{project_id.hex[:8]}",
                 domain_name=domain_name,
+                domain_id=domain_id,
                 description="Test project",
                 resource_policy=project_policy_name,
             )
@@ -883,6 +895,7 @@ class TestBulkUpsertUserFairShare:
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
         rg_id = ResourceGroupID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = uuid.uuid4()
         project_id = uuid.uuid4()
         user_uuids = [uuid.uuid4() for _ in range(3)]
 
@@ -900,6 +913,7 @@ class TestBulkUpsertUserFairShare:
             db_sess.add(sg)
 
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -933,6 +947,7 @@ class TestBulkUpsertUserFairShare:
                 id=project_id,
                 name=f"test-project-{project_id.hex[:8]}",
                 domain_name=domain_name,
+                domain_id=domain_id,
                 description="Test project",
                 resource_policy=project_policy_name,
             )

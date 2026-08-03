@@ -20,6 +20,7 @@ from ai.backend.common.dto.manager.user import (
 )
 from ai.backend.common.dto.manager.user.types import UserRole as UserRoleDTO
 from ai.backend.common.dto.manager.user.types import UserStatus as UserStatusDTO
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -68,8 +69,12 @@ class UserAdapter(BaseFilterAdapter):
         request: UpdateUserRequest,
         email: str,
         password_info: PasswordInfo | None = None,
+        domain_id: DomainID | None = None,
     ) -> Updater[UserRow]:
-        """Convert update request to updater."""
+        """Convert update request to updater.
+
+        ``domain_id`` must be pre-resolved by the caller when ``domain_name`` changes.
+        """
         username = OptionalState[str].nop()
         password = OptionalState[PasswordInfo].nop()
         need_password_change = OptionalState[bool].nop()
@@ -131,6 +136,7 @@ class UserAdapter(BaseFilterAdapter):
             description=description,
             status=status,
             domain_name=domain_name,
+            domain_id=OptionalState[DomainID].from_nullable(domain_id),
             role=role,
             allowed_client_ip=allowed_client_ip,
             totp_activated=totp_activated,
