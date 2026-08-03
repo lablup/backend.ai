@@ -8514,6 +8514,11 @@ type ImageV2 implements Node
   registryId: UUID!
 
   """
+  Added in 26.9.0. Whether this image is installed on at least one agent.
+  """
+  installed: Boolean!
+
+  """
   Added in 26.3.0. Timestamp of the most recent session created with this image. Returns null if the image has never been used.
   """
   lastUsed: DateTime
