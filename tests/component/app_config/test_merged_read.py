@@ -54,7 +54,7 @@ class TestPrincipalDecidesTheMerge:
         )
 
         merged = result.app_configs[0]
-        assert merged.merged_config == {"mode": "dark", "lang": "en"}
+        assert merged.config == {"mode": "dark", "lang": "en"}
 
     async def test_the_public_read_sees_only_public_over_the_same_data(
         self,
@@ -66,7 +66,7 @@ class TestPrincipalDecidesTheMerge:
         )
 
         merged = result.app_configs[0]
-        assert merged.merged_config == {"mode": "light", "lang": "en"}
+        assert merged.config == {"mode": "light", "lang": "en"}
 
 
 class TestPayloadShape:
@@ -84,4 +84,4 @@ class TestPayloadShape:
             "contributed",
             "uncontributed",
         ]
-        assert result.app_configs[1].merged_config == {}
+        assert result.app_configs[1].config == {}
