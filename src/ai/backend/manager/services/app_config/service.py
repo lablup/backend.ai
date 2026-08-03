@@ -5,7 +5,6 @@ from typing import Any
 
 from ai.backend.manager.data.app_config.types import AppConfigData
 from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
-from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
@@ -54,8 +53,8 @@ class AppConfigService:
 
         One entry per requested name, in request order; a repeated name is repeated in the
         output. Without a ``user_id`` this is the anonymous, pre-login read — only ``public``
-        fragments contribute. A name nothing contributes to fails the whole call with
-        ``AppConfigFragmentNotFound``.
+        fragments contribute. A name nothing contributes to yields an empty merge rather than
+        failing, so one such name never withholds the names that did merge.
         """
         fragments = await self._fragment_repository.list_visible_fragments_bulk(
             action.config_names, action.user_id
@@ -63,10 +62,6 @@ class AppConfigService:
         app_configs: list[AppConfigData] = []
         for config_name in action.config_names:
             visible = [fragment for fragment in fragments if fragment.config_name == config_name]
-            if not visible:
-                raise AppConfigFragmentNotFound(
-                    "No visible fragment contributes to this app config."
-                )
             app_configs.append(
                 AppConfigData(
                     config_name=config_name,

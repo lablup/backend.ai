@@ -15,7 +15,6 @@ from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
-from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
@@ -233,28 +232,36 @@ class TestAppConfigService:
         assert result.app_configs[0].merged_config == {"theme": "dark"}
         assert result.app_configs[1].merged_config == {"theme": "dark"}
 
-    async def test_get_without_matching_fragments_raises(
+    async def test_get_without_matching_fragments_returns_an_empty_merge(
         self,
         service: AppConfigService,
         no_fragments: list[AppConfigFragmentData],
     ) -> None:
-        # No contributing fragment is a 404 — not an AppConfigData carrying an empty merge.
-        with pytest.raises(AppConfigFragmentNotFound):
-            await service.get_app_configs(
-                GetAppConfigsAction(config_names=["unknown"], user_id=_USER_ID)
-            )
+        # No contributing fragment is an empty merge, not a 404.
+        result = await service.get_app_configs(
+            GetAppConfigsAction(config_names=["unknown"], user_id=_USER_ID)
+        )
 
-    async def test_get_fails_whole_call_on_one_absent_name(
+        assert [c.config_name for c in result.app_configs] == ["unknown"]
+        assert result.app_configs[0].merged_config == {}
+        assert result.app_configs[0].fragments == []
+
+    async def test_get_keeps_the_merged_names_alongside_an_absent_one(
         self,
         service: AppConfigService,
         two_name_fragments: list[AppConfigFragmentData],
     ) -> None:
-        # "unknown" contributes nothing, so the call fails as a whole — the names that did
-        # contribute are not returned alongside it.
-        with pytest.raises(AppConfigFragmentNotFound):
-            await service.get_app_configs(
-                GetAppConfigsAction(config_names=["theme", "menu", "unknown"], user_id=_USER_ID)
-            )
+        # "unknown" contributes nothing, but that must not withhold the names that did
+        # merge — every requested name still gets its entry, in request order.
+        result = await service.get_app_configs(
+            GetAppConfigsAction(config_names=["theme", "menu", "unknown"], user_id=_USER_ID)
+        )
+
+        assert [c.config_name for c in result.app_configs] == ["theme", "menu", "unknown"]
+        assert result.app_configs[0].merged_config == {"theme": "dark", "lang": "en"}
+        assert result.app_configs[1].merged_config == {"items": ["a"]}
+        assert result.app_configs[2].merged_config == {}
+        assert result.app_configs[2].fragments == []
 
     async def test_get_without_an_injected_user_merges_public_fragments_only(
         self,
