@@ -123,7 +123,9 @@ def get(app_config_fragment_id: uuid.UUID) -> None:
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.app_config_fragment.get(app_config_fragment_id)
+            result = await registry.app_config_fragment.get(
+                AppConfigFragmentID(app_config_fragment_id)
+            )
             print_result(result)
         finally:
             await registry.close()
@@ -139,7 +141,9 @@ def purge(app_config_fragment_id: uuid.UUID) -> None:
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.app_config_fragment.purge(app_config_fragment_id)
+            result = await registry.app_config_fragment.purge(
+                AppConfigFragmentID(app_config_fragment_id)
+            )
             print_result(result)
         finally:
             await registry.close()
