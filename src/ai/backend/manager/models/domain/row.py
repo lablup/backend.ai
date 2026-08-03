@@ -34,7 +34,7 @@ from ai.backend.manager.models.base import (
     SlugType,
     VFolderHostPermissionColumn,
 )
-from ai.backend.manager.models.mixins.scope_row import ScopeRowMixin
+from ai.backend.manager.models.mixins.scope_row import ScopeMixin
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
@@ -93,7 +93,7 @@ def _get_network_join_condition() -> sa.ColumnElement[bool]:
     return DomainRow.name == foreign(NetworkRow.domain_name)
 
 
-class DomainRow(ScopeRowMixin, CreatedAtMixin, Base):  # type: ignore[misc]
+class DomainRow(ScopeMixin, CreatedAtMixin, Base):  # type: ignore[misc]
     __tablename__ = "domains"
     __scope_type__ = DOMAIN_SCOPE_TYPE
 

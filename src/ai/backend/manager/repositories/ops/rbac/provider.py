@@ -51,7 +51,7 @@ from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair_data
-from ai.backend.manager.models.mixins.scope_row import ScopeRowMixin
+from ai.backend.manager.models.mixins.scope_row import ScopeMixin
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -220,7 +220,7 @@ class ScopeBatchDeletion[TRow: Base]:
 class RBACWriteOps(WriteOps):
     """Base write ops plus RBAC scope-associated creation and virtual-scope writes."""
 
-    _scope_rows: ClassVar[Mapping[ScopeType, type[ScopeRowMixin]]] = {
+    _scope_rows: ClassVar[Mapping[ScopeType, type[ScopeMixin]]] = {
         DOMAIN_SCOPE_TYPE: DomainRow,
         PROJECT_SCOPE_TYPE: GroupRow,
         RESOURCE_GROUP_SCOPE_TYPE: ScalingGroupRow,

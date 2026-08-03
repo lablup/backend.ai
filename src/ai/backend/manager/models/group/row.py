@@ -50,7 +50,7 @@ from ai.backend.manager.models.base import (
     StructuredJSONColumn,
     VFolderHostPermissionColumn,
 )
-from ai.backend.manager.models.mixins.scope_row import ScopeRowMixin
+from ai.backend.manager.models.mixins.scope_row import ScopeMixin
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -162,7 +162,7 @@ class AssocGroupUserRow(Base):  # type: ignore[misc]
 association_groups_users = AssocGroupUserRow.__table__
 
 
-class GroupRow(ScopeRowMixin, Base):  # type: ignore[misc]
+class GroupRow(ScopeMixin, Base):  # type: ignore[misc]
     __tablename__ = "groups"
     __scope_type__ = PROJECT_SCOPE_TYPE
     __table_args__ = (

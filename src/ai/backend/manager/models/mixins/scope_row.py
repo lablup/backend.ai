@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.types import ScopeType
 from ai.backend.common.identifier.scope import ScopeID
 
 
-class ScopeRowMixin:
+class ScopeMixin:
     """Marks a Row as an RBAC scope source.
 
     Adds ``scope_id`` / ``scope_name`` synonyms for the columns named by

@@ -34,7 +34,7 @@ from ai.backend.manager.models.base import (
 )
 from ai.backend.manager.models.hasher import PasswordHasherFactory
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordColumn, PasswordInfo
-from ai.backend.manager.models.mixins.scope_row import ScopeRowMixin
+from ai.backend.manager.models.mixins.scope_row import ScopeMixin
 from ai.backend.manager.models.types import (
     QueryCondition,
     QueryOption,
@@ -146,7 +146,7 @@ def _get_main_keypair_join_condition() -> Any:
     return KeyPairRow.access_key == foreign(UserRow.main_access_key)
 
 
-class UserRow(ScopeRowMixin, Base):  # type: ignore[misc]
+class UserRow(ScopeMixin, Base):  # type: ignore[misc]
     __tablename__ = "users"
     __scope_type__ = USER_SCOPE_TYPE
     __scope_id_column__ = "uuid"

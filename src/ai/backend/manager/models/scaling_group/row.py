@@ -49,7 +49,7 @@ from ai.backend.manager.models.base import (
     PydanticColumn,
 )
 from ai.backend.manager.models.group import resolve_group_name_or_id, resolve_groups
-from ai.backend.manager.models.mixins.scope_row import ScopeRowMixin
+from ai.backend.manager.models.mixins.scope_row import ScopeMixin
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -252,7 +252,7 @@ def _get_resource_preset_join_condition() -> Any:
     return ScalingGroupRow.name == foreign(ResourcePresetRow.scaling_group_name)
 
 
-class ScalingGroupRow(ScopeRowMixin, Base):  # type: ignore[misc]
+class ScalingGroupRow(ScopeMixin, Base):  # type: ignore[misc]
     __tablename__ = "scaling_groups"
     __scope_type__ = RESOURCE_GROUP_SCOPE_TYPE
     __table_args__ = (
