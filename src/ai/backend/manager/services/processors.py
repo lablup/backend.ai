@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, override
 
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.v2.validators import ActionValidators
 
 # fmt: off
 if TYPE_CHECKING:
@@ -468,6 +469,7 @@ class ProcessorArgs:
     service_args: ServiceArgs
     event_hub: EventHub
     event_fetcher: EventFetcher
+    validators: ActionValidators
 
 
 @dataclass
