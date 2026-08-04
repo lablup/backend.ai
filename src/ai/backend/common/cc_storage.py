@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import PurePosixPath
 from types import ModuleType
-from typing import IO, Final, Protocol
+from typing import IO, Final, Protocol, cast, override
 
 FORMAT_ID: Final = "backend.ai/cc-storage/v1"
 CAPABILITY_HEADER: Final = "X-BackendAI-Storage-Format"
@@ -38,9 +38,7 @@ class StorageFormatUnavailable(RuntimeError):
 @lru_cache(maxsize=1)
 def extension() -> ModuleType:
     try:
-        import bai_storage_format as installed
-
-        return installed
+        return importlib.import_module("bai_storage_format")
     except ImportError:
         pass
     candidates: list[pathlib.Path] = []
@@ -58,10 +56,26 @@ def extension() -> ModuleType:
             continue
         loader = importlib.machinery.ExtensionFileLoader("bai_storage_format", str(path))
         spec = importlib.util.spec_from_loader("bai_storage_format", loader)
+        if spec is None:
+            continue
         module = importlib.util.module_from_spec(spec)
         loader.exec_module(module)
         return module
     raise StorageFormatUnavailable(f"no build of {FORMAT_ID} is importable")
+
+
+class EncryptedName(Protocol):
+    @property
+    def on_disk(self) -> str: ...
+
+    @property
+    def encoded(self) -> str: ...
+
+    @property
+    def sidecar_name(self) -> str | None: ...
+
+    @property
+    def sidecar_content(self) -> str | None: ...
 
 
 @dataclass(frozen=True)
@@ -87,7 +101,7 @@ class FolderKeyMaterial:
 
 
 def stored_len(plaintext_len: int) -> int:
-    return extension().stored_len(plaintext_len)
+    return int(extension().stored_len(plaintext_len))
 
 
 def mint_material(tier: str = CONCURRENT_TIER) -> FolderKeyMaterial:
@@ -102,16 +116,16 @@ class FolderCipher:
         self._key = self.fmt.FolderKey(material.key)
 
     def seal(self, plaintext: bytes) -> bytes:
-        return self._key.encrypt(plaintext)
+        return bytes(self._key.encrypt(plaintext))
 
     def open(self, stored: bytes) -> bytes:
-        return self._key.decrypt(stored)
+        return bytes(self._key.decrypt(stored))
 
-    def name(self, dir_iv: bytes, name: str):
-        return self._key.encrypt_name(dir_iv, name)
+    def name(self, dir_iv: bytes, name: str) -> EncryptedName:
+        return cast(EncryptedName, self._key.encrypt_name(dir_iv, name))
 
     def plain_name(self, dir_iv: bytes, encoded: str) -> str:
-        return self._key.decrypt_name(dir_iv, encoded)
+        return str(self._key.decrypt_name(dir_iv, encoded))
 
 
 class EncryptingReader(io.RawIOBase):
@@ -123,8 +137,8 @@ class EncryptingReader(io.RawIOBase):
         self._file_id = fmt.new_file_id()
         self._header = self._key.file_header(self._file_id)
         self._plain = plaintext_size
-        self._size = fmt.stored_len(plaintext_size)
-        self._count = fmt.chunk_count(plaintext_size)
+        self._size = int(fmt.stored_len(plaintext_size))
+        self._count = int(fmt.chunk_count(plaintext_size))
         self._nonces: dict[int, bytes] = {}
         self._held = -1
         self._frame = b""
@@ -134,20 +148,25 @@ class EncryptingReader(io.RawIOBase):
     def stored_size(self) -> int:
         return self._size
 
+    @override
     def readable(self) -> bool:
         return True
 
+    @override
     def seekable(self) -> bool:
         return True
 
+    @override
     def tell(self) -> int:
         return self._pos
 
+    @override
     def seek(self, offset: int, whence: int = os.SEEK_SET) -> int:
         origin = {os.SEEK_SET: 0, os.SEEK_CUR: self._pos, os.SEEK_END: self._size}[whence]
         self._pos = max(0, min(self._size, origin + offset))
         return self._pos
 
+    @override
     def close(self) -> None:
         self._source.close()
         super().close()
@@ -164,6 +183,7 @@ class EncryptingReader(io.RawIOBase):
             self._held = index
         return self._frame
 
+    @override
     def read(self, size: int = -1) -> bytes:
         if size is None or size < 0:
             size = self._size - self._pos
@@ -248,11 +268,9 @@ class CipherPaths:
         current = ""
         for part in _components(relpath):
             encrypted = self.cipher.name(await self.dir_iv(current, create=create), part)
-            if create and encrypted.sidecar_name is not None:
-                await self._store.write(
-                    _join(current, encrypted.sidecar_name),
-                    encrypted.sidecar_content.encode("ascii"),
-                )
+            sidecar, content = encrypted.sidecar_name, encrypted.sidecar_content
+            if create and sidecar is not None and content is not None:
+                await self._store.write(_join(current, sidecar), content.encode("ascii"))
             current = _join(current, encrypted.on_disk)
         return current
 

@@ -133,6 +133,7 @@ def vfolder_service(
         vfolder_repository=mock_vfolder_repository,
         user_repository=MagicMock(),
         valkey_stat_client=mock_valkey_stat_client,
+        db=MagicMock(),
     )
 
 

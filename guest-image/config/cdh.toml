@@ -3,3 +3,6 @@ socket = "unix:///run/confidential-containers/cdh.sock"
 [kbc]
 name = "cc_kbc"
 url = "@KBS_URL@"
+
+[image]
+extra_root_certificates = ["""@REGISTRY_CA@"""]

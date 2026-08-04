@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import io
 from collections.abc import Mapping, Sequence
 from pathlib import Path, PurePosixPath
 from typing import Any, TypeVar, cast
@@ -29,7 +30,12 @@ from ai.backend.client.output.fields import vfolder_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
 from ai.backend.client.pagination import fetch_paginated_result
 from ai.backend.client.request import Request
-from ai.backend.common.cc_storage import EncryptingReader, decrypt_file, stored_len
+from ai.backend.common.cc_storage import (
+    CipherPaths,
+    EncryptingReader,
+    decrypt_file,
+    stored_len,
+)
 from ai.backend.common.types import ResultSet
 
 from .base import BaseFunction, api_function
@@ -439,14 +445,14 @@ class VFolderByName(BaseFunction):
                 f"Downloading {file_path.name} failed after {max_retries} retries"
             ) from e
 
-    async def _cipher(self):
+    async def _cipher(self) -> CipherPaths | None:
         if getattr(self, "_cipher_paths", "unset") == "unset":
             acquired = await cc.acquire(self, None)
             self._cipher_paths = acquired[0] if acquired else None
             self._release = acquired[1] if acquired else None
         return self._cipher_paths
 
-    async def _remote(self, path, *, create: bool = False) -> str:
+    async def _remote(self, path: str | Path | PurePosixPath, *, create: bool = False) -> str:
         paths = await self._cipher()
         return str(path) if paths is None else await paths.resolve(str(path), create=create)
 
@@ -540,12 +546,13 @@ class VFolderByName(BaseFunction):
                 upload_url = URL(overriden_url).with_query(params)
             tus_client = client.TusClient()
             if basedir:
-                input_file = (base_path / file_path).open("rb")
+                plain_file = (base_path / file_path).open("rb")
             else:
-                input_file = Path(file_path).relative_to(base_path).open("rb")
+                plain_file = Path(file_path).relative_to(base_path).open("rb")
             print(f"Uploading {base_path / file_path} via {upload_info['url']} ...")
+            input_file: io.IOBase = plain_file
             if paths is not None:
-                input_file = EncryptingReader(input_file, paths.cipher, file_size)
+                input_file = EncryptingReader(plain_file, paths.cipher, file_size)
             # TODO: refactor out the progress bar
             uploader = tus_client.async_uploader(
                 file_stream=input_file,

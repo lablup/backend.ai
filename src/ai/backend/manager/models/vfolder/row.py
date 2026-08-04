@@ -470,7 +470,9 @@ class VFolderRow(Base):  # type: ignore[misc]
 
 
 @sa.event.listens_for(VFolderRow.encryption_tier, "set", active_history=True)
-def _refuse_tier_change(target, value, previous, initiator) -> None:
+def _refuse_tier_change(
+    target: VFolderRow, value: Any, previous: Any, initiator: Any
+) -> None:
     if previous not in (None, NO_VALUE) and previous != value:
         raise ImmutableEncryptionTier(
             extra_msg=f"folder {target.id} was created at the {previous} tier"

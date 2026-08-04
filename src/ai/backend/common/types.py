@@ -1659,7 +1659,10 @@ class VFolderMount(JSONSerializableMixin):
     @classmethod
     @override
     def from_json(cls, obj: Mapping[str, Any]) -> Self:
-        base = cls.as_trafaret().check(obj)
+        base = dict(cls.as_trafaret().check(obj))
+        fields = base.get("confidential")
+        if fields is not None:
+            base["confidential"] = VFolderConfidential(**fields)
         return cls(**base)
 
     @classmethod
@@ -1695,8 +1698,7 @@ class VFolderMount(JSONSerializableMixin):
         from . import validators as tx
 
         return t.Dict({
-            t.Key("confidential", default=None): t.Null
-            | (VFolderConfidential.as_trafaret() >> (lambda fields: VFolderConfidential(**fields))),
+            t.Key("confidential", default=None): t.Null | VFolderConfidential.as_trafaret(),
             t.Key("name"): t.String,
             t.Key("vfid"): tx.VFolderID,
             t.Key("vfsubpath", default="."): tx.PurePath,

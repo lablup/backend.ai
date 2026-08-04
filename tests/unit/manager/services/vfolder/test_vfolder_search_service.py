@@ -155,6 +155,7 @@ class TestVFolderServiceSearchUserVFolders:
             vfolder_repository=mock_vfolder_repository,
             user_repository=MagicMock(),
             valkey_stat_client=MagicMock(),
+            db=MagicMock(),
         )
 
     @pytest.fixture

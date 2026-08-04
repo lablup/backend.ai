@@ -33,7 +33,9 @@ class _ProxyStore:
 
     async def read(self, path: str) -> bytes:
         try:
-            return await self._client.fetch_file_content(self._volume, self._vfolder_id, f"./{path}")
+            return bytes(
+                await self._client.fetch_file_content(self._volume, self._vfolder_id, f"./{path}")
+            )
         except Exception as e:
             raise FileNotFoundError(path) from e
 

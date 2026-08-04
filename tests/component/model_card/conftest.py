@@ -93,7 +93,7 @@ def model_card_processors(
 ) -> ModelCardProcessors:
     """Real ModelCardProcessors with real RBAC enforcement."""
     repo = ModelCardRepository(database_engine)
-    service = ModelCardService(repo, storage_manager)
+    service = ModelCardService(repo, storage_manager, database_engine)
     return ModelCardProcessors(
         service=service,
         action_monitors=[],

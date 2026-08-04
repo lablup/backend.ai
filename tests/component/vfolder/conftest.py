@@ -126,6 +126,7 @@ def vfolder_processors(
         vfolder_repository=vfolder_repository,
         user_repository=user_repository,
         valkey_stat_client=valkey_clients.stat,
+        db=database_engine,
     )
     return VFolderProcessors(
         service=service,

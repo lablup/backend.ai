@@ -5,6 +5,9 @@ need gzip base64 sha384sum
 
 kbs_url="${BAI_CC_KBS_URL:-}"
 [ -n "$kbs_url" ] || die "BAI_CC_KBS_URL must name the authorisation shim; there is no safe default"
+ca_file="${BAI_CC_REGISTRY_CA:-}"
+[ -r "$ca_file" ] || die "BAI_CC_REGISTRY_CA must point at the registry certificate authority the guest pulls against"
+registry_ca="$(cat "$ca_file")"
 
 blobs="${BAI_CC_OUT}/initdata"
 mkdir -p "$blobs"
@@ -18,7 +21,8 @@ render() {
 		-e "s|@TIME_REANCHOR_INTERVAL@|${BAI_CC_TIME_REANCHOR_INTERVAL}|g" \
 		-e "s|@ALLOW_SUDO@|${BAI_CC_ALLOW_SUDO}|g" \
 		-e "s|@GPU_VBIOS@|${BAI_CC_GPU_VBIOS}|g" \
-		-e "s|@GPU_DRIVER@|${BAI_CC_GPU_DRIVER}|g" "$1"
+		-e "s|@GPU_DRIVER@|${BAI_CC_GPU_DRIVER}|g" "$1" \
+		| awk -v ca="$registry_ca" '{ gsub(/@REGISTRY_CA@/, ca); print }'
 }
 
 emit_key() {

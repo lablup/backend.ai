@@ -85,6 +85,7 @@ def terminator(mock_repository: MagicMock, mock_agent_client_pool: MagicMock) ->
     mock_valkey_schedule = MagicMock()
     return SessionTerminator(
         SessionTerminatorArgs(
+            db=MagicMock(),
             repository=mock_repository,
             agent_client_pool=mock_agent_client_pool,
             valkey_schedule=mock_valkey_schedule,

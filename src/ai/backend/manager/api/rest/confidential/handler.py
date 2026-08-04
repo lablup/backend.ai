@@ -247,23 +247,6 @@ class ConfidentialHandler:
         )
 
 
-def _forwarded(request: web.Request) -> dict[str, str]:
-    return {
-        key: value
-        for key, value in request.headers.items()
-        if key.lower() in RELAYED_REQUEST_HEADERS
-    }
-
-
-def _passthrough(status: int, payload: bytes, headers: dict[str, str]) -> web.Response:
-    return web.Response(
-        status=status,
-        body=payload,
-        headers={
-            key: value for key, value in headers.items() if key.lower() in RELAYED_RESPONSE_HEADERS
-        },
-    )
-
     async def release_folder_key(
         self,
         body: BodyParam[FolderKeyRequest],
@@ -298,3 +281,21 @@ def _passthrough(status: int, payload: bytes, headers: dict[str, str]) -> web.Re
             declared_format=req.request.headers.get(CAPABILITY_HEADER),
         )
         return APIResponse.build(HTTPStatus.OK, _Payload(result=release.to_json()))
+
+
+def _forwarded(request: web.Request) -> dict[str, str]:
+    return {
+        key: value
+        for key, value in request.headers.items()
+        if key.lower() in RELAYED_REQUEST_HEADERS
+    }
+
+
+def _passthrough(status: int, payload: bytes, headers: dict[str, str]) -> web.Response:
+    return web.Response(
+        status=status,
+        body=payload,
+        headers={
+            key: value for key, value in headers.items() if key.lower() in RELAYED_RESPONSE_HEADERS
+        },
+    )
