@@ -82,6 +82,26 @@ class EmptySearchScopeError(RepositoryError, web.HTTPBadRequest):
         )
 
 
+class EntityNotFoundError(RepositoryError, web.HTTPNotFound):
+    """Raised when an ops-backed operation names a row that does not exist.
+
+    The generic repository has no domain to name a more specific error from, so the
+    entity type travels in the message instead. A domain that wants its own error
+    keeps a hand-written repository method.
+    """
+
+    error_type = "https://api.backend.ai/probs/entity-not-found"
+    error_title = "Entity not found."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DATABASE,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
 class RepositoryIntegrityError(RepositoryError, web.HTTPConflict):
     """Base class for integrity constraint violation errors.
 

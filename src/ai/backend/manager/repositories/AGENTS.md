@@ -8,6 +8,11 @@
   `types.py` (SearchScope + SearchResult), `options.py` (QueryCondition/QueryOrder),
   `db_source/db_source.py` (queries). Optional: `creators.py` / `updaters.py` / `purgers.py` / `upserters.py`.
 - Separate out db_source so it is clear which source a Repository uses.
+- Do NOT write a `repository.py` / `db_source.py` for an operation that only hands a spec to
+  ops and converts the row: `repositories/ops/repository.py` already does that for
+  get / search / create / update / purge. Write the spec files and wire `OpsRepository`.
+  Write the method yourself the moment the operation needs a branch, a multi-table write,
+  or its own not-found error.
 
 ## Method naming
 
