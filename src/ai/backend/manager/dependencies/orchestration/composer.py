@@ -137,6 +137,7 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
         # 2. Initialize sokovan orchestrator (independent)
         sokovan_dep = SokovanOrchestratorDependency()
         sokovan_input = SokovanOrchestratorInput(
+            db=setup_input.db,
             scheduler_repository=setup_input.scheduler_repository,
             deployment_repository=setup_input.deployment_repository,
             replica_group_repository=setup_input.replica_group_repository,

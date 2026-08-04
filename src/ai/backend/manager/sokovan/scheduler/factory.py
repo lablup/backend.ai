@@ -10,6 +10,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeySchedu
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.fair_share import FairShareRepository
 from ai.backend.manager.repositories.resource_usage_history import (
     ResourceUsageHistoryRepository,
@@ -105,6 +106,7 @@ from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
 
 
 def create_default_scheduler_components(
+    db: ExtendedAsyncSAEngine,
     repository: SchedulerRepository,
     fair_share_repository: FairShareRepository,
     config_provider: ManagerConfigProvider,
@@ -160,6 +162,7 @@ def create_default_scheduler_components(
     # Create launcher
     launcher = SessionLauncher(
         SessionLauncherArgs(
+            db=db,
             repository=repository,
             agent_client_pool=agent_client_pool,
             network_plugin_ctx=network_plugin_ctx,

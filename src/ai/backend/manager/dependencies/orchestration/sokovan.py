@@ -20,6 +20,7 @@ from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.fair_share import FairShareRepository
@@ -59,6 +60,7 @@ class SokovanOrchestratorInput:
     """Input required for sokovan orchestrator setup."""
 
     # Scheduler component dependencies
+    db: ExtendedAsyncSAEngine
     scheduler_repository: SchedulerRepository
     deployment_repository: DeploymentRepository
     replica_group_repository: ReplicaGroupRepository
@@ -117,6 +119,7 @@ class SokovanOrchestratorDependency(
         """
         # Create scheduler components
         scheduler_components = create_default_scheduler_components(
+            setup_input.db,
             setup_input.scheduler_repository,
             setup_input.fair_share_repository,
             setup_input.config_provider,

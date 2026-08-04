@@ -72,7 +72,13 @@ from .kernel import CocoKernel
 from .netns import NetworkConfig, SessionNetwork, SessionNetworkManager
 from .resources import ALLOC_LABEL, encode_allocations, resolve_char_devices
 from .runtime import AbstractRuntimeClient, NerdctlClient, RuntimeConfig
-from .spec import ContainerSpec, MountSpec, build_annotations
+from .spec import (
+    GUEST_ENTRYPOINT,
+    ContainerSpec,
+    MountSpec,
+    build_annotations,
+    guest_sourced_mounts,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -382,6 +388,12 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
         blob = self.blob_store.select(digest)
         cpu_alloc = kernel_obj.resource_spec.allocations.get(DeviceName("cpu"), {})
         cpuset = ",".join(sorted(str(core) for core in cpu_alloc.get(SlotName("cpu"), {})))
+        confidential = self.internal_data.get("confidential") or {}
+        env = dict(kernel_obj.environ)
+        if confidential.get("config_resource"):
+            env["BACKENDAI_CC_CONFIG_URI"] = confidential["config_resource"]
+        if confidential.get("secrets_resource"):
+            env["BACKENDAI_CC_SECRETS_URI"] = confidential["secrets_resource"]
         spec = ContainerSpec(
             name=f"kernel.{self.kernel_id}",
             image=self.image_ref.canonical,
@@ -392,7 +404,8 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
             memory_bytes=self._container_memory,
             cpuset=cpuset,
             dns_servers=self.settings.dns_servers,
-            env=dict(kernel_obj.environ),
+            entrypoint=GUEST_ENTRYPOINT,
+            env=env,
             labels=self._labels(kernel_obj, network),
             annotations=build_annotations(
                 self.settings.blob_annotation_key,
@@ -400,7 +413,7 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
                 self.image_ref.canonical,
             ),
             devices=self._char_devices,
-            mounts=self._mounts,
+            mounts=[*guest_sourced_mounts(), *self._mounts],
         )
         log.info(
             "starting confidential kernel {} on {} with blob {} and devices {}",

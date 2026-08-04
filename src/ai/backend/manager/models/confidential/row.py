@@ -31,7 +31,9 @@ class ConfidentialReferenceValueRow(Base):  # type: ignore[misc]
         "measurements", pgsql.JSONB(), nullable=False
     )
     pipeline_signature: Mapped[str] = mapped_column("pipeline_signature", sa.Text, nullable=False)
-    registered_by: Mapped[str] = mapped_column("registered_by", sa.String(length=256), nullable=False)
+    registered_by: Mapped[str] = mapped_column(
+        "registered_by", sa.String(length=256), nullable=False
+    )
     state: Mapped[ReferenceValueState] = mapped_column(
         "state",
         StrEnumType(ReferenceValueState),
@@ -72,11 +74,11 @@ class ConfidentialSessionResourceRow(Base):  # type: ignore[misc]
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    session_id: Mapped[uuid.UUID] = mapped_column(
-        "session_id", GUID, nullable=False, index=True
-    )
+    session_id: Mapped[uuid.UUID] = mapped_column("session_id", GUID, nullable=False, index=True)
     endpoint: Mapped[str] = mapped_column("endpoint", sa.String(length=1024), nullable=False)
-    resource_path: Mapped[str] = mapped_column("resource_path", sa.String(length=512), nullable=False)
+    resource_path: Mapped[str] = mapped_column(
+        "resource_path", sa.String(length=512), nullable=False
+    )
     kind: Mapped[SessionResourceKind] = mapped_column(
         "kind", StrEnumType(SessionResourceKind), nullable=False
     )
@@ -86,7 +88,9 @@ class ConfidentialSessionResourceRow(Base):  # type: ignore[misc]
     deleted_at: Mapped[datetime | None] = mapped_column(
         "deleted_at", sa.DateTime(timezone=True), nullable=True
     )
-    __table_args__ = (sa.UniqueConstraint("endpoint", "resource_path", name="uq_conf_resource_path"),)
+    __table_args__ = (
+        sa.UniqueConstraint("endpoint", "resource_path", name="uq_conf_resource_path"),
+    )
 
 
 class ConfidentialNonceRow(Base):  # type: ignore[misc]
@@ -110,6 +114,16 @@ class ConfidentialNonceRow(Base):  # type: ignore[misc]
     )
 
 
+class ConfidentialGuestClaimRow(Base):  # type: ignore[misc]
+    __tablename__ = "confidential_guest_claims"
+    nonce: Mapped[str] = mapped_column("nonce", sa.String(length=128), primary_key=True)
+    guest: Mapped[str] = mapped_column("guest", sa.String(length=128), primary_key=True)
+    session_id: Mapped[uuid.UUID] = mapped_column("session_id", GUID, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+    )
+
+
 class ConfidentialDecisionRow(Base):  # type: ignore[misc]
     __tablename__ = "confidential_decisions"
     id: Mapped[uuid.UUID] = mapped_column(
@@ -128,7 +142,9 @@ class ConfidentialDecisionRow(Base):  # type: ignore[misc]
     verdict: Mapped[DecisionVerdict] = mapped_column(
         "verdict", StrEnumType(DecisionVerdict), nullable=False, index=True
     )
-    resource_path: Mapped[str] = mapped_column("resource_path", sa.String(length=512), nullable=False)
+    resource_path: Mapped[str] = mapped_column(
+        "resource_path", sa.String(length=512), nullable=False
+    )
     measurement: Mapped[str | None] = mapped_column("measurement", sa.Text, nullable=True)
     failing_clause: Mapped[str | None] = mapped_column("failing_clause", sa.Text, nullable=True)
     session_id: Mapped[uuid.UUID | None] = mapped_column("session_id", GUID, nullable=True)
@@ -138,7 +154,9 @@ class ConfidentialDecisionRow(Base):  # type: ignore[misc]
 class ConfidentialMeasuredBlobRow(Base):  # type: ignore[misc]
     __tablename__ = "confidential_measured_blobs"
     endpoint: Mapped[str] = mapped_column("endpoint", sa.String(length=1024), primary_key=True)
-    image_digest: Mapped[str] = mapped_column("image_digest", sa.String(length=256), primary_key=True)
+    image_digest: Mapped[str] = mapped_column(
+        "image_digest", sa.String(length=256), primary_key=True
+    )
     profile_version: Mapped[str] = mapped_column(
         "profile_version", sa.String(length=64), primary_key=True
     )

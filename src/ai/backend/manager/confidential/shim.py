@@ -4,11 +4,14 @@ import base64
 import binascii
 import json
 import uuid
-from typing import Any, Final
+from http.cookies import SimpleCookie
+from typing import Any, Final, cast
 
 import sqlalchemy as sa
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.engine import CursorResult
 
 from ai.backend.manager.confidential.broker import BrokerClient, BrokerTarget
 from ai.backend.manager.errors.confidential import (
@@ -20,13 +23,14 @@ from ai.backend.manager.errors.confidential import (
 from ai.backend.manager.metrics.confidential import ConfidentialMetricObserver
 from ai.backend.manager.models.confidential.row import (
     ConfidentialDecisionRow,
+    ConfidentialGuestClaimRow,
     ConfidentialNonceRow,
 )
 from ai.backend.manager.models.confidential.types import DecisionActor, DecisionVerdict
 from ai.backend.manager.models.scaling_group.types import ConfidentialScalingGroupOpts
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-NONCE_HEADER: Final = "X-BackendAI-CC-Nonce"
+RCAR_SESSION_COOKIE: Final = "kbs-session-id"
 RELAYED_REQUEST_HEADERS: Final = frozenset({"content-type", "accept", "user-agent", "cookie"})
 RELAYED_RESPONSE_HEADERS: Final = frozenset({"content-type", "set-cookie", "www-authenticate"})
 
@@ -52,6 +56,20 @@ def _report_body(evidence: Any) -> bytes | None:
         elif isinstance(node, list):
             stack.extend(node)
     return None
+
+
+def path_nonce(resource_path: str) -> str | None:
+    segments = resource_path.split("/")
+    return segments[2] if len(segments) > 3 else None
+
+
+def rcar_session(headers: dict[str, str]) -> str | None:
+    jar: SimpleCookie = SimpleCookie()
+    for key, value in headers.items():
+        if key.lower() == "cookie":
+            jar.load(value)
+    morsel = jar.get(RCAR_SESSION_COOKIE)
+    return morsel.value if morsel is not None else None
 
 
 def presented_measurement(body: bytes | None) -> str | None:
@@ -94,9 +112,9 @@ class AuthorisationShim:
         ConfidentialMetricObserver.instance().observe_decision(actor, verdict)
 
     async def authorise_session_path(
-        self, domain_name: str, session_id: uuid.UUID, resource_path: str
+        self, domain_name: str, session_id: uuid.UUID, nonce: str, resource_path: str
     ) -> str:
-        expected_prefix = f"{domain_name}/{session_id}/"
+        expected_prefix = f"{domain_name}/{session_id}/{nonce}/"
         tail = resource_path.removeprefix(expected_prefix)
         refusal: str | None = None
         if not resource_path.startswith(expected_prefix):
@@ -149,21 +167,49 @@ class AuthorisationShim:
             )
             return claimed.scalar_one_or_none()
 
-    async def _release_claim(self, nonce: str) -> None:
+    async def _release_claim(self, nonce: str, guest: str) -> None:
         async with self._db.begin_session() as db_session:
+            await db_session.execute(
+                sa.delete(ConfidentialGuestClaimRow).where(
+                    (ConfidentialGuestClaimRow.nonce == nonce)
+                    & (ConfidentialGuestClaimRow.guest == guest)
+                )
+            )
             await db_session.execute(
                 sa.update(ConfidentialNonceRow)
                 .where(
-                    (ConfidentialNonceRow.nonce == nonce)
-                    & (ConfidentialNonceRow.claims_used > 0)
+                    (ConfidentialNonceRow.nonce == nonce) & (ConfidentialNonceRow.claims_used > 0)
                 )
                 .values(claims_used=ConfidentialNonceRow.claims_used - 1)
             )
 
+    async def _consume(self, nonce: str, guest: str) -> tuple[uuid.UUID, bool]:
+        async with self._db.begin_readonly_session() as db_session:
+            recorded = await db_session.scalar(
+                sa.select(ConfidentialGuestClaimRow.session_id).where(
+                    (ConfidentialGuestClaimRow.nonce == nonce)
+                    & (ConfidentialGuestClaimRow.guest == guest)
+                )
+            )
+        if recorded is not None:
+            return recorded, False
+        session_id = await self._claim(nonce)
+        if session_id is None:
+            raise NonceQuotaExhausted(extra_msg="no claim slot remains for this session nonce")
+        async with self._db.begin_session() as db_session:
+            inserted = await db_session.execute(
+                pg_insert(ConfidentialGuestClaimRow)
+                .values(nonce=nonce, guest=guest, session_id=session_id)
+                .on_conflict_do_nothing()
+            )
+        if cast(CursorResult[Any], inserted).rowcount == 0:
+            await self._release_claim(nonce, guest)
+            return session_id, False
+        return session_id, True
+
     async def relay_attest(
         self,
         opts: ConfidentialScalingGroupOpts,
-        nonce: str,
         body: bytes,
         headers: dict[str, str],
     ) -> tuple[int, bytes, dict[str, str]]:
@@ -172,30 +218,16 @@ class AuthorisationShim:
         except (ValueError, UnicodeDecodeError):
             evidence = None
         measurement = presented_measurement(_report_body(evidence))
-        session_id = await self._claim(nonce)
-        if session_id is None:
-            await self.record(
-                actor=DecisionActor.GUEST,
-                verdict=DecisionVerdict.DENIED,
-                resource_path="/kbs/v0/attest",
-                measurement=measurement,
-                failing_clause="launch-nonce claim quota exhausted or nonce unknown",
-                nonce=nonce,
-            )
-            raise NonceQuotaExhausted(extra_msg="no claim slot remains for this session nonce")
         try:
             status, payload, resp_headers = await self._broker.relay(
                 BrokerTarget.of(opts), "POST", "/kbs/v0/attest", body=body, headers=headers
             )
         except BrokerUnreachable:
-            await self._release_claim(nonce)
             await self.record(
                 actor=DecisionActor.GUEST,
                 verdict=DecisionVerdict.UNREACHABLE,
                 resource_path="/kbs/v0/attest",
                 measurement=measurement,
-                session_id=session_id,
-                nonce=nonce,
             )
             raise
         await self.record(
@@ -204,8 +236,6 @@ class AuthorisationShim:
             resource_path="/kbs/v0/attest",
             measurement=measurement,
             failing_clause=None if status < 400 else payload[:512].decode("utf-8", "replace"),
-            session_id=session_id,
-            nonce=nonce,
         )
         return status, payload, resp_headers
 
@@ -214,22 +244,48 @@ class AuthorisationShim:
         opts: ConfidentialScalingGroupOpts,
         resource_path: str,
         headers: dict[str, str],
-        nonce: str | None,
     ) -> tuple[int, bytes, dict[str, str]]:
-        target = BrokerTarget.of(opts)
+        nonce = path_nonce(resource_path)
+        guest = rcar_session(headers)
+        session_id: uuid.UUID | None = None
+        consumed = False
+        if nonce is not None:
+            if guest is None:
+                await self.record(
+                    actor=DecisionActor.GUEST,
+                    verdict=DecisionVerdict.DENIED,
+                    resource_path=resource_path,
+                    failing_clause="the fetch carried no attested session identifier to claim under",
+                    nonce=nonce,
+                )
+                raise ShimRefusal(extra_msg="an unattested fetch cannot claim a session nonce")
+            try:
+                session_id, consumed = await self._consume(nonce, guest)
+            except NonceQuotaExhausted:
+                await self.record(
+                    actor=DecisionActor.GUEST,
+                    verdict=DecisionVerdict.DENIED,
+                    resource_path=resource_path,
+                    failing_clause="launch-nonce claim quota exhausted or nonce unknown",
+                    nonce=nonce,
+                )
+                raise
         try:
             status, payload, resp_headers = await self._broker.relay(
-                target,
+                BrokerTarget.of(opts),
                 "GET",
                 f"/kbs/v0/resource/{resource_path}",
                 body=None,
                 headers=headers,
             )
         except BrokerUnreachable:
+            if consumed and nonce is not None and guest is not None:
+                await self._release_claim(nonce, guest)
             await self.record(
                 actor=DecisionActor.GUEST,
                 verdict=DecisionVerdict.UNREACHABLE,
                 resource_path=resource_path,
+                session_id=session_id,
                 nonce=nonce,
             )
             raise
@@ -238,6 +294,7 @@ class AuthorisationShim:
             verdict=DecisionVerdict.ALLOWED if status < 400 else DecisionVerdict.DENIED,
             resource_path=resource_path,
             failing_clause=None if status < 400 else payload[:512].decode("utf-8", "replace"),
+            session_id=session_id,
             nonce=nonce,
         )
         return status, payload, resp_headers

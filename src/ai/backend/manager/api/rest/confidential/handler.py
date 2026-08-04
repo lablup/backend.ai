@@ -22,7 +22,6 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.confidential.plane import ConfidentialPlane, verify_capability
 from ai.backend.manager.confidential.references import DEFAULT_COEXISTENCE
 from ai.backend.manager.confidential.shim import (
-    NONCE_HEADER,
     RELAYED_REQUEST_HEADERS,
     RELAYED_RESPONSE_HEADERS,
 )
@@ -48,9 +47,7 @@ class ScalingGroupPath(BaseRequestModel):
 
 class ResourcePath(BaseRequestModel):
     scaling_group: str
-    repository: str
-    type: str
-    tag: str
+    resource_path: str
 
 
 class CapabilityRequest(BaseRequestModel):
@@ -109,11 +106,8 @@ class ConfidentialHandler:
         self, path: PathParam[ScalingGroupPath], ctx: RequestCtx
     ) -> web.Response:
         opts = await self._plane.opts_of(path.parsed.scaling_group)
-        nonce = ctx.request.headers.get(NONCE_HEADER)
-        if not nonce:
-            raise ShimRefusal(extra_msg=f"{NONCE_HEADER} is required on the attest leg")
         status, payload, headers = await self._plane.shim.relay_attest(
-            opts, nonce, await ctx.request.read(), _forwarded(ctx.request)
+            opts, await ctx.request.read(), _forwarded(ctx.request)
         )
         return _passthrough(status, payload, headers)
 
@@ -121,10 +115,7 @@ class ConfidentialHandler:
         parsed = path.parsed
         opts = await self._plane.opts_of(parsed.scaling_group)
         status, payload, headers = await self._plane.shim.relay_release(
-            opts,
-            f"{parsed.repository}/{parsed.type}/{parsed.tag}",
-            _forwarded(ctx.request),
-            ctx.request.headers.get(NONCE_HEADER),
+            opts, parsed.resource_path, _forwarded(ctx.request)
         )
         return _passthrough(status, payload, headers)
 
@@ -140,9 +131,7 @@ class ConfidentialHandler:
             HTTPStatus.OK, _Payload(result=confidential_capability_view(parsed.confidential))
         )
 
-    async def register_reference_value(
-        self, body: BodyParam[ReferenceValueRequest]
-    ) -> APIResponse:
+    async def register_reference_value(self, body: BodyParam[ReferenceValueRequest]) -> APIResponse:
         parsed = body.parsed
         opts = await self._plane.opts_of(parsed.scaling_group)
         row = await self._plane.references.register(
@@ -158,7 +147,9 @@ class ConfidentialHandler:
         content_hash = await self._plane.policy.compose_and_upload(opts)
         return APIResponse.build(
             HTTPStatus.CREATED,
-            _Payload(result={"reference_value_id": str(row.id), "policy_content_hash": content_hash}),
+            _Payload(
+                result={"reference_value_id": str(row.id), "policy_content_hash": content_hash}
+            ),
         )
 
     async def drain_reference_value(self, body: BodyParam[DrainRequest]) -> APIResponse:
@@ -171,10 +162,12 @@ class ConfidentialHandler:
             await self._plane.provisioner.teardown(opts, session_id)
         return APIResponse.build(
             HTTPStatus.OK,
-            _Payload(result={
-                "policy_content_hash": content_hash,
-                "drained_sessions": [str(s) for s in affected],
-            }),
+            _Payload(
+                result={
+                    "policy_content_hash": content_hash,
+                    "drained_sessions": [str(s) for s in affected],
+                }
+            ),
         )
 
     async def publish_blob(self, body: BodyParam[BlobRequest]) -> APIResponse:
@@ -193,11 +186,13 @@ class ConfidentialHandler:
         content_hash = await self._plane.policy.compose_and_upload(opts)
         return APIResponse.build(
             HTTPStatus.OK,
-            _Payload(result={
-                "expires_at": row.expires_at.isoformat(),
-                "disclosure": row.disclosure,
-                "policy_content_hash": content_hash,
-            }),
+            _Payload(
+                result={
+                    "expires_at": row.expires_at.isoformat(),
+                    "disclosure": row.disclosure,
+                    "policy_content_hash": content_hash,
+                }
+            ),
         )
 
     async def list_decisions(self, body: BodyParam[DecisionQuery]) -> APIResponse:
@@ -213,21 +208,23 @@ class ConfidentialHandler:
             rows = (await db_session.scalars(stmt.limit(parsed.limit))).all()
         return APIResponse.build(
             HTTPStatus.OK,
-            _Payload(result={
-                "decisions": [
-                    {
-                        "occurred_at": row.occurred_at.isoformat(),
-                        "actor": row.actor.value,
-                        "verdict": row.verdict.value,
-                        "resource_path": row.resource_path,
-                        "measurement": row.measurement,
-                        "failing_clause": row.failing_clause,
-                        "session_id": str(row.session_id) if row.session_id else None,
-                        "nonce": row.nonce,
-                    }
-                    for row in rows
-                ]
-            }),
+            _Payload(
+                result={
+                    "decisions": [
+                        {
+                            "occurred_at": row.occurred_at.isoformat(),
+                            "actor": row.actor.value,
+                            "verdict": row.verdict.value,
+                            "resource_path": row.resource_path,
+                            "measurement": row.measurement,
+                            "failing_clause": row.failing_clause,
+                            "session_id": str(row.session_id) if row.session_id else None,
+                            "nonce": row.nonce,
+                        }
+                        for row in rows
+                    ]
+                }
+            ),
         )
 
 

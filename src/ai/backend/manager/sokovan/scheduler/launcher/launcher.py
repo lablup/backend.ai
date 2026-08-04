@@ -9,7 +9,9 @@ from itertools import groupby
 from typing import Any
 from uuid import UUID
 
+import aiohttp
 import async_timeout
+import sqlalchemy as sa
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -30,6 +32,8 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentClientPool
+from ai.backend.manager.confidential.payloads import configuration_bundle, secrets_bundle
+from ai.backend.manager.confidential.plane import ConfidentialPlane
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.sokovan import (
     ImageConfigData,
@@ -39,11 +43,16 @@ from ai.backend.manager.data.sokovan import (
     SessionDataForStart,
 )
 from ai.backend.manager.defs import START_SESSION_TIMEOUT_SEC
+from ai.backend.manager.errors.confidential import ConfidentialCapabilityRefused
 from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
 )
+from ai.backend.manager.models.confidential.types import SessionResourceKind
 from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
@@ -55,11 +64,28 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 @dataclass
 class SessionLauncherArgs:
+    db: ExtendedAsyncSAEngine
     repository: SchedulerRepository
     agent_client_pool: AgentClientPool
     network_plugin_ctx: NetworkPluginContext
     config_provider: ManagerConfigProvider
     valkey_schedule: ValkeyScheduleClient
+
+
+def _kernel_environ(
+    base: Mapping[str, str], kernel: KernelBindingData, image: ImageConfig
+) -> dict[str, str]:
+    return {
+        **base,
+        "BACKENDAI_KERNEL_ID": str(kernel.kernel_id),
+        "BACKENDAI_KERNEL_IMAGE": kernel.image,
+        "BACKENDAI_CLUSTER_ROLE": kernel.cluster_role,
+        "BACKENDAI_CLUSTER_IDX": str(kernel.cluster_idx),
+        "BACKENDAI_CLUSTER_LOCAL_RANK": str(kernel.local_rank),
+        "BACKENDAI_CLUSTER_HOST": kernel.cluster_hostname
+        or f"{kernel.cluster_role}{kernel.cluster_idx}",
+        "BACKENDAI_SERVICE_PORTS": str(image.get("labels", {}).get("ai.backend.service-ports", "")),
+    }
 
 
 class SessionLauncher:
@@ -80,6 +106,8 @@ class SessionLauncher:
     _phase_metrics: SchedulerPhaseMetricObserver
 
     def __init__(self, args: SessionLauncherArgs) -> None:
+        self._db = args.db
+        self._confidential: ConfidentialPlane | None = None
         self._repository = args.repository
         self._agent_client_pool = args.agent_client_pool
         self._network_plugin_ctx = args.network_plugin_ctx
@@ -298,6 +326,10 @@ class SessionLauncher:
             for img_id, img_cfg in image_configs.items():
                 image_configs_by_id[img_id] = img_cfg.to_image_config(AutoPullBehavior.DIGEST)
 
+            confidential = await self._provision_confidential(
+                session, environ, ssh_keypair, image_configs_by_id
+            )
+
             # Create kernels on each agent
             async def create_kernels_on_agent(
                 agent_id: AgentId,
@@ -332,6 +364,9 @@ class SessionLauncher:
                     cluster_idx = k.cluster_idx
                     local_rank = k.local_rank
                     cluster_hostname = k.cluster_hostname or f"{cluster_role}{cluster_idx}"
+                    internal_data = dict(k.internal_data or {})
+                    if k.kernel_id in confidential:
+                        internal_data["confidential"] = confidential[k.kernel_id]
 
                     # Build proper KernelCreationConfig matching registry.py format
                     kernel_config: KernelCreationConfig = {
@@ -352,20 +387,7 @@ class SessionLauncher:
                         "supplementary_gids": k.gids or [],
                         "resource_slots": k.requested_slots.to_json(),
                         "resource_opts": k.resource_opts or {},
-                        "environ": {
-                            **environ,
-                            "BACKENDAI_KERNEL_ID": kernel_id_str,
-                            "BACKENDAI_KERNEL_IMAGE": image_str,
-                            "BACKENDAI_CLUSTER_ROLE": cluster_role,
-                            "BACKENDAI_CLUSTER_IDX": str(cluster_idx),
-                            "BACKENDAI_CLUSTER_LOCAL_RANK": str(local_rank),
-                            "BACKENDAI_CLUSTER_HOST": cluster_hostname,
-                            "BACKENDAI_SERVICE_PORTS": str(
-                                kernel_image_config.get("labels", {}).get(
-                                    "ai.backend.service-ports", ""
-                                )
-                            ),
-                        },
+                        "environ": _kernel_environ(environ, k, kernel_image_config),
                         "mounts": [
                             m.to_json() if hasattr(m, "to_json") else m for m in k.vfolder_mounts
                         ],
@@ -373,7 +395,7 @@ class SessionLauncher:
                         "idle_timeout": int(idle_timeout),
                         "bootstrap_script": k.bootstrap_script,
                         "startup_command": k.startup_command,
-                        "internal_data": k.internal_data,
+                        "internal_data": internal_data,
                         "auto_pull": kernel_image_config.get("auto_pull", AutoPullBehavior.DIGEST),
                         "preopen_ports": k.preopen_ports or [],
                         "allocated_host_ports": [],  # Will be populated by agent
@@ -558,6 +580,85 @@ class SessionLauncher:
             network_config=network_config,
             cluster_ssh_port_mapping=cluster_ssh_port_mapping,
         )
+
+    async def _provision_confidential(
+        self,
+        session: SessionDataForStart,
+        base_environ: Mapping[str, str],
+        ssh_keypair: ClusterSSHKeyPair,
+        image_configs_by_id: Mapping[UUID, ImageConfig],
+    ) -> dict[KernelId, dict[str, Any]]:
+        async with self._db.begin_readonly_session() as db_session:
+            group = await db_session.get(ScalingGroupRow, session.kernels[0].scaling_group)
+            if group is None or not group.confidential.enabled:
+                return {}
+            opts = group.confidential
+            domain_name = await db_session.scalar(
+                sa.select(SessionRow.domain_name).where(SessionRow.id == session.session_id)
+            )
+        if domain_name is None:
+            raise ConfidentialCapabilityRefused(
+                extra_msg=f"session {session.session_id} carries no domain to scope resources under"
+            )
+        if self._confidential is None:
+            self._confidential = ConfidentialPlane(self._db, aiohttp.ClientSession())
+        plane = self._confidential
+        images = {
+            k.kernel_id: image_configs_by_id[k.image_id]
+            for k in session.kernels
+            if k.image_id is not None and k.image_id in image_configs_by_id
+        }
+        digest = images[session.kernels[0].kernel_id]["digest"]
+        profile = next(
+            (
+                row.profile_version
+                for row in await plane.references.admissible(opts.broker_endpoint)
+                if row.image_digest == digest
+            ),
+            None,
+        )
+        if profile is None:
+            raise ConfidentialCapabilityRefused(
+                extra_msg=f"no admissible reference value covers image digest {digest}"
+            )
+        resources: dict[str, tuple[SessionResourceKind, bytes]] = {}
+        for kernel in session.kernels:
+            resources[f"config-{kernel.kernel_id}"] = (
+                SessionResourceKind.SESSION_CONFIG,
+                configuration_bundle(
+                    _kernel_environ(base_environ, kernel, images[kernel.kernel_id])
+                ),
+            )
+            secrets = secrets_bundle(ssh_keypair, kernel.internal_data or {})
+            if secrets is not None:
+                resources[f"secrets-{kernel.kernel_id}"] = (
+                    SessionResourceKind.SESSION_SECRETS,
+                    secrets,
+                )
+        provisioning = await plane.provisioner.provision(
+            opts,
+            session_id=session.session_id,
+            domain_name=domain_name,
+            image_digest=digest,
+            profile_version=profile,
+            member_count=len(session.kernels),
+            resources=resources,
+        )
+        log.info(
+            "confidential: provisioned {} resources for session {} under quota {}",
+            len(provisioning.resource_paths),
+            session.session_id,
+            provisioning.quota,
+        )
+        return {
+            kernel.kernel_id: {
+                "config_resource": provisioning.path_of(f"config-{kernel.kernel_id}"),
+                "secrets_resource": provisioning.path_of(f"secrets-{kernel.kernel_id}"),
+                "shim_url": provisioning.shim_url,
+                "residual": provisioning.residual,
+            }
+            for kernel in session.kernels
+        }
 
     async def _create_cluster_ssh_keypair(self) -> ClusterSSHKeyPair:
         """

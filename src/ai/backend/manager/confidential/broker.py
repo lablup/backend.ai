@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import base64
 import json
 import logging
@@ -81,7 +80,7 @@ class BrokerClient:
                         extra_msg=f"{target.endpoint} rejected {path}: {payload[:512]!r}"
                     )
                 return payload
-        except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as e:
+        except (aiohttp.ClientError, TimeoutError, OSError) as e:
             raise BrokerUnreachable(extra_msg=f"{target.endpoint} unreachable: {e}") from e
 
     async def put_resource(self, target: BrokerTarget, resource_path: str, payload: bytes) -> None:
@@ -142,5 +141,5 @@ class BrokerClient:
                         extra_msg=f"{target.endpoint} answered {resp.status} for {path}"
                     )
                 return resp.status, payload, dict(resp.headers)
-        except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as e:
+        except (aiohttp.ClientError, TimeoutError, OSError) as e:
             raise BrokerUnreachable(extra_msg=f"{target.endpoint} unreachable: {e}") from e

@@ -19,7 +19,7 @@ def register_confidential_shim_routes(
     reg.add("POST", "/{scaling_group}/kbs/v0/attest", handler.relay_attest)
     reg.add(
         "GET",
-        "/{scaling_group}/kbs/v0/resource/{repository}/{type}/{tag}",
+        "/{scaling_group}/kbs/v0/resource/{resource_path:.+}",
         handler.relay_resource,
     )
     return reg

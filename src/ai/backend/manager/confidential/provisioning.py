@@ -13,6 +13,7 @@ import sqlalchemy as sa
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.confidential.admission import check_admission_belt
 from ai.backend.manager.confidential.broker import BrokerClient, BrokerTarget
+from ai.backend.manager.confidential.payloads import TIME_RESOURCE, attested_time
 from ai.backend.manager.confidential.shim import AuthorisationShim
 from ai.backend.manager.errors.confidential import BrokerUnreachable
 from ai.backend.manager.metrics.confidential import ConfidentialMetricObserver
@@ -45,6 +46,9 @@ class SessionProvisioning:
     shim_url: str
     resource_paths: list[str]
     residual: str = NONCE_RESIDUAL_DISCLOSURE
+
+    def path_of(self, tag: str) -> str | None:
+        return next((p for p in self.resource_paths if p.rsplit("/", 1)[-1] == tag), None)
 
 
 class SessionResourceProvisioner:
@@ -79,10 +83,11 @@ class SessionResourceProvisioner:
         )
         nonce = secrets.token_urlsafe(24)
         target = BrokerTarget.of(opts)
+        await self._broker.put_resource(target, TIME_RESOURCE, attested_time())
         written: list[str] = []
         for tag, (kind, payload) in resources.items():
             path = await self._shim.authorise_session_path(
-                domain_name, session_id, f"{domain_name}/{session_id}/{tag}"
+                domain_name, session_id, nonce, f"{domain_name}/{session_id}/{nonce}/{tag}"
             )
             await self._broker.put_resource(target, path, payload)
             written.append(path)
@@ -104,9 +109,7 @@ class SessionResourceProvisioner:
             )
         async with self._db.begin_session() as db_session:
             await db_session.execute(
-                sa.delete(ConfidentialNonceRow).where(
-                    ConfidentialNonceRow.session_id == session_id
-                )
+                sa.delete(ConfidentialNonceRow).where(ConfidentialNonceRow.session_id == session_id)
             )
             db_session.add(
                 ConfidentialNonceRow(
@@ -153,9 +156,7 @@ class SessionResourceProvisioner:
             destroyed += 1
         async with self._db.begin_session() as db_session:
             await db_session.execute(
-                sa.delete(ConfidentialNonceRow).where(
-                    ConfidentialNonceRow.session_id == session_id
-                )
+                sa.delete(ConfidentialNonceRow).where(ConfidentialNonceRow.session_id == session_id)
             )
         return destroyed
 

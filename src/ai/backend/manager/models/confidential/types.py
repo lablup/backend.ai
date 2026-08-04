@@ -22,6 +22,8 @@ class DecisionVerdict(enum.StrEnum):
 
 
 class SessionResourceKind(enum.StrEnum):
+    SESSION_CONFIG = "session-config"
+    SESSION_SECRETS = "session-secrets"
     NONCE_BINDING = "nonce-binding"
     MOUNT_PLAN = "mount-plan"
     FOLDER_KEY = "folder-key"

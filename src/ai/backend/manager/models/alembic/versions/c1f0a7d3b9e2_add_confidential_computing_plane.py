@@ -89,6 +89,15 @@ def upgrade() -> None:
         ),
     )
     op.create_table(
+        "confidential_guest_claims",
+        sa.Column("nonce", sa.String(length=128), primary_key=True),
+        sa.Column("guest", sa.String(length=128), primary_key=True),
+        sa.Column("session_id", GUID, nullable=False, index=True),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+    )
+    op.create_table(
         "confidential_decisions",
         sa.Column("id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")),
         sa.Column(
@@ -134,6 +143,7 @@ def downgrade() -> None:
     op.drop_table("confidential_tcb_grace")
     op.drop_table("confidential_measured_blobs")
     op.drop_table("confidential_decisions")
+    op.drop_table("confidential_guest_claims")
     op.drop_table("confidential_nonces")
     op.drop_table("confidential_session_resources")
     op.drop_table("confidential_policy_journal")

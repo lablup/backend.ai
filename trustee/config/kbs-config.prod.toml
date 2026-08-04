@@ -34,7 +34,7 @@ authorization_mode = "AuthenticatedAuthorization"
 
   [admin.authorization.regex_acl]
   acls = [
-    { role = "session-provisioner", allowed_endpoints = "^/kbs/v0/resource/[^/]+/[^/]+/[^/]+$" },
+    { role = "session-provisioner", allowed_endpoints = "^/kbs/v0/resource/[^/]+/[^/]+(/[^/]+)?/[^/]+$" },
     { role = "policy-publisher", allowed_endpoints = "^/kbs/v0/(resource-policy|reference-value)$" },
   ]
 

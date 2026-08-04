@@ -3,6 +3,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 IMAGE_NAME_ANNOTATION = "io.kubernetes.cri.image-name"
+GUEST_ENTRYPOINT = "/opt/kernel/bai-cc-entrypoint"
+GUEST_SOURCED_PATHS = ("/opt/backend.ai", "/opt/kernel", "/run/backend.ai")
 
 
 @dataclass(frozen=True)
@@ -23,6 +25,7 @@ class ContainerSpec:
     memory_bytes: int
     cpuset: str
     dns_servers: Sequence[str]
+    entrypoint: str = ""
     env: Mapping[str, str] = field(default_factory=dict)
     labels: Mapping[str, str] = field(default_factory=dict)
     annotations: Mapping[str, str] = field(default_factory=dict)
@@ -44,6 +47,8 @@ class ContainerSpec:
             "--stop-signal",
             "SIGINT",
         ]
+        if self.entrypoint:
+            args += ["--entrypoint", self.entrypoint]
         if self.memory_bytes > 0:
             args += ["--memory", str(self.memory_bytes)]
         if self.cpuset:
@@ -66,6 +71,10 @@ class ContainerSpec:
         args.append(self.image)
         args += list(self.command)
         return args
+
+
+def guest_sourced_mounts() -> list[MountSpec]:
+    return [MountSpec(Path(path), Path(path), True) for path in GUEST_SOURCED_PATHS]
 
 
 def build_annotations(
