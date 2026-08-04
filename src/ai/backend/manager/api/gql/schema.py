@@ -1080,10 +1080,6 @@ schema = CustomizedSchema(
 )
 
 
-async def _public_ping() -> str:
-    return "pong"
-
-
 @strawberry.type(name="Query")
 class PublicQueries:
     """Query root of the ``public`` subgraph, served without authentication at
@@ -1093,14 +1089,11 @@ class PublicQueries:
     physically absent, so they cannot be queried (no runtime gate needed). A public field belongs
     here and nowhere else: declaring it on ``Query`` as well would let the router resolve it
     against the authenticated subgraph, which answers 401 to an anonymous caller.
-
-    ``public_ping`` is a temporary placeholder so this type is non-empty (GraphQL requires >=1
-    field) and will be replaced by real public fields (e.g. ``publicAppConfigs``).
     """
 
-    public_ping: str = strawberry.field(
-        resolver=_public_ping,
-        description="Placeholder public field; returns 'pong'.",
+    ping: str = strawberry.field(
+        resolver=lambda: "pong",
+        description="Reachable without authentication; returns 'pong'.",
     )
 
 

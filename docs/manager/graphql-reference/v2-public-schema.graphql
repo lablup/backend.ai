@@ -1,0 +1,12 @@
+type Query {
+  _service: _Service!
+
+  """Reachable without authentication; returns 'pong'."""
+  ping: String!
+}
+
+scalar _Any
+
+type _Service {
+  sdl: String!
+}

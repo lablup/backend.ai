@@ -50,13 +50,11 @@ def register_admin_routes(
     # Routing URL of the `public` subgraph, reached by the router rather than by clients. No
     # auth_required, which is what lets an anonymous query resolve; the schema it serves contains
     # only public fields, so private fields are physically absent and cannot be queried.
-    # TODO(BA-6592): re-enable once a real public field exists (PublicQueries currently only has
-    # the public_ping placeholder, nothing safe to expose anonymously).
-    # reg.add(
-    #     "POST",
-    #     "/gql/strawberry/public",
-    #     handler.handle_gql_strawberry_public,
-    # )
+    reg.add(
+        "POST",
+        "/gql/strawberry/public",
+        handler.handle_gql_strawberry_public,
+    )
     reg.add(
         "GET",
         "/gql/strawberry",
