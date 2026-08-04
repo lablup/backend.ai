@@ -232,12 +232,7 @@ class DeleteService[TData]:
 
 
 class UpsertService[TData]:
-    """Inserts or updates on conflict.
-
-    The one service outside the standard six: ``upsert`` is not an
-    ``ActionOperationType``, so it has no slot among create / update, but the write is
-    distinct enough that folding it into either would misreport what ran.
-    """
+    """Inserts or updates on conflict."""
 
     _repository: OpsRepository[TData]
 

@@ -148,11 +148,7 @@ class UpdateOpsAction[TRow: Base, TData](OpsBackendAction):
 
 
 class UpsertOpsAction[TRow: Base, TData](OpsBackendAction):
-    """A create-or-update, the one write outside the standard six.
-
-    ``ActionOperationType`` has no ``upsert``, so the action still declares itself as a
-    create or an update for RBAC and the audit trail; only the write underneath differs.
-    """
+    """A create-or-update."""
 
     @abstractmethod
     def to_upserter(self) -> DataUpserter[TRow, TData]:

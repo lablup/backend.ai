@@ -21,7 +21,6 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.types import EntityData, EntityType, ScopeRef, ScopeType
-from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.permission.types import ScopeType as RBACScopeType
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.common.identifier.role_preset import RolePresetID
@@ -544,11 +543,6 @@ class _SearchPresetsAction(BaseScopeAction, SearchOpsAction[RolePresetRow, _Pres
     @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
-
-    @classmethod
-    @override
-    def required_permission(cls) -> Permission:
-        return Permission.READ
 
 
 class TestSearch:

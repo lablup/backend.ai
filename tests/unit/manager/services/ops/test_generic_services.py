@@ -24,7 +24,6 @@ import sqlalchemy as sa
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.types import EntityData, EntityType, ScopeRef, ScopeType
-from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.actions.types import ActionOperationType
@@ -308,11 +307,6 @@ class _GetAction(BaseSingleEntityAction, GetOpsAction[RolePresetRow, _PresetData
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.GET
 
-    @classmethod
-    @override
-    def required_permission(cls) -> Permission:
-        return Permission.READ
-
 
 @dataclass
 class _DeleteAction(BaseSingleEntityAction, UpdateOpsAction[RolePresetRow, _PresetData]):
@@ -339,11 +333,6 @@ class _DeleteAction(BaseSingleEntityAction, UpdateOpsAction[RolePresetRow, _Pres
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.DELETE
 
-    @classmethod
-    @override
-    def required_permission(cls) -> Permission:
-        return Permission.SOFT_DELETE
-
 
 @dataclass
 class _CreateAction(BaseScopeAction, CreateOpsAction[RolePresetRow, _PresetData]):
@@ -367,11 +356,6 @@ class _CreateAction(BaseScopeAction, CreateOpsAction[RolePresetRow, _PresetData]
     @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
-
-    @classmethod
-    @override
-    def required_permission(cls) -> Permission:
-        return Permission.CREATE
 
 
 @dataclass
@@ -397,11 +381,6 @@ class _UpdateAction(BaseSingleEntityAction, UpdateOpsAction[RolePresetRow, _Pres
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
-    @classmethod
-    @override
-    def required_permission(cls) -> Permission:
-        return Permission.UPDATE
-
 
 @dataclass
 class _PurgeAction(BaseSingleEntityAction, PurgeOpsAction[RolePresetRow, _PresetData]):
@@ -425,11 +404,6 @@ class _PurgeAction(BaseSingleEntityAction, PurgeOpsAction[RolePresetRow, _Preset
     @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.PURGE
-
-    @classmethod
-    @override
-    def required_permission(cls) -> Permission:
-        return Permission.HARD_DELETE
 
 
 @dataclass
@@ -456,11 +430,6 @@ class _UpsertAction(BaseSingleEntityAction, UpsertOpsAction[RolePresetRow, _Pres
     @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
-
-    @classmethod
-    @override
-    def required_permission(cls) -> Permission:
-        return Permission.UPDATE
 
 
 @dataclass(frozen=True)
@@ -519,11 +488,6 @@ class _BulkUpdateAction(BaseBulkAction, BulkUpdateOpsAction[RolePresetRow, _Pres
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
-    @classmethod
-    @override
-    def required_permission(cls) -> Permission:
-        return Permission.UPDATE
-
 
 @dataclass
 class _BulkPurgeAction(BaseBulkAction, BulkPurgeOpsAction[RolePresetRow, _PresetData]):
@@ -546,11 +510,6 @@ class _BulkPurgeAction(BaseBulkAction, BulkPurgeOpsAction[RolePresetRow, _Preset
     @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.PURGE
-
-    @classmethod
-    @override
-    def required_permission(cls) -> Permission:
-        return Permission.HARD_DELETE
 
 
 @dataclass
@@ -576,11 +535,6 @@ class _BulkCreateAction(BaseScopeAction, BulkCreateOpsAction[RolePresetRow, _Pre
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
 
-    @classmethod
-    @override
-    def required_permission(cls) -> Permission:
-        return Permission.CREATE
-
 
 @dataclass
 class _BatchUpdateAction(BaseScopeAction, BatchUpdateOpsAction[RolePresetRow, _PresetData]):
@@ -605,11 +559,6 @@ class _BatchUpdateAction(BaseScopeAction, BatchUpdateOpsAction[RolePresetRow, _P
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
-    @classmethod
-    @override
-    def required_permission(cls) -> Permission:
-        return Permission.UPDATE
-
 
 @dataclass
 class _BatchPurgeAction(BaseScopeAction, BatchPurgeOpsAction[RolePresetRow, _PresetData]):
@@ -633,11 +582,6 @@ class _BatchPurgeAction(BaseScopeAction, BatchPurgeOpsAction[RolePresetRow, _Pre
     @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.PURGE
-
-    @classmethod
-    @override
-    def required_permission(cls) -> Permission:
-        return Permission.HARD_DELETE
 
 
 @dataclass
@@ -667,11 +611,6 @@ class _SearchAction(BaseScopeAction, SearchOpsAction[RolePresetRow, _PresetData]
     @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
-
-    @classmethod
-    @override
-    def required_permission(cls) -> Permission:
-        return Permission.READ
 
 
 # =============================================================================
