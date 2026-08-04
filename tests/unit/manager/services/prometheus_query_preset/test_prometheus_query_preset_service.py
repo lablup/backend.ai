@@ -22,6 +22,7 @@ from ai.backend.common.exception import (
     PrometheusQueryPresetNotFound,
 )
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
+from ai.backend.manager.clients.prometheus.preset import LabelMatcher
 from ai.backend.manager.data.prometheus_query_preset import (
     ExecutePresetOptions,
     PrometheusQueryPresetData,
@@ -257,7 +258,7 @@ class TestPrometheusQueryPresetService:
         mock_repository.get_by_id.assert_called_once_with(preset_data.id)
         mock_prometheus_client.execute_preset.assert_called_once_with(
             query_template=preset_data.query_template,
-            filter_labels={"kernel_id": "test-kernel"},
+            filter_labels={"kernel_id": LabelMatcher.exact("test-kernel")},
             group_labels=["kernel_id"],
             time_window="5m",
             time_range=time_range,

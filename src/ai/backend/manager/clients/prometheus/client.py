@@ -112,22 +112,20 @@ class PrometheusClient:
         self,
         *,
         query_template: str,
-        filter_labels: Mapping[str, str],
+        filter_labels: Mapping[str, LabelMatcher],
         group_labels: Sequence[str],
         time_window: str,
         time_range: QueryTimeRange | None,
+        time: str | None = None,
     ) -> PrometheusResponse:
         metric_preset = MetricPreset(
             template=query_template,
-            labels={
-                label_name: LabelMatcher.exact(label_value)
-                for label_name, label_value in filter_labels.items()
-            },
+            labels=filter_labels,
             group_by=set(group_labels),
             window=time_window,
         )
         if time_range is None:
-            return await self._query_instant(preset=metric_preset)
+            return await self._query_instant(preset=metric_preset, time=time)
         return await self._query_range(
             preset=metric_preset,
             time_range=time_range,
