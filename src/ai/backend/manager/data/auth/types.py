@@ -26,7 +26,7 @@ class AuthorizationResult:
 @dataclass
 class UserData:
     uuid: uuid.UUID
-    username: str | None
+    username: str
     email: str
     password: str | None
     need_password_change: bool

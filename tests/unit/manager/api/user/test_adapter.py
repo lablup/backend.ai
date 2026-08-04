@@ -526,7 +526,7 @@ class TestUserAdapterConversion:
         user_data = UserData(
             id=user_id,
             uuid=user_id,
-            username=None,
+            username="minimal",
             email="minimal@example.com",
             need_password_change=None,
             full_name=None,
@@ -554,7 +554,7 @@ class TestUserAdapterConversion:
 
         assert isinstance(dto, UserDTO)
         assert dto.id == user_id
-        assert dto.username is None
+        assert dto.username == "minimal"
         assert dto.email == "minimal@example.com"
         assert dto.need_password_change is None
         assert dto.full_name is None

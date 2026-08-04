@@ -73,7 +73,7 @@ class SessionOwnerContext:
 class UserData:
     id: UUID = field(compare=False)
     uuid: UUID = field(compare=False)  # legacy
-    username: str | None
+    username: str
     email: str
     need_password_change: bool | None
     full_name: str | None
