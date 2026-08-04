@@ -87,6 +87,7 @@ class StreamService:
             repl_in_port=kernel.repl_in_port,
             repl_out_port=kernel.repl_out_port,
             service_ports=kernel.service_ports or [],
+            channel_vouch=await self._registry.vouch_channel(kernel.id),
         )
 
     async def execute_in_stream(self, action: ExecuteInStreamAction) -> ExecuteInStreamActionResult:

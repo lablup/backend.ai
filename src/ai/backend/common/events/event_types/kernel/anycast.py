@@ -194,3 +194,38 @@ class DoSyncKernelLogsEvent(BaseKernelEvent):
     @override
     def event_name(cls) -> str:
         return "do_sync_kernel_logs"
+
+
+@dataclass
+class SessionChannelActivityAnycastEvent(AbstractAnycastEvent):
+    session_id: SessionId
+    open_circuits: int
+    bytes_moved: int
+    idle_seconds: float
+
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.SESSION
+
+    @override
+    def domain_id(self) -> str | None:
+        return str(self.session_id)
+
+    @override
+    def serialize(self) -> tuple[Any, ...]:
+        return (str(self.session_id), self.open_circuits, self.bytes_moved, self.idle_seconds)
+
+    @classmethod
+    @override
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
+        return cls(SessionId(uuid.UUID(value[0])), int(value[1]), int(value[2]), float(value[3]))
+
+    @override
+    def user_event(self) -> UserEvent | None:
+        return None
+
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "session_channel_activity"

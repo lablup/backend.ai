@@ -45,6 +45,11 @@ class ProxyProtocol(enum.StrEnum):
     RDP = "rdp"
 
 
+class UpstreamScheme(enum.StrEnum):
+    PLAIN = "plain"
+    TLS = "tls"
+
+
 class AppMode(enum.StrEnum):
     INTERACTIVE = "interactive"
     INFERENCE = "inference"
@@ -150,6 +155,19 @@ class RouteInfo(BackendAISchema):
         ),
     ]
     protocol: ProxyProtocol
+    upstream_scheme: Annotated[
+        UpstreamScheme,
+        Field(
+            description=(
+                "Whether the kernel endpoint terminates its own transport security. A worker that"
+                " has not advertised upstream TLS support is never handed a route that names TLS,"
+                " because silently dropping this field would connect in plaintext against a guest"
+                " that expects otherwise."
+            ),
+            validation_alias=AliasChoices("upstream-scheme", "upstream_scheme"),
+            serialization_alias="upstream_scheme",
+        ),
+    ] = UpstreamScheme.PLAIN
     traffic_ratio: Annotated[float, Field(default=1.0)]
 
     @override

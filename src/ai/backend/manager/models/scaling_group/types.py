@@ -41,6 +41,8 @@ class ConfidentialScalingGroupOpts(BackendAISchema):
     metadata_egress_allowlist: list[str] = Field(default_factory=list)
     folder_key_escrow_path: str = ""
     folder_key_escrow_key: str = ""
+    channel_relay_port: int = 6021
+    channel_guest_port: int = 2010
 
     @property
     def confidential_capable(self) -> bool:

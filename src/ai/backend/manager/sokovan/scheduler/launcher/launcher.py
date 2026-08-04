@@ -17,7 +17,9 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
+from ai.backend.common.clients.valkey_client.valkey_schedule.client import (
+    ValkeyScheduleClient,
+)
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AgentId,
@@ -34,7 +36,12 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentClientPool
-from ai.backend.manager.confidential.payloads import configuration_bundle, secrets_bundle
+from ai.backend.manager.confidential.payloads import (
+    ChannelIdentity,
+    channel_identity,
+    configuration_bundle,
+    secrets_bundle,
+)
 from ai.backend.manager.confidential.plane import ConfidentialPlane
 from ai.backend.manager.confidential.storage import folder_key_tag, mount_plan
 from ai.backend.manager.confidential.tunnel import (
@@ -59,6 +66,7 @@ from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
 )
+from ai.backend.manager.models.confidential.row import ConfidentialChannelRow
 from ai.backend.manager.models.confidential.types import SessionResourceKind
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
@@ -641,6 +649,7 @@ class SessionLauncher:
                 )
             )
         resources: dict[str, tuple[SessionResourceKind, bytes]] = {}
+        identities: dict[KernelId, ChannelIdentity] = {}
         if len(session.kernels) > 1:
             resources.update(
                 tunnel_resources([
@@ -684,6 +693,12 @@ class SessionLauncher:
                 SessionResourceKind.MOUNT_PLAN,
                 mount_plan(mounts, scratch_tag),
             )
+            identity = channel_identity(str(session.session_id), str(kernel.kernel_id))
+            identities[kernel.kernel_id] = identity
+            resources[f"channel-{kernel.kernel_id}"] = (
+                SessionResourceKind.CHANNEL_KEY,
+                identity.bundle,
+            )
         provisioning = await plane.provisioner.provision(
             opts,
             session_id=session.session_id,
@@ -693,6 +708,27 @@ class SessionLauncher:
             member_count=len(session.kernels),
             resources=resources,
         )
+        async with self._db.begin_session() as db_session:
+            for kernel in session.kernels:
+                identity = identities[kernel.kernel_id]
+                relay_host = (kernel.agent_addr or "").replace("tcp://", "").split(":", 1)[0]
+                if not relay_host:
+                    raise ConfidentialCapabilityRefused(
+                        extra_msg=f"kernel {kernel.kernel_id} has no agent to relay its channel"
+                    )
+                db_session.add(
+                    ConfidentialChannelRow(
+                        kernel_id=UUID(str(kernel.kernel_id)),
+                        session_id=session.session_id,
+                        endpoint=opts.broker_endpoint,
+                        resource_path=provisioning.path_of(f"channel-{kernel.kernel_id}") or "",
+                        relay_addr=f"{relay_host}:{opts.channel_relay_port}",
+                        channel_port=opts.channel_guest_port,
+                        fingerprint=identity.fingerprint,
+                        token=identity.token,
+                        expires_at=identity.expires_at,
+                    )
+                )
         log.info(
             "confidential: provisioned {} resources for session {} under quota {}",
             len(provisioning.resource_paths),
@@ -704,6 +740,7 @@ class SessionLauncher:
                 "config_resource": provisioning.path_of(f"config-{kernel.kernel_id}"),
                 "secrets_resource": provisioning.path_of(f"secrets-{kernel.kernel_id}"),
                 "mount_plan_resource": provisioning.path_of(f"mount-plan-{kernel.kernel_id}"),
+                "channel_resource": provisioning.path_of(f"channel-{kernel.kernel_id}"),
                 "shim_url": provisioning.shim_url,
                 "residual": provisioning.residual,
                 "tunnel_resource": provisioning.path_of(f"tunnel-{kernel.kernel_id}"),

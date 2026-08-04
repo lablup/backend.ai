@@ -133,6 +133,10 @@ from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 from .handlers.agent import AgentEventHandler
+from ai.backend.common.events.event_types.kernel.anycast import (
+    SessionChannelActivityAnycastEvent,
+)
+
 from .handlers.idle_check import IdleCheckEventHandler
 from .handlers.image import ImageEventHandler
 from .handlers.kernel import KernelEventHandler
@@ -610,6 +614,12 @@ class Dispatchers:
             None,
             self._idle_check_event_handler.handle_do_idle_check,
             name="idle_check",
+        )
+        event_dispatcher.consume(
+            SessionChannelActivityAnycastEvent,
+            None,
+            self._idle_check_event_handler.handle_channel_activity,
+            name="channel_activity",
         )
 
     def _dispatch_notification_events(

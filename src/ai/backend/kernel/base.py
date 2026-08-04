@@ -35,6 +35,7 @@ from jupyter_client.asynchronous.client import AsyncKernelClient
 from jupyter_client.kernelspec import KernelSpecManager
 from jupyter_client.manager import AsyncKernelManager
 
+from . import guestops
 from .compat import current_loop
 from .intrinsic import (
     init_sshd_service,
@@ -44,6 +45,7 @@ from .intrinsic import (
 from .jupyter_client import aexecute_interactive
 from .logging import BraceStyleAdapter, setup_logger, setup_logger_basic
 from .service import ServiceParser
+from .terminator import TransportTerminator
 from .utils import TracebackSourceFilter, scan_proc_stats, wait_local_port_open
 
 logger = logging.getLogger()
@@ -1163,6 +1165,7 @@ class BaseRunner(metaclass=ABCMeta):
         user_input_server = await asyncio.start_unix_server(
             self.handle_user_input, "/tmp/bai-user-input.sock"
         )
+        await guestops.apply_guest_sudo()
         log.debug("initializing krunner...")
         await self._init_with_loop()
         log.debug("initializing jupyter kernel...")
@@ -1206,6 +1209,14 @@ class BaseRunner(metaclass=ABCMeta):
                     exc_info=result,
                 )
 
+        self._terminator = TransportTerminator()
+        try:
+            await self._terminator.start()
+        except Exception:
+            log.exception("refusing to serve the runner protocol without transport security")
+            os.kill(os.getpid(), signal.SIGTERM)
+            raise
+
         log.debug("start serving...")
         op_type = ""
         while True:
@@ -1215,6 +1226,11 @@ class BaseRunner(metaclass=ABCMeta):
                     # maybe some garbage data
                     continue
                 op_type = data[0].decode("ascii")
+                if op_type in guestops.GUEST_VERBS:
+                    guest_task = asyncio.create_task(guestops.serve(self.outsock, op_type, data[1]))
+                    self._background_tasks.add(guest_task)
+                    guest_task.add_done_callback(self._background_tasks.discard)
+                    continue
                 text = data[1].decode("utf8")
                 if op_type == "clean":
                     await self.task_queue.put(partial(self._clean, text))
@@ -1263,6 +1279,7 @@ class BaseRunner(metaclass=ABCMeta):
                 log.exception("main_loop: unexpected error")
                 # we need to continue anyway unless we are shutting down
                 continue
+        await self._terminator.stop()
         user_input_server.close()
         await user_input_server.wait_closed()
         monitor_proc_task.cancel()

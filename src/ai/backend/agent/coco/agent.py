@@ -1,6 +1,8 @@
 import asyncio
 import ipaddress
 import logging
+import signal
+import time
 from collections.abc import Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
@@ -15,7 +17,11 @@ from ai.backend.agent.agent import (
     ScanImagesResult,
 )
 from ai.backend.agent.config.unified import AgentUnifiedConfig
-from ai.backend.agent.errors import ContainerCreationError, UnsupportedResource
+from ai.backend.agent.errors import (
+    ContainerCreationError,
+    KernelNotFoundError,
+    UnsupportedResource,
+)
 from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ai.backend.agent.resources import (
@@ -32,6 +38,9 @@ from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.kernel.anycast import (
+    SessionChannelActivityAnycastEvent,
+)
 from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.types import (
     AutoPullBehavior,
@@ -71,11 +80,14 @@ from .errors import (
     ImageDistroUnresolved,
     ImagePushRefused,
     MultiNodeSessionRefused,
+    HostPrivilegeWriteRefused,
     NetworkSetupFailed,
+    RawCircuitRefused,
     ReleaseNotConfirmed,
 )
 from .kernel import CocoKernel
 from .netns import NetworkConfig, SessionNetwork, SessionNetworkManager
+from .relay import ChannelRelay, Circuit
 from .resources import ALLOC_LABEL, encode_allocations, resolve_char_devices
 from .runtime import AbstractRuntimeClient, NerdctlClient, RuntimeConfig
 from .volumes import BlockVolume, BlockVolumeManager
@@ -96,8 +108,9 @@ IMAGE_LABEL = "ai.backend.coco.image"
 NETWORK_ID_LABEL = "ai.backend.coco.network-id"
 KERNELSPEC_LABEL = "ai.backend.coco.kernelspec"
 
-REPL_IN_PORT = 2000
-REPL_OUT_PORT = 2001
+ACTIVITY_REPORT_INTERVAL = 30.0
+CHANNEL_PORT = 2010
+SELF_ENCRYPTING_SERVICES = frozenset({"sshd"})
 
 
 @dataclass(frozen=True)
@@ -109,6 +122,9 @@ class CocoSettings:
     dns_servers: Sequence[str]
     container_start_timeout: float
     attestation_timeout: float
+    relay_bind_host: str
+    relay_bind_port: int
+    raw_circuit_allowlist: frozenset[str]
     runtime_default_memory: int
     image_memory_allowance: int
     host_overhead_memory: int
@@ -127,6 +143,9 @@ def build_settings(local_config: AgentUnifiedConfig) -> CocoSettings:
         dns_servers=list(section.dns_servers),
         container_start_timeout=section.container_start_timeout,
         attestation_timeout=section.attestation_timeout,
+        relay_bind_host=str(section.relay_bind_addr.host),
+        relay_bind_port=section.relay_bind_addr.port,
+        raw_circuit_allowlist=frozenset(section.raw_circuit_allowlist),
         runtime_default_memory=int(section.runtime_default_memory),
         image_memory_allowance=int(section.image_memory_allowance),
         host_overhead_memory=int(section.host_overhead_memory),
@@ -267,7 +286,7 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
     @property
     @override
     def repl_ports(self) -> Sequence[int]:
-        return (REPL_IN_PORT, REPL_OUT_PORT)
+        return (CHANNEL_PORT,)
 
     @property
     @override
@@ -413,6 +432,14 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
         cpu_alloc = kernel_obj.resource_spec.allocations.get(DeviceName("cpu"), {})
         cpuset = ",".join(sorted(str(core) for core in cpu_alloc.get(SlotName("cpu"), {})))
         confidential = self.internal_data.get("confidential") or {}
+        if self.internal_data.get("sudo_session_enabled"):
+            raise HostPrivilegeWriteRefused(
+                extra_msg=(
+                    f"kernel {self.kernel_id} asked for a per-session root grant; under the"
+                    " confidential runtime that privilege is a measured image property the guest"
+                    " applies to itself, and the host writes nothing into the container"
+                )
+            )
         env = dict(kernel_obj.environ)
         if confidential.get("config_resource"):
             env["BACKENDAI_CC_CONFIG_URI"] = confidential["config_resource"]
@@ -422,6 +449,8 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
             env["BACKENDAI_CC_TUNNEL_URI"] = confidential["tunnel_resource"]
             env["BACKENDAI_CC_PEERS_URI"] = confidential["peers_resource"]
             env["BACKENDAI_CC_TUNNEL_BASE"] = str(network.subnet[2])
+        if confidential.get("channel_resource"):
+            env["BACKENDAI_CC_CHANNEL_URI"] = confidential["channel_resource"]
         plan_resource = confidential.get("mount_plan_resource")
         if not plan_resource:
             raise MountPlanMissing(extra_msg=str(self.kernel_id))
@@ -460,7 +489,7 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
             await self.runtime.start(container_id)
             await self.runtime.wait_running(container_id, self.settings.container_start_timeout)
             await _wait_for_port(
-                str(network.guest_addr), REPL_IN_PORT, self.settings.attestation_timeout
+                str(network.guest_addr), CHANNEL_PORT, self.settings.attestation_timeout
             )
         except Exception as e:
             raise ContainerCreationError(container_id, str(e)) from e
@@ -469,8 +498,13 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
         return {
             "container_id": container_id,
             "kernel_host": str(network.guest_addr),
-            "repl_in_port": REPL_IN_PORT,
-            "repl_out_port": REPL_OUT_PORT,
+            "repl_in_port": 0,
+            "repl_out_port": 0,
+            "channel_port": CHANNEL_PORT,
+            "channel_relay_addr": f"{self.settings.relay_bind_host}:{self.settings.relay_bind_port}",
+            "channel_resource": (self.internal_data.get("confidential") or {}).get(
+                "channel_resource"
+            ),
             "stdin_port": 0,
             "stdout_port": 0,
             "host_ports": [],
@@ -486,6 +520,8 @@ class CocoAgent(AbstractAgent[CocoKernel, CocoKernelCreationContext]):
     network_manager: SessionNetworkManager
     blob_store: MeasuredBlobStore
     volumes: BlockVolumeManager
+    relay: ChannelRelay
+    _metering_task: asyncio.Task[None] | None
 
     @override
     async def __ainit__(self) -> None:
@@ -504,7 +540,61 @@ class CocoAgent(AbstractAgent[CocoKernel, CocoKernelCreationContext]):
             self.settings.scratch_volume_size,
             self.settings.image_store_volume_size,
         )
+        self.relay = ChannelRelay(
+            self.settings.relay_bind_host, self.settings.relay_bind_port, self._resolve_circuit
+        )
+        await self.relay.start()
+        self._metering_task = asyncio.create_task(self._report_activity())
         await super().__ainit__()
+
+    async def _resolve_circuit(self, kernel_id: str, port: int) -> Circuit:
+        kernel_obj = self.kernel_registry.get(KernelId(UUID(kernel_id)))
+        if kernel_obj is None:
+            raise KernelNotFoundError(f"no live kernel {kernel_id} on this agent")
+        if port != CHANNEL_PORT:
+            allowed = {
+                sport["name"]
+                for sport in kernel_obj.service_ports
+                if port in sport["container_ports"]
+            }
+            permitted = self.settings.raw_circuit_allowlist | SELF_ENCRYPTING_SERVICES
+            if not allowed or not (allowed & permitted):
+                raise RawCircuitRefused(
+                    extra_msg=(
+                        f"port {port} on kernel {kernel_id} carries no guest-terminated scheme and"
+                        f" names no self-encrypting service in {sorted(permitted)}"
+                    )
+                )
+        return Circuit(
+            guest_host=str(kernel_obj.data["kernel_host"]),
+            guest_port=port,
+            session_id=str(kernel_obj.session_id),
+        )
+
+    async def _report_activity(self) -> None:
+        while True:
+            await asyncio.sleep(ACTIVITY_REPORT_INTERVAL)
+            now = time.monotonic()
+            for kernel_id, flow in list(self.relay.flows.items()):
+                if KernelId(UUID(kernel_id)) not in self.kernel_registry:
+                    self.relay.forget(kernel_id)
+                    continue
+                await self.anycast_event(
+                    SessionChannelActivityAnycastEvent(
+                        session_id=SessionId(UUID(flow.session_id)),
+                        open_circuits=flow.circuits,
+                        bytes_moved=flow.bytes_in + flow.bytes_out,
+                        idle_seconds=now - flow.last_activity,
+                    )
+                )
+
+    @override
+    async def shutdown(self, stop_signal: signal.Signals) -> None:
+        if self._metering_task is not None:
+            self._metering_task.cancel()
+            self._metering_task = None
+        await self.relay.close()
+        await super().shutdown(stop_signal)
 
     def _rebuild_kernel(self, container: Container) -> CocoKernel | None:
         labels = container.labels
@@ -535,8 +625,9 @@ class CocoAgent(AbstractAgent[CocoKernel, CocoKernelCreationContext]):
                 environ={},
                 data={
                     "kernel_host": guest_addr,
-                    "repl_in_port": REPL_IN_PORT,
-                    "repl_out_port": REPL_OUT_PORT,
+                    "repl_in_port": 0,
+                    "repl_out_port": 0,
+                    "channel_port": CHANNEL_PORT,
                     "stdin_port": 0,
                     "stdout_port": 0,
                     "host_ports": [],
@@ -595,8 +686,7 @@ class CocoAgent(AbstractAgent[CocoKernel, CocoKernelCreationContext]):
                     image=str((entry.get("Config") or {}).get("Image", "")),
                     labels=labels,
                     ports=[
-                        Port(guest_addr, REPL_IN_PORT, REPL_IN_PORT),
-                        Port(guest_addr, REPL_OUT_PORT, REPL_OUT_PORT),
+                        Port(guest_addr, CHANNEL_PORT, CHANNEL_PORT),
                     ],
                     backend_obj=entry,
                 ),
@@ -710,6 +800,7 @@ class CocoAgent(AbstractAgent[CocoKernel, CocoKernelCreationContext]):
         if container_id is not None:
             await self.runtime.delete(str(container_id), force=True)
         await self.volumes.release(kernel_id)
+        self.relay.forget(str(kernel_id))
         if restarting or session_id is None:
             return
         await self.network_manager.destroy(kernel_id, session_id)

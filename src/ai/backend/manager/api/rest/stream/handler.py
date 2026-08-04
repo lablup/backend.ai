@@ -41,6 +41,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.utils import call_non_bursty
 from ai.backend.manager.api.wsproxy import TCPProxy
 from ai.backend.manager.dto.context import RequestCtx
+from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.kernel import InvalidStreamMode
 from ai.backend.manager.errors.resource import AppNotFound, NoCurrentTaskContext
@@ -164,6 +165,14 @@ class StreamHandler:
             kernel_host = result.kernel_host
         repl_in_port = result.repl_in_port
         repl_out_port = result.repl_out_port
+        if result.channel_vouch is not None:
+            raise NotImplementedAPI(
+                extra_msg=(
+                    "This session terminates its own transport security inside the guest, so the"
+                    " manager holds no plaintext leg to stream through. Dial the vouched channel"
+                    " directly; the run loop, resize and ping are the client's from here on."
+                )
+            )
 
         ws = web.WebSocketResponse(max_msg_size=self.config_provider.config.manager.max_wsmsg_size)
         await ws.prepare(request)

@@ -101,6 +101,9 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.appproxy.types import CreateEndpointRequestBody
+from ai.backend.common.kernel_runner import CHANNEL_PROTOCOL_VERSION
+from ai.backend.manager.confidential.channel import ConfidentialChannel
+from ai.backend.manager.models.confidential.row import ConfidentialChannelRow
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageIdentifier
@@ -311,6 +314,7 @@ class AgentRegistry:
         self.valkey_live = valkey_live
         self.valkey_image = valkey_image
         self.event_producer = event_producer
+        self._channel = ConfidentialChannel(db, event_producer)
         self._event_hub = event_hub
         self.storage_manager = storage_manager
         self.hook_plugin_ctx = hook_plugin_ctx
@@ -1549,6 +1553,26 @@ class AgentRegistry:
             else:
                 pass
 
+    async def _confidential(self, kernel_id: KernelId) -> ConfidentialChannel | None:
+        async with self.db.begin_readonly_session() as db_session:
+            row = await db_session.get(ConfidentialChannelRow, uuid.UUID(str(kernel_id)))
+        return self._channel if row is not None else None
+
+    async def vouch_channel(self, kernel_id: KernelId) -> dict[str, Any] | None:
+        if await self._confidential(kernel_id) is None:
+            return None
+        row = await self._channel.vouch(kernel_id)
+        return {
+            "protocol": CHANNEL_PROTOCOL_VERSION,
+            "relay_addr": row.relay_addr,
+            "channel_port": row.channel_port,
+            "kernel_id": str(kernel_id),
+            "certificate_fingerprint": row.fingerprint,
+            "token": row.token,
+            "expires_at": row.expires_at.isoformat(),
+            "vouched_by": "manager",
+        }
+
     async def execute(
         self,
         session: SessionRow,
@@ -1566,6 +1590,16 @@ class AgentRegistry:
             major_api_version = api_version[0]
             if major_api_version == 4:  # manager-agent protocol is same.
                 major_api_version = 3
+            if (channel := await self._confidential(session.main_kernel.id)) is not None:
+                return await channel.execute(
+                    session.main_kernel.id,
+                    run_id,
+                    mode,
+                    code,
+                    opts=opts,
+                    api_version=major_api_version,
+                    flush_timeout=flush_timeout if flush_timeout is not None else 2.0,
+                )
             agent_id = session.main_kernel.agent
             if agent_id is None:
                 raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")
@@ -1602,6 +1636,8 @@ class AgentRegistry:
         session: SessionRow,
     ) -> Mapping[str, Any]:
         async with handle_session_exception("execute"):
+            if (channel := await self._confidential(session.main_kernel.id)) is not None:
+                return await channel.interrupt(session.main_kernel.id)
             agent_id = session.main_kernel.agent
             if agent_id is None:
                 raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")
@@ -1616,6 +1652,8 @@ class AgentRegistry:
     ) -> CodeCompletionResp:
         async with handle_session_exception("execute"):
             # NOTE: Callosum serialize all inputs to dict and upack all array inputs to tuples
+            if (channel := await self._confidential(session.main_kernel.id)) is not None:
+                return await channel.get_completions(session.main_kernel.id, text, opts)
             agent_id = session.main_kernel.agent
             if agent_id is None:
                 raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")
@@ -1631,6 +1669,10 @@ class AgentRegistry:
         opts: Mapping[str, Any],
     ) -> Mapping[str, Any]:
         async with handle_session_exception("execute"):
+            if (channel := await self._confidential(main_kernel_id)) is not None:
+                return await channel.start_service(
+                    main_kernel_id, {"name": service, "options": opts}
+                )
             async with self._agent_client_pool.acquire(agent_id) as client:
                 return await client.start_service(main_kernel_id, service, opts)
 
@@ -1640,6 +1682,9 @@ class AgentRegistry:
         service: str,
     ) -> None:
         async with handle_session_exception("shutdown_service"):
+            if (channel := await self._confidential(session.main_kernel.id)) is not None:
+                await channel.shutdown_service(session.main_kernel.id, service)
+                return None
             agent_id = session.main_kernel.agent
             if agent_id is None:
                 raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")
@@ -1653,6 +1698,9 @@ class AgentRegistry:
         payload: bytes,
     ) -> Mapping[str, Any]:
         async with handle_session_exception("upload_file"):
+            if (channel := await self._confidential(session.main_kernel.id)) is not None:
+                await channel.upload_file(session.main_kernel.id, filename, payload)
+                return {}
             agent_id = session.main_kernel.agent
             if agent_id is None:
                 raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")
@@ -1666,6 +1714,8 @@ class AgentRegistry:
     ) -> bytes:
         kernel = session.main_kernel
         async with handle_session_exception("download_file"):
+            if (channel := await self._confidential(kernel.id)) is not None:
+                return await channel.download_file(kernel.id, filepath)
             agent_id = kernel.agent
             if agent_id is None:
                 raise AgentNotAllocated(f"Kernel {kernel.id} has no agent allocated")
@@ -1680,6 +1730,8 @@ class AgentRegistry:
     ) -> bytes:
         kernel = session.main_kernel
         async with handle_session_exception("download_single"):
+            if (channel := await self._confidential(kernel.id)) is not None:
+                return await channel.download_single(kernel.id, filepath)
             agent_id = kernel.agent
             if agent_id is None:
                 raise AgentNotAllocated(f"Kernel {kernel.id} has no agent allocated")
@@ -1692,6 +1744,8 @@ class AgentRegistry:
         path: str,
     ) -> Mapping[str, Any]:
         async with handle_session_exception("list_files"):
+            if (channel := await self._confidential(session.main_kernel.id)) is not None:
+                return await channel.list_files(session.main_kernel.id, path)
             agent_id = session.main_kernel.agent
             if agent_id is None:
                 raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")

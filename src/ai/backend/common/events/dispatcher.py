@@ -40,7 +40,11 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
-from .reporter import AbstractEventReporter, CompleteEventReportArgs, PrepareEventReportArgs
+from .reporter import (
+    AbstractEventReporter,
+    CompleteEventReportArgs,
+    PrepareEventReportArgs,
+)
 from .types import AbstractAnycastEvent, AbstractBroadcastEvent, AbstractEvent
 
 __all__ = (

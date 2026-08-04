@@ -2260,6 +2260,30 @@ class ConfidentialConfig(BaseConfigSchema):
             added_version="26.7.0",
         ),
     ]
+    relay_bind_addr: Annotated[
+        HostPortPair,
+        Field(default=HostPortPair(host="0.0.0.0", port=6021)),
+        BackendAIConfigMeta(
+            description=(
+                "Where the blind channel relay accepts circuits. One port serves every session on"
+                " the node; the guests' own ports never leave their namespaces."
+            ),
+            added_version="26.7.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    raw_circuit_allowlist: Annotated[
+        list[str],
+        Field(default_factory=lambda: ["sshd"]),
+        BackendAIConfigMeta(
+            description=(
+                "Service names whose own protocol encrypts end to end, and which may therefore be"
+                " relayed as raw circuits. Everything else must terminate its own transport"
+                " security inside the guest."
+            ),
+            added_version="26.7.0",
+        ),
+    ]
     runtime_default_memory: Annotated[
         BinarySizeField,
         Field(default=BinarySize.from_str("2g")),
