@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from secrets import token_bytes
 from collections import defaultdict
 from collections.abc import Awaitable, Mapping
 from dataclasses import dataclass
@@ -29,11 +30,13 @@ from ai.backend.common.types import (
     KernelCreationConfig,
     KernelId,
     SessionId,
+    VFolderMount,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.confidential.payloads import configuration_bundle, secrets_bundle
 from ai.backend.manager.confidential.plane import ConfidentialPlane
+from ai.backend.manager.confidential.storage import folder_key_tag, mount_plan
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.sokovan import (
     ImageConfigData,
@@ -43,7 +46,10 @@ from ai.backend.manager.data.sokovan import (
     SessionDataForStart,
 )
 from ai.backend.manager.defs import START_SESSION_TIMEOUT_SEC
-from ai.backend.manager.errors.confidential import ConfidentialCapabilityRefused
+from ai.backend.manager.errors.confidential import (
+    ConfidentialCapabilityRefused,
+    FolderEncryptionMissing,
+)
 from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
@@ -629,12 +635,31 @@ class SessionLauncher:
                     _kernel_environ(base_environ, kernel, images[kernel.kernel_id])
                 ),
             )
-            secrets = secrets_bundle(ssh_keypair, kernel.internal_data or {})
-            if secrets is not None:
+            bundle = secrets_bundle(ssh_keypair, kernel.internal_data or {})
+            if bundle is not None:
                 resources[f"secrets-{kernel.kernel_id}"] = (
                     SessionResourceKind.SESSION_SECRETS,
-                    secrets,
+                    bundle,
                 )
+            mounts = [
+                m if isinstance(m, VFolderMount) else VFolderMount.from_json(m)
+                for m in (kernel.vfolder_mounts or [])
+            ]
+            for mount in mounts:
+                if mount.confidential is None:
+                    raise FolderEncryptionMissing(
+                        extra_msg=f"folder {mount.name} of session {session.session_id}"
+                    )
+                resources[folder_key_tag(mount.vfid)] = (
+                    SessionResourceKind.FOLDER_KEY,
+                    plane.custodian.release(opts, domain_name, mount.vfid),
+                )
+            scratch_tag = f"scratch-key-{kernel.kernel_id}"
+            resources[scratch_tag] = (SessionResourceKind.FOLDER_KEY, token_bytes(32))
+            resources[f"mount-plan-{kernel.kernel_id}"] = (
+                SessionResourceKind.MOUNT_PLAN,
+                mount_plan(mounts, scratch_tag),
+            )
         provisioning = await plane.provisioner.provision(
             opts,
             session_id=session.session_id,
@@ -654,6 +679,7 @@ class SessionLauncher:
             kernel.kernel_id: {
                 "config_resource": provisioning.path_of(f"config-{kernel.kernel_id}"),
                 "secrets_resource": provisioning.path_of(f"secrets-{kernel.kernel_id}"),
+                "mount_plan_resource": provisioning.path_of(f"mount-plan-{kernel.kernel_id}"),
                 "shim_url": provisioning.shim_url,
                 "residual": provisioning.residual,
             }

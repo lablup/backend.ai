@@ -174,6 +174,7 @@ def create_default_scheduler_components(
     # Create terminator
     terminator = SessionTerminator(
         SessionTerminatorArgs(
+            db=db,
             repository=repository,
             agent_client_pool=agent_client_pool,
             valkey_schedule=valkey_schedule,

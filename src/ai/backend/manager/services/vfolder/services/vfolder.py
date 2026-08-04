@@ -30,8 +30,10 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.confidential.plane import ConfidentialPlane
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.group.types import ProjectResourceInfo
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
     VFolderCreateParams,
@@ -225,7 +227,10 @@ class VFolderService:
         vfolder_repository: VfolderRepository,
         user_repository: UserRepository,
         valkey_stat_client: ValkeyStatClient,
+        db: ExtendedAsyncSAEngine,
     ) -> None:
+        self._db = db
+        self._confidential: ConfidentialPlane | None = None
         self._config_provider = config_provider
         self._etcd = etcd
         self._storage_manager = storage_manager
@@ -408,6 +413,7 @@ class VFolderService:
                 )
         except aiohttp.ClientResponseError as e:
             raise VFolderCreationFailure from e
+        await self._mint_folder_key(domain_name, vfid)
 
         # By default model store VFolder should be considered as read only for every users but without the creator
         if group_type == ProjectType.MODEL_STORE:
@@ -677,6 +683,21 @@ class VFolderService:
         await self._vfolder_repository.restore_vfolders_from_trash([vfolder_data.id])
         return RestoreVFolderFromTrashActionResult(vfolder_uuid=action.vfolder_uuid)
 
+    async def _plane(self) -> ConfidentialPlane:
+        if self._confidential is None:
+            self._confidential = ConfidentialPlane(self._db, aiohttp.ClientSession())
+        return self._confidential
+
+    async def _mint_folder_key(self, domain_name: str, vfid: VFolderID) -> None:
+        plane = await self._plane()
+        for opts in (await plane.confidential_endpoints()).values():
+            await plane.custodian.mint(opts, domain_name, vfid)
+
+    async def _destroy_folder_key(self, domain_name: str, vfid: VFolderID) -> None:
+        plane = await self._plane()
+        for opts in (await plane.confidential_endpoints()).values():
+            await plane.custodian.revoke(opts, domain_name, vfid)
+
     async def _remove_vfolder_from_storage(self, vfolder_data: VFolderData) -> None:
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
@@ -711,6 +732,9 @@ class VFolderService:
         )
         if result.failures:
             raise result.failures[0].exception
+        await self._destroy_folder_key(
+            user.domain_name, VFolderID(vfolder_data.quota_scope_id, vfolder_data.id)
+        )
         await self._remove_vfolder_from_storage(vfolder_data)
         return DeleteForeverVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 

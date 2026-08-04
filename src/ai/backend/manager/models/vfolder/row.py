@@ -59,6 +59,7 @@ from ai.backend.manager.defs import (
     RESERVED_VFOLDERS,
     VFOLDER_DSTPATHS_MAP,
 )
+from ai.backend.manager.confidential.storage import describe
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.storage import (
@@ -1128,6 +1129,7 @@ async def prepare_vfolder_mounts(
                 str(PurePosixPath(requested_vfolder_subpaths[requested_key])),
             )
             mount_base_path = PurePosixPath(mount_path_result["path"])
+            mount_export = mount_path_result.get("export")
         except VFolderOperationFailed as e:
             raise InvalidAPIParameters(e.extra_msg, e.extra_data) from None
         if (_vfname := vfolder["name"]) in VFOLDER_DSTPATHS_MAP:
@@ -1156,6 +1158,11 @@ async def prepare_vfolder_mounts(
                     kernel_path=PurePosixPath("/home/work/.local"),
                     mount_perm=vfolder["permission"],
                     usage_mode=vfolder["usage_mode"],
+                    confidential=describe(
+                        mount_export,
+                        user_scope.domain_name,
+                        VFolderID(vfolder["quota_scope_id"], vfolder["id"]),
+                    ),
                 )
             )
         else:
@@ -1197,6 +1204,7 @@ async def prepare_vfolder_mounts(
                     kernel_path=kernel_path,
                     mount_perm=mount_perm,
                     usage_mode=vfolder["usage_mode"],
+                    confidential=describe(mount_export, user_scope.domain_name, vfid),
                 )
             )
 

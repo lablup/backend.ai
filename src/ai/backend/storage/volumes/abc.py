@@ -256,6 +256,20 @@ class AbstractVolume(metaclass=ABCMeta):
         return target_path
 
     @final
+    def export_coordinates(self, mount_path: Path) -> dict[str, str] | None:
+        transport = self.config.get("export_transport")
+        server = self.config.get("export_server")
+        root = self.config.get("export_root")
+        if not (transport and server and root):
+            return None
+        relative = Path(mount_path).resolve().relative_to(Path(self.mount_path).resolve())
+        return {
+            "transport": str(transport),
+            "source": f"{server}:{PurePosixPath(root) / relative}",
+            "options": str(self.config.get("export_options") or ""),
+        }
+
+    @final
     def strip_vfpath(self, vfid: VFolderID, target_path: Path) -> PurePosixPath:
         vfpath = self.mangle_vfpath(vfid).resolve()
         return PurePosixPath(target_path.relative_to(vfpath))

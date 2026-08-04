@@ -53,6 +53,7 @@ from ai.backend.common.types import (
     ServicePort,
     SessionId,
     SlotName,
+    VFolderMount,
     current_resource_slots,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -60,6 +61,11 @@ from ai.backend.logging import BraceStyleAdapter
 from .blob import MeasuredBlobStore
 from .errors import (
     AcceleratorHooksRefused,
+    FolderEncryptionMissing,
+    HostLogFolderRefused,
+    MountPlanMissing,
+    StorageBindRefused,
+    UnmanagedFolderRefused,
     FractionalAcceleratorRefused,
     HostConfigReadbackRefused,
     ImageDistroUnresolved,
@@ -72,6 +78,7 @@ from .kernel import CocoKernel
 from .netns import NetworkConfig, SessionNetwork, SessionNetworkManager
 from .resources import ALLOC_LABEL, encode_allocations, resolve_char_devices
 from .runtime import AbstractRuntimeClient, NerdctlClient, RuntimeConfig
+from .volumes import BlockVolume, BlockVolumeManager
 from .spec import (
     GUEST_ENTRYPOINT,
     ContainerSpec,
@@ -105,6 +112,9 @@ class CocoSettings:
     runtime_default_memory: int
     image_memory_allowance: int
     host_overhead_memory: int
+    block_volume_root: Path
+    scratch_volume_size: int
+    image_store_volume_size: int
 
 
 def build_settings(local_config: AgentUnifiedConfig) -> CocoSettings:
@@ -120,6 +130,9 @@ def build_settings(local_config: AgentUnifiedConfig) -> CocoSettings:
         runtime_default_memory=int(section.runtime_default_memory),
         image_memory_allowance=int(section.image_memory_allowance),
         host_overhead_memory=int(section.host_overhead_memory),
+        block_volume_root=section.block_volume_root,
+        scratch_volume_size=int(section.scratch_volume_size),
+        image_store_volume_size=int(section.image_store_volume_size),
     )
 
 
@@ -185,7 +198,9 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
         blob_store: MeasuredBlobStore,
         runtime: AbstractRuntimeClient,
         network_manager: SessionNetworkManager,
+        volumes: BlockVolumeManager,
     ) -> None:
+        self.volumes = volumes
         super().__init__(
             ownership_data,
             event_producer,
@@ -204,6 +219,7 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
         self._container_memory = 0
         self._mounts: list[MountSpec] = []
         self._char_devices: list[Path] = []
+        self._block_volumes: list[BlockVolume] = []
 
     @override
     async def get_extra_envs(self) -> Mapping[str, str]:
@@ -242,7 +258,7 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
 
     @override
     async def prepare_scratch(self) -> None:
-        pass
+        self._block_volumes = await self.volumes.provision(self.kernel_id)
 
     @override
     async def get_intrinsic_mounts(self) -> Sequence[Mount]:
@@ -271,16 +287,24 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
         pass
 
     @override
+    async def mount_vfolders(
+        self, vfolders: Sequence[VFolderMount], resource_spec: KernelResourceSpec
+    ) -> None:
+        for vfolder in vfolders:
+            if vfolder.name == ".logs":
+                raise HostLogFolderRefused(extra_msg=str(vfolder.kernel_path))
+            descriptor = vfolder.confidential
+            if descriptor is None or not descriptor.key_path:
+                raise FolderEncryptionMissing(extra_msg=f"{vfolder.name} -> {vfolder.kernel_path}")
+            if not descriptor.source:
+                raise UnmanagedFolderRefused(extra_msg=f"{vfolder.name} at {vfolder.host_path}")
+
+    @override
     async def process_mounts(self, mounts: Sequence[Mount]) -> None:
-        self._mounts = [
-            MountSpec(
-                Path(mount.source),
-                Path(mount.target),
-                mount.permission is MountPermission.READ_ONLY,
+        for mount in mounts:
+            raise StorageBindRefused(
+                extra_msg=f"{mount.type.value} {mount.source} -> {mount.target}"
             )
-            for mount in mounts
-            if mount.type is MountTypes.BIND and mount.source is not None
-        ]
 
     @override
     async def mount_krunner(
@@ -394,6 +418,10 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
             env["BACKENDAI_CC_CONFIG_URI"] = confidential["config_resource"]
         if confidential.get("secrets_resource"):
             env["BACKENDAI_CC_SECRETS_URI"] = confidential["secrets_resource"]
+        plan_resource = confidential.get("mount_plan_resource")
+        if not plan_resource:
+            raise MountPlanMissing(extra_msg=str(self.kernel_id))
+        env["BACKENDAI_CC_MOUNT_PLAN_URI"] = plan_resource
         spec = ContainerSpec(
             name=f"kernel.{self.kernel_id}",
             image=self.image_ref.canonical,
@@ -413,6 +441,7 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
                 self.image_ref.canonical,
             ),
             devices=self._char_devices,
+            block_devices=[(v.loop, v.guest_path) for v in self._block_volumes],
             mounts=[*guest_sourced_mounts(), *self._mounts],
         )
         log.info(
@@ -452,6 +481,7 @@ class CocoAgent(AbstractAgent[CocoKernel, CocoKernelCreationContext]):
     runtime: AbstractRuntimeClient
     network_manager: SessionNetworkManager
     blob_store: MeasuredBlobStore
+    volumes: BlockVolumeManager
 
     @override
     async def __ainit__(self) -> None:
@@ -465,6 +495,11 @@ class CocoAgent(AbstractAgent[CocoKernel, CocoKernelCreationContext]):
         )
         self.network_manager = SessionNetworkManager(build_network_config(self.local_config))
         self.blob_store = MeasuredBlobStore(self.settings.blob_store_path)
+        self.volumes = BlockVolumeManager(
+            self.settings.block_volume_root,
+            self.settings.scratch_volume_size,
+            self.settings.image_store_volume_size,
+        )
         await super().__ainit__()
 
     def _rebuild_kernel(self, container: Container) -> CocoKernel | None:
@@ -642,6 +677,7 @@ class CocoAgent(AbstractAgent[CocoKernel, CocoKernelCreationContext]):
             blob_store=self.blob_store,
             runtime=self.runtime,
             network_manager=self.network_manager,
+            volumes=self.volumes,
         )
 
     async def _session_id_of(self, kernel_id: KernelId) -> SessionId | None:
@@ -669,6 +705,7 @@ class CocoAgent(AbstractAgent[CocoKernel, CocoKernelCreationContext]):
         session_id = await self._session_id_of(kernel_id)
         if container_id is not None:
             await self.runtime.delete(str(container_id), force=True)
+        await self.volumes.release(kernel_id)
         if restarting or session_id is None:
             return
         await self.network_manager.destroy(kernel_id, session_id)

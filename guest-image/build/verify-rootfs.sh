@@ -12,6 +12,7 @@ for path in \
 	usr/bin/gocryptfs usr/bin/fusermount3 usr/bin/kata-agent \
 	opt/backend.ai/bin/python opt/kernel/entrypoint.sh opt/kernel/bai-cc-entrypoint \
 	opt/kernel/su-exec opt/kernel/dropbearmulti usr/local/bin/bai-guest-boot \
+	usr/local/bin/bai-guest-storage sbin/mkfs.ext4 sbin/dmsetup \
 	usr/lib/systemd/system/bai-guest-boot.service
 do
 	if [ -e "${stage}/${path}" ] || [ -e "${stage}/usr/${path}" ]; then

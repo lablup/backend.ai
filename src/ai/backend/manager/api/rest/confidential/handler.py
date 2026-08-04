@@ -71,6 +71,10 @@ class DrainRequest(BaseRequestModel):
     reference_value_id: uuid.UUID
 
 
+class EscrowRestoreRequest(BaseRequestModel):
+    scaling_group: str
+
+
 class BlobRequest(BaseRequestModel):
     scaling_group: str
     image_digest: str
@@ -169,6 +173,13 @@ class ConfidentialHandler:
                 }
             ),
         )
+
+    async def restore_folder_keys(
+        self, body: BodyParam[EscrowRestoreRequest]
+    ) -> APIResponse:
+        opts = await self._plane.opts_of(body.parsed.scaling_group)
+        restored = await self._plane.custodian.restore(opts)
+        return APIResponse.build(HTTPStatus.OK, _Payload(result={"restored_keys": restored}))
 
     async def publish_blob(self, body: BodyParam[BlobRequest]) -> APIResponse:
         parsed = body.parsed

@@ -4,6 +4,7 @@ set -eu
 export LD_LIBRARY_PATH="/opt/backend.ai/lib:${LD_LIBRARY_PATH:-}"
 
 /opt/backend.ai/bin/python -s /opt/kernel/bai_cc_bootstrap.py
+/opt/backend.ai/bin/python -s /usr/local/bin/bai-guest-storage
 
 while IFS='=' read -r key value; do
   [ -n "$key" ] || continue

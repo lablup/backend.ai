@@ -29,7 +29,8 @@ verify:
 		-in $(OUT)/build-manifest.json -sigfile $(OUT)/build-manifest.json.sig
 	for f in $(BUILD)/*.sh; do bash -n "$$f" || exit 1; done
 	bash -n overlay/opt/kernel/bai-cc-entrypoint
-	python3 -m py_compile overlay/opt/kernel/bai_cc_bootstrap.py overlay/usr/local/bin/bai-guest-boot
+	python3 -m py_compile overlay/opt/kernel/bai_cc_bootstrap.py overlay/usr/local/bin/bai-guest-boot \
+		overlay/usr/local/bin/bai-guest-storage
 
 clean:
 	rm -rf $(OUT)
