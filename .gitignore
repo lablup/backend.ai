@@ -164,3 +164,7 @@ backup.*.json
 /INSTALL-INFO
 .serena/
 .claude/worktrees/
+
+# Rust storage format crate
+/rust/target/
+/rust/*/pkg/

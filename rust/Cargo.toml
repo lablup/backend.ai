@@ -1,0 +1,24 @@
+[workspace]
+resolver = "2"
+members = [
+    "bai-storage-format",
+    "bai-storage-corpus",
+    "bai-storage-format-python",
+    "bai-storage-format-wasm",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "LGPL-3.0-or-later"
+
+[workspace.dependencies]
+bai-storage-format = { path = "bai-storage-format" }
+base64 = { version = "0.22", default-features = false, features = ["alloc"] }
+chacha20 = "0.10"
+chacha20poly1305 = { version = "0.11", default-features = false, features = ["alloc"] }
+getrandom = "0.2"
+hkdf = "0.13"
+hmac = "0.13"
+sha2 = { version = "0.11", default-features = false }
+subtle = { version = "2.6", default-features = false }
