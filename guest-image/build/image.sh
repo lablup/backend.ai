@@ -22,7 +22,7 @@ hash_bytes=$(align_up $(( data_bytes / 128 + data_bytes / 16384 + 1048576 )) $((
 [ "$hash_bytes" -ge 4194304 ] || hash_bytes=4194304
 
 truncate -s "$data_bytes" "${work}/data.img"
-mkfs.ext4 -q -F -b "$bs" -m 3 -O ^has_journal \
+mkfs.ext4 -q -F -b "$bs" -m 3 \
 	-U "${BAI_CC_FS_UUID}" -E "hash_seed=${BAI_CC_FS_HASH_SEED}" \
 	-d "$stage" "${work}/data.img" "$data_blocks"
 
