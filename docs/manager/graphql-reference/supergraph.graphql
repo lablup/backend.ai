@@ -8933,6 +8933,7 @@ scalar join__FieldSet
 
 enum join__Graph {
   GRAPHENE @join__graph(name: "graphene", url: "http://host.docker.internal:8091/admin/gql")
+  PUBLIC @join__graph(name: "public", url: "http://host.docker.internal:8091/admin/gql/strawberry/public")
   STRAWBERRY @join__graph(name: "strawberry", url: "http://host.docker.internal:8091/admin/gql/strawberry")
 }
 
@@ -14997,6 +14998,7 @@ type PurgeVFolderV2Payload
 
 type Query
   @join__type(graph: GRAPHENE)
+  @join__type(graph: PUBLIC)
   @join__type(graph: STRAWBERRY)
 {
   """
@@ -15371,6 +15373,9 @@ type Query
 
   """Added in 25.8.0."""
   service_configs(services: [String]!, filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ServiceConfigConnection @join__field(graph: GRAPHENE)
+
+  """Placeholder public field; returns 'pong'."""
+  publicPing: String! @join__field(graph: PUBLIC)
 
   """Added in 25.15.0. Get aggregate agent resource statistics"""
   agentStats: AgentStats @join__field(graph: STRAWBERRY)

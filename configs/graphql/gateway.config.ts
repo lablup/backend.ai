@@ -70,6 +70,13 @@ export const gatewayConfig = defineConfig({
       // NOTE: STRAWBERRY supports WebSocket subscriptions
       location: 'http://host.docker.internal:8091/admin/gql/strawberry',
     },
+    PUBLIC: {
+      // Location points to the manager's GraphQL path
+      // This is configured for halfstack's Docker environment
+      // NOTE: This must be changed in production environments
+      // NOTE: PUBLIC carries no auth middleware, so anonymous queries resolve here
+      location: 'http://host.docker.internal:8091/admin/gql/strawberry/public',
+    },
     '*.http': {
       options: {
         subscriptions: {

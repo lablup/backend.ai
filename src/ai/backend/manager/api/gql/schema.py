@@ -1084,18 +1084,18 @@ async def _public_ping() -> str:
     return "pong"
 
 
-@strawberry.type
+@strawberry.type(name="Query")
 class PublicQueries:
-    """Query root served at the unauthenticated public endpoint (POST /admin/gql/strawberry/public).
+    """Query root of the ``public`` subgraph, served without authentication at
+    ``POST /admin/gql/strawberry/public``.
 
     Contains ONLY fields that are safe to expose without authentication; private fields are
-    physically absent, so they cannot be queried (no runtime gate needed). Real public fields
-    should be registered both here and on ``Query`` so authenticated clients can reach them via the
-    main endpoint too.
+    physically absent, so they cannot be queried (no runtime gate needed). A public field belongs
+    here and nowhere else: declaring it on ``Query`` as well would let the router resolve it
+    against the authenticated subgraph, which answers 401 to an anonymous caller.
 
     ``public_ping`` is a temporary placeholder so this type is non-empty (GraphQL requires >=1
-    field). It is intentionally registered only here (not on ``Query``) and will be replaced by
-    real public fields (e.g. ``publicAppConfigs``).
+    field) and will be replaced by real public fields (e.g. ``publicAppConfigs``).
     """
 
     public_ping: str = strawberry.field(
@@ -1104,11 +1104,12 @@ class PublicQueries:
     )
 
 
-# Plain (non-federation) schema: the public endpoint is hit directly, not through the Apollo
-# Router supergraph, so it needs no federation machinery.
-public_schema = strawberry.Schema(
+# A subgraph of the same supergraph as `schema`, kept separate only so that its routing URL
+# carries no auth middleware: anonymous queries compose against this subgraph alone.
+public_schema = Schema(
     query=PublicQueries,
     config=StrawberryConfig(auto_camel_case=True),
+    federation_version="2.7",
     extensions=[
         GQLLoggingExtension,
         GQLMetricExtension,
