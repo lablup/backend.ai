@@ -1,4 +1,5 @@
 from ai.backend.manager.models.confidential.row import (
+    ConfidentialClientReleaseRow,
     ConfidentialDecisionRow,
     ConfidentialGuestClaimRow,
     ConfidentialMeasuredBlobRow,
@@ -10,6 +11,7 @@ from ai.backend.manager.models.confidential.row import (
 )
 
 __all__ = (
+    "ConfidentialClientReleaseRow",
     "ConfidentialDecisionRow",
     "ConfidentialGuestClaimRow",
     "ConfidentialMeasuredBlobRow",

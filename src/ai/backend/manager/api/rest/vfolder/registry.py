@@ -15,6 +15,7 @@ from ai.backend.manager.api.rest.middleware.auth import (
     superadmin_required,
 )
 from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.confidential.client_keys import enforce_client_format
 from ai.backend.manager.api.rest.types import RouteMiddleware, WebRequestHandler
 from ai.backend.manager.models.vfolder import (
     VFolderPermission,
@@ -79,6 +80,11 @@ def _vfolder_resolver(
                     GetVFolderLegacyRowAction(vfolder_uuid=vfolder_uuid)
                 )
                 request["vfolder_row"] = row_result.row
+            enforce_client_format(
+                request.headers,
+                request["vfolder_row"],
+                perm not in (VFolderPermissionSetAlias.READABLE, VFolderPermission.READ_ONLY),
+            )
             return await handler(request)
 
         return wrapper

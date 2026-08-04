@@ -191,6 +191,7 @@ class VFolderData:
     group: uuid.UUID | None
     cloneable: bool
     status: VFolderOperationStatus
+    encryption_tier: str | None = None
 
 
 @dataclass
@@ -252,6 +253,7 @@ class VFolderCreateParams:
     unmanaged_path: str | None
     cloneable: bool
     status: VFolderOperationStatus
+    encryption_tier: str | None = None
 
 
 @dataclass

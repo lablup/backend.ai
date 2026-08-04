@@ -39,6 +39,7 @@ class VFolderCreatorSpec(CreatorSpec[VFolderRow]):
     unmanaged_path: str | None = None
     cloneable: bool = False
     status: VFolderOperationStatus = VFolderOperationStatus.READY
+    encryption_tier: str | None = None
 
     @override
     def build_row(self) -> VFolderRow:
@@ -59,4 +60,5 @@ class VFolderCreatorSpec(CreatorSpec[VFolderRow]):
             unmanaged_path=self.unmanaged_path,
             cloneable=self.cloneable,
             status=self.status,
+            encryption_tier=self.encryption_tier,
         )

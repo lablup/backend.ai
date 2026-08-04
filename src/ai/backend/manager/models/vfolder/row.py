@@ -25,6 +25,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship, selectinload
+from sqlalchemy.orm.base import NO_VALUE
 
 from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
 from ai.backend.common.identifier.vfolder import VFolderUUID
@@ -62,6 +63,7 @@ from ai.backend.manager.defs import (
 from ai.backend.manager.confidential.storage import describe
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.confidential import ImmutableEncryptionTier
 from ai.backend.manager.errors.storage import (
     InsufficientStoragePermission,
     VFolderNotFound,
@@ -382,6 +384,9 @@ class VFolderRow(Base):  # type: ignore[misc]
     status_history: Mapped[dict[str, Any] | None] = mapped_column(
         "status_history", pgsql.JSONB(), nullable=True, default=sa.null()
     )
+    encryption_tier: Mapped[str | None] = mapped_column(
+        "encryption_tier", sa.String(length=32), nullable=True
+    )
     status_changed: Mapped[datetime | None] = mapped_column(
         "status_changed", sa.DateTime(timezone=True), nullable=True, index=True
     )
@@ -460,6 +465,15 @@ class VFolderRow(Base):  # type: ignore[misc]
             group=self.group,
             cloneable=self.cloneable,
             status=self.status,
+            encryption_tier=self.encryption_tier,
+        )
+
+
+@sa.event.listens_for(VFolderRow.encryption_tier, "set", active_history=True)
+def _refuse_tier_change(target, value, previous, initiator) -> None:
+    if previous not in (None, NO_VALUE) and previous != value:
+        raise ImmutableEncryptionTier(
+            extra_msg=f"folder {target.id} was created at the {previous} tier"
         )
 
 

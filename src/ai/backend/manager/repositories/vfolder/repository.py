@@ -507,6 +507,7 @@ class VfolderRepository:
                 unmanaged_path=params.unmanaged_path,
                 cloneable=params.cloneable,
                 status=params.status,
+                encryption_tier=params.encryption_tier,
             )
 
             # Use RBACEntityCreator for atomic entity + scope association creation

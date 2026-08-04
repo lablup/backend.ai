@@ -18,6 +18,7 @@ from ai.backend.common.api_handlers import (
     BodyParam,
     PathParam,
 )
+from ai.backend.common.cc_storage import CAPABILITY_HEADER
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.confidential.plane import ConfidentialPlane, verify_capability
 from ai.backend.manager.confidential.references import DEFAULT_COEXISTENCE
@@ -25,12 +26,14 @@ from ai.backend.manager.confidential.shim import (
     RELAYED_REQUEST_HEADERS,
     RELAYED_RESPONSE_HEADERS,
 )
-from ai.backend.manager.dto.context import RequestCtx
-from ai.backend.manager.errors.confidential import ShimRefusal
+from ai.backend.manager.dto.context import RequestCtx, UserContext
+from ai.backend.manager.errors.confidential import ReleaseDenied, ShimRefusal
 from ai.backend.manager.models.confidential.disclosure import confidential_capability_view
 from ai.backend.manager.models.confidential.row import ConfidentialDecisionRow
 from ai.backend.manager.models.confidential.types import DecisionVerdict
 from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
+from ai.backend.manager.models.vfolder import VFolderRow, VFolderStatusSet
+from ai.backend.manager.models.vfolder.row import query_accessible_vfolders
 from ai.backend.manager.models.scaling_group.types import ConfidentialScalingGroupOpts
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -64,6 +67,11 @@ class ReferenceValueRequest(BaseRequestModel):
     pipeline_signature: str
     supersedes: uuid.UUID | None = None
     coexistence_seconds: float = DEFAULT_COEXISTENCE.total_seconds()
+
+
+class FolderKeyRequest(BaseRequestModel):
+    vfolder_id: uuid.UUID
+    session_id: uuid.UUID | None = None
 
 
 class DrainRequest(BaseRequestModel):
@@ -255,3 +263,38 @@ def _passthrough(status: int, payload: bytes, headers: dict[str, str]) -> web.Re
             key: value for key, value in headers.items() if key.lower() in RELAYED_RESPONSE_HEADERS
         },
     )
+
+    async def release_folder_key(
+        self,
+        body: BodyParam[FolderKeyRequest],
+        ctx: UserContext,
+        req: RequestCtx,
+    ) -> APIResponse:
+        vfolder_id = body.parsed.vfolder_id
+        async with self._db.begin_readonly() as conn:
+            accessible = await query_accessible_vfolders(
+                conn,
+                ctx.user_uuid,
+                user_role=ctx.user_role,
+                domain_name=ctx.user_domain,
+                allowed_status_set=VFolderStatusSet.READABLE,
+                extra_vf_conds=(VFolderRow.id == vfolder_id),
+            )
+        if not accessible:
+            raise ReleaseDenied(
+                extra_msg=f"{ctx.user_email} holds no grant on folder {vfolder_id}"
+            )
+        async with self._db.begin_readonly_session() as db_session:
+            folder = await db_session.get(VFolderRow, vfolder_id)
+        if folder is None or folder.encryption_tier is None:
+            return APIResponse.build(HTTPStatus.OK, _Payload(result={"format": None}))
+        release = await self._plane.client_keys.release(
+            domain_name=folder.domain_name,
+            vfolder_id=vfolder_id,
+            tier=folder.encryption_tier,
+            requester_id=ctx.user_uuid,
+            requester=ctx.user_email,
+            session_id=body.parsed.session_id,
+            declared_format=req.request.headers.get(CAPABILITY_HEADER),
+        )
+        return APIResponse.build(HTTPStatus.OK, _Payload(result=release.to_json()))
