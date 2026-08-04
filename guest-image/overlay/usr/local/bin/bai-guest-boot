@@ -100,6 +100,7 @@ def discipline(cfg, anchor_real, anchor_mono, source):
 
 def main():
     STATE.mkdir(mode=0o755, exist_ok=True)
+    (STATE / "session").mkdir(mode=0o755, exist_ok=True)
     cfg = settings()
     epoch, source = attested_now(cfg)
     set_realtime(epoch)

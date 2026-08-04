@@ -1,0 +1,91 @@
+#!/opt/backend.ai/bin/python
+import ipaddress
+import json
+import os
+import pathlib
+import socket
+import sys
+import time
+
+SHARED = pathlib.Path("/run/backend.ai/session")
+PORT = 47820
+CHUNK = 4 << 20
+VOLUME = 512 << 20
+
+
+def endpoints(peer_idx):
+    base = ipaddress.ip_address(json.loads((SHARED / "tunnel.json").read_text())["base"])
+    tunnel = ipaddress.ip_address(
+        json.loads((SHARED / "tunnel-state.json").read_text())["address"]
+    )
+    own_idx = int(os.environ["BACKENDAI_CLUSTER_IDX"])
+    return {
+        "bridge": str(base + peer_idx),
+        "tunnel": str(tunnel - own_idx + peer_idx),
+    }
+
+
+def serve():
+    listener = socket.socket()
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listener.bind(("", PORT))
+    listener.listen(4)
+    view = memoryview(bytearray(CHUNK))
+    while True:
+        conn, _ = listener.accept()
+        with conn:
+            while conn.recv_into(view, CHUNK):
+                pass
+
+
+def blast(host):
+    payload = os.urandom(CHUNK)
+    conn = socket.create_connection((host, PORT), timeout=30)
+    started = time.perf_counter()
+    with conn:
+        for _ in range(VOLUME // CHUNK):
+            conn.sendall(payload)
+    return VOLUME / (time.perf_counter() - started) / (1 << 20)
+
+
+def throughput(peer_idx):
+    result = {name: blast(host) for name, host in endpoints(peer_idx).items()}
+    result["cipher_cost"] = 1.0 - result["tunnel"] / result["bridge"]
+    print(json.dumps(result, indent=2))
+
+
+def allreduce(master, elements):
+    import torch
+    import torch.distributed as dist
+
+    os.environ["MASTER_ADDR"] = master
+    os.environ["MASTER_PORT"] = str(PORT + 1)
+    os.environ["RANK"] = os.environ["BACKENDAI_CLUSTER_IDX"]
+    os.environ["WORLD_SIZE"] = os.environ["BACKENDAI_CLUSTER_SIZE"]
+    dist.init_process_group("gloo")
+    tensor = torch.ones(elements)
+    dist.all_reduce(tensor)
+    dist.barrier()
+    started = time.perf_counter()
+    for _ in range(20):
+        dist.all_reduce(tensor)
+    elapsed = (time.perf_counter() - started) / 20
+    if dist.get_rank() == 0:
+        print(json.dumps({"master": master, "elements": elements, "seconds": elapsed}, indent=2))
+    dist.destroy_process_group()
+
+
+if sys.argv[1:2] == ["serve"]:
+    serve()
+elif sys.argv[1:2] == ["throughput"]:
+    throughput(int(sys.argv[2]))
+elif sys.argv[1:2] == ["allreduce"]:
+    allreduce(sys.argv[2], int(sys.argv[3]) if sys.argv[3:] else 64 << 20)
+else:
+    print(
+        "usage: bai-tunnel-bench serve"
+        " | throughput <peer cluster index>"
+        " | allreduce <master address> [elements]",
+        file=sys.stderr,
+    )
+    sys.exit(2)

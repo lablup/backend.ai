@@ -34,6 +34,11 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.confidential.payloads import configuration_bundle, secrets_bundle
 from ai.backend.manager.confidential.plane import ConfidentialPlane
+from ai.backend.manager.confidential.tunnel import (
+    PEER_DIRECTORY_TAG,
+    TunnelMember,
+    tunnel_resources,
+)
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.sokovan import (
     ImageConfigData,
@@ -621,7 +626,26 @@ class SessionLauncher:
             raise ConfidentialCapabilityRefused(
                 extra_msg=f"no admissible reference value covers image digest {digest}"
             )
+        if len({kernel.agent_id for kernel in session.kernels}) > 1:
+            raise ConfidentialCapabilityRefused(
+                extra_msg=(
+                    f"session {session.session_id} spans several agents; a confidential cluster"
+                    " session is single-node, because its inter-kernel tunnel rides one host bridge"
+                    " and inter-node bytes would cross the underlay bare"
+                )
+            )
         resources: dict[str, tuple[SessionResourceKind, bytes]] = {}
+        if len(session.kernels) > 1:
+            resources.update(
+                tunnel_resources([
+                    TunnelMember(
+                        kernel.kernel_id,
+                        kernel.cluster_idx,
+                        kernel.cluster_hostname or f"{kernel.cluster_role}{kernel.cluster_idx}",
+                    )
+                    for kernel in session.kernels
+                ])
+            )
         for kernel in session.kernels:
             resources[f"config-{kernel.kernel_id}"] = (
                 SessionResourceKind.SESSION_CONFIG,
@@ -656,6 +680,8 @@ class SessionLauncher:
                 "secrets_resource": provisioning.path_of(f"secrets-{kernel.kernel_id}"),
                 "shim_url": provisioning.shim_url,
                 "residual": provisioning.residual,
+                "tunnel_resource": provisioning.path_of(f"tunnel-{kernel.kernel_id}"),
+                "peers_resource": provisioning.path_of(PEER_DIRECTORY_TAG),
             }
             for kernel in session.kernels
         }

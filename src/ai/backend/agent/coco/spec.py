@@ -5,6 +5,7 @@ from pathlib import Path
 IMAGE_NAME_ANNOTATION = "io.kubernetes.cri.image-name"
 GUEST_ENTRYPOINT = "/opt/kernel/bai-cc-entrypoint"
 GUEST_SOURCED_PATHS = ("/opt/backend.ai", "/opt/kernel", "/run/backend.ai")
+GUEST_HANDOVER_PATH = "/run/backend.ai/session"
 
 
 @dataclass(frozen=True)
@@ -74,7 +75,10 @@ class ContainerSpec:
 
 
 def guest_sourced_mounts() -> list[MountSpec]:
-    return [MountSpec(Path(path), Path(path), True) for path in GUEST_SOURCED_PATHS]
+    return [
+        *(MountSpec(Path(path), Path(path), True) for path in GUEST_SOURCED_PATHS),
+        MountSpec(Path(GUEST_HANDOVER_PATH), Path(GUEST_HANDOVER_PATH), False),
+    ]
 
 
 def build_annotations(

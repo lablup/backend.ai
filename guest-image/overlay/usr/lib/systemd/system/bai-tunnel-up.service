@@ -1,0 +1,10 @@
+[Unit]
+Description=Backend.AI inter-kernel tunnel bring-up
+After=bai-guest-boot.service
+Requires=bai-guest-boot.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+Environment=LD_LIBRARY_PATH=/opt/backend.ai/lib
+ExecStart=/usr/local/bin/bai-tunnel-up
