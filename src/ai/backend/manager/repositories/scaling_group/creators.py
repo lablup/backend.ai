@@ -71,13 +71,13 @@ class ScalingGroupCreatorSpec(CreatorSpec[ScalingGroupRow]):
 class ScalingGroupForDomainCreatorSpec(CreatorSpec[ScalingGroupForDomainRow]):
     """CreatorSpec for associating a scaling group with a domain."""
 
-    scaling_group_id: ResourceGroupID
+    resource_group_id: ResourceGroupID
     domain_id: DomainID
 
     @override
     def build_row(self) -> ScalingGroupForDomainRow:
         return ScalingGroupForDomainRow(
-            scaling_group_id=self.scaling_group_id,
+            scaling_group_id=self.resource_group_id,
             domain_id=self.domain_id,
         )
 
@@ -86,13 +86,13 @@ class ScalingGroupForDomainCreatorSpec(CreatorSpec[ScalingGroupForDomainRow]):
 class ScalingGroupForKeypairsCreatorSpec(CreatorSpec[ScalingGroupForKeypairsRow]):
     """CreatorSpec for associating a scaling group with a keypair."""
 
-    scaling_group_id: ResourceGroupID
+    resource_group_id: ResourceGroupID
     access_key: AccessKey
 
     @override
     def build_row(self) -> ScalingGroupForKeypairsRow:
         return ScalingGroupForKeypairsRow(
-            scaling_group_id=self.scaling_group_id,
+            scaling_group_id=self.resource_group_id,
             access_key=self.access_key,
         )
 
@@ -101,12 +101,12 @@ class ScalingGroupForKeypairsCreatorSpec(CreatorSpec[ScalingGroupForKeypairsRow]
 class ScalingGroupForProjectCreatorSpec(CreatorSpec[ScalingGroupForProjectRow]):
     """CreatorSpec for associating a scaling group with a project (user group)."""
 
-    scaling_group_id: ResourceGroupID
+    resource_group_id: ResourceGroupID
     project: UUID
 
     @override
     def build_row(self) -> ScalingGroupForProjectRow:
         return ScalingGroupForProjectRow(
-            scaling_group_id=self.scaling_group_id,
+            scaling_group_id=self.resource_group_id,
             group=self.project,
         )

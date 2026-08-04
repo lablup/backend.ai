@@ -192,12 +192,12 @@ class ScalingGroupRepository:
 
     async def check_scaling_group_domain_association_exists(
         self,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
         domain_id: DomainID,
     ) -> bool:
         """Checks if a scaling group is associated with a domain."""
         return await self._db_source.check_scaling_group_domain_association_exists(
-            scaling_group_id=scaling_group_id,
+            resource_group_id=resource_group_id,
             domain_id=domain_id,
         )
 
@@ -217,12 +217,12 @@ class ScalingGroupRepository:
 
     async def check_scaling_group_keypair_association_exists(
         self,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
         access_key: str,
     ) -> bool:
         """Checks if a scaling group is associated with a keypair."""
         return await self._db_source.check_scaling_group_keypair_association_exists(
-            scaling_group_id, access_key
+            resource_group_id, access_key
         )
 
     async def associate_scaling_group_with_user_groups(
@@ -241,12 +241,12 @@ class ScalingGroupRepository:
 
     async def check_scaling_group_user_group_association_exists(
         self,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
         user_group: UUID,
     ) -> bool:
         """Checks if a scaling group is associated with a user group (project)."""
         return await self._db_source.check_scaling_group_user_group_association_exists(
-            scaling_group_id=scaling_group_id,
+            resource_group_id=resource_group_id,
             user_group=user_group,
         )
 

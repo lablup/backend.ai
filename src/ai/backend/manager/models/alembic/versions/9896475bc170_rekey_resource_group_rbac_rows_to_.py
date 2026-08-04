@@ -181,9 +181,11 @@ def _rekey_rbac_rows_to_uuid() -> None:
     conn.execute(
         sa.text("""
             DELETE FROM permissions p
-            USING scaling_groups sg
             WHERE p.scope_type = 'resource_group'
-              AND p.scope_id = sg.name
+              AND NOT EXISTS (
+                  SELECT 1 FROM scaling_groups sg
+                  WHERE sg.id::text = p.scope_id
+              )
         """)
     )
 

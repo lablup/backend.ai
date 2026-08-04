@@ -332,7 +332,7 @@ class ScalingGroupDBSource:
 
     async def check_scaling_group_domain_association_exists(
         self,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
         domain_id: DomainID,
     ) -> bool:
         """Checks if a scaling group is associated with a domain."""
@@ -342,7 +342,7 @@ class ScalingGroupDBSource:
                 .select_from(ScalingGroupForDomainRow)
                 .where(
                     sa.and_(
-                        ScalingGroupForDomainRow.scaling_group_id == scaling_group_id,
+                        ScalingGroupForDomainRow.scaling_group_id == resource_group_id,
                         ScalingGroupForDomainRow.domain_id == domain_id,
                     )
                 )
@@ -368,7 +368,7 @@ class ScalingGroupDBSource:
 
     async def check_scaling_group_keypair_association_exists(
         self,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
         access_key: str,
     ) -> bool:
         """Checks if a scaling group is associated with a keypair."""
@@ -376,7 +376,7 @@ class ScalingGroupDBSource:
             query = sa.select(
                 sa.exists().where(
                     sa.and_(
-                        ScalingGroupForKeypairsRow.scaling_group_id == scaling_group_id,
+                        ScalingGroupForKeypairsRow.scaling_group_id == resource_group_id,
                         ScalingGroupForKeypairsRow.access_key == access_key,
                     )
                 )
@@ -402,7 +402,7 @@ class ScalingGroupDBSource:
 
     async def check_scaling_group_user_group_association_exists(
         self,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
         user_group: uuid.UUID,
     ) -> bool:
         """Checks if a scaling group is associated with a user group (project)."""
@@ -412,7 +412,7 @@ class ScalingGroupDBSource:
                 .select_from(ScalingGroupForProjectRow)
                 .where(
                     sa.and_(
-                        ScalingGroupForProjectRow.scaling_group_id == scaling_group_id,
+                        ScalingGroupForProjectRow.scaling_group_id == resource_group_id,
                         ScalingGroupForProjectRow.group == user_group,
                     )
                 )

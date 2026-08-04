@@ -88,7 +88,7 @@ async def group_fixture(
     db_engine: SAEngine,
     domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
-    scaling_group_id: ResourceGroupID,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[uuid.UUID]:
     """Insert a test group with scaling-group association for fair-share tests."""
     group_id = uuid.uuid4()
@@ -130,7 +130,7 @@ async def group_fixture(
         )
         await conn.execute(
             sa.insert(sgroups_for_groups).values(
-                scaling_group_id=scaling_group_id,
+                scaling_group_id=resource_group_id,
                 group=group_id,
             )
         )

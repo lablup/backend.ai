@@ -309,7 +309,7 @@ class TestScalingGroupDomainAssociation:
                 pairs=[
                     RBACScopeBindingPair(
                         spec=ScalingGroupForDomainCreatorSpec(
-                            scaling_group_id=sg.id,
+                            resource_group_id=sg.id,
                             domain_id=domain_fixture.domain_id,
                         ),
                         entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, str(sg.id)),
@@ -324,7 +324,7 @@ class TestScalingGroupDomainAssociation:
             )
 
             exists = await scaling_group_repository.check_scaling_group_domain_association_exists(
-                scaling_group_id=sg.id,
+                resource_group_id=sg.id,
                 domain_id=domain_fixture.domain_id,
             )
             assert exists is True
@@ -351,7 +351,7 @@ class TestScalingGroupDomainAssociation:
                 pairs=[
                     RBACScopeBindingPair(
                         spec=ScalingGroupForDomainCreatorSpec(
-                            scaling_group_id=sg.id,
+                            resource_group_id=sg.id,
                             domain_id=domain_fixture.domain_id,
                         ),
                         entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, str(sg.id)),
@@ -368,14 +368,14 @@ class TestScalingGroupDomainAssociation:
             # Verify association exists
             assert (
                 await scaling_group_repository.check_scaling_group_domain_association_exists(
-                    scaling_group_id=sg.id,
+                    resource_group_id=sg.id,
                     domain_id=domain_fixture.domain_id,
                 )
             ) is True
 
             # Now disassociate
             unbinder = ResourceGroupDomainEntityUnbinder(
-                scaling_group_ids=[sg.id],
+                resource_group_ids=[sg.id],
                 domain_id=domain_fixture.domain_id,
             )
             await (
@@ -386,7 +386,7 @@ class TestScalingGroupDomainAssociation:
 
             # Association should be gone
             exists = await scaling_group_repository.check_scaling_group_domain_association_exists(
-                scaling_group_id=sg.id,
+                resource_group_id=sg.id,
                 domain_id=domain_fixture.domain_id,
             )
             assert exists is False
@@ -411,7 +411,7 @@ class TestScalingGroupDomainAssociation:
             # Before association: False
             assert (
                 await scaling_group_repository.check_scaling_group_domain_association_exists(
-                    scaling_group_id=sg.id,
+                    resource_group_id=sg.id,
                     domain_id=domain_fixture.domain_id,
                 )
             ) is False
@@ -421,7 +421,7 @@ class TestScalingGroupDomainAssociation:
                 pairs=[
                     RBACScopeBindingPair(
                         spec=ScalingGroupForDomainCreatorSpec(
-                            scaling_group_id=sg.id,
+                            resource_group_id=sg.id,
                             domain_id=domain_fixture.domain_id,
                         ),
                         entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, str(sg.id)),
@@ -436,7 +436,7 @@ class TestScalingGroupDomainAssociation:
             )
             assert (
                 await scaling_group_repository.check_scaling_group_domain_association_exists(
-                    scaling_group_id=sg.id,
+                    resource_group_id=sg.id,
                     domain_id=domain_fixture.domain_id,
                 )
             ) is True
@@ -466,7 +466,7 @@ class TestScalingGroupKeypairAssociation:
             bulk_creator = BulkCreator(
                 specs=[
                     ScalingGroupForKeypairsCreatorSpec(
-                        scaling_group_id=sg.id,
+                        resource_group_id=sg.id,
                         access_key=access_key,
                     )
                 ]
@@ -476,7 +476,7 @@ class TestScalingGroupKeypairAssociation:
             )
 
             exists = await scaling_group_repository.check_scaling_group_keypair_association_exists(
-                scaling_group_id=sg.id,
+                resource_group_id=sg.id,
                 access_key=access_key,
             )
             assert exists is True
@@ -503,7 +503,7 @@ class TestScalingGroupKeypairAssociation:
             bulk_creator = BulkCreator(
                 specs=[
                     ScalingGroupForKeypairsCreatorSpec(
-                        scaling_group_id=sg.id,
+                        resource_group_id=sg.id,
                         access_key=access_key,
                     )
                 ]
@@ -515,14 +515,14 @@ class TestScalingGroupKeypairAssociation:
             # Verify association exists
             assert (
                 await scaling_group_repository.check_scaling_group_keypair_association_exists(
-                    scaling_group_id=sg.id,
+                    resource_group_id=sg.id,
                     access_key=access_key,
                 )
             ) is True
 
             # Now disassociate
             purger = create_scaling_group_for_keypairs_purger(
-                scaling_group_id=sg.id,
+                resource_group_id=sg.id,
                 access_key=access_key,
             )
             await (
@@ -533,7 +533,7 @@ class TestScalingGroupKeypairAssociation:
 
             # Association should be gone
             exists = await scaling_group_repository.check_scaling_group_keypair_association_exists(
-                scaling_group_id=sg.id,
+                resource_group_id=sg.id,
                 access_key=access_key,
             )
             assert exists is False
@@ -561,11 +561,11 @@ class TestScalingGroupKeypairAssociation:
             bulk_creator = BulkCreator(
                 specs=[
                     ScalingGroupForKeypairsCreatorSpec(
-                        scaling_group_id=sg.id,
+                        resource_group_id=sg.id,
                         access_key=admin_key,
                     ),
                     ScalingGroupForKeypairsCreatorSpec(
-                        scaling_group_id=sg.id,
+                        resource_group_id=sg.id,
                         access_key=user_key,
                     ),
                 ]
@@ -576,13 +576,13 @@ class TestScalingGroupKeypairAssociation:
 
             assert (
                 await scaling_group_repository.check_scaling_group_keypair_association_exists(
-                    scaling_group_id=sg.id,
+                    resource_group_id=sg.id,
                     access_key=admin_key,
                 )
             ) is True
             assert (
                 await scaling_group_repository.check_scaling_group_keypair_association_exists(
-                    scaling_group_id=sg.id,
+                    resource_group_id=sg.id,
                     access_key=user_key,
                 )
             ) is True
@@ -608,7 +608,7 @@ class TestScalingGroupKeypairAssociation:
             # Before association: False
             assert (
                 await scaling_group_repository.check_scaling_group_keypair_association_exists(
-                    scaling_group_id=sg.id,
+                    resource_group_id=sg.id,
                     access_key=access_key,
                 )
             ) is False
@@ -617,7 +617,7 @@ class TestScalingGroupKeypairAssociation:
             bulk_creator = BulkCreator(
                 specs=[
                     ScalingGroupForKeypairsCreatorSpec(
-                        scaling_group_id=sg.id,
+                        resource_group_id=sg.id,
                         access_key=access_key,
                     )
                 ]
@@ -627,7 +627,7 @@ class TestScalingGroupKeypairAssociation:
             )
             assert (
                 await scaling_group_repository.check_scaling_group_keypair_association_exists(
-                    scaling_group_id=sg.id,
+                    resource_group_id=sg.id,
                     access_key=access_key,
                 )
             ) is True

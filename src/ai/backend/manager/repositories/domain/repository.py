@@ -218,7 +218,7 @@ class DomainRepository:
                     BulkCreator(
                         specs=[
                             ScalingGroupForDomainCreatorSpec(
-                                scaling_group_id=sgroup_id,
+                                resource_group_id=sgroup_id,
                                 domain_id=domain_row.id,
                             )
                             for sgroup_id in scaling_group_ids

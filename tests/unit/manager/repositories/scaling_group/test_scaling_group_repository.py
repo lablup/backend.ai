@@ -807,7 +807,7 @@ class TestScalingGroupRepositoryDB:
             pairs=[
                 RBACScopeBindingPair(
                     spec=ScalingGroupForDomainCreatorSpec(
-                        scaling_group_id=sgroup_id,
+                        resource_group_id=sgroup_id,
                         domain_id=sample_domain.domain_id,
                     ),
                     entity_ref=RBACElementRef(
@@ -826,7 +826,7 @@ class TestScalingGroupRepositoryDB:
         # Verify association using repository method
         association_exists = (
             await scaling_group_repository.check_scaling_group_domain_association_exists(
-                scaling_group_id=sgroup_id,
+                resource_group_id=sgroup_id,
                 domain_id=sample_domain.domain_id,
             )
         )
@@ -858,11 +858,11 @@ class TestScalingGroupRepositoryDB:
         sample_domain: DomainFixtureData,
     ) -> None:
         """Test disassociating a scaling group from a domain"""
-        scaling_group_id, _, _ = sample_scaling_group_with_domain_association
+        resource_group_id, _, _ = sample_scaling_group_with_domain_association
 
         # Disassociate the scaling group from the domain
         unbinder = ResourceGroupDomainEntityUnbinder(
-            scaling_group_ids=[scaling_group_id],
+            resource_group_ids=[resource_group_id],
             domain_id=sample_domain.domain_id,
         )
         await scaling_group_repository.disassociate_scaling_group_with_domains(unbinder)
@@ -870,7 +870,7 @@ class TestScalingGroupRepositoryDB:
         # Verify association is removed
         association_exists = (
             await scaling_group_repository.check_scaling_group_domain_association_exists(
-                scaling_group_id=scaling_group_id,
+                resource_group_id=resource_group_id,
                 domain_id=sample_domain.domain_id,
             )
         )
@@ -886,7 +886,7 @@ class TestScalingGroupRepositoryDB:
         sgroup_id, _ = sample_scaling_group_for_association
         # Disassociate without prior association should succeed without error
         unbinder = ResourceGroupDomainEntityUnbinder(
-            scaling_group_ids=[sgroup_id],
+            resource_group_ids=[sgroup_id],
             domain_id=sample_domain.domain_id,
         )
         await scaling_group_repository.disassociate_scaling_group_with_domains(unbinder)
@@ -935,7 +935,7 @@ class TestScalingGroupRepositoryDB:
             pairs=[
                 RBACScopeBindingPair(
                     spec=ScalingGroupForDomainCreatorSpec(
-                        scaling_group_id=sgroup_id,
+                        resource_group_id=sgroup_id,
                         domain_id=domain.domain_id,
                     ),
                     entity_ref=RBACElementRef(
@@ -956,7 +956,7 @@ class TestScalingGroupRepositoryDB:
         for domain in sample_multiple_domains:
             association_exists = (
                 await scaling_group_repository.check_scaling_group_domain_association_exists(
-                    scaling_group_id=sgroup_id,
+                    resource_group_id=sgroup_id,
                     domain_id=domain.domain_id,
                 )
             )
@@ -971,7 +971,7 @@ class TestScalingGroupRepositoryDB:
     ) -> None:
         """Test disassociating a scaling group from multiple domains"""
         (
-            scaling_group_id,
+            resource_group_id,
             _,
             domains,
         ) = sample_scaling_group_with_multiple_domain_associations
@@ -979,7 +979,7 @@ class TestScalingGroupRepositoryDB:
         # Disassociate all domains one by one
         for domain in domains:
             unbinder = ResourceGroupDomainEntityUnbinder(
-                scaling_group_ids=[scaling_group_id],
+                resource_group_ids=[resource_group_id],
                 domain_id=domain.domain_id,
             )
             await scaling_group_repository.disassociate_scaling_group_with_domains(unbinder)
@@ -988,7 +988,7 @@ class TestScalingGroupRepositoryDB:
         for domain in domains:
             association_exists = (
                 await scaling_group_repository.check_scaling_group_domain_association_exists(
-                    scaling_group_id=scaling_group_id,
+                    resource_group_id=resource_group_id,
                     domain_id=domain.domain_id,
                 )
             )
@@ -1060,7 +1060,7 @@ class TestScalingGroupRepositoryDB:
         bulk_creator = BulkCreator(
             specs=[
                 ScalingGroupForKeypairsCreatorSpec(
-                    scaling_group_id=sgroup_id,
+                    resource_group_id=sgroup_id,
                     access_key=access_key,
                 )
             ]
@@ -1090,7 +1090,7 @@ class TestScalingGroupRepositoryDB:
         bulk_creator = BulkCreator(
             specs=[
                 ScalingGroupForKeypairsCreatorSpec(
-                    scaling_group_id=sgroup_id,
+                    resource_group_id=sgroup_id,
                     access_key=access_key,
                 )
             ]
@@ -1107,7 +1107,7 @@ class TestScalingGroupRepositoryDB:
 
         # When: Disassociate the scaling group from the keypair
         purger = create_scaling_group_for_keypairs_purger(
-            scaling_group_id=sgroup_id,
+            resource_group_id=sgroup_id,
             access_key=access_key,
         )
         await scaling_group_repository.disassociate_scaling_group_with_keypairs(purger)
@@ -1133,7 +1133,7 @@ class TestScalingGroupRepositoryDB:
 
         # When: Disassociate (even though no association exists)
         purger = create_scaling_group_for_keypairs_purger(
-            scaling_group_id=sgroup_id,
+            resource_group_id=sgroup_id,
             access_key=access_key,
         )
         # Then: Should not raise any error (BatchPurger deletes 0 rows silently)
@@ -1157,7 +1157,7 @@ class TestScalingGroupRepositoryDB:
             pairs=[
                 RBACScopeBindingPair(
                     spec=ScalingGroupForProjectCreatorSpec(
-                        scaling_group_id=sgroup_id,
+                        resource_group_id=sgroup_id,
                         project=project_id,
                     ),
                     entity_ref=RBACElementRef(
@@ -1176,7 +1176,7 @@ class TestScalingGroupRepositoryDB:
         # Then: Association should exist
         association_exists = (
             await scaling_group_repository.check_scaling_group_user_group_association_exists(
-                scaling_group_id=sgroup_id,
+                resource_group_id=sgroup_id,
                 user_group=project_id,
             )
         )
@@ -1198,7 +1198,7 @@ class TestScalingGroupRepositoryDB:
             pairs=[
                 RBACScopeBindingPair(
                     spec=ScalingGroupForProjectCreatorSpec(
-                        scaling_group_id=sgroup_id,
+                        resource_group_id=sgroup_id,
                         project=project_id,
                     ),
                     entity_ref=RBACElementRef(
@@ -1217,7 +1217,7 @@ class TestScalingGroupRepositoryDB:
         # Verify association exists
         association_exists = (
             await scaling_group_repository.check_scaling_group_user_group_association_exists(
-                scaling_group_id=sgroup_id,
+                resource_group_id=sgroup_id,
                 user_group=project_id,
             )
         )
@@ -1225,14 +1225,14 @@ class TestScalingGroupRepositoryDB:
 
         # When: Disassociate the scaling group from the project
         unbinder = ResourceGroupProjectEntityUnbinder(
-            scaling_group_ids=[sgroup_id], project=project_id
+            resource_group_ids=[sgroup_id], project=project_id
         )
         await scaling_group_repository.disassociate_scaling_group_with_user_groups(unbinder)
 
         # Then: Association should no longer exist
         association_exists = (
             await scaling_group_repository.check_scaling_group_user_group_association_exists(
-                scaling_group_id=sgroup_id,
+                resource_group_id=sgroup_id,
                 user_group=project_id,
             )
         )
@@ -1251,7 +1251,7 @@ class TestScalingGroupRepositoryDB:
 
         # When: Disassociate (even though no association exists)
         unbinder = ResourceGroupProjectEntityUnbinder(
-            scaling_group_ids=[sgroup_id], project=project_id
+            resource_group_ids=[sgroup_id], project=project_id
         )
         # Then: Should not raise any error (unbinder deletes 0 rows silently)
         await scaling_group_repository.disassociate_scaling_group_with_user_groups(unbinder)

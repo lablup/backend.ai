@@ -858,7 +858,7 @@ class AssociateScalingGroupWithDomain(graphene.Mutation):  # type: ignore[misc]
                 pairs=[
                     RBACScopeBindingPair(
                         spec=ScalingGroupForDomainCreatorSpec(
-                            scaling_group_id=resource_group_id,
+                            resource_group_id=resource_group_id,
                             domain_id=domain_data.id,
                         ),
                         entity_ref=RBACElementRef(
@@ -907,7 +907,7 @@ class AssociateScalingGroupsWithDomain(graphene.Mutation):  # type: ignore[misc]
                 pairs=[
                     RBACScopeBindingPair(
                         spec=ScalingGroupForDomainCreatorSpec(
-                            scaling_group_id=resource_group_id,
+                            resource_group_id=resource_group_id,
                             domain_id=domain_data.id,
                         ),
                         entity_ref=RBACElementRef(
@@ -952,7 +952,7 @@ class DisassociateScalingGroupWithDomain(graphene.Mutation):  # type: ignore[mis
         resource_group_id = await _resolve_resource_group_id(graph_ctx, scaling_group)
         action = DisassociateScalingGroupWithDomainsAction(
             unbinder=ResourceGroupDomainEntityUnbinder(
-                scaling_group_ids=[resource_group_id],
+                resource_group_ids=[resource_group_id],
                 domain_id=domain_data.id,
             ),
         )
@@ -991,7 +991,7 @@ class DisassociateScalingGroupsWithDomain(graphene.Mutation):  # type: ignore[mi
         resource_group_ids = await _resolve_resource_group_ids(graph_ctx, scaling_groups)
         action = DisassociateScalingGroupWithDomainsAction(
             unbinder=ResourceGroupDomainEntityUnbinder(
-                scaling_group_ids=resource_group_ids,
+                resource_group_ids=resource_group_ids,
                 domain_id=domain_data.id,
             ),
         )
@@ -1025,7 +1025,7 @@ class DisassociateAllScalingGroupsWithDomain(graphene.Mutation):  # type: ignore
         ).data
         action = DisassociateScalingGroupWithDomainsAction(
             unbinder=ResourceGroupDomainEntityUnbinder(
-                scaling_group_ids=None,
+                resource_group_ids=None,
                 domain_id=domain_data.id,
             ),
         )
@@ -1060,7 +1060,7 @@ class AssociateScalingGroupWithUserGroup(graphene.Mutation):  # type: ignore[mis
                 pairs=[
                     RBACScopeBindingPair(
                         spec=ScalingGroupForProjectCreatorSpec(
-                            scaling_group_id=resource_group_id,
+                            resource_group_id=resource_group_id,
                             project=user_group,
                         ),
                         entity_ref=RBACElementRef(
@@ -1104,7 +1104,7 @@ class AssociateScalingGroupsWithUserGroup(graphene.Mutation):  # type: ignore[mi
                 pairs=[
                     RBACScopeBindingPair(
                         spec=ScalingGroupForProjectCreatorSpec(
-                            scaling_group_id=resource_group_id,
+                            resource_group_id=resource_group_id,
                             project=user_group,
                         ),
                         entity_ref=RBACElementRef(
@@ -1144,7 +1144,7 @@ class DisassociateScalingGroupWithUserGroup(graphene.Mutation):  # type: ignore[
         resource_group_id = await _resolve_resource_group_id(graph_ctx, scaling_group)
         action = DisassociateScalingGroupWithUserGroupsAction(
             unbinder=ResourceGroupProjectEntityUnbinder(
-                scaling_group_ids=[resource_group_id],
+                resource_group_ids=[resource_group_id],
                 project=user_group,
             ),
         )
@@ -1178,7 +1178,7 @@ class DisassociateScalingGroupsWithUserGroup(graphene.Mutation):  # type: ignore
         resource_group_ids = await _resolve_resource_group_ids(graph_ctx, scaling_groups)
         action = DisassociateScalingGroupWithUserGroupsAction(
             unbinder=ResourceGroupProjectEntityUnbinder(
-                scaling_group_ids=resource_group_ids,
+                resource_group_ids=resource_group_ids,
                 project=user_group,
             ),
         )
@@ -1207,7 +1207,7 @@ class DisassociateAllScalingGroupsWithGroup(graphene.Mutation):  # type: ignore[
         graph_ctx: GraphQueryContext = info.context
         action = DisassociateScalingGroupWithUserGroupsAction(
             unbinder=ResourceGroupProjectEntityUnbinder(
-                scaling_group_ids=None,
+                resource_group_ids=None,
                 project=user_group,
             ),
         )
@@ -1241,7 +1241,7 @@ class AssociateScalingGroupWithKeyPair(graphene.Mutation):  # type: ignore[misc]
             bulk_creator=BulkCreator(
                 specs=[
                     ScalingGroupForKeypairsCreatorSpec(
-                        scaling_group_id=resource_group_id,
+                        resource_group_id=resource_group_id,
                         access_key=AccessKey(access_key),
                     )
                 ]
@@ -1279,7 +1279,7 @@ class AssociateScalingGroupsWithKeyPair(graphene.Mutation):  # type: ignore[misc
             bulk_creator=BulkCreator(
                 specs=[
                     ScalingGroupForKeypairsCreatorSpec(
-                        scaling_group_id=resource_group_id,
+                        resource_group_id=resource_group_id,
                         access_key=AccessKey(access_key),
                     )
                     for resource_group_id in resource_group_ids
@@ -1314,7 +1314,7 @@ class DisassociateScalingGroupWithKeyPair(graphene.Mutation):  # type: ignore[mi
         resource_group_id = await _resolve_resource_group_id(graph_ctx, scaling_group)
         action = DisassociateScalingGroupWithKeypairsAction(
             purger=create_scaling_group_for_keypairs_purger(
-                scaling_group_id=resource_group_id,
+                resource_group_id=resource_group_id,
                 access_key=AccessKey(access_key),
             ),
         )
@@ -1348,7 +1348,7 @@ class DisassociateScalingGroupsWithKeyPair(graphene.Mutation):  # type: ignore[m
         resource_group_id = await _resolve_resource_group_id(graph_ctx, scaling_groups[0])
         action = DisassociateScalingGroupWithKeypairsAction(
             purger=create_scaling_group_for_keypairs_purger(
-                scaling_group_id=resource_group_id,
+                resource_group_id=resource_group_id,
                 access_key=AccessKey(access_key),
             ),
         )

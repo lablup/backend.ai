@@ -742,7 +742,7 @@ async def scaling_group_name(
 
 
 @pytest.fixture()
-async def scaling_group_id(
+async def resource_group_id(
     db_engine: SAEngine,
     scaling_group_name: ResourceGroupName,
 ) -> ResourceGroupID:
