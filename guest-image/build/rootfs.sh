@@ -46,10 +46,8 @@ stage_upstream_rootfs() {
 stage_krunner() {
 	rm -rf "$krunner"
 	mkdir -p "$krunner"
-	python3 -m pip download --no-deps --only-binary=:all: --dest "$krunner" "${BAI_CC_KRUNNER_REQUIREMENT}"
-	local whl
-	whl="$(find "$krunner" -name '*.whl' -print -quit)"
-	[ -n "$whl" ] || die "krunner wheel not downloaded"
+	local whl="${krunner}/krunner.whl"
+	fetch "${BAI_CC_KRUNNER_WHEEL_URL}" "$whl" "${BAI_CC_KRUNNER_WHEEL_SHA256}"
 	python3 -m zipfile -e "$whl" "${krunner}/unpacked"
 	local env_tar
 	env_tar="$(find "${krunner}/unpacked" -name "krunner-env.${BAI_CC_KRUNNER_DISTRO}.${BAI_CC_TARGET_ARCH}.tar.xz" -print -quit)"
