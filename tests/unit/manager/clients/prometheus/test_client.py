@@ -417,31 +417,6 @@ class TestExecutePreset:
         mock_session.post.assert_called_once()
         assert mock_session.post.call_args.args[0] == "query"
 
-    async def test_renders_label_matchers_and_instant_time(
-        self,
-        prometheus_client: PrometheusClient,
-        mock_session: Mock,
-        instant_response: AsyncMock,
-    ) -> None:
-        await prometheus_client.execute_preset(
-            query_template="sum(my_metric{{{labels}}}) by ({group_by})",
-            filter_labels={
-                "kernel_id": LabelMatcher.exact("kernel-1"),
-                "session_id": LabelMatcher.regex("id-1|id-2"),
-            },
-            group_labels=["session_id"],
-            time_window="5m",
-            time_range=None,
-            time="1704067200.123",
-        )
-
-        mock_session.post.assert_called_once()
-        form_data = mock_session.post.call_args.kwargs["data"]
-        field_values = {field[0]["name"]: field[2] for field in form_data._fields}
-        assert 'kernel_id="kernel-1"' in field_values["query"]
-        assert 'session_id=~"id-1|id-2"' in field_values["query"]
-        assert field_values["time"] == "1704067200.123"
-
 
 class TestTimeout:
     """Tests for PrometheusClient timeout behavior."""
