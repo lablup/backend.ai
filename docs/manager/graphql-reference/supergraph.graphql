@@ -1,7 +1,7 @@
 schema
   @link(url: "https://specs.apollo.dev/link/v1.0")
   @link(url: "https://specs.apollo.dev/join/v0.4", for: EXECUTION)
-  @link(url: "https://specs.backend.ai/public/v0.1", import: ["@public"])
+  @link(url: "https://directives.strawberry.rocks/public/v0.1", import: ["@public"])
 {
   query: Query
   mutation: Mutation

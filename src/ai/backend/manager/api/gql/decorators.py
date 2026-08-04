@@ -63,8 +63,6 @@ __all__ = (
     "gql_federation_type",
 )
 
-PUBLIC_DIRECTIVE_SPEC_URL = "https://specs.backend.ai/public/v0.1"
-
 T = TypeVar("T", bound="PydanticNodeMixin[Any]")
 T_conn = TypeVar("T_conn", bound="Connection[Any]")
 T_input = TypeVar("T_input", bound="PydanticInputMixin[Any]")
@@ -287,7 +285,6 @@ def gql_root_field(
     name="public",
     description="Resolvable without authentication.",
     compose=True,
-    import_url=PUBLIC_DIRECTIVE_SPEC_URL,
 )
 class Public:
     """``@public`` on a field definition. Carried into the supergraph via ``@composeDirective``."""

@@ -1,7 +1,7 @@
 """Resolvable without authentication."""
 directive @public on FIELD_DEFINITION
 
-schema @composeDirective(name: "@public") @link(url: "https://specs.backend.ai/public/v0.1", import: ["@public"]) @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@composeDirective"]) {
+schema @composeDirective(name: "@public") @link(url: "https://directives.strawberry.rocks/public/v0.1", import: ["@public"]) @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@composeDirective"]) {
   query: Query
 }
 
