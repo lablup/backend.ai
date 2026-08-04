@@ -16,9 +16,14 @@ to make the methods domain-specific, conversion included.
     | upsert    | ``DataUpserter``    | row class, conflict keys, ``to_data`` |
     | purge     | ``DataPurger``      | row class, pk, checks, ``to_data``    |
 
-Each write also has a many-row form — ``bulk_create`` over a sequence of ``DataCreator``,
-``batch_update`` and ``batch_purge`` over a ``DataBatchUpdater`` / ``DataBatchPurger``.
-They return what they wrote rather than a count, because a scope-shaped run reports the
+Each write also has many-row forms, and they differ in how failure lands:
+
+- ``bulk_create`` over a sequence of ``DataCreator`` — one transaction, all or nothing.
+- ``batch_update`` / ``batch_purge`` over a condition — one statement, all or nothing.
+- ``bulk_update`` / ``bulk_purge`` over entities the caller named — each in its own
+  savepoint, answering per entity, because the bulk shape reports per entity.
+
+All of them return what they wrote rather than a count, because a run reports the
 entities it touched through its result.
 
 Every method is delegation: the conversion runs inside ``ReadOps``/``WriteOps``, so no
@@ -41,15 +46,17 @@ operation protocols in ``services/ops/repository.py``, which both satisfy.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
+from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.base.creator import DataCreator
 from ai.backend.manager.repositories.base.purger import DataBatchPurger, DataPurger
 from ai.backend.manager.repositories.base.querier import DataFinder, DataQuerier
 from ai.backend.manager.repositories.base.searcher import Searcher, SearcherResult
+from ai.backend.manager.repositories.base.types import BulkResultWithFailures
 from ai.backend.manager.repositories.base.updater import DataBatchUpdater, DataUpdater
 from ai.backend.manager.repositories.base.upserter import DataUpserter
 from ai.backend.manager.repositories.ops.base.provider import DBOpsProvider
@@ -123,6 +130,24 @@ class OpsRepository[TData]:
                     f"{updater.row_class.__name__} {updater.pk_value()} not found"
                 )
             return data
+
+    async def bulk_update(
+        self, updaters: Mapping[EntityID, DataUpdater[Any, TData]]
+    ) -> BulkResultWithFailures[TData]:
+        """Update each named entity independently, answering for every one of them.
+
+        Nothing is raised for an individual failure: the caller named these entities, so
+        each one's fate belongs in the answer rather than aborting the rest.
+        """
+        async with self._ops.write_ops() as w:
+            return await w.bulk_update_data(updaters)
+
+    async def bulk_purge(
+        self, purgers: Mapping[EntityID, DataPurger[Any, TData]]
+    ) -> BulkResultWithFailures[TData]:
+        """Hard-delete each named entity independently, answering for every one."""
+        async with self._ops.write_ops() as w:
+            return await w.bulk_purge_data(purgers)
 
     async def batch_update(self, updater: DataBatchUpdater[Any, TData]) -> list[TData]:
         """Update every row matching the spec. An empty list means nothing matched."""

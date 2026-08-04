@@ -15,15 +15,18 @@ from typing import override
 
 from ai.backend.common.data.entity.types import EntityData
 from ai.backend.common.identifier.entity import EntityID
+from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupActionResult
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
+    BulkOpsResult,
     CreatedEntityOpsResult,
     EntitiesOpsResult,
     EntityOpsResult,
     LookupOpsResult,
 )
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
+from ai.backend.manager.errors.repository import EntityNotFoundError
 
 
 @dataclass
@@ -93,6 +96,29 @@ def test_lookup_result_works_for_a_name_keyed_domain() -> None:
     result = LookupOpsResult(data=_NameKeyedData(name="default"))
 
     assert result.resolved_entity_id() == uuid.uuid5(uuid.NAMESPACE_OID, "default")
+
+
+def test_bulk_result_answers_for_every_entity_named() -> None:
+    ok, broken = uuid.uuid4(), uuid.uuid4()
+
+    result = BulkOpsResult(
+        successes={ok: _PresetData(id=ok, name="a")},
+        errors={broken: EntityNotFoundError("gone")},
+    )
+
+    by_id = {r.entity_id: r for r in result.entity_results()}
+    assert by_id[ok].status is OperationStatus.SUCCESS
+    assert by_id[broken].status is OperationStatus.ERROR
+    assert by_id[broken].error_code == EntityNotFoundError("gone").error_code()
+
+
+def test_bulk_result_needs_nothing_from_its_data_type() -> None:
+    # The ids are the ones the caller passed in, so `EntityData` is not required.
+    entity_id = uuid.uuid4()
+
+    result = BulkOpsResult(successes={entity_id: _PlainData(name="a")}, errors={})
+
+    assert [r.entity_id for r in result.entity_results()] == [entity_id]
 
 
 def test_entity_result_carries_only_its_data() -> None:

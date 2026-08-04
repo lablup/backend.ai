@@ -14,7 +14,7 @@ generic path — and lands the answer in the shared result.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
 from unittest.mock import AsyncMock, MagicMock
@@ -28,12 +28,15 @@ from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction, LookupKey
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.base import (
     BatchPurgeOpsAction,
     BatchUpdateOpsAction,
     BulkCreateOpsAction,
+    BulkPurgeOpsAction,
+    BulkUpdateOpsAction,
     CreateOpsAction,
     GetOpsAction,
     LookupOpsAction,
@@ -61,7 +64,7 @@ from ai.backend.manager.repositories.base.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.purger import DataBatchPurger, DataPurger
 from ai.backend.manager.repositories.base.querier import DataFinder, DataQuerier
 from ai.backend.manager.repositories.base.searcher import Searcher, SearcherResult
-from ai.backend.manager.repositories.base.types import ConflictCheck
+from ai.backend.manager.repositories.base.types import BulkResultWithFailures, ConflictCheck
 from ai.backend.manager.repositories.base.updater import DataBatchUpdater, DataUpdater
 from ai.backend.manager.repositories.base.upserter import DataUpserter
 from ai.backend.manager.repositories.ops.repository import OpsRepository
@@ -69,6 +72,9 @@ from ai.backend.manager.services.ops.service import (
     BatchPurgeService,
     BatchUpdateService,
     BulkCreateService,
+    BulkDeleteService,
+    BulkPurgeService,
+    BulkUpdateService,
     CreateService,
     DeleteService,
     GetService,
@@ -491,6 +497,63 @@ class _LookupAction(BaseLookupAction, LookupOpsAction[RolePresetRow, _PresetData
 
 
 @dataclass
+class _BulkUpdateAction(BaseBulkAction, BulkUpdateOpsAction[RolePresetRow, _PresetData]):
+    updaters: dict[EntityID, _PresetUpdater]
+
+    @override
+    def to_updaters(self) -> Mapping[EntityID, DataUpdater[RolePresetRow, _PresetData]]:
+        return self.updaters
+
+    @override
+    def entity_ids(self) -> Sequence[EntityID]:
+        # Read off the same mapping, so the two cannot drift.
+        return tuple(self.updaters)
+
+    @classmethod
+    @override
+    def entity_type(cls) -> EntityType:
+        return _ENTITY_TYPE
+
+    @classmethod
+    @override
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+    @classmethod
+    @override
+    def required_permission(cls) -> Permission:
+        return Permission.UPDATE
+
+
+@dataclass
+class _BulkPurgeAction(BaseBulkAction, BulkPurgeOpsAction[RolePresetRow, _PresetData]):
+    purgers: dict[EntityID, _PresetPurger]
+
+    @override
+    def to_purgers(self) -> Mapping[EntityID, DataPurger[RolePresetRow, _PresetData]]:
+        return self.purgers
+
+    @override
+    def entity_ids(self) -> Sequence[EntityID]:
+        return tuple(self.purgers)
+
+    @classmethod
+    @override
+    def entity_type(cls) -> EntityType:
+        return _ENTITY_TYPE
+
+    @classmethod
+    @override
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.PURGE
+
+    @classmethod
+    @override
+    def required_permission(cls) -> Permission:
+        return Permission.HARD_DELETE
+
+
+@dataclass
 class _BulkCreateAction(BaseScopeAction, BulkCreateOpsAction[RolePresetRow, _PresetData]):
     scope: ScopeRef
     creators: list[_PresetCreator]
@@ -628,6 +691,14 @@ def repository(stored: _PresetData) -> MagicMock:
         setattr(mock, operation, AsyncMock(return_value=stored))
     for operation in ("bulk_create", "batch_update", "batch_purge"):
         setattr(mock, operation, AsyncMock(return_value=[stored]))
+    for operation in ("bulk_update", "bulk_purge"):
+        setattr(
+            mock,
+            operation,
+            AsyncMock(
+                return_value=BulkResultWithFailures(successes={stored.id: stored}, errors={})
+            ),
+        )
     mock.search = AsyncMock(
         return_value=SearcherResult(
             items=[stored], total_count=1, has_next_page=False, has_previous_page=True
@@ -778,6 +849,42 @@ async def test_bulk_create_forwards_every_creator(
 
     assert result.items == [stored]
     repository.bulk_create.assert_awaited_once_with(creators)
+
+
+async def test_bulk_update_answers_for_every_named_entity(
+    repository: MagicMock, stored: _PresetData
+) -> None:
+    service: BulkUpdateService[_PresetData] = BulkUpdateService(repository)
+    updaters = {stored.id: _PresetUpdater(target=stored.id)}
+
+    result = await service.execute(_BulkUpdateAction(updaters=updaters))
+
+    assert [r.entity_id for r in result.entity_results()] == [stored.id]
+    repository.bulk_update.assert_awaited_once_with(updaters)
+
+
+async def test_bulk_delete_writes_through_the_update_path(
+    repository: MagicMock, stored: _PresetData
+) -> None:
+    service: BulkDeleteService[_PresetData] = BulkDeleteService(repository)
+    updaters = {stored.id: _PresetUpdater(target=stored.id, values={"deleted": True})}
+
+    result = await service.execute(_BulkUpdateAction(updaters=updaters))
+
+    assert [r.entity_id for r in result.entity_results()] == [stored.id]
+    repository.bulk_update.assert_awaited_once_with(updaters)
+
+
+async def test_bulk_purge_answers_for_every_named_entity(
+    repository: MagicMock, stored: _PresetData
+) -> None:
+    service: BulkPurgeService[_PresetData] = BulkPurgeService(repository)
+    purgers = {stored.id: _PresetPurger(target=stored.id)}
+
+    result = await service.execute(_BulkPurgeAction(purgers=purgers))
+
+    assert [r.entity_id for r in result.entity_results()] == [stored.id]
+    repository.bulk_purge.assert_awaited_once_with(purgers)
 
 
 async def test_batch_update_names_what_it_wrote(

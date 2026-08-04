@@ -74,6 +74,7 @@ from .searcher import (
     SearcherResult,
 )
 from .types import (
+    BulkResultWithFailures,
     CursorConditionFactory,
     IntegrityErrorCheck,
 )
@@ -110,6 +111,7 @@ from .utils import (
 
 __all__ = [
     # Types
+    "BulkResultWithFailures",
     "CursorConditionFactory",
     "IntegrityErrorCheck",
     # Integrity

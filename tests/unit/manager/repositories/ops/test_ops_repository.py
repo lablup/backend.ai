@@ -363,6 +363,58 @@ class TestBulkCreate:
         assert await repository.bulk_create([]) == []
 
 
+class TestBulkUpdate:
+    """The bulk shape answers for every entity the caller named, one by one."""
+
+    async def test_each_named_entity_is_answered_for(
+        self, repository: OpsRepository[RolePresetData], preset: RolePresetData
+    ) -> None:
+        other = await repository.create(
+            _PresetCreator(name="other", scope_type=RBACScopeType.DOMAIN)
+        )
+
+        result = await repository.bulk_update({
+            preset.id: _PresetUpdater(name=OptionalState.update("a"), target=preset.id),
+            other.id: _PresetUpdater(name=OptionalState.update("b"), target=other.id),
+        })
+
+        assert set(result.successes) == {preset.id, other.id}
+        assert result.successes[preset.id].name == "a"
+        assert result.errors == {}
+
+    async def test_a_missing_entity_fails_without_taking_the_others_down(
+        self, repository: OpsRepository[RolePresetData], preset: RolePresetData
+    ) -> None:
+        absent = RolePresetID(uuid.uuid4())
+
+        result = await repository.bulk_update({
+            preset.id: _PresetUpdater(name=OptionalState.update("written"), target=preset.id),
+            absent: _PresetUpdater(name=OptionalState.update("nowhere"), target=absent),
+        })
+
+        assert set(result.successes) == {preset.id}
+        assert isinstance(result.errors[absent], EntityNotFoundError)
+        # The savepoint isolated the failure: the sibling write survives.
+        assert (await repository.get(_PresetQuerier(target=preset.id))).name == "written"
+
+
+class TestBulkPurge:
+    async def test_each_named_entity_is_answered_for(
+        self, repository: OpsRepository[RolePresetData], preset: RolePresetData
+    ) -> None:
+        absent = RolePresetID(uuid.uuid4())
+
+        result = await repository.bulk_purge({
+            preset.id: _PresetPurger(preset_id=preset.id),
+            absent: _PresetPurger(preset_id=absent),
+        })
+
+        assert result.successes[preset.id].id == preset.id
+        assert isinstance(result.errors[absent], EntityNotFoundError)
+        with pytest.raises(EntityNotFoundError):
+            await repository.get(_PresetQuerier(target=preset.id))
+
+
 class TestBatchUpdate:
     async def test_every_matching_row_comes_back(
         self, repository: OpsRepository[RolePresetData], preset: RolePresetData

@@ -19,6 +19,8 @@ from ai.backend.manager.actions.v2.ops.base import (
     BatchPurgeOpsAction,
     BatchUpdateOpsAction,
     BulkCreateOpsAction,
+    BulkPurgeOpsAction,
+    BulkUpdateOpsAction,
     CreateOpsAction,
     GetOpsAction,
     LookupOpsAction,
@@ -29,6 +31,7 @@ from ai.backend.manager.actions.v2.ops.base import (
 )
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
+    BulkOpsResult,
     CreatedEntityOpsResult,
     EntitiesOpsResult,
     EntityOpsResult,
@@ -42,6 +45,9 @@ __all__ = (
     "SearchService",
     "CreateService",
     "BulkCreateService",
+    "BulkUpdateService",
+    "BulkDeleteService",
+    "BulkPurgeService",
     "BatchUpdateService",
     "BatchPurgeService",
     "UpdateService",
@@ -123,6 +129,49 @@ class BulkCreateService[TData: EntityData]:
 
     async def execute(self, action: BulkCreateOpsAction[Any, TData]) -> EntitiesOpsResult[TData]:
         return EntitiesOpsResult(items=await self._repository.bulk_create(action.to_creators()))
+
+
+class BulkUpdateService[TData]:
+    """Updates each entity the action named, answering for every one of them."""
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: BulkUpdateOpsAction[Any, TData]) -> BulkOpsResult[TData]:
+        result = await self._repository.bulk_update(action.to_updaters())
+        return BulkOpsResult(successes=result.successes, errors=result.errors)
+
+
+class BulkDeleteService[TData]:
+    """Soft-deletes each entity the action named.
+
+    Takes ``BulkUpdateOpsAction`` for the same reason the single-entity delete does: the
+    status transition is domain knowledge and ops has no delete operation to generalize.
+    """
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: BulkUpdateOpsAction[Any, TData]) -> BulkOpsResult[TData]:
+        result = await self._repository.bulk_update(action.to_updaters())
+        return BulkOpsResult(successes=result.successes, errors=result.errors)
+
+
+class BulkPurgeService[TData]:
+    """Hard-deletes each entity the action named, answering for every one of them."""
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: BulkPurgeOpsAction[Any, TData]) -> BulkOpsResult[TData]:
+        result = await self._repository.bulk_purge(action.to_purgers())
+        return BulkOpsResult(successes=result.successes, errors=result.errors)
 
 
 class BatchUpdateService[TData: EntityData]:

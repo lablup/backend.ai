@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
+from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.base.creator import DataCreator
@@ -16,6 +17,8 @@ __all__ = (
     "LookupOpsAction",
     "CreateOpsAction",
     "BulkCreateOpsAction",
+    "BulkUpdateOpsAction",
+    "BulkPurgeOpsAction",
     "BatchUpdateOpsAction",
     "BatchPurgeOpsAction",
     "UpdateOpsAction",
@@ -85,6 +88,32 @@ class BulkCreateOpsAction[TRow: Base, TData](OpsBackendAction):
     @abstractmethod
     def to_creators(self) -> Sequence[DataCreator[TRow, TData]]:
         """Return one insert spec per row this action creates."""
+        raise NotImplementedError
+
+
+class BulkUpdateOpsAction[TRow: Base, TData](OpsBackendAction):
+    """An update of entities the caller named, each answered for separately.
+
+    A mapping rather than a list: the bulk shape reports per entity, and pairing the
+    specs to ``BaseBulkAction.entity_ids()`` by position would be an invariant nothing
+    enforces — one that fails by attributing an error to the wrong entity. A domain
+    action returns ``tuple(self.to_updaters())`` for its ids and the two cannot drift.
+
+    Soft deletes use this too, as the single-entity path does.
+    """
+
+    @abstractmethod
+    def to_updaters(self) -> Mapping[EntityID, DataUpdater[TRow, TData]]:
+        """Return the update spec for each entity this action names."""
+        raise NotImplementedError
+
+
+class BulkPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
+    """A hard delete of entities the caller named, each answered for separately."""
+
+    @abstractmethod
+    def to_purgers(self) -> Mapping[EntityID, DataPurger[TRow, TData]]:
+        """Return the delete spec for each entity this action names."""
         raise NotImplementedError
 
 

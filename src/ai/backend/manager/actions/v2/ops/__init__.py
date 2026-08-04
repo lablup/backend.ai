@@ -8,6 +8,8 @@ from .base import (
     BatchPurgeOpsAction,
     BatchUpdateOpsAction,
     BulkCreateOpsAction,
+    BulkPurgeOpsAction,
+    BulkUpdateOpsAction,
     CreateOpsAction,
     GetOpsAction,
     LookupOpsAction,
@@ -19,6 +21,7 @@ from .base import (
 )
 from .result import (
     BatchOpsResult,
+    BulkOpsResult,
     CreatedEntityOpsResult,
     EntitiesOpsResult,
     EntityOpsResult,
@@ -30,6 +33,9 @@ __all__ = (
     "BatchPurgeOpsAction",
     "BatchUpdateOpsAction",
     "BulkCreateOpsAction",
+    "BulkOpsResult",
+    "BulkPurgeOpsAction",
+    "BulkUpdateOpsAction",
     "CreateOpsAction",
     "CreatedEntityOpsResult",
     "EntitiesOpsResult",

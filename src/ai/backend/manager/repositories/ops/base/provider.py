@@ -8,16 +8,18 @@ managers and never touch the engine, raw sessions, or raw SQLAlchemy statements.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
 
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.errors.repository import (
     AmbiguousEntityKeyError,
     EmptySearchScopeError,
+    EntityNotFoundError,
 )
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.scopes import SearchScope
@@ -33,6 +35,7 @@ from ai.backend.manager.repositories.base import (
     BulkCreatorResult,
     BulkCreatorResultWithFailures,
     BulkPurgerResultWithFailures,
+    BulkResultWithFailures,
     BulkUpdaterResult,
     Creator,
     CreatorResult,
@@ -272,6 +275,61 @@ class WriteOps(ReadOps):
             return []
         result = await execute_bulk_creator(self._sess, BulkCreator(specs=list(creators)))
         return [creator.to_data(row) for creator, row in zip(creators, result.rows, strict=True)]
+
+    async def bulk_update_data[TRow: Base, TData](
+        self, updaters: Mapping[EntityID, DataUpdater[TRow, TData]]
+    ) -> BulkResultWithFailures[TData]:
+        """Update each named entity independently, reporting per entity.
+
+        Each row is written inside its own savepoint, so one failure rolls back only
+        itself and leaves the rest committed — the partial-failure behaviour the bulk
+        shape reports on.
+
+        Runs the loop here rather than through ``execute_bulk_updater_partial`` because
+        that function drops a missing primary key silently: it counts as neither a
+        success nor an error, which leaves the successes list impossible to attribute
+        back to the entities that produced it. The caller named these entities, so a
+        missing one is an answer it is owed, not a gap.
+        """
+        successes: dict[EntityID, TData] = {}
+        errors: dict[EntityID, Exception] = {}
+        for entity_id, updater in updaters.items():
+            try:
+                async with self._sess.begin_nested():
+                    result = await execute_updater(
+                        self._sess, Updater(spec=updater, pk_value=updater.pk_value())
+                    )
+                    if result is None:
+                        raise EntityNotFoundError(
+                            f"{updater.row_class.__name__} {updater.pk_value()} not found"
+                        )
+                    successes[entity_id] = updater.to_data(result.row)
+            except Exception as e:
+                errors[entity_id] = e
+        return BulkResultWithFailures(successes=successes, errors=errors)
+
+    async def bulk_purge_data[TRow: Base, TData](
+        self, purgers: Mapping[EntityID, DataPurger[TRow, TData]]
+    ) -> BulkResultWithFailures[TData]:
+        """Delete each named entity independently, reporting per entity.
+
+        Same savepoint isolation and the same reason for the explicit loop as
+        :meth:`bulk_update_data`.
+        """
+        successes: dict[EntityID, TData] = {}
+        errors: dict[EntityID, Exception] = {}
+        for entity_id, purger in purgers.items():
+            try:
+                async with self._sess.begin_nested():
+                    result = await execute_purger(self._sess, Purger(spec=purger))
+                    if result is None:
+                        raise EntityNotFoundError(
+                            f"{purger.row_class().__name__} {purger.pk_value()} not found"
+                        )
+                    successes[entity_id] = purger.to_data(result.row)
+            except Exception as e:
+                errors[entity_id] = e
+        return BulkResultWithFailures(successes=successes, errors=errors)
 
     async def batch_update_data[TRow: Base, TData](
         self, updater: DataBatchUpdater[TRow, TData]
