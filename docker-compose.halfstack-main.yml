@@ -47,7 +47,7 @@ services:
       - "9187:9187"
 
   backendai-half-redis:
-    image: valkey/valkey:9.1.0-alpine
+    image: valkey/valkey:9.1.1-alpine
     restart: unless-stopped
     networks:
       - half
