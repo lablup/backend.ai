@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     MyPurgeAppConfigFragmentsByNamesInput,
     MyUpsertAppConfigFragmentsInput,
     ScopedAppConfigFragmentsByNamesInput,
+    ScopedPurgeAppConfigFragmentsByNamesInput,
     ScopedUpsertAppConfigFragmentsInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
@@ -107,7 +108,15 @@ class V2AppConfigFragmentHandler:
         result = await self._adapter.my_upsert_app_config_fragments(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def my_bulk_purge(
+    async def scoped_bulk_purge_by_names(
+        self,
+        body: BodyParam[ScopedPurgeAppConfigFragmentsByNamesInput],
+    ) -> APIResponse:
+        """Purge one scope's fragments by config name, all-or-nothing (auth, RBAC-authorized)."""
+        result = await self._adapter.scoped_purge_app_config_fragments_by_names(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def my_bulk_purge_by_names(
         self,
         body: BodyParam[MyPurgeAppConfigFragmentsByNamesInput],
     ) -> APIResponse:

@@ -20,25 +20,26 @@ def register_v2_app_config_fragment_routes(
     """Register all REST v2 app config fragment routes.
 
     Writes go through ``/upsert``: a fragment is addressed by ``(scope, config_name)`` rather
-    than by id, so there is no separate create or update endpoint. ``/my/bulk-delete`` deletes
-    by that same address, so a caller removing their own fragments never has to resolve an id
-    first. The paginated scoped search is not exposed either — ``/by-names`` is the read a
-    client needs before editing. Every
+    than by id, so there is no separate create or update endpoint. ``/by-names`` carries that
+    same address for the operations that share it — the read, and the delete beneath it — so a
+    caller removing a fragment never has to resolve an id first. The paginated scoped search is
+    not exposed either: ``/by-names`` is the read a client needs before editing. Every
     route but ``/admin/search`` is open to any authenticated user and gated by RBAC at the
     processor (a user acts on their own user-scope, a domain admin on their domain's, a
     superadmin on any; public is superadmin-only). Only the system-wide ``/admin/search``
     skips RBAC, being superadmin-only at the middleware.
 
     Layout:
-        POST   /bulk-delete       purge many by id               (auth, RBAC)
-        POST   /admin/search      system-wide paginated search   (superadmin)
-        POST   /scoped/by-names   read one scope's by names      (auth, RBAC)
-        POST   /scoped/bulk-upsert  upsert many at one scope     (auth, RBAC)
-        POST   /my/by-names       read own scope's by names      (auth)
-        POST   /my/bulk-upsert    upsert many at own scope       (auth)
-        POST   /my/bulk-delete    purge own scope's by names     (auth)
-        GET    /{fragment_id}     get by id                      (auth, RBAC)
-        DELETE /{fragment_id}     purge by id                    (auth, RBAC)
+        POST   /bulk-delete                  purge many by id              (auth, RBAC)
+        POST   /admin/search                 system-wide paginated search  (superadmin)
+        POST   /scoped/by-names              read one scope's by names     (auth, RBAC)
+        POST   /scoped/by-names/bulk-delete  purge one scope's by names    (auth, RBAC)
+        POST   /scoped/bulk-upsert           upsert many at one scope      (auth, RBAC)
+        POST   /my/by-names                  read own scope's by names     (auth)
+        POST   /my/by-names/bulk-delete      purge own scope's by names    (auth)
+        POST   /my/bulk-upsert               upsert many at own scope      (auth)
+        GET    /{fragment_id}                get by id                     (auth, RBAC)
+        DELETE /{fragment_id}                purge by id                   (auth, RBAC)
     """
     registry = RouteRegistry.create("app-config-fragments", route_deps.cors_options)
 
@@ -48,11 +49,22 @@ def register_v2_app_config_fragment_routes(
         "POST", "/scoped/by-names", handler.scoped_fragments_by_names, middlewares=[auth_required]
     )
     registry.add(
+        "POST",
+        "/scoped/by-names/bulk-delete",
+        handler.scoped_bulk_purge_by_names,
+        middlewares=[auth_required],
+    )
+    registry.add(
         "POST", "/scoped/bulk-upsert", handler.scoped_bulk_upsert, middlewares=[auth_required]
     )
     registry.add("POST", "/my/by-names", handler.my_fragments_by_names, middlewares=[auth_required])
+    registry.add(
+        "POST",
+        "/my/by-names/bulk-delete",
+        handler.my_bulk_purge_by_names,
+        middlewares=[auth_required],
+    )
     registry.add("POST", "/my/bulk-upsert", handler.my_bulk_upsert, middlewares=[auth_required])
-    registry.add("POST", "/my/bulk-delete", handler.my_bulk_purge, middlewares=[auth_required])
     registry.add("GET", "/{fragment_id}", handler.get, middlewares=[auth_required])
     registry.add("DELETE", "/{fragment_id}", handler.purge, middlewares=[auth_required])
 

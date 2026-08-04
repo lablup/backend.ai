@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     MyPurgeAppConfigFragmentsByNamesInput,
     MyUpsertAppConfigFragmentsInput,
     ScopedAppConfigFragmentsByNamesInput,
+    ScopedPurgeAppConfigFragmentsByNamesInput,
     ScopedSearchAppConfigFragmentInput,
     ScopedUpsertAppConfigFragmentsInput,
 )
@@ -177,13 +178,29 @@ class AppConfigFragmentAdapter(BaseAdapter):
             ],
         )
 
+    async def scoped_purge_app_config_fragments_by_names(
+        self, input: ScopedPurgeAppConfigFragmentsByNamesInput
+    ) -> PurgeAppConfigFragmentsByNamesPayload:
+        """Purge the fragments written at the scope named in ``input`` for ``config_names``.
+
+        RBAC-authorized at that scope, so a caller purges only a scope they may write.
+        """
+        scope = AppConfigFragmentSearchScope(
+            scope_type=input.scope.scope_type, scope_id=input.scope.scope_id
+        )
+        action_result = await self._processors.app_config_fragment.purge_by_names.wait_for_complete(
+            PurgeAppConfigFragmentsByNamesAction(scope=scope, config_names=input.config_names)
+        )
+        return PurgeAppConfigFragmentsByNamesPayload(
+            items=[fragment.id for fragment in action_result.fragments]
+        )
+
     async def my_purge_app_config_fragments_by_names(
         self, input: MyPurgeAppConfigFragmentsByNamesInput
     ) -> PurgeAppConfigFragmentsByNamesPayload:
         """Purge the current user's own ``user``-scope fragments for ``config_names``.
 
-        All-or-nothing: a name the caller holds no fragment for purges nothing. Calls
-        ``current_user()`` internally — the caller does not pass a scope.
+        Calls ``current_user()`` internally — the caller does not pass a scope.
         """
         me = current_user()
         if me is None:
