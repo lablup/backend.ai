@@ -22,8 +22,11 @@ def setup_api(
     ``dep_resources.processing.processors`` is available) but **before**
     ``runner.setup()`` freezes the application router.
     """
+    import aiohttp
+
     from ai.backend.manager.api.adapters.registry import Adapters
     from ai.backend.manager.api.gql.adapter import BaseGQLAdapter
+    from ai.backend.manager.confidential.plane import ConfidentialPlane
 
     from .tree import build_api_routes
     from .types import GQLContextDeps
@@ -59,6 +62,17 @@ def setup_api(
         adapters=adapters,
     )
 
+    confidential_plane = ConfidentialPlane(r.infrastructure.db, aiohttp.ClientSession())
+
+    async def _start_confidential_plane(_app: web.Application) -> None:
+        confidential_plane.start()
+
+    async def _stop_confidential_plane(_app: web.Application) -> None:
+        await confidential_plane.close()
+
+    root_app.on_startup.append(_start_confidential_plane)
+    root_app.on_cleanup.append(_stop_confidential_plane)
+
     root_registry = RouteRegistry.create("", r.system.cors_options)
     for sub in build_api_routes(
         processors=r.processing.processors,
@@ -68,6 +82,7 @@ def setup_api(
         error_monitor=r.monitoring.error_monitor,
         gql_context_deps=gql_context_deps,
         valkey_rate_limit=r.infrastructure.valkey.rate_limit,
+        confidential_plane=confidential_plane,
         root_app=root_app,
         stream_cleanup_handler=r.processing.stream_cleanup_handler,
         health_probe=r.system.health_probe,

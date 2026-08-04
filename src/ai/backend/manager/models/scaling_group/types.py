@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -7,7 +8,45 @@ from pydantic import ConfigDict, Field, field_serializer, field_validator
 
 from ai.backend.common.types import BackendAISchema, ResourceSlot
 
-__all__ = ("FairShareScalingGroupSpec",)
+__all__ = ("ConfidentialScalingGroupOpts", "FairShareScalingGroupSpec")
+
+CAPABILITY_DISCLOSURE = (
+    "Confidential capability is operator-declared and backed by the signed broker provisioning"
+    " record named here. It is an integrity claim about our own paperwork, not a cryptographic"
+    " one: the key broker protocol offers no way to attest a running broker."
+)
+
+NONCE_RESIDUAL_DISCLOSURE = (
+    "The launch nonce binds a session with a claim quota equal to its member count. It preserves"
+    " cross-session isolation and does not provide member-against-member isolation within a"
+    " session; the quota binds count rather than identity, so a host that suppresses a legitimate"
+    " member can take the freed slot with a measurement-identical guest, whereupon the suppressed"
+    " member's fetch is refused and its session dies loudly."
+)
+
+
+class ConfidentialScalingGroupOpts(BackendAISchema):
+    model_config = ConfigDict(frozen=True)
+
+    enabled: bool = False
+    broker_endpoint: str = ""
+    broker_admin_token: str = ""
+    shim_public_addr: str = ""
+    provisioning_record: str = ""
+    pipeline_public_key: str = ""
+    attested_identity: str = ""
+    insecure_development: bool = False
+    tcb_grace_period: timedelta = timedelta(days=7)
+    admission_limit_per_image: int = 1
+    metadata_egress_allowlist: list[str] = Field(default_factory=list)
+
+    @property
+    def confidential_capable(self) -> bool:
+        return self.enabled and not self.insecure_development
+
+    @field_serializer("tcb_grace_period", mode="plain")
+    def serialize_tcb_grace_period(self, value: timedelta) -> float:
+        return value.total_seconds()
 
 
 class FairShareScalingGroupSpec(BackendAISchema):

@@ -19,7 +19,10 @@ from ai.backend.common.types import (
 if TYPE_CHECKING:
     from ai.backend.manager.data.deployment.types import DeploymentOptions
     from ai.backend.manager.data.session.options import DefaultSessionOptions
-    from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
+    from ai.backend.manager.models.scaling_group.types import (
+        ConfidentialScalingGroupOpts,
+        FairShareScalingGroupSpec,
+    )
 
 
 class SchedulerType(StrEnum):
@@ -126,6 +129,7 @@ class ScalingGroupData:
     fair_share_spec: FairShareScalingGroupSpec
     default_deployment_options: DeploymentOptions
     default_session_options: DefaultSessionOptions
+    confidential: ConfidentialScalingGroupOpts | None = None
 
 
 @dataclass

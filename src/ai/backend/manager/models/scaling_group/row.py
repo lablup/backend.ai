@@ -60,7 +60,10 @@ from ai.backend.manager.models.rbac import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import ScalingGroupPermission
-from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
+from ai.backend.manager.models.scaling_group.types import (
+    ConfidentialScalingGroupOpts,
+    FairShareScalingGroupSpec,
+)
 from ai.backend.manager.models.types import QueryCondition
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -306,6 +309,12 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
         nullable=False,
         default=ScalingGroupOpts,
     )
+    confidential: Mapped[ConfidentialScalingGroupOpts] = mapped_column(
+        "confidential",
+        PydanticColumn(ConfidentialScalingGroupOpts),
+        nullable=False,
+        default=ConfidentialScalingGroupOpts,
+    )
     fair_share_spec: Mapped[FairShareScalingGroupSpec | None] = mapped_column(
         "fair_share_spec",
         PydanticColumn(FairShareScalingGroupSpec),
@@ -405,6 +414,7 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
                 ),
             ),
             fair_share_spec=self.fair_share_spec or FairShareScalingGroupSpec(),
+            confidential=self.confidential,
             default_deployment_options=self.default_deployment_options,
             default_session_options=self.default_session_options,
         )

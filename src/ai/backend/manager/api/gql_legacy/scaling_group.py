@@ -22,6 +22,9 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentStatus
+from ai.backend.manager.models.confidential.disclosure import (
+    confidential_capability_view,
+)
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
     ScalingGroupForKeypairsRow,
@@ -33,6 +36,7 @@ from ai.backend.manager.models.scaling_group import (
     sgroups_for_groups,
     sgroups_for_keypairs,
 )
+from ai.backend.manager.models.scaling_group.types import ConfidentialScalingGroupOpts
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
 from ai.backend.manager.repositories.base.purger import Purger
@@ -55,6 +59,7 @@ from ai.backend.manager.repositories.scaling_group.scope_binders import (
     ResourceGroupProjectEntityUnbinder,
 )
 from ai.backend.manager.repositories.scaling_group.updaters import (
+    ScalingGroupConfidentialUpdaterSpec,
     ScalingGroupDriverConfigUpdaterSpec,
     ScalingGroupMetadataUpdaterSpec,
     ScalingGroupNetworkConfigUpdaterSpec,
@@ -148,6 +153,7 @@ class ScalingGroupNode(graphene.ObjectType):  # type: ignore[misc]
     scheduler = graphene.String()
     scheduler_opts = graphene.JSONString()
     use_host_network = graphene.Boolean()
+    confidential = graphene.JSONString(description="Added in 26.8.0.")
 
     @classmethod
     def from_row(
@@ -168,6 +174,7 @@ class ScalingGroupNode(graphene.ObjectType):  # type: ignore[misc]
             scheduler=row.scheduler,
             scheduler_opts=row.scheduler_opts,
             use_host_network=row.use_host_network,
+            confidential=confidential_capability_view(row.confidential),
         )
 
     # TODO: Refactor with action-processor structure, check permission
@@ -283,6 +290,7 @@ class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
     scheduler = graphene.String()
     scheduler_opts = graphene.JSONString()
     use_host_network = graphene.Boolean()
+    confidential = graphene.JSONString(description="Added in 26.8.0.")
     accelerator_quantum_size = graphene.Field(
         graphene.Float,
         description="Added in 25.5.0.",
@@ -462,6 +470,7 @@ class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
             scheduler=row.scheduler,
             scheduler_opts=row.scheduler_opts.model_dump(mode="json"),
             use_host_network=row.use_host_network,
+            confidential=confidential_capability_view(row.confidential),
         )
 
     @classmethod
@@ -482,6 +491,7 @@ class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
             scheduler=row.scheduler,
             scheduler_opts=row.scheduler_opts.model_dump(mode="json"),
             use_host_network=row.use_host_network,
+            confidential=confidential_capability_view(row.confidential),
         )
 
     @property
@@ -645,6 +655,7 @@ class CreateScalingGroupInput(graphene.InputObjectType):  # type: ignore[misc]
     scheduler = graphene.String(required=True)
     scheduler_opts = graphene.JSONString(required=False, default_value={})
     use_host_network = graphene.Boolean(required=False, default_value=False)
+    confidential = graphene.JSONString(required=False, default_value={})
 
 
 class ModifyScalingGroupInput(graphene.InputObjectType):  # type: ignore[misc]
@@ -658,6 +669,7 @@ class ModifyScalingGroupInput(graphene.InputObjectType):  # type: ignore[misc]
     scheduler = graphene.String(required=False)
     scheduler_opts = graphene.JSONString(required=False)
     use_host_network = graphene.Boolean(required=False)
+    confidential = graphene.JSONString(required=False)
 
     def to_updater(self, name: str) -> Updater[ScalingGroupRow]:
         """Convert GraphQL input to Updater for scaling group modification."""
@@ -685,12 +697,20 @@ class ModifyScalingGroupInput(graphene.InputObjectType):  # type: ignore[misc]
                 else Undefined
             ),
         )
+        confidential_spec = ScalingGroupConfidentialUpdaterSpec(
+            confidential=OptionalState.from_graphql(
+                ConfidentialScalingGroupOpts.model_validate(self.confidential)
+                if self.confidential is not None and self.confidential is not Undefined
+                else Undefined
+            ),
+        )
         spec = ScalingGroupUpdaterSpec(
             status=status_spec,
             metadata=metadata_spec,
             network=network_spec,
             driver=driver_spec,
             scheduler=scheduler_spec,
+            confidential=confidential_spec,
         )
         return Updater(spec=spec, pk_value=name)
 
@@ -727,6 +747,7 @@ class CreateScalingGroup(graphene.Mutation):  # type: ignore[misc]
             scheduler=props.scheduler,
             scheduler_opts=ScalingGroupOpts.model_validate(props.scheduler_opts),
             use_host_network=bool(props.use_host_network),
+            confidential=ConfidentialScalingGroupOpts.model_validate(props.confidential or {}),
         )
         creator = Creator(spec=spec)
         action = CreateScalingGroupAction(creator=creator)
@@ -749,6 +770,7 @@ class CreateScalingGroup(graphene.Mutation):  # type: ignore[misc]
                 scheduler=result.scaling_group.scheduler.name.value,
                 scheduler_opts=result.scaling_group.scheduler.options.to_json(),
                 use_host_network=result.scaling_group.network.use_host_network,
+                confidential=confidential_capability_view(result.scaling_group.confidential),
             ),
         )
 
