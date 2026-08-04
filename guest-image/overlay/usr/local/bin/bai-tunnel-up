@@ -1,0 +1,91 @@
+#!/opt/backend.ai/bin/python
+import ipaddress
+import json
+import pathlib
+import subprocess
+import sys
+import urllib.request
+
+STATE = pathlib.Path("/run/backend.ai")
+SHARED = STATE / "session"
+LINK = "wg0"
+
+
+class Refused(Exception):
+    pass
+
+
+def fetch(api, resource):
+    try:
+        with urllib.request.urlopen(f"{api}/cdh/resource/{resource}", timeout=60) as response:
+            return json.loads(response.read())
+    except OSError as error:
+        raise Refused(f"the broker did not release {resource}: {error}")
+
+
+def run(*args, feed=None):
+    result = subprocess.run(args, input=feed, capture_output=True)
+    if result.returncode != 0:
+        detail = result.stderr.decode().strip()
+        raise Refused(f"{' '.join(args)} exited {result.returncode}: {detail}")
+
+
+def carrier_mtu(name):
+    fields = subprocess.run(
+        ["ip", "-o", "link", "show", name], capture_output=True, check=False
+    ).stdout.split()
+    if b"mtu" not in fields:
+        raise Refused(f"the guest interface {name} reports no packet size to derive from")
+    return int(fields[fields.index(b"mtu") + 1])
+
+
+def report(payload):
+    (SHARED / "tunnel-state.json").write_text(json.dumps(payload, sort_keys=True) + "\n")
+
+
+def main():
+    request = json.loads((SHARED / "tunnel.json").read_text())
+    api = json.loads((STATE / "profile.json").read_text())["api"]
+    own = fetch(api, request["tunnel"])
+    directory = fetch(api, request["peers"])
+    base = ipaddress.ip_address(request["base"])
+    port = directory["port"]
+    peers = directory["peers"]
+    mine = next((p for p in peers if p["cluster_idx"] == own["cluster_idx"]), None)
+    if mine is None:
+        raise Refused("the session peer directory carries no entry for this member")
+    config = [f"[Interface]\nPrivateKey = {own['private_key']}\nListenPort = {port}\n"]
+    for peer in peers:
+        if peer["cluster_idx"] == own["cluster_idx"]:
+            continue
+        config.append(
+            f"[Peer]\nPublicKey = {peer['public_key']}\n"
+            f"AllowedIPs = {peer['tunnel_addr']}/32\n"
+            f"Endpoint = {base + peer['cluster_idx']}:{port}\nPersistentKeepalive = 25\n"
+        )
+    run("ip", "link", "add", LINK, "type", "wireguard")
+    run("wg", "setconf", LINK, "/dev/stdin", feed="\n".join(config).encode())
+    run("ip", "addr", "add", f"{mine['tunnel_addr']}/32", "dev", LINK)
+    run("ip", "link", "set", LINK, "mtu", str(carrier_mtu("eth0") - 80), "up")
+    for peer in peers:
+        if peer["cluster_idx"] != own["cluster_idx"]:
+            run("ip", "route", "add", f"{peer['tunnel_addr']}/32", "dev", LINK)
+    (SHARED / "hosts").write_text(
+        "".join(f"{peer['tunnel_addr']} {peer['hostname']}\n" for peer in peers)
+    )
+    report({
+        "state": "up",
+        "link": LINK,
+        "address": mine["tunnel_addr"],
+        "members": len(peers),
+        "residual": directory["residual"],
+    })
+
+
+try:
+    main()
+except (Refused, KeyError, ValueError, OSError) as failure:
+    subprocess.run(["ip", "link", "delete", LINK], capture_output=True, check=False)
+    report({"state": "failed", "reason": str(failure)})
+    print(f"backend.ai inter-kernel tunnel refused to come up: {failure}", file=sys.stderr)
+    sys.exit(1)

@@ -394,6 +394,10 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
             env["BACKENDAI_CC_CONFIG_URI"] = confidential["config_resource"]
         if confidential.get("secrets_resource"):
             env["BACKENDAI_CC_SECRETS_URI"] = confidential["secrets_resource"]
+        if confidential.get("tunnel_resource") and confidential.get("peers_resource"):
+            env["BACKENDAI_CC_TUNNEL_URI"] = confidential["tunnel_resource"]
+            env["BACKENDAI_CC_PEERS_URI"] = confidential["peers_resource"]
+            env["BACKENDAI_CC_TUNNEL_BASE"] = str(network.subnet[2])
         spec = ContainerSpec(
             name=f"kernel.{self.kernel_id}",
             image=self.image_ref.canonical,

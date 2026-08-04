@@ -57,6 +57,32 @@ def starve(reason):
         time.sleep(3600)
 
 
+def tunnel():
+    request = {
+        "tunnel": os.environ.get("BACKENDAI_CC_TUNNEL_URI", ""),
+        "peers": os.environ.get("BACKENDAI_CC_PEERS_URI", ""),
+        "base": os.environ.get("BACKENDAI_CC_TUNNEL_BASE", ""),
+    }
+    if not request["tunnel"]:
+        return
+    if not all(request.values()):
+        raise Refusal("the session names a tunnel key with no peer directory to bring up against")
+    shared = STATE / "session"
+    (shared / "tunnel.json").write_text(json.dumps(request, sort_keys=True))
+    state = shared / "tunnel-state.json"
+    for _ in range(120):
+        if state.is_file():
+            break
+        time.sleep(1)
+    else:
+        raise Refusal("the guest never reported on the inter-kernel tunnel")
+    report = json.loads(state.read_text())
+    if report["state"] != "up":
+        raise Refusal(f"the inter-kernel tunnel did not come up: {report['reason']}")
+    with open("/etc/hosts", "a") as hosts:
+        hosts.write((shared / "hosts").read_text())
+
+
 def main():
     api = profile()["api"]
     config_uri = os.environ.get("BACKENDAI_CC_CONFIG_URI")
@@ -76,6 +102,7 @@ def main():
     delivered = CONFIG / "ssh" / "dropbear_rsa_host_key"
     delivered.write_bytes(identity.read_bytes())
     delivered.chmod(0o600)
+    tunnel()
 
 
 try:

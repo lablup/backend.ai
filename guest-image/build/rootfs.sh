@@ -140,12 +140,24 @@ stage_storage_clients() {
 	done
 }
 
+stage_tunnel() {
+	local one rel
+	one="$(stage_one_root)"
+	for rel in ${BAI_CC_TUNNEL_BINS}; do
+		[ -e "${one}/${rel}" ] || die "stage-one carries no ${rel}, needed by the inter-kernel tunnel"
+		install -D -m 0755 "${one}/${rel}" "${stage}/${rel}"
+		stage_needed_libs "$one" "${one}/${rel}"
+	done
+}
+
 stage_overlay() {
 	cp -a "${BAI_CC_ROOT}/overlay/." "${stage}/"
 	find "${stage}/opt/kernel" "${stage}/usr/local/bin" -name '__pycache__' -type d -prune -exec rm -rf {} +
-	chmod 0755 "${stage}/opt/kernel/bai-cc-entrypoint" "${stage}/usr/local/bin/bai-guest-boot"
+	chmod 0755 "${stage}/opt/kernel/bai-cc-entrypoint" "${stage}/usr/local/bin/bai-guest-boot" \
+		"${stage}/usr/local/bin/bai-tunnel-up" "${stage}/opt/kernel/bai-tunnel-bench"
 	install -d -m 0755 "${stage}/usr/lib/systemd/system/multi-user.target.wants"
 	ln -sf ../bai-guest-boot.service "${stage}/usr/lib/systemd/system/multi-user.target.wants/bai-guest-boot.service"
+	ln -sf ../bai-tunnel-up.path "${stage}/usr/lib/systemd/system/multi-user.target.wants/bai-tunnel-up.path"
 	rm -f "${stage}"/opt/kernel/libbaihook.*.so "${stage}"/opt/kernel/jail.*.bin
 }
 
@@ -155,6 +167,7 @@ stage_upstream_rootfs
 stage_krunner
 stage_runner
 stage_storage_clients
+stage_tunnel
 stage_overlay
 canonicalise_tree "$stage"
 mkdir -p "${BAI_CC_OUT}"
