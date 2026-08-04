@@ -1102,7 +1102,6 @@ async def webapp_ctx(
     )
     cors.add(app.router.add_route("POST", "/func/{path:auth/signup}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:auth/signout}", manager_web_handler))
-    # `manager_web_handler` answers 401 without a browser session, before reaching the manager.
     # `public` is a reserved anonymous segment in v2 paths (manager `api/rest/v2/AGENTS.md`).
     for method in PROXIED_HTTP_METHODS:
         cors.add(
