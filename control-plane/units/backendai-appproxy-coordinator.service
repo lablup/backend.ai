@@ -1,0 +1,34 @@
+[Unit]
+Description=Backend.AI app-proxy coordinator
+Requires=backendai-credentials.service backendai-postgresql.service backendai-valkey.service
+After=backendai-credentials.service backendai-postgresql.service backendai-valkey.service backendai-manager.service
+
+[Service]
+Type=simple
+User=backendai
+Group=backendai
+LoadCredential=proxy-coordinator.toml:/run/backendai-credentials.sock
+LoadCredential=tls.key:/run/backendai-credentials.sock
+LoadCredential=tls.crt:/run/backendai-credentials.sock
+ExecStartPre=/usr/lib/backendai/credential-guard proxy-coordinator.toml tls.key tls.crt
+ExecStart=/usr/lib/backendai/backendai-appproxy-coordinator start-server -f ${CREDENTIALS_DIRECTORY}/proxy-coordinator.toml
+WorkingDirectory=/var/lib/backendai/coordinator
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateMounts=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/backendai/coordinator /run/backendai
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

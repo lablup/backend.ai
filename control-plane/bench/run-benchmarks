@@ -1,0 +1,191 @@
+#!/usr/bin/env python3
+import argparse
+import http.client
+import json
+import statistics
+import subprocess
+import sys
+import threading
+import time
+import urllib.parse
+
+
+def percentiles(samples):
+    if not samples:
+        return {"count": 0}
+    ordered = sorted(samples)
+    return {
+        "count": len(ordered),
+        "p50_ms": round(statistics.median(ordered) * 1000, 3),
+        "p95_ms": round(ordered[int(len(ordered) * 0.95) - 1] * 1000, 3),
+        "p99_ms": round(ordered[int(len(ordered) * 0.99) - 1] * 1000, 3),
+        "max_ms": round(ordered[-1] * 1000, 3),
+    }
+
+
+def shell(args, timeout=120):
+    return subprocess.run(args, capture_output=True, text=True, timeout=timeout, check=False)
+
+
+def control_plane_burst(args):
+    target = urllib.parse.urlparse(args.manager_url)
+    samples = []
+    lock = threading.Lock()
+    errors = []
+
+    def worker(count):
+        local = []
+        for _ in range(count):
+            connection = http.client.HTTPSConnection(target.netloc, timeout=30)
+            start = time.perf_counter()
+            try:
+                connection.request("GET", target.path or "/")
+                connection.getresponse().read()
+                local.append(time.perf_counter() - start)
+            except Exception as exc:
+                errors.append(str(exc))
+            finally:
+                connection.close()
+        with lock:
+            samples.extend(local)
+
+    threads = [
+        threading.Thread(target=worker, args=(args.requests // args.concurrency,))
+        for _ in range(args.concurrency)
+    ]
+    started = time.perf_counter()
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    elapsed = time.perf_counter() - started
+    report = percentiles(samples)
+    report["concurrency"] = args.concurrency
+    report["throughput_per_s"] = round(len(samples) / elapsed, 2) if elapsed else 0
+    report["errors"] = len(errors)
+    report["first_error"] = errors[0] if errors else ""
+    return report
+
+
+def etcd_commit(args):
+    base = ["etcdctl", "--endpoints", args.etcd_endpoint]
+    samples = []
+    for index in range(args.iterations):
+        start = time.perf_counter()
+        done = shell(base + ["put", f"/bench/commit/{index}", "x" * 256])
+        if done.returncode == 0:
+            samples.append(time.perf_counter() - start)
+    report = percentiles(samples)
+    terms, leaders = [], []
+    deadline = time.time() + args.election_window_s
+    while time.time() < deadline:
+        status = shell(base + ["endpoint", "status", "-w", "json"])
+        if status.returncode == 0:
+            try:
+                member = json.loads(status.stdout)[0]["Status"]
+                terms.append(member["raftTerm"])
+                leaders.append(member["leader"])
+            except (ValueError, KeyError, IndexError):
+                pass
+        time.sleep(1)
+    report["raft_term_changes"] = len(set(terms)) - 1 if terms else -1
+    report["leader_changes"] = len(set(leaders)) - 1 if leaders else -1
+    report["election_window_s"] = args.election_window_s
+    shell(base + ["del", "--prefix", "/bench/commit/"])
+    return report
+
+
+def postgres_commit(args):
+    samples = []
+    shell(["psql", "-q", "-d", args.database, "-c",
+           "CREATE TABLE IF NOT EXISTS bench_commit (id serial primary key, payload text)"])
+    for _ in range(args.iterations):
+        start = time.perf_counter()
+        done = shell(["psql", "-q", "-v", "ON_ERROR_STOP=1", "-d", args.database, "-c",
+                      "INSERT INTO bench_commit (payload) VALUES (repeat('x', 256))"])
+        if done.returncode == 0:
+            samples.append(time.perf_counter() - start)
+    report = percentiles(samples)
+    for setting in ("huge_pages", "synchronous_commit", "wal_sync_method", "shared_buffers"):
+        value = shell(["psql", "-tA", "-d", args.database, "-c", f"SHOW {setting}"])
+        report[setting] = value.stdout.strip() if value.returncode == 0 else "unread"
+    try:
+        with open("/proc/meminfo", encoding="utf-8") as f:
+            report["meminfo_hugepages"] = [
+                line.strip() for line in f if "Huge" in line
+            ]
+    except OSError:
+        report["meminfo_hugepages"] = []
+    shell(["psql", "-q", "-d", args.database, "-c", "DROP TABLE bench_commit"])
+    return report
+
+
+def credential_fanout(args):
+    samples = []
+    consumers = args.consumer_units.split(",") if args.consumer_units else []
+    for _ in range(args.rounds):
+        start = time.perf_counter()
+        done = shell(["systemctl", "restart", "backendai-credentials.service"], timeout=300)
+        if done.returncode != 0:
+            return {"count": 0, "error": done.stderr.strip()}
+        samples.append(time.perf_counter() - start)
+    report = {"broker_ready": percentiles(samples)}
+    for unit in consumers:
+        unit_samples = []
+        for _ in range(args.rounds):
+            start = time.perf_counter()
+            if shell(["systemctl", "restart", unit], timeout=300).returncode == 0:
+                unit_samples.append(time.perf_counter() - start)
+        report[unit] = percentiles(unit_samples)
+    return report
+
+
+def kill_drills(_args):
+    return {
+        "status": "descoped",
+        "reason": "the design review made streaming replication post-version-one work gated on "
+        "these drills, and the database ships as a documented single point of failure, so the "
+        "drills are deferred with the work they gate",
+    }
+
+
+BENCHMARKS = {
+    "control-plane-burst": control_plane_burst,
+    "etcd-commit": etcd_commit,
+    "postgres-commit": postgres_commit,
+    "credential-fanout": credential_fanout,
+    "kill-a-state-cvm": kill_drills,
+}
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(prog="run-benchmarks")
+    parser.add_argument("--only", action="append", choices=sorted(BENCHMARKS))
+    parser.add_argument("--manager-url", default="https://127.0.0.1:8081/")
+    parser.add_argument("--etcd-endpoint", default="http://127.0.0.1:2379")
+    parser.add_argument("--database", default="backend")
+    parser.add_argument("--consumer-units", default="backendai-manager.service")
+    parser.add_argument("--requests", type=int, default=2000)
+    parser.add_argument("--concurrency", type=int, default=50)
+    parser.add_argument("--iterations", type=int, default=1000)
+    parser.add_argument("--rounds", type=int, default=5)
+    parser.add_argument("--election-window-s", type=int, default=120)
+    parser.add_argument("--label", default="unlabelled")
+    args = parser.parse_args(argv)
+
+    selected = args.only or sorted(BENCHMARKS)
+    report = {
+        "label": args.label,
+        "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "thresholds": "deferred by the design review; these are numbers, not a gate",
+        "results": {},
+    }
+    for name in selected:
+        report["results"][name] = BENCHMARKS[name](args)
+    json.dump(report, sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

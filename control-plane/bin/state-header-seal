@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+
+DEVICE=${1:?usage: state-header-seal <device> [keyfile]}
+KEYFILE=${2:-${CREDENTIALS_DIRECTORY:?no credentials directory}/state-disk-key}
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
+
+[ -s "$KEYFILE" ] || { echo "state-header-seal: disk key is empty" >&2; exit 78; }
+
+cryptsetup luksHeaderBackup "$DEVICE" --header-backup-file "${WORK}/header" -q
+diskkey=$(od -An -v -tx1 < "$KEYFILE" | tr -d ' \n')
+mackey=$(printf 'backendai-luks-header-v1' | openssl dgst -sha256 -mac HMAC -macopt "hexkey:${diskkey}" -r | cut -d' ' -f1)
+openssl dgst -sha256 -mac HMAC -macopt "hexkey:${mackey}" -r "${WORK}/header" | cut -d' ' -f1

@@ -1,0 +1,98 @@
+[broker]
+url = "https://kbs.confidential.backend.ai:8080"
+client = "/usr/bin/kbs-client"
+socket = "/run/backendai-credentials.sock"
+template_dir = "/usr/share/backendai/credential-templates"
+identity_dir = "/run/backendai-credentials"
+decision_log = "/var/log/backendai-credentials.jsonl"
+certificate_plugin = "plugin/pkix"
+timeout_seconds = 30
+boot_attempts = 5
+boot_backoff_seconds = 5
+renewal_seconds = 86400
+renewal_jitter_seconds = 3600
+clock_skew_bound_seconds = 60
+
+[[credential]]
+unit = "backendai-manager.service"
+name = "manager.toml"
+render = "manager.toml.in"
+
+[[credential]]
+unit = "backendai-manager.service"
+name = "rpc-keypair"
+resource = "default/control-plane/rpc-keypair"
+
+[[credential]]
+unit = "backendai-manager.service"
+name = "tls.key"
+identity = "manager"
+part = "key"
+subject = "/CN=manager.control.backend.ai"
+sans = [
+  "DNS:manager.control.backend.ai",
+  "URI:spiffe://backend.ai/domain/default/control-plane/manager",
+]
+
+[[credential]]
+unit = "backendai-manager.service"
+name = "tls.crt"
+identity = "manager"
+part = "chain"
+subject = "/CN=manager.control.backend.ai"
+sans = [
+  "DNS:manager.control.backend.ai",
+  "URI:spiffe://backend.ai/domain/default/control-plane/manager",
+]
+
+[[credential]]
+unit = "backendai-appproxy-coordinator.service"
+name = "proxy-coordinator.toml"
+render = "proxy-coordinator.toml.in"
+
+[[credential]]
+unit = "backendai-appproxy-coordinator.service"
+name = "tls.key"
+identity = "coordinator"
+part = "key"
+subject = "/CN=coordinator.control.backend.ai"
+sans = [
+  "DNS:coordinator.control.backend.ai",
+  "URI:spiffe://backend.ai/domain/default/control-plane/coordinator",
+]
+
+[[credential]]
+unit = "backendai-appproxy-coordinator.service"
+name = "tls.crt"
+identity = "coordinator"
+part = "chain"
+subject = "/CN=coordinator.control.backend.ai"
+sans = [
+  "DNS:coordinator.control.backend.ai",
+  "URI:spiffe://backend.ai/domain/default/control-plane/coordinator",
+]
+
+[[credential]]
+unit = "backendai-postgresql.service"
+name = "password"
+resource = "default/control-plane/postgres-password"
+
+[[credential]]
+unit = "backendai-etcd.service"
+name = "root-password"
+resource = "default/control-plane/etcd-root-password"
+
+[[credential]]
+unit = "backendai-valkey.service"
+name = "valkey.conf"
+render = "valkey.conf.in"
+
+[[credential]]
+unit = "backendai-state-backup.service"
+name = "backup.key"
+resource = "default/control-plane/state-backup-key"
+
+[[credential]]
+unit = "backendai-state-backup.service"
+name = "etcd-root-password"
+resource = "default/control-plane/etcd-root-password"

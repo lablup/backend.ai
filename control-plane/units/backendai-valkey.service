@@ -1,0 +1,31 @@
+[Unit]
+Description=Backend.AI state bundle event bus
+Requires=backendai-credentials.service
+After=backendai-credentials.service
+
+[Service]
+Type=notify
+User=valkey
+Group=valkey
+LoadCredential=valkey.conf:/run/backendai-credentials.sock
+ExecStartPre=/usr/lib/backendai/credential-guard valkey.conf
+ExecStart=/usr/bin/valkey-server ${CREDENTIALS_DIRECTORY}/valkey.conf --supervised systemd
+Restart=on-failure
+RuntimeDirectory=backendai/valkey
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateMounts=yes
+ProtectSystem=strict
+ReadWritePaths=/run/backendai/valkey
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

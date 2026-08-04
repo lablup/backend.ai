@@ -1,0 +1,172 @@
+#!/bin/bash
+set -euo pipefail
+
+HERE=$(cd "$(dirname "$0")" && pwd)
+TREE=$(cd "${HERE}/.." && pwd)
+REPO=$(cd "${TREE}/.." && pwd)
+
+set -a
+. "${HERE}/pins.env"
+set +a
+MIRROR="https://snapshot.debian.org/archive/debian/${SNAPSHOT}"
+ETCD_URL="https://github.com/etcd-io/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-amd64.tar.gz"
+VALKEY_URL="https://download.valkey.io/releases/valkey-${VALKEY_VERSION}-noble-x86_64.tar.gz"
+
+PACKAGES=(systemd systemd-sysv systemd-boot dracut cryptsetup-bin openssl python3
+          postgresql-16 postgresql-client-16 ca-certificates iproute2 curl)
+
+OUT=${1:?usage: build-state-bundle.sh <output-dir> <manager.pex> <coordinator.pex> <kbs-client> <kernel>}
+MANAGER_PEX=${2:?manager pex}
+COORDINATOR_PEX=${3:?coordinator pex}
+KBS_CLIENT=${4:?kbs-client binary}
+KERNEL=${5:?kernel image}
+ROOT="${OUT}/rootfs"
+
+fail() { echo "build-state-bundle: $*" >&2; exit 1; }
+
+for pin in ETCD_SHA256 VALKEY_SHA256 SNAPSHOT SOURCE_DATE_EPOCH IMAGE_UUID COMMITTED_RPC_KEY_SHA256; do
+    value=${!pin:-}
+    [ -n "$value" ] || fail "pins.env leaves ${pin} unset"
+    [ "$value" != "PIN-ME" ] || fail "pins.env leaves ${pin} unpinned; fill it from the release you intend to ship"
+done
+
+verify() {
+    local want=$1 path=$2
+    local got
+    got=$(sha256sum "$path" | cut -d' ' -f1)
+    [ "$got" = "$want" ] || fail "$path digest $got does not match the pinned $want"
+}
+
+fetch() {
+    curl -fsSL --retry 3 -o "$2" "$1"
+    verify "$3" "$2"
+}
+
+rm -rf "$OUT"
+mkdir -p "$OUT/cache" "$ROOT"
+
+debootstrap --variant=minbase --merged-usr --include="$(IFS=,; echo "${PACKAGES[*]}")" \
+    "$SUITE" "$ROOT" "$MIRROR"
+
+fetch "$ETCD_URL" "$OUT/cache/etcd.tgz" "$ETCD_SHA256"
+tar -xzf "$OUT/cache/etcd.tgz" -C "$OUT/cache"
+install -m 0755 "$OUT"/cache/etcd-*/etcd "$OUT"/cache/etcd-*/etcdctl "$OUT"/cache/etcd-*/etcdutl "$ROOT/usr/bin/"
+
+fetch "$VALKEY_URL" "$OUT/cache/valkey.tgz" "$VALKEY_SHA256"
+tar -xzf "$OUT/cache/valkey.tgz" -C "$OUT/cache"
+install -m 0755 "$OUT"/cache/valkey-*/bin/valkey-server "$OUT"/cache/valkey-*/bin/valkey-cli "$ROOT/usr/bin/"
+
+install -d -m 0755 "$ROOT/usr/lib/backendai" "$ROOT/etc/backendai" \
+    "$ROOT/usr/share/backendai/credential-templates" \
+    "$ROOT/usr/lib/backendai/credential-broker" \
+    "$ROOT/usr/lib/dracut/modules.d/91backendai-unlock"
+install -m 0755 "$MANAGER_PEX" "$ROOT/usr/lib/backendai/backendai-manager"
+install -m 0755 "$COORDINATOR_PEX" "$ROOT/usr/lib/backendai/backendai-appproxy-coordinator"
+install -m 0755 "$KBS_CLIENT" "$ROOT/usr/bin/kbs-client"
+cp -a "${REPO}/credential-broker/broker" "$ROOT/usr/lib/backendai/credential-broker/"
+install -m 0644 "${REPO}"/credential-broker/templates/* "$ROOT/usr/share/backendai/credential-templates/"
+install -m 0644 "${REPO}/credential-broker/policy/state-bundle.toml" "$ROOT/etc/backendai/credential-policy.toml"
+install -m 0755 "${TREE}"/bin/* "$ROOT/usr/lib/backendai/"
+install -m 0644 "${TREE}"/units/*.service "${TREE}"/units/*.timer "$ROOT/usr/lib/systemd/system/"
+install -m 0755 "${TREE}/initramfs/module-setup.sh" "$ROOT/usr/lib/dracut/modules.d/91backendai-unlock/"
+install -m 0755 "${TREE}/initramfs/unlock-state-volume" "$ROOT/usr/lib/dracut/modules.d/91backendai-unlock/"
+install -m 0644 "${TREE}/initramfs/backendai-unlock-state.service" "$ROOT/usr/lib/dracut/modules.d/91backendai-unlock/"
+
+cp -a "${HERE}/no-introspection/aiomonitor" "$ROOT/usr/lib/backendai/no-introspection-aiomonitor"
+
+chroot "$ROOT" /bin/sh -e <<'INSIDE'
+useradd --system --home-dir /var/lib/backendai --create-home backendai
+useradd --system --home-dir /var/lib/backendai/etcd --create-home etcd
+useradd --system --home-dir /var/lib/backendai/valkey --create-home valkey
+install -d -m 0700 -o postgres -g postgres /var/lib/backendai/postgresql
+install -d -m 0750 -o backendai -g backendai /var/lib/backendai/manager /var/lib/backendai/coordinator
+systemctl enable backendai-credentials.service backendai-postgresql.service \
+    backendai-etcd.service backendai-valkey.service backendai-manager.service \
+    backendai-appproxy-coordinator.service backendai-state-backup.timer
+systemctl mask systemd-timesyncd.service serial-getty@ttyS0.service getty@tty1.service \
+    debug-shell.service systemd-ask-password-console.service
+apt-get -y purge openssh-server 2>/dev/null || true
+apt-get -y clean
+rm -rf /var/lib/apt/lists/* /var/cache/debconf/*-old /usr/share/doc /usr/share/man
+INSIDE
+
+for pex in backendai-manager backendai-appproxy-coordinator; do
+    find "$ROOT/usr/lib/backendai" -path "*/${pex}*" -name 'aiomonitor' -type d -prune -exec rm -rf {} + 2>/dev/null || true
+done
+python3 - "$ROOT" <<'PY'
+import pathlib, shutil, sys
+root = pathlib.Path(sys.argv[1])
+shim = root / "usr/lib/backendai/no-introspection-aiomonitor"
+removed = 0
+for target in root.rglob("aiomonitor"):
+    if target.is_dir() and target != shim and "no-introspection" not in str(target):
+        shutil.rmtree(target)
+        shutil.copytree(shim, target)
+        removed += 1
+for target in root.rglob("aiomonitor*.dist-info"):
+    shutil.rmtree(target, ignore_errors=True)
+print(f"build-state-bundle: replaced {removed} aiomonitor trees with the absent shim")
+PY
+
+if grep -rql "aiomonitor.termui\|start_monitor(" "$ROOT/usr/lib/backendai" 2>/dev/null; then
+    fail "an introspection console implementation survived in the image"
+fi
+if [ -e "$ROOT/usr/sbin/sshd" ] || [ -e "$ROOT/usr/bin/sshd" ]; then
+    fail "a secure shell daemon survived in the image"
+fi
+if find "$ROOT" -type f -size -8k -exec sha256sum {} + | grep -q "$COMMITTED_RPC_KEY_SHA256"; then
+    fail "the repository-committed default RPC private key survived in the image"
+fi
+grep -q 'no-introspection' "$ROOT/usr/lib/backendai/no-introspection-aiomonitor/__init__.py" ||
+    fail "the introspection shim is missing"
+
+chroot "$ROOT" dracut --force --no-hostonly --add "backendai-unlock" \
+    --kver "$(basename "$KERNEL" | sed 's/^vmlinuz-//')" /boot/initrd.img
+cp "$ROOT/boot/initrd.img" "$OUT/initrd.img"
+rm -f "$ROOT/boot/initrd.img"
+
+find "$ROOT" -newermt "@${SOURCE_DATE_EPOCH}" -print0 |
+    xargs -0r touch --no-dereference --date="@${SOURCE_DATE_EPOCH}"
+mkfs.erofs -zlz4hc -T "$SOURCE_DATE_EPOCH" -U "$IMAGE_UUID" --all-root "$OUT/rootfs.erofs" "$ROOT"
+
+veritysetup format "$OUT/rootfs.erofs" "$OUT/rootfs.verity" --uuid "$IMAGE_UUID" |
+    tee "$OUT/verity.txt"
+ROOTHASH=$(awk '/Root hash:/ { print $3 }' "$OUT/verity.txt")
+[ -n "$ROOTHASH" ] || fail "veritysetup produced no root hash"
+
+CMDLINE="root=/dev/mapper/root ro systemd.verity=yes roothash=${ROOTHASH} \
+BACKENDAI_KBS_URL=${BACKENDAI_KBS_URL:?BACKENDAI_KBS_URL must be set for the measured command line} \
+BACKENDAI_STATE_DEVICE=/dev/disk/by-partlabel/backendai-state console=ttyS0 quiet"
+printf '%s' "$CMDLINE" > "$OUT/cmdline"
+ukify build --linux="$KERNEL" --initrd="$OUT/initrd.img" --cmdline="@${OUT}/cmdline" \
+    --os-release="@${ROOT}/usr/lib/os-release" --output="$OUT/state-bundle.efi"
+
+python3 - "$OUT" "$ROOTHASH" "$IMAGE_UUID" > "$OUT/reference-values.json" <<'PY'
+import hashlib, json, pathlib, sys
+out, roothash, uuid = pathlib.Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+
+
+def digest(name, algorithm):
+    h = hashlib.new(algorithm)
+    h.update((out / name).read_bytes())
+    return h.hexdigest()
+
+
+json.dump(
+    {
+        "version": "0.1.0",
+        "bundle": "state",
+        "image-uuid": uuid,
+        "verity-root-hash": roothash,
+        "uki-sha384": digest("state-bundle.efi", "sha384"),
+        "cmdline-sha384": digest("cmdline", "sha384"),
+        "rootfs-sha256": digest("rootfs.erofs", "sha256"),
+        "rtmr": "capture-reference-values must fill these from a booted trust domain",
+    },
+    sys.stdout,
+    indent=2,
+    sort_keys=True,
+)
+PY
+
+echo "build-state-bundle: ${OUT}/state-bundle.efi roothash=${ROOTHASH}"

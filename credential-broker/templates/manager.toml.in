@@ -1,0 +1,56 @@
+[etcd]
+namespace = "backendai"
+addr = { host = "127.0.0.1", port = 2379 }
+user = "root"
+password = "@@default/control-plane/etcd-root-password@@"
+
+[db]
+type = "postgresql"
+addr = { host = "127.0.0.1", port = 5432 }
+name = "backend"
+user = "postgres"
+password = "@@default/control-plane/postgres-password@@"
+pool-recycle = 50
+pool-pre-ping = false
+
+[manager]
+num-proc = 4
+service-addr = { host = "0.0.0.0", port = 8081 }
+internal-addr = { host = "127.0.0.1", port = 18080 }
+heartbeat-timeout = 40.0
+pid-file = "/run/backendai/manager.pid"
+disabled-plugins = []
+hide-agents = true
+agent-selection-resource-priority = ["cuda", "rocm", "tpu", "cpu", "mem"]
+rpc-auth-manager-keypair = "/run/credentials/backendai-manager.service/rpc-keypair"
+secret = "@@default/control-plane/manager-secret@@"
+ssl-enabled = true
+ssl-cert = "/run/credentials/backendai-manager.service/tls.crt"
+ssl-privkey = "/run/credentials/backendai-manager.service/tls.key"
+
+[redis]
+addr = { host = "127.0.0.1", port = 6379 }
+password = "@@default/control-plane/valkey-password@@"
+
+[watcher]
+token = "@@default/control-plane/watcher-token@@"
+
+[docker-registry]
+ssl-verify = true
+
+[pyroscope]
+enabled = false
+
+[logging]
+level = "INFO"
+drivers = ["console"]
+
+[logging.console]
+colored = false
+format = "verbose"
+
+[debug]
+enabled = false
+
+[otel]
+enabled = false

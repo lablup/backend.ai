@@ -1,0 +1,41 @@
+#!/bin/sh
+set -eu
+
+TARGET=${BACKENDAI_BACKUP_TARGET:-/var/lib/backendai/backup}
+KEYFILE=${CREDENTIALS_DIRECTORY:?no credentials directory}/backup.key
+PGBIN=/usr/lib/postgresql/16/bin
+SEGMENT=${1:?usage: state-restore <segment>}
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
+
+[ -s "$KEYFILE" ] || { echo "state-restore: backup key is empty" >&2; exit 78; }
+
+key=$(od -An -v -tx1 < "$KEYFILE" | tr -d ' \n')
+mackey=$(printf 'backendai-state-backup-v1' | openssl dgst -sha256 -mac HMAC -macopt "hexkey:${key}" -r | cut -d' ' -f1)
+
+manifest_mac=$(openssl dgst -sha256 -mac HMAC -macopt "hexkey:${mackey}" -r "${TARGET}/manifest" | cut -d' ' -f1)
+if [ "$manifest_mac" != "$(tr -d ' \n\r' < "${TARGET}/manifest.mac")" ]; then
+    echo "state-restore: the backup manifest does not authenticate" >&2
+    exit 78
+fi
+
+expected=$(awk -v s="$SEGMENT" '$2 == s { print $3 }' "${TARGET}/manifest" | tail -n 1)
+[ -n "$expected" ] || { echo "state-restore: $SEGMENT is not in the manifest" >&2; exit 78; }
+
+actual=$(openssl dgst -sha256 -mac HMAC -macopt "hexkey:${mackey}" -r "${TARGET}/${SEGMENT}" | cut -d' ' -f1)
+if [ "$actual" != "$expected" ]; then
+    echo "state-restore: $SEGMENT does not authenticate against the manifest" >&2
+    exit 78
+fi
+
+openssl enc -d -aes-256-ctr -pbkdf2 -iter 200000 -kfile "$KEYFILE" -in "${TARGET}/${SEGMENT}" -out "${WORK}/bundle.tar"
+tar -C "$WORK" -xf "${WORK}/bundle.tar"
+
+for db in backend appproxy; do
+    "${PGBIN}/dropdb" --if-exists "$db"
+    "${PGBIN}/createdb" "$db"
+    "${PGBIN}/pg_restore" --no-owner --dbname="$db" "${WORK}/${db}.dump"
+done
+etcdutl snapshot restore "${WORK}/etcd.snapshot" --data-dir /var/lib/backendai/etcd.restored
+
+echo "state-restore: restored ${SEGMENT}; etcd data dir is /var/lib/backendai/etcd.restored"
