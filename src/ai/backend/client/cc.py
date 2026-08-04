@@ -56,8 +56,11 @@ class VFolderCipherStore:
             pass
 
     async def listdir(self, path: str) -> list[tuple[str, int, bool]]:
-        rqst = Request("GET", f"/folders/{self._folder.request_key}/files")
-        rqst.set_json({"path": path or "."})
+        rqst = Request(
+            "GET",
+            f"/folders/{self._folder.request_key}/files",
+            params={"path": path or "."},
+        )
         async with rqst.fetch() as resp:
             items = (await resp.json())["items"]
         return [
