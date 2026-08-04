@@ -123,7 +123,7 @@ stage_one_root() {
 				sed -i 's/^Components:.*/Components: ${BAI_CC_REPO_COMPONENTS}/' /etc/apt/sources.list.d/ubuntu.sources
 				apt-get update -qq
 				apt-get install -y --no-install-recommends ${BAI_CC_EXTRA_PKGS} >/dev/null
-				dpkg-query -W -f='\''\${Package}=\${Version}\n'\'' | sort > /out/.packages
+				dpkg-query -W | sort > /out/.packages
 				tar -C / -cf - bin sbin lib lib64 usr | tar -C /out -xf -" >/dev/null
 	fi
 	printf '%s' "$src"
