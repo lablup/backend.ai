@@ -53842,7 +53842,7 @@
           }
         },
         "parameters": [],
-        "description": "Anonymous (unauthenticated) GraphQL endpoint.\n\nRegistered without ``auth_required`` so unauthenticated callers reach it. It serves a\nseparate ``PublicQueries`` schema that contains only public fields, so private fields are\nphysically absent and cannot be queried (no runtime gate needed). Authenticated routes are\nunaffected.\n"
+        "description": "Execute a GraphQL query without credentials.\n\nServes the public schema, which holds only the fields that are safe to read anonymously;\nevery other field is absent from it and cannot be queried here. The full schema is at\n``POST /admin/gql/strawberry`` and requires authentication.\n"
       }
     },
     "/admin/domains": {
