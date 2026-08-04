@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.actions.types import ActionOperationType, ActionSpec
 
@@ -24,12 +23,6 @@ class BaseSingleEntityAction(ABC):
     @abstractmethod
     def entity_id(self) -> EntityID:
         """Return the ID of the entity that this action applies to."""
-        raise NotImplementedError
-
-    @classmethod
-    @abstractmethod
-    def required_permission(cls) -> Permission:
-        """Return the permission required to perform this action."""
         raise NotImplementedError
 
     @classmethod

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from ai.backend.common.data.entity.types import EntityType, ScopeType
-from ai.backend.common.data.permission.types import OperationType
+from ai.backend.common.data.permission.types import OperationType, Permission
 
 # Placeholder substituted when an id (request_id, entity_id, ...) is absent while
 # materializing action metadata into audit/report records.
@@ -40,6 +40,7 @@ class ActionOperationType(enum.StrEnum):
     UPDATE = "update"
     DELETE = "delete"
     PURGE = "purge"
+    RESTORE = "restore"
 
     @classmethod
     def read_operations(cls) -> frozenset["ActionOperationType"]:
@@ -64,6 +65,26 @@ class ActionOperationType(enum.StrEnum):
                 return OperationType.SOFT_DELETE
             case ActionOperationType.PURGE:
                 return OperationType.HARD_DELETE
+            case ActionOperationType.RESTORE:
+                return OperationType.SOFT_DELETE
+
+    def to_permission(self) -> Permission:
+        """The permission an action performing this operation must hold.
+
+        ``RESTORE`` shares ``SOFT_DELETE``: undoing a soft delete flips one status
+        flag back and reaches nothing the deleter could not already reach.
+        """
+        match self:
+            case ActionOperationType.GET | ActionOperationType.SEARCH:
+                return Permission.READ
+            case ActionOperationType.CREATE:
+                return Permission.CREATE
+            case ActionOperationType.UPDATE:
+                return Permission.UPDATE
+            case ActionOperationType.DELETE | ActionOperationType.RESTORE:
+                return Permission.SOFT_DELETE
+            case ActionOperationType.PURGE:
+                return Permission.HARD_DELETE
 
 
 @dataclass

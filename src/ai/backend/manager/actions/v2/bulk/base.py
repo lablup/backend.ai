@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.actions.types import ActionOperationType, ActionSpec
 
@@ -25,12 +24,6 @@ class BaseBulkAction(ABC):
     @abstractmethod
     def entity_ids(self) -> Sequence[EntityID]:
         """Return the IDs of the entities that this action applies to."""
-        raise NotImplementedError
-
-    @classmethod
-    @abstractmethod
-    def required_permission(cls) -> Permission:
-        """Return the permission required to perform this action."""
         raise NotImplementedError
 
     @classmethod

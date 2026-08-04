@@ -54,7 +54,7 @@ class VirtualScopeBulkActionRBACValidator(BulkActionValidator):
             )
             for entity_id in action.entity_ids()
         ]
-        permission = action.required_permission()
+        permission = action.operation_type().to_permission()
         permission_map = await self._repository.check_bulk_permission_via_virtual_scope(
             keys, permission
         )

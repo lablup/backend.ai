@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
 from ai.backend.common.data.entity.types import EntityType, ScopeRef
-from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.actions.types import ActionOperationType, ActionSpec
 
 
@@ -24,12 +23,6 @@ class BaseScopeAction(ABC):
     @abstractmethod
     def operation_type(cls) -> ActionOperationType:
         """Return the operation that this action performs within the scopes."""
-        raise NotImplementedError
-
-    @classmethod
-    @abstractmethod
-    def required_permission(cls) -> Permission:
-        """Return the permission required to perform this action."""
         raise NotImplementedError
 
     @classmethod
