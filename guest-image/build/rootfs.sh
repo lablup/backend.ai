@@ -134,6 +134,7 @@ stage_storage_clients() {
 	one="$(stage_one_root)"
 	local rel
 	for rel in usr/sbin/mount.nfs usr/sbin/mount.nfs4 usr/sbin/mount.ceph usr/sbin/mount.cifs \
+		usr/sbin/integritysetup usr/sbin/losetup usr/sbin/resize2fs \
 		usr/sbin/rpcbind usr/sbin/rpc.statd usr/bin/gocryptfs usr/bin/fusermount3 \
 		usr/sbin/cryptsetup usr/sbin/dmsetup usr/sbin/mkfs.ext4 usr/sbin/blkid; do
 		[ -e "${one}/${rel}" ] || die "stage-one carries no ${rel}"
