@@ -12,7 +12,7 @@ from abc import ABCMeta
 from collections import OrderedDict
 from collections.abc import Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Literal, NotRequired, TypedDict, cast, override
+from typing import Any, Final, Literal, NotRequired, TypedDict, cast, override
 
 from async_timeout import timeout
 
@@ -26,6 +26,7 @@ from ai.backend.common.types import KernelId, SessionId, aobject
 from ai.backend.logging import BraceStyleAdapter
 
 from .errors import (
+    ChannelNotEstablished,
     InvalidSocket,
     OutputQueueMismatchError,
     OutputQueueNotInitializedError,
@@ -36,6 +37,9 @@ from .transport import RunnerTransport, ZeroMQTransport
 from .vocabulary import RunnerReply, RunnerVerb
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+REDIAL_STALL_LIMIT: Final = 30
+REDIAL_BACKOFF: Final = 1.0
 
 
 # msg types visible to the API client.
@@ -757,6 +761,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             codecs.getincrementaldecoder("utf8")(errors="replace"),
         )
         transport = await self._get_transport()
+        stalls = 0
         while True:
             try:
                 data = await transport.recv_multipart()
@@ -829,6 +834,14 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                     decoders[0].decode(b"", True)
                     decoders[1].decode(b"", True)
                     self.finished_at = time.monotonic()
+            except ChannelNotEstablished as e:
+                stalls += 1
+                if stalls > REDIAL_STALL_LIMIT:
+                    log.warning("the kernel channel stayed unreachable ({}); giving up", e)
+                    self._is_socket_invalid = True
+                    break
+                await asyncio.sleep(REDIAL_BACKOFF)
+                continue
             except InvalidSocket:
                 self._is_socket_invalid = True
                 break
@@ -837,3 +850,4 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             except Exception:
                 log.exception("unexpected error")
                 break
+            stalls = 0

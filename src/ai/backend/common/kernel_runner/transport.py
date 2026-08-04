@@ -199,7 +199,7 @@ class FramedTransport(RunnerTransport):
             return await _read_frames(reader)
         except (OSError, ssl.SSLError, asyncio.IncompleteReadError) as e:
             self._drop()
-            raise InvalidSocket from e
+            raise ChannelNotEstablished(extra_msg=f"the channel dropped while reading: {e}") from e
 
     @override
     def close(self) -> None:
