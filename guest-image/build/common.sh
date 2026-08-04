@@ -49,12 +49,13 @@ kata_variant_suffix() {
 
 canonicalise_tree() {
 	local dir="$1"
+	chown -R 0:0 "$dir"
 	find "$dir" -exec touch -h -d "@${SOURCE_DATE_EPOCH}" {} +
 }
 
 canonical_tar() {
 	local dir="$1" dest="$2"
-	tar --sort=name --format=gnu --numeric-owner \
+	tar --sort=name --format=posix --numeric-owner \
 		--mtime="@${SOURCE_DATE_EPOCH}" \
 		--pax-option=exthdr.name=%d/PaxHeaders/%f,delete=atime,delete=ctime \
 		-C "$dir" -cf "$dest" .

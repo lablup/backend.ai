@@ -62,6 +62,7 @@ stage_runner() {
 	install -d -m 0755 "$sp" "${stage}/opt/kernel"
 	cp -a "${src}/kernel" "${sp}/kernel"
 	cp -a "${src}/helpers" "${sp}/helpers"
+	find "$sp" -name '__pycache__' -type d -prune -exec rm -rf {} +
 	local arch="${BAI_CC_TARGET_ARCH}"
 	install -m 0755 "${src}/runner/su-exec.${arch}.bin" "${stage}/opt/kernel/su-exec"
 	install -m 0755 "${src}/runner/dropbearmulti.${arch}.bin" "${stage}/opt/kernel/dropbearmulti"
@@ -81,6 +82,7 @@ stage_runner() {
 
 stage_overlay() {
 	cp -a "${BAI_CC_ROOT}/overlay/." "${stage}/"
+	find "${stage}/opt/kernel" "${stage}/usr/local/bin" -name '__pycache__' -type d -prune -exec rm -rf {} +
 	chmod 0755 "${stage}/opt/kernel/bai-cc-entrypoint" "${stage}/usr/local/bin/bai-guest-boot"
 	install -d -m 0755 "${stage}/usr/lib/systemd/system/multi-user.target.wants"
 	ln -sf ../bai-guest-boot.service "${stage}/usr/lib/systemd/system/multi-user.target.wants/bai-guest-boot.service"
