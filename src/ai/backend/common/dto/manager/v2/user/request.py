@@ -60,7 +60,7 @@ class CreateUserInput(BaseRequestModel):
     password: str = Field(description="Initial password for the user.")
     domain_name: str | None = Field(
         default=None,
-        description="Domain to assign the user to, by name. Deprecated: use `domain_id`.",
+        description="Deprecated since 26.9.0. Use domain_id instead. Domain to assign the user to, by name.",
     )
     domain_id: DomainID | None = Field(
         default=None,
@@ -154,7 +154,7 @@ class UpdateUserInput(BaseRequestModel):
     )
     domain_name: str | None = Field(
         default=None,
-        description="New domain assignment, by name. Deprecated: use `domain_id`.",
+        description="Deprecated since 26.9.0. Use domain_id instead. New domain assignment, by name.",
     )
     domain_id: DomainID | None = Field(
         default=None,

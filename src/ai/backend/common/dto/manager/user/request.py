@@ -37,7 +37,8 @@ class CreateUserRequest(BaseRequestModel):
         default=False, description="Whether user needs to change password on first login"
     )
     domain_name: str | None = Field(
-        default=None, description="Domain the user belongs to, by name. Deprecated: use domain_id"
+        default=None,
+        description="Deprecated since 26.9.0. Use domain_id instead. Domain the user belongs to, by name",
     )
     domain_id: DomainID | None = Field(
         default=None,
@@ -80,7 +81,8 @@ class UpdateUserRequest(BaseRequestModel):
     status: UserStatus | None = Field(default=None, description="Updated user status")
     role: UserRole | None = Field(default=None, description="Updated user role")
     domain_name: str | None = Field(
-        default=None, description="Updated domain, by name. Deprecated: use domain_id"
+        default=None,
+        description="Deprecated since 26.9.0. Use domain_id instead. Updated domain, by name",
     )
     domain_id: DomainID | None = Field(
         default=None, description="Updated domain, by id. Mutually exclusive with domain_name"

@@ -67,9 +67,9 @@ class CreateUserInputGQL(PydanticInputMixin[CreateUserInputDTO]):
     username: str = gql_field(description="Unique username for login.")
     password: str = gql_field(description="Initial password for the user.")
     domain_name: str | None = gql_field(
-        description="Domain to assign the user to, by name. Deprecated: use `domain_id`.",
+        description="Deprecated since 26.9.0. Use domain_id instead. Domain to assign the user to, by name.",
         default=None,
-        deprecation_reason="Use `domain_id` instead.",
+        deprecation_reason="Use domain_id instead.",
     )
     domain_id: UUID | None = gql_added_field(
         BackendAIGQLMeta(
@@ -146,9 +146,9 @@ class UpdateUserV2InputGQL(PydanticInputMixin[UpdateUserInputDTO]):
     status: UserStatusEnumGQL | None = gql_field(description="New account status.", default=UNSET)
     role: UserRoleEnumGQL | None = gql_field(description="New user role.", default=UNSET)
     domain_name: str | None = gql_field(
-        description="New domain assignment, by name. Deprecated: use `domain_id`.",
+        description="Deprecated since 26.9.0. Use domain_id instead. New domain assignment, by name.",
         default=UNSET,
-        deprecation_reason="Use `domain_id` instead.",
+        deprecation_reason="Use domain_id instead.",
     )
     domain_id: UUID | None = gql_added_field(
         BackendAIGQLMeta(
