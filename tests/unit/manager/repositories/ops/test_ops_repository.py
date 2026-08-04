@@ -31,6 +31,7 @@ from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.errors.repository import (
     AmbiguousEntityKeyError,
+    EmptySearchScopeError,
     EntityNotFoundError,
 )
 from ai.backend.manager.models.clauses import QueryCondition
@@ -549,12 +550,22 @@ class TestSearch:
     async def test_global_search_returns_every_row(
         self, view_repository: OpsRepository[_PresetView], preset: RolePresetData
     ) -> None:
-        result = await view_repository.search(
-            _PresetSearcher(pagination=OffsetPagination(offset=0, limit=20)), scopes=()
+        result = await view_repository.search_in_global(
+            _PresetSearcher(pagination=OffsetPagination(offset=0, limit=20))
         )
 
         assert result.total_count == 1
         assert result.items[0].id == preset.id
+
+    async def test_an_empty_scope_list_is_rejected_rather_than_widened(
+        self, view_repository: OpsRepository[_PresetView], preset: RolePresetData
+    ) -> None:
+        # A caller whose RBAC resolution came back empty asked for nothing, not for
+        # everything; the global scan is a separate call.
+        with pytest.raises(EmptySearchScopeError):
+            await view_repository.search_in_scopes(
+                scopes=[], searcher=_PresetSearcher(pagination=OffsetPagination(offset=0, limit=20))
+            )
 
     async def test_scoped_search_filters(
         self,
@@ -564,9 +575,9 @@ class TestSearch:
     ) -> None:
         await repository.create(_PresetCreator(name="other", scope_type=RBACScopeType.DOMAIN))
 
-        result = await view_repository.search(
-            _PresetSearcher(pagination=OffsetPagination(offset=0, limit=20)),
+        result = await view_repository.search_in_scopes(
             scopes=[_NamedScope(name="default")],
+            searcher=_PresetSearcher(pagination=OffsetPagination(offset=0, limit=20)),
         )
 
         assert [item.id for item in result.items] == [preset.id]
@@ -583,7 +594,8 @@ class TestFullStack:
             service.execute
         )
         action = _SearchPresetsAction(
-            scope=ScopeRef(scope_type=ScopeType("domain"), scope_id=uuid.uuid4())
+            scope=ScopeRef(scope_type=ScopeType("domain"), scope_id=uuid.uuid4()),
+            scopes=(_NamedScope(name="default"),),
         )
 
         result = await processor.run(action)

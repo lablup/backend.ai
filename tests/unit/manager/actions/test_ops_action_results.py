@@ -18,12 +18,12 @@ from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupActionResult
 from ai.backend.manager.actions.v2.ops.result import (
-    BatchOpsResult,
     BulkOpsResult,
     CreatedEntityOpsResult,
     EntitiesOpsResult,
     EntityOpsResult,
     LookupOpsResult,
+    ScopedBatchOpsResult,
 )
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.errors.repository import EntityNotFoundError
@@ -144,10 +144,10 @@ def test_entities_result_names_nothing_when_the_write_matched_nothing() -> None:
     assert EntitiesOpsResult[_PresetData](items=[]).entity_ids() == ()
 
 
-def test_batch_result_names_every_entity_on_the_page() -> None:
+def test_scoped_batch_result_names_every_entity_on_the_page() -> None:
     first, second = _PresetData(id=uuid.uuid4(), name="a"), _PresetData(id=uuid.uuid4(), name="b")
 
-    result = BatchOpsResult(
+    result = ScopedBatchOpsResult(
         items=[first, second],
         total_count=2,
         has_next_page=False,
@@ -157,8 +157,8 @@ def test_batch_result_names_every_entity_on_the_page() -> None:
     assert result.entity_ids() == (first.id, second.id)
 
 
-def test_batch_result_names_nothing_when_the_page_is_empty() -> None:
-    result = BatchOpsResult[_PresetData](
+def test_scoped_batch_result_names_nothing_when_the_page_is_empty() -> None:
+    result = ScopedBatchOpsResult[_PresetData](
         items=[],
         total_count=0,
         has_next_page=False,

@@ -12,6 +12,7 @@ from .base import (
     BulkUpdateOpsAction,
     CreateOpsAction,
     GetOpsAction,
+    GlobalSearchOpsAction,
     LookupOpsAction,
     OpsBackendAction,
     PurgeOpsAction,
@@ -26,6 +27,7 @@ from .result import (
     EntitiesOpsResult,
     EntityOpsResult,
     LookupOpsResult,
+    ScopedBatchOpsResult,
 )
 
 __all__ = (
@@ -45,6 +47,8 @@ __all__ = (
     "GetOpsAction",
     "OpsBackendAction",
     "PurgeOpsAction",
+    "GlobalSearchOpsAction",
+    "ScopedBatchOpsResult",
     "SearchOpsAction",
     "UpdateOpsAction",
     "UpsertOpsAction",

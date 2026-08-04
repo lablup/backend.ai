@@ -11,6 +11,7 @@ to make the methods domain-specific, conversion included.
     | get       | ``DataQuerier``     | row class, pk, ``to_data``            |
     | find      | ``DataFinder``      | row class, key conditions, ``to_data``|
     | search    | ``Searcher``        | select, options, ``to_data``          |
+    |           |                     | scoped and global are separate calls  |
     | create    | ``DataCreator``     | ``build_row``, ``to_data``            |
     | update    | ``DataUpdater``     | row class, pk, values, ``to_data``    |
     | upsert    | ``DataUpserter``    | row class, conflict keys, ``to_data`` |
@@ -97,21 +98,30 @@ class OpsRepository[TData]:
                 raise EntityNotFoundError(f"No {finder.row_class().__name__} matches the given key")
             return data
 
-    async def search(
+    async def search_in_scopes(
         self,
-        searcher: Searcher[Any, TData],
         scopes: Sequence[SearchScope],
+        searcher: Searcher[Any, TData],
     ) -> SearcherResult[TData]:
-        """Read a page, scoped when ``scopes`` is non-empty.
+        """Read a page restricted to ``scopes``, which must not be empty.
 
-        An empty sequence means an explicit global scan, which is why it routes to
-        ``search_in_global`` rather than being rejected: the searcher reached here from
-        an action that already declared it wanted no scope filter.
+        No fallback for an empty sequence: ops rejects one with
+        ``EmptySearchScopeError`` and that rejection is the point. A caller whose RBAC
+        resolution came back empty is asking for nothing, not for everything, and
+        widening it here would hand them every row.
         """
         async with self._ops.read_ops() as r:
-            if not scopes:
-                return await r.search_in_global(searcher)
             return await r.search_with_scopes(scopes, searcher)
+
+    async def search_in_global(self, searcher: Searcher[Any, TData]) -> SearcherResult[TData]:
+        """Read a page across the entire table, with no scope filter.
+
+        A separate method rather than the empty case of the scoped one, matching the
+        split ops itself makes: choosing this is an explicit decision that the caller
+        holds the authority for it.
+        """
+        async with self._ops.read_ops() as r:
+            return await r.search_in_global(searcher)
 
     async def create(self, creator: DataCreator[Any, TData]) -> TData:
         async with self._ops.write_ops() as w:

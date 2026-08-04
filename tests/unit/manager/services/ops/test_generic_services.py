@@ -28,6 +28,7 @@ from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction, LookupKey
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.base import (
@@ -38,6 +39,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     BulkUpdateOpsAction,
     CreateOpsAction,
     GetOpsAction,
+    GlobalSearchOpsAction,
     LookupOpsAction,
     PurgeOpsAction,
     SearchOpsAction,
@@ -45,11 +47,11 @@ from ai.backend.manager.actions.v2.ops.base import (
     UpsertOpsAction,
 )
 from ai.backend.manager.actions.v2.ops.result import (
-    BatchOpsResult,
     CreatedEntityOpsResult,
     EntitiesOpsResult,
     EntityOpsResult,
     LookupOpsResult,
+    ScopedBatchOpsResult,
 )
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
@@ -77,6 +79,7 @@ from ai.backend.manager.services.ops.service import (
     CreateService,
     DeleteService,
     GetService,
+    GlobalSearchService,
     LookupService,
     PurgeService,
     SearchService,
@@ -585,6 +588,27 @@ class _BatchPurgeAction(BaseScopeAction, BatchPurgeOpsAction[RolePresetRow, _Pre
 
 
 @dataclass
+class _GlobalSearchAction(BaseGlobalAction, GlobalSearchOpsAction[RolePresetRow, _PresetData]):
+    """Declares no scope at all: the SUPERADMIN gate is what answers for the scan."""
+
+    searcher: _PresetSearcher
+
+    @override
+    def to_searcher(self) -> Searcher[RolePresetRow, _PresetData]:
+        return self.searcher
+
+    @classmethod
+    @override
+    def entity_type(cls) -> EntityType:
+        return _ENTITY_TYPE
+
+    @classmethod
+    @override
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+
+@dataclass
 class _SearchAction(BaseScopeAction, SearchOpsAction[RolePresetRow, _PresetData]):
     scope: ScopeRef
     searcher: _PresetSearcher
@@ -626,7 +650,7 @@ def stored() -> _PresetData:
 @pytest.fixture
 def repository(stored: _PresetData) -> MagicMock:
     mock = MagicMock(spec=OpsRepository)
-    for operation in ("get", "find", "search", "create", "update", "upsert", "purge"):
+    for operation in ("get", "find", "create", "update", "upsert", "purge"):
         setattr(mock, operation, AsyncMock(return_value=stored))
     for operation in ("bulk_create", "batch_update", "batch_purge"):
         setattr(mock, operation, AsyncMock(return_value=[stored]))
@@ -638,7 +662,12 @@ def repository(stored: _PresetData) -> MagicMock:
                 return_value=BulkResultWithFailures(successes={stored.id: stored}, errors={})
             ),
         )
-    mock.search = AsyncMock(
+    mock.search_in_global = AsyncMock(
+        return_value=SearcherResult(
+            items=[stored], total_count=1, has_next_page=False, has_previous_page=True
+        )
+    )
+    mock.search_in_scopes = AsyncMock(
         return_value=SearcherResult(
             items=[stored], total_count=1, has_next_page=False, has_previous_page=True
         )
@@ -867,7 +896,21 @@ async def test_search_forwards_the_searcher_and_its_scopes(
     assert result.total_count == 1
     assert result.has_next_page is False
     assert result.has_previous_page is True
-    repository.search.assert_awaited_once_with(searcher, [project_scope])
+    repository.search_in_scopes.assert_awaited_once_with([project_scope], searcher)
+
+
+async def test_global_search_takes_no_scopes_at_all(
+    repository: MagicMock, stored: _PresetData, searcher: _PresetSearcher
+) -> None:
+    # The unscoped read is a different service reached from a different action shape,
+    # not the empty case of the scoped one.
+    service: GlobalSearchService[_PresetData] = GlobalSearchService(repository)
+
+    result = await service.execute(_GlobalSearchAction(searcher=searcher))
+
+    assert result.items == [stored]
+    repository.search_in_global.assert_awaited_once_with(searcher)
+    repository.search_in_scopes.assert_not_awaited()
 
 
 # =============================================================================
@@ -897,7 +940,7 @@ async def test_search_names_what_it_read_under_the_scope_processor(
     repository: MagicMock, stored: _PresetData, scope: ScopeRef, searcher: _PresetSearcher
 ) -> None:
     service: SearchService[_PresetData] = SearchService(repository)
-    processor: ScopeActionProcessor[_SearchAction, BatchOpsResult[_PresetData]] = (
+    processor: ScopeActionProcessor[_SearchAction, ScopedBatchOpsResult[_PresetData]] = (
         ScopeActionProcessor(service.execute)
     )
 

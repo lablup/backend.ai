@@ -23,6 +23,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     BulkUpdateOpsAction,
     CreateOpsAction,
     GetOpsAction,
+    GlobalSearchOpsAction,
     LookupOpsAction,
     PurgeOpsAction,
     SearchOpsAction,
@@ -36,6 +37,7 @@ from ai.backend.manager.actions.v2.ops.result import (
     EntitiesOpsResult,
     EntityOpsResult,
     LookupOpsResult,
+    ScopedBatchOpsResult,
 )
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 
@@ -43,6 +45,7 @@ __all__ = (
     "GetService",
     "LookupService",
     "SearchService",
+    "GlobalSearchService",
     "CreateService",
     "BulkCreateService",
     "BulkUpdateService",
@@ -82,15 +85,45 @@ class LookupService[TData: EntityData]:
 
 
 class SearchService[TData: EntityData]:
-    """Runs the action's searcher over the scopes it names."""
+    """Runs the action's searcher over the scopes it names.
+
+    Raises rather than widening if the action names none: see
+    ``SearchOpsAction.search_scopes``. An unscoped read is
+    :class:`GlobalSearchService`, wired from a different action shape.
+    """
 
     _repository: OpsRepository[TData]
 
     def __init__(self, repository: OpsRepository[TData]) -> None:
         self._repository = repository
 
-    async def execute(self, action: SearchOpsAction[Any, TData]) -> BatchOpsResult[TData]:
-        result = await self._repository.search(action.to_searcher(), action.search_scopes())
+    async def execute(self, action: SearchOpsAction[Any, TData]) -> ScopedBatchOpsResult[TData]:
+        result = await self._repository.search_in_scopes(
+            action.search_scopes(), action.to_searcher()
+        )
+        return ScopedBatchOpsResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+
+class GlobalSearchService[TData]:
+    """Runs the action's searcher across the entire table.
+
+    Wired from ``BaseGlobalAction``, whose SUPERADMIN gate is what answers for an
+    unscoped scan. Needs no :class:`EntityData`: the global shape asks its result to
+    name nothing.
+    """
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: GlobalSearchOpsAction[Any, TData]) -> BatchOpsResult[TData]:
+        result = await self._repository.search_in_global(action.to_searcher())
         return BatchOpsResult(
             items=result.items,
             total_count=result.total_count,

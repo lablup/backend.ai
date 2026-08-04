@@ -4,7 +4,7 @@ Domains used to write a result type per operation whose only distinguishing feat
 the field name — ``allow_list=``, ``vfolder=``, ``image=`` — which is what forced a
 conversion step between the repository and the result. These replace all of them.
 
-There are six rather than one because the v2 shapes ask different things of a result.
+There are seven rather than one because the v2 shapes ask different things of a result.
 A single-entity run is identified by its action, so its result owes nothing; a run over
 a scope has to name what it touched and a lookup has to produce the id it resolved,
 neither of which the action can know; those get it from the ``data/`` type, which says
@@ -30,6 +30,7 @@ __all__ = (
     "EntitiesOpsResult",
     "BulkOpsResult",
     "BatchOpsResult",
+    "ScopedBatchOpsResult",
 )
 
 
@@ -136,17 +137,27 @@ class EntitiesOpsResult[TData: EntityData](BaseScopeActionResult):
 
 
 @dataclass
-class BatchOpsResult[TData: EntityData](BaseScopeActionResult):
-    """A page of entities, from a search over a scope.
+class BatchOpsResult[TData]:
+    """A page of entities.
 
     Mirrors the fields of ``SearcherResult`` so the repository result carries straight
-    through.
+    through. Carries no contract, which is what a global search needs: that shape is
+    gated on the SUPERADMIN role and reports no target.
     """
 
     items: list[TData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
+
+
+@dataclass
+class ScopedBatchOpsResult[TData: EntityData](BatchOpsResult[TData], BaseScopeActionResult):
+    """A page of entities read within a scope.
+
+    Separate from the global page because only this one is asked what it reached, and
+    only this one therefore needs its ``data/`` type to implement :class:`EntityData`.
+    """
 
     @override
     def entity_ids(self) -> Sequence[EntityID]:

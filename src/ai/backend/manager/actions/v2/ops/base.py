@@ -25,6 +25,7 @@ __all__ = (
     "UpsertOpsAction",
     "PurgeOpsAction",
     "SearchOpsAction",
+    "GlobalSearchOpsAction",
 )
 
 
@@ -178,11 +179,27 @@ class SearchOpsAction[TRow: Base, TData](OpsBackendAction):
 
     @abstractmethod
     def search_scopes(self) -> Sequence[SearchScope]:
-        """Return the scopes the search is restricted to, empty for a global search.
+        """Return the scopes the search is restricted to. Never empty.
 
         These are the models-layer query scopes, distinct from the RBAC
-        ``scope_targets()`` the shape axis declares. Whether an empty sequence is
-        allowed at all is the domain repository's call, since only it knows if the
-        path carries the authority for an unscoped scan.
+        ``scope_targets()`` the shape axis declares. An empty sequence is rejected
+        rather than widened into an unscoped scan: a caller whose RBAC resolution came
+        back empty would otherwise be handed every row. Searching without a scope is
+        :class:`GlobalSearchOpsAction`, which says so in the shape it declares.
         """
+        raise NotImplementedError
+
+
+class GlobalSearchOpsAction[TRow: Base, TData](OpsBackendAction):
+    """A list read across an entire table, with no scope filter.
+
+    Mixed in alongside ``BaseGlobalAction``, whose SUPERADMIN gate is what makes an
+    unscoped scan answerable for. Kept apart from :class:`SearchOpsAction` rather than
+    signalled by an empty scope list, so the authority a query needs is visible in the
+    action's shape instead of in the value of one of its fields.
+    """
+
+    @abstractmethod
+    def to_searcher(self) -> Searcher[TRow, TData]:
+        """Return the search spec this action executes."""
         raise NotImplementedError
