@@ -152,6 +152,21 @@ class ScalingGroupDBSource:
                 raise ScalingGroupNotFound(name)
             return resource_group_id
 
+    async def get_resource_group_ids_by_names(
+        self,
+        names: list[ResourceGroupName],
+    ) -> dict[ResourceGroupName, ResourceGroupID]:
+        """Resolve resource group row IDs from names; missing names are absent."""
+        if not names:
+            return {}
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            rows = await db_sess.execute(
+                sa.select(ScalingGroupRow.name, ScalingGroupRow.id).where(
+                    ScalingGroupRow.name.in_(names)
+                )
+            )
+            return {ResourceGroupName(row.name): row.id for row in rows}
+
     async def get_scaling_group_by_name(
         self,
         name: str,
@@ -317,8 +332,8 @@ class ScalingGroupDBSource:
 
     async def check_scaling_group_domain_association_exists(
         self,
-        scaling_group: str,
-        domain: str,
+        resource_group_id: ResourceGroupID,
+        domain_id: DomainID,
     ) -> bool:
         """Checks if a scaling group is associated with a domain."""
         async with self._db.begin_readonly_session_read_committed() as session:
@@ -327,8 +342,8 @@ class ScalingGroupDBSource:
                 .select_from(ScalingGroupForDomainRow)
                 .where(
                     sa.and_(
-                        ScalingGroupForDomainRow.scaling_group == scaling_group,
-                        ScalingGroupForDomainRow.domain == domain,
+                        ScalingGroupForDomainRow.resource_group_id == resource_group_id,
+                        ScalingGroupForDomainRow.domain_id == domain_id,
                     )
                 )
             )
@@ -353,7 +368,7 @@ class ScalingGroupDBSource:
 
     async def check_scaling_group_keypair_association_exists(
         self,
-        scaling_group_name: str,
+        resource_group_id: ResourceGroupID,
         access_key: str,
     ) -> bool:
         """Checks if a scaling group is associated with a keypair."""
@@ -361,7 +376,7 @@ class ScalingGroupDBSource:
             query = sa.select(
                 sa.exists().where(
                     sa.and_(
-                        ScalingGroupForKeypairsRow.scaling_group == scaling_group_name,
+                        ScalingGroupForKeypairsRow.resource_group_id == resource_group_id,
                         ScalingGroupForKeypairsRow.access_key == access_key,
                     )
                 )
@@ -387,7 +402,7 @@ class ScalingGroupDBSource:
 
     async def check_scaling_group_user_group_association_exists(
         self,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
         user_group: uuid.UUID,
     ) -> bool:
         """Checks if a scaling group is associated with a user group (project)."""
@@ -397,7 +412,7 @@ class ScalingGroupDBSource:
                 .select_from(ScalingGroupForProjectRow)
                 .where(
                     sa.and_(
-                        ScalingGroupForProjectRow.scaling_group == scaling_group,
+                        ScalingGroupForProjectRow.resource_group_id == resource_group_id,
                         ScalingGroupForProjectRow.group == user_group,
                     )
                 )
@@ -514,20 +529,21 @@ class ScalingGroupDBSource:
     async def update_allowed_resource_groups_for_domain(
         self,
         domain_name: str,
-        add: list[str],
-        remove: list[str],
+        add: list[ResourceGroupID],
+        remove: list[ResourceGroupID],
     ) -> list[str]:
         """Atomically add/remove allowed resource groups for a domain.
 
         Returns the current list of allowed resource group names after the update.
         """
         async with self._db.begin_session_read_committed() as session:
-            domain_scope_id = str(await self._get_domain_id(session, domain_name))
+            domain_id = await self._get_domain_id(session, domain_name)
+            domain_scope_id = str(domain_id)
             if remove:
                 await session.execute(
                     sa.delete(ScalingGroupForDomainRow).where(
-                        ScalingGroupForDomainRow.domain == domain_name,
-                        ScalingGroupForDomainRow.scaling_group.in_(remove),
+                        ScalingGroupForDomainRow.domain_id == domain_id,
+                        ScalingGroupForDomainRow.resource_group_id.in_(remove),
                     )
                 )
                 await session.execute(
@@ -537,15 +553,17 @@ class ScalingGroupDBSource:
                         AssociationScopesEntitiesRow.scope_id == domain_scope_id,
                         AssociationScopesEntitiesRow.entity_type
                         == RBACElementType.RESOURCE_GROUP.to_entity_type(),
-                        AssociationScopesEntitiesRow.entity_id.in_(remove),
+                        AssociationScopesEntitiesRow.entity_id.in_([
+                            str(rg_id) for rg_id in remove
+                        ]),
                     )
                 )
 
             if add:
-                for rg_name in add:
+                for rg_id in add:
                     await session.execute(
                         pg_insert(ScalingGroupForDomainRow.__table__)
-                        .values(scaling_group=rg_name, domain=domain_name)
+                        .values(resource_group_id=rg_id, domain_id=domain_id)
                         .on_conflict_do_nothing()
                     )
                     await session.execute(
@@ -554,24 +572,27 @@ class ScalingGroupDBSource:
                             scope_type=RBACElementType.DOMAIN.to_scope_type(),
                             scope_id=domain_scope_id,
                             entity_type=RBACElementType.RESOURCE_GROUP.to_entity_type(),
-                            entity_id=rg_name,
+                            entity_id=str(rg_id),
                             relation_type=RelationType.AUTO,
                         )
                         .on_conflict_do_nothing()
                     )
 
             result = await session.execute(
-                sa.select(ScalingGroupForDomainRow.scaling_group).where(
-                    ScalingGroupForDomainRow.domain == domain_name
+                sa.select(ScalingGroupRow.name)
+                .join(
+                    ScalingGroupForDomainRow,
+                    ScalingGroupForDomainRow.resource_group_id == ScalingGroupRow.id,
                 )
+                .where(ScalingGroupForDomainRow.domain_id == domain_id)
             )
             return [row[0] for row in result]
 
     async def update_allowed_resource_groups_for_project(
         self,
         project_id: uuid.UUID,
-        add: list[str],
-        remove: list[str],
+        add: list[ResourceGroupID],
+        remove: list[ResourceGroupID],
     ) -> list[str]:
         """Atomically add/remove allowed resource groups for a project.
 
@@ -582,7 +603,7 @@ class ScalingGroupDBSource:
                 await session.execute(
                     sa.delete(ScalingGroupForProjectRow).where(
                         ScalingGroupForProjectRow.group == project_id,
-                        ScalingGroupForProjectRow.scaling_group.in_(remove),
+                        ScalingGroupForProjectRow.resource_group_id.in_(remove),
                     )
                 )
                 await session.execute(
@@ -592,15 +613,17 @@ class ScalingGroupDBSource:
                         AssociationScopesEntitiesRow.scope_id == str(project_id),
                         AssociationScopesEntitiesRow.entity_type
                         == RBACElementType.RESOURCE_GROUP.to_entity_type(),
-                        AssociationScopesEntitiesRow.entity_id.in_(remove),
+                        AssociationScopesEntitiesRow.entity_id.in_([
+                            str(rg_id) for rg_id in remove
+                        ]),
                     )
                 )
 
             if add:
-                for rg_name in add:
+                for rg_id in add:
                     await session.execute(
                         pg_insert(ScalingGroupForProjectRow.__table__)
-                        .values(scaling_group=rg_name, group=project_id)
+                        .values(resource_group_id=rg_id, group=project_id)
                         .on_conflict_do_nothing()
                     )
                     await session.execute(
@@ -609,22 +632,25 @@ class ScalingGroupDBSource:
                             scope_type=RBACElementType.PROJECT.to_scope_type(),
                             scope_id=str(project_id),
                             entity_type=RBACElementType.RESOURCE_GROUP.to_entity_type(),
-                            entity_id=rg_name,
+                            entity_id=str(rg_id),
                             relation_type=RelationType.AUTO,
                         )
                         .on_conflict_do_nothing()
                     )
 
             result = await session.execute(
-                sa.select(ScalingGroupForProjectRow.scaling_group).where(
-                    ScalingGroupForProjectRow.group == project_id
+                sa.select(ScalingGroupRow.name)
+                .join(
+                    ScalingGroupForProjectRow,
+                    ScalingGroupForProjectRow.resource_group_id == ScalingGroupRow.id,
                 )
+                .where(ScalingGroupForProjectRow.group == project_id)
             )
             return [row[0] for row in result]
 
     async def update_allowed_domains_for_resource_group(
         self,
-        resource_group_name: str,
+        resource_group_id: ResourceGroupID,
         add: list[str],
         remove: list[str],
     ) -> list[str]:
@@ -635,23 +661,25 @@ class ScalingGroupDBSource:
         async with self._db.begin_session_read_committed() as session:
             domain_ids_by_name = await self._get_domain_ids_by_names(session, [*add, *remove])
             if remove:
+                remove_ids = [
+                    domain_ids_by_name[name] for name in remove if name in domain_ids_by_name
+                ]
                 await session.execute(
                     sa.delete(ScalingGroupForDomainRow).where(
-                        ScalingGroupForDomainRow.scaling_group == resource_group_name,
-                        ScalingGroupForDomainRow.domain.in_(remove),
+                        ScalingGroupForDomainRow.resource_group_id == resource_group_id,
+                        ScalingGroupForDomainRow.domain_id.in_(remove_ids),
                     )
                 )
-                remove_scope_ids = [
-                    str(domain_ids_by_name[name]) for name in remove if name in domain_ids_by_name
-                ]
                 await session.execute(
                     sa.delete(AssociationScopesEntitiesRow).where(
                         AssociationScopesEntitiesRow.entity_type
                         == RBACElementType.RESOURCE_GROUP.to_entity_type(),
-                        AssociationScopesEntitiesRow.entity_id == resource_group_name,
+                        AssociationScopesEntitiesRow.entity_id == str(resource_group_id),
                         AssociationScopesEntitiesRow.scope_type
                         == RBACElementType.DOMAIN.to_scope_type(),
-                        AssociationScopesEntitiesRow.scope_id.in_(remove_scope_ids),
+                        AssociationScopesEntitiesRow.scope_id.in_([
+                            str(domain_id) for domain_id in remove_ids
+                        ]),
                     )
                 )
 
@@ -662,7 +690,7 @@ class ScalingGroupDBSource:
                         raise DomainNotFound(f"Domain '{domain_name}' not found")
                     await session.execute(
                         pg_insert(ScalingGroupForDomainRow.__table__)
-                        .values(scaling_group=resource_group_name, domain=domain_name)
+                        .values(resource_group_id=resource_group_id, domain_id=domain_id)
                         .on_conflict_do_nothing()
                     )
                     await session.execute(
@@ -671,22 +699,25 @@ class ScalingGroupDBSource:
                             scope_type=RBACElementType.DOMAIN.to_scope_type(),
                             scope_id=str(domain_id),
                             entity_type=RBACElementType.RESOURCE_GROUP.to_entity_type(),
-                            entity_id=resource_group_name,
+                            entity_id=str(resource_group_id),
                             relation_type=RelationType.AUTO,
                         )
                         .on_conflict_do_nothing()
                     )
 
             result = await session.execute(
-                sa.select(ScalingGroupForDomainRow.domain).where(
-                    ScalingGroupForDomainRow.scaling_group == resource_group_name
+                sa.select(DomainRow.name)
+                .join(
+                    ScalingGroupForDomainRow,
+                    ScalingGroupForDomainRow.domain_id == DomainRow.id,
                 )
+                .where(ScalingGroupForDomainRow.resource_group_id == resource_group_id)
             )
             return [row[0] for row in result]
 
     async def update_allowed_projects_for_resource_group(
         self,
-        resource_group_name: str,
+        resource_group_id: ResourceGroupID,
         add: list[uuid.UUID],
         remove: list[uuid.UUID],
     ) -> list[uuid.UUID]:
@@ -698,7 +729,7 @@ class ScalingGroupDBSource:
             if remove:
                 await session.execute(
                     sa.delete(ScalingGroupForProjectRow).where(
-                        ScalingGroupForProjectRow.scaling_group == resource_group_name,
+                        ScalingGroupForProjectRow.resource_group_id == resource_group_id,
                         ScalingGroupForProjectRow.group.in_(remove),
                     )
                 )
@@ -706,7 +737,7 @@ class ScalingGroupDBSource:
                     sa.delete(AssociationScopesEntitiesRow).where(
                         AssociationScopesEntitiesRow.entity_type
                         == RBACElementType.RESOURCE_GROUP.to_entity_type(),
-                        AssociationScopesEntitiesRow.entity_id == resource_group_name,
+                        AssociationScopesEntitiesRow.entity_id == str(resource_group_id),
                         AssociationScopesEntitiesRow.scope_type
                         == RBACElementType.PROJECT.to_scope_type(),
                         AssociationScopesEntitiesRow.scope_id.in_([str(pid) for pid in remove]),
@@ -717,7 +748,7 @@ class ScalingGroupDBSource:
                 for project_id in add:
                     await session.execute(
                         pg_insert(ScalingGroupForProjectRow.__table__)
-                        .values(scaling_group=resource_group_name, group=project_id)
+                        .values(resource_group_id=resource_group_id, group=project_id)
                         .on_conflict_do_nothing()
                     )
                     await session.execute(
@@ -726,7 +757,7 @@ class ScalingGroupDBSource:
                             scope_type=RBACElementType.PROJECT.to_scope_type(),
                             scope_id=str(project_id),
                             entity_type=RBACElementType.RESOURCE_GROUP.to_entity_type(),
-                            entity_id=resource_group_name,
+                            entity_id=str(resource_group_id),
                             relation_type=RelationType.AUTO,
                         )
                         .on_conflict_do_nothing()
@@ -734,7 +765,7 @@ class ScalingGroupDBSource:
 
             result = await session.execute(
                 sa.select(ScalingGroupForProjectRow.group).where(
-                    ScalingGroupForProjectRow.scaling_group == resource_group_name
+                    ScalingGroupForProjectRow.resource_group_id == resource_group_id
                 )
             )
             return [row[0] for row in result]
@@ -750,9 +781,13 @@ class ScalingGroupDBSource:
         """Get allowed resource group names for a domain."""
         async with self._db.begin_readonly_session_read_committed() as session:
             result = await session.execute(
-                sa.select(ScalingGroupForDomainRow.scaling_group).where(
-                    ScalingGroupForDomainRow.domain == domain_name
+                sa.select(ScalingGroupRow.name)
+                .join(
+                    ScalingGroupForDomainRow,
+                    ScalingGroupForDomainRow.resource_group_id == ScalingGroupRow.id,
                 )
+                .join(DomainRow, DomainRow.id == ScalingGroupForDomainRow.domain_id)
+                .where(DomainRow.name == domain_name)
             )
             return [row[0] for row in result]
 
@@ -763,34 +798,40 @@ class ScalingGroupDBSource:
         """Get allowed resource group names for a project."""
         async with self._db.begin_readonly_session_read_committed() as session:
             result = await session.execute(
-                sa.select(ScalingGroupForProjectRow.scaling_group).where(
-                    ScalingGroupForProjectRow.group == project_id
+                sa.select(ScalingGroupRow.name)
+                .join(
+                    ScalingGroupForProjectRow,
+                    ScalingGroupForProjectRow.resource_group_id == ScalingGroupRow.id,
                 )
+                .where(ScalingGroupForProjectRow.group == project_id)
             )
             return [row[0] for row in result]
 
     async def get_allowed_domains_for_resource_group(
         self,
-        resource_group_name: str,
+        resource_group_id: ResourceGroupID,
     ) -> list[str]:
         """Get allowed domain names for a resource group."""
         async with self._db.begin_readonly_session_read_committed() as session:
             result = await session.execute(
-                sa.select(ScalingGroupForDomainRow.domain).where(
-                    ScalingGroupForDomainRow.scaling_group == resource_group_name
+                sa.select(DomainRow.name)
+                .join(
+                    ScalingGroupForDomainRow,
+                    ScalingGroupForDomainRow.domain_id == DomainRow.id,
                 )
+                .where(ScalingGroupForDomainRow.resource_group_id == resource_group_id)
             )
             return [row[0] for row in result]
 
     async def get_allowed_projects_for_resource_group(
         self,
-        resource_group_name: str,
+        resource_group_id: ResourceGroupID,
     ) -> list[uuid.UUID]:
         """Get allowed project IDs for a resource group."""
         async with self._db.begin_readonly_session_read_committed() as session:
             result = await session.execute(
                 sa.select(ScalingGroupForProjectRow.group).where(
-                    ScalingGroupForProjectRow.scaling_group == resource_group_name
+                    ScalingGroupForProjectRow.resource_group_id == resource_group_id
                 )
             )
             return [row[0] for row in result]

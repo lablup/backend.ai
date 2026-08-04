@@ -99,6 +99,10 @@ from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_id
     ResolveResourceGroupIDByNameAction,
     ResolveResourceGroupIDByNameActionResult,
 )
+from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_ids_by_names import (
+    ResolveResourceGroupIDsByNamesAction,
+    ResolveResourceGroupIDsByNamesActionResult,
+)
 from ai.backend.manager.services.scaling_group.actions.update_allowed_domains_for_rg import (
     UpdateAllowedDomainsForResourceGroupAction,
     UpdateAllowedDomainsForResourceGroupActionResult,
@@ -182,6 +186,12 @@ class ScalingGroupService:
     ) -> ResolveResourceGroupIDByNameActionResult:
         resource_group_id = await self._repository.get_resource_group_id_by_name(action.name)
         return ResolveResourceGroupIDByNameActionResult(resource_group_id=resource_group_id)
+
+    async def resolve_resource_group_ids_by_names(
+        self, action: ResolveResourceGroupIDsByNamesAction
+    ) -> ResolveResourceGroupIDsByNamesActionResult:
+        ids_by_name = await self._repository.get_resource_group_ids_by_names(action.names)
+        return ResolveResourceGroupIDsByNamesActionResult(ids_by_name=ids_by_name)
 
     async def search_scaling_groups(
         self, action: SearchScalingGroupsAction
@@ -419,7 +429,7 @@ class ScalingGroupService:
     ) -> UpdateAllowedDomainsForResourceGroupActionResult:
         """Atomically add/remove allowed domains for a resource group."""
         items = await self._repository.update_allowed_domains_for_resource_group(
-            resource_group_name=action.resource_group_name,
+            resource_group_id=action.resource_group_id,
             add=action.add,
             remove=action.remove,
         )
@@ -431,7 +441,7 @@ class ScalingGroupService:
     ) -> UpdateAllowedProjectsForResourceGroupActionResult:
         """Atomically add/remove allowed projects for a resource group."""
         items = await self._repository.update_allowed_projects_for_resource_group(
-            resource_group_name=action.resource_group_name,
+            resource_group_id=action.resource_group_id,
             add=action.add,
             remove=action.remove,
         )
@@ -459,7 +469,7 @@ class ScalingGroupService:
     ) -> GetAllowedDomainsForResourceGroupActionResult:
         """Get allowed domains for a resource group."""
         items = await self._repository.get_allowed_domains_for_resource_group(
-            action.resource_group_name,
+            action.resource_group_id,
         )
         return GetAllowedDomainsForResourceGroupActionResult(items=items)
 
@@ -469,6 +479,6 @@ class ScalingGroupService:
     ) -> GetAllowedProjectsForResourceGroupActionResult:
         """Get allowed projects for a resource group."""
         items = await self._repository.get_allowed_projects_for_resource_group(
-            action.resource_group_name,
+            action.resource_group_id,
         )
         return GetAllowedProjectsForResourceGroupActionResult(items=items)

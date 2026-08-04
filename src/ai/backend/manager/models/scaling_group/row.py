@@ -30,6 +30,7 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.sql.expression import SQLColumnExpression, false, true
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.scope import ScopeID
@@ -144,21 +145,21 @@ class ScalingGroupForDomainRow(Base):  # type: ignore[misc]
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    scaling_group: Mapped[str] = mapped_column(
-        "scaling_group",
-        sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
+    resource_group_id: Mapped[ResourceGroupID] = mapped_column(
+        "resource_group_id",
+        sa.ForeignKey("scaling_groups.id", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
     )
-    domain: Mapped[str] = mapped_column(
-        "domain",
-        sa.ForeignKey("domains.name", onupdate="CASCADE", ondelete="CASCADE"),
+    domain_id: Mapped[DomainID] = mapped_column(
+        "domain_id",
+        sa.ForeignKey("domains.id", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
     )
     __table_args__ = (
         # constraint
-        sa.UniqueConstraint("scaling_group", "domain", name="uq_sgroup_domain"),
+        sa.UniqueConstraint("resource_group_id", "domain_id", name="uq_sgroup_domain"),
     )
     sgroup_row: Mapped[ScalingGroupRow] = relationship(
         "ScalingGroupRow",
@@ -179,9 +180,9 @@ class ScalingGroupForProjectRow(Base):  # type: ignore[misc]
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    scaling_group: Mapped[str] = mapped_column(
-        "scaling_group",
-        sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
+    resource_group_id: Mapped[ResourceGroupID] = mapped_column(
+        "resource_group_id",
+        sa.ForeignKey("scaling_groups.id", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
     )
@@ -194,7 +195,7 @@ class ScalingGroupForProjectRow(Base):  # type: ignore[misc]
 
     __table_args__ = (
         # constraint
-        sa.UniqueConstraint("scaling_group", "group", name="uq_sgroup_ugroup"),
+        sa.UniqueConstraint("resource_group_id", "group", name="uq_sgroup_ugroup"),
     )
     sgroup_row: Mapped[ScalingGroupRow] = relationship(
         "ScalingGroupRow",
@@ -215,9 +216,9 @@ class ScalingGroupForKeypairsRow(Base):  # type: ignore[misc]
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    scaling_group: Mapped[str] = mapped_column(
-        "scaling_group",
-        sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
+    resource_group_id: Mapped[ResourceGroupID] = mapped_column(
+        "resource_group_id",
+        sa.ForeignKey("scaling_groups.id", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
     )
@@ -229,7 +230,7 @@ class ScalingGroupForKeypairsRow(Base):  # type: ignore[misc]
     )
     __table_args__ = (
         # constraint
-        sa.UniqueConstraint("scaling_group", "access_key", name="uq_sgroup_akey"),
+        sa.UniqueConstraint("resource_group_id", "access_key", name="uq_sgroup_akey"),
     )
     sgroup_row: Mapped[ScalingGroupRow] = relationship(
         "ScalingGroupRow",
@@ -538,9 +539,14 @@ async def query_allowed_sgroups(
     group: ProjectID | Iterable[ProjectID] | str | Iterable[str],
     access_key: str,
 ) -> Sequence[Row[Any]]:
-    query = sa.select(sgroups_for_domains).where(sgroups_for_domains.c.domain == domain_name)
+    from ai.backend.manager.models.domain import DomainRow
+
+    query = sa.select(sgroups_for_domains).where(
+        sgroups_for_domains.c.domain_id
+        == sa.select(DomainRow.id).where(DomainRow.name == domain_name).scalar_subquery()
+    )
     result = await db_conn.execute(query)
-    from_domain = {row.scaling_group for row in result}
+    from_domain = {row.resource_group_id for row in result}
 
     group_ids: Sequence[uuid.UUID] = []
     match group:
@@ -551,24 +557,24 @@ async def query_allowed_sgroups(
                 group_ids = []
         case list() | tuple() | set():
             group_ids = await resolve_groups(db_conn, domain_name, cast(Iterable[Any], group))
-    from_group: set[str]
+    from_group: set[ResourceGroupID]
     if not group_ids:
         from_group = set()  # empty
     else:
         group_cond = sgroups_for_groups.c.group.in_(group_ids)
         query = sa.select(sgroups_for_groups).where(group_cond)
         result = await db_conn.execute(query)
-        from_group = {row.scaling_group for row in result}
+        from_group = {row.resource_group_id for row in result}
 
     query = sa.select(sgroups_for_keypairs).where(sgroups_for_keypairs.c.access_key == access_key)
     result = await db_conn.execute(query)
-    from_keypair = {row.scaling_group for row in result}
+    from_keypair = {row.resource_group_id for row in result}
 
-    sgroups = from_domain | from_group | from_keypair
+    sgroup_ids = from_domain | from_group | from_keypair
     query = (
         sa.select(scaling_groups)
         .where(
-            (scaling_groups.c.name.in_(sgroups)) & (scaling_groups.c.is_active),
+            (scaling_groups.c.id.in_(sgroup_ids)) & (scaling_groups.c.is_active),
         )
         .order_by(scaling_groups.c.name)
     )
@@ -714,7 +720,11 @@ class ScalingGroupPermissionContextBuilder(
         stmt = (
             sa.select(DomainRow)
             .where(DomainRow.name == scope.domain_name)
-            .options(selectinload(DomainRow.sgroup_for_domains_rows))
+            .options(
+                selectinload(DomainRow.sgroup_for_domains_rows).selectinload(
+                    ScalingGroupForDomainRow.sgroup_row
+                )
+            )
         )
         domain_row = await self.db_session.scalar(stmt)
         if domain_row is None:
@@ -722,7 +732,7 @@ class ScalingGroupPermissionContextBuilder(
         scaling_groups = domain_row.sgroup_for_domains_rows
         return ScalingGroupPermissionContext(
             object_id_to_additional_permission_map={
-                row.scaling_group: permissions for row in scaling_groups
+                row.sgroup_row.name: permissions for row in scaling_groups
             }
         )
 
@@ -742,7 +752,11 @@ class ScalingGroupPermissionContextBuilder(
         stmt = (
             sa.select(GroupRow)
             .where(GroupRow.id == scope.project_id)
-            .options(selectinload(GroupRow.sgroup_for_groups_rows))
+            .options(
+                selectinload(GroupRow.sgroup_for_groups_rows).selectinload(
+                    ScalingGroupForProjectRow.sgroup_row
+                )
+            )
         )
         project_row = await self.db_session.scalar(stmt)
         if project_row is None:
@@ -750,7 +764,7 @@ class ScalingGroupPermissionContextBuilder(
         scaling_groups = project_row.sgroup_for_groups_rows
         return ScalingGroupPermissionContext(
             object_id_to_additional_permission_map={
-                row.scaling_group: project_permissions for row in scaling_groups
+                row.sgroup_row.name: project_permissions for row in scaling_groups
             }
         )
 
@@ -773,7 +787,9 @@ class ScalingGroupPermissionContextBuilder(
             .where(UserRow.uuid == scope.user_id)
             .options(
                 selectinload(UserRow.keypairs).options(
-                    joinedload(KeyPairRow.sgroup_for_keypairs_rows)
+                    joinedload(KeyPairRow.sgroup_for_keypairs_rows).joinedload(
+                        ScalingGroupForKeypairsRow.sgroup_row
+                    )
                 )
             )
         )
@@ -785,8 +801,8 @@ class ScalingGroupPermissionContextBuilder(
         for keypair in user_row.keypairs:
             scaling_groups = keypair.sgroup_for_keypairs_rows
             for sg in scaling_groups:
-                if sg.scaling_group not in object_id_to_additional_permission_map:
-                    object_id_to_additional_permission_map[sg.scaling_group] = user_permissions
+                if sg.sgroup_row.name not in object_id_to_additional_permission_map:
+                    object_id_to_additional_permission_map[sg.sgroup_row.name] = user_permissions
         return ScalingGroupPermissionContext(
             object_id_to_additional_permission_map=object_id_to_additional_permission_map
         )
@@ -832,6 +848,7 @@ async def get_scaling_groups(
     requested_permission: ScalingGroupPermission,
     sgroup_names: Iterable[str] | None = None,
     *,
+    sgroup_ids: Iterable[ResourceGroupID] | None = None,
     ctx: ClientContext,
     db_session: SASession,
 ) -> list[ScalingGroupModel]:
@@ -844,6 +861,8 @@ async def get_scaling_groups(
     _stmt = sa.select(ScalingGroupRow).where(cond)
     if sgroup_names is not None:
         _stmt = _stmt.where(ScalingGroupRow.name.in_(sgroup_names))
+    if sgroup_ids is not None:
+        _stmt = _stmt.where(ScalingGroupRow.id.in_(sgroup_ids))
     async for row in await db_session.stream_scalars(_stmt):
         permissions = await permission_ctx.calculate_final_permission(row)
         ret.append(ScalingGroupModel.from_row(row, permissions))

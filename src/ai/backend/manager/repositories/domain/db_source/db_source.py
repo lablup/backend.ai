@@ -92,7 +92,7 @@ class DomainDBSource:
                 sa.select(DomainRow)
                 .join(
                     ScalingGroupForDomainRow,
-                    DomainRow.name == ScalingGroupForDomainRow.domain,
+                    DomainRow.id == ScalingGroupForDomainRow.domain_id,
                 )
                 .distinct()
             )
