@@ -3,6 +3,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, override
 
+from ai.backend.common.cc_storage import CONCURRENT_TIER
 from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
 from ai.backend.common.types import (
     AccessKey,
@@ -107,6 +108,7 @@ class CreateVFolderAction(VFolderScopeAction):
     user_uuid: uuid.UUID
     user_role: UserRole
     creator_email: str
+    encryption_tier: str | None = CONCURRENT_TIER
 
     @override
     def entity_id(self) -> str | None:

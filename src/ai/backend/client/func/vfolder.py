@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Mapping, Sequence
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, TypeVar, cast
 from uuid import UUID
 
@@ -21,6 +21,7 @@ from tenacity import (
 from tqdm import tqdm
 from yarl import URL
 
+from ai.backend.client import cc
 from ai.backend.client.compat import current_loop
 from ai.backend.client.config import DEFAULT_CHUNK_SIZE, MAX_INFLIGHT_CHUNKS
 from ai.backend.client.exceptions import BackendClientError
@@ -28,6 +29,7 @@ from ai.backend.client.output.fields import vfolder_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
 from ai.backend.client.pagination import fetch_paginated_result
 from ai.backend.client.request import Request
+from ai.backend.common.cc_storage import EncryptingReader, decrypt_file, stored_len
 from ai.backend.common.types import ResultSet
 
 from .base import BaseFunction, api_function
@@ -437,6 +439,17 @@ class VFolderByName(BaseFunction):
                 f"Downloading {file_path.name} failed after {max_retries} retries"
             ) from e
 
+    async def _cipher(self):
+        if getattr(self, "_cipher_paths", "unset") == "unset":
+            acquired = await cc.acquire(self, None)
+            self._cipher_paths = acquired[0] if acquired else None
+            self._release = acquired[1] if acquired else None
+        return self._cipher_paths
+
+    async def _remote(self, path, *, create: bool = False) -> str:
+        paths = await self._cipher()
+        return str(path) if paths is None else await paths.resolve(str(path), create=create)
+
     @api_function
     async def download(
         self,
@@ -458,7 +471,7 @@ class VFolderByName(BaseFunction):
 
             rqst = Request("POST", f"/folders/{self.request_key}/request-download")
             rqst.set_json({
-                "path": str(relpath),
+                "path": await self._remote(relpath),
             })
             async with rqst.fetch() as resp:
                 download_info = await resp.json()
@@ -476,9 +489,16 @@ class VFolderByName(BaseFunction):
                 if dst_dir is not None:
                     params["dst_dir"] = dst_dir
                 download_url = URL(overriden_url).with_query(params)
-            await self._download_file(
-                file_path, download_url, chunk_size, max_retries, show_progress
+            paths = await self._cipher()
+            staged = (
+                file_path
+                if paths is None
+                else file_path.with_name(f"{file_path.name}.bai-ciphertext")
             )
+            await self._download_file(staged, download_url, chunk_size, max_retries, show_progress)
+            if paths is not None:
+                decrypt_file(paths.cipher, staged, file_path)
+                staged.unlink()
 
     async def _upload_files(
         self,
@@ -496,10 +516,12 @@ class VFolderByName(BaseFunction):
                     f"Failed to upload {file_path}. Use recursive option to upload directories."
                 )
             file_size = Path(file_path).stat().st_size
+            paths = await self._cipher()
+            relative = str(Path(file_path).relative_to(base_path))
             rqst = Request("POST", f"/folders/{self.request_key}/request-upload")
             rqst.set_json({
-                "path": f"{Path(file_path).relative_to(base_path)!s}",
-                "size": int(file_size),
+                "path": await self._remote(relative, create=True),
+                "size": int(file_size if paths is None else stored_len(file_size)),
             })
             async with rqst.fetch() as resp:
                 upload_info = await resp.json()
@@ -522,6 +544,8 @@ class VFolderByName(BaseFunction):
             else:
                 input_file = Path(file_path).relative_to(base_path).open("rb")
             print(f"Uploading {base_path / file_path} via {upload_info['url']} ...")
+            if paths is not None:
+                input_file = EncryptingReader(input_file, paths.cipher, file_size)
             # TODO: refactor out the progress bar
             uploader = tus_client.async_uploader(
                 file_stream=input_file,
@@ -584,8 +608,9 @@ class VFolderByName(BaseFunction):
     ) -> ResultSet:
         await self.update_id_by_name()
         rqst = Request("POST", f"/folders/{self.request_key}/mkdir")
+        entries = path if isinstance(path, list) else [path]
         rqst.set_json({
-            "path": path,
+            "path": [await self._remote(entry, create=True) for entry in entries],
             "parents": parents,
             "exist_ok": exist_ok,
         })
@@ -606,9 +631,19 @@ class VFolderByName(BaseFunction):
     async def rename_file(self, target_path: str, new_name: str) -> dict[str, Any]:
         await self.update_id_by_name()
         rqst = Request("POST", f"/folders/{self.request_key}/rename-file")
+        paths = await self._cipher()
         rqst.set_json({
-            "target_path": target_path,
-            "new_name": new_name,
+            "target_path": await self._remote(target_path),
+            "new_name": (
+                new_name
+                if paths is None
+                else paths.cipher.name(
+                    await paths.dir_iv(
+                        await self._remote(PurePosixPath(target_path).parent), create=False
+                    ),
+                    new_name,
+                ).on_disk
+            ),
         })
         async with rqst.fetch() as resp:
             result: dict[str, Any] = await resp.json()
@@ -619,8 +654,8 @@ class VFolderByName(BaseFunction):
         await self.update_id_by_name()
         rqst = Request("POST", f"/folders/{self.request_key}/move-file")
         rqst.set_json({
-            "src": src_path,
-            "dst": dst_path,
+            "src": await self._remote(src_path),
+            "dst": await self._remote(dst_path, create=True),
         })
         async with rqst.fetch() as resp:
             result: dict[str, Any] = await resp.json()
@@ -631,7 +666,7 @@ class VFolderByName(BaseFunction):
         await self.update_id_by_name()
         rqst = Request("DELETE", f"/folders/{self.request_key}/delete-files")
         rqst.set_json({
-            "files": files,
+            "files": [await self._remote(name) for name in files],
             "recursive": recursive,
         })
         async with rqst.fetch() as resp:
@@ -640,6 +675,14 @@ class VFolderByName(BaseFunction):
     @api_function
     async def list_files(self, path: str | Path = ".") -> dict[str, Any]:
         await self.update_id_by_name()
+        paths = await self._cipher()
+        if paths is not None:
+            return {
+                "items": [
+                    {"name": e.name, "size": e.size, "type": "DIRECTORY" if e.is_dir else "FILE"}
+                    for e in await paths.listing(str(path))
+                ]
+            }
         rqst = Request("GET", f"/folders/{self.request_key}/files", params={"path": str(path)})
         async with rqst.fetch() as resp:
             result: dict[str, Any] = await resp.json()

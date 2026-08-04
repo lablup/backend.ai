@@ -3,6 +3,8 @@ from uuid import UUID
 
 from ruamel.yaml import YAML
 
+from ai.backend.manager.confidential.catalogue import CatalogueReader
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.types import VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -59,9 +61,11 @@ class ModelCardService:
         self,
         repository: ModelCardRepository,
         storage_manager: StorageSessionManager,
+        db: ExtendedAsyncSAEngine,
     ) -> None:
         self._repository = repository
         self._storage_manager = storage_manager
+        self._catalogue = CatalogueReader(db)
 
     async def create(self, action: CreateModelCardAction) -> CreateModelCardActionResult:
         data = await self._repository.create(action.creator)
@@ -157,24 +161,28 @@ class ModelCardService:
         )
         manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
 
-        result = await manager_client.list_files(volume_name, str(vfolder_id), ".")
-        vfolder_files = result["items"]
+        view = await self._catalogue.view(
+            manager_client,
+            volume_name,
+            str(vfolder_id),
+            domain_name=vf.domain_name,
+            folder_uuid=vf.id,
+        )
+        vfolder_files = await view.names()
 
         model_def_filename: str | None = None
-        readme_idx: int | None = None
-        for idx, item in enumerate(vfolder_files):
-            if item["name"] in ("model-definition.yml", "model-definition.yaml"):
+        readme_name: str | None = None
+        for name in vfolder_files:
+            if name in ("model-definition.yml", "model-definition.yaml"):
                 if model_def_filename is None:
-                    model_def_filename = item["name"]
-            if item["name"].lower().startswith("readme."):
-                readme_idx = idx
+                    model_def_filename = name
+            if name.lower().startswith("readme."):
+                readme_name = name
 
         if model_def_filename is None:
             return None
 
-        raw_bytes = await manager_client.fetch_file_content(
-            volume_name, str(vfolder_id), f"./{model_def_filename}"
-        )
+        raw_bytes = await view.read(model_def_filename)
         yaml = YAML()
         try:
             parsed = yaml.load(raw_bytes.decode("utf-8"))
@@ -190,13 +198,9 @@ class ModelCardService:
         name = first_model.name
 
         readme: str | None = None
-        if readme_idx is not None:
-            readme_filename = vfolder_files[readme_idx]["name"]
+        if readme_name is not None:
             try:
-                readme_bytes = await manager_client.fetch_file_content(
-                    volume_name, str(vfolder_id), f"./{readme_filename}"
-                )
-                readme = readme_bytes.decode("utf-8")
+                readme = (await view.read(readme_name)).decode("utf-8")
             except Exception:
                 log.warning("Failed to fetch README from vfolder {}", vf.id)
 

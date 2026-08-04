@@ -183,3 +183,27 @@ class ConfidentialTcbGraceRow(Base):  # type: ignore[misc]
     resolved_at: Mapped[datetime | None] = mapped_column(
         "resolved_at", sa.DateTime(timezone=True), nullable=True
     )
+
+
+class ConfidentialClientReleaseRow(Base):  # type: ignore[misc]
+    __tablename__ = "confidential_client_releases"
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    released_at: Mapped[datetime] = mapped_column(
+        "released_at",
+        sa.DateTime(timezone=True),
+        server_default=sa.func.now(),
+        nullable=False,
+        index=True,
+    )
+    vfolder_id: Mapped[uuid.UUID] = mapped_column("vfolder_id", GUID, nullable=False, index=True)
+    domain_name: Mapped[str] = mapped_column("domain_name", sa.String(length=64), nullable=False)
+    requester_id: Mapped[uuid.UUID] = mapped_column("requester_id", GUID, nullable=False)
+    requester: Mapped[str] = mapped_column("requester", sa.String(length=256), nullable=False)
+    session_id: Mapped[uuid.UUID | None] = mapped_column("session_id", GUID, nullable=True)
+    scope: Mapped[str] = mapped_column("scope", sa.String(length=128), nullable=False)
+    tier: Mapped[str] = mapped_column("tier", sa.String(length=32), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(
+        "expires_at", sa.DateTime(timezone=True), nullable=False
+    )

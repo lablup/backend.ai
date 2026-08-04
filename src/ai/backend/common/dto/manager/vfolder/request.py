@@ -10,6 +10,7 @@ from typing import Any
 from pydantic import AliasChoices, Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.cc_storage import CONCURRENT_TIER
 from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.typed_validators import VFolderName
 from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
@@ -82,6 +83,9 @@ class VFolderCreateReq(BaseRequestModel):
         validation_alias=AliasChoices("group", "groupId"),
     )
     cloneable: bool = Field(default=False)
+    encryption_tier: str | None = Field(
+        default=CONCURRENT_TIER, alias="encryptionTier"
+    )
 
 
 class RenameVFolderReq(BaseRequestModel):

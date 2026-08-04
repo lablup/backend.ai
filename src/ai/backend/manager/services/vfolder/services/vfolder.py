@@ -429,6 +429,7 @@ class VFolderService:
             group=group_uuid if ownership_type == "group" else None,
             unmanaged_path=unmanaged_path,
             cloneable=action.cloneable,
+            encryption_tier=action.encryption_tier,
             status=VFolderOperationStatus.READY,
         )
 
@@ -1683,6 +1684,7 @@ class VFolderService:
             group=group_uuid if ownership_type == "group" else None,
             unmanaged_path=None,
             cloneable=action.cloneable,
+            encryption_tier=action.encryption_tier,
             status=VFolderOperationStatus.READY,
         )
         vfolder_data = await self._vfolder_repository.create_vfolder_with_permission(

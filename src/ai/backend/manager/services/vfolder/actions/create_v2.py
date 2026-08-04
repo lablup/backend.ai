@@ -2,6 +2,7 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.cc_storage import CONCURRENT_TIER
 from ai.backend.common.data.permission.types import (
     EntityType,
     RBACElementType,
@@ -28,6 +29,7 @@ class CreateVFolderV2Action(BaseScopeAction):
     usage_mode: VFolderUsageMode
     permission: VFolderPermission
     cloneable: bool
+    encryption_tier: str | None = CONCURRENT_TIER
 
     @override
     @classmethod

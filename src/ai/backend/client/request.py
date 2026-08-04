@@ -28,6 +28,7 @@ from dateutil.tz import tzutc
 from multidict import CIMultiDict
 from yarl import URL
 
+from ai.backend.common.cc_storage import CAPABILITY_HEADER, FORMAT_ID
 from ai.backend.common.json import dump_json_str
 
 from .auth import generate_signature
@@ -166,6 +167,7 @@ class Request:
             ("User-Agent", self.config.user_agent),
             ("X-BackendAI-Domain", self.config.domain),
             ("X-BackendAI-Version", self.api_version),
+            (CAPABILITY_HEADER, FORMAT_ID),
         ])
         self._content = b""
         self._attached_files = None

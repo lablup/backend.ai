@@ -11,6 +11,7 @@ import aiohttp
 from multidict import CIMultiDict
 from yarl import URL
 
+from ai.backend.common.cc_storage import CAPABILITY_HEADER, FORMAT_ID
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.common.api_handlers import (
     BaseRequestModel,
@@ -123,6 +124,7 @@ class BackendAIAuthClient:
             "Date": now.isoformat(),
             "Content-Type": content_type,
             "X-BackendAI-Version": self._config.api_version,
+            CAPABILITY_HEADER: FORMAT_ID,
             **headers,
         }
 
@@ -410,6 +412,7 @@ class BackendAIAnonymousClient:
             "Date": datetime.now(UTC).isoformat(),
             "Content-Type": content_type,
             "X-BackendAI-Version": self._config.api_version,
+            CAPABILITY_HEADER: FORMAT_ID,
         })
 
     async def _request(

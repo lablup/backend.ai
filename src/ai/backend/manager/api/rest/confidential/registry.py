@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.rest.middleware.auth import superadmin_required
+from ai.backend.manager.api.rest.middleware.auth import auth_required, superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
 from .handler import ConfidentialHandler
@@ -36,4 +36,10 @@ def register_confidential_routes(
     reg.add("POST", "/measured-blobs", handler.publish_blob, middlewares=admin)
     reg.add("POST", "/tcb-grace", handler.open_grace, middlewares=admin)
     reg.add("POST", "/decisions/search", handler.list_decisions, middlewares=admin)
+    reg.add(
+        "POST",
+        "/folder-keys",
+        handler.release_folder_key,
+        middlewares=[auth_required, route_deps.read_status_mw],
+    )
     return reg

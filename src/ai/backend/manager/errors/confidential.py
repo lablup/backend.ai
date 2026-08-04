@@ -128,3 +128,29 @@ class AdmissionBeltExceeded(BackendAIError, web.HTTPConflict):
             operation=ErrorOperation.CHECK_LIMIT,
             error_detail=ErrorDetail.CONFLICT,
         )
+
+
+class ClientFormatRefused(BackendAIError, web.HTTPPreconditionFailed):
+    error_type = "https://api.backend.ai/probs/confidential-client-format-refused"
+    error_title = "The client does not speak the confidential storage format this folder requires."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class ImmutableEncryptionTier(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/confidential-immutable-encryption-tier"
+    error_title = "A folder's encryption tier is fixed at creation and cannot be changed."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )

@@ -13,6 +13,10 @@ from yarl import URL
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.confidential.blobs import MeasuredBlobStore
 from ai.backend.manager.confidential.broker import BrokerClient
+from ai.backend.manager.confidential.client_keys import (
+    BrokerFolderKeyCustody,
+    ClientKeyRelease,
+)
 from ai.backend.manager.confidential.policy import ReleasePolicyComposer
 from ai.backend.manager.confidential.provisioning import (
     RECONCILE_INTERVAL,
@@ -76,6 +80,7 @@ class ConfidentialPlane:
         self.policy = ReleasePolicyComposer(db, self.broker, self.references)
         self.provisioner = SessionResourceProvisioner(db, self.broker, self.shim)
         self.blobs = MeasuredBlobStore(db)
+        self.client_keys = ClientKeyRelease(db, BrokerFolderKeyCustody(self.broker))
         self._reconciler: asyncio.Task[None] | None = None
 
     async def opts_of(self, scaling_group: str) -> ConfidentialScalingGroupOpts:
