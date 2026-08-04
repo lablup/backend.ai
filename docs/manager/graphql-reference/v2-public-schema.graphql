@@ -1,7 +1,7 @@
 type Query {
   _service: _Service!
 
-  """Reachable without authentication; returns 'pong'."""
+  """Added in 26.9.0. Reachable without authentication; returns 'pong'"""
   ping: String!
 }
 

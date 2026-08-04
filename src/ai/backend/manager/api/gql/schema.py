@@ -7,6 +7,8 @@ from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 
 from ai.backend.common.api_handlers import Sentinel as BackendSentinel
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_root_field
 from ai.backend.manager.api.gql.extensions import (
     GQLExceptionHandlerExtension,
     GQLLoggingExtension,
@@ -1080,6 +1082,16 @@ schema = CustomizedSchema(
 )
 
 
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Reachable without authentication; returns 'pong'",
+    )
+)  # type: ignore[misc]
+async def ping() -> str:
+    return "pong"
+
+
 @strawberry.type(name="Query")
 class PublicQueries:
     """Query root of the ``public`` subgraph, served without authentication at
@@ -1091,10 +1103,7 @@ class PublicQueries:
     against the authenticated subgraph, which answers 401 to an anonymous caller.
     """
 
-    ping: str = strawberry.field(
-        resolver=lambda: "pong",
-        description="Reachable without authentication; returns 'pong'.",
-    )
+    ping = ping
 
 
 # A subgraph of the same supergraph as `schema`, kept separate only so that its routing URL
