@@ -13,9 +13,11 @@ import yarl
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship
+from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.exception import UnknownImageRegistry
+from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.container_registry import (
@@ -259,6 +261,14 @@ class ContainerRegistryRow(Base):  # type: ignore[misc]
                 result[project] = {}
             result[project][registry_name] = yarl.URL(url)
         return result
+
+    @classmethod
+    def scope_id_expr(cls) -> SQLColumnExpression[ScopeID]:
+        return cls.id
+
+    @classmethod
+    def scope_name_expr(cls) -> SQLColumnExpression[str]:
+        return cls.registry_name
 
     @classmethod
     def from_dataclass(cls, data: ContainerRegistryData) -> Self:

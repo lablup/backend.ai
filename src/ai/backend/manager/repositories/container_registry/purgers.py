@@ -9,11 +9,16 @@ from typing import override
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.identifier.container_registry import ContainerRegistryID
+from ai.backend.common.identifier.project import ProjectID
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.repositories.base.purger import BatchPurgerSpec, PurgerSpec
+from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
+from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurgerSpec
 from ai.backend.manager.repositories.base.types import ConflictCheck
 
 
@@ -23,15 +28,15 @@ class ContainerRegistryGroupPurgerSpec(
 ):
     """PurgerSpec for removing a container registry association from a project."""
 
-    registry_id: uuid.UUID
-    group_id: uuid.UUID
+    registry_id: ContainerRegistryID
+    project_id: ProjectID
 
     @override
     def build_subquery(self) -> sa.sql.Select[tuple[AssociationContainerRegistriesGroupsRow]]:
         return sa.select(AssociationContainerRegistriesGroupsRow).where(
             sa.and_(
                 AssociationContainerRegistriesGroupsRow.registry_id == self.registry_id,
-                AssociationContainerRegistriesGroupsRow.group_id == self.group_id,
+                AssociationContainerRegistriesGroupsRow.group_id == self.project_id,
             )
         )
 
@@ -41,10 +46,10 @@ class ContainerRegistryGroupPurgerSpec(
 
 
 @dataclass
-class ContainerRegistryPurgerSpec(PurgerSpec[ContainerRegistryRow]):
-    """PurgerSpec for deleting a container registry."""
+class ContainerRegistryPurgerSpec(RBACEntityPurgerSpec[ContainerRegistryRow]):
+    """PurgerSpec for deleting a container registry with its RBAC entries."""
 
-    registry_id: uuid.UUID
+    registry_id: ContainerRegistryID
 
     @override
     def row_class(self) -> type[ContainerRegistryRow]:
@@ -53,6 +58,17 @@ class ContainerRegistryPurgerSpec(PurgerSpec[ContainerRegistryRow]):
     @override
     def pk_value(self) -> uuid.UUID:
         return self.registry_id
+
+    @override
+    def element_type(self) -> RBACElementType:
+        return RBACElementType.CONTAINER_REGISTRY
+
+    @override
+    def entity_ref(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType.CONTAINER_REGISTRY,
+            element_id=str(self.registry_id),
+        )
 
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:
