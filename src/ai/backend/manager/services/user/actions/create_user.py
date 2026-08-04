@@ -65,7 +65,8 @@ class CreateUserActionResult(UserScopeActionResult):
 
     @override
     def scope_id(self) -> str:
-        # UserCreateResultData always has domain_name set (from creator.spec.domain_name)
+        # Stays on the name while CreateUserAction reports the id, since UserData carries no
+        # domain id. RBAC reads target_element(), not this.
         return self.data.user.domain_name or ""
 
 
