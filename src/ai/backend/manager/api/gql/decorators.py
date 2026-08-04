@@ -32,9 +32,7 @@ import strawberry.experimental.pydantic
 import strawberry.federation
 from pydantic import BaseModel
 from strawberry.experimental.pydantic.conversion_types import StrawberryTypeFromPydantic
-from strawberry.federation import schema_directive
 from strawberry.relay import Connection
-from strawberry.schema_directive import Location
 from strawberry.schema_directives import OneOf
 from strawberry.types.field import StrawberryField
 from strawberry.types.field import field as strawberry_field
@@ -280,20 +278,6 @@ def gql_root_field(
     )
 
 
-@schema_directive(
-    locations=[Location.FIELD_DEFINITION],
-    name="public",
-    description="Resolvable without authentication.",
-    compose=True,
-)
-class Public:
-    """``@public`` on a field definition, carried into the supergraph.
-
-    Federation namespaces a composed directive by a spec ``@link`` URL, so the schema emits one.
-    Backend.AI publishes no such spec, so the library default stands in.
-    """
-
-
 def gql_public_root_field(
     meta: BackendAIGQLMeta,
     *,
@@ -304,14 +288,13 @@ def gql_public_root_field(
     """Root query field resolvable without authentication.
 
     Distinct from ``gql_root_field`` so that every anonymously reachable field is greppable by
-    its declaration, and marked ``@public`` in the schema so the exposure survives introspection
-    rather than living in prose.
+    its declaration.
     """
     return strawberry.field(
         description=_build_description(meta),
         name=name,
         deprecation_reason=deprecation_reason,
-        directives=[Public(), *directives],
+        directives=directives,
     )
 
 

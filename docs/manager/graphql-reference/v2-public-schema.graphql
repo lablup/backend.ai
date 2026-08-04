@@ -1,15 +1,8 @@
-"""Resolvable without authentication."""
-directive @public on FIELD_DEFINITION
-
-schema @composeDirective(name: "@public") @link(url: "https://directives.strawberry.rocks/public/v0.1", import: ["@public"]) @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@composeDirective"]) {
-  query: Query
-}
-
 type Query {
   _service: _Service!
 
   """Added in 26.9.0. Returns 'pong'"""
-  ping: String! @public
+  ping: String!
 }
 
 scalar _Any
