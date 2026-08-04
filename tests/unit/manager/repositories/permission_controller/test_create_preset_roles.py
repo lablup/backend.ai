@@ -56,12 +56,14 @@ class SeededPreset:
     scope_type: ScopeType
     auto_assign: bool
     permissions: tuple[tuple[EntityType, OperationType], ...]
+    role_name_template: str | None = None
 
 
 async def _seed_preset(db: ExtendedAsyncSAEngine, preset: SeededPreset, *, deleted: bool) -> None:
     async with db.begin_session() as db_sess:
         preset_row = RolePresetRow(
             name=preset.name,
+            role_name_template=preset.role_name_template,
             scope_type=preset.scope_type,
             auto_assign=preset.auto_assign,
             deleted=deleted,
@@ -280,3 +282,26 @@ class TestCreatePresetRoles:
         async with db_with_tables.begin_session() as db_sess:
             role_count = await db_sess.scalar(sa.select(sa.func.count()).select_from(RoleRow))
             assert role_count == len(two_domain_presets)
+
+    async def test_role_name_template_is_ignored_in_legacy_path(
+        self,
+        role_manager: RoleManager,
+        db_with_tables: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Name templates are rendered only by the RBAC write ops; this legacy
+        path always uses the preset's fixed name."""
+        preset = SeededPreset(
+            name="domain-member",
+            scope_type=ScopeType.DOMAIN,
+            auto_assign=False,
+            permissions=(),
+            role_name_template="{{ scope.name }}-member",
+        )
+        await _seed_preset(db_with_tables, preset, deleted=False)
+        scope_id = ScopeId(scope_type=ScopeType.DOMAIN, scope_id=str(uuid.uuid4()))
+
+        async with db_with_tables.begin_session() as db_sess:
+            created = await role_manager.create_preset_roles(db_sess, scope_id)
+
+        assert len(created) == 1
+        assert created[0].name == preset.name

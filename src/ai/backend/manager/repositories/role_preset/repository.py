@@ -24,7 +24,7 @@ from ai.backend.manager.repositories.base import (
     BulkCreator,
 )
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 from ai.backend.manager.repositories.role_preset.creators import (
     RolePermissionPresetDependentCreatorSpec,
     RolePresetCreatorSpec,
@@ -39,7 +39,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class RolePresetRepository:
     _db_source: RolePresetDBSource
 
-    def __init__(self, ops_provider: DBOpsProvider) -> None:
+    def __init__(self, ops_provider: RBACOpsProvider) -> None:
         self._db_source = RolePresetDBSource(ops_provider)
 
     async def create(
