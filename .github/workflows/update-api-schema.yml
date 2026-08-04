@@ -75,7 +75,7 @@ jobs:
       run: |
         git add docs/manager/graphql-reference/schema.graphql
         git add docs/manager/graphql-reference/v2-schema.graphql
-        # git add docs/manager/graphql-reference/v2-public-schema.graphql
+        git add docs/manager/graphql-reference/v2-public-schema.graphql
         git add docs/manager/graphql-reference/supergraph.graphql
         git add docs/manager/rest-reference/openapi.json
         author_name=$(git show -q --pretty='format:%an')
