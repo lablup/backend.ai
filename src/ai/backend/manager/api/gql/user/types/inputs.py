@@ -55,7 +55,7 @@ from .enums import UserRoleEnumGQL, UserStatusEnumGQL
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        description="Input for creating a new user. Required fields: email, username, password, domain_name, need_password_change, status, role.",
+        description="Input for creating a new user. Required fields: email, username, password, need_password_change, status, role, and exactly one of domain_id or domain_name.",
         added_version="26.2.0",
     ),
     name="CreateUserV2Input",
@@ -67,7 +67,9 @@ class CreateUserInputGQL(PydanticInputMixin[CreateUserInputDTO]):
     username: str = gql_field(description="Unique username for login.")
     password: str = gql_field(description="Initial password for the user.")
     domain_name: str | None = gql_field(
-        description="Domain to assign the user to, by name.", default=None
+        description="Domain to assign the user to, by name. Deprecated: use `domain_id`.",
+        default=None,
+        deprecation_reason="Use `domain_id` instead.",
     )
     domain_id: UUID | None = gql_added_field(
         BackendAIGQLMeta(
@@ -143,7 +145,11 @@ class UpdateUserV2InputGQL(PydanticInputMixin[UpdateUserInputDTO]):
     description: str | None = gql_field(description="New description.", default=UNSET)
     status: UserStatusEnumGQL | None = gql_field(description="New account status.", default=UNSET)
     role: UserRoleEnumGQL | None = gql_field(description="New user role.", default=UNSET)
-    domain_name: str | None = gql_field(description="New domain assignment.", default=UNSET)
+    domain_name: str | None = gql_field(
+        description="New domain assignment, by name. Deprecated: use `domain_id`.",
+        default=UNSET,
+        deprecation_reason="Use `domain_id` instead.",
+    )
     domain_id: UUID | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
