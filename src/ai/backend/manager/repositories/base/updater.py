@@ -72,6 +72,44 @@ class UpdaterSpec[TRow: Base](ABC):
             setattr(row, column, value)
 
 
+class DataUpdater[TRow: Base, TData](UpdaterSpec[TRow], ABC):
+    """An updater spec that names its target row and how the updated row becomes data.
+
+    ``UpdaterSpec`` says only what to set, leaving ``pk_value`` on the
+    :class:`Updater` wrapper and the conversion to the caller. Carrying both here makes
+    it self-contained, so the ops layer returns the ``data/`` type and the ORM row never
+    leaves it.
+
+    Example:
+        class UserRenamer(DataUpdater[UserRow, UserData]):
+            @property
+            def row_class(self) -> type[UserRow]:
+                return UserRow
+
+            def pk_value(self) -> UUID:
+                return self._user_id
+
+            def build_values(self) -> dict[str, Any]:
+                return {"name": self._new_name}
+
+            def to_data(self, row: UserRow) -> UserData:
+                return row.to_data()
+
+        async with ops.write_ops() as w:
+            user = await w.update_data(UserRenamer(user_id, "Bob"))
+    """
+
+    @abstractmethod
+    def pk_value(self) -> UUID | str | int:
+        """Return the primary key value identifying the target row."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        """Convert the updated row into its ``data/`` type."""
+        raise NotImplementedError
+
+
 class BatchUpdaterSpec[TRow: Base](ABC):
     """Abstract base class defining values to update for batch updates.
 

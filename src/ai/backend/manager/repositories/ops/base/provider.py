@@ -33,6 +33,11 @@ from ai.backend.manager.repositories.base import (
     BulkUpdaterResult,
     Creator,
     CreatorResult,
+    DataCreator,
+    DataPurger,
+    DataQuerier,
+    DataUpdater,
+    DataUpserter,
     DependentCreatorSpec,
     NextValuePolicy,
     Purger,
@@ -97,6 +102,22 @@ class ReadOps:
     async def query[TRow: Base](self, querier: Querier[TRow]) -> QuerierResult[TRow] | None:
         """Fetch a single row by primary key."""
         return await execute_querier(self._sess, querier)
+
+    async def query_data[TRow: Base, TData](
+        self, querier: DataQuerier[TRow, TData]
+    ) -> TData | None:
+        """Fetch a single row by primary key and return it as its ``data/`` type.
+
+        Converting counterpart of :meth:`query`, mirroring what :meth:`search_with_scopes`
+        does for lists: the querier carries its own conversion, so the ORM row is
+        consumed here and never reaches the caller.
+        """
+        result = await execute_querier(
+            self._sess, Querier(row_class=querier.row_class(), pk_value=querier.pk_value())
+        )
+        if result is None:
+            return None
+        return querier.to_data(result.row)
 
     async def batch_query_in_global(
         self,
@@ -183,6 +204,29 @@ class WriteOps(ReadOps):
         """Insert a single row."""
         return await execute_creator(self._sess, creator)
 
+    async def create_data[TRow: Base, TData](self, creator: DataCreator[TRow, TData]) -> TData:
+        """Insert a single row and return it as its ``data/`` type."""
+        result = await execute_creator(self._sess, Creator(spec=creator))
+        return creator.to_data(result.row)
+
+    async def update_data[TRow: Base, TData](
+        self, updater: DataUpdater[TRow, TData]
+    ) -> TData | None:
+        """Update a single row by primary key and return it as its ``data/`` type."""
+        result = await execute_updater(
+            self._sess, Updater(spec=updater, pk_value=updater.pk_value())
+        )
+        if result is None:
+            return None
+        return updater.to_data(result.row)
+
+    async def purge_data[TRow: Base, TData](self, purger: DataPurger[TRow, TData]) -> TData | None:
+        """Delete a single row by primary key and return it as its ``data/`` type."""
+        result = await execute_purger(self._sess, Purger(spec=purger))
+        if result is None:
+            return None
+        return purger.to_data(result.row)
+
     async def bulk_create[TRow: Base](self, bulk: BulkCreator[TRow]) -> BulkCreatorResult[TRow]:
         """Insert multiple rows atomically (all-or-nothing)."""
         return await execute_bulk_creator(self._sess, bulk)
@@ -254,6 +298,13 @@ class WriteOps(ReadOps):
     ) -> UpserterResult[TRow]:
         """Insert or update a single row on conflict."""
         return await execute_upserter(self._sess, upserter, index_elements=index_elements)
+
+    async def upsert_data[TRow: Base, TData](self, upserter: DataUpserter[TRow, TData]) -> TData:
+        """Insert or update a single row on conflict, returning its ``data/`` type."""
+        result = await execute_upserter(
+            self._sess, Upserter(spec=upserter), index_elements=upserter.index_elements()
+        )
+        return upserter.to_data(result.row)
 
     async def create_rbac_entity[TRow: Base](
         self, creator: RBACEntityCreator[TRow]

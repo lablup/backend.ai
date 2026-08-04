@@ -11,6 +11,7 @@ from .creator import (
     Creator,
     CreatorResult,
     CreatorSpec,
+    DataCreator,
     DependentCreatorSpec,
     NextValuePolicy,
     execute_bulk_creator,
@@ -49,6 +50,7 @@ from .purger import (
     BatchPurgerSpec,
     BulkPurgerError,
     BulkPurgerResultWithFailures,
+    DataPurger,
     Purger,
     PurgerResult,
     execute_batch_purger,
@@ -59,6 +61,7 @@ from .querier import (
     BatchQuerier,
     BatchQuerierResult,
     BatchQueryOptions,
+    DataQuerier,
     Querier,
     QuerierResult,
     execute_batch_querier,
@@ -78,6 +81,7 @@ from .updater import (
     BatchUpdaterSpec,
     BulkUpdaterError,
     BulkUpdaterResult,
+    DataUpdater,
     Updater,
     UpdaterResult,
     UpdaterSpec,
@@ -88,6 +92,7 @@ from .updater import (
 from .upserter import (
     BulkUpserter,
     BulkUpserterResult,
+    DataUpserter,
     Upserter,
     UpserterResult,
     UpserterSpec,
@@ -125,6 +130,7 @@ __all__ = [
     "CursorBackwardPagination",
     "PageInfoResult",
     # Querier
+    "DataQuerier",
     "Querier",
     "QuerierResult",
     "execute_querier",
@@ -138,6 +144,7 @@ __all__ = [
     "SearcherResult",
     # Creator
     "CreatorSpec",
+    "DataCreator",
     "Creator",
     "CreatorResult",
     "execute_creator",
@@ -157,6 +164,7 @@ __all__ = [
     "execute_bulk_creator_partial",
     # Updater
     "UpdaterSpec",
+    "DataUpdater",
     "Updater",
     "UpdaterResult",
     "execute_updater",
@@ -171,6 +179,7 @@ __all__ = [
     "execute_bulk_updater_partial",
     # Upserter
     "UpserterSpec",
+    "DataUpserter",
     "Upserter",
     "UpserterResult",
     "execute_upserter",
@@ -179,6 +188,7 @@ __all__ = [
     "BulkUpserterResult",
     "execute_bulk_upserter",
     # Purger
+    "DataPurger",
     "Purger",
     "PurgerResult",
     "execute_purger",
