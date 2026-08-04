@@ -1,0 +1,12 @@
+[package]
+name = "bai-storage-format-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+bai-storage-format = { workspace = true, features = ["js"] }
+wasm-bindgen = "0.2"

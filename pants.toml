@@ -26,6 +26,7 @@ pants_ignore = [
     "/proposals/",
     "*.log",
     "/tools/pants-plugins",
+    "/rust/",
     "/wheelhouse/*/",
     "/wheelhouse/*.whl"
 ]
