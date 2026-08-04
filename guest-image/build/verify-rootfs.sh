@@ -30,7 +30,7 @@ if [ -n "$config" ]; then
 	while IFS= read -r want; do
 		case "$want" in
 			''|'#'*) continue ;;
-			*=n) grep -qx "# ${want%%=*} is not set" "$config" || grep -qx "$want" "$config" ;;
+			*=n) ! grep -qE "^${want%%=*}=" "$config" ;;
 			*) grep -qx "$want" "$config" ;;
 		esac && report ok "kernel ${want%%=*}" || report MISS "kernel $want"
 	done < "${BAI_CC_ROOT}/kernel/fragments/backendai.conf"
