@@ -182,7 +182,7 @@ class ScalingGroupConditions:
     def by_project(project_id: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ScalingGroupRow.id.in_(
-                sa.select(ScalingGroupForProjectRow.scaling_group_id).where(
+                sa.select(ScalingGroupForProjectRow.resource_group_id).where(
                     ScalingGroupForProjectRow.group == project_id
                 )
             )

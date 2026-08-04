@@ -342,7 +342,7 @@ class ScalingGroupDBSource:
                 .select_from(ScalingGroupForDomainRow)
                 .where(
                     sa.and_(
-                        ScalingGroupForDomainRow.scaling_group_id == resource_group_id,
+                        ScalingGroupForDomainRow.resource_group_id == resource_group_id,
                         ScalingGroupForDomainRow.domain_id == domain_id,
                     )
                 )
@@ -376,7 +376,7 @@ class ScalingGroupDBSource:
             query = sa.select(
                 sa.exists().where(
                     sa.and_(
-                        ScalingGroupForKeypairsRow.scaling_group_id == resource_group_id,
+                        ScalingGroupForKeypairsRow.resource_group_id == resource_group_id,
                         ScalingGroupForKeypairsRow.access_key == access_key,
                     )
                 )
@@ -412,7 +412,7 @@ class ScalingGroupDBSource:
                 .select_from(ScalingGroupForProjectRow)
                 .where(
                     sa.and_(
-                        ScalingGroupForProjectRow.scaling_group_id == resource_group_id,
+                        ScalingGroupForProjectRow.resource_group_id == resource_group_id,
                         ScalingGroupForProjectRow.group == user_group,
                     )
                 )
@@ -543,7 +543,7 @@ class ScalingGroupDBSource:
                 await session.execute(
                     sa.delete(ScalingGroupForDomainRow).where(
                         ScalingGroupForDomainRow.domain_id == domain_id,
-                        ScalingGroupForDomainRow.scaling_group_id.in_(remove),
+                        ScalingGroupForDomainRow.resource_group_id.in_(remove),
                     )
                 )
                 await session.execute(
@@ -563,7 +563,7 @@ class ScalingGroupDBSource:
                 for rg_id in add:
                     await session.execute(
                         pg_insert(ScalingGroupForDomainRow.__table__)
-                        .values(scaling_group_id=rg_id, domain_id=domain_id)
+                        .values(resource_group_id=rg_id, domain_id=domain_id)
                         .on_conflict_do_nothing()
                     )
                     await session.execute(
@@ -582,7 +582,7 @@ class ScalingGroupDBSource:
                 sa.select(ScalingGroupRow.name)
                 .join(
                     ScalingGroupForDomainRow,
-                    ScalingGroupForDomainRow.scaling_group_id == ScalingGroupRow.id,
+                    ScalingGroupForDomainRow.resource_group_id == ScalingGroupRow.id,
                 )
                 .where(ScalingGroupForDomainRow.domain_id == domain_id)
             )
@@ -603,7 +603,7 @@ class ScalingGroupDBSource:
                 await session.execute(
                     sa.delete(ScalingGroupForProjectRow).where(
                         ScalingGroupForProjectRow.group == project_id,
-                        ScalingGroupForProjectRow.scaling_group_id.in_(remove),
+                        ScalingGroupForProjectRow.resource_group_id.in_(remove),
                     )
                 )
                 await session.execute(
@@ -623,7 +623,7 @@ class ScalingGroupDBSource:
                 for rg_id in add:
                     await session.execute(
                         pg_insert(ScalingGroupForProjectRow.__table__)
-                        .values(scaling_group_id=rg_id, group=project_id)
+                        .values(resource_group_id=rg_id, group=project_id)
                         .on_conflict_do_nothing()
                     )
                     await session.execute(
@@ -642,7 +642,7 @@ class ScalingGroupDBSource:
                 sa.select(ScalingGroupRow.name)
                 .join(
                     ScalingGroupForProjectRow,
-                    ScalingGroupForProjectRow.scaling_group_id == ScalingGroupRow.id,
+                    ScalingGroupForProjectRow.resource_group_id == ScalingGroupRow.id,
                 )
                 .where(ScalingGroupForProjectRow.group == project_id)
             )
@@ -666,7 +666,7 @@ class ScalingGroupDBSource:
                 ]
                 await session.execute(
                     sa.delete(ScalingGroupForDomainRow).where(
-                        ScalingGroupForDomainRow.scaling_group_id == resource_group_id,
+                        ScalingGroupForDomainRow.resource_group_id == resource_group_id,
                         ScalingGroupForDomainRow.domain_id.in_(remove_ids),
                     )
                 )
@@ -690,7 +690,7 @@ class ScalingGroupDBSource:
                         raise DomainNotFound(f"Domain '{domain_name}' not found")
                     await session.execute(
                         pg_insert(ScalingGroupForDomainRow.__table__)
-                        .values(scaling_group_id=resource_group_id, domain_id=domain_id)
+                        .values(resource_group_id=resource_group_id, domain_id=domain_id)
                         .on_conflict_do_nothing()
                     )
                     await session.execute(
@@ -711,7 +711,7 @@ class ScalingGroupDBSource:
                     ScalingGroupForDomainRow,
                     ScalingGroupForDomainRow.domain_id == DomainRow.id,
                 )
-                .where(ScalingGroupForDomainRow.scaling_group_id == resource_group_id)
+                .where(ScalingGroupForDomainRow.resource_group_id == resource_group_id)
             )
             return [row[0] for row in result]
 
@@ -729,7 +729,7 @@ class ScalingGroupDBSource:
             if remove:
                 await session.execute(
                     sa.delete(ScalingGroupForProjectRow).where(
-                        ScalingGroupForProjectRow.scaling_group_id == resource_group_id,
+                        ScalingGroupForProjectRow.resource_group_id == resource_group_id,
                         ScalingGroupForProjectRow.group.in_(remove),
                     )
                 )
@@ -748,7 +748,7 @@ class ScalingGroupDBSource:
                 for project_id in add:
                     await session.execute(
                         pg_insert(ScalingGroupForProjectRow.__table__)
-                        .values(scaling_group_id=resource_group_id, group=project_id)
+                        .values(resource_group_id=resource_group_id, group=project_id)
                         .on_conflict_do_nothing()
                     )
                     await session.execute(
@@ -765,7 +765,7 @@ class ScalingGroupDBSource:
 
             result = await session.execute(
                 sa.select(ScalingGroupForProjectRow.group).where(
-                    ScalingGroupForProjectRow.scaling_group_id == resource_group_id
+                    ScalingGroupForProjectRow.resource_group_id == resource_group_id
                 )
             )
             return [row[0] for row in result]
@@ -784,7 +784,7 @@ class ScalingGroupDBSource:
                 sa.select(ScalingGroupRow.name)
                 .join(
                     ScalingGroupForDomainRow,
-                    ScalingGroupForDomainRow.scaling_group_id == ScalingGroupRow.id,
+                    ScalingGroupForDomainRow.resource_group_id == ScalingGroupRow.id,
                 )
                 .join(DomainRow, DomainRow.id == ScalingGroupForDomainRow.domain_id)
                 .where(DomainRow.name == domain_name)
@@ -801,7 +801,7 @@ class ScalingGroupDBSource:
                 sa.select(ScalingGroupRow.name)
                 .join(
                     ScalingGroupForProjectRow,
-                    ScalingGroupForProjectRow.scaling_group_id == ScalingGroupRow.id,
+                    ScalingGroupForProjectRow.resource_group_id == ScalingGroupRow.id,
                 )
                 .where(ScalingGroupForProjectRow.group == project_id)
             )
@@ -819,7 +819,7 @@ class ScalingGroupDBSource:
                     ScalingGroupForDomainRow,
                     ScalingGroupForDomainRow.domain_id == DomainRow.id,
                 )
-                .where(ScalingGroupForDomainRow.scaling_group_id == resource_group_id)
+                .where(ScalingGroupForDomainRow.resource_group_id == resource_group_id)
             )
             return [row[0] for row in result]
 
@@ -831,7 +831,7 @@ class ScalingGroupDBSource:
         async with self._db.begin_readonly_session_read_committed() as session:
             result = await session.execute(
                 sa.select(ScalingGroupForProjectRow.group).where(
-                    ScalingGroupForProjectRow.scaling_group_id == resource_group_id
+                    ScalingGroupForProjectRow.resource_group_id == resource_group_id
                 )
             )
             return [row[0] for row in result]

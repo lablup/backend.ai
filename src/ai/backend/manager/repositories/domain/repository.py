@@ -251,7 +251,7 @@ class DomainRepository:
                 await session.execute(
                     sa.insert(ScalingGroupForDomainRow),
                     [
-                        {"scaling_group_id": sgroup_id, "domain_id": domain_id}
+                        {"resource_group_id": sgroup_id, "domain_id": domain_id}
                         for sgroup_id in sgroup_ids_to_add
                     ],
                 )
@@ -260,7 +260,7 @@ class DomainRepository:
                 await session.execute(
                     sa.delete(ScalingGroupForDomainRow).where(
                         (ScalingGroupForDomainRow.domain_id == domain_id)
-                        & (ScalingGroupForDomainRow.scaling_group_id.in_(sgroup_ids_to_remove))
+                        & (ScalingGroupForDomainRow.resource_group_id.in_(sgroup_ids_to_remove))
                     ),
                 )
 

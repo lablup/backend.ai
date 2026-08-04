@@ -161,7 +161,7 @@ class TestDomainCreateCRUD:
             )
             await conn.execute(
                 sa.insert(sgroups_for_domains).values(
-                    scaling_group_id=sgroup_id,
+                    resource_group_id=sgroup_id,
                     domain_id=domain_id,
                 )
             )
@@ -169,9 +169,9 @@ class TestDomainCreateCRUD:
         try:
             async with db_engine.connect() as conn:
                 row = await conn.execute(
-                    sa.select(sgroups_for_domains.c.scaling_group_id).where(
+                    sa.select(sgroups_for_domains.c.resource_group_id).where(
                         (sgroups_for_domains.c.domain_id == domain_id)
-                        & (sgroups_for_domains.c.scaling_group_id == sgroup_id)
+                        & (sgroups_for_domains.c.resource_group_id == sgroup_id)
                     )
                 )
                 assoc = row.fetchone()
@@ -180,7 +180,7 @@ class TestDomainCreateCRUD:
             async with db_engine.begin() as conn:
                 await conn.execute(
                     sgroups_for_domains.delete().where(
-                        sgroups_for_domains.c.scaling_group_id == sgroup_id
+                        sgroups_for_domains.c.resource_group_id == sgroup_id
                     )
                 )
                 await conn.execute(

@@ -843,7 +843,7 @@ class TestScalingGroupRepositoryDB:
         sgroup_id, sgroup_name = sample_scaling_group_for_association
         async with db_with_cleanup.begin_session() as db_sess:
             association = ScalingGroupForDomainRow(
-                scaling_group_id=sgroup_id,
+                resource_group_id=sgroup_id,
                 domain_id=sample_domain.domain_id,
             )
             db_sess.add(association)
@@ -916,7 +916,7 @@ class TestScalingGroupRepositoryDB:
         async with db_with_cleanup.begin_session() as db_sess:
             for domain in sample_multiple_domains:
                 association = ScalingGroupForDomainRow(
-                    scaling_group_id=sgroup_id,
+                    resource_group_id=sgroup_id,
                     domain_id=domain.domain_id,
                 )
                 db_sess.add(association)

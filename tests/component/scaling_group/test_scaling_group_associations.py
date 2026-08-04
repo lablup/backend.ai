@@ -56,14 +56,14 @@ async def private_sgroup_for_visibility(
         )
         await conn.execute(
             sa.insert(sgroups_for_domains).values(
-                scaling_group_id=sgroup_id,
+                resource_group_id=sgroup_id,
                 domain_id=domain_fixture.domain_id,
             )
         )
     yield name
     async with db_engine.begin() as conn:
         await conn.execute(
-            sgroups_for_domains.delete().where(sgroups_for_domains.c.scaling_group_id == sgroup_id)
+            sgroups_for_domains.delete().where(sgroups_for_domains.c.resource_group_id == sgroup_id)
         )
         await conn.execute(scaling_groups.delete().where(scaling_groups.c.name == name))
 

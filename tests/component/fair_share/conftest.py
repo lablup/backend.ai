@@ -130,7 +130,7 @@ async def group_fixture(
         )
         await conn.execute(
             sa.insert(sgroups_for_groups).values(
-                scaling_group_id=resource_group_id,
+                resource_group_id=resource_group_id,
                 group=group_id,
             )
         )

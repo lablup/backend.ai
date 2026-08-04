@@ -166,7 +166,7 @@ class TestSearchDomainFairSharesEntityBased:
             )
             await db_sess.flush()
             db_sess.add(
-                ScalingGroupForDomainRow(scaling_group_id=RESOURCE_GROUP_ID, domain_id=domain_id)
+                ScalingGroupForDomainRow(resource_group_id=RESOURCE_GROUP_ID, domain_id=domain_id)
             )
             await db_sess.commit()
 
@@ -205,7 +205,7 @@ class TestSearchDomainFairSharesEntityBased:
             )
             await db_sess.flush()
             db_sess.add(
-                ScalingGroupForDomainRow(scaling_group_id=RESOURCE_GROUP_ID, domain_id=domain_id)
+                ScalingGroupForDomainRow(resource_group_id=RESOURCE_GROUP_ID, domain_id=domain_id)
             )
             await db_sess.commit()
         return domain_name
@@ -285,12 +285,12 @@ class TestSearchDomainFairSharesEntityBased:
             await db_sess.flush()
             db_sess.add(
                 ScalingGroupForDomainRow(
-                    scaling_group_id=resource_group_ids[0], domain_id=domain_ids[0]
+                    resource_group_id=resource_group_ids[0], domain_id=domain_ids[0]
                 )
             )
             db_sess.add(
                 ScalingGroupForDomainRow(
-                    scaling_group_id=resource_group_ids[1], domain_id=domain_ids[1]
+                    resource_group_id=resource_group_ids[1], domain_id=domain_ids[1]
                 )
             )
             await db_sess.commit()
@@ -330,7 +330,7 @@ class TestSearchDomainFairSharesEntityBased:
                 await db_sess.flush()
                 db_sess.add(
                     ScalingGroupForDomainRow(
-                        scaling_group_id=RESOURCE_GROUP_ID, domain_id=domain_id
+                        resource_group_id=RESOURCE_GROUP_ID, domain_id=domain_id
                     )
                 )
             await db_sess.commit()
@@ -724,7 +724,7 @@ class TestSearchProjectFairSharesEntityBased:
             )
             await db_sess.flush()
             db_sess.add(
-                ScalingGroupForDomainRow(scaling_group_id=RESOURCE_GROUP_ID, domain_id=domain_id)
+                ScalingGroupForDomainRow(resource_group_id=RESOURCE_GROUP_ID, domain_id=domain_id)
             )
             await db_sess.commit()
         return domain_name
@@ -770,7 +770,7 @@ class TestSearchProjectFairSharesEntityBased:
             await db_sess.flush()
 
             db_sess.add(
-                ScalingGroupForProjectRow(scaling_group_id=RESOURCE_GROUP_ID, group=project_id)
+                ScalingGroupForProjectRow(resource_group_id=RESOURCE_GROUP_ID, group=project_id)
             )
             await db_sess.commit()
 
@@ -820,7 +820,7 @@ class TestSearchProjectFairSharesEntityBased:
             await db_sess.flush()
 
             db_sess.add(
-                ScalingGroupForProjectRow(scaling_group_id=RESOURCE_GROUP_ID, group=project_id)
+                ScalingGroupForProjectRow(resource_group_id=RESOURCE_GROUP_ID, group=project_id)
             )
             await db_sess.commit()
         return project_id
@@ -1115,7 +1115,7 @@ class TestSearchUserFairSharesEntityBased:
             )
             await db_sess.flush()
             db_sess.add(
-                ScalingGroupForDomainRow(scaling_group_id=RESOURCE_GROUP_ID, domain_id=domain_id)
+                ScalingGroupForDomainRow(resource_group_id=RESOURCE_GROUP_ID, domain_id=domain_id)
             )
             await db_sess.commit()
         return domain_name
@@ -1152,7 +1152,7 @@ class TestSearchUserFairSharesEntityBased:
             await db_sess.flush()
 
             db_sess.add(
-                ScalingGroupForProjectRow(scaling_group_id=RESOURCE_GROUP_ID, group=project_id)
+                ScalingGroupForProjectRow(resource_group_id=RESOURCE_GROUP_ID, group=project_id)
             )
             await db_sess.commit()
         return project_id

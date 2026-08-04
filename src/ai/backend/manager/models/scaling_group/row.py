@@ -145,8 +145,8 @@ class ScalingGroupForDomainRow(Base):  # type: ignore[misc]
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    scaling_group_id: Mapped[ResourceGroupID] = mapped_column(
-        "scaling_group_id",
+    resource_group_id: Mapped[ResourceGroupID] = mapped_column(
+        "resource_group_id",
         sa.ForeignKey("scaling_groups.id", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
@@ -159,7 +159,7 @@ class ScalingGroupForDomainRow(Base):  # type: ignore[misc]
     )
     __table_args__ = (
         # constraint
-        sa.UniqueConstraint("scaling_group_id", "domain_id", name="uq_sgroup_domain"),
+        sa.UniqueConstraint("resource_group_id", "domain_id", name="uq_sgroup_domain"),
     )
     sgroup_row: Mapped[ScalingGroupRow] = relationship(
         "ScalingGroupRow",
@@ -180,8 +180,8 @@ class ScalingGroupForProjectRow(Base):  # type: ignore[misc]
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    scaling_group_id: Mapped[ResourceGroupID] = mapped_column(
-        "scaling_group_id",
+    resource_group_id: Mapped[ResourceGroupID] = mapped_column(
+        "resource_group_id",
         sa.ForeignKey("scaling_groups.id", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
@@ -195,7 +195,7 @@ class ScalingGroupForProjectRow(Base):  # type: ignore[misc]
 
     __table_args__ = (
         # constraint
-        sa.UniqueConstraint("scaling_group_id", "group", name="uq_sgroup_ugroup"),
+        sa.UniqueConstraint("resource_group_id", "group", name="uq_sgroup_ugroup"),
     )
     sgroup_row: Mapped[ScalingGroupRow] = relationship(
         "ScalingGroupRow",
@@ -216,8 +216,8 @@ class ScalingGroupForKeypairsRow(Base):  # type: ignore[misc]
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    scaling_group_id: Mapped[ResourceGroupID] = mapped_column(
-        "scaling_group_id",
+    resource_group_id: Mapped[ResourceGroupID] = mapped_column(
+        "resource_group_id",
         sa.ForeignKey("scaling_groups.id", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
@@ -230,7 +230,7 @@ class ScalingGroupForKeypairsRow(Base):  # type: ignore[misc]
     )
     __table_args__ = (
         # constraint
-        sa.UniqueConstraint("scaling_group_id", "access_key", name="uq_sgroup_akey"),
+        sa.UniqueConstraint("resource_group_id", "access_key", name="uq_sgroup_akey"),
     )
     sgroup_row: Mapped[ScalingGroupRow] = relationship(
         "ScalingGroupRow",
@@ -546,7 +546,7 @@ async def query_allowed_sgroups(
         == sa.select(DomainRow.id).where(DomainRow.name == domain_name).scalar_subquery()
     )
     result = await db_conn.execute(query)
-    from_domain = {row.scaling_group_id for row in result}
+    from_domain = {row.resource_group_id for row in result}
 
     group_ids: Sequence[uuid.UUID] = []
     match group:
@@ -564,11 +564,11 @@ async def query_allowed_sgroups(
         group_cond = sgroups_for_groups.c.group.in_(group_ids)
         query = sa.select(sgroups_for_groups).where(group_cond)
         result = await db_conn.execute(query)
-        from_group = {row.scaling_group_id for row in result}
+        from_group = {row.resource_group_id for row in result}
 
     query = sa.select(sgroups_for_keypairs).where(sgroups_for_keypairs.c.access_key == access_key)
     result = await db_conn.execute(query)
-    from_keypair = {row.scaling_group_id for row in result}
+    from_keypair = {row.resource_group_id for row in result}
 
     sgroup_ids = from_domain | from_group | from_keypair
     query = (

@@ -77,7 +77,7 @@ class ScalingGroupForDomainCreatorSpec(CreatorSpec[ScalingGroupForDomainRow]):
     @override
     def build_row(self) -> ScalingGroupForDomainRow:
         return ScalingGroupForDomainRow(
-            scaling_group_id=self.resource_group_id,
+            resource_group_id=self.resource_group_id,
             domain_id=self.domain_id,
         )
 
@@ -92,7 +92,7 @@ class ScalingGroupForKeypairsCreatorSpec(CreatorSpec[ScalingGroupForKeypairsRow]
     @override
     def build_row(self) -> ScalingGroupForKeypairsRow:
         return ScalingGroupForKeypairsRow(
-            scaling_group_id=self.resource_group_id,
+            resource_group_id=self.resource_group_id,
             access_key=self.access_key,
         )
 
@@ -107,6 +107,6 @@ class ScalingGroupForProjectCreatorSpec(CreatorSpec[ScalingGroupForProjectRow]):
     @override
     def build_row(self) -> ScalingGroupForProjectRow:
         return ScalingGroupForProjectRow(
-            scaling_group_id=self.resource_group_id,
+            resource_group_id=self.resource_group_id,
             group=self.project,
         )

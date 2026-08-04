@@ -218,7 +218,7 @@ class ScalingGroupNode(graphene.ObjectType):  # type: ignore[misc]
         j = sa.join(
             ScalingGroupRow,
             ScalingGroupForProjectRow,
-            ScalingGroupRow.id == ScalingGroupForProjectRow.scaling_group_id,
+            ScalingGroupRow.id == ScalingGroupForProjectRow.resource_group_id,
         )
         _stmt = (
             sa.select(ScalingGroupRow)
@@ -244,7 +244,7 @@ class ScalingGroupNode(graphene.ObjectType):  # type: ignore[misc]
         j = sa.join(
             ScalingGroupRow,
             ScalingGroupForDomainRow,
-            ScalingGroupRow.id == ScalingGroupForDomainRow.scaling_group_id,
+            ScalingGroupRow.id == ScalingGroupForDomainRow.resource_group_id,
         ).join(DomainRow, DomainRow.id == ScalingGroupForDomainRow.domain_id)
         _stmt = sa.select(ScalingGroupRow).select_from(j).where(DomainRow.name.in_(domain_names))
         async with ctx.db.begin_readonly_session() as db_session:
@@ -266,7 +266,7 @@ class ScalingGroupNode(graphene.ObjectType):  # type: ignore[misc]
         j = sa.join(
             ScalingGroupRow,
             ScalingGroupForKeypairsRow,
-            ScalingGroupRow.id == ScalingGroupForKeypairsRow.scaling_group_id,
+            ScalingGroupRow.id == ScalingGroupForKeypairsRow.resource_group_id,
         )
         _stmt = (
             sa.select(ScalingGroupRow)
@@ -542,7 +542,7 @@ class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
         j = sa.join(
             scaling_groups,
             sgroups_for_domains,
-            scaling_groups.c.id == sgroups_for_domains.c.scaling_group_id,
+            scaling_groups.c.id == sgroups_for_domains.c.resource_group_id,
         )
         query = (
             sa.select(scaling_groups)
@@ -572,7 +572,7 @@ class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
         j = sa.join(
             scaling_groups,
             sgroups_for_groups,
-            scaling_groups.c.id == sgroups_for_groups.c.scaling_group_id,
+            scaling_groups.c.id == sgroups_for_groups.c.resource_group_id,
         )
         query = sa.select(scaling_groups).select_from(j).where(sgroups_for_groups.c.group == group)
         if is_active is not None:
@@ -595,7 +595,7 @@ class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
         j = sa.join(
             scaling_groups,
             sgroups_for_keypairs,
-            scaling_groups.c.id == sgroups_for_keypairs.c.scaling_group_id,
+            scaling_groups.c.id == sgroups_for_keypairs.c.resource_group_id,
         )
         query = (
             sa.select(scaling_groups)
@@ -620,7 +620,7 @@ class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
         j = sa.join(
             scaling_groups,
             sgroups_for_groups,
-            scaling_groups.c.id == sgroups_for_groups.c.scaling_group_id,
+            scaling_groups.c.id == sgroups_for_groups.c.resource_group_id,
         )
         query = (
             sa.select(scaling_groups, sgroups_for_groups.c.group)

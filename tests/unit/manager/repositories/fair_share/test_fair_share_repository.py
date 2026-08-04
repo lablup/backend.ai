@@ -162,7 +162,7 @@ class TestFairShareRepository:
 
             # Associate domain with scaling group
             db_sess.add(
-                ScalingGroupForDomainRow(scaling_group_id=RESOURCE_GROUP_ID, domain_id=domain_id)
+                ScalingGroupForDomainRow(resource_group_id=RESOURCE_GROUP_ID, domain_id=domain_id)
             )
             await db_sess.commit()
 
@@ -203,7 +203,7 @@ class TestFairShareRepository:
 
             # Associate project with scaling group
             db_sess.add(
-                ScalingGroupForProjectRow(scaling_group_id=RESOURCE_GROUP_ID, group=project_id)
+                ScalingGroupForProjectRow(resource_group_id=RESOURCE_GROUP_ID, group=project_id)
             )
             await db_sess.commit()
 

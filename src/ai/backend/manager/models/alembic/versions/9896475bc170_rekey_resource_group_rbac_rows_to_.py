@@ -6,7 +6,7 @@ and in the legacy RBAC tables (``association_scopes_entities``,
 This migration unifies the resource-group key on the row UUID:
 
 - ``sgroups_for_domains`` / ``sgroups_for_groups`` / ``sgroups_for_keypairs``:
-  the ``scaling_group`` name FK column is replaced by a ``scaling_group_id``
+  the ``scaling_group`` name FK column is replaced by a ``resource_group_id``
   FK column referencing ``scaling_groups.id``.
 - ``association_scopes_entities`` rows keyed by a resource-group name (as
   entity or as scope) are converted to the canonical string form of
@@ -47,27 +47,27 @@ _MAPPING_TABLES = (
 def _rekey_mapping_tables_to_uuid() -> None:
     conn = op.get_bind()
     for table, sibling, uq_name in _MAPPING_TABLES:
-        op.add_column(table, sa.Column("scaling_group_id", GUID(), nullable=True))
+        op.add_column(table, sa.Column("resource_group_id", GUID(), nullable=True))
         conn.execute(
             sa.text(f"""
                 UPDATE {table} t
-                SET scaling_group_id = sg.id
+                SET resource_group_id = sg.id
                 FROM scaling_groups sg
                 WHERE t.scaling_group = sg.name
             """)
         )
-        op.alter_column(table, "scaling_group_id", nullable=False)
+        op.alter_column(table, "resource_group_id", nullable=False)
         op.drop_constraint(f"fk_{table}_scaling_group_scaling_groups", table, type_="foreignkey")
         op.drop_constraint(uq_name, table, type_="unique")
         op.drop_index(f"ix_{table}_scaling_group", table_name=table)
         op.drop_column(table, "scaling_group")
-        op.create_unique_constraint(uq_name, table, ["scaling_group_id", sibling])
-        op.create_index(f"ix_{table}_scaling_group_id", table, ["scaling_group_id"])
+        op.create_unique_constraint(uq_name, table, ["resource_group_id", sibling])
+        op.create_index(f"ix_{table}_resource_group_id", table, ["resource_group_id"])
         op.create_foreign_key(
-            f"fk_{table}_scaling_group_id_scaling_groups",
+            f"fk_{table}_resource_group_id_scaling_groups",
             table,
             "scaling_groups",
-            ["scaling_group_id"],
+            ["resource_group_id"],
             ["id"],
             onupdate="CASCADE",
             ondelete="CASCADE",
@@ -83,14 +83,16 @@ def _rekey_mapping_tables_to_name() -> None:
                 UPDATE {table} t
                 SET scaling_group = sg.name
                 FROM scaling_groups sg
-                WHERE t.scaling_group_id = sg.id
+                WHERE t.resource_group_id = sg.id
             """)
         )
         op.alter_column(table, "scaling_group", nullable=False)
-        op.drop_constraint(f"fk_{table}_scaling_group_id_scaling_groups", table, type_="foreignkey")
+        op.drop_constraint(
+            f"fk_{table}_resource_group_id_scaling_groups", table, type_="foreignkey"
+        )
         op.drop_constraint(uq_name, table, type_="unique")
-        op.drop_index(f"ix_{table}_scaling_group_id", table_name=table)
-        op.drop_column(table, "scaling_group_id")
+        op.drop_index(f"ix_{table}_resource_group_id", table_name=table)
+        op.drop_column(table, "resource_group_id")
         op.create_unique_constraint(uq_name, table, ["scaling_group", sibling])
         op.create_index(f"ix_{table}_scaling_group", table, ["scaling_group"])
         op.create_foreign_key(

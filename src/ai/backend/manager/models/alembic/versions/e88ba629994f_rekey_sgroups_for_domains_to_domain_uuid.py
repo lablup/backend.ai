@@ -4,7 +4,7 @@
 column while the RBAC tables key domains by ``domains.id``. This migration
 replaces the ``domain`` name FK column with a ``domain_id`` FK column
 referencing ``domains.id``, completing the UUID keying of the mapping table
-together with the preceding ``scaling_group_id`` rekey.
+together with the preceding ``resource_group_id`` rekey.
 
 Revision ID: e88ba629994f
 Revises: 9896475bc170
@@ -44,7 +44,7 @@ def upgrade() -> None:
     op.drop_index("ix_sgroups_for_domains_domain", table_name="sgroups_for_domains")
     op.drop_column("sgroups_for_domains", "domain")
     op.create_unique_constraint(
-        "uq_sgroup_domain", "sgroups_for_domains", ["scaling_group_id", "domain_id"]
+        "uq_sgroup_domain", "sgroups_for_domains", ["resource_group_id", "domain_id"]
     )
     op.create_index("ix_sgroups_for_domains_domain_id", "sgroups_for_domains", ["domain_id"])
     op.create_foreign_key(
@@ -77,7 +77,7 @@ def downgrade() -> None:
     op.drop_index("ix_sgroups_for_domains_domain_id", table_name="sgroups_for_domains")
     op.drop_column("sgroups_for_domains", "domain_id")
     op.create_unique_constraint(
-        "uq_sgroup_domain", "sgroups_for_domains", ["scaling_group_id", "domain"]
+        "uq_sgroup_domain", "sgroups_for_domains", ["resource_group_id", "domain"]
     )
     op.create_index("ix_sgroups_for_domains_domain", "sgroups_for_domains", ["domain"])
     op.create_foreign_key(

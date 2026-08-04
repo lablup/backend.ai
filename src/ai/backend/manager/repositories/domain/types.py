@@ -38,7 +38,7 @@ class DomainSearchScope(SearchScope):
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return (
-                ScalingGroupForDomainRow.scaling_group_id
+                ScalingGroupForDomainRow.resource_group_id
                 == sa.select(ScalingGroupRow.id)
                 .where(ScalingGroupRow.name == resource_group)
                 .scalar_subquery()

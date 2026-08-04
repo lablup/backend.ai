@@ -252,7 +252,7 @@ class DomainConditions:
                 sa.select(1)
                 .where(ScalingGroupForDomainRow.domain_id == DomainRow.id)
                 .where(
-                    ScalingGroupForDomainRow.scaling_group_id
+                    ScalingGroupForDomainRow.resource_group_id
                     == sa.select(ScalingGroupRow.id)
                     .where(ScalingGroupRow.name == resource_group)
                     .scalar_subquery()

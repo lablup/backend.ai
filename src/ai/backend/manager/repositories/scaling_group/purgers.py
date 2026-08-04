@@ -50,7 +50,7 @@ class ScalingGroupForDomainPurgerSpec(BatchPurgerSpec[ScalingGroupForDomainRow])
     def build_subquery(self) -> sa.sql.Select[tuple[ScalingGroupForDomainRow]]:
         return sa.select(ScalingGroupForDomainRow).where(
             sa.and_(
-                ScalingGroupForDomainRow.scaling_group_id == self.resource_group_id,
+                ScalingGroupForDomainRow.resource_group_id == self.resource_group_id,
                 ScalingGroupForDomainRow.domain_id == self.domain_id,
             )
         )
@@ -71,7 +71,7 @@ class ScalingGroupsForDomainPurgerSpec(BatchPurgerSpec[ScalingGroupForDomainRow]
     def build_subquery(self) -> sa.sql.Select[tuple[ScalingGroupForDomainRow]]:
         return sa.select(ScalingGroupForDomainRow).where(
             sa.and_(
-                ScalingGroupForDomainRow.scaling_group_id.in_(self.resource_group_ids),
+                ScalingGroupForDomainRow.resource_group_id.in_(self.resource_group_ids),
                 ScalingGroupForDomainRow.domain_id == self.domain_id,
             )
         )
@@ -109,7 +109,7 @@ class ScalingGroupForKeypairsPurgerSpec(BatchPurgerSpec[ScalingGroupForKeypairsR
     def build_subquery(self) -> sa.sql.Select[tuple[ScalingGroupForKeypairsRow]]:
         return sa.select(ScalingGroupForKeypairsRow).where(
             sa.and_(
-                ScalingGroupForKeypairsRow.scaling_group_id == self.resource_group_id,
+                ScalingGroupForKeypairsRow.resource_group_id == self.resource_group_id,
                 ScalingGroupForKeypairsRow.access_key == self.access_key,
             )
         )
@@ -130,7 +130,7 @@ class ScalingGroupsForKeypairsPurgerSpec(BatchPurgerSpec[ScalingGroupForKeypairs
     def build_subquery(self) -> sa.sql.Select[tuple[ScalingGroupForKeypairsRow]]:
         return sa.select(ScalingGroupForKeypairsRow).where(
             sa.and_(
-                ScalingGroupForKeypairsRow.scaling_group_id.in_(self.resource_group_ids),
+                ScalingGroupForKeypairsRow.resource_group_id.in_(self.resource_group_ids),
                 ScalingGroupForKeypairsRow.access_key == self.access_key,
             )
         )
@@ -179,7 +179,7 @@ class ScalingGroupForProjectPurgerSpec(BatchPurgerSpec[ScalingGroupForProjectRow
     def build_subquery(self) -> sa.sql.Select[tuple[ScalingGroupForProjectRow]]:
         return sa.select(ScalingGroupForProjectRow).where(
             sa.and_(
-                ScalingGroupForProjectRow.scaling_group_id == self.resource_group_id,
+                ScalingGroupForProjectRow.resource_group_id == self.resource_group_id,
                 ScalingGroupForProjectRow.group == self.project,
             )
         )
@@ -200,7 +200,7 @@ class ScalingGroupsForProjectPurgerSpec(BatchPurgerSpec[ScalingGroupForProjectRo
     def build_subquery(self) -> sa.sql.Select[tuple[ScalingGroupForProjectRow]]:
         return sa.select(ScalingGroupForProjectRow).where(
             sa.and_(
-                ScalingGroupForProjectRow.scaling_group_id.in_(self.resource_group_ids),
+                ScalingGroupForProjectRow.resource_group_id.in_(self.resource_group_ids),
                 ScalingGroupForProjectRow.group == self.project,
             )
         )

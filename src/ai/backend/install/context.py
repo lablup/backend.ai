@@ -1436,7 +1436,7 @@ class Context(metaclass=ABCMeta):
             return
 
         self.log_header(f"Registering '{sftp.scaling_group}' scaling group for SFTP agent...")
-        scaling_group_id = str(
+        resource_group_id = str(
             uuid.uuid5(uuid.NAMESPACE_URL, f"backend.ai/scaling-group/{sftp.scaling_group}")
         )
         with self.resource_path("ai.backend.install.fixtures", "example-users.json") as user_path:
@@ -1451,7 +1451,7 @@ class Context(metaclass=ABCMeta):
                     json.dumps({
                         "scaling_groups": [
                             {
-                                "id": scaling_group_id,
+                                "id": resource_group_id,
                                 "name": sftp.scaling_group,
                                 "description": "Scaling group dedicated to SFTP upload sessions",
                                 "is_active": True,
@@ -1468,7 +1468,7 @@ class Context(metaclass=ABCMeta):
                         ],
                         "sgroups_for_domains": [
                             {
-                                "scaling_group_id": scaling_group_id,
+                                "resource_group_id": resource_group_id,
                                 "domain_id": default_domain_id,
                             }
                         ],

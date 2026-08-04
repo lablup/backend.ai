@@ -625,7 +625,7 @@ class TestProjectQuerySQLGenerationForBugReproduction:
         """sgroups_for_groups must appear before scaling_groups in the JOIN chain.
 
         SCALING_GROUP_JOIN depends on sgroups_for_groups already being joined,
-        because its condition references ScalingGroupForProjectRow.scaling_group_id.
+        because its condition references ScalingGroupForProjectRow.resource_group_id.
         """
         query = adapter.build_project_query(
             report=PROJECT_REPORT,
@@ -820,7 +820,7 @@ class TestProjectExportExecuteStreamingDB:
             )
             await db_sess.flush()
 
-            db_sess.add(ScalingGroupForProjectRow(scaling_group_id=rg_id, group=project_id))
+            db_sess.add(ScalingGroupForProjectRow(resource_group_id=rg_id, group=project_id))
             await db_sess.flush()
 
             db_sess.add(
