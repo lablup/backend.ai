@@ -20,6 +20,7 @@ from ai.backend.manager.confidential.provisioning import (
 )
 from ai.backend.manager.confidential.references import ReferenceValueStore
 from ai.backend.manager.confidential.shim import AuthorisationShim
+from ai.backend.manager.confidential.storage import FolderKeyCustodian
 from ai.backend.manager.errors.confidential import ConfidentialCapabilityRefused
 from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
 from ai.backend.manager.models.scaling_group.types import ConfidentialScalingGroupOpts
@@ -76,6 +77,7 @@ class ConfidentialPlane:
         self.policy = ReleasePolicyComposer(db, self.broker, self.references)
         self.provisioner = SessionResourceProvisioner(db, self.broker, self.shim)
         self.blobs = MeasuredBlobStore(db)
+        self.custodian = FolderKeyCustodian(self.broker)
         self._reconciler: asyncio.Task[None] | None = None
 
     async def opts_of(self, scaling_group: str) -> ConfidentialScalingGroupOpts:

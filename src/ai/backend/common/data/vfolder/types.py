@@ -3,6 +3,7 @@ from pathlib import PurePosixPath
 
 from ai.backend.common.types import (
     MountPermission,
+    VFolderConfidential,
     VFolderID,
     VFolderUsageMode,
 )
@@ -17,3 +18,4 @@ class VFolderMountData:
     kernel_path: PurePosixPath
     mount_perm: MountPermission
     usage_mode: VFolderUsageMode
+    confidential: VFolderConfidential | None = None

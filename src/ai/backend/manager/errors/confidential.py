@@ -128,3 +128,36 @@ class AdmissionBeltExceeded(BackendAIError, web.HTTPConflict):
             operation=ErrorOperation.CHECK_LIMIT,
             error_detail=ErrorDetail.CONFLICT,
         )
+
+
+class FolderEscrowUnreachable(BackendAIError, web.HTTPServiceUnavailable):
+    error_type = "https://api.backend.ai/probs/confidential-folder-escrow-unreachable"
+    error_title = (
+        "The durable folder-key escrow is unreachable, so no folder key may be minted:"
+        " a key that lives only in the broker and nowhere else is unrecoverable if the"
+        " broker's disk is lost."
+    )
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
+class FolderEncryptionMissing(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/confidential-folder-encryption-missing"
+    error_title = (
+        "A folder reached a confidential session without an encryption descriptor;"
+        " mounting it would put plaintext on storage the operator can read."
+    )
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )

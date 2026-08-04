@@ -225,6 +225,7 @@ def create_services(args: ServiceArgs) -> Services:
             repositories.vfolder.repository,
             repositories.user.repository,
             args.valkey_stat_client,
+            args.db,
         ),
         vfolder_admin=VFolderAdminService(
             vfolder_admin_repository=repositories.vfolder.admin_repository,

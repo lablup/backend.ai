@@ -39,6 +39,8 @@ class ConfidentialScalingGroupOpts(BackendAISchema):
     tcb_grace_period: timedelta = timedelta(days=7)
     admission_limit_per_image: int = 1
     metadata_egress_allowlist: list[str] = Field(default_factory=list)
+    folder_key_escrow_path: str = ""
+    folder_key_escrow_key: str = ""
 
     @property
     def confidential_capable(self) -> bool:

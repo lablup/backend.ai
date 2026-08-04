@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+
+import aiohttp
 from collections.abc import Awaitable
 from dataclasses import dataclass
 from uuid import UUID
@@ -13,12 +15,14 @@ from ai.backend.common.clients.valkey_client.valkey_schedule.client import Valke
 from ai.backend.common.types import AgentId, KernelId, ResourceSlot, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentClientPool
+from ai.backend.manager.confidential.plane import ConfidentialPlane
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.repositories.scheduler import (
     KernelTerminationResult,
     SchedulerRepository,
     TerminatingSessionData,
 )
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 
@@ -29,6 +33,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class SessionTerminatorArgs:
     """Arguments for SessionTerminator initialization."""
 
+    db: ExtendedAsyncSAEngine
     repository: SchedulerRepository
     agent_client_pool: AgentClientPool
     valkey_schedule: ValkeyScheduleClient
@@ -42,6 +47,8 @@ class SessionTerminator:
     _valkey_schedule: ValkeyScheduleClient
 
     def __init__(self, args: SessionTerminatorArgs) -> None:
+        self._db = args.db
+        self._confidential: ConfidentialPlane | None = None
         self._repository = args.repository
         self._agent_client_pool = args.agent_client_pool
         self._valkey_schedule = args.valkey_schedule
@@ -60,6 +67,26 @@ class SessionTerminator:
         """
         await self._terminate_sessions_internal(terminating_sessions)
 
+    async def _release_confidential(
+        self, terminating_sessions: list[TerminatingSessionData]
+    ) -> None:
+        if self._confidential is None:
+            self._confidential = ConfidentialPlane(self._db, aiohttp.ClientSession())
+        plane = self._confidential
+        endpoints = await plane.confidential_endpoints()
+        if not endpoints:
+            return
+        for session in terminating_sessions:
+            for opts in endpoints.values():
+                try:
+                    await plane.provisioner.teardown(opts, session.session_id)
+                except Exception:
+                    log.exception(
+                        "confidential: session-scoped resources for {} survive teardown and"
+                        " must be swept by the reconciler",
+                        session.session_id,
+                    )
+
     async def _terminate_sessions_internal(
         self,
         terminating_sessions: list[TerminatingSessionData],
@@ -75,6 +102,8 @@ class SessionTerminator:
             return ScheduleResult(scheduled_session_ids=[], scheduling_failures=[])
 
         log.info("Processing {} sessions for termination", len(terminating_sessions))
+
+        await self._release_confidential(terminating_sessions)
 
         # Collect all termination tasks from all sessions
         all_tasks: list[Awaitable[KernelTerminationResult]] = []

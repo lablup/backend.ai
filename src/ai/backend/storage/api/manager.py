@@ -620,6 +620,7 @@ async def get_vfolder_mount(request: web.Request) -> web.Response:
             return web.json_response(
                 {
                     "path": str(mount_path),
+                    "export": volume.export_coordinates(mount_path),
                 },
             )
 

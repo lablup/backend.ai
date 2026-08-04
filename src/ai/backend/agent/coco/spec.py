@@ -6,6 +6,7 @@ IMAGE_NAME_ANNOTATION = "io.kubernetes.cri.image-name"
 GUEST_ENTRYPOINT = "/opt/kernel/bai-cc-entrypoint"
 GUEST_SOURCED_PATHS = ("/opt/backend.ai", "/opt/kernel", "/run/backend.ai")
 GUEST_HANDOVER_PATH = "/run/backend.ai/session"
+GUEST_MOUNT_CAPABILITY = "SYS_ADMIN"
 
 
 @dataclass(frozen=True)
@@ -31,6 +32,7 @@ class ContainerSpec:
     labels: Mapping[str, str] = field(default_factory=dict)
     annotations: Mapping[str, str] = field(default_factory=dict)
     devices: Sequence[Path] = field(default_factory=list)
+    block_devices: Sequence[tuple[Path, Path]] = field(default_factory=list)
     mounts: Sequence[MountSpec] = field(default_factory=list)
 
     def to_args(self) -> list[str]:
@@ -47,6 +49,8 @@ class ContainerSpec:
             "never",
             "--stop-signal",
             "SIGINT",
+            "--cap-add",
+            GUEST_MOUNT_CAPABILITY,
         ]
         if self.entrypoint:
             args += ["--entrypoint", self.entrypoint]
@@ -64,6 +68,8 @@ class ContainerSpec:
             args += ["--annotation", f"{key}={value}"]
         for device in self.devices:
             args += ["--device", str(device)]
+        for host_device, guest_device in self.block_devices:
+            args += ["--device", f"{host_device}:{guest_device}"]
         for mount in self.mounts:
             options = ["type=bind", f"src={mount.source}", f"dst={mount.target}"]
             if mount.read_only:

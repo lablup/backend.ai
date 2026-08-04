@@ -133,7 +133,8 @@ stage_storage_clients() {
 	one="$(stage_one_root)"
 	local rel
 	for rel in usr/sbin/mount.nfs usr/sbin/mount.nfs4 usr/sbin/mount.ceph usr/sbin/mount.cifs \
-		usr/sbin/rpcbind usr/sbin/rpc.statd usr/bin/gocryptfs usr/bin/fusermount3; do
+		usr/sbin/rpcbind usr/sbin/rpc.statd usr/bin/gocryptfs usr/bin/fusermount3 \
+		usr/sbin/cryptsetup usr/sbin/dmsetup usr/sbin/mkfs.ext4 usr/sbin/blkid; do
 		[ -e "${one}/${rel}" ] || die "stage-one carries no ${rel}"
 		install -D -m 0755 "${one}/${rel}" "${stage}/${rel}"
 		stage_needed_libs "$one" "${one}/${rel}"
@@ -154,6 +155,7 @@ stage_overlay() {
 	cp -a "${BAI_CC_ROOT}/overlay/." "${stage}/"
 	find "${stage}/opt/kernel" "${stage}/usr/local/bin" -name '__pycache__' -type d -prune -exec rm -rf {} +
 	chmod 0755 "${stage}/opt/kernel/bai-cc-entrypoint" "${stage}/usr/local/bin/bai-guest-boot" \
+		"${stage}/usr/local/bin/bai-guest-storage" \
 		"${stage}/usr/local/bin/bai-tunnel-up" "${stage}/opt/kernel/bai-tunnel-bench"
 	install -d -m 0755 "${stage}/usr/lib/systemd/system/multi-user.target.wants"
 	ln -sf ../bai-guest-boot.service "${stage}/usr/lib/systemd/system/multi-user.target.wants/bai-guest-boot.service"

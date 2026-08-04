@@ -2293,6 +2293,41 @@ class ConfidentialConfig(BaseConfigSchema):
             added_version="26.7.0",
         ),
     ]
+    block_volume_root: Annotated[
+        Path,
+        Field(default=Path("/var/lib/backend.ai/coco-volumes")),
+        BackendAIConfigMeta(
+            description=(
+                "Directory holding the per-guest opaque backing files for scratch and the image"
+                " store. The host never holds a key to any of them, so deleting a scratch key at"
+                " the broker is what erases the scratch volume."
+            ),
+            added_version="26.7.0",
+        ),
+    ]
+    scratch_volume_size: Annotated[
+        BinarySizeField,
+        Field(default=BinarySize.from_str("16g")),
+        BackendAIConfigMeta(
+            description=(
+                "Sparse size of the per-guest scratch block device, formatted inside the guest"
+                " with block encryption and sector authentication."
+            ),
+            added_version="26.7.0",
+        ),
+    ]
+    image_store_volume_size: Annotated[
+        BinarySizeField,
+        Field(default=BinarySize.from_str("64g")),
+        BackendAIConfigMeta(
+            description=(
+                "Sparse size of the per-guest image store block device presented as"
+                " /dev/trusted_store. Zero falls back to the guest's memory-backed image"
+                " filesystem, which caps images at half of guest memory."
+            ),
+            added_version="26.7.0",
+        ),
+    ]
     vfio_vendor_ids: Annotated[
         list[str],
         Field(default_factory=lambda: ["0x10de"]),

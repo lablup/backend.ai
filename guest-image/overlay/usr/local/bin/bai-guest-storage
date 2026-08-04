@@ -1,0 +1,163 @@
+#!/opt/backend.ai/bin/python
+import ctypes
+import json
+import os
+import pathlib
+import shutil
+import stat
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+
+STATE = pathlib.Path("/run/backend.ai")
+STAGING = pathlib.Path("/run/bai-storage")
+MAPPER = "bai-scratch"
+HELPERS = {"nfs": "mount.nfs", "nfs4": "mount.nfs4", "ceph": "mount.ceph", "cifs": "mount.cifs"}
+GOCRYPTFS_FLAGS = ("-raw64", "-hkdf", "-longnames", "-noprealloc", "-allow_other")
+
+
+class Refusal(Exception):
+    pass
+
+
+def tool(name):
+    found = shutil.which(name)
+    if found is None:
+        raise Refusal(f"the measured guest image carries no {name}")
+    return found
+
+
+def run(argv, stdin=None):
+    result = subprocess.run(argv, input=stdin, capture_output=True)
+    if result.returncode != 0:
+        detail = result.stderr.decode(errors="replace").strip() or f"exit {result.returncode}"
+        raise Refusal(f"{argv[0]} failed: {detail}")
+
+
+def node(path, major, minor):
+    pathlib.Path(path).parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+    if not pathlib.Path(path).exists():
+        os.mknod(path, 0o600 | stat.S_IFCHR, os.makedev(major, minor))
+
+
+def kmount(source, target, fstype, flags):
+    libc = ctypes.CDLL("libc.so.6", use_errno=True)
+    if libc.mount(source.encode(), str(target).encode(), fstype.encode(), flags, None) != 0:
+        raise Refusal(f"mounting {source} at {target} failed: {os.strerror(ctypes.get_errno())}")
+
+
+def fetch(api, resource):
+    url = f"{api}/cdh/resource/{resource}"
+    try:
+        with urllib.request.urlopen(url, timeout=60) as response:
+            payload = response.read()
+    except urllib.error.HTTPError as error:
+        raise Refusal(f"the broker refused {resource} with {error.code}")
+    except OSError as error:
+        raise Refusal(f"the broker at {api} was unreachable for {resource}: {error}")
+    if not payload:
+        raise Refusal(f"the broker released {resource} as zero bytes")
+    return payload
+
+
+def released_key(api, scope, descriptor, subject):
+    tag = descriptor.get("key_tag")
+    if not tag or "/" in tag:
+        raise Refusal(f"{subject} carries an encryption descriptor with no key tag")
+    resource = f"{scope}/{tag}"
+    key = fetch(api, resource)
+    if len(key) != 32:
+        raise Refusal(f"the broker released {resource} as {len(key)} bytes, not a folder key")
+    return key
+
+
+def transport(entry, cipher):
+    kind = entry.get("kind")
+    if kind not in HELPERS:
+        raise Refusal(f"folder {entry['name']} names transport {kind!r}, which is not baked in")
+    options = [entry["options"]] if entry.get("options") else []
+    if entry.get("read_only"):
+        options.append("ro")
+    argv = [tool(HELPERS[kind]), entry["source"], str(cipher)]
+    if options:
+        argv += ["-o", ",".join(options)]
+    run(argv)
+
+
+def mount_folder(api, scope, entry):
+    name = entry["name"]
+    descriptor = entry.get("encryption")
+    if not descriptor:
+        raise Refusal(f"folder {name} arrived without an encryption descriptor")
+    if descriptor.get("format") != "gocryptfs":
+        raise Refusal(
+            f"folder {name} is written in {descriptor.get('format')!r},"
+            " for which this measured image carries no reader"
+        )
+    node("/dev/fuse", 10, 229)
+    key = released_key(api, scope, descriptor, f"folder {name}")
+    cipher = STAGING / name
+    cipher.mkdir(mode=0o700, parents=True, exist_ok=True)
+    transport(entry, cipher)
+    target = pathlib.Path(entry["target"])
+    target.mkdir(mode=0o755, parents=True, exist_ok=True)
+    argv = [tool("gocryptfs"), "-masterkey", "stdin", *GOCRYPTFS_FLAGS]
+    if entry.get("read_only"):
+        argv.append("-ro")
+    run([*argv, str(cipher), str(target)], key.hex().encode() + b"\n")
+
+
+def open_scratch(api, scope, scratch):
+    device = scratch["device"]
+    if not pathlib.Path(device).exists():
+        raise Refusal(f"the session scratch device {device} was never attached")
+    node("/dev/mapper/control", 10, 236)
+    key = released_key(api, scope, scratch, "session scratch")
+    cryptsetup = tool("cryptsetup")
+    keyed = ["--batch-mode", "--key-file", "-", "--keyfile-size", "32"]
+    run([cryptsetup, "luksFormat", "--type", "luks2", "--integrity", "hmac-sha256",
+         "--integrity-no-wipe", *keyed, device], key)
+    run([cryptsetup, "open", *keyed, device, MAPPER], key)
+    run([tool("mkfs.ext4"), "-q", "-F", "-E", "nodiscard", f"/dev/mapper/{MAPPER}"])
+    target = pathlib.Path(scratch["target"])
+    target.mkdir(mode=0o755, parents=True, exist_ok=True)
+    kmount(f"/dev/mapper/{MAPPER}", target, "ext4", 0)
+    os.chmod(target, 0o755)
+
+
+def starve(reason):
+    message = f"backend.ai confidential kernel refuses its storage: {reason}"
+    print(message, file=sys.stderr, flush=True)
+    try:
+        with open("/dev/console", "w") as console:
+            print(message, file=console, flush=True)
+    except OSError:
+        pass
+    while True:
+        time.sleep(3600)
+
+
+def main():
+    if not (STATE / "ready").is_file():
+        raise Refusal("the guest never established attested wall-clock time")
+    api = json.loads((STATE / "profile.json").read_text())["api"]
+    resource = os.environ.get("BACKENDAI_CC_MOUNT_PLAN_URI")
+    if not resource:
+        raise Refusal("no mount plan resource was named for this kernel")
+    scope = resource.rsplit("/", 1)[0]
+    plan = json.loads(fetch(api, resource))
+    if plan.get("version") != 1:
+        raise Refusal(f"the mount plan claims version {plan.get('version')!r}")
+    STAGING.mkdir(mode=0o700, exist_ok=True)
+    if plan.get("scratch"):
+        open_scratch(api, scope, plan["scratch"])
+    for entry in plan.get("mounts", []):
+        mount_folder(api, scope, entry)
+
+
+try:
+    main()
+except Refusal as refusal:
+    starve(refusal)

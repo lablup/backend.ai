@@ -131,3 +131,45 @@ class VfioDeviceUnavailable(_CocoFailure):
     error_type = _PREFIX + "vfio-device-unavailable"
     error_title = "An allocated accelerator has no vfio character device bound at launch time."
     _detail = ErrorDetail.UNAVAILABLE
+
+
+class StorageBindRefused(_CocoRefusal):
+    error_type = _PREFIX + "storage-bind-refused"
+    error_title = (
+        "The confidential path emits no storage bind mount on the host side. Folders reach the"
+        " guest as an attested mount plan the guest mounts and decrypts for itself."
+    )
+
+
+class UnmanagedFolderRefused(_CocoRefusal):
+    error_type = _PREFIX + "unmanaged-folder-refused"
+    error_title = "Unmanaged folders bind an arbitrary host path and skip the storage service."
+
+
+class HostLogFolderRefused(_CocoRefusal):
+    error_type = _PREFIX + "host-log-folder-refused"
+    error_title = "The log folder's host bind is gone: it would carry enclave plaintext to the host."
+
+
+class FolderEncryptionMissing(_CocoFailure, web.HTTPBadRequest):
+    error_type = _PREFIX + "folder-encryption-missing"
+    error_title = (
+        "A folder reached a confidential kernel without an encryption descriptor, or with an"
+        " empty key reference. Mounting it would degrade silently to plaintext."
+    )
+    _detail = ErrorDetail.INVALID_PARAMETERS
+
+
+class MountPlanMissing(_CocoFailure, web.HTTPBadRequest):
+    error_type = _PREFIX + "mount-plan-missing"
+    error_title = "Folders were granted but the manager provisioned no mount plan resource."
+    _detail = ErrorDetail.INVALID_PARAMETERS
+
+
+class BlockVolumeUnavailable(_CocoFailure):
+    error_type = _PREFIX + "block-volume-unavailable"
+    error_title = (
+        "A per-guest block volume could not be provisioned. Scratch and the image store are"
+        " opaque devices the guest keys itself; there is no host-side fallback."
+    )
+    _detail = ErrorDetail.UNAVAILABLE

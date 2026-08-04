@@ -1608,6 +1608,30 @@ class VFolderUsageMode(CIStrEnum):
     DATA = "data"
 
 
+@attrs.define(slots=True, frozen=True)
+class VFolderConfidential:
+    transport: str
+    source: str
+    options: str
+    tier: str
+    format: str
+    key_path: str
+
+    def to_json(self) -> dict[str, str]:
+        return attrs.asdict(self)
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        return t.Dict({
+            t.Key("transport"): t.String,
+            t.Key("source"): t.String,
+            t.Key("options", default=""): t.String(allow_blank=True),
+            t.Key("tier"): t.String,
+            t.Key("format"): t.String,
+            t.Key("key_path"): t.String,
+        })
+
+
 @attrs.define(slots=True)
 class VFolderMount(JSONSerializableMixin):
     name: str
@@ -1617,6 +1641,7 @@ class VFolderMount(JSONSerializableMixin):
     kernel_path: PurePosixPath
     mount_perm: MountPermission
     usage_mode: VFolderUsageMode
+    confidential: VFolderConfidential | None = None
 
     @override
     def to_json(self) -> dict[str, Any]:
@@ -1628,6 +1653,7 @@ class VFolderMount(JSONSerializableMixin):
             "kernel_path": str(self.kernel_path),
             "mount_perm": self.mount_perm.value,
             "usage_mode": self.usage_mode.value,
+            "confidential": self.confidential.to_json() if self.confidential else None,
         }
 
     @classmethod
@@ -1646,6 +1672,7 @@ class VFolderMount(JSONSerializableMixin):
             kernel_path=obj.kernel_path,
             mount_perm=obj.mount_perm,
             usage_mode=obj.usage_mode,
+            confidential=obj.confidential,
         )
 
     def to_dataclass(self) -> VFolderMountData:
@@ -1659,6 +1686,7 @@ class VFolderMount(JSONSerializableMixin):
             kernel_path=self.kernel_path,
             mount_perm=self.mount_perm,
             usage_mode=self.usage_mode,
+            confidential=self.confidential,
         )
 
     @classmethod
@@ -1667,6 +1695,8 @@ class VFolderMount(JSONSerializableMixin):
         from . import validators as tx
 
         return t.Dict({
+            t.Key("confidential", default=None): t.Null
+            | (VFolderConfidential.as_trafaret() >> (lambda fields: VFolderConfidential(**fields))),
             t.Key("name"): t.String,
             t.Key("vfid"): tx.VFolderID,
             t.Key("vfsubpath", default="."): tx.PurePath,
