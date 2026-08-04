@@ -556,13 +556,9 @@ async def apollo_router_handler(
 ) -> web.StreamResponse:
     """Proxy GraphQL requests to the Apollo Router (a.k.a. Hive Router).
 
-    A caller holding a web session takes :func:`web_handler_with_jwt`, which authenticates it
-    with a JWT minted from that session. A caller without one is proxied anonymously instead of
-    being rejected: the supergraph carries a `public` subgraph whose routing URL has no auth
-    middleware, and every other subgraph answers 401 on its own if the query reaches it.
-
-    Anonymous subscriptions are the exception — they are rejected here, since no subgraph
-    serving them is reachable without credentials.
+    A caller without a web session is proxied anonymously rather than rejected: the supergraph
+    carries a subgraph whose routing URL has no auth middleware, and every other subgraph
+    answers 401 on its own.
     """
     session = await get_session(frontend_rqst)
     if session.get("authenticated", False):
