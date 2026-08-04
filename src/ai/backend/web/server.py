@@ -1104,9 +1104,6 @@ async def webapp_ctx(
     cors.add(app.router.add_route("POST", "/func/{path:auth/signout}", manager_web_handler))
     # `manager_web_handler` answers 401 without a browser session, before reaching the manager.
     # `public` is a reserved anonymous segment in v2 paths (manager `api/rest/v2/AGENTS.md`).
-    cors.add(
-        app.router.add_route("POST", "/func/{path:admin/gql/strawberry/public}", anon_web_handler)
-    )
     for method in PROXIED_HTTP_METHODS:
         cors.add(
             app.router.add_route(method, "/func/{path:v2/[^/]+/public/[^/]+$}", anon_web_handler)
@@ -1129,6 +1126,12 @@ async def webapp_ctx(
         )
         cors.add(app.router.add_route("GET", "/func/admin/gql", supergraph_handler))
         cors.add(app.router.add_route("POST", "/func/admin/gql", supergraph_handler))
+
+    # A separate, non-federated Query root, so the manager serves it whether or not the router is
+    # on. Anonymous for the same reason as the v2 public routes above.
+    cors.add(
+        app.router.add_route("POST", "/func/{path:admin/gql/strawberry/public}", anon_web_handler)
+    )
 
     for method in PROXIED_HTTP_METHODS:
         cors.add(app.router.add_route(method, "/func/{path:.*$}", manager_web_handler))
