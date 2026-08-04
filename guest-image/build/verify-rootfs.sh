@@ -9,6 +9,8 @@ report() { printf '%-6s %s\n' "$1" "$2"; [ "$1" = "ok" ] || fail=1; }
 
 for path in \
 	sbin/mount.nfs sbin/mount.nfs4 sbin/mount.ceph sbin/cryptsetup \
+	sbin/integritysetup sbin/losetup sbin/mkfs.ext4 sbin/resize2fs \
+	usr/local/bin/bai-integrity-mount \
 	usr/bin/gocryptfs usr/bin/fusermount3 usr/bin/kata-agent \
 	opt/backend.ai/bin/python opt/kernel/entrypoint.sh opt/kernel/bai-cc-entrypoint \
 	opt/kernel/su-exec opt/kernel/dropbearmulti usr/local/bin/bai-guest-boot \
