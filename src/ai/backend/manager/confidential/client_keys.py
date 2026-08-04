@@ -95,7 +95,8 @@ class ClientKeyRelease:
         async with self._db.begin_readonly_session() as db_session:
             rows = (
                 await db_session.scalars(
-                    sa.select(ScalingGroupRow).join(
+                    sa.select(ScalingGroupRow)
+                    .join(
                         ScalingGroupForDomainRow,
                         ScalingGroupForDomainRow.scaling_group == ScalingGroupRow.name,
                     )

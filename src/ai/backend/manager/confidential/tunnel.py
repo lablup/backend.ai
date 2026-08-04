@@ -61,9 +61,7 @@ def tunnel_resources(
                 "hostname": member.hostname,
                 "tunnel_addr": member.tunnel_addr,
                 "public_key": _encode(
-                    keys[member.kernel_id]
-                    .public_key()
-                    .public_bytes(Encoding.Raw, PublicFormat.Raw)
+                    keys[member.kernel_id].public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
                 ),
             }
             for member in sorted(members, key=lambda m: m.cluster_idx)

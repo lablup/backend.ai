@@ -89,6 +89,7 @@ __all__ = [
     "outgoing_msg_types",
 ]
 
+
 class AbstractKernel(UserDict[str, Any], aobject, metaclass=ABCMeta):
     version: int
     ownership_data: KernelOwnershipData
@@ -495,8 +496,6 @@ class KernelRegistry(MutableMapping[AgentKernelRegistryKey, AbstractKernel]):
     @override
     def __len__(self) -> int:
         return len(self._registry)
-
-
 
 
 def match_distro_data(data: Mapping[str, Any], distro: str) -> tuple[str, Any]:

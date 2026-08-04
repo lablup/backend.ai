@@ -159,9 +159,7 @@ def build_api_routes(
 
     # 2. Build all handlers
     acl_handler = AclHandler()
-    confidential_handler = ConfidentialHandler(
-        plane=confidential_plane, db=gql_context_deps.db
-    )
+    confidential_handler = ConfidentialHandler(plane=confidential_plane, db=gql_context_deps.db)
     auth_handler = AuthHandler(auth=processors.auth)
     agent_handler = AgentHandler(agent=processors.agent)
     resource_slot_handler = ResourceSlotHandler(resource_slot=processors.resource_slot)

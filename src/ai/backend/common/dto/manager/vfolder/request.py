@@ -83,9 +83,7 @@ class VFolderCreateReq(BaseRequestModel):
         validation_alias=AliasChoices("group", "groupId"),
     )
     cloneable: bool = Field(default=False)
-    encryption_tier: str | None = Field(
-        default=CONCURRENT_TIER, alias="encryptionTier"
-    )
+    encryption_tier: str | None = Field(default=CONCURRENT_TIER, alias="encryptionTier")
 
 
 class RenameVFolderReq(BaseRequestModel):

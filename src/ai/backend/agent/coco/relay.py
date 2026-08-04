@@ -18,6 +18,7 @@ from .errors import RawCircuitRefused, RelayUnavailable
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
+
 def _splice_unavailable(*args: object, **kwargs: object) -> int:
     raise RelayUnavailable(extra_msg=f"os.splice is absent on {sys.platform}")
 

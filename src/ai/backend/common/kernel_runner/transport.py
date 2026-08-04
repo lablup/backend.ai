@@ -150,9 +150,9 @@ class FramedTransport(RunnerTransport):
                         extra_msg=f"the guest presented {presented}, not the vouched identity"
                     )
                 nonce = secrets.token_hex(32)
-                await _write_frames(writer, [
-                    json.dumps({"token": endpoint.token, "nonce": nonce}).encode("utf-8")
-                ])
+                await _write_frames(
+                    writer, [json.dumps({"token": endpoint.token, "nonce": nonce}).encode("utf-8")]
+                )
                 hello = json.loads((await _read_frames(reader))[0])
                 if not hello.get("ok"):
                     raise ChannelIdentityRefused(

@@ -7,7 +7,9 @@ RENEWAL_INTERVAL = timedelta(days=1)
 CLOCK_SKEW_ALLOWANCE = timedelta(minutes=5)
 
 _LABEL = re.compile(r"\A[a-z0-9][a-z0-9._-]{0,62}\Z")
-_DNS_NAME = re.compile(r"\A[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*\Z")
+_DNS_NAME = re.compile(
+    r"\A[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*\Z"
+)
 
 
 class PKIError(Exception):

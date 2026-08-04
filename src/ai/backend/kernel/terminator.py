@@ -188,16 +188,14 @@ class TransportTerminator:
     async def _greet(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> bool:
         refusal = self._admit(json.loads((await _read_frames(reader))[0]))
         if refusal is not None:
-            await _write_frames(writer, [
-                json.dumps({"ok": False, "error": refusal}).encode("utf-8")
-            ])
+            await _write_frames(
+                writer, [json.dumps({"ok": False, "error": refusal}).encode("utf-8")]
+            )
             log.warning("terminator: {}", refusal)
             return False
         epoch = self._epoch
         self._epoch += 1
-        await _write_frames(writer, [
-            json.dumps({"ok": True, "epoch": epoch}).encode("utf-8")
-        ])
+        await _write_frames(writer, [json.dumps({"ok": True, "epoch": epoch}).encode("utf-8")])
         return True
 
     async def _channel(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:

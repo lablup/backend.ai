@@ -80,7 +80,9 @@ class NonceQuotaExhausted(BackendAIError, web.HTTPForbidden):
 
 class ReferenceValueRejected(BackendAIError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/confidential-reference-value-rejected"
-    error_title = "Reference-value registration failed the attested-identity and pipeline-signature gate."
+    error_title = (
+        "Reference-value registration failed the attested-identity and pipeline-signature gate."
+    )
 
     @override
     def error_code(self) -> ErrorCode:

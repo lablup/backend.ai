@@ -182,9 +182,7 @@ class ConfidentialHandler:
             ),
         )
 
-    async def restore_folder_keys(
-        self, body: BodyParam[EscrowRestoreRequest]
-    ) -> APIResponse:
+    async def restore_folder_keys(self, body: BodyParam[EscrowRestoreRequest]) -> APIResponse:
         opts = await self._plane.opts_of(body.parsed.scaling_group)
         restored = await self._plane.custodian.restore(opts)
         return APIResponse.build(HTTPStatus.OK, _Payload(result={"restored_keys": restored}))
@@ -246,7 +244,6 @@ class ConfidentialHandler:
             ),
         )
 
-
     async def release_folder_key(
         self,
         body: BodyParam[FolderKeyRequest],
@@ -264,9 +261,7 @@ class ConfidentialHandler:
                 extra_vf_conds=(VFolderRow.id == vfolder_id),
             )
         if not accessible:
-            raise ReleaseDenied(
-                extra_msg=f"{ctx.user_email} holds no grant on folder {vfolder_id}"
-            )
+            raise ReleaseDenied(extra_msg=f"{ctx.user_email} holds no grant on folder {vfolder_id}")
         async with self._db.begin_readonly_session() as db_session:
             folder = await db_session.get(VFolderRow, vfolder_id)
         if folder is None or folder.encryption_tier is None:

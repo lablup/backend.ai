@@ -58,8 +58,9 @@ class BlockVolumeManager:
             backing = self._backing(kernel_id, guest_path)
             if not backing.exists():
                 continue
-            attached = await _run("losetup", "--noheadings", "--output", "NAME", "--associated",
-                                  str(backing))
+            attached = await _run(
+                "losetup", "--noheadings", "--output", "NAME", "--associated", str(backing)
+            )
             for loop in attached.split():
                 await _run("losetup", "--detach", loop)
             backing.unlink(missing_ok=True)

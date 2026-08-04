@@ -23,7 +23,9 @@ def generate_key_and_request(identity: WorkloadIdentity) -> tuple[bytes, bytes]:
     key = ec.generate_private_key(ec.SECP256R1())
     request = (
         x509.CertificateSigningRequestBuilder()
-        .subject_name(x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, identity.common_name)]))
+        .subject_name(
+            x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, identity.common_name)])
+        )
         .add_extension(_subject_alternative_names(identity), critical=False)
         .sign(key, hashes.SHA256())
     )
@@ -54,7 +56,9 @@ def issue_leaf(
     except x509.ExtensionNotFound:
         requested = authorised
     if set(requested) != set(authorised):
-        raise IssuanceRefused(f"request names {set(requested)} do not match authorised {set(authorised)}")
+        raise IssuanceRefused(
+            f"request names {set(requested)} do not match authorised {set(authorised)}"
+        )
 
     issuer = x509.load_pem_x509_certificate(issuer_certificate_pem)
     issuer_key = serialization.load_pem_private_key(issuer_key_pem, password=None)
@@ -62,7 +66,9 @@ def issue_leaf(
         raise IssuanceRefused("issuer key is not an elliptic-curve signing key")
     certificate = (
         x509.CertificateBuilder()
-        .subject_name(x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, identity.common_name)]))
+        .subject_name(
+            x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, identity.common_name)])
+        )
         .issuer_name(issuer.subject)
         .public_key(request.public_key())
         .serial_number(x509.random_serial_number())
@@ -91,7 +97,9 @@ def issue_leaf(
             ]),
             critical=False,
         )
-        .add_extension(x509.SubjectKeyIdentifier.from_public_key(request.public_key()), critical=False)
+        .add_extension(
+            x509.SubjectKeyIdentifier.from_public_key(request.public_key()), critical=False
+        )
         .add_extension(
             x509.AuthorityKeyIdentifier.from_issuer_public_key(issuer_key.public_key()),
             critical=False,

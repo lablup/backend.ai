@@ -148,7 +148,9 @@ class UnmanagedFolderRefused(_CocoRefusal):
 
 class HostLogFolderRefused(_CocoRefusal):
     error_type = _PREFIX + "host-log-folder-refused"
-    error_title = "The log folder's host bind is gone: it would carry enclave plaintext to the host."
+    error_title = (
+        "The log folder's host bind is gone: it would carry enclave plaintext to the host."
+    )
 
 
 class FolderEncryptionMissing(_CocoFailure, web.HTTPBadRequest):

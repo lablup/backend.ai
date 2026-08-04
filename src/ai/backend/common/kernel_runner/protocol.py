@@ -496,9 +496,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         }
 
     async def feed_upload_file(self, container_path: str, filedata: bytes) -> None:
-        await self._guest_request(
-            RunnerVerb.UPLOAD_FILE, {"path": container_path}, body=filedata
-        )
+        await self._guest_request(RunnerVerb.UPLOAD_FILE, {"path": container_path}, body=filedata)
 
     async def feed_download_file(self, container_path: str) -> bytes:
         _, body = await self._guest_request(RunnerVerb.DOWNLOAD_FILE, {"path": container_path})

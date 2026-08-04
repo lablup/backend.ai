@@ -248,7 +248,9 @@ class CipherPaths:
     async def _sealed(self, cipher_dir: str) -> list[tuple[str, int, bool]]:
         fmt = self.cipher.fmt
         return [
-            entry for entry in await self._store.listdir(cipher_dir) if not fmt.is_reserved(entry[0])
+            entry
+            for entry in await self._store.listdir(cipher_dir)
+            if not fmt.is_reserved(entry[0])
         ]
 
     async def dir_iv(self, cipher_dir: str, *, create: bool) -> bytes:
