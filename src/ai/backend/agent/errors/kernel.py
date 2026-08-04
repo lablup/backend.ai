@@ -8,6 +8,20 @@ from typing import override
 
 from aiohttp import web
 
+from ai.backend.common.kernel_runner.errors import (
+    OutputQueueMismatchError,
+    OutputQueueNotInitializedError,
+    RunIdNotSetError,
+)
+
+__all__ = [
+    "AsyncioContextError",
+    "KernelRunnerNotInitializedError",
+    "OutputQueueMismatchError",
+    "OutputQueueNotInitializedError",
+    "RunIdNotSetError",
+]
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -62,46 +76,4 @@ class SubprocessStreamError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
-class OutputQueueNotInitializedError(BackendAIError, web.HTTPInternalServerError):
-    """Raised when the output queue is not initialized."""
 
-    error_type = "https://api.backend.ai/probs/agent/output-queue-not-initialized"
-    error_title = "Output queue is not initialized."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.KERNEL,
-            operation=ErrorOperation.EXECUTE,
-            error_detail=ErrorDetail.NOT_READY,
-        )
-
-
-class OutputQueueMismatchError(BackendAIError, web.HTTPInternalServerError):
-    """Raised when output queue does not match expected value."""
-
-    error_type = "https://api.backend.ai/probs/agent/output-queue-mismatch"
-    error_title = "Output queue mismatch."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.KERNEL,
-            operation=ErrorOperation.EXECUTE,
-            error_detail=ErrorDetail.MISMATCH,
-        )
-
-
-class RunIdNotSetError(BackendAIError, web.HTTPInternalServerError):
-    """Raised when current_run_id is not set."""
-
-    error_type = "https://api.backend.ai/probs/agent/run-id-not-set"
-    error_title = "Run ID is not set."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.KERNEL,
-            operation=ErrorOperation.EXECUTE,
-            error_detail=ErrorDetail.NOT_READY,
-        )

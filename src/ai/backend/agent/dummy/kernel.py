@@ -226,7 +226,6 @@ class DummyFakeCodeRunner(AbstractCodeRunner):
 
     input_sock: None
     output_sock: None
-    zctx: None  # type: ignore[assignment]
 
     def __init__(
         self,
@@ -240,7 +239,6 @@ class DummyFakeCodeRunner(AbstractCodeRunner):
         exec_timeout: float = 0,
         client_features: frozenset[str] | None = None,
     ) -> None:
-        self.zctx = None
         self.input_sock = None
         self.output_sock = None
 
@@ -270,7 +268,6 @@ class DummyFakeCodeRunner(AbstractCodeRunner):
     @override
     def __setstate__(self, props: MutableMapping[str, Any]) -> None:
         self.__dict__.update(props)
-        self.zctx = None
         self.input_sock = None
         self.output_sock = None
 

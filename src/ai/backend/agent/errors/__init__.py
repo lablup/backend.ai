@@ -2,6 +2,8 @@
 Agent-side error classes.
 """
 
+from ai.backend.common.kernel_runner.errors import InvalidSocket
+
 from .agent import (
     AgentInitializationError,
     AsyncioTaskNotAvailableError,
@@ -19,7 +21,6 @@ from .agent import (
     InvalidChunkSizeError,
     InvalidLoggingConfigError,
     InvalidMountPathError,
-    InvalidSocket,
     K8sError,
     KernelNotFoundError,
     ModelDefinitionEmptyError,
