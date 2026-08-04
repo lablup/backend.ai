@@ -772,6 +772,24 @@ class ProxyWorkerConfig(BaseSchema):
         ),
     ]
 
+    backend_connection_pool_limit: Annotated[
+        int,
+        Field(default=100, ge=1),
+        BackendAIConfigMeta(
+            description=(
+                "The maximum number of concurrent connections the worker opens to a single "
+                "upstream route. The worker keeps one connection pool per route, so the "
+                "worker-wide ceiling is this value multiplied by the number of live routes, "
+                "not this value alone. Raise it for bursty high-concurrency workloads such as "
+                "model serving, and budget the result against the process file-descriptor "
+                "limit, since exhausting that affects every route rather than only the "
+                "saturated one."
+            ),
+            added_version="26.8.0",
+            example=ConfigExample(local="100", prod="500"),
+        ),
+    ]
+
     announce_addr: Annotated[
         HostPortPair | None,
         Field(default=None),
