@@ -5,9 +5,10 @@ Shared between Client SDK and Manager API.
 
 from __future__ import annotations
 
+from typing import Self
 from uuid import UUID
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
@@ -28,6 +29,7 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserStatus,
     UserStatusFilter,
 )
+from ai.backend.common.identifier.domain import DomainID
 
 __all__ = (
     "AdminSearchUsersInput",
@@ -56,7 +58,14 @@ class CreateUserInput(BaseRequestModel):
     email: str = Field(description="User's email address. Must be unique across the system.")
     username: str = Field(description="Unique username for login.")
     password: str = Field(description="Initial password for the user.")
-    domain_name: str = Field(description="Domain to assign the user to.")
+    domain_name: str | None = Field(
+        default=None,
+        description="Deprecated since 26.9.0. Use domain_id instead. Domain to assign the user to, by name.",
+    )
+    domain_id: DomainID | None = Field(
+        default=None,
+        description="Domain to assign the user to, by id. Mutually exclusive with `domain_name`.",
+    )
     need_password_change: bool = Field(
         default=False,
         description="If true, user must change password on first login.",
@@ -109,6 +118,12 @@ class CreateUserInput(BaseRequestModel):
         description="External system integration identifier.",
     )
 
+    @model_validator(mode="after")
+    def _check_one_domain_reference(self) -> Self:
+        if (self.domain_name is None) == (self.domain_id is None):
+            raise ValueError("Specify exactly one of domain_name or domain_id.")
+        return self
+
 
 class UpdateUserInput(BaseRequestModel):
     """Input for updating user information. All fields optional — only provided fields will be updated."""
@@ -139,7 +154,11 @@ class UpdateUserInput(BaseRequestModel):
     )
     domain_name: str | None = Field(
         default=None,
-        description="New domain assignment.",
+        description="Deprecated since 26.9.0. Use domain_id instead. New domain assignment, by name.",
+    )
+    domain_id: DomainID | None = Field(
+        default=None,
+        description="New domain assignment, by id. Mutually exclusive with `domain_name`.",
     )
     group_ids: list[UUID] | Sentinel | None = Field(
         default=SENTINEL,
@@ -190,6 +209,15 @@ class UpdateUserInput(BaseRequestModel):
         if isinstance(v, str) and len(v) > 512:
             raise ValueError("integration_name must be at most 512 characters")
         return v
+
+    @model_validator(mode="after")
+    def _check_one_domain_reference(self) -> Self:
+        if self.domain_name is not None and self.domain_id is not None:
+            raise ValueError(
+                "Specify either domain_name or domain_id, not both: the two may name "
+                "different domains."
+            )
+        return self
 
 
 class DeleteUserInput(BaseRequestModel):

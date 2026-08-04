@@ -61,7 +61,7 @@ class UserCreatorSpec(CreatorSpec[UserRow]):
     username: str
     password: PasswordInfo
     need_password_change: bool
-    domain_name: str
+    domain_name: str | None = None
     domain_id: DomainID | None = field(init=False, default=None)
     full_name: str | None = None
     description: str | None = None

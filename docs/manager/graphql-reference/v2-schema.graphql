@@ -3300,7 +3300,7 @@ type CreateUserResourcePolicyPayload {
 }
 
 """
-Added in 26.2.0. Input for creating a new user. Required fields: email, username, password, domain_name, need_password_change, status, role.
+Added in 26.2.0. Input for creating a new user. Required fields: email, username, password, need_password_change, status, role, and exactly one of domain_id or domain_name.
 """
 input CreateUserV2Input {
   """User's email address. Must be unique across the system."""
@@ -3312,8 +3312,15 @@ input CreateUserV2Input {
   """Initial password for the user."""
   password: String!
 
-  """Domain to assign the user to."""
-  domainName: String!
+  """
+  Deprecated since 26.9.0. Use domain_id instead. Domain to assign the user to, by name.
+  """
+  domainName: String = null @deprecated(reason: "Use domain_id instead.")
+
+  """
+  Added in 26.9.0. Domain to assign the user to, by id. Mutually exclusive with `domain_name`.
+  """
+  domainId: UUID = null
 
   """If true, user must change password on first login."""
   needPasswordChange: Boolean!
@@ -15558,8 +15565,15 @@ input UpdateUserV2Input {
   """New user role."""
   role: UserRoleV2
 
-  """New domain assignment."""
-  domainName: String
+  """
+  Deprecated since 26.9.0. Use domain_id instead. New domain assignment, by name.
+  """
+  domainName: String @deprecated(reason: "Use domain_id instead.")
+
+  """
+  Added in 26.9.0. New domain assignment, by id. Mutually exclusive with `domain_name`.
+  """
+  domainId: UUID
 
   """New project (group) assignments. Replaces existing assignments."""
   groupIds: [UUID!]

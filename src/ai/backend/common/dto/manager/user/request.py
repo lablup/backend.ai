@@ -5,12 +5,14 @@ Shared between Client SDK and Manager API.
 
 from __future__ import annotations
 
+from typing import Self
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.identifier.domain import DomainID
 
 from .types import OrderDirection, UserOrderField, UserRole, UserStatus
 
@@ -34,7 +36,14 @@ class CreateUserRequest(BaseRequestModel):
     need_password_change: bool = Field(
         default=False, description="Whether user needs to change password on first login"
     )
-    domain_name: str = Field(description="Domain the user belongs to")
+    domain_name: str | None = Field(
+        default=None,
+        description="Deprecated since 26.9.0. Use domain_id instead. Domain the user belongs to, by name",
+    )
+    domain_id: DomainID | None = Field(
+        default=None,
+        description="Domain the user belongs to, by id. Mutually exclusive with domain_name",
+    )
     full_name: str | None = Field(default=None, description="Full name of the user")
     description: str | None = Field(default=None, description="User description")
     status: UserStatus | None = Field(default=None, description="User account status")
@@ -52,6 +61,12 @@ class CreateUserRequest(BaseRequestModel):
     container_gids: list[int] | None = Field(default=None, description="Container additional GIDs")
     group_ids: list[str] | None = Field(default=None, description="Group IDs to assign the user to")
 
+    @model_validator(mode="after")
+    def _check_one_domain_reference(self) -> Self:
+        if (self.domain_name is None) == (self.domain_id is None):
+            raise ValueError("Specify exactly one of domain_name or domain_id.")
+        return self
+
 
 class UpdateUserRequest(BaseRequestModel):
     """Request to update an existing user."""
@@ -65,7 +80,13 @@ class UpdateUserRequest(BaseRequestModel):
     description: str | None = Field(default=None, description="Updated description")
     status: UserStatus | None = Field(default=None, description="Updated user status")
     role: UserRole | None = Field(default=None, description="Updated user role")
-    domain_name: str | None = Field(default=None, description="Updated domain name")
+    domain_name: str | None = Field(
+        default=None,
+        description="Deprecated since 26.9.0. Use domain_id instead. Updated domain, by name",
+    )
+    domain_id: DomainID | None = Field(
+        default=None, description="Updated domain, by id. Mutually exclusive with domain_name"
+    )
     allowed_client_ip: list[str] | None = Field(
         default=None, description="Updated allowed client IPs"
     )
@@ -81,6 +102,15 @@ class UpdateUserRequest(BaseRequestModel):
         default=None, description="Updated container additional GIDs"
     )
     group_ids: list[str] | None = Field(default=None, description="Updated group IDs")
+
+    @model_validator(mode="after")
+    def _check_one_domain_reference(self) -> Self:
+        if self.domain_name is not None and self.domain_id is not None:
+            raise ValueError(
+                "Specify either domain_name or domain_id, not both: the two may name "
+                "different domains."
+            )
+        return self
 
 
 class UserFilter(BaseRequestModel):

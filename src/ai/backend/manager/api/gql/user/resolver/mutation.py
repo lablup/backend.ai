@@ -113,6 +113,7 @@ def _build_bulk_create_user_action(
             password=password_info,
             need_password_change=dto.need_password_change,
             domain_name=dto.domain_name,
+            domain_id=dto.domain_id,
             full_name=dto.full_name,
             description=dto.description,
             status=UserStatus(dto.status),
@@ -297,6 +298,11 @@ async def admin_bulk_update_users_v2(
             domain_name=(
                 OptionalState.update(dto.domain_name)
                 if dto.domain_name is not None
+                else OptionalState.nop()
+            ),
+            domain_id=(
+                OptionalState.update(dto.domain_id)
+                if dto.domain_id is not None
                 else OptionalState.nop()
             ),
             role=(

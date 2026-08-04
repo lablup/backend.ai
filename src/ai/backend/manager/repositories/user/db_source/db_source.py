@@ -202,6 +202,16 @@ class UserDBSource:
         enrollments) within the caller's write ops transaction."""
         spec = cast(UserCreatorSpec, creator.spec)
 
+        # Until domain_name goes away, fill in whichever column the request did not name
+        if spec.domain_name is None:
+            domain_names = await w.batch_query_in_global(
+                sa.select(DomainRow.name).where(DomainRow.id == spec.domain_id),
+                BatchQuerier(pagination=NoPagination()),
+            )
+            if not domain_names.rows:
+                raise UserCreationBadRequest(f"Domain '{spec.domain_id}' does not exist.")
+            spec.domain_name = domain_names.rows[0].name
+
         domain_query = sa.select(DomainRow.id).where(DomainRow.name == spec.domain_name)
         domains = await w.batch_query_in_global(
             domain_query, BatchQuerier(pagination=NoPagination())
@@ -301,6 +311,20 @@ class UserDBSource:
                 domain_exists = await self._check_domain_exists(session, new_domain_name)
                 if not domain_exists:
                     raise UserModificationBadRequest(f"Domain '{new_domain_name}' does not exist.")
+
+            # Until domain_name goes away, fill in whichever column the request did not name
+            new_domain_id = updater_spec.domain_id.optional_value()
+            if new_domain_name is not None:
+                to_update["domain_id"] = await session.scalar(
+                    sa.select(DomainRow.id).where(DomainRow.name == new_domain_name)
+                )
+            elif new_domain_id is not None:
+                domain_name = await session.scalar(
+                    sa.select(DomainRow.name).where(DomainRow.id == new_domain_id)
+                )
+                if domain_name is None:
+                    raise UserModificationBadRequest(f"Domain '{new_domain_id}' does not exist.")
+                to_update["domain_name"] = domain_name
 
             # Check if new resource_policy exists
             new_resource_policy = updater_spec.resource_policy.optional_value()
@@ -411,6 +435,20 @@ class UserDBSource:
             domain_exists = await self._check_domain_exists(session, new_domain_name)
             if not domain_exists:
                 raise UserModificationBadRequest(f"Domain '{new_domain_name}' does not exist.")
+
+        # Until domain_name goes away, fill in whichever column the request did not name
+        new_domain_id = updater_spec.domain_id.optional_value()
+        if new_domain_name is not None:
+            to_update["domain_id"] = await session.scalar(
+                sa.select(DomainRow.id).where(DomainRow.name == new_domain_name)
+            )
+        elif new_domain_id is not None:
+            domain_name = await session.scalar(
+                sa.select(DomainRow.name).where(DomainRow.id == new_domain_id)
+            )
+            if domain_name is None:
+                raise UserModificationBadRequest(f"Domain '{new_domain_id}' does not exist.")
+            to_update["domain_name"] = domain_name
 
         # Check if new resource_policy exists
         new_resource_policy = updater_spec.resource_policy.optional_value()
