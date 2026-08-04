@@ -26,15 +26,26 @@ _REPRESENTATIVE_ACTION_CLASSES: list[type[BaseAction]] = [
 
 
 class TestActionOperationType:
-    def test_has_exactly_eight_values(self) -> None:
+    def test_has_exactly_nine_values(self) -> None:
         values = list(ActionOperationType)
-        assert len(values) == 8
-        expected = {"get", "search", "create", "update", "upsert", "delete", "purge", "restore"}
+        assert len(values) == 9
+        expected = {
+            "get",
+            "search",
+            "create",
+            "update",
+            "upsert",
+            "delete",
+            "purge",
+            "restore",
+            "lookup",
+        }
         assert {v.value for v in values} == expected
 
     def test_to_permission_operation_mapping(self) -> None:
         assert ActionOperationType.GET.to_permission_operation() == OperationType.READ
         assert ActionOperationType.SEARCH.to_permission_operation() == OperationType.READ
+        assert ActionOperationType.LOOKUP.to_permission_operation() == OperationType.READ
         assert ActionOperationType.CREATE.to_permission_operation() == OperationType.CREATE
         assert ActionOperationType.UPDATE.to_permission_operation() == OperationType.UPDATE
         assert ActionOperationType.UPSERT.to_permission_operation() == OperationType.CREATE
@@ -45,6 +56,7 @@ class TestActionOperationType:
     def test_to_permission_mapping(self) -> None:
         assert ActionOperationType.GET.to_permission() == Permission.READ
         assert ActionOperationType.SEARCH.to_permission() == Permission.READ
+        assert ActionOperationType.LOOKUP.to_permission() == Permission.READ
         assert ActionOperationType.CREATE.to_permission() == Permission.CREATE
         assert ActionOperationType.UPDATE.to_permission() == Permission.UPDATE
         assert ActionOperationType.DELETE.to_permission() == Permission.SOFT_DELETE
@@ -136,11 +148,13 @@ class TestAllActionClassesUseEnums:
 
         ``RESTORE`` and ``UPSERT`` are excluded: no concrete action declares them
         yet. The existing upsert actions still sit on the legacy base and are
-        re-declared once they move to the v2 bases.
+        re-declared once they move to the v2 bases. ``LOOKUP`` is excluded because
+        only the v2 lookup base declares it, and every class here is a legacy one.
         """
         expected = set(ActionOperationType) - {
             ActionOperationType.RESTORE,
             ActionOperationType.UPSERT,
+            ActionOperationType.LOOKUP,
         }
         covered = {cls.operation_type() for cls in _REPRESENTATIVE_ACTION_CLASSES}
         assert covered == expected, (

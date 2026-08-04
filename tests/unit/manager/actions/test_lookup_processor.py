@@ -100,7 +100,7 @@ def action() -> _Action:
 
 
 def test_a_lookup_is_a_read_so_the_audit_read_rules_apply() -> None:
-    assert _Action.operation_type() is ActionOperationType.GET
+    assert _Action.operation_type() is ActionOperationType.LOOKUP
     assert _Action.operation_type() in ActionOperationType.read_operations()
 
 

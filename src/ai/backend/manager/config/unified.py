@@ -1522,7 +1522,7 @@ class AuditLogConfig(BaseConfigSchema):
                 "Opt-in list: a read operation is recorded only if it is named here. The "
                 "default is an empty list, so successful reads are not recorded at all and "
                 "read volume stays off until an operator turns it on. A listed operation is "
-                "recorded for every entity type. Must be 'get' or 'search': mutating "
+                "recorded for every entity type. Must be 'get', 'search' or 'lookup': mutating "
                 "operations are always recorded and listing them here is rejected. Failed "
                 "and denied reads are recorded either way."
             ),

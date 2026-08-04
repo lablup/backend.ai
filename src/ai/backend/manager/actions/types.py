@@ -42,6 +42,7 @@ class ActionOperationType(enum.StrEnum):
     DELETE = "delete"
     PURGE = "purge"
     RESTORE = "restore"
+    LOOKUP = "lookup"
 
     @classmethod
     def read_operations(cls) -> frozenset["ActionOperationType"]:
@@ -50,7 +51,7 @@ class ActionOperationType(enum.StrEnum):
         The audit layer draws its "always record" line here: a state change is
         recorded unconditionally, while recording a read is a configurable choice.
         """
-        return frozenset({cls.GET, cls.SEARCH})
+        return frozenset({cls.GET, cls.SEARCH, cls.LOOKUP})
 
     def to_permission_operation(self) -> OperationType:
         """The legacy single :class:`OperationType` this operation maps to.
@@ -62,6 +63,8 @@ class ActionOperationType(enum.StrEnum):
             case ActionOperationType.GET:
                 return OperationType.READ
             case ActionOperationType.SEARCH:
+                return OperationType.READ
+            case ActionOperationType.LOOKUP:
                 return OperationType.READ
             case ActionOperationType.CREATE:
                 return OperationType.CREATE
@@ -87,7 +90,7 @@ class ActionOperationType(enum.StrEnum):
         flag back and reaches nothing the deleter could not already reach.
         """
         match self:
-            case ActionOperationType.GET | ActionOperationType.SEARCH:
+            case ActionOperationType.GET | ActionOperationType.SEARCH | ActionOperationType.LOOKUP:
                 return Permission.READ
             case ActionOperationType.CREATE:
                 return Permission.CREATE

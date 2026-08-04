@@ -6,7 +6,9 @@ arguments only append — what the shape carries is always applied.
 
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
+from typing import Any
 
+from ai.backend.common.data.entity.types import EntityData
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.bulk.monitor import BulkActionMonitor
@@ -21,6 +23,31 @@ from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction, BaseLook
 from ai.backend.manager.actions.v2.lookup.monitor import LookupActionMonitor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.lookup.validator import LookupActionValidator
+from ai.backend.manager.actions.v2.ops.base import (
+    BatchPurgeScopeOpsAction,
+    BatchUpdateScopeOpsAction,
+    BulkCreateScopeOpsAction,
+    CreateGlobalOpsAction,
+    CreateScopeOpsAction,
+    DeleteBulkOpsAction,
+    DeleteSingleEntityOpsAction,
+    GetSingleEntityOpsAction,
+    PurgeBulkOpsAction,
+    PurgeSingleEntityOpsAction,
+    SearchGlobalOpsAction,
+    SearchScopeOpsAction,
+    UpdateBulkOpsAction,
+    UpdateSingleEntityOpsAction,
+    UpsertSingleEntityOpsAction,
+)
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    BulkOpsResult,
+    CreatedEntityOpsResult,
+    EntitiesOpsResult,
+    EntityOpsResult,
+    ScopedBatchOpsResult,
+)
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.monitor import ScopeActionMonitor
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
@@ -32,6 +59,22 @@ from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityAc
 from ai.backend.manager.actions.v2.single_entity.validator import SingleEntityActionValidator
 from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.services.ops.service import (
+    BatchPurgeService,
+    BatchUpdateService,
+    BulkCreateService,
+    BulkDeleteService,
+    BulkPurgeService,
+    BulkUpdateService,
+    CreateService,
+    DeleteService,
+    GetService,
+    GlobalSearchService,
+    PurgeService,
+    SearchService,
+    UpdateService,
+    UpsertService,
+)
 
 __all__ = (
     "ProcessorDependencies",
@@ -41,13 +84,13 @@ __all__ = (
 
 
 @dataclass(frozen=True)
-class ProcessorDependencies[TData]:
+class ProcessorDependencies[TData: EntityData]:
     monitors: ActionMonitors
     validators: ActionValidators
     repository: OpsRepository[TData]
 
 
-class ProcessorGroup[TData]:
+class ProcessorGroup[TData: EntityData]:
     _deps: ProcessorDependencies[TData]
 
     def __init__(self, deps: ProcessorDependencies[TData]) -> None:
@@ -249,8 +292,196 @@ class ProcessorGroup[TData]:
             validators=(*self._deps.validators.lookup, *validators),
         )
 
+    def single_get_ops(
+        self,
+        *,
+        validators: Sequence[SingleEntityActionValidator] = (),
+        monitors: Sequence[SingleEntityActionMonitor] = (),
+    ) -> SingleEntityActionProcessor[GetSingleEntityOpsAction[Any, TData], EntityOpsResult[TData]]:
+        return SingleEntityActionProcessor(
+            GetService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.single_entity, *monitors),
+            validators=(*self._deps.validators.single_entity, *validators),
+        )
 
-class ProcessorRegistry[TData]:
+    def single_update_ops(
+        self,
+        *,
+        validators: Sequence[SingleEntityActionValidator] = (),
+        monitors: Sequence[SingleEntityActionMonitor] = (),
+    ) -> SingleEntityActionProcessor[
+        UpdateSingleEntityOpsAction[Any, TData], EntityOpsResult[TData]
+    ]:
+        return SingleEntityActionProcessor(
+            UpdateService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.single_entity, *monitors),
+            validators=(*self._deps.validators.single_entity, *validators),
+        )
+
+    def single_delete_ops(
+        self,
+        *,
+        validators: Sequence[SingleEntityActionValidator] = (),
+        monitors: Sequence[SingleEntityActionMonitor] = (),
+    ) -> SingleEntityActionProcessor[
+        DeleteSingleEntityOpsAction[Any, TData], EntityOpsResult[TData]
+    ]:
+        return SingleEntityActionProcessor(
+            DeleteService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.single_entity, *monitors),
+            validators=(*self._deps.validators.single_entity, *validators),
+        )
+
+    def single_upsert_ops(
+        self,
+        *,
+        validators: Sequence[SingleEntityActionValidator] = (),
+        monitors: Sequence[SingleEntityActionMonitor] = (),
+    ) -> SingleEntityActionProcessor[
+        UpsertSingleEntityOpsAction[Any, TData], EntityOpsResult[TData]
+    ]:
+        return SingleEntityActionProcessor(
+            UpsertService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.single_entity, *monitors),
+            validators=(*self._deps.validators.single_entity, *validators),
+        )
+
+    def single_purge_ops(
+        self,
+        *,
+        validators: Sequence[SingleEntityActionValidator] = (),
+        monitors: Sequence[SingleEntityActionMonitor] = (),
+    ) -> SingleEntityActionProcessor[
+        PurgeSingleEntityOpsAction[Any, TData], EntityOpsResult[TData]
+    ]:
+        return SingleEntityActionProcessor(
+            PurgeService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.single_entity, *monitors),
+            validators=(*self._deps.validators.single_entity, *validators),
+        )
+
+    def bulk_update_ops(
+        self,
+        *,
+        validators: Sequence[BulkActionValidator] = (),
+        monitors: Sequence[BulkActionMonitor] = (),
+    ) -> BulkActionProcessor[UpdateBulkOpsAction[Any, TData], BulkOpsResult[TData]]:
+        return BulkActionProcessor(
+            BulkUpdateService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.bulk, *monitors),
+            validators=(*self._deps.validators.bulk, *validators),
+        )
+
+    def bulk_delete_ops(
+        self,
+        *,
+        validators: Sequence[BulkActionValidator] = (),
+        monitors: Sequence[BulkActionMonitor] = (),
+    ) -> BulkActionProcessor[DeleteBulkOpsAction[Any, TData], BulkOpsResult[TData]]:
+        return BulkActionProcessor(
+            BulkDeleteService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.bulk, *monitors),
+            validators=(*self._deps.validators.bulk, *validators),
+        )
+
+    def bulk_purge_ops(
+        self,
+        *,
+        validators: Sequence[BulkActionValidator] = (),
+        monitors: Sequence[BulkActionMonitor] = (),
+    ) -> BulkActionProcessor[PurgeBulkOpsAction[Any, TData], BulkOpsResult[TData]]:
+        return BulkActionProcessor(
+            BulkPurgeService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.bulk, *monitors),
+            validators=(*self._deps.validators.bulk, *validators),
+        )
+
+    def scope_create_ops(
+        self,
+        *,
+        validators: Sequence[ScopeActionValidator] = (),
+        monitors: Sequence[ScopeActionMonitor] = (),
+    ) -> ScopeActionProcessor[CreateScopeOpsAction[Any, TData], CreatedEntityOpsResult[TData]]:
+        return ScopeActionProcessor(
+            CreateService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.scope, *monitors),
+            validators=(*self._deps.validators.scope, *validators),
+        )
+
+    def scope_bulk_create_ops(
+        self,
+        *,
+        validators: Sequence[ScopeActionValidator] = (),
+        monitors: Sequence[ScopeActionMonitor] = (),
+    ) -> ScopeActionProcessor[BulkCreateScopeOpsAction[Any, TData], EntitiesOpsResult[TData]]:
+        return ScopeActionProcessor(
+            BulkCreateService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.scope, *monitors),
+            validators=(*self._deps.validators.scope, *validators),
+        )
+
+    def scope_batch_update_ops(
+        self,
+        *,
+        validators: Sequence[ScopeActionValidator] = (),
+        monitors: Sequence[ScopeActionMonitor] = (),
+    ) -> ScopeActionProcessor[BatchUpdateScopeOpsAction[Any, TData], EntitiesOpsResult[TData]]:
+        return ScopeActionProcessor(
+            BatchUpdateService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.scope, *monitors),
+            validators=(*self._deps.validators.scope, *validators),
+        )
+
+    def scope_batch_purge_ops(
+        self,
+        *,
+        validators: Sequence[ScopeActionValidator] = (),
+        monitors: Sequence[ScopeActionMonitor] = (),
+    ) -> ScopeActionProcessor[BatchPurgeScopeOpsAction[Any, TData], EntitiesOpsResult[TData]]:
+        return ScopeActionProcessor(
+            BatchPurgeService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.scope, *monitors),
+            validators=(*self._deps.validators.scope, *validators),
+        )
+
+    def scope_search_ops(
+        self,
+        *,
+        validators: Sequence[ScopeActionValidator] = (),
+        monitors: Sequence[ScopeActionMonitor] = (),
+    ) -> ScopeActionProcessor[SearchScopeOpsAction[Any, TData], ScopedBatchOpsResult[TData]]:
+        return ScopeActionProcessor(
+            SearchService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.scope, *monitors),
+            validators=(*self._deps.validators.scope, *validators),
+        )
+
+    def global_create_ops(
+        self,
+        *,
+        validators: Sequence[GlobalActionValidator] = (),
+        monitors: Sequence[GlobalActionMonitor] = (),
+    ) -> GlobalActionProcessor[CreateGlobalOpsAction[Any, TData], CreatedEntityOpsResult[TData]]:
+        return GlobalActionProcessor(
+            CreateService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.global_scope, *monitors),
+            validators=(*self._deps.validators.global_scope, *validators),
+        )
+
+    def global_search_ops(
+        self,
+        *,
+        validators: Sequence[GlobalActionValidator] = (),
+        monitors: Sequence[GlobalActionMonitor] = (),
+    ) -> GlobalActionProcessor[SearchGlobalOpsAction[Any, TData], BatchOpsResult[TData]]:
+        return GlobalActionProcessor(
+            GlobalSearchService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.global_scope, *monitors),
+            validators=(*self._deps.validators.global_scope, *validators),
+        )
+
+
+class ProcessorRegistry[TData: EntityData]:
     _deps: ProcessorDependencies[TData]
 
     def __init__(self, deps: ProcessorDependencies[TData]) -> None:
