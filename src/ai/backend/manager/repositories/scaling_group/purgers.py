@@ -7,16 +7,23 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey
+from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
     ScalingGroupForKeypairsRow,
     ScalingGroupForProjectRow,
     ScalingGroupRow,
 )
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.repositories.base.purger import BatchPurger, BatchPurgerSpec, PurgerSpec
+from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurgerSpec
 from ai.backend.manager.repositories.base.types import ConflictCheck
 
 
@@ -33,6 +40,117 @@ class ScalingGroupPurgerSpec(PurgerSpec[ScalingGroupRow]):
     @override
     def pk_value(self) -> str:
         return self.name
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
+
+@dataclass
+class ResourceGroupPurgerSpec(RBACEntityPurgerSpec[ScalingGroupRow]):
+    """PurgerSpec for purging a scaling group together with its RBAC entries."""
+
+    name: str
+    resource_group_id: ResourceGroupID
+
+    @override
+    def row_class(self) -> type[ScalingGroupRow]:
+        return ScalingGroupRow
+
+    @override
+    def pk_value(self) -> str:
+        return self.name
+
+    @override
+    def element_type(self) -> RBACElementType:
+        return RBACElementType.RESOURCE_GROUP
+
+    @override
+    def entity_ref(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType.RESOURCE_GROUP,
+            element_id=str(self.resource_group_id),
+        )
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
+
+@dataclass
+class ScalingGroupRoutingsPurgerSpec(BatchPurgerSpec[RoutingRow]):
+    """PurgerSpec for deleting the routings of a scaling group's sessions."""
+
+    resource_group_id: ResourceGroupID
+
+    @override
+    def build_subquery(self) -> sa.sql.Select[tuple[RoutingRow]]:
+        return sa.select(RoutingRow).where(
+            RoutingRow.session.in_(
+                sa.select(SessionRow.id).where(
+                    SessionRow.resource_group_id == self.resource_group_id
+                )
+            )
+        )
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
+
+@dataclass
+class ScalingGroupEndpointsPurgerSpec(BatchPurgerSpec[EndpointRow]):
+    """PurgerSpec for deleting the endpoints of a scaling group.
+
+    ``endpoints.resource_group`` stores the scaling group name, so the id is
+    resolved to the name with a subquery."""
+
+    resource_group_id: ResourceGroupID
+
+    @override
+    def build_subquery(self) -> sa.sql.Select[tuple[EndpointRow]]:
+        return sa.select(EndpointRow).where(
+            EndpointRow.resource_group
+            == sa.select(ScalingGroupRow.name)
+            .where(ScalingGroupRow.id == self.resource_group_id)
+            .scalar_subquery()
+        )
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
+
+@dataclass
+class ScalingGroupKernelsPurgerSpec(BatchPurgerSpec[KernelRow]):
+    """PurgerSpec for deleting the kernels of a scaling group's sessions."""
+
+    resource_group_id: ResourceGroupID
+
+    @override
+    def build_subquery(self) -> sa.sql.Select[tuple[KernelRow]]:
+        return sa.select(KernelRow).where(
+            KernelRow.session_id.in_(
+                sa.select(SessionRow.id).where(
+                    SessionRow.resource_group_id == self.resource_group_id
+                )
+            )
+        )
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
+
+@dataclass
+class ScalingGroupSessionsPurgerSpec(BatchPurgerSpec[SessionRow]):
+    """PurgerSpec for deleting the sessions of a scaling group."""
+
+    resource_group_id: ResourceGroupID
+
+    @override
+    def build_subquery(self) -> sa.sql.Select[tuple[SessionRow]]:
+        return sa.select(SessionRow).where(SessionRow.resource_group_id == self.resource_group_id)
 
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:
@@ -73,6 +191,27 @@ class ScalingGroupsForDomainPurgerSpec(BatchPurgerSpec[ScalingGroupForDomainRow]
             sa.and_(
                 ScalingGroupForDomainRow.resource_group_id.in_(self.resource_group_ids),
                 ScalingGroupForDomainRow.domain_id == self.domain_id,
+            )
+        )
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
+
+@dataclass
+class DomainsForScalingGroupPurgerSpec(BatchPurgerSpec[ScalingGroupForDomainRow]):
+    """PurgerSpec for disassociating multiple domains from a scaling group."""
+
+    resource_group_id: ResourceGroupID
+    domain_ids: list[DomainID]
+
+    @override
+    def build_subquery(self) -> sa.sql.Select[tuple[ScalingGroupForDomainRow]]:
+        return sa.select(ScalingGroupForDomainRow).where(
+            sa.and_(
+                ScalingGroupForDomainRow.resource_group_id == self.resource_group_id,
+                ScalingGroupForDomainRow.domain_id.in_(self.domain_ids),
             )
         )
 
@@ -202,6 +341,27 @@ class ScalingGroupsForProjectPurgerSpec(BatchPurgerSpec[ScalingGroupForProjectRo
             sa.and_(
                 ScalingGroupForProjectRow.resource_group_id.in_(self.resource_group_ids),
                 ScalingGroupForProjectRow.group == self.project,
+            )
+        )
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
+
+@dataclass
+class ProjectsForScalingGroupPurgerSpec(BatchPurgerSpec[ScalingGroupForProjectRow]):
+    """PurgerSpec for disassociating multiple projects from a scaling group."""
+
+    resource_group_id: ResourceGroupID
+    projects: list[UUID]
+
+    @override
+    def build_subquery(self) -> sa.sql.Select[tuple[ScalingGroupForProjectRow]]:
+        return sa.select(ScalingGroupForProjectRow).where(
+            sa.and_(
+                ScalingGroupForProjectRow.resource_group_id == self.resource_group_id,
+                ScalingGroupForProjectRow.group.in_(self.projects),
             )
         )
 

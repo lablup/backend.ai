@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
 from uuid import UUID
 
+from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_SCOPE_TYPE
+from ai.backend.common.data.entity.types import ScopeRef
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import ScalingGroupConflict
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
@@ -19,7 +22,12 @@ from ai.backend.manager.models.scaling_group import (
     ScalingGroupRow,
 )
 from ai.backend.manager.repositories.base.creator import CreatorSpec
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
+from ai.backend.manager.repositories.ops.rbac.provider import ScopeCreation
+from ai.backend.manager.repositories.permission_controller.role_manager import (
+    ScopeSystemRoleData,
+)
 
 
 @dataclass
@@ -65,6 +73,33 @@ class ScalingGroupCreatorSpec(CreatorSpec[ScalingGroupRow]):
             use_host_network=self.use_host_network,
             fair_share_spec=self.fair_share_spec,
         )
+
+
+@dataclass
+class ResourceGroupScopeCreation(ScopeCreation[ScalingGroupRow]):
+    """Creates a scaling group row and the resource-group scope it becomes.
+
+    A resource group declares no scope-local system roles: roles come only from
+    matching role presets, if any. Domain/project scope associations are written by
+    the allow/associate paths, not by this creator."""
+
+    spec: ScalingGroupCreatorSpec
+
+    @override
+    def creator(self) -> RBACEntityCreator[ScalingGroupRow]:
+        return RBACEntityCreator(
+            spec=self.spec,
+            element_type=RBACElementType.RESOURCE_GROUP,
+            scope_ref=None,
+        )
+
+    @override
+    def scope_of(self, row: ScalingGroupRow) -> ScopeRef:
+        return ScopeRef(scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=row.id)
+
+    @override
+    def system_roles_of(self, row: ScalingGroupRow) -> Collection[ScopeSystemRoleData]:
+        return ()
 
 
 @dataclass
