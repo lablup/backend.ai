@@ -74,6 +74,7 @@ from .errors import (
     ImageDistroUnresolved,
     ImagePushRefused,
     MultiNodeSessionRefused,
+    HostPrivilegeWriteRefused,
     NetworkSetupFailed,
     RawCircuitRefused,
     ReleaseNotConfirmed,
@@ -407,11 +408,21 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
         cpu_alloc = kernel_obj.resource_spec.allocations.get(DeviceName("cpu"), {})
         cpuset = ",".join(sorted(str(core) for core in cpu_alloc.get(SlotName("cpu"), {})))
         confidential = self.internal_data.get("confidential") or {}
+        if self.internal_data.get("sudo_session_enabled"):
+            raise HostPrivilegeWriteRefused(
+                extra_msg=(
+                    f"kernel {self.kernel_id} asked for a per-session root grant; under the"
+                    " confidential runtime that privilege is a measured image property the guest"
+                    " applies to itself, and the host writes nothing into the container"
+                )
+            )
         env = dict(kernel_obj.environ)
         if confidential.get("config_resource"):
             env["BACKENDAI_CC_CONFIG_URI"] = confidential["config_resource"]
         if confidential.get("secrets_resource"):
             env["BACKENDAI_CC_SECRETS_URI"] = confidential["secrets_resource"]
+        if confidential.get("channel_resource"):
+            env["BACKENDAI_CC_CHANNEL_URI"] = confidential["channel_resource"]
         spec = ContainerSpec(
             name=f"kernel.{self.kernel_id}",
             image=self.image_ref.canonical,

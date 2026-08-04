@@ -25,6 +25,7 @@ from ai.backend.appproxy.common.types import (
     EndpointConfig,
     FrontendMode,
     ProxyProtocol,
+    UpstreamScheme,
     RouteInfo,
     SessionConfig,
     Slot,
@@ -106,6 +107,9 @@ class Worker(Base, BaseMixin):  # type: ignore[misc]
         pgsql.ARRAY(EnumType(AppMode)), nullable=False
     )
     filtered_apps_only: Mapped[bool] = mapped_column(sa.Boolean(), default=False, nullable=False)
+    upstream_tls_capable: Mapped[bool] = mapped_column(
+        sa.Boolean(), default=False, nullable=False, server_default=sa.text("false")
+    )
 
     traefik_last_used_marker_path: Mapped[str | None] = mapped_column(
         sa.String(length=1024), nullable=True
@@ -205,6 +209,7 @@ class Worker(Base, BaseMixin):  # type: ignore[misc]
         wildcard_traffic_port: int | None = None,
         traefik_last_used_marker_path: str | None = None,
         filtered_apps_only: bool = False,
+        upstream_tls_capable: bool = False,
         status: WorkerStatus = WorkerStatus.LOST,
     ) -> "Worker":
         w = cls()
@@ -221,6 +226,7 @@ class Worker(Base, BaseMixin):  # type: ignore[misc]
         w.wildcard_domain = wildcard_domain
         w.wildcard_traffic_port = wildcard_traffic_port
         w.filtered_apps_only = filtered_apps_only
+        w.upstream_tls_capable = upstream_tls_capable
         w.traefik_last_used_marker_path = traefik_last_used_marker_path
         w.status = status
 
@@ -358,6 +364,7 @@ async def pick_worker(
     endpoint_info: EndpointConfig | None,
     protocol: ProxyProtocol,
     app_mode: AppMode,
+    upstream_scheme: UpstreamScheme = UpstreamScheme.PLAIN,
 ) -> Worker:
     app_filter_queries = [
         (WorkerAppFilter.property_name == f"session.{key}")
@@ -383,6 +390,8 @@ async def pick_worker(
         & (Worker.accepted_traffics.contains([app_mode]))
         & (Worker.status == WorkerStatus.ALIVE)
     )
+    if upstream_scheme is UpstreamScheme.TLS:
+        worker_query = worker_query.where(Worker.upstream_tls_capable)
     if worker_ids:
         worker_query = worker_query.where(
             Worker.filtered_apps_only & (Worker.accepted_traffics.contains(app_mode))

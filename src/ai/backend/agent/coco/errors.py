@@ -153,3 +153,8 @@ class ChannelKeyOnHostRefused(_CocoFailure):
 class ChannelTerminatedVerbRefused(_CocoRefusal):
     error_type = _PREFIX + "channel-terminated-verb-refused"
     error_title = "This verb moved off the agent onto the end-to-end guest channel."
+
+
+class HostPrivilegeWriteRefused(_CocoRefusal):
+    error_type = _PREFIX + "host-privilege-write-refused"
+    error_title = "The host does not write root into the tenant's container."

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, cast, override
 
 import aiodocker
+import attrs
 
 from ai.backend.agent import __version__
 from ai.backend.agent.docker.intrinsic import CPUPlugin as DockerCPUPlugin
@@ -30,6 +31,7 @@ from ai.backend.agent.stats import (
 from ai.backend.agent.types import Container, MountInfo
 from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.json import dump_json_str, load_json
+from ai.backend.common.types import MetricKey
 from ai.backend.common.types import (
     AcceleratorMetadata,
     DeviceId,
@@ -134,7 +136,17 @@ def decode_allocations(
     }
 
 
+HYPERVISOR_PREFIX = "hypervisor_"
+
+
 class _HypervisorBlindMixin:
+    async def gather_node_measures(self, ctx: StatContext) -> Sequence[NodeMeasurement]:
+        measured = await super().gather_node_measures(ctx)  # type: ignore[misc]
+        return [
+            attrs.evolve(measurement, key=MetricKey(HYPERVISOR_PREFIX + str(measurement.key)))
+            for measurement in measured
+        ]
+
     async def gather_container_measures(
         self, ctx: StatContext, container_ids: Sequence[str]
     ) -> Sequence[ContainerMeasurement]:
