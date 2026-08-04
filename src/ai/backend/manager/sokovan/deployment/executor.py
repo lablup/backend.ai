@@ -35,7 +35,7 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.appproxy.client import AppProxyClient
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
-from ai.backend.manager.clients.prometheus.preset import LabelMatcher
+from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.scale import AutoScalingRule
 from ai.backend.manager.data.deployment.types import (
@@ -606,10 +606,11 @@ class DeploymentExecutor:
 
         try:
             response = await self._prometheus_client.execute_preset(
-                query_template=preset_data.query_template,
-                filter_labels=labels,
-                group_labels=[],
-                time_window=time_window,
+                MetricPreset(
+                    template=preset_data.query_template,
+                    labels=labels,
+                    window=time_window,
+                ),
                 time_range=None,
             )
         except (PrometheusConnectionError, FailedToGetMetric) as e:

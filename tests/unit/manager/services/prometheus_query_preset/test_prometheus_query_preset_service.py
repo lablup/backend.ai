@@ -22,7 +22,7 @@ from ai.backend.common.exception import (
     PrometheusQueryPresetNotFound,
 )
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
-from ai.backend.manager.clients.prometheus.preset import LabelMatcher
+from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset
 from ai.backend.manager.data.prometheus_query_preset import (
     ExecutePresetOptions,
     PrometheusQueryPresetData,
@@ -257,10 +257,12 @@ class TestPrometheusQueryPresetService:
         assert result.response == prometheus_response
         mock_repository.get_by_id.assert_called_once_with(preset_data.id)
         mock_prometheus_client.execute_preset.assert_called_once_with(
-            query_template=preset_data.query_template,
-            filter_labels={"kernel_id": LabelMatcher.exact("test-kernel")},
-            group_labels=["kernel_id"],
-            time_window="5m",
+            MetricPreset(
+                template=preset_data.query_template,
+                labels={"kernel_id": LabelMatcher.exact("test-kernel")},
+                group_by={"kernel_id"},
+                window="5m",
+            ),
             time_range=time_range,
         )
 
@@ -340,7 +342,7 @@ class TestPrometheusQueryPresetService:
         assert result.response == prometheus_response
         # Verify the preset was called (the window used is 10m from preset)
         call_args = mock_prometheus_client.execute_preset.call_args
-        assert call_args.kwargs["time_window"] == "10m"
+        assert call_args.args[0].window == "10m"
 
     async def test_execute_preset_window_fallback_to_server_default(
         self,
@@ -374,7 +376,7 @@ class TestPrometheusQueryPresetService:
         assert result.response == prometheus_response
         # Verify the window used is the server default "1m"
         call_args = mock_prometheus_client.execute_preset.call_args
-        assert call_args.kwargs["time_window"] == "1m"
+        assert call_args.args[0].window == "1m"
 
     @pytest.fixture
     def time_range(self) -> QueryTimeRange:

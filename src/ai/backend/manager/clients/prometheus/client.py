@@ -1,4 +1,4 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from http import HTTPMethod
 from typing import Any, cast
 
@@ -110,24 +110,15 @@ class PrometheusClient:
 
     async def execute_preset(
         self,
+        preset: MetricPreset,
         *,
-        query_template: str,
-        filter_labels: Mapping[str, LabelMatcher],
-        group_labels: Sequence[str],
-        time_window: str,
         time_range: QueryTimeRange | None,
         time: str | None = None,
     ) -> PrometheusResponse:
-        metric_preset = MetricPreset(
-            template=query_template,
-            labels=filter_labels,
-            group_by=set(group_labels),
-            window=time_window,
-        )
         if time_range is None:
-            return await self._query_instant(preset=metric_preset, time=time)
+            return await self._query_instant(preset=preset, time=time)
         return await self._query_range(
-            preset=metric_preset,
+            preset=preset,
             time_range=time_range,
         )
 

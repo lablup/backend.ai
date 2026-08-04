@@ -3,7 +3,7 @@ import logging
 from ai.backend.common.exception import PrometheusQueryPresetInvalidLabel
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
-from ai.backend.manager.clients.prometheus.preset import LabelMatcher
+from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset
 from ai.backend.manager.data.prometheus_query_preset import (
     ExecutePresetOptions,
     PrometheusQueryPresetData,
@@ -105,13 +105,15 @@ class PrometheusQueryPresetService:
         time_window = action.time_window or preset_data.time_window or self._default_timewindow
 
         response = await self._prometheus_client.execute_preset(
-            query_template=preset_data.query_template,
-            filter_labels={
-                name: LabelMatcher.exact(value)
-                for name, value in action.options.filter_labels.items()
-            },
-            group_labels=action.options.group_labels,
-            time_window=time_window,
+            MetricPreset(
+                template=preset_data.query_template,
+                labels={
+                    name: LabelMatcher.exact(value)
+                    for name, value in action.options.filter_labels.items()
+                },
+                group_by=set(action.options.group_labels),
+                window=time_window,
+            ),
             time_range=action.time_range,
         )
         return ExecutePresetActionResult(response=response)
