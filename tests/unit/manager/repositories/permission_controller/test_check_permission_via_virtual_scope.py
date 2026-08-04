@@ -145,6 +145,7 @@ class TestCheckPermissionViaVirtualScope:
             db_sess.add(policy)
             user = UserRow(
                 uuid=ids.user_id,
+                username=f"user-{ids.user_id.hex[:8]}",
                 email="testuser@test.com",
                 resource_policy="test-rbac-policy",
                 status=UserStatus.ACTIVE,
