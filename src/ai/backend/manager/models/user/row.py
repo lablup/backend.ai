@@ -149,6 +149,14 @@ def _get_main_keypair_join_condition() -> Any:
 
 class UserRow(Base):  # type: ignore[misc]
     __tablename__ = "users"
+    __table_args__ = (
+        # MATCH SIMPLE: a row that carries only one of the two columns goes unchecked.
+        sa.ForeignKeyConstraint(
+            ["domain_id", "domain_name"],
+            ["domains.id", "domains.name"],
+            name="fk_users_domain_pair_domains",
+        ),
+    )
 
     uuid: Mapped[uuid_mod.UUID] = mapped_column(
         "uuid", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
