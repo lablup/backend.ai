@@ -1,0 +1,56 @@
+[db]
+type = "postgresql"
+name = "appproxy"
+user = "postgres"
+password = "@@default/control-plane/postgres-password@@"
+pool_size = 8
+max_overflow = 64
+addr = { host = "127.0.0.1", port = 5432 }
+
+[redis]
+addr = { host = "127.0.0.1", port = 6379 }
+password = "@@default/control-plane/valkey-password@@"
+
+[core_redis]
+addr = { host = "127.0.0.1", port = 6379 }
+password = "@@default/control-plane/valkey-password@@"
+
+[etcd]
+namespace = "backendai"
+addr = { host = "127.0.0.1", port = 2379 }
+user = "root"
+password = "@@default/control-plane/etcd-root-password@@"
+
+[proxy_coordinator]
+tls_listen = true
+tls_advertised = true
+tls_cert = "/run/credentials/backendai-appproxy-coordinator.service/tls.crt"
+tls_privkey = "/run/credentials/backendai-appproxy-coordinator.service/tls.key"
+allow_unauthorized_configure_request = false
+
+[proxy_coordinator.bind_addr]
+host = "0.0.0.0"
+port = 10200
+
+[proxy_coordinator.advertised_addr]
+host = "coordinator.control.backend.ai"
+port = 10200
+
+[secrets]
+api_secret = "@@default/control-plane/coordinator-api-secret@@"
+jwt_secret = "@@default/control-plane/coordinator-jwt-secret@@"
+
+[permit_hash]
+secret = "@@default/control-plane/coordinator-permit-hash-secret@@"
+digest_mod = "SHA256"
+
+[logging]
+level = "INFO"
+drivers = ["console"]
+
+[logging.console]
+colored = false
+format = "verbose"
+
+[debug]
+enabled = false

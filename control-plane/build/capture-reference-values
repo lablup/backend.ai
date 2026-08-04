@@ -1,0 +1,40 @@
+#!/usr/bin/env python3
+import base64
+import json
+import subprocess
+import sys
+
+FIELDS = ("mr_td", "mr_config_id", "mr_seam", "mrsigner_seam", "rtmr_0", "rtmr_1", "rtmr_2", "rtmr_3")
+
+
+def main(argv):
+    if len(argv) != 3:
+        print("usage: capture-reference-values <kbs-url> <reference-values.json>", file=sys.stderr)
+        return 64
+    url, path = argv[1], argv[2]
+    token = subprocess.run(
+        ["kbs-client", "--url", url, "attest"], capture_output=True, check=True, timeout=120
+    ).stdout.strip()
+    payload = token.split(b".")[1]
+    claims = json.loads(base64.urlsafe_b64decode(payload + b"=" * (-len(payload) % 4)))
+    evidence = claims["submods"]["cpu0"]["ear.veraison.annotated-evidence"]
+    body = evidence["tdx"]["quote"]["body"]
+    with open(path, "r", encoding="utf-8") as f:
+        reference = json.load(f)
+    reference["rtmr"] = {field: body[field] for field in FIELDS if field in body}
+    reference["tcb-status"] = evidence["tdx"].get("tcb_status", "unstated")
+    reference["collateral-expiration-status"] = evidence["tdx"].get(
+        "collateral_expiration_status", "unstated"
+    )
+    missing = [field for field in FIELDS if field not in body]
+    if missing:
+        print(f"capture-reference-values: token omitted {missing}", file=sys.stderr)
+        return 1
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(reference, f, indent=2, sort_keys=True)
+    print(f"capture-reference-values: wrote {len(reference['rtmr'])} measurements to {path}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

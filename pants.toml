@@ -27,7 +27,9 @@ pants_ignore = [
     "*.log",
     "/tools/pants-plugins",
     "/wheelhouse/*/",
-    "/wheelhouse/*.whl"
+    "/wheelhouse/*.whl",
+    "/control-plane/",
+    "/credential-broker/"
 ]
 build_file_prelude_globs = ["tools/build-macros.py"]
 unmatched_build_file_globs = "error"

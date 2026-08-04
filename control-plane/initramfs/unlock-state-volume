@@ -1,0 +1,38 @@
+#!/bin/sh
+set -eu
+
+DEVICE=${BACKENDAI_STATE_DEVICE:-/dev/disk/by-partlabel/backendai-state}
+NAME=${BACKENDAI_STATE_NAME:-backendai-state}
+URL=${BACKENDAI_KBS_URL:?BACKENDAI_KBS_URL is not set in the measured command line}
+KEY_PATH=${BACKENDAI_KEY_PATH:-default/control-plane/state-disk-key}
+MAC_PATH=${BACKENDAI_MAC_PATH:-default/control-plane/state-header-mac}
+WORK=$(mktemp -d)
+trap 'shred -u "$WORK"/* 2>/dev/null || true; rm -rf "$WORK"' EXIT
+
+fetch() {
+    if ! kbs-client --url "$URL" get-resource --path "$1" | base64 -d > "$2"; then
+        echo "unlock-state-volume: release refused for $1" >&2
+        exit 78
+    fi
+    if [ ! -s "$2" ]; then
+        echo "unlock-state-volume: $1 released zero bytes; refusing to unlock" >&2
+        exit 78
+    fi
+}
+
+fetch "$KEY_PATH" "$WORK/key"
+fetch "$MAC_PATH" "$WORK/expected"
+
+cryptsetup luksHeaderBackup "$DEVICE" --header-backup-file "$WORK/header" -q
+diskkey=$(od -An -v -tx1 < "$WORK/key" | tr -d ' \n')
+mackey=$(printf 'backendai-luks-header-v1' | openssl dgst -sha256 -mac HMAC -macopt "hexkey:${diskkey}" -r | cut -d' ' -f1)
+actual=$(openssl dgst -sha256 -mac HMAC -macopt "hexkey:${mackey}" -r "$WORK/header" | cut -d' ' -f1)
+expected=$(tr -d ' \n\r' < "$WORK/expected")
+
+if [ "$actual" != "$expected" ]; then
+    echo "unlock-state-volume: the encryption header does not authenticate" >&2
+    echo "unlock-state-volume: expected ${expected}, computed ${actual}" >&2
+    exit 78
+fi
+
+cryptsetup luksOpen --key-file "$WORK/key" "$DEVICE" "$NAME"

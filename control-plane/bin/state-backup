@@ -1,0 +1,36 @@
+#!/bin/sh
+set -eu
+
+TARGET=${BACKENDAI_BACKUP_TARGET:-/var/lib/backendai/backup}
+KEYFILE=${CREDENTIALS_DIRECTORY:?no credentials directory}/backup.key
+PGBIN=/usr/lib/postgresql/16/bin
+STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
+
+ETCDPW=${CREDENTIALS_DIRECTORY}/etcd-root-password
+[ -s "$KEYFILE" ] || { echo "state-backup: backup key is empty" >&2; exit 78; }
+[ -s "$ETCDPW" ] || { echo "state-backup: etcd root password is empty" >&2; exit 78; }
+[ -d "$TARGET" ] || { echo "state-backup: durable target $TARGET is unreachable" >&2; exit 75; }
+
+key=$(od -An -v -tx1 < "$KEYFILE" | tr -d ' \n')
+mackey=$(printf 'backendai-state-backup-v1' | openssl dgst -sha256 -mac HMAC -macopt "hexkey:${key}" -r | cut -d' ' -f1)
+
+for db in backend appproxy; do
+    "${PGBIN}/pg_dump" --format=custom --no-owner --file="${WORK}/${db}.dump" "$db"
+done
+etcdctl --endpoints=http://127.0.0.1:2379 --user "root:$(cat "$ETCDPW")" \
+    snapshot save "${WORK}/etcd.snapshot"
+
+tar --sort=name --owner=0 --group=0 --numeric-owner --mtime=@0 -C "$WORK" -cf "${WORK}/bundle.tar" \
+    backend.dump appproxy.dump etcd.snapshot
+
+segment="${TARGET}/state-${STAMP}.enc"
+openssl enc -aes-256-ctr -pbkdf2 -iter 200000 -kfile "$KEYFILE" -in "${WORK}/bundle.tar" -out "$segment"
+mac=$(openssl dgst -sha256 -mac HMAC -macopt "hexkey:${mackey}" -r "$segment" | cut -d' ' -f1)
+printf '%s %s %s\n' "$STAMP" "$(basename "$segment")" "$mac" >> "${TARGET}/manifest"
+manifest_mac=$(openssl dgst -sha256 -mac HMAC -macopt "hexkey:${mackey}" -r "${TARGET}/manifest" | cut -d' ' -f1)
+printf '%s\n' "$manifest_mac" > "${TARGET}/manifest.mac"
+
+sync "$segment" "${TARGET}/manifest" "${TARGET}/manifest.mac"
+echo "state-backup: wrote $(basename "$segment")"

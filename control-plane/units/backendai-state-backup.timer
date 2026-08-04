@@ -1,0 +1,10 @@
+[Unit]
+Description=Backend.AI state bundle backup schedule
+
+[Timer]
+OnCalendar=hourly
+RandomizedDelaySec=600
+Persistent=true
+
+[Install]
+WantedBy=timers.target

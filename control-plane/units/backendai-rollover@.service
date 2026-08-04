@@ -1,0 +1,7 @@
+[Unit]
+Description=Backend.AI certificate rollover restart of %i
+Documentation=man:systemctl(1)
+
+[Service]
+Type=oneshot
+ExecStart=/bin/systemctl try-restart %i

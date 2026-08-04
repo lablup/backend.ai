@@ -1,0 +1,31 @@
+[Unit]
+Description=Backend.AI state bundle etcd member
+Requires=backendai-credentials.service
+After=backendai-credentials.service
+
+[Service]
+Type=notify
+User=etcd
+Group=etcd
+LoadCredential=root-password:/run/backendai-credentials.sock
+ExecStartPre=/usr/lib/backendai/credential-guard root-password
+ExecStart=/usr/bin/etcd --name state-bundle --data-dir /var/lib/backendai/etcd --listen-client-urls http://127.0.0.1:2379 --advertise-client-urls http://127.0.0.1:2379 --listen-peer-urls http://127.0.0.1:2380 --initial-advertise-peer-urls http://127.0.0.1:2380 --initial-cluster state-bundle=http://127.0.0.1:2380 --auto-compaction-retention 1
+ExecStartPost=/usr/lib/backendai/datastore-bootstrap etcd-sync
+Restart=on-failure
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateMounts=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/backendai/etcd
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

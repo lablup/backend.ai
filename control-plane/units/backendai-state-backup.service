@@ -1,0 +1,16 @@
+[Unit]
+Description=Backend.AI state bundle application-level backup
+Requires=backendai-credentials.service backendai-postgresql.service
+After=backendai-credentials.service backendai-postgresql.service backendai-etcd.service backendai-valkey.service
+
+[Service]
+Type=oneshot
+LoadCredential=backup.key:/run/backendai-credentials.sock
+LoadCredential=etcd-root-password:/run/backendai-credentials.sock
+ExecStartPre=/usr/lib/backendai/credential-guard backup.key etcd-root-password
+ExecStart=/usr/lib/backendai/state-backup
+PrivateTmp=yes
+PrivateMounts=yes
+ProtectHome=yes
+UMask=0077
+NoNewPrivileges=yes

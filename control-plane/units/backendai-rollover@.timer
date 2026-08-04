@@ -1,0 +1,10 @@
+[Unit]
+Description=Backend.AI staggered weekly certificate rollover restart of %i
+
+[Timer]
+OnCalendar=weekly
+RandomizedDelaySec=21600
+Persistent=true
+
+[Install]
+WantedBy=timers.target

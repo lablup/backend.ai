@@ -164,3 +164,6 @@ backup.*.json
 /INSTALL-INFO
 .serena/
 .claude/worktrees/
+
+# Confidential control-plane image build outputs
+/control-plane/build/out/

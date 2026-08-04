@@ -1,0 +1,35 @@
+[Unit]
+Description=Backend.AI state bundle PostgreSQL
+Requires=backendai-credentials.service
+After=backendai-credentials.service
+
+[Service]
+Type=notify
+User=postgres
+Group=postgres
+LoadCredential=password:/run/backendai-credentials.sock
+ExecStartPre=/usr/lib/backendai/credential-guard password
+ExecStartPre=/usr/lib/backendai/datastore-bootstrap postgres-init
+ExecStart=/usr/lib/postgresql/16/bin/postgres -D /var/lib/backendai/postgresql -c listen_addresses=127.0.0.1 -c port=5432 -c unix_socket_directories=/run/backendai
+ExecStartPost=/usr/lib/backendai/datastore-bootstrap postgres-sync
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RuntimeDirectory=backendai
+RuntimeDirectoryPreserve=yes
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateMounts=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/backendai/postgresql /run/backendai
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

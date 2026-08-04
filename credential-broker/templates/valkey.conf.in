@@ -1,0 +1,9 @@
+bind 127.0.0.1 -::1
+port 6379
+protected-mode yes
+requirepass "@@default/control-plane/valkey-password@@"
+save ""
+appendonly no
+dir /run/backendai/valkey
+logfile ""
+daemonize no

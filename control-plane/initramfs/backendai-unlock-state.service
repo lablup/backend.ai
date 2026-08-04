@@ -1,0 +1,17 @@
+[Unit]
+Description=Backend.AI attested unlock of the state volume
+DefaultDependencies=no
+After=network-online.target
+Wants=network-online.target
+Before=initrd-root-device.target sysroot.mount
+Conflicts=shutdown.target initrd-switch-root.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/unlock-state-volume
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=initrd.target
