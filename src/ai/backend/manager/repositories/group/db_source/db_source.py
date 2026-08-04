@@ -279,7 +279,7 @@ class GroupDBSource:
         new_user_rows = await self._users_addable_to_project(w, project_id, user_ids)
         if not new_user_rows:
             return
-        await w.add_entity_members(
+        await w.bulk_add_entity_members(
             EntityMembersAddition(
                 scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
                 members=[ProjectUserMember(user_id=UserID(row.uuid)) for row in new_user_rows],
@@ -654,7 +654,7 @@ class GroupDBSource:
             if not new_user_rows:
                 return []
 
-            await w.add_entity_members(
+            await w.bulk_add_entity_members(
                 EntityMembersAddition(
                     scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
                     members=[
@@ -737,7 +737,7 @@ class GroupDBSource:
         Idempotent: adding an existing member is a no-op.
         """
         async with self._rbac_ops_provider.write_ops() as w:
-            await w.add_entity_members(
+            await w.bulk_add_entity_members(
                 EntityMembersAddition(
                     scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
                     members=[ProjectUserMember(user_id=user_id, manage_roles=False)],

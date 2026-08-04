@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.types import EntityRef, ScopeRef
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.identifier.virtual_scope import VirtualScopeID
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.status import PermissionStatus, RoleStatus
 from ai.backend.manager.data.permission.types import (
@@ -24,7 +26,9 @@ from ai.backend.manager.models.rbac_models.permission.object_permission import O
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.repositories.base.creator import CreatorSpec
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.repositories.base.creator import CreatorSpec, DependentCreatorSpec
 from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 
@@ -140,4 +144,43 @@ class AssociationScopesEntitiesCreatorSpec(CreatorSpec[AssociationScopesEntities
             scope_id=self.scope_id.scope_id,
             entity_type=self.object_id.entity_type,
             entity_id=self.object_id.entity_id,
+        )
+
+
+@dataclass
+class EntityMembershipCreatorSpec(DependentCreatorSpec[VirtualScopeID, EntityMembershipRow]):
+    """Membership of an entity in a virtual scope; the virtual scope id is resolved
+    by the caller at execution time and passed as the dependency."""
+
+    entity_ref: EntityRef
+    permission_cap: Permission | None = None
+
+    @override
+    def build_row(self, dependency: VirtualScopeID) -> EntityMembershipRow:
+        return EntityMembershipRow(
+            virtual_scope_id=dependency,
+            entity_type=self.entity_ref.entity_type,
+            entity_id=self.entity_ref.entity_id,
+            permission_cap=self.permission_cap,
+        )
+
+
+@dataclass
+class ScopeBindingCreatorSpec(
+    DependentCreatorSpec[Mapping[ScopeRef, VirtualScopeID], ScopeBindingRow]
+):
+    """Binding of ``scope`` into ``owner``'s virtual scope; the owner→virtual-scope-id
+    mapping is resolved by the caller at execution time and passed as the dependency."""
+
+    owner: ScopeRef
+    scope: ScopeRef
+    permission_cap: Permission | None = None
+
+    @override
+    def build_row(self, dependency: Mapping[ScopeRef, VirtualScopeID]) -> ScopeBindingRow:
+        return ScopeBindingRow(
+            virtual_scope_id=dependency[self.owner],
+            scope_type=self.scope.scope_type,
+            scope_id=self.scope.scope_id,
+            permission_cap=self.permission_cap,
         )
