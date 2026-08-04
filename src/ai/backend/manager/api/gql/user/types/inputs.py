@@ -39,7 +39,6 @@ from ai.backend.common.dto.manager.v2.user.request import (
 from ai.backend.common.dto.manager.v2.user.request import (
     UpdateUserInput as UpdateUserInputDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -55,7 +54,7 @@ from .enums import UserRoleEnumGQL, UserStatusEnumGQL
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        description="Input for creating a new user. Required fields: email, username, password, need_password_change, status, role, and exactly one of domain_id or domain_name.",
+        description="Input for creating a new user. Required fields: email, username, password, domain_name, need_password_change, status, role.",
         added_version="26.2.0",
     ),
     name="CreateUserV2Input",
@@ -66,18 +65,7 @@ class CreateUserInputGQL(PydanticInputMixin[CreateUserInputDTO]):
     email: str = gql_field(description="User's email address. Must be unique across the system.")
     username: str = gql_field(description="Unique username for login.")
     password: str = gql_field(description="Initial password for the user.")
-    domain_name: str | None = gql_field(
-        description="Deprecated since 26.9.0. Use domain_id instead. Domain to assign the user to, by name.",
-        default=None,
-        deprecation_reason="Use domain_id instead.",
-    )
-    domain_id: UUID | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
-            description="Domain to assign the user to, by id. Mutually exclusive with `domain_name`.",
-        ),
-        default=None,
-    )
+    domain_name: str = gql_field(description="Domain to assign the user to.")
     need_password_change: bool = gql_field(
         description="If true, user must change password on first login."
     )
@@ -145,18 +133,7 @@ class UpdateUserV2InputGQL(PydanticInputMixin[UpdateUserInputDTO]):
     description: str | None = gql_field(description="New description.", default=UNSET)
     status: UserStatusEnumGQL | None = gql_field(description="New account status.", default=UNSET)
     role: UserRoleEnumGQL | None = gql_field(description="New user role.", default=UNSET)
-    domain_name: str | None = gql_field(
-        description="Deprecated since 26.9.0. Use domain_id instead. New domain assignment, by name.",
-        default=UNSET,
-        deprecation_reason="Use domain_id instead.",
-    )
-    domain_id: UUID | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
-            description="New domain assignment, by id. Mutually exclusive with `domain_name`.",
-        ),
-        default=UNSET,
-    )
+    domain_name: str | None = gql_field(description="New domain assignment.", default=UNSET)
     group_ids: list[UUID] | None = gql_field(
         description="New project (group) assignments. Replaces existing assignments.", default=UNSET
     )

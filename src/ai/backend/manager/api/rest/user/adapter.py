@@ -20,7 +20,6 @@ from ai.backend.common.dto.manager.user import (
 )
 from ai.backend.common.dto.manager.user.types import UserRole as UserRoleDTO
 from ai.backend.common.dto.manager.user.types import UserStatus as UserStatusDTO
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -78,7 +77,6 @@ class UserAdapter(BaseFilterAdapter):
         description = TriState[str].nop()
         status = OptionalState[UserStatus].nop()
         domain_name = OptionalState[str].nop()
-        domain_id = OptionalState[DomainID].nop()
         role: OptionalState[UserRole] = OptionalState.nop()
         allowed_client_ip = TriState[list[str]].nop()
         totp_activated = OptionalState[bool].nop()
@@ -104,8 +102,6 @@ class UserAdapter(BaseFilterAdapter):
             status = OptionalState.update(UserStatus(request.status.value))
         if request.domain_name is not None:
             domain_name = OptionalState.update(request.domain_name)
-        if request.domain_id is not None:
-            domain_id = OptionalState.update(request.domain_id)
         if request.role is not None:
             role = OptionalState.update(UserRole(request.role.value))
         if request.allowed_client_ip is not None:
@@ -135,7 +131,6 @@ class UserAdapter(BaseFilterAdapter):
             description=description,
             status=status,
             domain_name=domain_name,
-            domain_id=domain_id,
             role=role,
             allowed_client_ip=allowed_client_ip,
             totp_activated=totp_activated,

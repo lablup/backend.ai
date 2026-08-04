@@ -44,9 +44,8 @@ class CreateUserAction(UserScopeAction):
 
     @override
     def scope_id(self) -> str:
-        # Stays on the name; the id form is target_element(), which is what RBAC reads.
         spec = cast(UserCreatorSpec, self.creator.spec)
-        return spec.domain_name or ""
+        return spec.domain_name
 
     @override
     def target_element(self) -> RBACElementRef:
@@ -67,6 +66,7 @@ class CreateUserActionResult(UserScopeActionResult):
 
     @override
     def scope_id(self) -> str:
+        # UserCreateResultData always has domain_name set (from creator.spec.domain_name)
         return self.data.user.domain_name or ""
 
 

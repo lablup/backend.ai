@@ -211,13 +211,3 @@ class TestUserUpdaterSpecRowClass:
         spec = UserUpdaterSpec()
 
         assert spec.row_class is UserRow
-
-
-class TestUserUpdaterSpecDomain:
-    def test_leaving_the_domain_alone_touches_neither_column(self) -> None:
-        spec = UserUpdaterSpec(is_active=OptionalState.update(True))
-
-        values = spec.build_values()
-
-        assert "domain_name" not in values
-        assert "domain_id" not in values

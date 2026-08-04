@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, override
 
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -29,7 +28,6 @@ class UserUpdaterSpec(UpdaterSpec[UserRow]):
     is_active: OptionalState[bool] = field(default_factory=OptionalState.nop)
     status: OptionalState[UserStatus] = field(default_factory=OptionalState.nop)
     domain_name: OptionalState[str] = field(default_factory=OptionalState.nop)
-    domain_id: OptionalState[DomainID] = field(default_factory=OptionalState.nop)
     role: OptionalState[UserRole] = field(default_factory=OptionalState.nop)
     allowed_client_ip: TriState[list[str]] = field(default_factory=TriState.nop)
     totp_activated: OptionalState[bool] = field(default_factory=OptionalState.nop)
@@ -60,7 +58,6 @@ class UserUpdaterSpec(UpdaterSpec[UserRow]):
         self.description.update_dict(to_update, "description")
         self.is_active.update_dict(to_update, "is_active")
         self.domain_name.update_dict(to_update, "domain_name")
-        self.domain_id.update_dict(to_update, "domain_id")
         self.role.update_dict(to_update, "role")
         self.allowed_client_ip.update_dict(to_update, "allowed_client_ip")
         self.totp_activated.update_dict(to_update, "totp_activated")

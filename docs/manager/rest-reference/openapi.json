@@ -30077,31 +30077,9 @@
             "type": "string"
           },
           "domain_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Deprecated since 26.9.0. Use domain_id instead. Domain to assign the user to, by name.",
-            "title": "Domain Name"
-          },
-          "domain_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Domain to assign the user to, by id. Mutually exclusive with `domain_name`.",
-            "title": "Domain Id"
+            "description": "Domain to assign the user to.",
+            "title": "Domain Name",
+            "type": "string"
           },
           "need_password_change": {
             "default": false,
@@ -30255,6 +30233,7 @@
           "email",
           "username",
           "password",
+          "domain_name",
           "status",
           "role"
         ],
@@ -30356,22 +30335,8 @@
               }
             ],
             "default": null,
-            "description": "Deprecated since 26.9.0. Use domain_id instead. New domain assignment, by name.",
+            "description": "New domain assignment.",
             "title": "Domain Name"
-          },
-          "domain_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "New domain assignment, by id. Mutually exclusive with `domain_name`.",
-            "title": "Domain Id"
           },
           "group_ids": {
             "anyOf": [
@@ -33073,31 +33038,9 @@
             "type": "boolean"
           },
           "domain_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Deprecated since 26.9.0. Use domain_id instead. Domain the user belongs to, by name",
-            "title": "Domain Name"
-          },
-          "domain_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Domain the user belongs to, by id. Mutually exclusive with domain_name",
-            "title": "Domain Id"
+            "description": "Domain the user belongs to",
+            "title": "Domain Name",
+            "type": "string"
           },
           "full_name": {
             "anyOf": [
@@ -33266,7 +33209,8 @@
         "required": [
           "email",
           "username",
-          "password"
+          "password",
+          "domain_name"
         ],
         "title": "CreateUserRequest",
         "type": "object"
@@ -33373,22 +33317,8 @@
               }
             ],
             "default": null,
-            "description": "Deprecated since 26.9.0. Use domain_id instead. Updated domain, by name",
+            "description": "Updated domain name",
             "title": "Domain Name"
-          },
-          "domain_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Updated domain, by id. Mutually exclusive with domain_name",
-            "title": "Domain Id"
           },
           "allowed_client_ip": {
             "anyOf": [
