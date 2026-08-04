@@ -242,12 +242,21 @@ def gql_added_field(
     *,
     name: str | None = None,
     default: Any = strawberry.UNSET,
+    default_factory: Callable[[], Any] | None = None,
     deprecation_reason: str | None = None,
 ) -> Any:
     """Field added after the parent type was released (has its own version).
 
     Automatically prefixes the description with "Added in {version}."
+    ``default_factory`` renders the default into the schema SDL (input fields).
     """
+    if default_factory is not None:
+        return strawberry.field(
+            description=_build_description(meta),
+            name=name,
+            default_factory=default_factory,
+            deprecation_reason=deprecation_reason,
+        )
     return strawberry.field(
         description=_build_description(meta),
         name=name,

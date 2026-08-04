@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import enum
 from decimal import Decimal
-from typing import Self
+from typing import Final, Self
 
 from pydantic import Field, model_validator
 
 from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.types import BackendAISchema
+
+# Metric label carrying the session UUID; grouping by it enables per-session mapping.
+SESSION_ID_LABEL: Final = "session_id"
 
 
 class CheckerType(enum.StrEnum):
@@ -34,6 +37,20 @@ class UtilizationThresholdEntry(BackendAISchema):
     )
     threshold: Decimal = Field(
         description="Underutilization threshold compared against the preset's query result.",
+    )
+    filter_labels: dict[str, str] = Field(
+        default_factory=dict,
+        description="Label filters injected into the preset's {labels} placeholder.",
+    )
+    group_labels: list[str] = Field(
+        default_factory=lambda: [SESSION_ID_LABEL],
+        description=(
+            "Labels injected into the preset's {group_by} placeholder. "
+            "Must include 'session_id' for per-session values to be mapped. "
+            "When 'session_id' is grouped, the checker adds a session_id filter that "
+            "limits the query to the sessions being evaluated; a user-provided "
+            "'session_id' entry in filter_labels takes precedence over it."
+        ),
     )
 
 

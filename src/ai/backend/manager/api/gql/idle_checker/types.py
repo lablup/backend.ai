@@ -10,6 +10,7 @@ from uuid import UUID
 from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.idle_checker.types import SESSION_ID_LABEL
 from ai.backend.common.dto.manager.v2.idle_checker.request import (
     CreateIdleCheckerInput as CreateIdleCheckerInputDTO,
 )
@@ -53,11 +54,13 @@ from ai.backend.common.dto.manager.v2.idle_checker.types import (
     CheckerTypeFilter as CheckerTypeFilterDTO,
 )
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -65,6 +68,8 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
     gql_pydantic_type,
 )
+from ai.backend.manager.api.gql.prometheus_query_preset.types.inputs import MetricLabelEntryInput
+from ai.backend.manager.api.gql.prometheus_query_preset.types.payloads import MetricLabelEntryGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -142,6 +147,18 @@ class NetworkTimeoutIdleCheckerSpecGQL(PydanticOutputMixin[NetworkTimeoutSpecInf
 class UtilizationIdleCheckerThresholdGQL(PydanticOutputMixin[UtilizationThresholdInfo]):
     preset_id: UUID = gql_field(description="Prometheus query preset ID.")
     threshold: Decimal = gql_field(description="Underutilization threshold.")
+    filter_labels: list[MetricLabelEntryGQL] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Label filters injected into the preset query.",
+        )
+    )
+    group_labels: list[str] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Group-by labels injected into the preset query.",
+        )
+    )
 
 
 @gql_pydantic_type(
@@ -284,6 +301,24 @@ class NetworkTimeoutIdleCheckerSpecInputGQL(PydanticInputMixin[NetworkTimeoutSpe
 class UtilizationIdleCheckerThresholdInputGQL(PydanticInputMixin[UtilizationThresholdInputDTO]):
     preset_id: UUID = gql_field(description="Prometheus query preset ID.")
     threshold: Decimal = gql_field(description="Underutilization threshold.")
+    filter_labels: list[MetricLabelEntryInput] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Label filters injected into the preset query.",
+        ),
+        default_factory=list,
+    )
+    group_labels: list[str] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Group-by labels injected into the preset query. "
+                "Per-session mapping requires 'session_id'; when included, the query is "
+                "also scoped to the sessions under evaluation."
+            ),
+        ),
+        default_factory=lambda: [SESSION_ID_LABEL],
+    )
 
 
 @gql_pydantic_input(

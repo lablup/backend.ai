@@ -42,6 +42,7 @@ from ai.backend.common.dto.manager.v2.idle_checker.types import (
     IdleCheckerOrderField,
     IdleCheckerTypeDTO,
 )
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import MetricLabelEntryInfo
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -231,6 +232,11 @@ class IdleCheckerAdapter(BaseAdapter):
                         threshold=UtilizationThresholdInfo(
                             preset_id=utilization.threshold.preset_id,
                             threshold=utilization.threshold.threshold,
+                            filter_labels=[
+                                MetricLabelEntryInfo(key=key, value=value)
+                                for key, value in utilization.threshold.filter_labels.items()
+                            ],
+                            group_labels=utilization.threshold.group_labels,
                         ),
                     ),
                 )
@@ -261,6 +267,10 @@ class IdleCheckerAdapter(BaseAdapter):
                 threshold=UtilizationThresholdEntry(
                     preset_id=utilization.threshold.preset_id,
                     threshold=utilization.threshold.threshold,
+                    filter_labels={
+                        entry.key: entry.value for entry in utilization.threshold.filter_labels
+                    },
+                    group_labels=utilization.threshold.group_labels,
                 ),
             ),
         )
