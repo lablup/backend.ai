@@ -40,7 +40,7 @@ default WriteStreamRequest := false
 
 copy_file_leaf := ["resolv.conf", "hostname", "hosts", "termination-log"]
 
-CopyFileRequest {
+CopyFileRequest if {
 	startswith(input.path, "/run/kata-containers/shared/containers/")
 	some i
 	endswith(input.path, copy_file_leaf[i])

@@ -679,7 +679,7 @@ class CocoAgent(AbstractAgent[CocoKernel, CocoKernelCreationContext]):
             try:
                 status = ContainerStatus(raw_status)
             except ValueError:
-                status = ContainerStatus.DEAD
+                status = ContainerStatus.CREATED
             if status not in status_filter:
                 continue
             guest_addr = labels.get(GUEST_ADDR_LABEL, "")
