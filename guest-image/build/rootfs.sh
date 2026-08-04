@@ -28,7 +28,7 @@ build_upstream() {
 	REPO_COMPONENTS="${BAI_CC_REPO_COMPONENTS}" \
 	API_SERVER_REST_FEATURES="${BAI_CC_API_SERVER_REST_FEATURES}" \
 	SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH}" \
-		make -C "$lb" "kernel-${variant}-tarball" "rootfs-image-${variant}-tarball"
+		make -C "$lb" "rootfs-image-${variant}-tarball"
 }
 
 stage_upstream_rootfs() {
