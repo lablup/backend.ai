@@ -14,6 +14,7 @@ Decorator roles:
     gql_field              — Fields introduced with the parent type (no separate version).
     gql_added_field        — Fields added after the parent type (own version via meta).
     gql_root_field         — Root query fields (always have their own version via meta).
+    gql_public_root_field  — Root query fields resolvable without authentication.
     gql_enum               — Enum types with version metadata.
     gql_mutation           — Mutation resolvers with version metadata.
     gql_subscription       — Subscription resolvers with version metadata.
@@ -270,6 +271,26 @@ def gql_root_field(
     """
     return strawberry.field(
         description=_build_description(meta),
+        name=name,
+        deprecation_reason=deprecation_reason,
+        directives=directives,
+    )
+
+
+def gql_public_root_field(
+    meta: BackendAIGQLMeta,
+    *,
+    name: str | None = None,
+    deprecation_reason: str | None = None,
+    directives: Sequence[object] = (),
+) -> Any:
+    """Root query field resolvable without authentication.
+
+    Distinct from ``gql_root_field`` so that every anonymously reachable field is greppable by
+    its declaration, and so the SDL states the exposure to whoever reads it.
+    """
+    return strawberry.field(
+        description=f"{_build_description(meta).rstrip('.')}. Resolvable without authentication.",
         name=name,
         deprecation_reason=deprecation_reason,
         directives=directives,

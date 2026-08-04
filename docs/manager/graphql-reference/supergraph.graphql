@@ -15374,7 +15374,7 @@ type Query
   """Added in 25.8.0."""
   service_configs(services: [String]!, filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ServiceConfigConnection @join__field(graph: GRAPHENE)
 
-  """Added in 26.9.0. Reachable without authentication; returns 'pong'"""
+  """Added in 26.9.0. Returns 'pong'. Resolvable without authentication."""
   ping: String! @join__field(graph: PUBLIC)
 
   """Added in 25.15.0. Get aggregate agent resource statistics"""

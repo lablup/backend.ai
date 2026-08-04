@@ -21,6 +21,7 @@
   - `@gql_connection_type` — `Connection[T]`/`Edge[T]` subclass
   - `gql_field` / `gql_added_field` — a field introduced together with its parent type / a field added later (with its own version)
   - `@gql_root_field` — a root query field on the Query type (always version-tagged)
+  - `@gql_public_root_field` — a root query field resolvable without authentication; declare it on the public query root alone
   - `gql_enum` / `@gql_enum`, `@gql_mutation`, `@gql_subscription`, `@gql_federation_type`
 - Do NOT add new decorators to bypass the Pydantic DTO requirement.
 

@@ -8,7 +8,7 @@ from strawberry.schema.config import StrawberryConfig
 
 from ai.backend.common.api_handlers import Sentinel as BackendSentinel
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_root_field
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_public_root_field
 from ai.backend.manager.api.gql.extensions import (
     GQLExceptionHandlerExtension,
     GQLLoggingExtension,
@@ -1082,11 +1082,8 @@ schema = CustomizedSchema(
 )
 
 
-@gql_root_field(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Reachable without authentication; returns 'pong'",
-    )
+@gql_public_root_field(
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Returns 'pong'")
 )  # type: ignore[misc]
 async def ping() -> str:
     return "pong"
