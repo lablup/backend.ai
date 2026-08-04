@@ -154,6 +154,7 @@ class AuthDBSource:
             if not domain_result.rows:
                 raise UserCreationBadRequest(f"Domain '{user_spec.domain_name}' does not exist.")
             domain_id = DomainID(domain_result.rows[0].id)
+            user_spec.domain_id = domain_id
 
             result = await w.create_full_user(
                 FullUserCreation(

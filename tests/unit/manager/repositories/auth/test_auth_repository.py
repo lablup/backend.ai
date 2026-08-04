@@ -15,6 +15,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.permission.types import RelationType
 from ai.backend.common.exception import UserNotFound
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.types import UserData
@@ -52,7 +53,11 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.auth.repository import AuthRepository
+from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.testutils.db import with_tables
 
 
@@ -70,6 +75,7 @@ class DomainTestData:
     """Test data for domain fixture"""
 
     name: str
+    id: DomainID
 
 
 @dataclass
@@ -117,6 +123,9 @@ class TestAuthRepository:
                 ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
+                VirtualScopeRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
             ],
         ):
             yield database_connection
@@ -131,8 +140,10 @@ class TestAuthRepository:
     ) -> AsyncGenerator[DomainTestData, None]:
         """Create default domain"""
         domain_name = f"domain-{uuid.uuid4()}"
+        domain_id = DomainID(uuid.uuid4())
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Default domain",
                 is_active=True,
@@ -142,7 +153,7 @@ class TestAuthRepository:
             )
             db_sess.add(domain)
             await db_sess.commit()
-        yield DomainTestData(name=domain_name)
+        yield DomainTestData(name=domain_name, id=domain_id)
 
     @pytest.fixture
     async def user_resource_policy(
@@ -161,6 +172,29 @@ class TestAuthRepository:
             db_sess.add(policy)
             await db_sess.commit()
         yield ResourcePolicyTestData(name=policy_name)
+
+    @pytest.fixture
+    def signup_user_spec(
+        self,
+        default_domain: DomainTestData,
+        user_resource_policy: ResourcePolicyTestData,
+    ) -> UserCreatorSpec:
+        """Build the creator spec a signup submits: the domain named, its id unset."""
+        return UserCreatorSpec(
+            email=f"signup-{uuid.uuid4()}@example.com",
+            username=f"signup-{uuid.uuid4().hex[:8]}",
+            password=PasswordInfo(
+                password="signup_password",
+                algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                rounds=100_000,
+                salt_size=32,
+            ),
+            need_password_change=False,
+            domain_name=default_domain.name,
+            status=UserStatus.INACTIVE,
+            role=UserRole.USER,
+            resource_policy=user_resource_policy.name,
+        )
 
     @pytest.fixture
     async def keypair_resource_policy(
@@ -554,3 +588,24 @@ class TestAuthRepository:
     ) -> None:
         with pytest.raises(AccessKeyNotFound):
             await auth_repository.get_user_id_by_access_key(AccessKey("AKIANONEXISTENT"))
+
+    async def test_create_user_with_keypair_writes_the_domain_id_from_the_name(
+        self,
+        auth_repository: AuthRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        default_domain: DomainTestData,
+        keypair_resource_policy: ResourcePolicyTestData,
+        signup_user_spec: UserCreatorSpec,
+    ) -> None:
+        result = await auth_repository.create_user_with_keypair(
+            signup_user_spec,
+            [],
+            keypair_resource_policy=keypair_resource_policy.name,
+            keypair_rate_limit=1000,
+        )
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            row = await db_sess.scalar(sa.select(UserRow).where(UserRow.uuid == result.user.uuid))
+        assert row is not None
+        assert row.domain_name == default_domain.name
+        assert row.domain_id == default_domain.id

@@ -143,9 +143,6 @@ class DomainRow(CreatedAtMixin, Base):  # type: ignore[misc]
     users: Mapped[list[UserRow]] = relationship(
         "UserRow",
         back_populates="domain",
-        # Pinned because `users` holds two foreign keys into this table. When `domain_name`
-        # is dropped, move this and `UserRow.domain`'s primaryjoin to `domain_id` together —
-        # the pair is bound by back_populates and must join on the same column.
         foreign_keys="[UserRow.domain_name]",
     )
     groups: Mapped[list[GroupRow]] = relationship("GroupRow", back_populates="domain")
