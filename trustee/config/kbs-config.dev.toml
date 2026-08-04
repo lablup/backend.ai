@@ -1,0 +1,32 @@
+[http_server]
+sockets = ["0.0.0.0:KBS_LISTEN_PORT"]
+insecure_http = true
+
+[attestation_token]
+insecure_key = true
+
+[attestation_service]
+type = "coco_as_builtin"
+
+  [attestation_service.attestation_token_broker]
+  duration_min = 5
+
+  [attestation_service.rvps_config]
+  type = "BuiltIn"
+
+  [attestation_service.verifier_config.nvidia_verifier]
+  type = "Remote"
+  verifier_url = "https://nras.attestation.nvidia.com/v4/attest"
+
+[admin]
+type = "InsecureAllowAll"
+
+[storage_backend]
+storage_type = "LocalFs"
+
+  [storage_backend.backends.local_fs]
+  dir_path = "/opt/confidential-containers/storage"
+
+[[plugins]]
+name = "resource"
+storage_backend_type = "kvstorage"

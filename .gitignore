@@ -170,3 +170,5 @@ backup.*.json
 /guest-image/out/
 /guest-image/.cache/
 /control-plane/build/out/
+/trustee/.local/
+/host-setup/.state/

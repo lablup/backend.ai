@@ -1,0 +1,49 @@
+[http_server]
+sockets = ["0.0.0.0:KBS_LISTEN_PORT"]
+insecure_http = false
+private_key = "/etc/kbs/listener/listener.key"
+certificate = "/etc/kbs/listener/listener.chain.crt"
+
+[attestation_token]
+insecure_key = false
+signer_key = "/etc/kbs/token/token.key"
+signer_cert_chain = "/etc/kbs/token/token.chain.crt"
+
+[attestation_service]
+type = "coco_as_builtin"
+
+  [attestation_service.attestation_token_broker]
+  duration_min = 5
+
+  [attestation_service.rvps_config]
+  type = "BuiltIn"
+
+  [attestation_service.verifier_config.nvidia_verifier]
+  type = "Remote"
+  verifier_url = "https://nras.attestation.nvidia.com/v4/attest"
+
+[admin]
+authorization_mode = "AuthenticatedAuthorization"
+
+  [admin.authentication.bearer_jwt]
+  [[admin.authentication.bearer_jwt.identity_providers]]
+  name = "backendai-shim"
+  public_key_uri = "file:///etc/kbs/admin/shim-issuer.pem"
+  iss = "backendai-authorisation-shim"
+  aud = "backendai-key-broker"
+
+  [admin.authorization.regex_acl]
+  acls = [
+    { role = "session-provisioner", allowed_endpoints = "^/kbs/v0/resource/[^/]+/[^/]+/[^/]+$" },
+    { role = "policy-publisher", allowed_endpoints = "^/kbs/v0/(resource-policy|reference-value)$" },
+  ]
+
+[storage_backend]
+storage_type = "LocalFs"
+
+  [storage_backend.backends.local_fs]
+  dir_path = "/opt/confidential-containers/storage"
+
+[[plugins]]
+name = "resource"
+storage_backend_type = "kvstorage"

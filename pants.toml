@@ -31,7 +31,9 @@ pants_ignore = [
     "/wheelhouse/*/",
     "/wheelhouse/*.whl",
     "/control-plane/",
-    "/credential-broker/"
+    "/credential-broker/",
+    "/host-setup/",
+    "/trustee/"
 ]
 build_file_prelude_globs = ["tools/build-macros.py"]
 unmatched_build_file_globs = "error"
