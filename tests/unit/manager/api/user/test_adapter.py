@@ -23,6 +23,7 @@ from ai.backend.common.dto.manager.user import (
 )
 from ai.backend.common.dto.manager.user.types import UserRole as UserRoleDTO
 from ai.backend.common.dto.manager.user.types import UserStatus as UserStatusDTO
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.api.rest.user.adapter import UserAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserData, UserStatus
@@ -482,6 +483,7 @@ class TestUserAdapterConversion:
             created_at=now,
             modified_at=now,
             domain_name="default",
+            domain_id=DomainID(uuid4()),
             role=DataUserRole.USER,
             resource_policy="default",
             allowed_client_ip=["10.0.0.1"],
@@ -537,6 +539,7 @@ class TestUserAdapterConversion:
             created_at=None,
             modified_at=None,
             domain_name=None,
+            domain_id=None,
             role=None,
             resource_policy="default",
             allowed_client_ip=None,

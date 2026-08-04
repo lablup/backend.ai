@@ -140,6 +140,7 @@ class TestSetupUserContext:
             is_superadmin=True,
             role=UserRole.SUPERADMIN,
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
         )
         with _setup_user_context(request, effective, trigger):
             assert current_user() == effective

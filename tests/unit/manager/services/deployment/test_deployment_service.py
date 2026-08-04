@@ -24,6 +24,7 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
 )
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
@@ -495,6 +496,7 @@ class TestAddModelRevision(ModelRevisionFixtures):
             is_superadmin=False,
             role=UserRole.USER,
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
         )
 
     @pytest.fixture(autouse=True)

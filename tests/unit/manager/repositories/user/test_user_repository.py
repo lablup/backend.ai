@@ -436,6 +436,23 @@ class TestUserRepository:
         assert result.keypair is not None
         assert result.keypair.access_key is not None
 
+    async def test_create_user_validated_writes_the_domain_id_from_the_name(
+        self,
+        user_repository: UserRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_domain: DomainFixtureData,
+        default_keypair_resource_policy: str,
+        sample_user_creator: Creator[UserRow],
+    ) -> None:
+        """The insert resolves the named domain into its id, so the two columns agree."""
+        result = await user_repository.create_user_validated(sample_user_creator, group_ids=[])
+
+        async with db_with_cleanup.begin_readonly_session() as session:
+            row = await session.scalar(sa.select(UserRow).where(UserRow.uuid == result.user.uuid))
+        assert row is not None
+        assert row.domain_name == sample_domain.domain_name
+        assert row.domain_id == sample_domain.domain_id
+
     async def test_create_user_validated_materializes_virtual_scope(
         self,
         user_repository: UserRepository,

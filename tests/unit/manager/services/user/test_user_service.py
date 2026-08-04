@@ -97,6 +97,7 @@ def _make_user_data(
         created_at=datetime.now(tz=UTC),
         modified_at=datetime.now(tz=UTC),
         domain_name=domain_name,
+        domain_id=DomainID(uuid.uuid4()),
         role=role,
         resource_policy="default",
         allowed_client_ip=None,

@@ -552,6 +552,7 @@ class TestImageRepositoryLastUsedAt:
     ) -> UserRow:
         user = UserRow(
             uuid=uuid4(),
+            username=f"testuser-{uuid4().hex[:8]}",
             email=f"test-{uuid4().hex[:8]}@example.com",
             domain_name=domain.name,
             resource_policy=user_policy.name,

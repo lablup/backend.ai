@@ -86,6 +86,7 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
             "role": "superadmin",
             "main_access_key": null
@@ -101,6 +102,7 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
             "role": "admin",
             "main_access_key": null
@@ -116,6 +118,7 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
             "role": "user",
             "main_access_key": null
@@ -131,6 +134,7 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
             "role": "user",
             "main_access_key": null
@@ -146,6 +150,7 @@
             "status": "active",
             "status_info": "admin-requested",
             "domain_name": "default",
+            "domain_id": "b9e676dc-e23e-54c6-b350-e83fba4127e9",
             "resource_policy": "default",
             "role": "monitor",
             "main_access_key": null

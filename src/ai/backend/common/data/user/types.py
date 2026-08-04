@@ -27,11 +27,7 @@ class UserData:
     is_superadmin: bool
     role: UserRole
     domain_name: str
-    domain_id: DomainID | None = None
-    """The id of ``domain_name``, so a caller filtering on the domain need not resolve the
-    name back into an id. The auth middleware always sets it; it is optional only so a
-    payload serialized before this field existed still deserializes.
-    """
+    domain_id: DomainID
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:

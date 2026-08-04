@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Collection, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, override
 
 from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
@@ -61,6 +62,7 @@ class UserCreatorSpec(CreatorSpec[UserRow]):
     password: PasswordInfo
     need_password_change: bool
     domain_name: str
+    domain_id: DomainID | None = field(init=False, default=None)
     full_name: str | None = None
     description: str | None = None
     is_active: bool | None = None
@@ -111,6 +113,7 @@ class UserCreatorSpec(CreatorSpec[UserRow]):
             status=status,
             status_info=self.status_info,
             domain_name=self.domain_name,
+            domain_id=self.domain_id,
             role=UserRole(self.role) if self.role is not None else UserRole.USER,
             resource_policy=self.resource_policy if self.resource_policy is not None else "default",
             allowed_client_ip=self.allowed_client_ip,

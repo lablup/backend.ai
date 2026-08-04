@@ -11,6 +11,7 @@ from ai.backend.common.contexts.user import with_triggered_user, with_user
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import ErrorCode
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.actions.action import (
     BaseAction,
     BaseActionResult,
@@ -214,6 +215,7 @@ def _make_user(user_id: UUID, is_superadmin: bool = False) -> UserData:
         is_superadmin=is_superadmin,
         role=UserRole.SUPERADMIN if is_superadmin else UserRole.USER,
         domain_name="default",
+        domain_id=DomainID(uuid4()),
     )
 
 

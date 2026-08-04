@@ -140,7 +140,11 @@ class DomainRow(CreatedAtMixin, Base):  # type: ignore[misc]
         back_populates="domain",
         foreign_keys="[SessionRow.domain_name]",
     )
-    users: Mapped[list[UserRow]] = relationship("UserRow", back_populates="domain")
+    users: Mapped[list[UserRow]] = relationship(
+        "UserRow",
+        back_populates="domain",
+        foreign_keys="[UserRow.domain_name]",
+    )
     groups: Mapped[list[GroupRow]] = relationship("GroupRow", back_populates="domain")
     sgroup_for_domains_rows: Mapped[list[ScalingGroupForDomainRow]] = relationship(
         "ScalingGroupForDomainRow",
