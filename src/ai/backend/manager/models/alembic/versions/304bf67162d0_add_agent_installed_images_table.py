@@ -1,4 +1,4 @@
-"""add agent_images junction table
+"""add agent_installed_images table
 
 Records which images are installed on which agents.
 
@@ -23,7 +23,7 @@ depends_on = None
 
 def upgrade() -> None:
     op.create_table(
-        "agent_images",
+        "agent_installed_images",
         sa.Column("agent_id", sa.String(length=64), nullable=False),
         sa.Column("image_id", GUID(), nullable=False),
         sa.Column(
@@ -32,23 +32,28 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
-        sa.PrimaryKeyConstraint("agent_id", "image_id", name=op.f("pk_agent_images")),
+        sa.PrimaryKeyConstraint("agent_id", "image_id", name=op.f("pk_agent_installed_images")),
         sa.ForeignKeyConstraint(
             ["agent_id"],
             ["agents.id"],
-            name=op.f("fk_agent_images_agent_id_agents"),
+            name=op.f("fk_agent_installed_images_agent_id_agents"),
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
             ["image_id"],
             ["images.id"],
-            name=op.f("fk_agent_images_image_id_images"),
+            name=op.f("fk_agent_installed_images_image_id_images"),
             ondelete="CASCADE",
         ),
     )
-    op.create_index(op.f("ix_agent_images_image_id"), "agent_images", ["image_id"], unique=False)
+    op.create_index(
+        op.f("ix_agent_installed_images_image_id"),
+        "agent_installed_images",
+        ["image_id"],
+        unique=False,
+    )
 
 
 def downgrade() -> None:
-    op.drop_index(op.f("ix_agent_images_image_id"), table_name="agent_images")
-    op.drop_table("agent_images")
+    op.drop_index(op.f("ix_agent_installed_images_image_id"), table_name="agent_installed_images")
+    op.drop_table("agent_installed_images")
