@@ -25,6 +25,7 @@ import sqlalchemy as sa
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.types import EntityData, EntityType, ScopeRef, ScopeType
 from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
@@ -684,6 +685,7 @@ def authenticated_user() -> UserData:
         is_superadmin=False,
         role=UserRole.USER,
         domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
     )
 
 
