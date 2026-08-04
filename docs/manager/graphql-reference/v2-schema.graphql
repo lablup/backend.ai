@@ -613,11 +613,11 @@ type AllowedResourceGroupsPayload {
 Added in 26.9.0. The merged config for one config name: every fragment visible to the caller, deep-merged in ascending allow-list rank order.
 """
 type AppConfig @shareable {
-  """Config name this view is for."""
+  """Added in 26.9.0. Config name this view is for."""
   configName: String!
 
   """
-  Every fragment visible to the caller, deep-merged in ascending allow-list rank order. Empty when nothing visible contributes, or when everything that did was empty. Read the fragment API for the per-scope values behind it.
+  Added in 26.9.0. Every fragment visible to the caller, deep-merged in ascending allow-list rank order. Empty when nothing visible contributes, or when everything that did was empty. Read the fragment API for the per-scope values behind it.
   """
   config: JSON!
 }
@@ -10375,7 +10375,10 @@ type Query {
   """
   Added in 26.9.0. Read the acting user's merged config for each of the given names — public, the caller's domain, and the caller's own fragments deep-merged by allow-list rank. One entry per requested name, in request order; a name nothing visible contributes to yields an empty merge.
   """
-  myAppConfigs(configNames: [String!]!): [AppConfig!]!
+  myAppConfigs(
+    """Added in 26.9.0. Config names to read merges for."""
+    configNames: [String!]!
+  ): [AppConfig!]!
 
   """
   Added in 25.14.0. Retrieve a specific artifact by its ID. Returns detailed information about the artifact including its metadata, registry information, and availability status.
