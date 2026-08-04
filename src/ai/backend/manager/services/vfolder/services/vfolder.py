@@ -692,12 +692,12 @@ class VFolderService:
     async def _mint_folder_key(self, domain_name: str, vfid: VFolderID) -> None:
         plane = await self._plane()
         for opts in (await plane.confidential_endpoints()).values():
-            await plane.custodian.mint(opts, domain_name, vfid)
+            await plane.custodian.mint(opts, domain_name, vfid.folder_id)
 
     async def _destroy_folder_key(self, domain_name: str, vfid: VFolderID) -> None:
         plane = await self._plane()
         for opts in (await plane.confidential_endpoints()).values():
-            await plane.custodian.revoke(opts, domain_name, vfid)
+            await plane.custodian.revoke(opts, domain_name, vfid.folder_id)
 
     async def _remove_vfolder_from_storage(self, vfolder_data: VFolderData) -> None:
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(

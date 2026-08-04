@@ -393,6 +393,7 @@ class ModelCardDBSource:
                     unmanaged_path=row.unmanaged_path,
                     domain_name=row.domain_name,
                     project_id=row.group,
+                    encryption_tier=row.encryption_tier,
                 )
                 for row in rows
                 if row.group is not None

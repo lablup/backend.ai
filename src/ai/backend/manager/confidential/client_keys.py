@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import json
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from http import HTTPStatus
 from typing import Any, Final, Protocol
 
 import sqlalchemy as sa
@@ -15,9 +13,8 @@ from ai.backend.common.cc_storage import (
     TAMPER_EVIDENT,
     TIER_DISCLOSURE,
     FolderKeyMaterial,
-    mint_material,
 )
-from ai.backend.manager.confidential.broker import BrokerClient, BrokerTarget
+from ai.backend.manager.confidential.storage import FolderKeyCustodian
 from ai.backend.manager.errors.confidential import ClientFormatRefused, ReleaseDenied
 from ai.backend.manager.models.confidential.row import ConfidentialClientReleaseRow
 from ai.backend.manager.models.scaling_group.row import (
@@ -36,7 +33,9 @@ CLIENT_TRUST_STATEMENT: Final = (
     " format is symmetric, so a read-only grant is not cryptographically enforced: every device ever"
     " granted read access holds a key that also writes. Revoking a grant does not revoke the key, and"
     " version one has no re-key operation, so the exposure of a leaked client device is every byte"
-    " the folder ever holds."
+    " the folder ever holds. This is the same key the attested guest holds, because a folder has"
+    " exactly one, so that exposure covers what a confidential session writes as well as what a"
+    " client uploads."
 )
 
 RELEASE_TTL: Final = timedelta(hours=12)
@@ -52,13 +51,9 @@ class FolderKeyCustody(Protocol):
     ) -> FolderKeyMaterial: ...
 
 
-class BrokerFolderKeyCustody:
-    def __init__(self, broker: BrokerClient) -> None:
-        self._broker = broker
-
-    @staticmethod
-    def resource_path(domain_name: str, vfolder_id: uuid.UUID) -> str:
-        return f"{domain_name}/folders/{vfolder_id}/key"
+class CustodianFolderKeyCustody:
+    def __init__(self, custodian: FolderKeyCustodian) -> None:
+        self._custodian = custodian
 
     async def material(
         self,
@@ -67,24 +62,9 @@ class BrokerFolderKeyCustody:
         vfolder_id: uuid.UUID,
         tier: str,
     ) -> FolderKeyMaterial:
-        target = BrokerTarget.of(opts)
-        path = self.resource_path(domain_name, vfolder_id)
-        status, payload, _ = await self._broker.relay(
-            target,
-            "GET",
-            f"/kbs/v0/resource/{path}",
-            body=None,
-            headers=target.admin_headers,
+        return FolderKeyMaterial(
+            key=self._custodian.release(opts, domain_name, vfolder_id), tier=tier
         )
-        if status == HTTPStatus.OK and payload:
-            return FolderKeyMaterial.from_json(json.loads(payload))
-        if status != HTTPStatus.NOT_FOUND:
-            raise ReleaseDenied(extra_msg=f"custody of {path} answered {status}")
-        minted = mint_material(tier)
-        await self._broker.put_resource(
-            target, path, json.dumps(minted.to_json()).encode("utf-8")
-        )
-        return minted
 
 
 @dataclass(frozen=True)

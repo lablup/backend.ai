@@ -167,6 +167,7 @@ class ModelCardService:
             str(vfolder_id),
             domain_name=vf.domain_name,
             folder_uuid=vf.id,
+            encryption_tier=vf.encryption_tier,
         )
         vfolder_files = await view.names()
 

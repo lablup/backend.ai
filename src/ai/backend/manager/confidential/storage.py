@@ -5,6 +5,7 @@ import json
 import os
 import secrets
 import time
+import uuid
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Final
@@ -25,8 +26,8 @@ MOUNT_PLAN_VERSION: Final = 1
 SCRATCH_DEVICE: Final = "/dev/bai_scratch"
 
 
-def folder_key_path(domain_name: str, vfid: VFolderID) -> str:
-    return f"{domain_name}/vfolder/{vfid.folder_id.hex}"
+def folder_key_path(domain_name: str, folder_id: uuid.UUID) -> str:
+    return f"{domain_name}/vfolder/{folder_id.hex}"
 
 
 def folder_key_tag(vfid: VFolderID) -> str:
@@ -98,9 +99,9 @@ class FolderKeyCustodian:
         )
 
     async def mint(
-        self, opts: ConfidentialScalingGroupOpts, domain_name: str, vfid: VFolderID
+        self, opts: ConfidentialScalingGroupOpts, domain_name: str, folder_id: uuid.UUID
     ) -> str:
-        resource_path = folder_key_path(domain_name, vfid)
+        resource_path = folder_key_path(domain_name, folder_id)
         escrow = self.escrow(opts)
         key = secrets.token_bytes(FOLDER_KEY_BYTES)
         escrow.append(resource_path, key)
@@ -108,19 +109,19 @@ class FolderKeyCustodian:
         return resource_path
 
     async def revoke(
-        self, opts: ConfidentialScalingGroupOpts, domain_name: str, vfid: VFolderID
+        self, opts: ConfidentialScalingGroupOpts, domain_name: str, folder_id: uuid.UUID
     ) -> None:
-        resource_path = folder_key_path(domain_name, vfid)
+        resource_path = folder_key_path(domain_name, folder_id)
         self.escrow(opts).append(resource_path, b"")
         await self._broker.destroy_resource(BrokerTarget.of(opts), resource_path)
 
     def release(
-        self, opts: ConfidentialScalingGroupOpts, domain_name: str, vfid: VFolderID
+        self, opts: ConfidentialScalingGroupOpts, domain_name: str, folder_id: uuid.UUID
     ) -> bytes:
-        key = self.escrow(opts).held(folder_key_path(domain_name, vfid))
+        key = self.escrow(opts).held(folder_key_path(domain_name, folder_id))
         if key is None:
             raise FolderEncryptionMissing(
-                extra_msg=f"no folder key is held for {vfid}; the folder predates encryption"
+                extra_msg=f"no folder key is held for {folder_id}; the folder predates encryption"
             )
         return key
 
@@ -143,7 +144,7 @@ def describe(
         options=export.get("options", ""),
         tier=DEFAULT_TIER,
         format=DEFAULT_FORMAT,
-        key_path=folder_key_path(domain_name, vfid),
+        key_path=folder_key_path(domain_name, vfid.folder_id),
     )
 
 

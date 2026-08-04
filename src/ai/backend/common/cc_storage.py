@@ -35,6 +35,10 @@ class StorageFormatUnavailable(RuntimeError):
     pass
 
 
+class FolderRootVectorMissing(RuntimeError):
+    pass
+
+
 @lru_cache(maxsize=1)
 def extension() -> ModuleType:
     try:
@@ -81,32 +85,24 @@ class EncryptedName(Protocol):
 @dataclass(frozen=True)
 class FolderKeyMaterial:
     key: bytes
-    root_dir_iv: bytes
     tier: str = CONCURRENT_TIER
 
     @classmethod
     def from_json(cls, payload: dict[str, str]) -> FolderKeyMaterial:
         return cls(
             key=bytes.fromhex(payload["key"]),
-            root_dir_iv=bytes.fromhex(payload["root_dir_iv"]),
             tier=payload.get("tier", CONCURRENT_TIER),
         )
 
     def to_json(self) -> dict[str, str]:
         return {
             "key": self.key.hex(),
-            "root_dir_iv": self.root_dir_iv.hex(),
             "tier": self.tier,
         }
 
 
 def stored_len(plaintext_len: int) -> int:
     return int(extension().stored_len(plaintext_len))
-
-
-def mint_material(tier: str = CONCURRENT_TIER) -> FolderKeyMaterial:
-    fmt = extension()
-    return FolderKeyMaterial(fmt.generate_folder_key(), fmt.new_dir_iv(), tier)
 
 
 class FolderCipher:
@@ -247,19 +243,32 @@ class CipherPaths:
     def __init__(self, cipher: FolderCipher, store: CipherStore) -> None:
         self.cipher = cipher
         self._store = store
-        self._ivs: dict[str, bytes] = {"": cipher.material.root_dir_iv}
+        self._ivs: dict[str, bytes] = {}
+
+    async def _sealed(self, cipher_dir: str) -> list[tuple[str, int, bool]]:
+        fmt = self.cipher.fmt
+        return [
+            entry for entry in await self._store.listdir(cipher_dir) if not fmt.is_reserved(entry[0])
+        ]
 
     async def dir_iv(self, cipher_dir: str, *, create: bool) -> bytes:
         if cipher_dir in self._ivs:
             return self._ivs[cipher_dir]
-        marker = _join(cipher_dir, self.cipher.fmt.DIR_IV_FILE)
+        fmt = self.cipher.fmt
+        marker = _join(cipher_dir, fmt.DIR_IV_FILE)
         try:
             iv = await self._store.read(marker)
         except FileNotFoundError:
+            if not cipher_dir and await self._sealed(cipher_dir):
+                raise FolderRootVectorMissing(
+                    f"the ciphertext root holds sealed entries but no {fmt.DIR_IV_FILE}; this"
+                    " folder was written before the vector of its root directory was carried on"
+                    " the export, and no key releasable today decrypts the names in it"
+                ) from None
             if not create:
                 raise
             await self._store.mkdir(cipher_dir)
-            await self._store.write(marker, self.cipher.fmt.new_dir_iv())
+            await self._store.write(marker, fmt.new_dir_iv())
             iv = await self._store.read(marker)
         self._ivs[cipher_dir] = iv
         return iv
@@ -277,11 +286,12 @@ class CipherPaths:
     async def listing(self, relpath: str | os.PathLike[str]) -> list[CipherEntry]:
         fmt = self.cipher.fmt
         cipher_dir = await self.resolve(relpath)
+        sealed = await self._sealed(cipher_dir)
+        if not sealed:
+            return []
         iv = await self.dir_iv(cipher_dir, create=False)
         entries: list[CipherEntry] = []
-        for on_disk, size, is_dir in await self._store.listdir(cipher_dir):
-            if fmt.is_reserved(on_disk):
-                continue
+        for on_disk, size, is_dir in sealed:
             sidecar = fmt.sidecar_of(on_disk)
             encoded = (
                 (await self._store.read(_join(cipher_dir, sidecar))).decode("ascii")

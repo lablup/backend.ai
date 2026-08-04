@@ -13,7 +13,6 @@ export function materialFromRelease(released) {
   const unhex = (text) => Uint8Array.from(text.match(/../g).map((b) => parseInt(b, 16)));
   return {
     key: unhex(released.key),
-    root_dir_iv: unhex(released.root_dir_iv),
     tier: released.tier,
   };
 }
@@ -66,7 +65,12 @@ export class CipherPaths {
   constructor(cipher, store) {
     this.cipher = cipher;
     this.store = store;
-    this.ivs = new Map([["", cipher.material.root_dir_iv]]);
+    this.ivs = new Map();
+  }
+
+  async sealed(cipherDir) {
+    const fmt = this.cipher.fmt;
+    return (await this.store.listdir(cipherDir)).filter((entry) => !fmt.is_reserved(entry.name));
   }
 
   async dirIv(cipherDir, create) {
@@ -75,6 +79,13 @@ export class CipherPaths {
     const marker = join(cipherDir, fmt.dir_iv_file());
     let iv = await this.store.read(marker);
     if (iv === null) {
+      if (cipherDir === "" && (await this.sealed(cipherDir)).length > 0) {
+        throw new Error(
+          `the ciphertext root holds sealed entries but no ${fmt.dir_iv_file()}; this folder was` +
+            " written before the vector of its root directory was carried on the export, and no" +
+            " key releasable today decrypts the names in it",
+        );
+      }
       if (!create) throw new Error(`no directory vector at ${marker}`);
       await this.store.mkdir(cipherDir);
       await this.store.write(marker, fmt.new_dir_iv());
@@ -103,10 +114,11 @@ export class CipherPaths {
   async listing(relpath) {
     const fmt = this.cipher.fmt;
     const cipherDir = await this.resolve(relpath);
+    const sealed = await this.sealed(cipherDir);
+    if (sealed.length === 0) return [];
     const iv = await this.dirIv(cipherDir, false);
     const out = [];
-    for (const entry of await this.store.listdir(cipherDir)) {
-      if (fmt.is_reserved(entry.name)) continue;
+    for (const entry of sealed) {
       const sidecar = fmt.sidecar_of(entry.name);
       const encoded =
         sidecar === undefined

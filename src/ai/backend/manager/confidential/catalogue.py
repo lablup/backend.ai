@@ -6,16 +6,15 @@ from typing import Any, Protocol
 import aiohttp
 
 from ai.backend.common.cc_storage import (
-    CONCURRENT_TIER,
     CipherPaths,
     FolderCipher,
-    extension,
 )
 from ai.backend.manager.confidential.broker import BrokerClient
 from ai.backend.manager.confidential.client_keys import (
-    BrokerFolderKeyCustody,
     ClientKeyRelease,
+    CustodianFolderKeyCustody,
 )
+from ai.backend.manager.confidential.storage import FolderKeyCustodian
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
@@ -89,15 +88,15 @@ class CatalogueReader:
         *,
         domain_name: str,
         folder_uuid: uuid.UUID,
+        encryption_tier: str | None,
     ) -> CatalogueView:
         store = _ProxyStore(client, volume, vfolder_id)
-        marker = extension().DIR_IV_FILE
-        if all(name != marker for name, _, _ in await store.listdir("")):
+        if encryption_tier is None:
             return _PlainView(store)
         async with aiohttp.ClientSession() as session:
-            custody = BrokerFolderKeyCustody(BrokerClient(session))
+            custody = CustodianFolderKeyCustody(FolderKeyCustodian(BrokerClient(session)))
             releases = ClientKeyRelease(self._db, custody)
             opts = await releases.opts_for_domain(domain_name)
-            material = await custody.material(opts, domain_name, folder_uuid, CONCURRENT_TIER)
+            material = await custody.material(opts, domain_name, folder_uuid, encryption_tier)
         cipher = FolderCipher(material)
         return _CipherView(cipher=cipher, paths=CipherPaths(cipher, store), store=store)

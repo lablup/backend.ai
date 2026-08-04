@@ -68,3 +68,4 @@ class VFolderScanData:
     unmanaged_path: str | None
     domain_name: str
     project_id: UUID
+    encryption_tier: str | None = None

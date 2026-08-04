@@ -685,7 +685,7 @@ class SessionLauncher:
                     )
                 resources[folder_key_tag(mount.vfid)] = (
                     SessionResourceKind.FOLDER_KEY,
-                    plane.custodian.release(opts, domain_name, mount.vfid),
+                    plane.custodian.release(opts, domain_name, mount.vfid.folder_id),
                 )
             scratch_tag = f"scratch-key-{kernel.kernel_id}"
             resources[scratch_tag] = (SessionResourceKind.FOLDER_KEY, token_bytes(32))
