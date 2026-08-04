@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import NewType
 
@@ -26,3 +27,22 @@ class EntityRef:
 
     entity_type: EntityType
     entity_id: EntityID
+
+
+class EntityData(ABC):
+    """A ``data/`` type that can name the entity it represents.
+
+    Inherited by the ``data/`` types of entities whose id has to be reported by a
+    result rather than by an action — a create names a scope, so nothing upstream knows
+    the id until the row exists, and the value that comes back is the only thing that
+    does.
+
+    An abstract method rather than an ``id`` field: several domains key on a name
+    (``domains.name``, ``scaling_groups.name``, ``keypairs.access_key``) and map it to
+    an ``EntityID`` themselves.
+    """
+
+    @abstractmethod
+    def entity_id(self) -> EntityID:
+        """Return the id of the entity this value describes."""
+        raise NotImplementedError
