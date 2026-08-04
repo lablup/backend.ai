@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import sqlalchemy as sa
 
@@ -33,6 +33,8 @@ from ai.backend.manager.repositories.base import (
     BulkUpdaterResult,
     Creator,
     CreatorResult,
+    DataBatchPurger,
+    DataBatchUpdater,
     DataCreator,
     DataPurger,
     DataQuerier,
@@ -66,6 +68,11 @@ from ai.backend.manager.repositories.base import (
     execute_updater,
     execute_upserter,
 )
+from ai.backend.manager.repositories.base.integrity import (
+    match_integrity_error,
+    parse_integrity_error,
+)
+from ai.backend.manager.repositories.base.purger import validate_conflict_checks
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     RBACEntityCreatorResult,
@@ -226,6 +233,77 @@ class WriteOps(ReadOps):
         if result is None:
             return None
         return purger.to_data(result.row)
+
+    async def bulk_create_data[TRow: Base, TData](
+        self, creators: Sequence[DataCreator[TRow, TData]]
+    ) -> list[TData]:
+        """Insert several rows atomically, returning them as their ``data/`` type.
+
+        Takes a sequence of the same spec ``create_data`` takes rather than a spec of
+        its own: a bulk create is N of them, and each already knows how its row converts.
+        """
+        if not creators:
+            return []
+        result = await execute_bulk_creator(self._sess, BulkCreator(specs=list(creators)))
+        return [creator.to_data(row) for creator, row in zip(creators, result.rows, strict=True)]
+
+    async def batch_update_data[TRow: Base, TData](
+        self, updater: DataBatchUpdater[TRow, TData]
+    ) -> list[TData]:
+        """Update every row matching the spec's conditions, returning what was written.
+
+        Converting counterpart of :meth:`batch_update`, which reports a row count. The
+        rows come back through RETURNING because a scope-shaped run has to name the
+        entities it touched, and a count cannot.
+        """
+        row_class = updater.row_class
+        table = row_class.__table__
+        stmt = sa.update(table).values(updater.build_values())
+        for condition in updater.conditions():
+            stmt = stmt.where(condition())
+        stmt = stmt.returning(*table.columns)
+        try:
+            result = await self._sess.execute(stmt)
+        except sa.exc.IntegrityError as e:
+            parsed = parse_integrity_error(e)
+            match_integrity_error(parsed, updater.integrity_error_checks)
+        return [updater.to_data(row_class(**dict(r._mapping))) for r in result.fetchall()]
+
+    async def batch_purge_data[TRow: Base, TData](
+        self, purger: DataBatchPurger[TRow, TData], batch_size: int = 1000
+    ) -> list[TData]:
+        """Delete every row the spec's subquery selects, returning what was removed.
+
+        Converting counterpart of :meth:`batch_purge`, deleting in chunks the same way
+        so one call cannot hold a long transaction open. Every chunk's rows are
+        accumulated, so the caller sees each entity the run removed rather than a count.
+        """
+        base_subquery = purger.build_subquery()
+        entity = base_subquery.column_descriptions[0]["entity"]
+        table = sa.inspect(entity).local_table
+        pk_columns = list(table.primary_key.columns)
+        row_class = cast(type[TRow], entity)
+
+        await validate_conflict_checks(self._sess, purger.conflict_checks())
+
+        removed: list[TData] = []
+        while True:
+            sub = purger.build_subquery().subquery()
+            pk_subquery = sa.select(*[sub.c[pk.key] for pk in pk_columns]).limit(batch_size)
+            stmt = (
+                sa.delete(table)
+                .where(sa.tuple_(*pk_columns).in_(pk_subquery))
+                .returning(*table.columns)
+            )
+            try:
+                result = await self._sess.execute(stmt)
+            except sa.exc.IntegrityError as e:
+                raise parse_integrity_error(e) from e
+            rows = result.fetchall()
+            removed.extend(purger.to_data(row_class(**dict(r._mapping))) for r in rows)
+            if len(rows) < batch_size:
+                break
+        return removed
 
     async def bulk_create[TRow: Base](self, bulk: BulkCreator[TRow]) -> BulkCreatorResult[TRow]:
         """Insert multiple rows atomically (all-or-nothing)."""

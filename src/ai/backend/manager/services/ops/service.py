@@ -16,6 +16,9 @@ from typing import Any
 
 from ai.backend.common.data.entity.types import EntityData
 from ai.backend.manager.actions.v2.ops.base import (
+    BatchPurgeOpsAction,
+    BatchUpdateOpsAction,
+    BulkCreateOpsAction,
     CreateOpsAction,
     GetOpsAction,
     PurgeOpsAction,
@@ -26,6 +29,7 @@ from ai.backend.manager.actions.v2.ops.base import (
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     CreatedEntityOpsResult,
+    EntitiesOpsResult,
     EntityOpsResult,
 )
 from ai.backend.manager.repositories.ops.repository import OpsRepository
@@ -34,6 +38,9 @@ __all__ = (
     "GetService",
     "SearchService",
     "CreateService",
+    "BulkCreateService",
+    "BatchUpdateService",
+    "BatchPurgeService",
     "UpdateService",
     "DeleteService",
     "UpsertService",
@@ -89,6 +96,44 @@ class CreateService[TData: EntityData]:
 
     async def execute(self, action: CreateOpsAction[Any, TData]) -> CreatedEntityOpsResult[TData]:
         return CreatedEntityOpsResult(data=await self._repository.create(action.to_creator()))
+
+
+class BulkCreateService[TData: EntityData]:
+    """Inserts every row the action's creators describe, atomically."""
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: BulkCreateOpsAction[Any, TData]) -> EntitiesOpsResult[TData]:
+        return EntitiesOpsResult(items=await self._repository.bulk_create(action.to_creators()))
+
+
+class BatchUpdateService[TData: EntityData]:
+    """Updates every row matching the action's spec, and names what it wrote."""
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: BatchUpdateOpsAction[Any, TData]) -> EntitiesOpsResult[TData]:
+        return EntitiesOpsResult(
+            items=await self._repository.batch_update(action.to_batch_updater())
+        )
+
+
+class BatchPurgeService[TData: EntityData]:
+    """Hard-deletes every row the action's spec selects, and names what it removed."""
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: BatchPurgeOpsAction[Any, TData]) -> EntitiesOpsResult[TData]:
+        return EntitiesOpsResult(items=await self._repository.batch_purge(action.to_batch_purger()))
 
 
 class UpdateService[TData]:

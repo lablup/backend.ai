@@ -1,6 +1,9 @@
 """Generic services for ops-backed actions, replacing per-domain pass-through methods."""
 
 from .service import (
+    BatchPurgeService,
+    BatchUpdateService,
+    BulkCreateService,
     CreateService,
     DeleteService,
     GetService,
@@ -11,6 +14,9 @@ from .service import (
 )
 
 __all__ = (
+    "BatchPurgeService",
+    "BatchUpdateService",
+    "BulkCreateService",
     "CreateService",
     "DeleteService",
     "GetService",

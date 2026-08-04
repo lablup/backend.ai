@@ -17,6 +17,7 @@ from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     CreatedEntityOpsResult,
+    EntitiesOpsResult,
     EntityOpsResult,
 )
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
@@ -86,6 +87,18 @@ def test_entity_result_carries_only_its_data() -> None:
 
     assert result.data is data
     assert not isinstance(result, BaseScopeActionResult)
+
+
+def test_entities_result_names_every_entity_a_many_row_write_touched() -> None:
+    first, second = _PresetData(id=uuid.uuid4(), name="a"), _PresetData(id=uuid.uuid4(), name="b")
+
+    result = EntitiesOpsResult(items=[first, second])
+
+    assert result.entity_ids() == (first.id, second.id)
+
+
+def test_entities_result_names_nothing_when_the_write_matched_nothing() -> None:
+    assert EntitiesOpsResult[_PresetData](items=[]).entity_ids() == ()
 
 
 def test_batch_result_names_every_entity_on_the_page() -> None:

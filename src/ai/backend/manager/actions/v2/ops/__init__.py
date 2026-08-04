@@ -5,6 +5,9 @@ the domain writes no service method for it.
 """
 
 from .base import (
+    BatchPurgeOpsAction,
+    BatchUpdateOpsAction,
+    BulkCreateOpsAction,
     CreateOpsAction,
     GetOpsAction,
     OpsBackendAction,
@@ -16,13 +19,18 @@ from .base import (
 from .result import (
     BatchOpsResult,
     CreatedEntityOpsResult,
+    EntitiesOpsResult,
     EntityOpsResult,
 )
 
 __all__ = (
     "BatchOpsResult",
+    "BatchPurgeOpsAction",
+    "BatchUpdateOpsAction",
+    "BulkCreateOpsAction",
     "CreateOpsAction",
     "CreatedEntityOpsResult",
+    "EntitiesOpsResult",
     "EntityOpsResult",
     "GetOpsAction",
     "OpsBackendAction",

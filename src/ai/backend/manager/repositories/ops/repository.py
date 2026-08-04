@@ -15,6 +15,11 @@ to make the methods domain-specific, conversion included.
     | upsert    | ``DataUpserter``    | row class, conflict keys, ``to_data`` |
     | purge     | ``DataPurger``      | row class, pk, checks, ``to_data``    |
 
+Each write also has a many-row form — ``bulk_create`` over a sequence of ``DataCreator``,
+``batch_update`` and ``batch_purge`` over a ``DataBatchUpdater`` / ``DataBatchPurger``.
+They return what they wrote rather than a count, because a scope-shaped run reports the
+entities it touched through its result.
+
 Every method is delegation: the conversion runs inside ``ReadOps``/``WriteOps``, so no
 ORM row reaches even this class. What is left here is the repository-layer seam — a
 missing row becomes :class:`EntityNotFoundError` rather than ``None``.
@@ -41,10 +46,10 @@ from typing import Any
 from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.base.creator import DataCreator
-from ai.backend.manager.repositories.base.purger import DataPurger
+from ai.backend.manager.repositories.base.purger import DataBatchPurger, DataPurger
 from ai.backend.manager.repositories.base.querier import DataQuerier
 from ai.backend.manager.repositories.base.searcher import Searcher, SearcherResult
-from ai.backend.manager.repositories.base.updater import DataUpdater
+from ai.backend.manager.repositories.base.updater import DataBatchUpdater, DataUpdater
 from ai.backend.manager.repositories.base.upserter import DataUpserter
 from ai.backend.manager.repositories.ops.base.provider import DBOpsProvider
 
@@ -92,6 +97,11 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.create_data(creator)
 
+    async def bulk_create(self, creators: Sequence[DataCreator[Any, TData]]) -> list[TData]:
+        """Insert several rows atomically. Nothing is absent, so nothing to raise."""
+        async with self._ops.write_ops() as w:
+            return await w.bulk_create_data(creators)
+
     async def update(self, updater: DataUpdater[Any, TData]) -> TData:
         async with self._ops.write_ops() as w:
             data = await w.update_data(updater)
@@ -100,6 +110,16 @@ class OpsRepository[TData]:
                     f"{updater.row_class.__name__} {updater.pk_value()} not found"
                 )
             return data
+
+    async def batch_update(self, updater: DataBatchUpdater[Any, TData]) -> list[TData]:
+        """Update every row matching the spec. An empty list means nothing matched."""
+        async with self._ops.write_ops() as w:
+            return await w.batch_update_data(updater)
+
+    async def batch_purge(self, purger: DataBatchPurger[Any, TData]) -> list[TData]:
+        """Delete every row the spec selects. An empty list means nothing matched."""
+        async with self._ops.write_ops() as w:
+            return await w.batch_purge_data(purger)
 
     async def upsert(self, upserter: DataUpserter[Any, TData]) -> TData:
         """Insert or update on conflict. Never absent, so nothing to raise."""

@@ -4,16 +4,19 @@ from collections.abc import Sequence
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.base.creator import DataCreator
-from ai.backend.manager.repositories.base.purger import DataPurger
+from ai.backend.manager.repositories.base.purger import DataBatchPurger, DataPurger
 from ai.backend.manager.repositories.base.querier import DataQuerier
 from ai.backend.manager.repositories.base.searcher import Searcher
-from ai.backend.manager.repositories.base.updater import DataUpdater
+from ai.backend.manager.repositories.base.updater import DataBatchUpdater, DataUpdater
 from ai.backend.manager.repositories.base.upserter import DataUpserter
 
 __all__ = (
     "OpsBackendAction",
     "GetOpsAction",
     "CreateOpsAction",
+    "BulkCreateOpsAction",
+    "BatchUpdateOpsAction",
+    "BatchPurgeOpsAction",
     "UpdateOpsAction",
     "UpsertOpsAction",
     "PurgeOpsAction",
@@ -58,6 +61,33 @@ class CreateOpsAction[TRow: Base, TData](OpsBackendAction):
     @abstractmethod
     def to_creator(self) -> DataCreator[TRow, TData]:
         """Return the insert spec this action executes."""
+        raise NotImplementedError
+
+
+class BulkCreateOpsAction[TRow: Base, TData](OpsBackendAction):
+    """A create of several rows at once, atomically."""
+
+    @abstractmethod
+    def to_creators(self) -> Sequence[DataCreator[TRow, TData]]:
+        """Return one insert spec per row this action creates."""
+        raise NotImplementedError
+
+
+class BatchUpdateOpsAction[TRow: Base, TData](OpsBackendAction):
+    """An update of every row matching a condition, rather than of one named row."""
+
+    @abstractmethod
+    def to_batch_updater(self) -> DataBatchUpdater[TRow, TData]:
+        """Return the batch update spec this action executes."""
+        raise NotImplementedError
+
+
+class BatchPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
+    """A hard delete of every row matching a condition."""
+
+    @abstractmethod
+    def to_batch_purger(self) -> DataBatchPurger[TRow, TData]:
+        """Return the batch delete spec this action executes."""
         raise NotImplementedError
 
 

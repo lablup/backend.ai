@@ -50,6 +50,7 @@ from .purger import (
     BatchPurgerSpec,
     BulkPurgerError,
     BulkPurgerResultWithFailures,
+    DataBatchPurger,
     DataPurger,
     Purger,
     PurgerResult,
@@ -81,6 +82,7 @@ from .updater import (
     BatchUpdaterSpec,
     BulkUpdaterError,
     BulkUpdaterResult,
+    DataBatchUpdater,
     DataUpdater,
     Updater,
     UpdaterResult,
@@ -164,6 +166,7 @@ __all__ = [
     "execute_bulk_creator_partial",
     # Updater
     "UpdaterSpec",
+    "DataBatchUpdater",
     "DataUpdater",
     "Updater",
     "UpdaterResult",
@@ -188,6 +191,7 @@ __all__ = [
     "BulkUpserterResult",
     "execute_bulk_upserter",
     # Purger
+    "DataBatchPurger",
     "DataPurger",
     "Purger",
     "PurgerResult",

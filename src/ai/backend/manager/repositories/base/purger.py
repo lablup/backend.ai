@@ -241,6 +241,34 @@ class BatchPurgerSpec[TRow: Base](ABC):
         raise NotImplementedError
 
 
+class DataBatchPurger[TRow: Base, TData](BatchPurgerSpec[TRow], ABC):
+    """A batch purger that also says how each deleted row becomes data.
+
+    ``BatchPurgerSpec`` is already self-contained about what to delete; this adds the
+    conversion so the operation returns the entities it removed rather than a count,
+    which is what the scope shape reports through its result.
+
+    Example:
+        class PurgeOldSessions(DataBatchPurger[SessionRow, SessionData]):
+            def build_subquery(self) -> sa.sql.Select[tuple[SessionRow]]:
+                return sa.select(SessionRow).where(SessionRow.terminated_at < self._cutoff)
+
+            def conflict_checks(self) -> Sequence[ConflictCheck]:
+                return ()
+
+            def to_data(self, row: SessionRow) -> SessionData:
+                return row.to_data()
+
+        async with ops.write_ops() as w:
+            removed = await w.batch_purge_data(PurgeOldSessions(cutoff))
+    """
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        """Convert one deleted row into its ``data/`` type."""
+        raise NotImplementedError
+
+
 @dataclass
 class BatchPurger[TRow: Base]:
     """Bundles batch purger spec and batch configuration for bulk delete operations.

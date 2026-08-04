@@ -143,6 +143,45 @@ class BatchUpdaterSpec[TRow: Base](ABC):
         return ()
 
 
+class DataBatchUpdater[TRow: Base, TData](BatchUpdaterSpec[TRow], ABC):
+    """A batch updater that names its own conditions and how each updated row becomes data.
+
+    ``BatchUpdaterSpec`` says only what to set, leaving the conditions on the
+    :class:`BatchUpdater` wrapper, and the ops layer reports a row count. Carrying both
+    the conditions and ``to_data`` here makes the spec self-contained and lets the
+    operation return what it actually wrote — which the scope shape needs, since a run
+    over a scope reports the entities it touched through its result.
+
+    Example:
+        class ExpireSessions(DataBatchUpdater[SessionRow, SessionData]):
+            @property
+            def row_class(self) -> type[SessionRow]:
+                return SessionRow
+
+            def conditions(self) -> list[QueryCondition]:
+                return [lambda: SessionRow.status == SessionStatus.PENDING]
+
+            def build_values(self) -> dict[str, Any]:
+                return {"status": SessionStatus.CANCELLED}
+
+            def to_data(self, row: SessionRow) -> SessionData:
+                return row.to_data()
+
+        async with ops.write_ops() as w:
+            cancelled = await w.batch_update_data(ExpireSessions())
+    """
+
+    @abstractmethod
+    def conditions(self) -> list[QueryCondition]:
+        """Return the WHERE clauses selecting the rows to update (AND combined)."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        """Convert one updated row into its ``data/`` type."""
+        raise NotImplementedError
+
+
 @dataclass
 class Updater[TRow: Base]:
     """Bundles updater spec with target info for single-row update operations.

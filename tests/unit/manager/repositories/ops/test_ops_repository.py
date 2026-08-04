@@ -37,10 +37,11 @@ from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import DataCreator
 from ai.backend.manager.repositories.base.pagination import OffsetPagination
-from ai.backend.manager.repositories.base.purger import DataPurger
+from ai.backend.manager.repositories.base.purger import DataBatchPurger, DataPurger
 from ai.backend.manager.repositories.base.querier import DataQuerier
 from ai.backend.manager.repositories.base.searcher import Searcher
-from ai.backend.manager.repositories.base.updater import DataUpdater
+from ai.backend.manager.repositories.base.types import ConflictCheck
+from ai.backend.manager.repositories.base.updater import DataBatchUpdater, DataUpdater
 from ai.backend.manager.repositories.base.upserter import DataUpserter
 from ai.backend.manager.repositories.ops.base.provider import DBOpsProvider
 from ai.backend.manager.repositories.ops.repository import OpsRepository
@@ -146,6 +147,42 @@ class _PresetQuerier(DataQuerier[RolePresetRow, RolePresetData]):
     @override
     def pk_value(self) -> uuid.UUID:
         return self.target
+
+    @override
+    def to_data(self, row: RolePresetRow) -> RolePresetData:
+        return row.to_data()
+
+
+@dataclass
+class _PresetBatchUpdater(
+    RolePresetDeletedFlagUpdaterSpec, DataBatchUpdater[RolePresetRow, RolePresetData]
+):
+    """Marks every preset of one scope type deleted, in one statement."""
+
+    scope: RBACScopeType = RBACScopeType.DOMAIN
+
+    @override
+    def conditions(self) -> list[QueryCondition]:
+        return [lambda: RolePresetRow.scope_type == self.scope]
+
+    @override
+    def to_data(self, row: RolePresetRow) -> RolePresetData:
+        return row.to_data()
+
+
+@dataclass
+class _PresetBatchPurger(DataBatchPurger[RolePresetRow, RolePresetData]):
+    """Removes every preset whose name matches."""
+
+    name: str
+
+    @override
+    def build_subquery(self) -> sa.sql.Select[tuple[RolePresetRow]]:
+        return sa.select(RolePresetRow).where(RolePresetRow.name == self.name)
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
@@ -264,6 +301,67 @@ class TestUpdate:
             await repository.update(
                 _PresetUpdater(name=OptionalState.update("x"), target=RolePresetID(uuid.uuid4()))
             )
+
+
+class TestBulkCreate:
+    async def test_all_rows_are_inserted(self, repository: OpsRepository[RolePresetData]) -> None:
+        created = await repository.bulk_create([
+            _PresetCreator(name="a", scope_type=RBACScopeType.DOMAIN),
+            _PresetCreator(name="b", scope_type=RBACScopeType.PROJECT),
+        ])
+
+        assert [c.name for c in created] == ["a", "b"]
+        assert all(c.id is not None for c in created)
+
+    async def test_empty_input_writes_nothing(
+        self, repository: OpsRepository[RolePresetData]
+    ) -> None:
+        assert await repository.bulk_create([]) == []
+
+
+class TestBatchUpdate:
+    async def test_every_matching_row_comes_back(
+        self, repository: OpsRepository[RolePresetData], preset: RolePresetData
+    ) -> None:
+        await repository.create(_PresetCreator(name="other", scope_type=RBACScopeType.DOMAIN))
+        await repository.create(_PresetCreator(name="elsewhere", scope_type=RBACScopeType.PROJECT))
+
+        updated = await repository.batch_update(
+            _PresetBatchUpdater(deleted=True, scope=RBACScopeType.DOMAIN)
+        )
+
+        # The two domain-scoped rows, not the project-scoped one.
+        assert sorted(u.name for u in updated) == ["default", "other"]
+        assert all(u.deleted for u in updated)
+
+    async def test_no_match_returns_nothing(
+        self, repository: OpsRepository[RolePresetData]
+    ) -> None:
+        assert (
+            await repository.batch_update(
+                _PresetBatchUpdater(deleted=True, scope=RBACScopeType.PROJECT)
+            )
+            == []
+        )
+
+
+class TestBatchPurge:
+    async def test_every_matching_row_is_removed_and_named(
+        self, repository: OpsRepository[RolePresetData], preset: RolePresetData
+    ) -> None:
+        await repository.create(_PresetCreator(name="default", scope_type=RBACScopeType.PROJECT))
+
+        removed = await repository.batch_purge(_PresetBatchPurger(name="default"))
+
+        assert len(removed) == 2
+        assert {r.name for r in removed} == {"default"}
+        with pytest.raises(EntityNotFoundError):
+            await repository.get(_PresetQuerier(target=preset.id))
+
+    async def test_no_match_returns_nothing(
+        self, repository: OpsRepository[RolePresetData], preset: RolePresetData
+    ) -> None:
+        assert await repository.batch_purge(_PresetBatchPurger(name="absent")) == []
 
 
 class TestUpsert:
