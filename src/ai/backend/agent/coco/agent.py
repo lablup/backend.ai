@@ -95,7 +95,6 @@ from .spec import (
     ContainerSpec,
     MountSpec,
     build_annotations,
-    guest_sourced_mounts,
 )
 from .volumes import BlockVolume, BlockVolumeManager
 
@@ -480,7 +479,7 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
             ),
             devices=self._char_devices,
             block_devices=[(v.loop, v.guest_path) for v in self._block_volumes],
-            mounts=[*guest_sourced_mounts(), *self._mounts],
+            mounts=self._mounts,
         )
         log.info(
             "starting confidential kernel {} on {} with blob {} and devices {}",

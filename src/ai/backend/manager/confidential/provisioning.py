@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from typing import Final
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.confidential.admission import check_admission_belt
@@ -81,7 +82,13 @@ class SessionResourceProvisioner:
             limit=opts.admission_limit_per_image,
             session_id=session_id,
         )
-        nonce = secrets.token_urlsafe(24)
+        async with self._db.begin_readonly_session() as db_session:
+            held = await db_session.scalar(
+                sa.select(ConfidentialNonceRow.nonce).where(
+                    ConfidentialNonceRow.session_id == session_id
+                )
+            )
+        nonce = held or secrets.token_urlsafe(24)
         target = BrokerTarget.of(opts)
         await self._broker.put_resource(target, TIME_RESOURCE, attested_time())
         written: list[str] = []
@@ -92,13 +99,15 @@ class SessionResourceProvisioner:
             await self._broker.put_resource(target, path, payload)
             written.append(path)
             async with self._db.begin_session() as db_session:
-                db_session.add(
-                    ConfidentialSessionResourceRow(
+                await db_session.execute(
+                    pg_insert(ConfidentialSessionResourceRow)
+                    .values(
                         session_id=session_id,
                         endpoint=opts.broker_endpoint,
                         resource_path=path,
                         kind=kind,
                     )
+                    .on_conflict_do_nothing(constraint="uq_conf_resource_path")
                 )
             await self._shim.record(
                 actor=DecisionActor.MANAGER,

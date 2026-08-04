@@ -71,6 +71,7 @@ from .plugin.webapp import WebappPluginContext
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "manager"
+ATTESTATION_HEADER_LIMIT: Final = 262144
 
 
 @asynccontextmanager
@@ -265,7 +266,9 @@ async def server_main(
     ) -> AsyncGenerator[None]:
         config_provider = dep_resources.bootstrap.config_provider
 
-        runner = web.AppRunner(root_app, keepalive_timeout=30.0)
+        runner = web.AppRunner(
+            root_app, keepalive_timeout=30.0, max_field_size=ATTESTATION_HEADER_LIMIT
+        )
 
         internal_app = build_internal_app(dep_resources)
         internal_runner = web.AppRunner(internal_app, keepalive_timeout=30.0)

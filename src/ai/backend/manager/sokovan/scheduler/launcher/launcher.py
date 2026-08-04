@@ -16,6 +16,7 @@ import sqlalchemy as sa
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import (
     ValkeyScheduleClient,
@@ -716,18 +717,21 @@ class SessionLauncher:
                     raise ConfidentialCapabilityRefused(
                         extra_msg=f"kernel {kernel.kernel_id} has no agent to relay its channel"
                     )
-                db_session.add(
-                    ConfidentialChannelRow(
-                        kernel_id=UUID(str(kernel.kernel_id)),
-                        session_id=session.session_id,
-                        endpoint=opts.broker_endpoint,
-                        resource_path=provisioning.path_of(f"channel-{kernel.kernel_id}") or "",
-                        relay_addr=f"{relay_host}:{opts.channel_relay_port}",
-                        channel_port=opts.channel_guest_port,
-                        fingerprint=identity.fingerprint,
-                        token=identity.token,
-                        expires_at=identity.expires_at,
-                    )
+                values = {
+                    "kernel_id": UUID(str(kernel.kernel_id)),
+                    "session_id": session.session_id,
+                    "endpoint": opts.broker_endpoint,
+                    "resource_path": provisioning.path_of(f"channel-{kernel.kernel_id}") or "",
+                    "relay_addr": f"{relay_host}:{opts.channel_relay_port}",
+                    "channel_port": opts.channel_guest_port,
+                    "fingerprint": identity.fingerprint,
+                    "token": identity.token,
+                    "expires_at": identity.expires_at,
+                }
+                await db_session.execute(
+                    pg_insert(ConfidentialChannelRow)
+                    .values(**values)
+                    .on_conflict_do_update(index_elements=["kernel_id"], set_=values)
                 )
         log.info(
             "confidential: provisioned {} resources for session {} under quota {}",

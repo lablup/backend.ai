@@ -1,0 +1,23 @@
+#!/opt/backend.ai/bin/python
+import json
+import os
+import subprocess
+import time
+
+subprocess.run(
+    ["/bin/nvidia-ctk", "cdi", "generate", "--format=json", "--output=/run/cdi/nvidia.json"],
+    check=True,
+)
+with open("/run/cdi/nvidia.json") as handle:
+    spec = json.load(handle)
+with open("/opt/kernel/backendai.cdi.json") as handle:
+    spec.setdefault("containerEdits", {}).setdefault("mounts", []).extend(json.load(handle))
+with open("/run/cdi/nvidia.json", "w") as handle:
+    json.dump(spec, handle)
+os.remove("/run/cdi/nvidia.yaml")
+if os.fork() == 0:
+    os.setsid()
+    while subprocess.call(["/usr/local/bin/bai-guest-boot"]) != 0:
+        time.sleep(5)
+    os._exit(0)
+os.execv("/usr/bin/kata-agent.real", ["/usr/bin/kata-agent"])

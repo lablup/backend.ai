@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hashlib
 import json
 import uuid
 from http.cookies import SimpleCookie
@@ -31,7 +32,13 @@ from ai.backend.manager.models.scaling_group.types import ConfidentialScalingGro
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 RCAR_SESSION_COOKIE: Final = "kbs-session-id"
-RELAYED_REQUEST_HEADERS: Final = frozenset({"content-type", "accept", "user-agent", "cookie"})
+RELAYED_REQUEST_HEADERS: Final = frozenset({
+    "content-type",
+    "accept",
+    "user-agent",
+    "cookie",
+    "authorization",
+})
 RELAYED_RESPONSE_HEADERS: Final = frozenset({"content-type", "set-cookie", "www-authenticate"})
 
 _QUOTE_HEADER_LEN: Final = 48
@@ -63,6 +70,43 @@ def path_nonce(resource_path: str) -> str | None:
     if len(segments) != 3:
         return None
     return segments[1].partition(".")[2] or None
+
+
+def _tee_pubkey(claims: Any) -> Any:
+    stack = [claims]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, dict):
+            found = node.get("tee-pubkey")
+            if found is not None:
+                return found
+            stack.extend(node.values())
+        elif isinstance(node, list):
+            stack.extend(node)
+    return None
+
+
+def attested_guest(headers: dict[str, str]) -> str | None:
+    for key, value in headers.items():
+        if key.lower() != "authorization":
+            continue
+        scheme, _, token = value.partition(" ")
+        if scheme.lower() != "bearer":
+            continue
+        segments = token.split(".")
+        if len(segments) < 2:
+            continue
+        payload = segments[1] + "=" * (-len(segments[1]) % 4)
+        try:
+            claims = json.loads(base64.urlsafe_b64decode(payload))
+        except (ValueError, binascii.Error):
+            continue
+        pubkey = _tee_pubkey(claims)
+        if pubkey is None:
+            continue
+        rendered = json.dumps(pubkey, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        return hashlib.sha256(rendered).hexdigest()
+    return None
 
 
 def rcar_session(headers: dict[str, str]) -> str | None:
@@ -248,7 +292,7 @@ class AuthorisationShim:
         headers: dict[str, str],
     ) -> tuple[int, bytes, dict[str, str]]:
         nonce = path_nonce(resource_path)
-        guest = rcar_session(headers)
+        guest = rcar_session(headers) or attested_guest(headers)
         session_id: uuid.UUID | None = None
         consumed = False
         if nonce is not None:

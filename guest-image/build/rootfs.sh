@@ -74,6 +74,7 @@ stage_krunner() {
 	[ -n "$env_tar" ] || die "krunner environment archive for ${BAI_CC_KRUNNER_DISTRO}/${BAI_CC_TARGET_ARCH} not in wheel"
 	install -d -m 0755 "${stage}/opt/backend.ai"
 	tar xJf "$env_tar" -C "${stage}/opt/backend.ai"
+	stage_needed_libs "$(stage_one_root)" "${stage}/opt/backend.ai/bin/python3.13"
 }
 
 stage_runner() {
@@ -103,6 +104,7 @@ stage_runner() {
 stage_needed_libs() {
 	local one="$1" obj="$2" so found rel
 	for so in $(objdump -p "$obj" 2>/dev/null | awk '/NEEDED/ {print $2}'); do
+		case "$so" in */*) continue ;; esac
 		found="$(find "${one}/lib" "${one}/usr/lib" -name "$so" -print -quit 2>/dev/null)"
 		[ -n "$found" ] || die "stage-one has no ${so}, needed by ${obj#"${one}"/}"
 		rel="${found#"${one}"/}"
@@ -174,9 +176,11 @@ stage_tunnel() {
 }
 
 stage_overlay() {
+	mv "${stage}/usr/bin/kata-agent" "${stage}/usr/bin/kata-agent.real"
 	cp -a "${BAI_CC_ROOT}/overlay/." "${stage}/"
 	find "${stage}/opt/kernel" "${stage}/usr/local/bin" -name '__pycache__' -type d -prune -exec rm -rf {} +
-	chmod 0755 "${stage}/opt/kernel/bai-cc-entrypoint" "${stage}/usr/local/bin/bai-guest-boot" \
+	chmod 0755 "${stage}/usr/bin/kata-agent" \
+		"${stage}/opt/kernel/bai-cc-entrypoint" "${stage}/usr/local/bin/bai-guest-boot" \
 		"${stage}/usr/local/bin/bai-guest-storage" \
 		"${stage}/usr/local/bin/bai-tunnel-up" "${stage}/opt/kernel/bai-tunnel-bench"
 	install -d -m 0755 "${stage}/usr/lib/systemd/system/multi-user.target.wants"

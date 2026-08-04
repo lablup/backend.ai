@@ -1,0 +1,22 @@
+[
+  {
+    "hostPath": "/opt/backend.ai",
+    "containerPath": "/opt/backend.ai",
+    "options": ["ro", "rbind", "rprivate"]
+  },
+  {
+    "hostPath": "/opt/kernel",
+    "containerPath": "/opt/kernel",
+    "options": ["ro", "rbind", "rprivate"]
+  },
+  {
+    "hostPath": "/run/backend.ai",
+    "containerPath": "/run/backend.ai",
+    "options": ["ro", "rbind", "rprivate"]
+  },
+  {
+    "hostPath": "/run/backend.ai/session",
+    "containerPath": "/run/backend.ai/session",
+    "options": ["rw", "rbind", "rprivate"]
+  }
+]
