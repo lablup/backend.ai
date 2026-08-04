@@ -32,7 +32,9 @@ import strawberry.experimental.pydantic
 import strawberry.federation
 from pydantic import BaseModel
 from strawberry.experimental.pydantic.conversion_types import StrawberryTypeFromPydantic
+from strawberry.federation import schema_directive
 from strawberry.relay import Connection
+from strawberry.schema_directive import Location
 from strawberry.schema_directives import OneOf
 from strawberry.types.field import StrawberryField
 from strawberry.types.field import field as strawberry_field
@@ -55,10 +57,13 @@ __all__ = (
     "gql_pydantic_input",
     "gql_pydantic_interface",
     "gql_pydantic_type",
+    "gql_public_root_field",
     "gql_root_field",
     "gql_subscription",
     "gql_federation_type",
 )
+
+PUBLIC_DIRECTIVE_SPEC_URL = "https://specs.backend.ai/public/v0.1"
 
 T = TypeVar("T", bound="PydanticNodeMixin[Any]")
 T_conn = TypeVar("T_conn", bound="Connection[Any]")
@@ -277,6 +282,17 @@ def gql_root_field(
     )
 
 
+@schema_directive(
+    locations=[Location.FIELD_DEFINITION],
+    name="public",
+    description="Resolvable without authentication.",
+    compose=True,
+    import_url=PUBLIC_DIRECTIVE_SPEC_URL,
+)
+class Public:
+    """``@public`` on a field definition. Carried into the supergraph via ``@composeDirective``."""
+
+
 def gql_public_root_field(
     meta: BackendAIGQLMeta,
     *,
@@ -287,13 +303,14 @@ def gql_public_root_field(
     """Root query field resolvable without authentication.
 
     Distinct from ``gql_root_field`` so that every anonymously reachable field is greppable by
-    its declaration, and so the SDL states the exposure to whoever reads it.
+    its declaration, and marked ``@public`` in the schema so the exposure survives introspection
+    rather than living in prose.
     """
     return strawberry.field(
-        description=f"{_build_description(meta).rstrip('.')}. Resolvable without authentication.",
+        description=_build_description(meta),
         name=name,
         deprecation_reason=deprecation_reason,
-        directives=directives,
+        directives=[Public(), *directives],
     )
 
 

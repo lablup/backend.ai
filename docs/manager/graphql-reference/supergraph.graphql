@@ -1,6 +1,7 @@
 schema
   @link(url: "https://specs.apollo.dev/link/v1.0")
   @link(url: "https://specs.apollo.dev/join/v0.4", for: EXECUTION)
+  @link(url: "https://specs.backend.ai/public/v0.1", import: ["@public"])
 {
   query: Query
   mutation: Mutation
@@ -22,6 +23,9 @@ directive @join__type(graph: join__Graph!, key: join__FieldSet, extension: Boole
 directive @join__unionMember(graph: join__Graph!, member: String!) repeatable on UNION
 
 directive @link(url: String, as: String, for: link__Purpose, import: [link__Import]) repeatable on SCHEMA
+
+"""Resolvable without authentication."""
+directive @public on FIELD_DEFINITION
 
 """Added in 26.4.4. Input for accepting a role invitation."""
 input AcceptRoleInvitationInput
@@ -15374,8 +15378,8 @@ type Query
   """Added in 25.8.0."""
   service_configs(services: [String]!, filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ServiceConfigConnection @join__field(graph: GRAPHENE)
 
-  """Added in 26.9.0. Returns 'pong'. Resolvable without authentication."""
-  ping: String! @join__field(graph: PUBLIC)
+  """Added in 26.9.0. Returns 'pong'"""
+  ping: String! @join__field(graph: PUBLIC) @public
 
   """Added in 25.15.0. Get aggregate agent resource statistics"""
   agentStats: AgentStats @join__field(graph: STRAWBERRY)
