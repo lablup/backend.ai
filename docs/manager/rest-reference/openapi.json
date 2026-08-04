@@ -53821,30 +53821,6 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/admin/gql/strawberry/public": {
-      "post": {
-        "operationId": "admin.handle_gql_strawberry_public",
-        "tags": [
-          "admin"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GraphQLRequest"
-              }
-            }
-          }
-        },
-        "parameters": [],
-        "description": "Anonymous (unauthenticated) GraphQL endpoint.\n\nRegistered without ``auth_required`` so unauthenticated callers reach it. It serves a\nseparate ``PublicQueries`` schema that contains only public fields, so private fields are\nphysically absent and cannot be queried (no runtime gate needed). Authenticated routes are\nunaffected.\n"
-      }
-    },
     "/admin/domains": {
       "post": {
         "operationId": "admin/domains.create",

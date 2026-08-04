@@ -33,7 +33,9 @@ subgraphs:
 
   # Unauthenticated fields. Its routing URL carries no auth middleware, so an anonymous query
   # composed entirely of these fields resolves without credentials.
-  public:
-    routing_url: http://host.docker.internal:8091/admin/gql/strawberry/public
-    schema:
-      file: ../../docs/manager/graphql-reference/v2-public-schema.graphql
+  # TODO(BA-6592): re-enable together with the route in manager api/rest/admin/registry.py, once a
+  # real public field exists. Composing it now would publish the `public_ping` placeholder.
+  # public:
+  #   routing_url: http://host.docker.internal:8091/admin/gql/strawberry/public
+  #   schema:
+  #     file: ../../docs/manager/graphql-reference/v2-public-schema.graphql
