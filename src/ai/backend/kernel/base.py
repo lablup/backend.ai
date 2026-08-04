@@ -35,6 +35,7 @@ from jupyter_client.asynchronous.client import AsyncKernelClient
 from jupyter_client.kernelspec import KernelSpecManager
 from jupyter_client.manager import AsyncKernelManager
 
+from . import guestops
 from .compat import current_loop
 from .intrinsic import (
     init_sshd_service,
@@ -1163,6 +1164,7 @@ class BaseRunner(metaclass=ABCMeta):
         user_input_server = await asyncio.start_unix_server(
             self.handle_user_input, "/tmp/bai-user-input.sock"
         )
+        await guestops.apply_guest_sudo()
         log.debug("initializing krunner...")
         await self._init_with_loop()
         log.debug("initializing jupyter kernel...")
@@ -1215,6 +1217,11 @@ class BaseRunner(metaclass=ABCMeta):
                     # maybe some garbage data
                     continue
                 op_type = data[0].decode("ascii")
+                if op_type in guestops.GUEST_VERBS:
+                    guest_task = asyncio.create_task(guestops.serve(self.outsock, op_type, data[1]))
+                    self._background_tasks.add(guest_task)
+                    guest_task.add_done_callback(self._background_tasks.discard)
+                    continue
                 text = data[1].decode("utf8")
                 if op_type == "clean":
                     await self.task_queue.put(partial(self._clean, text))

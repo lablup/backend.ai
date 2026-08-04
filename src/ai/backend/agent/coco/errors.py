@@ -131,3 +131,25 @@ class VfioDeviceUnavailable(_CocoFailure):
     error_type = _PREFIX + "vfio-device-unavailable"
     error_title = "An allocated accelerator has no vfio character device bound at launch time."
     _detail = ErrorDetail.UNAVAILABLE
+
+
+class RelayUnavailable(_CocoFailure):
+    error_type = _PREFIX + "relay-unavailable"
+    error_title = "The blind byte relay cannot run on this kernel."
+    _detail = ErrorDetail.UNAVAILABLE
+
+
+class RawCircuitRefused(_CocoRefusal):
+    error_type = _PREFIX + "raw-circuit-refused"
+    error_title = "Raw circuits are refused outside the self-encrypting allowlist."
+
+
+class ChannelKeyOnHostRefused(_CocoFailure):
+    error_type = _PREFIX + "channel-key-on-host-refused"
+    error_title = "The session channel key may never be present on the agent host."
+    _detail = ErrorDetail.FORBIDDEN
+
+
+class ChannelTerminatedVerbRefused(_CocoRefusal):
+    error_type = _PREFIX + "channel-terminated-verb-refused"
+    error_title = "This verb moved off the agent onto the end-to-end guest channel."

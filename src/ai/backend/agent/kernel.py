@@ -148,11 +148,17 @@ class AbstractKernel(UserDict[str, Any], aobject, metaclass=ABCMeta):
         self.state = KernelLifecycleStatus.PREPARING
         self.session_type = session_type
 
+    @property
+    def channel_terminated(self) -> bool:
+        return False
+
     def set_container_id(self, cid: ContainerId) -> None:
         self.container_id = cid
         self["container_id"] = cid
 
     async def init(self, event_producer: EventProducer) -> None:
+        if self.channel_terminated:
+            return
         log.debug(
             "kernel.init(k:{0}, api-ver:{1}, client-features:{2}): starting new runner",
             self.kernel_id,

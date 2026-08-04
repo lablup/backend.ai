@@ -3102,9 +3102,8 @@ class AbstractAgent[
                             ),
                         ):
                             with attempt:
-                                # Wait until bootstrap script is executed.
-                                # - Main kernel runner is executed after bootstrap script, and
-                                #   check_status is accessible only after kernel runner is loaded.
+                                if kernel_obj.channel_terminated:
+                                    break
                                 async with asyncio.timeout(kernel_init_timeout):
                                     await kernel_obj.check_status()
                                     # Update the service-ports metadata from the image labels
