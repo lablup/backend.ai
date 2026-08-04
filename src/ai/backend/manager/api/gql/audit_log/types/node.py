@@ -37,6 +37,7 @@ class AuditLogStatusGQL(StrEnum):
     ERROR = "error"
     UNKNOWN = "unknown"
     RUNNING = "running"
+    DENIED = "denied"
 
 
 @gql_node_type(

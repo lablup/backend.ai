@@ -37,19 +37,19 @@ from ai.backend.common.identifier.entity import EntityID
 from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.common.identifier.virtual_scope import VirtualScopeID
 from ai.backend.manager.actions.action.base import BaseActionTriggerMeta
-from ai.backend.manager.actions.bulk.base import BaseBulkAction
-from ai.backend.manager.actions.bulk.validator.rbac import (
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
+from ai.backend.manager.actions.v2.bulk.validator.rbac import (
     VirtualScopeBulkActionRBACValidator,
 )
-from ai.backend.manager.actions.scope.base import BaseScopeAction
-from ai.backend.manager.actions.scope.validator.rbac import (
+from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
+from ai.backend.manager.actions.v2.scope.validator.rbac import (
     VirtualScopeScopeActionRBACValidator,
 )
-from ai.backend.manager.actions.single_entity.base import BaseSingleEntityAction
-from ai.backend.manager.actions.single_entity.validator.rbac import (
+from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
+from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
     VirtualScopeSingleEntityActionRBACValidator,
 )
-from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.agent import AgentRow
@@ -219,6 +219,7 @@ async def _seed_user_with_role(
         db_sess.add(
             UserRow(
                 uuid=user_id,
+                username=f"user-{suffix}",
                 email=f"user-{suffix}@test.com",
                 resource_policy=policy_name,
                 status=UserStatus.ACTIVE,

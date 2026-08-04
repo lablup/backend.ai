@@ -1913,6 +1913,7 @@ enum AuditLogStatus
   ERROR @join__enumValue(graph: STRAWBERRY)
   UNKNOWN @join__enumValue(graph: STRAWBERRY)
   RUNNING @join__enumValue(graph: STRAWBERRY)
+  DENIED @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 24.09.0. Filter for audit log status field."""

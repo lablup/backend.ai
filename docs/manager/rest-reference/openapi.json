@@ -2327,7 +2327,8 @@
           "success",
           "error",
           "unknown",
-          "running"
+          "running",
+          "denied"
         ],
         "title": "AuditLogStatus",
         "type": "string"

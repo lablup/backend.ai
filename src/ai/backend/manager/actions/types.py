@@ -16,6 +16,21 @@ class OperationStatus(enum.StrEnum):
     ERROR = "error"
     UNKNOWN = "unknown"
     RUNNING = "running"
+    # Rejected by a validator before the action ran. Kept apart from ERROR because a
+    # denial is an authorization signal, not the operation failing.
+    DENIED = "denied"
+
+
+class ActionKind(enum.StrEnum):
+    """The shape of an action's target, recorded on every audit row."""
+
+    SINGLE_ENTITY = "single_entity"
+    BULK = "bulk"
+    SCOPE = "scope"
+    GLOBAL = "global"
+    LOOKUP = "lookup"
+    # Still on the legacy ``BaseAction`` base, which declares no shape.
+    UNKNOWN = "unknown"
 
 
 class ActionOperationType(enum.StrEnum):
@@ -25,6 +40,15 @@ class ActionOperationType(enum.StrEnum):
     UPDATE = "update"
     DELETE = "delete"
     PURGE = "purge"
+
+    @classmethod
+    def read_operations(cls) -> frozenset["ActionOperationType"]:
+        """The operations that only read. Everything else changes state.
+
+        The audit layer draws its "always record" line here: a state change is
+        recorded unconditionally, while recording a read is a configurable choice.
+        """
+        return frozenset({cls.GET, cls.SEARCH})
 
     def to_permission_operation(self) -> OperationType:
         match self:
