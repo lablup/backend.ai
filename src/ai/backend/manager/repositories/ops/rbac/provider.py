@@ -707,7 +707,7 @@ class RBACWriteOps(WriteOps):
         """Deterministic per-scope role name used when a preset's template cannot
         be rendered. Built with plain string formatting — never via the template
         engine — so scope creation cannot fail on role naming."""
-        return f"{scope.scope_type}-{scope.scope_id}-role"
+        return f"{scope.scope_type}-{str(scope.scope_id)[:8]}-role"
 
     def _render_preset_role_name(
         self,
@@ -716,7 +716,7 @@ class RBACWriteOps(WriteOps):
         scope_template_value: ScopeTemplateValue | None,
     ) -> str:
         """Render the name of a role instantiated from the preset, falling back to
-        ``{scope_type}-{scope_id}-role`` so that scope creation never fails on a
+        ``{scope_type}-{scope_id[:8]}-role`` so that scope creation never fails on a
         bad template."""
         if preset.role_name_template is None:
             return preset.name
