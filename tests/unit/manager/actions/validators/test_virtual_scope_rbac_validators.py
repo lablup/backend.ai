@@ -219,6 +219,7 @@ async def _seed_user_with_role(
         db_sess.add(
             UserRow(
                 uuid=user_id,
+                username=f"user-{suffix}",
                 email=f"user-{suffix}@test.com",
                 resource_policy=policy_name,
                 status=UserStatus.ACTIVE,
