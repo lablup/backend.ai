@@ -97,7 +97,7 @@ services:
 
   # Initial master is redis-node01.
   backendai-half-redis-node01:
-    image: valkey/valkey:9.1.0-alpine
+    image: valkey/valkey:9.1.1-alpine
     hostname: node01
     networks:
     - half
@@ -117,7 +117,7 @@ services:
     # network partitioning.
 
   backendai-half-redis-node02:
-    image: valkey/valkey:9.1.0-alpine
+    image: valkey/valkey:9.1.1-alpine
     hostname: node02
     networks:
     - half
@@ -135,7 +135,7 @@ services:
       --min-slaves-max-lag 10
 
   backendai-half-redis-node03:
-    image: valkey/valkey:9.1.0-alpine
+    image: valkey/valkey:9.1.1-alpine
     hostname: node03
     ports:
     - 0.0.0.0:${REDIS_SLAVE2_PORT}:${REDIS_SLAVE2_PORT}
@@ -153,7 +153,7 @@ services:
       --min-slaves-max-lag 10
 
   backendai-half-redis-sentinel01:
-    image: valkey/valkey:9.1.0-alpine
+    image: valkey/valkey:9.1.1-alpine
     hostname: sentinel01
     networks:
     - half
@@ -173,7 +173,7 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
 
   backendai-half-redis-sentinel02:
-    image: valkey/valkey:9.1.0-alpine
+    image: valkey/valkey:9.1.1-alpine
     hostname: sentinel02
     networks:
     - half
@@ -193,7 +193,7 @@ services:
     - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
 
   backendai-half-redis-sentinel03:
-    image: valkey/valkey:9.1.0-alpine
+    image: valkey/valkey:9.1.1-alpine
     hostname: sentinel03
     networks:
     - half

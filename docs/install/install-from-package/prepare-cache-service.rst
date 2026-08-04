@@ -20,7 +20,7 @@ Please refer `the latest configuration <https://github.com/lablup/backend.ai/blo
       backendai-half-redis:
          <<: *base
          container_name: backendai-halfstack-redis
-         image: valkey/valkey:9.1.0-alpine
+         image: valkey/valkey:9.1.1-alpine
          restart: unless-stopped
          command: >
             valkey-server
