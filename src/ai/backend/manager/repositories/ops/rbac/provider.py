@@ -21,6 +21,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.sql.expression import SQLColumnExpression
 
+from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_SCOPE_TYPE
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_SCOPE_TYPE
@@ -57,6 +58,7 @@ from ai.backend.manager.errors.permission import VirtualScopeNotFound
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.errors.role_preset import InvalidRoleNameTemplate
 from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair_data
@@ -208,6 +210,21 @@ class ScopeUserMember(ScopeMember):
 
 
 @dataclass
+class ScopeEntityMember(ScopeMember):
+    """A non-user entity joining a scope; no roles are granted for it."""
+
+    ref: EntityRef
+
+    @override
+    def entity_ref(self) -> EntityRef:
+        return self.ref
+
+    @override
+    def assign_role_on(self) -> UserID | None:
+        return None
+
+
+@dataclass
 class EntityMembersAddition:
     scope: ScopeRef
     members: Collection[ScopeMember]
@@ -248,6 +265,7 @@ class RBACWriteOps(WriteOps):
     """Base write ops plus RBAC scope-associated creation and virtual-scope writes."""
 
     _scope_rows: ClassVar[Mapping[ScopeType, type[ScopeSource]]] = {
+        CONTAINER_REGISTRY_SCOPE_TYPE: ContainerRegistryRow,
         DOMAIN_SCOPE_TYPE: DomainRow,
         PROJECT_SCOPE_TYPE: GroupRow,
         RESOURCE_GROUP_SCOPE_TYPE: ScalingGroupRow,

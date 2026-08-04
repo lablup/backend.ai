@@ -11,6 +11,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.common.exception import ContainerRegistryGroupsAlreadyAssociated
+from ai.backend.common.identifier.container_registry import ContainerRegistryID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
@@ -35,10 +36,14 @@ from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.rbac_models import PermissionRow, RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
+    RolePermissionPresetRow,
+)
+from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -53,6 +58,9 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
@@ -145,6 +153,13 @@ class TestContainerRegistryRepository:
                 ContainerRegistryRow,
                 AssociationContainerRegistriesGroupsRow,
                 AssociationScopesEntitiesRow,
+                PermissionRow,
+                RolePresetRow,
+                RolePermissionPresetRow,
+                # The registry's owner virtual scope and the allowed-project edges
+                VirtualScopeRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
             ],
         ):
             yield database_connection
@@ -1256,7 +1271,7 @@ class TestContainerRegistryRepository:
     ) -> None:
         """Test successful registry deletion"""
         # Given: A pre-created test registry
-        registry_id = test_registry.id
+        registry_id = ContainerRegistryID(test_registry.id)
         registry_name = test_registry.registry_name
 
         # When: Delete the registry
@@ -1278,7 +1293,7 @@ class TestContainerRegistryRepository:
     ) -> None:
         """Test deletion of non-existent registry raises error"""
         # Given: Non-existent registry ID
-        non_existent_id = uuid.uuid4()
+        non_existent_id = ContainerRegistryID(uuid.uuid4())
 
         # When/Then: Raises ContainerRegistryNotFound
         with pytest.raises(ContainerRegistryNotFound):
@@ -1295,7 +1310,9 @@ class TestContainerRegistryRepository:
         registry = test_registry_with_custom_props
 
         # When: Delete the registry
-        purger = Purger(spec=ContainerRegistryPurgerSpec(registry_id=registry.id))
+        purger = Purger(
+            spec=ContainerRegistryPurgerSpec(registry_id=ContainerRegistryID(registry.id))
+        )
         result = await repository.delete_registry(purger)
 
         # Then: Returns all registry data with correct properties
