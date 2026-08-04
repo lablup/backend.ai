@@ -2150,7 +2150,7 @@ class ConfidentialConfig(BaseConfigSchema):
     ]
     blob_annotation_key: Annotated[
         str,
-        Field(default="io.katacontainers.config.runtime.cc_init_data"),
+        Field(default="io.katacontainers.config.hypervisor.cc_init_data"),
         BackendAIConfigMeta(
             description="Annotation the measured configuration blob is attached under, verbatim.",
             added_version="26.7.0",
