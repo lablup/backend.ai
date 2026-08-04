@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Collection, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, override
 
 from ai.backend.common.data.entity.types import ScopeRef
@@ -62,7 +62,7 @@ class UserCreatorSpec(CreatorSpec[UserRow]):
     password: PasswordInfo
     need_password_change: bool
     domain_name: str
-    domain_id: DomainID | None = None
+    domain_id: DomainID | None = field(init=False, default=None)
     full_name: str | None = None
     description: str | None = None
     is_active: bool | None = None
