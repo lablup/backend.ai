@@ -1,9 +1,4 @@
-"""GraphQL query resolvers for the merged app config view.
-
-Both fields are batch reads keyed by config name. Neither takes a scope: ``my_app_configs``
-resolves the principal from the session inside the adapter, and ``public_app_configs`` names
-no principal at all, which is what makes it safe to serve anonymously.
-"""
+"""GraphQL query resolvers for the merged app config view."""
 
 from __future__ import annotations
 

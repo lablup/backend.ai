@@ -27,14 +27,10 @@ __all__ = ("AppConfigGQL",)
     ),
     model=AppConfigNode,
     name="AppConfig",
-    # Both the `strawberry` subgraph (myAppConfigs) and the `public` one (publicAppConfigs)
-    # resolve this type, which federation rejects unless it is shareable.
     directives=[Shareable()],
 )
 class AppConfigGQL(PydanticOutputMixin[AppConfigNode]):
     config_name: str = gql_field(description="Config name this view is for.")
-    # Strawberry surfaces the Pydantic field's description, not this one — keep them in step
-    # so the SDL and the DTO cannot drift apart.
     config: JSON = gql_field(
         description=(
             "Every fragment visible to the caller, deep-merged in ascending allow-list rank "
