@@ -1,4 +1,4 @@
-"""Add name_template to role_presets
+"""Add role_name_template to role_presets
 
 A role preset may carry a Jinja template (e.g. ``{{scope.type}}-{{scope.name}}-member``)
 rendering the name of roles instantiated from it; NULL keeps the preset's
@@ -22,9 +22,9 @@ depends_on = None
 def upgrade() -> None:
     op.add_column(
         "role_presets",
-        sa.Column("name_template", sa.Text(), nullable=True),
+        sa.Column("role_name_template", sa.Text(), nullable=True),
     )
 
 
 def downgrade() -> None:
-    op.drop_column("role_presets", "name_template")
+    op.drop_column("role_presets", "role_name_template")

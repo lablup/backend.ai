@@ -56,14 +56,14 @@ class SeededPreset:
     scope_type: ScopeType
     auto_assign: bool
     permissions: tuple[tuple[EntityType, OperationType], ...]
-    name_template: str | None = None
+    role_name_template: str | None = None
 
 
 async def _seed_preset(db: ExtendedAsyncSAEngine, preset: SeededPreset, *, deleted: bool) -> None:
     async with db.begin_session() as db_sess:
         preset_row = RolePresetRow(
             name=preset.name,
-            name_template=preset.name_template,
+            role_name_template=preset.role_name_template,
             scope_type=preset.scope_type,
             auto_assign=preset.auto_assign,
             deleted=deleted,
@@ -283,7 +283,7 @@ class TestCreatePresetRoles:
             role_count = await db_sess.scalar(sa.select(sa.func.count()).select_from(RoleRow))
             assert role_count == len(two_domain_presets)
 
-    async def test_name_template_is_ignored_in_legacy_path(
+    async def test_role_name_template_is_ignored_in_legacy_path(
         self,
         role_manager: RoleManager,
         db_with_tables: ExtendedAsyncSAEngine,
@@ -295,7 +295,7 @@ class TestCreatePresetRoles:
             scope_type=ScopeType.DOMAIN,
             auto_assign=False,
             permissions=(),
-            name_template="{{ scope.name }}-member",
+            role_name_template="{{ scope.name }}-member",
         )
         await _seed_preset(db_with_tables, preset, deleted=False)
         scope_id = ScopeId(scope_type=ScopeType.DOMAIN, scope_id=str(uuid.uuid4()))

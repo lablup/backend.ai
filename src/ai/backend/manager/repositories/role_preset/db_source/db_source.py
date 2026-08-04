@@ -67,8 +67,8 @@ class RolePresetDBSource:
         permission_creator_specs: Sequence[RolePermissionPresetDependentCreatorSpec],
     ) -> RolePresetData:
         async with self._ops.write_ops() as w:
-            if creator_spec.name_template is not None:
-                w.validate_role_name_template(creator_spec.name_template)
+            if creator_spec.role_name_template is not None:
+                w.validate_role_name_template(creator_spec.role_name_template)
             created = await w.create(Creator(spec=creator_spec))
             preset_row = created.row
             if permission_creator_specs:
@@ -116,8 +116,8 @@ class RolePresetDBSource:
     ) -> RolePresetData:
         async with self._ops.write_ops() as w:
             spec = updater.spec
-            if isinstance(spec, RolePresetUpdaterSpec) and spec.name_template.is_update():
-                w.validate_role_name_template(spec.name_template.value())
+            if isinstance(spec, RolePresetUpdaterSpec) and spec.role_name_template.is_update():
+                w.validate_role_name_template(spec.role_name_template.value())
             result = await w.update(updater)
             if result is None:
                 raise RolePresetNotFound(f"Role preset with ID {updater.pk_value} not found.")

@@ -306,7 +306,7 @@ class RBACWriteOps(WriteOps):
         }
 
     def _render_role_name(self, template: str, scope: ScopeTemplateValue) -> str:
-        """Render a role name from a preset's ``name_template`` (e.g.
+        """Render a role name from a preset's ``role_name_template`` (e.g.
         ``{{scope.type}}-{{scope.name}}-member``), raising :class:`InvalidRoleNameTemplate`
         on syntax errors, undefined variables, or an unusable result."""
         try:
@@ -325,7 +325,7 @@ class RBACWriteOps(WriteOps):
         return rendered
 
     def validate_role_name_template(self, template: str) -> None:
-        """Validate a preset's ``name_template`` by rendering it against
+        """Validate a preset's ``role_name_template`` by rendering it against
         representative dummy values, so syntax errors and undefined variables
         are rejected before the preset is stored."""
         dummy = ScopeTemplateValue(
@@ -683,7 +683,7 @@ class RBACWriteOps(WriteOps):
         for preset in preset_rows:
             presets_by_scope_type[preset.scope_type].append(preset)
         scope_template_values: dict[ScopeRef, ScopeTemplateValue | None] = {}
-        if any(preset.name_template is not None for preset in preset_rows):
+        if any(preset.role_name_template is not None for preset in preset_rows):
             scope_template_values = await self._resolve_scope_template_values(scopes)
         return [
             _RoleSpec(
@@ -718,25 +718,25 @@ class RBACWriteOps(WriteOps):
         """Render the name of a role instantiated from the preset, falling back to
         ``{scope_type}-{scope_id}-role`` so that scope creation never fails on a
         bad template."""
-        if preset.name_template is None:
+        if preset.role_name_template is None:
             return preset.name
         if scope_template_value is None:
             fallback = self._fallback_preset_role_name(scope)
             log.warning(
                 "Cannot resolve scope attributes for role preset {} ({}); falling back to {}",
                 preset.id,
-                preset.name_template,
+                preset.role_name_template,
                 fallback,
             )
             return fallback
         try:
-            return self._render_role_name(preset.name_template, scope_template_value)
+            return self._render_role_name(preset.role_name_template, scope_template_value)
         except InvalidRoleNameTemplate as e:
             fallback = self._fallback_preset_role_name(scope)
             log.warning(
                 "Failed to render role name template of preset {} ({}): {}; falling back to {}",
                 preset.id,
-                preset.name_template,
+                preset.role_name_template,
                 e,
                 fallback,
             )
