@@ -47,7 +47,7 @@ class VirtualScopeSingleEntityActionRBACValidator(SingleEntityActionValidator):
                 entity_id=action.entity_id(),
             ),
         )
-        permission = action.required_permission()
+        permission = action.operation_type().to_permission()
         allowed = await self._repository.check_single_entity_permission_via_virtual_scope(
             key, permission
         )

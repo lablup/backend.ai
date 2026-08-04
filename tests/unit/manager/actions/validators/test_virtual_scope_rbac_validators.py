@@ -119,11 +119,6 @@ class _ProjectCreateScopeAction(BaseScopeAction):
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
 
-    @classmethod
-    @override
-    def required_permission(cls) -> Permission:
-        return Permission.CREATE
-
 
 @dataclass
 class _VfolderUpdateAction(BaseSingleEntityAction):
@@ -145,11 +140,6 @@ class _VfolderUpdateAction(BaseSingleEntityAction):
     def entity_id(self) -> EntityID:
         return self.vfolder_id
 
-    @classmethod
-    @override
-    def required_permission(cls) -> Permission:
-        return Permission.UPDATE
-
 
 @dataclass
 class _BulkVfolderUpdateAction(BaseBulkAction):
@@ -170,11 +160,6 @@ class _BulkVfolderUpdateAction(BaseBulkAction):
     @override
     def entity_ids(self) -> Sequence[EntityID]:
         return self.ids
-
-    @classmethod
-    @override
-    def required_permission(cls) -> Permission:
-        return Permission.UPDATE
 
 
 def _domain_scope(scope_id: ScopeID) -> ScopeRef:

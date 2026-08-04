@@ -13,7 +13,6 @@ from typing import override
 import pytest
 
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import PermissionDeniedError
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
@@ -45,11 +44,6 @@ class _Action(BaseSingleEntityAction):
     @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.DELETE
-
-    @classmethod
-    @override
-    def required_permission(cls) -> Permission:
-        return Permission.SOFT_DELETE
 
 
 @dataclass

@@ -53,7 +53,7 @@ class VirtualScopeScopeActionRBACValidator(ScopeActionValidator):
             )
             for scope in action.scope_targets()
         ]
-        permission = action.required_permission()
+        permission = action.operation_type().to_permission()
         permission_map = await self._repository.check_scope_permission_via_virtual_scope(
             keys, permission
         )
