@@ -1,7 +1,13 @@
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
+from typing import override
 
 from ai.backend.common.identifier.entity import EntityID
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
+from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
+from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.base.creator import DataCreator
@@ -26,6 +32,21 @@ __all__ = (
     "PurgeOpsAction",
     "SearchOpsAction",
     "GlobalSearchOpsAction",
+    "GetSingleEntityOpsAction",
+    "UpdateSingleEntityOpsAction",
+    "DeleteSingleEntityOpsAction",
+    "UpsertSingleEntityOpsAction",
+    "PurgeSingleEntityOpsAction",
+    "UpdateBulkOpsAction",
+    "DeleteBulkOpsAction",
+    "PurgeBulkOpsAction",
+    "CreateScopeOpsAction",
+    "BulkCreateScopeOpsAction",
+    "BatchUpdateScopeOpsAction",
+    "BatchPurgeScopeOpsAction",
+    "SearchScopeOpsAction",
+    "CreateGlobalOpsAction",
+    "SearchGlobalOpsAction",
 )
 
 
@@ -203,3 +224,161 @@ class GlobalSearchOpsAction[TRow: Base, TData](OpsBackendAction):
     def to_searcher(self) -> Searcher[TRow, TData]:
         """Return the search spec this action executes."""
         raise NotImplementedError
+
+
+class GetSingleEntityOpsAction[TRow: Base, TData](
+    BaseSingleEntityAction, GetOpsAction[TRow, TData], ABC
+):
+    """A single-entity read, backed by ops.
+
+    The two axes named together, because the registry has to bound them together: a
+    processor built by ``single_get_ops`` takes an action that is single-entity shaped
+    *and* carries a querier, and Python has no intersection type to say both.
+    """
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
+
+
+class UpdateSingleEntityOpsAction[TRow: Base, TData](
+    BaseSingleEntityAction, UpdateOpsAction[TRow, TData], ABC
+):
+    """A single-entity write, backed by ops. A soft delete carries this too."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+
+class UpsertSingleEntityOpsAction[TRow: Base, TData](
+    BaseSingleEntityAction, UpsertOpsAction[TRow, TData], ABC
+):
+    """A single-entity create-or-update, backed by ops."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPSERT
+
+
+class PurgeSingleEntityOpsAction[TRow: Base, TData](
+    BaseSingleEntityAction, PurgeOpsAction[TRow, TData], ABC
+):
+    """A single-entity hard delete, backed by ops."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.PURGE
+
+
+class UpdateBulkOpsAction[TRow: Base, TData](BaseBulkAction, BulkUpdateOpsAction[TRow, TData], ABC):
+    """A write over the entities the caller named. A bulk soft delete carries this too."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+
+class PurgeBulkOpsAction[TRow: Base, TData](BaseBulkAction, BulkPurgeOpsAction[TRow, TData], ABC):
+    """A hard delete over the entities the caller named."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.PURGE
+
+
+class CreateScopeOpsAction[TRow: Base, TData](BaseScopeAction, CreateOpsAction[TRow, TData], ABC):
+    """An insert of one row into the scope the action names."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
+
+
+class BulkCreateScopeOpsAction[TRow: Base, TData](
+    BaseScopeAction, BulkCreateOpsAction[TRow, TData], ABC
+):
+    """An atomic insert of several rows into the scope the action names."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
+
+
+class BatchUpdateScopeOpsAction[TRow: Base, TData](
+    BaseScopeAction, BatchUpdateOpsAction[TRow, TData], ABC
+):
+    """A write over every row matching the action's condition."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+
+class BatchPurgeScopeOpsAction[TRow: Base, TData](
+    BaseScopeAction, BatchPurgeOpsAction[TRow, TData], ABC
+):
+    """A hard delete of every row matching the action's condition."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.PURGE
+
+
+class SearchScopeOpsAction[TRow: Base, TData](BaseScopeAction, SearchOpsAction[TRow, TData], ABC):
+    """A page read from within the scopes the action names."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+
+class CreateGlobalOpsAction[TRow: Base, TData](BaseGlobalAction, CreateOpsAction[TRow, TData], ABC):
+    """An insert of one row of system-wide state."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
+
+
+class SearchGlobalOpsAction[TRow: Base, TData](
+    BaseGlobalAction, GlobalSearchOpsAction[TRow, TData], ABC
+):
+    """A page read across the whole table."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+
+class DeleteSingleEntityOpsAction[TRow: Base, TData](
+    BaseSingleEntityAction, UpdateOpsAction[TRow, TData], ABC
+):
+    """A single-entity soft delete: a status transition, so it carries an updater."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
+
+
+class DeleteBulkOpsAction[TRow: Base, TData](BaseBulkAction, BulkUpdateOpsAction[TRow, TData], ABC):
+    """A soft delete over the entities the caller named."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE

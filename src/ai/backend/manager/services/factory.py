@@ -1,6 +1,8 @@
 from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY
 from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.registry import ProcessorDependencies, ProcessorRegistry
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
 )
@@ -14,9 +16,6 @@ from ai.backend.manager.services.app_config.service import (
 )
 from ai.backend.manager.services.app_config_allow_list.processors import (
     AppConfigAllowListProcessors,
-)
-from ai.backend.manager.services.app_config_allow_list.service import (
-    AppConfigAllowListService,
 )
 from ai.backend.manager.services.app_config_definition.processors import (
     AppConfigDefinitionProcessors,
@@ -197,9 +196,6 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         app_config=AppConfigService(
             fragment_repository=repositories.app_config_fragment.repository,
-        ),
-        app_config_allow_list=AppConfigAllowListService(
-            repository=repositories.app_config_allow_list.repository,
         ),
         app_config_fragment=AppConfigFragmentService(
             repository=repositories.app_config_fragment.repository,
@@ -469,6 +465,7 @@ def create_processors(
     validators: ActionValidators,
 ) -> Processors:
     services = create_services(args.service_args)
+    repositories = args.service_args.repositories
     # Legacy BaseAction-era packages consume the flat monitor list; packages migrated
     # to the pure-ABC frameworks pick the per-type monitors from `monitors` instead.
     action_monitors = monitors.legacy
@@ -476,7 +473,13 @@ def create_processors(
         agent=AgentProcessors(services.agent, action_monitors, validators),
         app_config=AppConfigProcessors(services.app_config, action_monitors),
         app_config_allow_list=AppConfigAllowListProcessors(
-            services.app_config_allow_list, action_monitors
+            ProcessorRegistry(
+                ProcessorDependencies(
+                    monitors=monitors,
+                    validators=args.validators,
+                    repository=OpsRepository(repositories.ops_provider),
+                )
+            )
         ),
         app_config_fragment=AppConfigFragmentProcessors(
             services.app_config_fragment, action_monitors, validators

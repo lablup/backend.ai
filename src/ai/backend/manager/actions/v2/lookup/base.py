@@ -51,8 +51,11 @@ class BaseLookupAction(ABC):
 
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        """A lookup reads, so it follows the audit rules for reads."""
-        return ActionOperationType.GET
+        """Its own operation, so the audit trail can tell a key resolution from a read by id.
+
+        Still a read, so it follows the audit rules for reads.
+        """
+        return ActionOperationType.LOOKUP
 
     @classmethod
     def spec(cls) -> ActionSpec:

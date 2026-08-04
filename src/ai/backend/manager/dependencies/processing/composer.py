@@ -30,6 +30,7 @@ from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
+from ai.backend.manager.actions.v2 import validators as v2_validators
 from ai.backend.manager.actions.v2.bulk.monitor.audit_log import BulkActionAuditLogMonitor
 from ai.backend.manager.actions.v2.bulk.monitor.prometheus import BulkActionPrometheusMonitor
 from ai.backend.manager.actions.v2.bulk.monitor.reporter import BulkActionReporterMonitor
@@ -367,6 +368,11 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                     rbac=rbac_validators,
                     legacy_rbac=legacy_rbac_validators,
                     virtual_scope_rbac=virtual_scope_rbac_validators,
+                ),
+                v2_validators=v2_validators.ActionValidators(
+                    single_entity=[virtual_scope_rbac_validators.single_entity],
+                    bulk=[virtual_scope_rbac_validators.bulk],
+                    scope=[virtual_scope_rbac_validators.scope],
                 ),
             ),
         )
