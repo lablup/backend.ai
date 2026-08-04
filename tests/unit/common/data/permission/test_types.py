@@ -122,6 +122,24 @@ class TestPermission:
         assert (within & ~cap) == Permission.NONE
         assert (exceeding & ~cap) != Permission.NONE
 
+    def test_covers_requires_every_required_bit(self) -> None:
+        """``covers`` is ALL-bits, not ANY-bit: a partial hold is not enough."""
+        required = Permission.CREATE | Permission.UPDATE
+        assert not Permission.CREATE.covers(required)
+        assert not Permission.UPDATE.covers(required)
+        assert not Permission.NONE.covers(required)
+        assert (Permission.CREATE | Permission.UPDATE).covers(required)
+        assert Permission.full().covers(required)
+
+    def test_covers_matches_any_bit_for_a_single_bit_requirement(self) -> None:
+        """Single-bit requirements keep the pre-mask behavior unchanged."""
+        for effective in (Permission.NONE, Permission.READ | Permission.UPDATE, Permission.full()):
+            for required in _ATOMIC_PERMISSIONS:
+                assert effective.covers(required) is bool(effective & required)
+
+    def test_covers_nothing_is_always_true(self) -> None:
+        assert Permission.NONE.covers(Permission.NONE)
+
     def test_cap_superset_check_is_not_magnitude(self) -> None:
         """Cap membership is a bitwise superset test, never an int >= comparison."""
         cap = Permission.HARD_DELETE

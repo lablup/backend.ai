@@ -452,7 +452,8 @@ class PermissionControllerRepository:
 
         Resolves the effective permission via
         ``entity -> entity_memberships -> scope_bindings -> scope`` with per-hop
-        cap clipping and tests it bitwise against ``permission``.
+        cap clipping and grants only when it covers every bit of ``permission``,
+        which may be a mask (``UPSERT`` requires ``CREATE | UPDATE``).
         """
         return await self._db_source.check_single_entity_permission_via_virtual_scope(
             key, permission

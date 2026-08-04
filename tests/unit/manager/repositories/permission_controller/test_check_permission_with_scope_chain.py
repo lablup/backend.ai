@@ -138,6 +138,7 @@ class TestCheckPermissionWithScopeChain:
             db_sess.add(policy)
             user = UserRow(
                 uuid=fixture_ids.user_id,
+                username=f"user-{fixture_ids.user_id.hex[:8]}",
                 email="testuser@test.com",
                 resource_policy="test-rbac-policy",
                 status=UserStatus.ACTIVE,
@@ -404,6 +405,7 @@ class TestCheckPermissionWithScopeChain:
             db_sess.add(policy)
             user = UserRow(
                 uuid=fixture_ids.user_id,
+                username=f"user-{fixture_ids.user_id.hex[:8]}",
                 email="testuser@test.com",
                 resource_policy="test-rbac-policy",
                 status=UserStatus.ACTIVE,
@@ -591,6 +593,7 @@ class TestCheckPermissionWithScopeChain:
             db_sess.add(policy)
             user = UserRow(
                 uuid=fixture_ids.user_id,
+                username=f"user-{fixture_ids.user_id.hex[:8]}",
                 email="testuser@test.com",
                 resource_policy="test-rbac-policy",
                 status=UserStatus.ACTIVE,
@@ -702,6 +705,7 @@ class TestCheckPermissionWithScopeChain:
             db_sess.add(policy)
             user = UserRow(
                 uuid=fixture_ids.user_id,
+                username=f"user-{fixture_ids.user_id.hex[:8]}",
                 email="testuser@test.com",
                 resource_policy="test-rbac-policy",
                 status=UserStatus.ACTIVE,
@@ -986,6 +990,7 @@ class TestCheckPermissionWithScopeChain:
             db_sess.add(policy)
             other_user = UserRow(
                 uuid=other_user_id,
+                username=f"user-{other_user_id.hex[:8]}",
                 email="otheruser@test.com",
                 resource_policy="test-rbac-policy",
                 status=UserStatus.ACTIVE,

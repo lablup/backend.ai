@@ -38,6 +38,7 @@ class ActionOperationType(enum.StrEnum):
     SEARCH = "search"
     CREATE = "create"
     UPDATE = "update"
+    UPSERT = "upsert"
     DELETE = "delete"
     PURGE = "purge"
     RESTORE = "restore"
@@ -52,6 +53,11 @@ class ActionOperationType(enum.StrEnum):
         return frozenset({cls.GET, cls.SEARCH})
 
     def to_permission_operation(self) -> OperationType:
+        """The legacy single :class:`OperationType` this operation maps to.
+
+        ``UPSERT`` narrows to ``CREATE``: this axis carries one value and cannot
+        express the ``CREATE | UPDATE`` mask, so it keeps the stronger of the two.
+        """
         match self:
             case ActionOperationType.GET:
                 return OperationType.READ
@@ -61,6 +67,8 @@ class ActionOperationType(enum.StrEnum):
                 return OperationType.CREATE
             case ActionOperationType.UPDATE:
                 return OperationType.UPDATE
+            case ActionOperationType.UPSERT:
+                return OperationType.CREATE
             case ActionOperationType.DELETE:
                 return OperationType.SOFT_DELETE
             case ActionOperationType.PURGE:
@@ -70,6 +78,10 @@ class ActionOperationType(enum.StrEnum):
 
     def to_permission(self) -> Permission:
         """The permission an action performing this operation must hold.
+
+        The result is a mask, not necessarily a single bit, and every bit in it is
+        required: ``UPSERT`` may insert or overwrite, so demanding only ``CREATE``
+        would let it overwrite without ``UPDATE`` and vice versa.
 
         ``RESTORE`` shares ``SOFT_DELETE``: undoing a soft delete flips one status
         flag back and reaches nothing the deleter could not already reach.
@@ -81,6 +93,8 @@ class ActionOperationType(enum.StrEnum):
                 return Permission.CREATE
             case ActionOperationType.UPDATE:
                 return Permission.UPDATE
+            case ActionOperationType.UPSERT:
+                return Permission.CREATE | Permission.UPDATE
             case ActionOperationType.DELETE | ActionOperationType.RESTORE:
                 return Permission.SOFT_DELETE
             case ActionOperationType.PURGE:
