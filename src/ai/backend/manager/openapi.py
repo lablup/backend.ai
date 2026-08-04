@@ -603,6 +603,7 @@ async def generate() -> dict[str, Any]:
         error_monitor=stub,
         gql_context_deps=stub,
         valkey_rate_limit=None,
+        confidential_plane=stub,
         root_app=web.Application(),
         stream_cleanup_handler=stub,
         health_probe=stub,

@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.x509.oid import ExtendedKeyUsageOID
 
 from .types import (
     CLOCK_SKEW_ALLOWANCE,
@@ -85,14 +86,14 @@ def issue_leaf(
         )
         .add_extension(
             x509.ExtendedKeyUsage([
-                x509.ExtendedKeyUsageOID.SERVER_AUTH,
-                x509.ExtendedKeyUsageOID.CLIENT_AUTH,
+                ExtendedKeyUsageOID.SERVER_AUTH,
+                ExtendedKeyUsageOID.CLIENT_AUTH,
             ]),
             critical=False,
         )
         .add_extension(x509.SubjectKeyIdentifier.from_public_key(request.public_key()), critical=False)
         .add_extension(
-            x509.AuthorityKeyIdentifier.from_issuer_public_key(issuer.public_key()),
+            x509.AuthorityKeyIdentifier.from_issuer_public_key(issuer_key.public_key()),
             critical=False,
         )
         .sign(issuer_key, hashes.SHA256())

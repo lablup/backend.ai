@@ -3,9 +3,10 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Any, Final
+from typing import Any, Final, cast
 
 import sqlalchemy as sa
+from sqlalchemy.engine import CursorResult
 
 from ai.backend.manager.confidential.shim import AuthorisationShim
 from ai.backend.manager.errors.confidential import ReferenceValueRejected
@@ -114,7 +115,7 @@ class ReferenceValueStore:
                 )
                 .values(state=ReferenceValueState.RETIRED)
             )
-            return int(result.rowcount or 0)
+            return cast(CursorResult[Any], result).rowcount
 
     async def retire(self, value_id: uuid.UUID) -> ConfidentialReferenceValueRow:
         async with self._db.begin_session() as db_session:

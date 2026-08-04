@@ -9,9 +9,15 @@ from typing import Any, Final
 
 import sqlalchemy as sa
 from aiohttp import web
-from pydantic import BaseModel, Field
+from pydantic import Field
 
-from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.api_handlers import (
+    APIResponse,
+    BaseRequestModel,
+    BaseResponseModel,
+    BodyParam,
+    PathParam,
+)
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.confidential.plane import ConfidentialPlane, verify_capability
 from ai.backend.manager.confidential.references import DEFAULT_COEXISTENCE
@@ -32,27 +38,27 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class _Payload(BaseModel):
+class _Payload(BaseResponseModel):
     result: dict[str, Any]
 
 
-class ScalingGroupPath(BaseModel):
+class ScalingGroupPath(BaseRequestModel):
     scaling_group: str
 
 
-class ResourcePath(BaseModel):
+class ResourcePath(BaseRequestModel):
     scaling_group: str
     repository: str
     type: str
     tag: str
 
 
-class CapabilityRequest(BaseModel):
+class CapabilityRequest(BaseRequestModel):
     scaling_group: str
     confidential: ConfidentialScalingGroupOpts
 
 
-class ReferenceValueRequest(BaseModel):
+class ReferenceValueRequest(BaseRequestModel):
     scaling_group: str
     attested_identity: str
     image_digest: str
@@ -63,25 +69,25 @@ class ReferenceValueRequest(BaseModel):
     coexistence_seconds: float = DEFAULT_COEXISTENCE.total_seconds()
 
 
-class DrainRequest(BaseModel):
+class DrainRequest(BaseRequestModel):
     scaling_group: str
     reference_value_id: uuid.UUID
 
 
-class BlobRequest(BaseModel):
+class BlobRequest(BaseRequestModel):
     scaling_group: str
     image_digest: str
     profile_version: str
     blob_base64: str
 
 
-class GraceRequest(BaseModel):
+class GraceRequest(BaseRequestModel):
     scaling_group: str
     platform_status: str
     disclosure: str
 
 
-class DecisionQuery(BaseModel):
+class DecisionQuery(BaseRequestModel):
     verdict: DecisionVerdict | None = None
     session_id: uuid.UUID | None = None
     limit: int = Field(default=100, ge=1, le=1000)
