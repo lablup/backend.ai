@@ -98,9 +98,9 @@ from . import __version__, user_agent
 from .auth import build_forwarding_headers, fill_forwarding_hdrs_to_api_session, get_client_ip
 from .errors import InvalidAPIConfigurationError, UnexpectedAuthResponseError
 from .proxy import (
+    apollo_router_handler,
     decrypt_payload,
     web_handler,
-    web_handler_with_jwt,
     web_plugin_handler,
     websocket_handler,
 )
@@ -1119,19 +1119,12 @@ async def webapp_ctx(
 
     # Feature flag for using Apollo Router(Graphql Federation)
     if config.apollo_router.enabled:
-        # Use JWT authentication for Apollo Router if enabled, otherwise use HMAC
         supergraph_handler = partial(
-            web_handler_with_jwt,
+            apollo_router_handler,
             endpoint_pool=cast(HealthyEndpointPool, app["apollo_router_pool"]),
         )
         cors.add(app.router.add_route("GET", "/func/admin/gql", supergraph_handler))
         cors.add(app.router.add_route("POST", "/func/admin/gql", supergraph_handler))
-
-    # A separate, non-federated Query root, so the manager serves it whether or not the router is
-    # on. Anonymous for the same reason as the v2 public routes above.
-    cors.add(
-        app.router.add_route("POST", "/func/{path:admin/gql/strawberry/public}", anon_web_handler)
-    )
 
     for method in PROXIED_HTTP_METHODS:
         cors.add(app.router.add_route(method, "/func/{path:.*$}", manager_web_handler))

@@ -217,10 +217,10 @@ async def _run_proxy_request(
     http_headers_to_forward_extra: Iterable[str] | None,
     log_prefix: str,
 ) -> web.StreamResponse:
-    """Shared HTTP proxy body for the manager and pipeline handlers.
+    """Shared HTTP proxy body for the manager, pipeline and Apollo Router handlers.
 
     ``acquire_ctx`` decides how to obtain the upstream endpoint: a real
-    healthy-endpoint pool for the manager case, a static one-shot
+    healthy-endpoint pool for the manager and router cases, a static one-shot
     :func:`_direct_acquire` for the pipeline case.
     """
     stats: WebStats = frontend_rqst.app["stats"]
@@ -546,6 +546,48 @@ async def web_handler_with_jwt(
             }),
             content_type="application/problem+json",
         )
+
+
+async def apollo_router_handler(
+    frontend_rqst: web.Request,
+    *,
+    endpoint_pool: HealthyEndpointPool,
+    http_headers_to_forward_extra: Iterable[str] | None = None,
+) -> web.StreamResponse:
+    """Proxy GraphQL requests to the Apollo Router (a.k.a. Hive Router).
+
+    A caller holding a web session takes :func:`web_handler_with_jwt`, which authenticates it
+    with a JWT minted from that session. A caller without one is proxied anonymously instead of
+    being rejected: the supergraph carries a `public` subgraph whose routing URL has no auth
+    middleware, and every other subgraph answers 401 on its own if the query reaches it.
+
+    Anonymous subscriptions are the exception — they are rejected here, since no subgraph
+    serving them is reachable without credentials.
+    """
+    session = await get_session(frontend_rqst)
+    if session.get("authenticated", False):
+        return await web_handler_with_jwt(
+            frontend_rqst,
+            endpoint_pool=endpoint_pool,
+            http_headers_to_forward_extra=http_headers_to_forward_extra,
+        )
+    if _is_websocket_upgrade(frontend_rqst):
+        # Subscriptions live on the authenticated subgraphs only.
+        raise web.HTTPUnauthorized(
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/auth-failed",
+                "title": "Unauthorized access",
+            }),
+            content_type="application/problem+json",
+        )
+    return await _run_proxy_request(
+        frontend_rqst,
+        acquire_ctx=endpoint_pool.acquire(),
+        path=_strip_route_prefix(frontend_rqst, prefix="/func"),
+        is_anonymous=True,
+        http_headers_to_forward_extra=http_headers_to_forward_extra,
+        log_prefix="apollo_router_handler",
+    )
 
 
 async def web_plugin_handler(
