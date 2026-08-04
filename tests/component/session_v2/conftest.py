@@ -460,7 +460,7 @@ async def admin_session_seed(
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
     scaling_group_name: ResourceGroupName,
-    scaling_group_id: ResourceGroupID,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING session owned by the admin user."""
     seed = await _seed_session(
@@ -471,7 +471,7 @@ async def admin_session_seed(
         user_uuid=admin_user_fixture.user_uuid,
         access_key=admin_user_fixture.keypair.access_key,
         scaling_group=scaling_group_name,
-        resource_group_id=scaling_group_id,
+        resource_group_id=resource_group_id,
     )
     yield seed
     await _cleanup_session(db_engine, seed.session_id)
@@ -484,7 +484,7 @@ async def user_session_seed(
     group_fixture: uuid.UUID,
     regular_user_fixture: UserFixtureData,
     scaling_group_name: ResourceGroupName,
-    scaling_group_id: ResourceGroupID,
+    resource_group_id: ResourceGroupID,
     user_system_role: uuid.UUID,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING session owned by the regular user.
@@ -499,7 +499,7 @@ async def user_session_seed(
         user_uuid=regular_user_fixture.user_uuid,
         access_key=regular_user_fixture.keypair.access_key,
         scaling_group=scaling_group_name,
-        resource_group_id=scaling_group_id,
+        resource_group_id=resource_group_id,
     )
     yield seed
     await _cleanup_session(db_engine, seed.session_id)
@@ -588,7 +588,7 @@ async def compute_image_fixture(
 async def agent_factory(
     db_engine: SAEngine,
     scaling_group_name: ResourceGroupName,
-    scaling_group_id: ResourceGroupID,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[AgentFactoryFunc]:
     """Factory that seeds ALIVE schedulable x86_64 agents in the test scaling group."""
     created_ids: list[str] = []
@@ -602,7 +602,7 @@ async def agent_factory(
                     status=AgentStatus.ALIVE,
                     region="local",
                     scaling_group=scaling_group_name,
-                    resource_group_id=scaling_group_id,
+                    resource_group_id=resource_group_id,
                     schedulable=True,
                     available_slots=ResourceSlot(available_slots),
                     occupied_slots=ResourceSlot(),

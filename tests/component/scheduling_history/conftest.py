@@ -190,7 +190,7 @@ async def kernel_history_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     scaling_group_name: ResourceGroupName,
-    scaling_group_id: ResourceGroupID,
+    resource_group_id: ResourceGroupID,
     admin_user_fixture: UserFixtureData,
 ) -> AsyncIterator[KernelHistorySeed]:
     """Seed one session with two kernels: three history rows on the first, one on the second.
@@ -241,7 +241,7 @@ async def kernel_history_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 scaling_group_name=scaling_group_name,
-                resource_group_id=scaling_group_id,
+                resource_group_id=resource_group_id,
                 occupying_slots=slots,
                 requested_slots=slots,
             )
@@ -261,7 +261,7 @@ async def kernel_history_seed(
                 stdin_port=0,
                 stdout_port=0,
                 scaling_group=scaling_group_name,
-                resource_group_id=scaling_group_id,
+                resource_group_id=resource_group_id,
             )
             for kid in (kernel_id, other_kernel_id)
         ])

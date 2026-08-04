@@ -19,7 +19,7 @@ UUID-keyed duplicate are dropped instead, and the remaining non-UUID-keyed
 rows are removed as dangling.
 
 Revision ID: 9896475bc170
-Revises: 9fbeda8995ff
+Revises: 3a1c8f52d6b4
 Create Date: 2026-08-03 21:14:37.626627
 
 """
@@ -31,7 +31,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "9896475bc170"
-down_revision = "9fbeda8995ff"
+down_revision = "3a1c8f52d6b4"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
