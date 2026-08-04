@@ -26,10 +26,10 @@ _REPRESENTATIVE_ACTION_CLASSES: list[type[BaseAction]] = [
 
 
 class TestActionOperationType:
-    def test_has_exactly_seven_values(self) -> None:
+    def test_has_exactly_eight_values(self) -> None:
         values = list(ActionOperationType)
-        assert len(values) == 7
-        expected = {"get", "search", "create", "update", "delete", "purge", "restore"}
+        assert len(values) == 8
+        expected = {"get", "search", "create", "update", "upsert", "delete", "purge", "restore"}
         assert {v.value for v in values} == expected
 
     def test_to_permission_operation_mapping(self) -> None:
@@ -37,6 +37,7 @@ class TestActionOperationType:
         assert ActionOperationType.SEARCH.to_permission_operation() == OperationType.READ
         assert ActionOperationType.CREATE.to_permission_operation() == OperationType.CREATE
         assert ActionOperationType.UPDATE.to_permission_operation() == OperationType.UPDATE
+        assert ActionOperationType.UPSERT.to_permission_operation() == OperationType.CREATE
         assert ActionOperationType.DELETE.to_permission_operation() == OperationType.SOFT_DELETE
         assert ActionOperationType.PURGE.to_permission_operation() == OperationType.HARD_DELETE
         assert ActionOperationType.RESTORE.to_permission_operation() == OperationType.SOFT_DELETE
@@ -49,6 +50,14 @@ class TestActionOperationType:
         assert ActionOperationType.DELETE.to_permission() == Permission.SOFT_DELETE
         assert ActionOperationType.PURGE.to_permission() == Permission.HARD_DELETE
         assert ActionOperationType.RESTORE.to_permission() == Permission.SOFT_DELETE
+
+    def test_upsert_requires_both_create_and_update(self) -> None:
+        """An upsert may insert or overwrite, so neither bit alone is sufficient."""
+        required = ActionOperationType.UPSERT.to_permission()
+        assert required == Permission.CREATE | Permission.UPDATE
+        assert not Permission.CREATE.covers(required)
+        assert not Permission.UPDATE.covers(required)
+        assert (Permission.CREATE | Permission.UPDATE).covers(required)
 
     def test_to_permission_covers_every_operation(self) -> None:
         for op in ActionOperationType:
@@ -125,9 +134,14 @@ class TestAllActionClassesUseEnums:
     def test_covers_all_operation_types(self) -> None:
         """Ensure the representative classes cover every declarable operation.
 
-        ``RESTORE`` is excluded: no concrete action declares it yet.
+        ``RESTORE`` and ``UPSERT`` are excluded: no concrete action declares them
+        yet. The existing upsert actions still sit on the legacy base and are
+        re-declared once they move to the v2 bases.
         """
-        expected = set(ActionOperationType) - {ActionOperationType.RESTORE}
+        expected = set(ActionOperationType) - {
+            ActionOperationType.RESTORE,
+            ActionOperationType.UPSERT,
+        }
         covered = {cls.operation_type() for cls in _REPRESENTATIVE_ACTION_CLASSES}
         assert covered == expected, (
             f"Not all ActionOperationType values are covered. Missing: {expected - covered}"
