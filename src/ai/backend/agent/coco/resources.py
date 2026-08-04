@@ -139,14 +139,14 @@ def decode_allocations(
 HYPERVISOR_PREFIX = "hypervisor_"
 
 
-class _HypervisorBlindMixin:
-    async def gather_node_measures(self, ctx: StatContext) -> Sequence[NodeMeasurement]:
-        measured = await super().gather_node_measures(ctx)  # type: ignore[misc]
-        return [
-            attrs.evolve(measurement, key=MetricKey(HYPERVISOR_PREFIX + str(measurement.key)))
-            for measurement in measured
-        ]
+def relabel_as_hypervisor(measured: Sequence[NodeMeasurement]) -> Sequence[NodeMeasurement]:
+    return [
+        attrs.evolve(measurement, key=MetricKey(HYPERVISOR_PREFIX + str(measurement.key)))
+        for measurement in measured
+    ]
 
+
+class _HypervisorBlindMixin:
     async def gather_container_measures(
         self, ctx: StatContext, container_ids: Sequence[str]
     ) -> Sequence[ContainerMeasurement]:
@@ -160,6 +160,10 @@ class _HypervisorBlindMixin:
 
 class CPUPlugin(_HypervisorBlindMixin, DockerCPUPlugin):
     @override
+    async def gather_node_measures(self, ctx: StatContext) -> Sequence[NodeMeasurement]:
+        return relabel_as_hypervisor(await super().gather_node_measures(ctx))
+
+    @override
     async def restore_from_container(
         self, container: Container, alloc_map: AbstractAllocMap
     ) -> None:
@@ -169,6 +173,10 @@ class CPUPlugin(_HypervisorBlindMixin, DockerCPUPlugin):
 
 
 class MemoryPlugin(_HypervisorBlindMixin, DockerMemoryPlugin):
+    @override
+    async def gather_node_measures(self, ctx: StatContext) -> Sequence[NodeMeasurement]:
+        return relabel_as_hypervisor(await super().gather_node_measures(ctx))
+
     @override
     async def restore_from_container(
         self, container: Container, alloc_map: AbstractAllocMap
