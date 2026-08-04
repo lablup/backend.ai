@@ -422,7 +422,6 @@ class UserAdapter(BaseAdapter):
             password=password_info,
             need_password_change=input.need_password_change,
             domain_name=input.domain_name,
-            domain_id=input.domain_id,
             full_name=input.full_name,
             description=input.description,
             status=UserStatus(input.status),

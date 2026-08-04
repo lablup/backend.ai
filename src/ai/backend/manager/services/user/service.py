@@ -137,7 +137,7 @@ class UserService:
 
     async def create_user(self, action: CreateUserAction) -> CreateUserActionResult:
         user_data_result = await self._user_repository.create_user_validated(
-            action.creator, action.group_ids
+            action.creator, action.group_ids, action._domain_id
         )
         return CreateUserActionResult(
             data=user_data_result,

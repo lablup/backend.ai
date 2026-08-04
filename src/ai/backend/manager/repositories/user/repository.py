@@ -12,6 +12,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -94,12 +95,15 @@ class UserRepository:
 
     @user_repository_resilience.apply()
     async def create_user_validated(
-        self, creator: Creator[UserRow], group_ids: list[str] | None
+        self,
+        creator: Creator[UserRow],
+        group_ids: list[str] | None,
+        domain_id: DomainID | None = None,
     ) -> UserCreateResultData:
         """
         Create a new user with default keypair and group associations.
         """
-        return await self._db_source.create_user_validated(creator, group_ids)
+        return await self._db_source.create_user_validated(creator, group_ids, domain_id)
 
     @user_repository_resilience.apply()
     async def bulk_create_users_validated(

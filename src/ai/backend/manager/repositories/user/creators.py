@@ -134,3 +134,4 @@ class UserCreateSpec:
 
     creator: Creator[UserRow]
     group_ids: list[str] | None = None
+    domain_id: DomainID | None = None

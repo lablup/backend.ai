@@ -184,19 +184,23 @@ class UserDBSource:
             return UserData.from_row(user_row)
 
     async def create_user_validated(
-        self, creator: Creator[UserRow], group_ids: list[str] | None
+        self,
+        creator: Creator[UserRow],
+        group_ids: list[str] | None,
+        domain_id: DomainID | None = None,
     ) -> UserCreateResultData:
         """
         Create a new user with default keypair and group associations.
         """
         async with self._rbac_ops_provider.write_ops() as w:
-            return await self._create_user_with_keypair_and_groups(w, creator, group_ids)
+            return await self._create_user_with_keypair_and_groups(w, creator, group_ids, domain_id)
 
     async def _create_user_with_keypair_and_groups(
         self,
         w: RBACWriteOps,
         creator: Creator[UserRow],
         group_ids: list[str] | None,
+        requested_domain_id: DomainID | None = None,
     ) -> UserCreateResultData:
         """Provision a user (row, default keypair, domain/project/model-store scope
         enrollments) within the caller's write ops transaction."""
@@ -205,11 +209,11 @@ class UserDBSource:
         # Until domain_name goes away, fill in whichever column the request did not name
         if spec.domain_name is None:
             domain_names = await w.batch_query_in_global(
-                sa.select(DomainRow.name).where(DomainRow.id == spec.domain_id),
+                sa.select(DomainRow.name).where(DomainRow.id == requested_domain_id),
                 BatchQuerier(pagination=NoPagination()),
             )
             if not domain_names.rows:
-                raise UserCreationBadRequest(f"Domain '{spec.domain_id}' does not exist.")
+                raise UserCreationBadRequest(f"Domain '{requested_domain_id}' does not exist.")
             spec.domain_name = domain_names.rows[0].name
 
         domain_query = sa.select(DomainRow.id).where(DomainRow.name == spec.domain_name)
@@ -271,7 +275,7 @@ class UserDBSource:
                     async with w.savepoint():
                         successes.append(
                             await self._create_user_with_keypair_and_groups(
-                                w, item.creator, item.group_ids
+                                w, item.creator, item.group_ids, item.domain_id
                             )
                         )
                 except Exception as e:

@@ -113,7 +113,6 @@ def _build_bulk_create_user_action(
             password=password_info,
             need_password_change=dto.need_password_change,
             domain_name=dto.domain_name,
-            domain_id=dto.domain_id,
             full_name=dto.full_name,
             description=dto.description,
             status=UserStatus(dto.status),
@@ -128,7 +127,9 @@ def _build_bulk_create_user_action(
         )
 
         group_ids = [str(gid) for gid in dto.group_ids] if dto.group_ids else None
-        items.append(UserCreateSpec(creator=Creator(spec=spec), group_ids=group_ids))
+        items.append(
+            UserCreateSpec(creator=Creator(spec=spec), group_ids=group_ids, domain_id=dto.domain_id)
+        )
 
     return BulkCreateUserAction(items=items)
 

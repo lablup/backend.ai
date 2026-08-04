@@ -94,7 +94,6 @@ class UserHandler:
                 password=password_info,
                 need_password_change=body.parsed.need_password_change,
                 domain_name=body.parsed.domain_name,
-                domain_id=body.parsed.domain_id,
                 full_name=body.parsed.full_name,
                 description=body.parsed.description,
                 status=ManagerUserStatus(body.parsed.status.value)
