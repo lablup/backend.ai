@@ -43,8 +43,6 @@ build_upstream() {
 		log "upstream rootfs already current for ${want}; BAI_CC_FORCE_UPSTREAM=1 rebuilds it"
 		return 0
 	fi
-	rm -rf "${lb}/build/rootfs-${variant}-stage-one" "${lb}/build/rootfs-${variant}-stage-one.tar.zst" \
-		"${BAI_CC_CACHE}/stage-one"
 	EXTRA_PKGS="${BAI_CC_EXTRA_PKGS}" \
 	REPO_COMPONENTS="${BAI_CC_REPO_COMPONENTS}" \
 	API_SERVER_REST_FEATURES="${BAI_CC_API_SERVER_REST_FEATURES}" \
@@ -116,18 +114,19 @@ stage_needed_libs() {
 }
 
 stage_one_root() {
-	local dir="${BAI_CC_KATA_SRC}/tools/packaging/kata-deploy/local-build/build/rootfs-${variant}-stage-one"
-	if [ -e "${dir}/usr/sbin/mount.nfs" ]; then
-		printf '%s' "$dir"
-		return 0
+	local src="${BAI_CC_CACHE}/pkgsrc"
+	if [ ! -e "${src}/usr/bin/gocryptfs" ]; then
+		rm -rf "$src"
+		mkdir -p "$src"
+		docker run --rm --platform "${BAI_CC_RUST_PLATFORM}" -v "${src}:/out" \
+			"${BAI_CC_PKGSRC_IMAGE}" sh -c "set -e
+				sed -i 's/^Components:.*/Components: ${BAI_CC_REPO_COMPONENTS}/' /etc/apt/sources.list.d/ubuntu.sources
+				apt-get update -qq
+				apt-get install -y --no-install-recommends ${BAI_CC_EXTRA_PKGS} >/dev/null
+				dpkg-query -W -f='\''\${Package}=\${Version}\n'\'' | sort > /out/.packages
+				tar -C / -cf - bin sbin lib lib64 usr | tar -C /out -xf -" >/dev/null
 	fi
-	local unpacked="${BAI_CC_CACHE}/stage-one"
-	if [ ! -e "${unpacked}/usr/sbin/mount.nfs" ]; then
-		[ -e "${dir}.tar.zst" ] || die "neither the stage-one tree nor its tarball is present"
-		mkdir -p "$unpacked"
-		tar --zstd -xf "${dir}.tar.zst" -C "$unpacked"
-	fi
-	printf '%s' "$unpacked"
+	printf '%s' "$src"
 }
 
 stage_storage_clients() {
