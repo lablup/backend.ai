@@ -1102,11 +1102,8 @@ async def webapp_ctx(
     )
     cors.add(app.router.add_route("POST", "/func/{path:auth/signup}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:auth/signout}", manager_web_handler))
-    # The manager serves these without auth so a client can read config before it holds
-    # credentials. Proxying them through `manager_web_handler` would defeat that: it demands a
-    # browser session and answers 401 before the request ever leaves the webserver.
-    # The v2 pattern matches any entity: `public` is reserved for anonymous operations in v2
-    # paths (manager `api/rest/v2/AGENTS.md`), so it never names a domain-level public resource.
+    # `manager_web_handler` answers 401 without a browser session, before reaching the manager.
+    # `public` is a reserved anonymous segment in v2 paths (manager `api/rest/v2/AGENTS.md`).
     cors.add(
         app.router.add_route("POST", "/func/{path:admin/gql/strawberry/public}", anon_web_handler)
     )
