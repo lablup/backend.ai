@@ -33,7 +33,7 @@ REST v2 Handler → Adapter (api/adapters/) → Processor → Service → Reposi
 - superadmin only: `admin_` prefix + `superadmin_required` middleware.
 - scoped: currently a `{scope}_` prefix. **Forward direction (under consideration):** unify to `scoped_` and receive the scope as a request field (see below).
 - self-service: `/v2/{entity}/my/` — the entity comes first, `my` is the scope qualifier.
-- anonymous: `/v2/{entity}/public/` — no auth middleware. `public` is **reserved** for this (see below).
+- anonymous: `/v2/{entity}/public/` — no auth middleware. `public` is reserved for this (see below).
 
 **search — always two variants:**
 - `POST /v2/{entity}/search`: superadmin only, no scope — system-wide query.
@@ -52,13 +52,11 @@ REST v2 Handler → Adapter (api/adapters/) → Processor → Service → Reposi
   `auth_required` middleware.
 
 **anonymous (`public`) — reserved segment:**
-- `POST /v2/{entity}/public/{operation}` (e.g. `/v2/app-config/public/get`). No auth middleware — callers reach the handler
-  without credentials.
-- `public` in a v2 path means "no authentication required" and **nothing else**. Never use it for a domain-level notion of
-  public (`open_to_public` deployments, `is_public` services) — name those by the resource instead.
-- The webserver whitelists this shape by pattern (`/func/{path:v2/[^/]+/public/[^/]+$}` in `web/server.py`, for every proxied
-  HTTP method), so any route added under `public/` is exposed anonymously through the webserver with no further edit.
-- Nested paths below the operation are not whitelisted — keep it at exactly `{entity}/public/{operation}`.
+- `POST /v2/{entity}/public/{operation}` (e.g. `/v2/app-config/public/get`). No auth middleware.
+- `public` means "no authentication required" and nothing else — never a domain notion of public
+  (`open_to_public` deployments, `is_public` services).
+- The webserver proxies exactly this shape anonymously by pattern (`web/server.py`), so adding a route here exposes it with no
+  further edit. Two segments only — nothing nested below the operation.
 
 **create / update / get / delete / purge — criteria for splitting out `admin_`:**
 - admin-only entities: a single `admin_`.
