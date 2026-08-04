@@ -1,7 +1,14 @@
 """Holds what every processor is built from, so a domain names no monitor or validator.
 
-Method names are ``<shape>_<operation>``. The per-operation ``validators`` / ``monitors``
-arguments only append — what the shape carries is always applied.
+A service-backed operation is wrapped by its target shape — ``single_entity``,
+``scope``, ``bulk``, ``global_scope``, ``lookup`` — and there is no factory per
+operation, because the shape is all that changes: the operation is on the action,
+where the audit trail and the RBAC validators read it from. An ``<shape>_<operation>_ops``
+factory does vary by operation, which decides the generic service it builds, the spec it
+demands of the action, and the result type.
+
+The ``validators`` / ``monitors`` arguments only append — what the shape carries is
+always applied.
 """
 
 from collections.abc import Awaitable, Callable, Sequence
@@ -96,11 +103,12 @@ class ProcessorGroup[TData: EntityData]:
     def __init__(self, deps: ProcessorDependencies[TData]) -> None:
         self._deps = deps
 
-    def _single_entity[TAction: BaseSingleEntityAction, TResult](
+    def single_entity[TAction: BaseSingleEntityAction, TResult](
         self,
         func: Callable[[TAction], Awaitable[TResult]],
-        validators: Sequence[SingleEntityActionValidator],
-        monitors: Sequence[SingleEntityActionMonitor],
+        *,
+        validators: Sequence[SingleEntityActionValidator] = (),
+        monitors: Sequence[SingleEntityActionMonitor] = (),
     ) -> SingleEntityActionProcessor[TAction, TResult]:
         return SingleEntityActionProcessor(
             func,
@@ -108,47 +116,12 @@ class ProcessorGroup[TData: EntityData]:
             validators=(*self._deps.validators.single_entity, *validators),
         )
 
-    def single_get[TAction: BaseSingleEntityAction, TResult](
+    def scope[TAction: BaseScopeAction, TResult: BaseScopeActionResult](
         self,
         func: Callable[[TAction], Awaitable[TResult]],
         *,
-        validators: Sequence[SingleEntityActionValidator] = (),
-        monitors: Sequence[SingleEntityActionMonitor] = (),
-    ) -> SingleEntityActionProcessor[TAction, TResult]:
-        return self._single_entity(func, validators, monitors)
-
-    def single_update[TAction: BaseSingleEntityAction, TResult](
-        self,
-        func: Callable[[TAction], Awaitable[TResult]],
-        *,
-        validators: Sequence[SingleEntityActionValidator] = (),
-        monitors: Sequence[SingleEntityActionMonitor] = (),
-    ) -> SingleEntityActionProcessor[TAction, TResult]:
-        return self._single_entity(func, validators, monitors)
-
-    def single_delete[TAction: BaseSingleEntityAction, TResult](
-        self,
-        func: Callable[[TAction], Awaitable[TResult]],
-        *,
-        validators: Sequence[SingleEntityActionValidator] = (),
-        monitors: Sequence[SingleEntityActionMonitor] = (),
-    ) -> SingleEntityActionProcessor[TAction, TResult]:
-        return self._single_entity(func, validators, monitors)
-
-    def single_purge[TAction: BaseSingleEntityAction, TResult](
-        self,
-        func: Callable[[TAction], Awaitable[TResult]],
-        *,
-        validators: Sequence[SingleEntityActionValidator] = (),
-        monitors: Sequence[SingleEntityActionMonitor] = (),
-    ) -> SingleEntityActionProcessor[TAction, TResult]:
-        return self._single_entity(func, validators, monitors)
-
-    def _scope[TAction: BaseScopeAction, TResult: BaseScopeActionResult](
-        self,
-        func: Callable[[TAction], Awaitable[TResult]],
-        validators: Sequence[ScopeActionValidator],
-        monitors: Sequence[ScopeActionMonitor],
+        validators: Sequence[ScopeActionValidator] = (),
+        monitors: Sequence[ScopeActionMonitor] = (),
     ) -> ScopeActionProcessor[TAction, TResult]:
         return ScopeActionProcessor(
             func,
@@ -156,65 +129,12 @@ class ProcessorGroup[TData: EntityData]:
             validators=(*self._deps.validators.scope, *validators),
         )
 
-    def scope_get[TAction: BaseScopeAction, TResult: BaseScopeActionResult](
+    def bulk[TAction: BaseBulkAction, TResult: BaseBulkActionResult](
         self,
         func: Callable[[TAction], Awaitable[TResult]],
         *,
-        validators: Sequence[ScopeActionValidator] = (),
-        monitors: Sequence[ScopeActionMonitor] = (),
-    ) -> ScopeActionProcessor[TAction, TResult]:
-        return self._scope(func, validators, monitors)
-
-    def scope_create[TAction: BaseScopeAction, TResult: BaseScopeActionResult](
-        self,
-        func: Callable[[TAction], Awaitable[TResult]],
-        *,
-        validators: Sequence[ScopeActionValidator] = (),
-        monitors: Sequence[ScopeActionMonitor] = (),
-    ) -> ScopeActionProcessor[TAction, TResult]:
-        return self._scope(func, validators, monitors)
-
-    def scope_search[TAction: BaseScopeAction, TResult: BaseScopeActionResult](
-        self,
-        func: Callable[[TAction], Awaitable[TResult]],
-        *,
-        validators: Sequence[ScopeActionValidator] = (),
-        monitors: Sequence[ScopeActionMonitor] = (),
-    ) -> ScopeActionProcessor[TAction, TResult]:
-        return self._scope(func, validators, monitors)
-
-    def scope_update[TAction: BaseScopeAction, TResult: BaseScopeActionResult](
-        self,
-        func: Callable[[TAction], Awaitable[TResult]],
-        *,
-        validators: Sequence[ScopeActionValidator] = (),
-        monitors: Sequence[ScopeActionMonitor] = (),
-    ) -> ScopeActionProcessor[TAction, TResult]:
-        return self._scope(func, validators, monitors)
-
-    def scope_delete[TAction: BaseScopeAction, TResult: BaseScopeActionResult](
-        self,
-        func: Callable[[TAction], Awaitable[TResult]],
-        *,
-        validators: Sequence[ScopeActionValidator] = (),
-        monitors: Sequence[ScopeActionMonitor] = (),
-    ) -> ScopeActionProcessor[TAction, TResult]:
-        return self._scope(func, validators, monitors)
-
-    def scope_purge[TAction: BaseScopeAction, TResult: BaseScopeActionResult](
-        self,
-        func: Callable[[TAction], Awaitable[TResult]],
-        *,
-        validators: Sequence[ScopeActionValidator] = (),
-        monitors: Sequence[ScopeActionMonitor] = (),
-    ) -> ScopeActionProcessor[TAction, TResult]:
-        return self._scope(func, validators, monitors)
-
-    def _bulk[TAction: BaseBulkAction, TResult: BaseBulkActionResult](
-        self,
-        func: Callable[[TAction], Awaitable[TResult]],
-        validators: Sequence[BulkActionValidator],
-        monitors: Sequence[BulkActionMonitor],
+        validators: Sequence[BulkActionValidator] = (),
+        monitors: Sequence[BulkActionMonitor] = (),
     ) -> BulkActionProcessor[TAction, TResult]:
         return BulkActionProcessor(
             func,
@@ -222,62 +142,18 @@ class ProcessorGroup[TData: EntityData]:
             validators=(*self._deps.validators.bulk, *validators),
         )
 
-    def bulk_update[TAction: BaseBulkAction, TResult: BaseBulkActionResult](
+    def global_scope[TAction: BaseGlobalAction, TResult](
         self,
         func: Callable[[TAction], Awaitable[TResult]],
         *,
-        validators: Sequence[BulkActionValidator] = (),
-        monitors: Sequence[BulkActionMonitor] = (),
-    ) -> BulkActionProcessor[TAction, TResult]:
-        return self._bulk(func, validators, monitors)
-
-    def bulk_delete[TAction: BaseBulkAction, TResult: BaseBulkActionResult](
-        self,
-        func: Callable[[TAction], Awaitable[TResult]],
-        *,
-        validators: Sequence[BulkActionValidator] = (),
-        monitors: Sequence[BulkActionMonitor] = (),
-    ) -> BulkActionProcessor[TAction, TResult]:
-        return self._bulk(func, validators, monitors)
-
-    def bulk_purge[TAction: BaseBulkAction, TResult: BaseBulkActionResult](
-        self,
-        func: Callable[[TAction], Awaitable[TResult]],
-        *,
-        validators: Sequence[BulkActionValidator] = (),
-        monitors: Sequence[BulkActionMonitor] = (),
-    ) -> BulkActionProcessor[TAction, TResult]:
-        return self._bulk(func, validators, monitors)
-
-    def _global[TAction: BaseGlobalAction, TResult](
-        self,
-        func: Callable[[TAction], Awaitable[TResult]],
-        validators: Sequence[GlobalActionValidator],
-        monitors: Sequence[GlobalActionMonitor],
+        validators: Sequence[GlobalActionValidator] = (),
+        monitors: Sequence[GlobalActionMonitor] = (),
     ) -> GlobalActionProcessor[TAction, TResult]:
         return GlobalActionProcessor(
             func,
             monitors=(*self._deps.monitors.global_scope, *monitors),
             validators=(*self._deps.validators.global_scope, *validators),
         )
-
-    def global_create[TAction: BaseGlobalAction, TResult](
-        self,
-        func: Callable[[TAction], Awaitable[TResult]],
-        *,
-        validators: Sequence[GlobalActionValidator] = (),
-        monitors: Sequence[GlobalActionMonitor] = (),
-    ) -> GlobalActionProcessor[TAction, TResult]:
-        return self._global(func, validators, monitors)
-
-    def global_search[TAction: BaseGlobalAction, TResult](
-        self,
-        func: Callable[[TAction], Awaitable[TResult]],
-        *,
-        validators: Sequence[GlobalActionValidator] = (),
-        monitors: Sequence[GlobalActionMonitor] = (),
-    ) -> GlobalActionProcessor[TAction, TResult]:
-        return self._global(func, validators, monitors)
 
     def lookup[TAction: BaseLookupAction, TResult: BaseLookupActionResult](
         self,
