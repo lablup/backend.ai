@@ -3312,8 +3312,10 @@ input CreateUserV2Input {
   """Initial password for the user."""
   password: String!
 
-  """Domain to assign the user to, by name. Deprecated: use `domain_id`."""
-  domainName: String = null @deprecated(reason: "Use `domain_id` instead.")
+  """
+  Deprecated since 26.9.0. Use domain_id instead. Domain to assign the user to, by name.
+  """
+  domainName: String = null @deprecated(reason: "Use domain_id instead.")
 
   """
   Added in 26.9.0. Domain to assign the user to, by id. Mutually exclusive with `domain_name`.
@@ -15563,8 +15565,10 @@ input UpdateUserV2Input {
   """New user role."""
   role: UserRoleV2
 
-  """New domain assignment, by name. Deprecated: use `domain_id`."""
-  domainName: String @deprecated(reason: "Use `domain_id` instead.")
+  """
+  Deprecated since 26.9.0. Use domain_id instead. New domain assignment, by name.
+  """
+  domainName: String @deprecated(reason: "Use domain_id instead.")
 
   """
   Added in 26.9.0. New domain assignment, by id. Mutually exclusive with `domain_name`.

@@ -30086,7 +30086,7 @@
               }
             ],
             "default": null,
-            "description": "Domain to assign the user to, by name. Deprecated: use `domain_id`.",
+            "description": "Deprecated since 26.9.0. Use domain_id instead. Domain to assign the user to, by name.",
             "title": "Domain Name"
           },
           "domain_id": {
@@ -30356,7 +30356,7 @@
               }
             ],
             "default": null,
-            "description": "New domain assignment, by name. Deprecated: use `domain_id`.",
+            "description": "Deprecated since 26.9.0. Use domain_id instead. New domain assignment, by name.",
             "title": "Domain Name"
           },
           "domain_id": {
@@ -33082,7 +33082,7 @@
               }
             ],
             "default": null,
-            "description": "Domain the user belongs to, by name. Deprecated: use domain_id",
+            "description": "Deprecated since 26.9.0. Use domain_id instead. Domain the user belongs to, by name",
             "title": "Domain Name"
           },
           "domain_id": {
@@ -33373,7 +33373,7 @@
               }
             ],
             "default": null,
-            "description": "Updated domain, by name. Deprecated: use domain_id",
+            "description": "Deprecated since 26.9.0. Use domain_id instead. Updated domain, by name",
             "title": "Domain Name"
           },
           "domain_id": {
