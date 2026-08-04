@@ -183,3 +183,24 @@ class ConfidentialTcbGraceRow(Base):  # type: ignore[misc]
     resolved_at: Mapped[datetime | None] = mapped_column(
         "resolved_at", sa.DateTime(timezone=True), nullable=True
     )
+
+
+class ConfidentialChannelRow(Base):  # type: ignore[misc]
+    __tablename__ = "confidential_channels"
+    kernel_id: Mapped[uuid.UUID] = mapped_column("kernel_id", GUID, primary_key=True)
+    session_id: Mapped[uuid.UUID] = mapped_column("session_id", GUID, nullable=False, index=True)
+    endpoint: Mapped[str] = mapped_column("endpoint", sa.String(length=1024), nullable=False)
+    resource_path: Mapped[str] = mapped_column(
+        "resource_path", sa.String(length=512), nullable=False
+    )
+    relay_addr: Mapped[str] = mapped_column("relay_addr", sa.String(length=256), nullable=False)
+    channel_port: Mapped[int] = mapped_column("channel_port", sa.Integer, nullable=False)
+    fingerprint: Mapped[str] = mapped_column("fingerprint", sa.String(length=128), nullable=False)
+    token: Mapped[str] = mapped_column("token", sa.String(length=256), nullable=False)
+    epoch: Mapped[int] = mapped_column("epoch", sa.Integer, nullable=False, default=0)
+    expires_at: Mapped[datetime] = mapped_column(
+        "expires_at", sa.DateTime(timezone=True), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+    )
