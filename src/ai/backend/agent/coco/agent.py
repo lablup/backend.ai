@@ -334,6 +334,11 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
             hooks = await computer_ctx.instance.get_hooks(self.distro, arch)
             if hooks:
                 raise AcceleratorHooksRefused(extra_msg=f"{device_name}: {hooks}")
+        for device_view in resource_spec.device_list:
+            await self.apply_accelerator_allocation(
+                self.computers[device_view.device].instance,
+                {device_view.slot: device_view.device_alloc},
+            )
 
     @override
     async def apply_accelerator_allocation(

@@ -53,7 +53,7 @@ def upgrade() -> None:
         "confidential_policy_journal",
         sa.Column("id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")),
         sa.Column("endpoint", sa.String(length=1024), nullable=False, index=True),
-        sa.Column("content_hash", sa.String(length=71), nullable=False),
+        sa.Column("content_hash", sa.String(length=96), nullable=False),
         sa.Column("document", sa.Text, nullable=False),
         sa.Column(
             "composed_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False

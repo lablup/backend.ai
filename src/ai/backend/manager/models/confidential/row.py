@@ -58,7 +58,7 @@ class ConfidentialPolicyJournalRow(Base):  # type: ignore[misc]
     endpoint: Mapped[str] = mapped_column(
         "endpoint", sa.String(length=1024), nullable=False, index=True
     )
-    content_hash: Mapped[str] = mapped_column("content_hash", sa.String(length=71), nullable=False)
+    content_hash: Mapped[str] = mapped_column("content_hash", sa.String(length=96), nullable=False)
     document: Mapped[str] = mapped_column("document", sa.Text, nullable=False)
     composed_at: Mapped[datetime] = mapped_column(
         "composed_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
