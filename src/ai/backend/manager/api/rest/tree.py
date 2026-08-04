@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from ai.backend.common.health_checker.probe import HealthProbe
     from ai.backend.common.plugin.monitor import ErrorPluginContext
     from ai.backend.manager.api.adapters.registry import Adapters
+    from ai.backend.manager.confidential.plane import ConfidentialPlane
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.event_dispatcher.handlers.stream_cleanup import (
         StreamCleanupEventHandler,
@@ -40,6 +41,7 @@ def build_api_routes(
     error_monitor: ErrorPluginContext,
     gql_context_deps: GQLContextDeps,
     valkey_rate_limit: ValkeyRateLimitClient | None,
+    confidential_plane: ConfidentialPlane,
     root_app: web.Application,
     stream_cleanup_handler: StreamCleanupEventHandler,
     health_probe: HealthProbe,
@@ -54,6 +56,11 @@ def build_api_routes(
     from ai.backend.manager.api.gql.schema import public_schema as public_strawberry_schema
     from ai.backend.manager.api.gql.schema import schema as strawberry_schema
     from ai.backend.manager.api.gql_legacy.schema import graphene_schema
+    from ai.backend.manager.api.rest.confidential.handler import ConfidentialHandler
+    from ai.backend.manager.api.rest.confidential.registry import (
+        register_confidential_routes,
+        register_confidential_shim_routes,
+    )
 
     from .acl.handler import AclHandler
     from .acl.registry import register_acl_routes
@@ -152,6 +159,9 @@ def build_api_routes(
 
     # 2. Build all handlers
     acl_handler = AclHandler()
+    confidential_handler = ConfidentialHandler(
+        plane=confidential_plane, db=gql_context_deps.db
+    )
     auth_handler = AuthHandler(auth=processors.auth)
     agent_handler = AgentHandler(agent=processors.agent)
     resource_slot_handler = ResourceSlotHandler(resource_slot=processors.resource_slot)
@@ -337,6 +347,8 @@ def build_api_routes(
             sub_registries=[cluster_template_reg, session_template_reg],
         ),
         register_scaling_group_routes(scaling_group_handler, route_deps),
+        register_confidential_routes(confidential_handler, route_deps),
+        register_confidential_shim_routes(confidential_handler, route_deps),
         register_error_log_routes(error_log_handler, route_deps),
         register_health_routes(health_handler, route_deps),
         register_ratelimit_routes(route_deps, valkey_rate_limit=valkey_rate_limit),

@@ -14,7 +14,10 @@ from sqlalchemy.dialects.postgresql import array as pg_array
 
 from ai.backend.manager.data.scaling_group.types import PreemptionConfig as DataPreemptionConfig
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
-from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
+from ai.backend.manager.models.scaling_group.types import (
+    ConfidentialScalingGroupOpts,
+    FairShareScalingGroupSpec,
+)
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -179,6 +182,24 @@ class ResourceGroupFairShareUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
 
 
 @dataclass
+class ScalingGroupConfidentialUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
+    confidential: OptionalState[ConfidentialScalingGroupOpts] = field(
+        default_factory=OptionalState[ConfidentialScalingGroupOpts].nop
+    )
+
+    @property
+    @override
+    def row_class(self) -> type[ScalingGroupRow]:
+        return ScalingGroupRow
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        to_update: dict[str, Any] = {}
+        self.confidential.update_dict(to_update, "confidential")
+        return to_update
+
+
+@dataclass
 class ScalingGroupUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
     """Composite UpdaterSpec for scaling group updates.
 
@@ -192,6 +213,7 @@ class ScalingGroupUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
     driver: ScalingGroupDriverConfigUpdaterSpec | None = None
     scheduler: ScalingGroupSchedulerConfigUpdaterSpec | None = None
     fair_share: ResourceGroupFairShareUpdaterSpec | None = None
+    confidential: ScalingGroupConfidentialUpdaterSpec | None = None
 
     @property
     @override
@@ -213,4 +235,6 @@ class ScalingGroupUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
             to_update.update(self.scheduler.build_values())
         if self.fair_share:
             to_update.update(self.fair_share.build_values())
+        if self.confidential:
+            to_update.update(self.confidential.build_values())
         return to_update

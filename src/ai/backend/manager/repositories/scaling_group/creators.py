@@ -15,7 +15,10 @@ from ai.backend.manager.models.scaling_group import (
     ScalingGroupOpts,
     ScalingGroupRow,
 )
-from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
+from ai.backend.manager.models.scaling_group.types import (
+    ConfidentialScalingGroupOpts,
+    FairShareScalingGroupSpec,
+)
 from ai.backend.manager.repositories.base.creator import CreatorSpec
 from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
@@ -36,6 +39,7 @@ class ScalingGroupCreatorSpec(CreatorSpec[ScalingGroupRow]):
     scheduler_opts: ScalingGroupOpts | None = None
     use_host_network: bool = False
     fair_share_spec: FairShareScalingGroupSpec | None = None
+    confidential: ConfidentialScalingGroupOpts | None = None
 
     @property
     @override
@@ -62,6 +66,7 @@ class ScalingGroupCreatorSpec(CreatorSpec[ScalingGroupRow]):
             scheduler_opts=self.scheduler_opts if self.scheduler_opts else ScalingGroupOpts(),
             use_host_network=self.use_host_network,
             fair_share_spec=self.fair_share_spec,
+            confidential=self.confidential or ConfidentialScalingGroupOpts(),
         )
 
 

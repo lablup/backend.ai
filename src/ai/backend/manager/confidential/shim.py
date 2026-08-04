@@ -1,0 +1,250 @@
+from __future__ import annotations
+
+import base64
+import binascii
+import json
+import uuid
+from typing import Any, Final
+
+import sqlalchemy as sa
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
+from ai.backend.manager.confidential.broker import BrokerClient, BrokerTarget
+from ai.backend.manager.errors.confidential import (
+    BrokerUnreachable,
+    NonceQuotaExhausted,
+    ReferenceValueRejected,
+    ShimRefusal,
+)
+from ai.backend.manager.metrics.confidential import ConfidentialMetricObserver
+from ai.backend.manager.models.confidential.row import (
+    ConfidentialDecisionRow,
+    ConfidentialNonceRow,
+)
+from ai.backend.manager.models.confidential.types import DecisionActor, DecisionVerdict
+from ai.backend.manager.models.scaling_group.types import ConfidentialScalingGroupOpts
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+
+NONCE_HEADER: Final = "X-BackendAI-CC-Nonce"
+RELAYED_REQUEST_HEADERS: Final = frozenset({"content-type", "accept", "user-agent", "cookie"})
+RELAYED_RESPONSE_HEADERS: Final = frozenset({"content-type", "set-cookie", "www-authenticate"})
+
+_QUOTE_HEADER_LEN: Final = 48
+_MR_TD: Final = slice(136, 184)
+_MR_CONFIG_ID: Final = slice(184, 232)
+
+
+def _report_body(evidence: Any) -> bytes | None:
+    stack = [evidence]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, dict):
+            quote = node.get("quote")
+            if isinstance(quote, str):
+                try:
+                    raw = base64.b64decode(quote, validate=False)
+                except binascii.Error:
+                    raw = b""
+                if len(raw) >= _QUOTE_HEADER_LEN + 584:
+                    return raw[_QUOTE_HEADER_LEN : _QUOTE_HEADER_LEN + 584]
+            stack.extend(node.values())
+        elif isinstance(node, list):
+            stack.extend(node)
+    return None
+
+
+def presented_measurement(body: bytes | None) -> str | None:
+    if body is None:
+        return None
+    return json.dumps({
+        "mr_td": body[_MR_TD].hex(),
+        "mr_config_id": body[_MR_CONFIG_ID].hex(),
+    })
+
+
+class AuthorisationShim:
+    def __init__(self, db: ExtendedAsyncSAEngine, broker: BrokerClient) -> None:
+        self._db = db
+        self._broker = broker
+
+    async def record(
+        self,
+        *,
+        actor: DecisionActor,
+        verdict: DecisionVerdict,
+        resource_path: str,
+        measurement: str | None = None,
+        failing_clause: str | None = None,
+        session_id: uuid.UUID | None = None,
+        nonce: str | None = None,
+    ) -> None:
+        async with self._db.begin_session() as db_session:
+            db_session.add(
+                ConfidentialDecisionRow(
+                    actor=actor,
+                    verdict=verdict,
+                    resource_path=resource_path,
+                    measurement=measurement,
+                    failing_clause=failing_clause,
+                    session_id=session_id,
+                    nonce=nonce,
+                )
+            )
+        ConfidentialMetricObserver.instance().observe_decision(actor, verdict)
+
+    async def authorise_session_path(
+        self, domain_name: str, session_id: uuid.UUID, resource_path: str
+    ) -> str:
+        expected_prefix = f"{domain_name}/{session_id}/"
+        tail = resource_path.removeprefix(expected_prefix)
+        refusal: str | None = None
+        if not resource_path.startswith(expected_prefix):
+            refusal = f"path is not under the session's domain scope {expected_prefix}"
+        elif not tail or "/" in tail or ".." in tail:
+            refusal = "path must carry exactly one tag segment under the session scope"
+        if refusal is not None:
+            await self.record(
+                actor=DecisionActor.MANAGER,
+                verdict=DecisionVerdict.OUT_OF_SCOPE,
+                resource_path=resource_path,
+                failing_clause=refusal,
+                session_id=session_id,
+            )
+            raise ShimRefusal(extra_msg=refusal)
+        return resource_path
+
+    async def authorise_bundle(
+        self, opts: ConfidentialScalingGroupOpts, kind: str, bundle: bytes, signature: str
+    ) -> None:
+        refusal: str | None = None
+        if not opts.pipeline_public_key:
+            refusal = "no deterministic build pipeline public key is configured"
+        else:
+            try:
+                key = Ed25519PublicKey.from_public_bytes(bytes.fromhex(opts.pipeline_public_key))
+                key.verify(bytes.fromhex(signature), bundle)
+            except (ValueError, InvalidSignature) as e:
+                refusal = f"pipeline signature did not verify: {e}"
+        if refusal is not None:
+            await self.record(
+                actor=DecisionActor.MANAGER,
+                verdict=DecisionVerdict.OUT_OF_SCOPE,
+                resource_path=f"{kind}-bundle",
+                failing_clause=refusal,
+            )
+            raise ReferenceValueRejected(extra_msg=refusal)
+
+    async def _claim(self, nonce: str) -> uuid.UUID | None:
+        async with self._db.begin_session() as db_session:
+            claimed = await db_session.execute(
+                sa.update(ConfidentialNonceRow)
+                .where(
+                    (ConfidentialNonceRow.nonce == nonce)
+                    & (ConfidentialNonceRow.claims_used < ConfidentialNonceRow.quota)
+                )
+                .values(claims_used=ConfidentialNonceRow.claims_used + 1)
+                .returning(ConfidentialNonceRow.session_id)
+                .execution_options(synchronize_session=False)
+            )
+            return claimed.scalar_one_or_none()
+
+    async def _release_claim(self, nonce: str) -> None:
+        async with self._db.begin_session() as db_session:
+            await db_session.execute(
+                sa.update(ConfidentialNonceRow)
+                .where(
+                    (ConfidentialNonceRow.nonce == nonce)
+                    & (ConfidentialNonceRow.claims_used > 0)
+                )
+                .values(claims_used=ConfidentialNonceRow.claims_used - 1)
+            )
+
+    async def relay_attest(
+        self,
+        opts: ConfidentialScalingGroupOpts,
+        nonce: str,
+        body: bytes,
+        headers: dict[str, str],
+    ) -> tuple[int, bytes, dict[str, str]]:
+        try:
+            evidence = json.loads(body)
+        except (ValueError, UnicodeDecodeError):
+            evidence = None
+        measurement = presented_measurement(_report_body(evidence))
+        session_id = await self._claim(nonce)
+        if session_id is None:
+            await self.record(
+                actor=DecisionActor.GUEST,
+                verdict=DecisionVerdict.DENIED,
+                resource_path="/kbs/v0/attest",
+                measurement=measurement,
+                failing_clause="launch-nonce claim quota exhausted or nonce unknown",
+                nonce=nonce,
+            )
+            raise NonceQuotaExhausted(extra_msg="no claim slot remains for this session nonce")
+        try:
+            status, payload, resp_headers = await self._broker.relay(
+                BrokerTarget.of(opts), "POST", "/kbs/v0/attest", body=body, headers=headers
+            )
+        except BrokerUnreachable:
+            await self._release_claim(nonce)
+            await self.record(
+                actor=DecisionActor.GUEST,
+                verdict=DecisionVerdict.UNREACHABLE,
+                resource_path="/kbs/v0/attest",
+                measurement=measurement,
+                session_id=session_id,
+                nonce=nonce,
+            )
+            raise
+        await self.record(
+            actor=DecisionActor.GUEST,
+            verdict=DecisionVerdict.ALLOWED if status < 400 else DecisionVerdict.DENIED,
+            resource_path="/kbs/v0/attest",
+            measurement=measurement,
+            failing_clause=None if status < 400 else payload[:512].decode("utf-8", "replace"),
+            session_id=session_id,
+            nonce=nonce,
+        )
+        return status, payload, resp_headers
+
+    async def relay_release(
+        self,
+        opts: ConfidentialScalingGroupOpts,
+        resource_path: str,
+        headers: dict[str, str],
+        nonce: str | None,
+    ) -> tuple[int, bytes, dict[str, str]]:
+        target = BrokerTarget.of(opts)
+        try:
+            status, payload, resp_headers = await self._broker.relay(
+                target,
+                "GET",
+                f"/kbs/v0/resource/{resource_path}",
+                body=None,
+                headers=headers,
+            )
+        except BrokerUnreachable:
+            await self.record(
+                actor=DecisionActor.GUEST,
+                verdict=DecisionVerdict.UNREACHABLE,
+                resource_path=resource_path,
+                nonce=nonce,
+            )
+            raise
+        await self.record(
+            actor=DecisionActor.GUEST,
+            verdict=DecisionVerdict.ALLOWED if status < 400 else DecisionVerdict.DENIED,
+            resource_path=resource_path,
+            failing_clause=None if status < 400 else payload[:512].decode("utf-8", "replace"),
+            nonce=nonce,
+        )
+        return status, payload, resp_headers
+
+    async def relay_auth(
+        self, opts: ConfidentialScalingGroupOpts, body: bytes, headers: dict[str, str]
+    ) -> tuple[int, bytes, dict[str, str]]:
+        return await self._broker.relay(
+            BrokerTarget.of(opts), "POST", "/kbs/v0/auth", body=body, headers=headers
+        )
