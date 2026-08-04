@@ -53913,6 +53913,30 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/admin/gql/strawberry/public": {
+      "post": {
+        "operationId": "admin.handle_gql_strawberry_public",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GraphQLRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Execute a GraphQL query without credentials.\n\nServes the public schema, which holds only the fields that are safe to read anonymously;\nevery other field is absent from it and cannot be queried here. The full schema is at\n``POST /admin/gql/strawberry`` and requires authentication.\n"
+      }
+    },
     "/admin/domains": {
       "post": {
         "operationId": "admin/domains.create",

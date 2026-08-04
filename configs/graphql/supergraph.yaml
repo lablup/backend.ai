@@ -30,3 +30,10 @@ subgraphs:
     routing_url: http://host.docker.internal:8091/admin/gql/strawberry
     schema:
       file: ../../docs/manager/graphql-reference/v2-schema.graphql
+
+  # Unauthenticated fields. Its routing URL carries no auth middleware, so an anonymous query
+  # composed entirely of these fields resolves without credentials.
+  public:
+    routing_url: http://host.docker.internal:8091/admin/gql/strawberry/public
+    schema:
+      file: ../../docs/manager/graphql-reference/v2-public-schema.graphql
