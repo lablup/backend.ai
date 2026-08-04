@@ -5,6 +5,7 @@ from typing import override
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user, triggered_user
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
+from ai.backend.manager.actions.audit_policy import AuditLogPolicy
 from ai.backend.manager.actions.types import BLANK_ID
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.bulk.monitor.base import BulkActionMonitor
@@ -26,9 +27,11 @@ class BulkActionAuditLogMonitor(BulkActionMonitor):
     """
 
     _repository: AuditLogRepository
+    _policy: AuditLogPolicy
 
-    def __init__(self, repository: AuditLogRepository) -> None:
+    def __init__(self, repository: AuditLogRepository, policy: AuditLogPolicy) -> None:
         self._repository = repository
+        self._policy = policy
 
     @override
     async def prepare(self, action: BaseBulkAction, meta: BaseActionTriggerMeta) -> None:
@@ -40,6 +43,7 @@ class BulkActionAuditLogMonitor(BulkActionMonitor):
         acting = current_user()
         meta = result.meta
         request_id = current_request_id() or BLANK_ID
+        spec = action.spec()
         bulk_creator = BulkCreator(
             specs=[
                 BulkAuditLogCreatorSpec(
@@ -56,6 +60,7 @@ class BulkActionAuditLogMonitor(BulkActionMonitor):
                     duration=meta.duration,
                 )
                 for entity_result in meta.entity_results
+                if self._policy.should_record(spec, entity_result.status)
             ]
         )
         await self._repository.bulk_create(bulk_creator)

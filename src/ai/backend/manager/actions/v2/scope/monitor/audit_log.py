@@ -6,6 +6,7 @@ from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user, triggered_user
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
+from ai.backend.manager.actions.audit_policy import AuditLogPolicy
 from ai.backend.manager.actions.types import BLANK_ID
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.monitor.base import ScopeActionMonitor
@@ -29,9 +30,11 @@ class ScopeActionAuditLogMonitor(ScopeActionMonitor):
     """
 
     _repository: AuditLogRepository
+    _policy: AuditLogPolicy
 
-    def __init__(self, repository: AuditLogRepository) -> None:
+    def __init__(self, repository: AuditLogRepository, policy: AuditLogPolicy) -> None:
         self._repository = repository
+        self._policy = policy
 
     @override
     async def prepare(self, action: BaseScopeAction, meta: BaseActionTriggerMeta) -> None:
@@ -40,6 +43,8 @@ class ScopeActionAuditLogMonitor(ScopeActionMonitor):
     @override
     async def done(self, action: BaseScopeAction, result: ScopeActionProcessResult) -> None:
         meta = result.meta
+        if not self._policy.should_record(action.spec(), meta.status):
+            return
         specs = [self._build_spec(action, result, entity_id) for entity_id in meta.entity_ids]
         if not specs:
             # Nothing was touched, but the run still has to leave a trace.

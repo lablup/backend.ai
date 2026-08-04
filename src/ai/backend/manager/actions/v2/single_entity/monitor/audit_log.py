@@ -5,6 +5,7 @@ from typing import override
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user, triggered_user
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
+from ai.backend.manager.actions.audit_policy import AuditLogPolicy
 from ai.backend.manager.actions.types import BLANK_ID
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.actions.v2.single_entity.monitor.base import SingleEntityActionMonitor
@@ -26,9 +27,11 @@ class SingleEntityActionAuditLogMonitor(SingleEntityActionMonitor):
     """
 
     _repository: AuditLogRepository
+    _policy: AuditLogPolicy
 
-    def __init__(self, repository: AuditLogRepository) -> None:
+    def __init__(self, repository: AuditLogRepository, policy: AuditLogPolicy) -> None:
         self._repository = repository
+        self._policy = policy
 
     @override
     async def prepare(self, action: BaseSingleEntityAction, meta: BaseActionTriggerMeta) -> None:
@@ -38,9 +41,11 @@ class SingleEntityActionAuditLogMonitor(SingleEntityActionMonitor):
     async def done(
         self, action: BaseSingleEntityAction, result: SingleEntityActionProcessResult
     ) -> None:
+        meta = result.meta
+        if not self._policy.should_record(action.spec(), meta.status):
+            return
         trigger = triggered_user()
         acting = current_user()
-        meta = result.meta
         creator = Creator(
             spec=SingleEntityAuditLogCreatorSpec(
                 action_id=meta.action_id,

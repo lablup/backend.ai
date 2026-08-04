@@ -41,6 +41,15 @@ class ActionOperationType(enum.StrEnum):
     DELETE = "delete"
     PURGE = "purge"
 
+    @classmethod
+    def read_operations(cls) -> frozenset["ActionOperationType"]:
+        """The operations that only read. Everything else changes state.
+
+        The audit layer draws its "always record" line here: a state change is
+        recorded unconditionally, while recording a read is a configurable choice.
+        """
+        return frozenset({cls.GET, cls.SEARCH})
+
     def to_permission_operation(self) -> OperationType:
         match self:
             case ActionOperationType.GET:

@@ -25,6 +25,7 @@ from ai.backend.common.message_queue.abc.queue import AbstractMessageQueue
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
+from ai.backend.manager.actions.audit_policy import AuditLogPolicy
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
@@ -262,28 +263,31 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         reporter_monitor = ReporterMonitor(reporter_hub)
         prometheus_monitor = PrometheusMonitor()
         audit_log_repository = setup_input.repositories.audit_log.repository
-        audit_log_monitor = AuditLogMonitor(audit_log_repository)
+        audit_log_policy = AuditLogPolicy(
+            setup_input.config_provider.config.audit_log.record_read_operations
+        )
+        audit_log_monitor = AuditLogMonitor(audit_log_repository, audit_log_policy)
         action_monitors = ActionMonitors(
             legacy=[reporter_monitor, prometheus_monitor, audit_log_monitor],
             single_entity=[
                 SingleEntityActionReporterMonitor(reporter_hub),
                 SingleEntityActionPrometheusMonitor(),
-                SingleEntityActionAuditLogMonitor(audit_log_repository),
+                SingleEntityActionAuditLogMonitor(audit_log_repository, audit_log_policy),
             ],
             bulk=[
                 BulkActionReporterMonitor(reporter_hub),
                 BulkActionPrometheusMonitor(),
-                BulkActionAuditLogMonitor(audit_log_repository),
+                BulkActionAuditLogMonitor(audit_log_repository, audit_log_policy),
             ],
             scope=[
                 ScopeActionReporterMonitor(reporter_hub),
                 ScopeActionPrometheusMonitor(),
-                ScopeActionAuditLogMonitor(audit_log_repository),
+                ScopeActionAuditLogMonitor(audit_log_repository, audit_log_policy),
             ],
             global_scope=[
                 GlobalActionReporterMonitor(reporter_hub),
                 GlobalActionPrometheusMonitor(),
-                GlobalActionAuditLogMonitor(audit_log_repository),
+                GlobalActionAuditLogMonitor(audit_log_repository, audit_log_policy),
             ],
         )
 

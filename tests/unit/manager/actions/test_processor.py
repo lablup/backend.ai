@@ -18,6 +18,7 @@ from ai.backend.manager.actions.action import (
     BaseActionTriggerMeta,
     ProcessResult,
 )
+from ai.backend.manager.actions.audit_policy import AuditLogPolicy
 from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
@@ -181,7 +182,7 @@ class TestAuditLogMonitorExclusionAtSetupTime:
 
     @pytest.fixture
     def audit_log_monitor(self, mock_audit_log_repository: MagicMock) -> AuditLogMonitor:
-        return AuditLogMonitor(repository=mock_audit_log_repository)
+        return AuditLogMonitor(repository=mock_audit_log_repository, policy=AuditLogPolicy([]))
 
     @pytest.fixture
     def mock_action(self) -> MockAction:
@@ -228,7 +229,7 @@ class TestAuditLogMonitorActorIdentities:
 
     @pytest.fixture
     def audit_log_monitor(self, mock_audit_log_repository: MagicMock) -> AuditLogMonitor:
-        return AuditLogMonitor(repository=mock_audit_log_repository)
+        return AuditLogMonitor(repository=mock_audit_log_repository, policy=AuditLogPolicy([]))
 
     def _result(self) -> ProcessResult:
         now = datetime.now(tz=UTC)
