@@ -1,0 +1,5 @@
+socket = "unix:///run/confidential-containers/cdh.sock"
+
+[kbc]
+name = "cc_kbc"
+url = "@KBS_URL@"

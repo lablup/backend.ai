@@ -165,6 +165,7 @@ backup.*.json
 .serena/
 .claude/worktrees/
 
-# Rust storage format crate
 /rust/target/
 /rust/*/pkg/
+/guest-image/out/
+/guest-image/.cache/

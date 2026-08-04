@@ -1,0 +1,84 @@
+import io
+import json
+import os
+import pathlib
+import sys
+import tarfile
+import time
+import urllib.error
+import urllib.request
+
+STATE = pathlib.Path("/run/backend.ai")
+CONFIG = pathlib.Path("/home/config")
+
+
+class Refusal(Exception):
+    pass
+
+
+def profile():
+    if not (STATE / "ready").is_file():
+        raise Refusal("the guest never established attested wall-clock time")
+    return json.loads((STATE / "profile.json").read_text())
+
+
+def fetch(api, resource):
+    url = f"{api}/cdh/resource/{resource}"
+    try:
+        with urllib.request.urlopen(url, timeout=60) as response:
+            payload = response.read()
+    except urllib.error.HTTPError as error:
+        raise Refusal(f"the broker refused {resource} with {error.code}")
+    except OSError as error:
+        raise Refusal(f"the broker at {api} was unreachable for {resource}: {error}")
+    if not payload:
+        raise Refusal(f"the broker released {resource} as zero bytes")
+    return payload
+
+
+def unpack(payload, destination, mode):
+    raw = destination.parent / f".{destination.name}.received"
+    raw.write_bytes(payload)
+    raw.chmod(mode)
+    with tarfile.open(fileobj=io.BytesIO(payload), mode="r:*") as bundle:
+        bundle.extractall(destination, filter="data")
+    raw.unlink()
+
+
+def starve(reason):
+    message = f"backend.ai confidential kernel refuses to start: {reason}"
+    print(message, file=sys.stderr, flush=True)
+    try:
+        with open("/dev/console", "w") as console:
+            print(message, file=console, flush=True)
+    except OSError:
+        pass
+    while True:
+        time.sleep(3600)
+
+
+def main():
+    api = profile()["api"]
+    config_uri = os.environ.get("BACKENDAI_CC_CONFIG_URI")
+    if not config_uri:
+        raise Refusal("no session configuration resource was named for this kernel")
+    CONFIG.mkdir(mode=0o755, parents=True, exist_ok=True)
+    unpack(fetch(api, config_uri), CONFIG, 0o644)
+    if not (CONFIG / "environ.txt").is_file():
+        raise Refusal("the released session configuration carries no environ.txt")
+    secrets_uri = os.environ.get("BACKENDAI_CC_SECRETS_URI")
+    if secrets_uri:
+        unpack(fetch(api, secrets_uri), CONFIG, 0o600)
+    identity = STATE / "ssh" / "dropbear_rsa_host_key"
+    if not identity.is_file():
+        raise Refusal("the guest generated no in-guest secure shell host identity")
+    (CONFIG / "ssh").mkdir(mode=0o700, exist_ok=True)
+    delivered = CONFIG / "ssh" / "dropbear_rsa_host_key"
+    delivered.write_bytes(identity.read_bytes())
+    delivered.chmod(0o600)
+
+
+try:
+    main()
+except Refusal as refusal:
+    starve(refusal)

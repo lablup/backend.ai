@@ -1,0 +1,120 @@
+#!/opt/backend.ai/bin/python
+import base64
+import ctypes
+import json
+import os
+import pathlib
+import subprocess
+import sys
+import time
+import tomllib
+import urllib.request
+
+INITDATA = pathlib.Path("/run/confidential-containers/initdata/initdata.toml")
+STATE = pathlib.Path("/run/backend.ai")
+
+
+class Starve(Exception):
+    pass
+
+
+def settings():
+    if not INITDATA.is_file():
+        raise Starve("no measured configuration blob in the guest")
+    blob = tomllib.loads(INITDATA.read_text())
+    try:
+        return tomllib.loads(blob["data"]["backendai.toml"])
+    except KeyError:
+        raise Starve("measured configuration blob carries no backendai.toml")
+
+
+def get(url, timeout=15):
+    with urllib.request.urlopen(url, timeout=timeout) as response:
+        return response.read()
+
+
+def token_issued_at(api):
+    body = json.loads(get(f"{api}/aa/token?token_type=kbs"))
+    claims = body["token"].split(".")[1]
+    claims += "=" * (-len(claims) % 4)
+    return int(json.loads(base64.urlsafe_b64decode(claims))["iat"])
+
+
+def resource_issued_at(api, resource):
+    return int(json.loads(get(f"{api}/cdh/resource/{resource}"))["iat"])
+
+
+def attested_now(cfg):
+    api, resource = cfg["api"], cfg["time_resource"]
+    try:
+        return token_issued_at(api), "attestation-token"
+    except Exception:
+        return resource_issued_at(api, resource), "broker-resource"
+
+
+def set_realtime(epoch):
+    libc = ctypes.CDLL("libc.so.6", use_errno=True)
+
+    class Timespec(ctypes.Structure):
+        _fields_ = [("tv_sec", ctypes.c_long), ("tv_nsec", ctypes.c_long)]
+
+    if libc.clock_settime(0, ctypes.byref(Timespec(epoch, 0))) != 0:
+        raise Starve(f"clock_settime refused: {os.strerror(ctypes.get_errno())}")
+
+
+def publish(name, payload):
+    path = STATE / name
+    path.write_text(json.dumps(payload, sort_keys=True) + "\n")
+
+
+def guest_identity():
+    keydir = STATE / "ssh"
+    keydir.mkdir(mode=0o700, exist_ok=True)
+    key = keydir / "dropbear_rsa_host_key"
+    if not key.exists():
+        subprocess.run(
+            ["/opt/kernel/dropbearmulti", "dropbearkey", "-t", "rsa", "-f", str(key)],
+            check=True,
+            stdout=subprocess.DEVNULL,
+        )
+        key.chmod(0o600)
+
+
+def discipline(cfg, anchor_real, anchor_mono, source):
+    bound = float(cfg["time_skew_bound"])
+    interval = float(cfg["time_reanchor_interval"])
+    while True:
+        time.sleep(interval)
+        elapsed = time.clock_gettime(time.CLOCK_MONOTONIC_RAW) - anchor_mono
+        local = anchor_real + elapsed
+        drift = abs(time.time() - local)
+        if drift > bound:
+            raise Starve(f"wall clock diverged from the hardware counter by {drift:.1f}s")
+        remote, source = attested_now(cfg)
+        skew = abs(remote - local)
+        if skew > bound:
+            raise Starve(f"attested time differs from the disciplined clock by {skew:.1f}s")
+        set_realtime(int(local))
+        publish("time.json", {"state": "disciplined", "source": source, "skew": skew})
+
+
+def main():
+    STATE.mkdir(mode=0o755, exist_ok=True)
+    cfg = settings()
+    epoch, source = attested_now(cfg)
+    set_realtime(epoch)
+    anchor_mono = time.clock_gettime(time.CLOCK_MONOTONIC_RAW)
+    publish("time.json", {"state": "anchored", "source": source, "issued_at": epoch})
+    guest_identity()
+    publish("profile.json", {"api": cfg["api"], "allow_sudo": bool(cfg.get("allow_sudo", False))})
+    (STATE / "ready").write_text("ready\n")
+    discipline(cfg, epoch, anchor_mono, source)
+
+
+try:
+    main()
+except Starve as failure:
+    (STATE / "ready").unlink(missing_ok=True)
+    publish("time.json", {"state": "failed", "reason": str(failure)})
+    print(f"backend.ai confidential guest refuses to become ready: {failure}", file=sys.stderr)
+    sys.exit(1)
