@@ -11,6 +11,7 @@ from typing import Final
 
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
+from ai.backend.common.cc_storage import FORMAT_ID
 from ai.backend.common.types import VFolderConfidential, VFolderID, VFolderMount
 
 from ..errors.confidential import FolderEscrowUnreachable, FolderEncryptionMissing
@@ -19,7 +20,7 @@ from .broker import BrokerClient, BrokerTarget
 
 FOLDER_KEY_BYTES: Final = 32
 DEFAULT_TIER: Final = "file"
-DEFAULT_FORMAT: Final = "gocryptfs"
+DEFAULT_FORMAT: Final = FORMAT_ID
 MOUNT_PLAN_VERSION: Final = 1
 SCRATCH_DEVICE: Final = "/dev/bai_scratch"
 

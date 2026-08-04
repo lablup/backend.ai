@@ -16,6 +16,7 @@ STAGING = pathlib.Path("/run/bai-storage")
 MAPPER = "bai-scratch"
 HELPERS = {"nfs": "mount.nfs", "nfs4": "mount.nfs4", "ceph": "mount.ceph", "cifs": "mount.cifs"}
 GOCRYPTFS_FLAGS = ("-raw64", "-hkdf", "-longnames", "-noprealloc", "-allow_other")
+CC_STORAGE_FORMAT = "backend.ai/cc-storage/v1"
 
 
 class Refusal(Exception):
@@ -86,16 +87,27 @@ def transport(entry, cipher):
     run(argv)
 
 
+def layer(entry, name, cipher, target, key):
+    fmt = entry["encryption"].get("format")
+    if fmt == CC_STORAGE_FORMAT:
+        argv = [tool("bai-storage-fuse"), "-allow-other"]
+    elif fmt == "gocryptfs":
+        argv = [tool("gocryptfs"), "-masterkey", "stdin", *GOCRYPTFS_FLAGS]
+    else:
+        raise Refusal(
+            f"folder {name} is written in {fmt!r},"
+            " for which this measured image carries no reader"
+        )
+    if entry.get("read_only"):
+        argv.append("-ro")
+    run([*argv, str(cipher), str(target)], key.hex().encode() + b"\n")
+
+
 def mount_folder(api, scope, entry):
     name = entry["name"]
     descriptor = entry.get("encryption")
     if not descriptor:
         raise Refusal(f"folder {name} arrived without an encryption descriptor")
-    if descriptor.get("format") != "gocryptfs":
-        raise Refusal(
-            f"folder {name} is written in {descriptor.get('format')!r},"
-            " for which this measured image carries no reader"
-        )
     node("/dev/fuse", 10, 229)
     key = released_key(api, scope, descriptor, f"folder {name}")
     cipher = STAGING / name
@@ -103,10 +115,7 @@ def mount_folder(api, scope, entry):
     transport(entry, cipher)
     target = pathlib.Path(entry["target"])
     target.mkdir(mode=0o755, parents=True, exist_ok=True)
-    argv = [tool("gocryptfs"), "-masterkey", "stdin", *GOCRYPTFS_FLAGS]
-    if entry.get("read_only"):
-        argv.append("-ro")
-    run([*argv, str(cipher), str(target)], key.hex().encode() + b"\n")
+    layer(entry, name, cipher, target, key)
 
 
 def open_scratch(api, scope, scratch):

@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "bai-storage-format",
     "bai-storage-corpus",
+    "bai-storage-fuse",
     "bai-storage-format-python",
     "bai-storage-format-wasm",
 ]
@@ -17,7 +18,9 @@ bai-storage-format = { path = "bai-storage-format" }
 base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 chacha20 = "0.10"
 chacha20poly1305 = { version = "0.11", default-features = false, features = ["alloc"] }
+fuser = { version = "0.18", default-features = false }
 getrandom = "0.2"
+libc = "0.2"
 hkdf = "0.13"
 hmac = "0.13"
 sha2 = { version = "0.11", default-features = false }
