@@ -111,6 +111,7 @@ def launcher(
     """Create SessionLauncher with mocked dependencies."""
     return SessionLauncher(
         SessionLauncherArgs(
+            db=MagicMock(),
             repository=mock_repository,
             agent_client_pool=mock_agent_client_pool,
             network_plugin_ctx=mock_network_plugin_ctx,
