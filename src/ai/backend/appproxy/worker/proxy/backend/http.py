@@ -40,6 +40,17 @@ HOP_ONLY_HEADERS: Final[CIMultiDict[int]] = CIMultiDict([
     ("Upgrade", 1),
 ])
 
+BACKEND_CLIENT_TIMEOUT: Final[aiohttp.ClientTimeout] = aiohttp.ClientTimeout(
+    total=None,
+    # `connect` budgets waiting for a free pool slot *and* establishing the
+    # connection, so any finite value turns pool saturation into a gateway timeout
+    # once concurrency exceeds the connector limit. Leave queueing unbounded and
+    # cap the socket connect alone, which is what detects an unreachable upstream.
+    connect=None,
+    sock_connect=10.0,
+    sock_read=None,
+)
+
 
 class HTTPBackend(BaseBackend):
     """HTTP proxy backend that keeps routes in a health-checked pool.
@@ -56,17 +67,11 @@ class HTTPBackend(BaseBackend):
     def __init__(self, routes: list[RouteInfo], *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._pool = RoutePool(initial_routes=routes)
-        client_timeout = aiohttp.ClientTimeout(
-            total=None,
-            connect=10.0,
-            sock_connect=10.0,
-            sock_read=None,
-        )
         cleanup_interval = self.root_context.local_config.proxy_worker.client_pool_cleanup_interval
         self.client_pool = ClientPool(
             partial(
                 tcp_client_session_factory,
-                timeout=client_timeout,
+                timeout=BACKEND_CLIENT_TIMEOUT,
                 auto_decompress=False,  # transparently pass the response body
             ),
             cleanup_interval_seconds=cleanup_interval,
