@@ -16,6 +16,9 @@ class OperationStatus(enum.StrEnum):
     ERROR = "error"
     UNKNOWN = "unknown"
     RUNNING = "running"
+    # Rejected by a validator before the action ran. Kept apart from ERROR because a
+    # denial is an authorization signal, not the operation failing.
+    DENIED = "denied"
 
 
 class ActionKind(enum.StrEnum):

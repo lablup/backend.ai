@@ -12,10 +12,12 @@ __all__ = ("ScopeActionPrometheusMonitor",)
 
 
 class ScopeActionPrometheusMonitor(ScopeActionMonitor):
-    """Observes scope action outcomes into the Prometheus action metrics.
+    """Observes scope action results into the Prometheus action metrics.
 
-    One observation per run — the action metric is keyed by (entity_type,
-    operation, status), not by target scope, so a scope run does not fan out.
+    The run is observed once, so ``backendai_action_count`` stays a count of requests.
+    The entities it affected are counted separately — a scope run can touch any number
+    of them, which the per-run metric cannot show. They share the run's status: a scope
+    action reports which entities it affected, not a status for each.
     """
 
     _observer: ActionMetricObserver
@@ -29,10 +31,18 @@ class ScopeActionPrometheusMonitor(ScopeActionMonitor):
 
     @override
     async def done(self, action: BaseScopeAction, result: ScopeActionProcessResult) -> None:
+        meta = result.meta
         self._observer.observe_action(
             entity_type=action.entity_type(),
             operation_type=action.operation_type(),
-            status=result.meta.status,
-            duration=result.meta.duration.total_seconds(),
-            error_code=result.meta.error_code,
+            status=meta.status,
+            duration=meta.duration.total_seconds(),
+            error_code=meta.error_code,
         )
+        for _ in meta.entity_ids:
+            self._observer.observe_action_entity(
+                entity_type=action.entity_type(),
+                operation_type=action.operation_type(),
+                status=meta.status,
+                error_code=meta.error_code,
+            )

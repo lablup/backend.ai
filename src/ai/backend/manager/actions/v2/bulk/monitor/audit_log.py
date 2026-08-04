@@ -47,15 +47,15 @@ class BulkActionAuditLogMonitor(BulkActionMonitor):
                     entity_type=action.entity_type(),
                     operation=action.operation_type(),
                     created_at=meta.started_at,
-                    description=meta.description,
-                    status=meta.status,
-                    entity_id=entity_id,
+                    description=entity_result.description,
+                    status=entity_result.status,
+                    entity_id=entity_result.entity_id,
                     request_id=request_id,
                     triggered_by=str(trigger.user_id) if trigger else None,
                     acted_as=acting.user_id if acting else None,
                     duration=meta.duration,
                 )
-                for entity_id in meta.entity_ids
+                for entity_result in meta.entity_results
             ]
         )
         await self._repository.bulk_create(bulk_creator)

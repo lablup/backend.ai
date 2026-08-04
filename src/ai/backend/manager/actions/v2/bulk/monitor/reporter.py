@@ -55,18 +55,18 @@ class BulkActionReporterMonitor(BulkActionMonitor):
         acting = current_user()
         meta = result.meta
         request_id = current_request_id() or BLANK_ID
-        for entity_id in meta.entity_ids:
+        for entity_result in meta.entity_results:
             message = FinishedActionMessage(
                 action_id=meta.action_id,
                 action_type=action.spec().type(),
-                entity_id=entity_id,
+                entity_id=entity_result.entity_id,
                 request_id=request_id,
                 triggered_by=str(trigger.user_id) if trigger else None,
                 acted_as=acting.user_id if acting else None,
                 entity_type=action.entity_type(),
                 operation_type=action.operation_type(),
-                status=meta.status,
-                description=meta.description,
+                status=entity_result.status,
+                description=entity_result.description,
                 created_at=meta.started_at,
                 ended_at=meta.ended_at,
                 duration=meta.duration,

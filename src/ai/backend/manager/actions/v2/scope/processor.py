@@ -3,11 +3,10 @@ import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
 
-from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
-from ai.backend.manager.actions.types import OperationStatus
+from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.monitor import ScopeActionMonitor
 from ai.backend.manager.actions.v2.scope.result import (
@@ -66,46 +65,39 @@ class ScopeActionProcessor[TAction: BaseScopeAction, TResult: BaseScopeActionRes
         action_id = uuid.uuid4()
         trigger_meta = BaseActionTriggerMeta(action_id=action_id, started_at=started_at)
 
-        status = OperationStatus.UNKNOWN
-        description = "unknown"
-        error_code: ErrorCode | None = None
+        run_status = ActionRunStatus.unknown()
         entity_ids: Sequence[EntityID] = []
 
         # Validation runs inside the monitor lifecycle so a rejected action is
         # recorded too; monitors that only wrapped execution missed every denial.
         await self._prepare_monitors(action, trigger_meta)
         try:
-            for validator in self._validators:
-                await validator.validate(action, trigger_meta)
-            result = await self._func(action)
-        except BackendAIError as e:
-            log.exception("Action processing error: {}", e)
-            status = OperationStatus.ERROR
-            description = str(e)
-            error_code = e.error_code()
-            raise
-        except BaseException as e:
-            log.exception("Unexpected error during action processing: {}", e)
-            status = OperationStatus.ERROR
-            description = str(e)
-            error_code = ErrorCode.default()
-            raise
-        else:
-            entity_ids = result.entity_ids()
-            status = OperationStatus.SUCCESS
-            description = "Success"
-            return result
+            try:
+                for validator in self._validators:
+                    await validator.validate(action, trigger_meta)
+            except BaseException as e:
+                run_status = ActionRunStatus.of_failure(e, during_validation=True)
+                raise
+            try:
+                result = await self._func(action)
+            except BaseException as e:
+                run_status = ActionRunStatus.of_failure(e, during_validation=False)
+                raise
+            else:
+                entity_ids = result.entity_ids()
+                run_status = ActionRunStatus.success()
+                return result
         finally:
             ended_at = datetime.now(UTC)
             meta = ScopeActionResultMeta(
                 action_id=action_id,
                 scope_targets=action.scope_targets(),
                 entity_ids=entity_ids,
-                status=status,
-                description=description,
+                status=run_status.status,
+                description=run_status.description,
                 started_at=started_at,
                 ended_at=ended_at,
                 duration=ended_at - started_at,
-                error_code=error_code,
+                error_code=run_status.error_code,
             )
             await self._finalize_monitors(action, meta)

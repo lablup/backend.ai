@@ -3,15 +3,16 @@ import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
 
-from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
-from ai.backend.manager.actions.types import OperationStatus
+from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.bulk.monitor import BulkActionMonitor
 from ai.backend.manager.actions.v2.bulk.result import (
+    BaseBulkActionResult,
     BulkActionProcessResult,
     BulkActionResultMeta,
+    BulkEntityResult,
 )
 from ai.backend.manager.actions.v2.bulk.validator import BulkActionValidator
 
@@ -20,7 +21,7 @@ __all__ = ("BulkActionProcessor",)
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class BulkActionProcessor[TAction: BaseBulkAction, TResult]:
+class BulkActionProcessor[TAction: BaseBulkAction, TResult: BaseBulkActionResult]:
     """Validate, run monitors around, then execute a bulk action.
 
     Each registered validator runs first. The action function then executes within a
@@ -64,43 +65,49 @@ class BulkActionProcessor[TAction: BaseBulkAction, TResult]:
         action_id = uuid.uuid4()
         trigger_meta = BaseActionTriggerMeta(action_id=action_id, started_at=started_at)
 
-        status = OperationStatus.UNKNOWN
-        description = "unknown"
-        error_code: ErrorCode | None = None
+        entity_results: Sequence[BulkEntityResult] = []
 
         # Validation runs inside the monitor lifecycle so a rejected action is
         # recorded too; monitors that only wrapped execution missed every denial.
         await self._prepare_monitors(action, trigger_meta)
         try:
-            for validator in self._validators:
-                await validator.validate(action, trigger_meta)
-            result = await self._func(action)
-        except BackendAIError as e:
-            log.exception("Action processing error: {}", e)
-            status = OperationStatus.ERROR
-            description = str(e)
-            error_code = e.error_code()
-            raise
-        except BaseException as e:
-            log.exception("Unexpected error during action processing: {}", e)
-            status = OperationStatus.ERROR
-            description = str(e)
-            error_code = ErrorCode.default()
-            raise
-        else:
-            status = OperationStatus.SUCCESS
-            description = "Success"
-            return result
+            try:
+                for validator in self._validators:
+                    await validator.validate(action, trigger_meta)
+            except BaseException as e:
+                run_status = ActionRunStatus.of_failure(e, during_validation=True)
+                entity_results = self._same_result_for_every_entity(action, run_status)
+                raise
+            try:
+                result = await self._func(action)
+            except BaseException as e:
+                run_status = ActionRunStatus.of_failure(e, during_validation=False)
+                entity_results = self._same_result_for_every_entity(action, run_status)
+                raise
+            else:
+                entity_results = result.entity_results()
+                return result
         finally:
             ended_at = datetime.now(UTC)
             meta = BulkActionResultMeta(
                 action_id=action_id,
-                entity_ids=action.entity_ids(),
-                status=status,
-                description=description,
+                entity_results=entity_results,
                 started_at=started_at,
                 ended_at=ended_at,
                 duration=ended_at - started_at,
-                error_code=error_code,
             )
             await self._finalize_monitors(action, meta)
+
+    def _same_result_for_every_entity(
+        self, action: TAction, run_status: ActionRunStatus
+    ) -> Sequence[BulkEntityResult]:
+        """Attribute a whole-run failure to every entity the caller named."""
+        return [
+            BulkEntityResult(
+                entity_id=entity_id,
+                status=run_status.status,
+                description=run_status.description,
+                error_code=run_status.error_code,
+            )
+            for entity_id in action.entity_ids()
+        ]

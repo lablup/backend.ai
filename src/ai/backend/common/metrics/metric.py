@@ -4,7 +4,7 @@ import os
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Self
+from typing import Final, Self
 
 import psutil
 
@@ -344,6 +344,12 @@ class BgTaskMetricObserver:
         ).inc()
 
 
+# Status label for a run that reached some of its entities but not others. Metrics
+# only: an audit row covers one entity, which is never partly done, so this is not an
+# ``OperationStatus``.
+ACTION_STATUS_PARTIAL: Final[str] = "partial"
+
+
 class ActionMetricObserver:
     _instance: Self | None = None
 
@@ -354,6 +360,18 @@ class ActionMetricObserver:
         self._action_count = Counter(
             name="backendai_action_count",
             documentation="Total number of actions",
+            labelnames=[
+                "entity_type",
+                "operation_type",
+                "status",
+                "domain",
+                "operation",
+                "error_detail",
+            ],
+        )
+        self._action_entity_count = Counter(
+            name="backendai_action_entity_count",
+            documentation="Total number of entities processed by actions",
             labelnames=[
                 "entity_type",
                 "operation_type",
@@ -408,6 +426,28 @@ class ActionMetricObserver:
             operation=error_code.operation if error_code else "",
             error_detail=error_code.error_detail if error_code else "",
         ).observe(duration)
+
+    def observe_action_entity(
+        self,
+        *,
+        entity_type: EntityType,
+        operation_type: str,
+        status: str,
+        error_code: ErrorCode | None,
+    ) -> None:
+        """Count one entity an action processed.
+
+        A bulk or scope run touches many entities under one action, so the per-run
+        ``observe_action`` cannot show how much work was done or how much of it failed.
+        """
+        self._action_entity_count.labels(
+            entity_type=entity_type,
+            operation_type=operation_type,
+            status=status,
+            domain=error_code.domain if error_code else "",
+            operation=error_code.operation if error_code else "",
+            error_detail=error_code.error_detail if error_code else "",
+        ).inc()
 
 
 class DomainType(enum.StrEnum):
