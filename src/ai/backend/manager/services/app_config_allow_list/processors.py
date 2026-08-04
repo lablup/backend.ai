@@ -1,62 +1,72 @@
 from __future__ import annotations
 
-from typing import override
+from typing import Any, override
 
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor.global_action import GlobalActionProcessor
-from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
-from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.ops.base import (
+    CreateGlobalOpsAction,
+    GetSingleEntityOpsAction,
+    PurgeSingleEntityOpsAction,
+    SearchGlobalOpsAction,
+    UpdateSingleEntityOpsAction,
+)
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    CreatedEntityOpsResult,
+    EntityOpsResult,
+)
+from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
+from ai.backend.manager.data.app_config_allow_list.types import AppConfigAllowListData
 from ai.backend.manager.services.app_config_allow_list.actions.admin_search import (
     AdminSearchAppConfigAllowListAction,
-    SearchAppConfigAllowListActionResult,
 )
 from ai.backend.manager.services.app_config_allow_list.actions.create import (
     CreateAppConfigAllowListAction,
-    CreateAppConfigAllowListActionResult,
 )
 from ai.backend.manager.services.app_config_allow_list.actions.get import (
     GetAppConfigAllowListAction,
-    GetAppConfigAllowListActionResult,
 )
 from ai.backend.manager.services.app_config_allow_list.actions.purge import (
     PurgeAppConfigAllowListAction,
-    PurgeAppConfigAllowListActionResult,
 )
 from ai.backend.manager.services.app_config_allow_list.actions.update import (
     UpdateAppConfigAllowListAction,
-    UpdateAppConfigAllowListActionResult,
-)
-from ai.backend.manager.services.app_config_allow_list.service import (
-    AppConfigAllowListService,
 )
 
 
 class AppConfigAllowListProcessors(AbstractProcessorPackage):
-    create: ScopeActionProcessor[
-        CreateAppConfigAllowListAction, CreateAppConfigAllowListActionResult
+    """Every operation runs straight against ops, so this domain has no service."""
+
+    create: GlobalActionProcessor[
+        CreateGlobalOpsAction[Any, AppConfigAllowListData],
+        CreatedEntityOpsResult[AppConfigAllowListData],
     ]
-    get: SingleEntityActionProcessor[GetAppConfigAllowListAction, GetAppConfigAllowListActionResult]
-    admin_search: GlobalActionProcessor[
-        AdminSearchAppConfigAllowListAction, SearchAppConfigAllowListActionResult
+    get: SingleEntityActionProcessor[
+        GetSingleEntityOpsAction[Any, AppConfigAllowListData],
+        EntityOpsResult[AppConfigAllowListData],
     ]
     update: SingleEntityActionProcessor[
-        UpdateAppConfigAllowListAction, UpdateAppConfigAllowListActionResult
+        UpdateSingleEntityOpsAction[Any, AppConfigAllowListData],
+        EntityOpsResult[AppConfigAllowListData],
     ]
     purge: SingleEntityActionProcessor[
-        PurgeAppConfigAllowListAction, PurgeAppConfigAllowListActionResult
+        PurgeSingleEntityOpsAction[Any, AppConfigAllowListData],
+        EntityOpsResult[AppConfigAllowListData],
+    ]
+    admin_search: GlobalActionProcessor[
+        SearchGlobalOpsAction[Any, AppConfigAllowListData],
+        BatchOpsResult[AppConfigAllowListData],
     ]
 
-    def __init__(
-        self,
-        service: AppConfigAllowListService,
-        action_monitors: list[ActionMonitor],
-    ) -> None:
-        self.create = ScopeActionProcessor(service.create, action_monitors)
-        self.get = SingleEntityActionProcessor(service.get, action_monitors)
-        self.admin_search = GlobalActionProcessor(service.admin_search, action_monitors)
-        self.update = SingleEntityActionProcessor(service.update, action_monitors)
-        self.purge = SingleEntityActionProcessor(service.purge, action_monitors)
+    def __init__(self, registry: ProcessorRegistry[AppConfigAllowListData]) -> None:
+        p = registry.group()
+        self.create = p.global_create_ops()
+        self.get = p.single_get_ops()
+        self.update = p.single_update_ops()
+        self.purge = p.single_purge_ops()
+        self.admin_search = p.global_search_ops()
 
     @override
     def supported_actions(self) -> list[ActionSpec]:

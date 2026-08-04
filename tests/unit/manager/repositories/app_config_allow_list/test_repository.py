@@ -1,4 +1,4 @@
-"""Tests for AppConfigAllowListRepository with real database operations."""
+"""Tests for the ops-backed app config allow-list repository against a real database."""
 
 from __future__ import annotations
 
@@ -14,8 +14,8 @@ from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowLis
 from ai.backend.manager.data.app_config_allow_list.types import (
     AppConfigAllowListData,
 )
-from ai.backend.manager.errors.app_config import AppConfigAllowListNotFound
 from ai.backend.manager.errors.repository import (
+    EntityNotFoundError,
     ForeignKeyViolationError,
     UniqueConstraintViolationError,
 )
@@ -28,16 +28,19 @@ from ai.backend.manager.models.app_config_definition.row import AppConfigDefinit
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_allow_list.creators import (
-    AppConfigAllowListCreatorSpec,
+    AppConfigAllowListCreator,
 )
 from ai.backend.manager.repositories.app_config_allow_list.purgers import (
-    AppConfigAllowListPurgerSpec,
+    AppConfigAllowListPurger,
 )
-from ai.backend.manager.repositories.app_config_allow_list.repository import (
-    AppConfigAllowListRepository,
+from ai.backend.manager.repositories.app_config_allow_list.queriers import (
+    AppConfigAllowListQuerier,
+)
+from ai.backend.manager.repositories.app_config_allow_list.searchers import (
+    AppConfigAllowListSearcher,
 )
 from ai.backend.manager.repositories.app_config_allow_list.updaters import (
-    AppConfigAllowListUpdaterSpec,
+    AppConfigAllowListUpdater,
 )
 from ai.backend.manager.repositories.app_config_definition.creators import (
     AppConfigDefinitionCreatorSpec,
@@ -49,15 +52,14 @@ from ai.backend.manager.repositories.app_config_definition.repository import (
     AppConfigDefinitionRepository,
 )
 from ai.backend.manager.repositories.base import (
-    BatchQuerier,
     Creator,
     CursorBackwardPagination,
     CursorForwardPagination,
     OffsetPagination,
     Purger,
-    Updater,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 
@@ -76,8 +78,8 @@ async def database(
 
 
 @pytest.fixture
-def repository(database: ExtendedAsyncSAEngine) -> AppConfigAllowListRepository:
-    return AppConfigAllowListRepository(DBOpsProvider(database))
+def repository(database: ExtendedAsyncSAEngine) -> OpsRepository[AppConfigAllowListData]:
+    return OpsRepository(DBOpsProvider(database))
 
 
 @pytest.fixture
@@ -93,17 +95,13 @@ async def _register(definition_repository: AppConfigDefinitionRepository, config
 
 
 async def _create_entry(
-    repository: AppConfigAllowListRepository,
+    repository: OpsRepository[AppConfigAllowListData],
     config_name: str,
     scope_type: AppConfigScopeType,
     rank: int | None = None,
 ) -> AppConfigAllowListData:
     return await repository.create(
-        Creator(
-            spec=AppConfigAllowListCreatorSpec(
-                config_name=config_name, scope_type=scope_type, rank=rank
-            )
-        )
+        AppConfigAllowListCreator(config_name=config_name, scope_type=scope_type, rank=rank)
     )
 
 
@@ -113,7 +111,7 @@ def _missing_id() -> AppConfigAllowListID:
 
 @pytest.fixture
 async def existing_entry(
-    repository: AppConfigAllowListRepository,
+    repository: OpsRepository[AppConfigAllowListData],
     definition_repository: AppConfigDefinitionRepository,
 ) -> AppConfigAllowListData:
     await _register(definition_repository, "theme")
@@ -122,7 +120,7 @@ async def existing_entry(
 
 @pytest.fixture
 async def seeded_entries(
-    repository: AppConfigAllowListRepository,
+    repository: OpsRepository[AppConfigAllowListData],
     definition_repository: AppConfigDefinitionRepository,
 ) -> list[AppConfigAllowListData]:
     for config_name in ("theme", "menu"):
@@ -140,22 +138,24 @@ async def seeded_entries(
 class TestCreateAndGet:
     async def test_create_then_get_by_id(
         self,
-        repository: AppConfigAllowListRepository,
+        repository: OpsRepository[AppConfigAllowListData],
         definition_repository: AppConfigDefinitionRepository,
     ) -> None:
         await _register(definition_repository, "theme")
         created = await _create_entry(repository, "theme", AppConfigScopeType.PUBLIC)
-        fetched = await repository.get_by_id(created.id)
+        fetched = await repository.get(AppConfigAllowListQuerier(allow_list_id=created.id))
         assert fetched.id == created.id
         assert fetched.config_name == "theme"
         assert fetched.scope_type is AppConfigScopeType.PUBLIC
 
-    async def test_get_by_id_missing_raises(self, repository: AppConfigAllowListRepository) -> None:
-        with pytest.raises(AppConfigAllowListNotFound):
-            await repository.get_by_id(_missing_id())
+    async def test_get_by_id_missing_raises(
+        self, repository: OpsRepository[AppConfigAllowListData]
+    ) -> None:
+        with pytest.raises(EntityNotFoundError):
+            await repository.get(AppConfigAllowListQuerier(allow_list_id=_missing_id()))
 
     async def test_create_requires_registered_config_name(
-        self, repository: AppConfigAllowListRepository
+        self, repository: OpsRepository[AppConfigAllowListData]
     ) -> None:
         # No app_config_definitions row for "unregistered" -> FK violation.
         with pytest.raises(ForeignKeyViolationError):
@@ -163,7 +163,7 @@ class TestCreateAndGet:
 
     async def test_duplicate_config_name_scope_type_rejected(
         self,
-        repository: AppConfigAllowListRepository,
+        repository: OpsRepository[AppConfigAllowListData],
         existing_entry: AppConfigAllowListData,
     ) -> None:
         with pytest.raises(UniqueConstraintViolationError):
@@ -181,7 +181,7 @@ class TestRankAssignment:
     )
     async def test_rank_defaults_by_scope_type(
         self,
-        repository: AppConfigAllowListRepository,
+        repository: OpsRepository[AppConfigAllowListData],
         definition_repository: AppConfigDefinitionRepository,
         scope_type: AppConfigScopeType,
         expected_rank: int,
@@ -192,39 +192,43 @@ class TestRankAssignment:
 
     async def test_explicit_rank_overrides_default(
         self,
-        repository: AppConfigAllowListRepository,
+        repository: OpsRepository[AppConfigAllowListData],
         definition_repository: AppConfigDefinitionRepository,
     ) -> None:
         await _register(definition_repository, "theme")
         created = await _create_entry(repository, "theme", AppConfigScopeType.DOMAIN, rank=250)
         assert created.rank == 250
-        assert (await repository.get_by_id(created.id)).rank == 250
+        assert (
+            await repository.get(AppConfigAllowListQuerier(allow_list_id=created.id))
+        ).rank == 250
 
 
 class TestUpdate:
     async def test_update_changes_rank(
         self,
-        repository: AppConfigAllowListRepository,
+        repository: OpsRepository[AppConfigAllowListData],
         existing_entry: AppConfigAllowListData,
     ) -> None:
         updated = await repository.update(
-            Updater(
-                spec=AppConfigAllowListUpdaterSpec(rank=OptionalState.update(250)),
-                pk_value=existing_entry.id,
+            AppConfigAllowListUpdater(
+                allow_list_id=existing_entry.id, rank=OptionalState.update(250)
             )
         )
         assert updated.rank == 250
-        assert (await repository.get_by_id(existing_entry.id)).rank == 250
+        assert (
+            await repository.get(AppConfigAllowListQuerier(allow_list_id=existing_entry.id))
+        ).rank == 250
         # identity fields are untouched
         assert updated.config_name == existing_entry.config_name
         assert updated.scope_type is existing_entry.scope_type
 
-    async def test_update_missing_raises(self, repository: AppConfigAllowListRepository) -> None:
-        with pytest.raises(AppConfigAllowListNotFound):
+    async def test_update_missing_raises(
+        self, repository: OpsRepository[AppConfigAllowListData]
+    ) -> None:
+        with pytest.raises(EntityNotFoundError):
             await repository.update(
-                Updater(
-                    spec=AppConfigAllowListUpdaterSpec(rank=OptionalState.update(250)),
-                    pk_value=_missing_id(),
+                AppConfigAllowListUpdater(
+                    allow_list_id=_missing_id(), rank=OptionalState.update(250)
                 )
             )
 
@@ -232,26 +236,24 @@ class TestUpdate:
 class TestPurge:
     async def test_purge_removes_row(
         self,
-        repository: AppConfigAllowListRepository,
+        repository: OpsRepository[AppConfigAllowListData],
         existing_entry: AppConfigAllowListData,
     ) -> None:
-        purged = await repository.purge(
-            Purger(spec=AppConfigAllowListPurgerSpec(allow_list_id=existing_entry.id))
-        )
+        purged = await repository.purge(AppConfigAllowListPurger(allow_list_id=existing_entry.id))
         assert purged.id == existing_entry.id
-        with pytest.raises(AppConfigAllowListNotFound):
-            await repository.get_by_id(existing_entry.id)
+        with pytest.raises(EntityNotFoundError):
+            await repository.get(AppConfigAllowListQuerier(allow_list_id=existing_entry.id))
 
-    async def test_purge_missing_raises(self, repository: AppConfigAllowListRepository) -> None:
-        with pytest.raises(AppConfigAllowListNotFound):
-            await repository.purge(
-                Purger(spec=AppConfigAllowListPurgerSpec(allow_list_id=_missing_id()))
-            )
+    async def test_purge_missing_raises(
+        self, repository: OpsRepository[AppConfigAllowListData]
+    ) -> None:
+        with pytest.raises(EntityNotFoundError):
+            await repository.purge(AppConfigAllowListPurger(allow_list_id=_missing_id()))
 
     async def test_purge_cascades_to_fragments(
         self,
         database: ExtendedAsyncSAEngine,
-        repository: AppConfigAllowListRepository,
+        repository: OpsRepository[AppConfigAllowListData],
         existing_entry: AppConfigAllowListData,
     ) -> None:
         # existing_entry is ("theme", PUBLIC); a fragment under it must go with it.
@@ -266,9 +268,7 @@ class TestPurge:
             )
             await db_sess.flush()
 
-        await repository.purge(
-            Purger(spec=AppConfigAllowListPurgerSpec(allow_list_id=existing_entry.id))
-        )
+        await repository.purge(AppConfigAllowListPurger(allow_list_id=existing_entry.id))
 
         async with database.begin_readonly_session() as db_sess:
             remaining = await db_sess.scalar(
@@ -279,7 +279,7 @@ class TestPurge:
     async def test_definition_purge_cascades_to_allow_list_and_fragments(
         self,
         database: ExtendedAsyncSAEngine,
-        repository: AppConfigAllowListRepository,
+        repository: OpsRepository[AppConfigAllowListData],
         definition_repository: AppConfigDefinitionRepository,
     ) -> None:
         # Deleting the definition cascades to its allow-list entry and its fragment.
@@ -316,22 +316,22 @@ class TestPurge:
 class TestAdminSearch:
     async def test_admin_search_returns_all_with_total_count(
         self,
-        repository: AppConfigAllowListRepository,
+        repository: OpsRepository[AppConfigAllowListData],
         seeded_entries: list[AppConfigAllowListData],
     ) -> None:
-        result = await repository.admin_search(
-            BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
+        result = await repository.search_in_global(
+            AppConfigAllowListSearcher(pagination=OffsetPagination(limit=10, offset=0))
         )
         assert result.total_count == len(seeded_entries)
         assert {item.id for item in result.items} == {entry.id for entry in seeded_entries}
 
     async def test_admin_search_respects_pagination(
         self,
-        repository: AppConfigAllowListRepository,
+        repository: OpsRepository[AppConfigAllowListData],
         seeded_entries: list[AppConfigAllowListData],
     ) -> None:
-        result = await repository.admin_search(
-            BatchQuerier(pagination=OffsetPagination(limit=2, offset=0))
+        result = await repository.search_in_global(
+            AppConfigAllowListSearcher(pagination=OffsetPagination(limit=2, offset=0))
         )
         assert result.total_count == len(seeded_entries)
         assert len(result.items) == 2
@@ -339,11 +339,11 @@ class TestAdminSearch:
 
     async def test_admin_search_filters_by_config_name(
         self,
-        repository: AppConfigAllowListRepository,
+        repository: OpsRepository[AppConfigAllowListData],
         seeded_entries: list[AppConfigAllowListData],
     ) -> None:
-        result = await repository.admin_search(
-            BatchQuerier(
+        result = await repository.search_in_global(
+            AppConfigAllowListSearcher(
                 pagination=OffsetPagination(limit=10, offset=0),
                 conditions=[
                     AppConfigAllowListConditions.by_config_name_equals(
@@ -357,11 +357,11 @@ class TestAdminSearch:
 
     async def test_admin_search_filters_by_scope_type(
         self,
-        repository: AppConfigAllowListRepository,
+        repository: OpsRepository[AppConfigAllowListData],
         seeded_entries: list[AppConfigAllowListData],
     ) -> None:
-        result = await repository.admin_search(
-            BatchQuerier(
+        result = await repository.search_in_global(
+            AppConfigAllowListSearcher(
                 pagination=OffsetPagination(limit=10, offset=0),
                 conditions=[
                     AppConfigAllowListConditions.by_scope_type_equals(AppConfigScopeType.USER)
@@ -375,11 +375,11 @@ class TestAdminSearch:
 
     async def test_admin_search_filters_by_scope_type_not_equals(
         self,
-        repository: AppConfigAllowListRepository,
+        repository: OpsRepository[AppConfigAllowListData],
         seeded_entries: list[AppConfigAllowListData],
     ) -> None:
-        result = await repository.admin_search(
-            BatchQuerier(
+        result = await repository.search_in_global(
+            AppConfigAllowListSearcher(
                 pagination=OffsetPagination(limit=10, offset=0),
                 conditions=[
                     AppConfigAllowListConditions.by_scope_type_not_equals(AppConfigScopeType.USER)
@@ -393,11 +393,11 @@ class TestAdminSearch:
 
     async def test_admin_search_orders_by_config_name_desc(
         self,
-        repository: AppConfigAllowListRepository,
+        repository: OpsRepository[AppConfigAllowListData],
         seeded_entries: list[AppConfigAllowListData],
     ) -> None:
-        result = await repository.admin_search(
-            BatchQuerier(
+        result = await repository.search_in_global(
+            AppConfigAllowListSearcher(
                 pagination=OffsetPagination(limit=10, offset=0),
                 orders=[AppConfigAllowListOrders.config_name(ascending=False)],
             )
@@ -407,12 +407,12 @@ class TestAdminSearch:
 
     async def test_admin_search_filters_by_created_at(
         self,
-        repository: AppConfigAllowListRepository,
+        repository: OpsRepository[AppConfigAllowListData],
         seeded_entries: list[AppConfigAllowListData],
     ) -> None:
         target = seeded_entries[1]
-        result = await repository.admin_search(
-            BatchQuerier(
+        result = await repository.search_in_global(
+            AppConfigAllowListSearcher(
                 pagination=OffsetPagination(limit=10, offset=0),
                 conditions=[AppConfigAllowListConditions.by_created_at_equals(target.created_at)],
             )
@@ -421,12 +421,12 @@ class TestAdminSearch:
 
     async def test_admin_search_filters_by_updated_at(
         self,
-        repository: AppConfigAllowListRepository,
+        repository: OpsRepository[AppConfigAllowListData],
         seeded_entries: list[AppConfigAllowListData],
     ) -> None:
         target = seeded_entries[1]
-        result = await repository.admin_search(
-            BatchQuerier(
+        result = await repository.search_in_global(
+            AppConfigAllowListSearcher(
                 pagination=OffsetPagination(limit=10, offset=0),
                 conditions=[AppConfigAllowListConditions.by_updated_at_equals(target.updated_at)],
             )
@@ -435,11 +435,11 @@ class TestAdminSearch:
 
     async def test_admin_search_orders_by_rank_asc(
         self,
-        repository: AppConfigAllowListRepository,
+        repository: OpsRepository[AppConfigAllowListData],
         seeded_entries: list[AppConfigAllowListData],
     ) -> None:
-        result = await repository.admin_search(
-            BatchQuerier(
+        result = await repository.search_in_global(
+            AppConfigAllowListSearcher(
                 pagination=OffsetPagination(limit=10, offset=0),
                 orders=[AppConfigAllowListOrders.rank(ascending=True)],
             )
@@ -449,11 +449,11 @@ class TestAdminSearch:
 
     async def test_admin_search_orders_by_created_at(
         self,
-        repository: AppConfigAllowListRepository,
+        repository: OpsRepository[AppConfigAllowListData],
         seeded_entries: list[AppConfigAllowListData],
     ) -> None:
-        result = await repository.admin_search(
-            BatchQuerier(
+        result = await repository.search_in_global(
+            AppConfigAllowListSearcher(
                 pagination=OffsetPagination(limit=10, offset=0),
                 orders=[AppConfigAllowListOrders.created_at(ascending=True)],
             )
@@ -463,13 +463,13 @@ class TestAdminSearch:
 
     async def test_admin_search_cursor_forward(
         self,
-        repository: AppConfigAllowListRepository,
+        repository: OpsRepository[AppConfigAllowListData],
         seeded_entries: list[AppConfigAllowListData],
     ) -> None:
         by_created_desc = sorted(seeded_entries, key=lambda e: e.created_at, reverse=True)
         cursor = by_created_desc[0].id
-        result = await repository.admin_search(
-            BatchQuerier(
+        result = await repository.search_in_global(
+            AppConfigAllowListSearcher(
                 pagination=CursorForwardPagination(
                     first=10,
                     cursor_order=AppConfigAllowListOrders.created_at(ascending=False),
@@ -481,13 +481,13 @@ class TestAdminSearch:
 
     async def test_admin_search_cursor_backward(
         self,
-        repository: AppConfigAllowListRepository,
+        repository: OpsRepository[AppConfigAllowListData],
         seeded_entries: list[AppConfigAllowListData],
     ) -> None:
         by_created_asc = sorted(seeded_entries, key=lambda e: e.created_at)
         cursor = by_created_asc[0].id
-        result = await repository.admin_search(
-            BatchQuerier(
+        result = await repository.search_in_global(
+            AppConfigAllowListSearcher(
                 pagination=CursorBackwardPagination(
                     last=10,
                     cursor_order=AppConfigAllowListOrders.created_at(ascending=True),

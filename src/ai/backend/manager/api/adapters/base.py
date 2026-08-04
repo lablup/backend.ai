@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ai.backend.manager.api.adapter_options.pagination.pagination import (
     PaginationOptions,
@@ -13,6 +13,7 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import (
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
+from ai.backend.manager.repositories.base.searcher import Searcher
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.processors import Processors
@@ -93,3 +94,45 @@ class BaseAdapter(BaseFilterAdapter):
             pagination_spec,
         )
         return BatchQuerier(conditions=all_conditions, orders=all_orders, pagination=pagination)
+
+    def _build_searcher[TSearcher: Searcher[Any, Any]](
+        self,
+        searcher_class: type[TSearcher],
+        conditions: list[QueryCondition],
+        orders: list[QueryOrder],
+        pagination_spec: PaginationSpec,
+        first: int | None = None,
+        after: str | None = None,
+        last: int | None = None,
+        before: str | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> TSearcher:
+        """Build a domain :class:`Searcher` with the same pagination handling as
+        :meth:`_build_querier`.
+
+        A searcher carries the SELECT and the row conversion as well, so the ORM row
+        never leaves the repository layer. Domains move here as they migrate;
+        ``_build_querier`` goes away once the last one has.
+
+        No ``base_conditions``: it was how a fixed filter — a foreign-key scope, mostly —
+        got prepended before there was a scope to say it with. A scoped search now names
+        its scopes on the action, so a caller reaching for this should be adding a
+        ``SearchScope`` instead.
+        """
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=pagination_spec,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+        return searcher_class(
+            pagination=querier.pagination,
+            conditions=querier.conditions,
+            orders=querier.orders,
+        )

@@ -55,9 +55,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.app_config_allow_list.processors import (
         AppConfigAllowListProcessors,
     )
-    from ai.backend.manager.services.app_config_allow_list.service import (
-        AppConfigAllowListService,
-    )
     from ai.backend.manager.services.app_config_definition.processors import (
         AppConfigDefinitionProcessors,
     )
@@ -403,7 +400,6 @@ class ServiceArgs:
 class Services:
     agent: AgentService
     app_config: AppConfigService
-    app_config_allow_list: AppConfigAllowListService
     app_config_definition: AppConfigDefinitionService
     app_config_fragment: AppConfigFragmentService
     domain: DomainService

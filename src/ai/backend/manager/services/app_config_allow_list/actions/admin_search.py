@@ -3,38 +3,29 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.app_config import APP_CONFIG_ALLOW_LIST_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.app_config_allow_list.types import AppConfigAllowListData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.app_config_allow_list.actions.base import (
-    AppConfigAllowListGlobalAction,
+from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
+from ai.backend.manager.repositories.app_config_allow_list.searchers import (
+    AppConfigAllowListSearcher,
 )
 
 
 @dataclass
-class AdminSearchAppConfigAllowListAction(AppConfigAllowListGlobalAction):
+class AdminSearchAppConfigAllowListAction(
+    SearchGlobalOpsAction[AppConfigAllowListRow, AppConfigAllowListData]
+):
     """Super-admin path: search every allow-list entry, across all scope types."""
 
-    querier: BatchQuerier
+    searcher: AppConfigAllowListSearcher
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+    def entity_type(cls) -> EntityType:
+        return APP_CONFIG_ALLOW_LIST_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return None
-
-
-@dataclass
-class SearchAppConfigAllowListActionResult(BaseActionResult):
-    items: list[AppConfigAllowListData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    def to_searcher(self) -> AppConfigAllowListSearcher:
+        return self.searcher
