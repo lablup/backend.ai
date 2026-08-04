@@ -60,7 +60,9 @@ def _report_body(evidence: Any) -> bytes | None:
 
 def path_nonce(resource_path: str) -> str | None:
     segments = resource_path.split("/")
-    return segments[2] if len(segments) > 3 else None
+    if len(segments) != 3:
+        return None
+    return segments[1].partition(".")[2] or None
 
 
 def rcar_session(headers: dict[str, str]) -> str | None:
@@ -114,7 +116,7 @@ class AuthorisationShim:
     async def authorise_session_path(
         self, domain_name: str, session_id: uuid.UUID, nonce: str, resource_path: str
     ) -> str:
-        expected_prefix = f"{domain_name}/{session_id}/{nonce}/"
+        expected_prefix = f"{domain_name}/{session_id}.{nonce}/"
         tail = resource_path.removeprefix(expected_prefix)
         refusal: str | None = None
         if not resource_path.startswith(expected_prefix):

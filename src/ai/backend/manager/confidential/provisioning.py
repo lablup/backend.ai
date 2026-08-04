@@ -87,7 +87,7 @@ class SessionResourceProvisioner:
         written: list[str] = []
         for tag, (kind, payload) in resources.items():
             path = await self._shim.authorise_session_path(
-                domain_name, session_id, nonce, f"{domain_name}/{session_id}/{nonce}/{tag}"
+                domain_name, session_id, nonce, f"{domain_name}/{session_id}.{nonce}/{tag}"
             )
             await self._broker.put_resource(target, path, payload)
             written.append(path)
