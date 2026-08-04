@@ -2097,6 +2097,223 @@ class DockerExtraConfig(BaseConfigSchema):
     ]
 
 
+class ConfidentialConfig(BaseConfigSchema):
+    """
+    Settings for the confidential-computing agent backend.
+    """
+
+    nerdctl_path: Annotated[
+        str,
+        Field(default="/usr/local/bin/nerdctl"),
+        BackendAIConfigMeta(
+            description="Path to the nerdctl binary the narrow runtime interface shells out to.",
+            added_version="26.7.0",
+        ),
+    ]
+    containerd_address: Annotated[
+        str,
+        Field(default="/run/containerd/containerd.sock"),
+        BackendAIConfigMeta(
+            description="containerd socket the runtime client talks to.",
+            added_version="26.7.0",
+        ),
+    ]
+    containerd_namespace: Annotated[
+        str,
+        Field(default="backendai"),
+        BackendAIConfigMeta(
+            description=(
+                "containerd namespace holding confidential sandboxes. Named explicitly on every"
+                " enumeration so reconciliation never inspects a foreign namespace."
+            ),
+            added_version="26.7.0",
+        ),
+    ]
+    runtime_class: Annotated[
+        str,
+        Field(default="io.containerd.kata-qemu-tdx.v2"),
+        BackendAIConfigMeta(
+            description="containerd runtime handler selecting the confidential Kata shim.",
+            added_version="26.7.0",
+        ),
+    ]
+    blob_store_path: Annotated[
+        Path,
+        Field(default=Path("/var/lib/backend.ai/coco-blobs")),
+        BackendAIConfigMeta(
+            description=(
+                "Content-addressed store of pre-built measured configuration blobs, with a"
+                " by-image index keyed by kernel image digest."
+            ),
+            added_version="26.7.0",
+        ),
+    ]
+    blob_annotation_key: Annotated[
+        str,
+        Field(default="io.katacontainers.config.runtime.cc_init_data"),
+        BackendAIConfigMeta(
+            description="Annotation the measured configuration blob is attached under, verbatim.",
+            added_version="26.7.0",
+        ),
+    ]
+    broker_shim_addr: Annotated[
+        HostPortPair,
+        Field(default=HostPortPair(host="10.255.0.1", port=8080)),
+        BackendAIConfigMeta(
+            description=(
+                "Address of the key broker's authorisation shim, frozen into the measured blob."
+                " It must be reachable identically from every session namespace, so a loopback"
+                " address is refused."
+            ),
+            added_version="26.7.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    broker_upstream_addr: Annotated[
+        HostPortPair | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description=(
+                "Where the shim actually listens, when that differs from the frozen address."
+                " Each session bridge then translates the frozen address to it, which is how a"
+                " host-networked broker is reached without changing the measurement."
+            ),
+            added_version="26.7.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    broker_reachability_timeout: Annotated[
+        float,
+        Field(default=5.0),
+        BackendAIConfigMeta(
+            description="Seconds to allow the per-namespace shim reachability probe.",
+            added_version="26.7.0",
+        ),
+    ]
+    metadata_endpoint: Annotated[
+        str,
+        Field(default="169.254.169.254"),
+        BackendAIConfigMeta(
+            description="Cloud metadata address denied to every confidential session.",
+            added_version="26.7.0",
+        ),
+    ]
+    management_networks: Annotated[
+        list[str],
+        Field(default_factory=list),
+        BackendAIConfigMeta(
+            description="Management network prefixes denied to every confidential session.",
+            added_version="26.7.0",
+        ),
+    ]
+    session_subnet_pool: Annotated[
+        str,
+        Field(default="10.64.0.0/12"),
+        BackendAIConfigMeta(
+            description="Address pool the per-session bridge subnets are carved from.",
+            added_version="26.7.0",
+        ),
+    ]
+    session_subnet_prefix: Annotated[
+        int,
+        Field(default=28),
+        BackendAIConfigMeta(
+            description="Prefix length of each per-session bridge subnet.",
+            added_version="26.7.0",
+        ),
+    ]
+    session_mtu: Annotated[
+        int,
+        Field(default=1500),
+        BackendAIConfigMeta(
+            description="MTU applied to the session veth pair and the guest's eth0.",
+            added_version="26.7.0",
+        ),
+    ]
+    dns_servers: Annotated[
+        list[str],
+        Field(default_factory=lambda: ["8.8.8.8"]),
+        BackendAIConfigMeta(
+            description=(
+                "Non-loopback resolvers written into the session namespace and handed to the"
+                " runtime. A loopback resolver here breaks guest image pull and is refused."
+            ),
+            added_version="26.7.0",
+        ),
+    ]
+    container_start_timeout: Annotated[
+        float,
+        Field(default=300.0),
+        BackendAIConfigMeta(
+            description="Seconds to allow the sandbox to reach the running state.",
+            added_version="26.7.0",
+        ),
+    ]
+    attestation_timeout: Annotated[
+        float,
+        Field(default=600.0),
+        BackendAIConfigMeta(
+            description=(
+                "Seconds to allow the guest to complete its post-attestation fetch and open the"
+                " runner channel. Expiry refuses the kernel rather than reporting it ready."
+            ),
+            added_version="26.7.0",
+        ),
+    ]
+    runtime_default_memory: Annotated[
+        BinarySizeField,
+        Field(default=BinarySize.from_str("2g")),
+        BackendAIConfigMeta(
+            description=(
+                "The Kata runtime's configured default guest memory. It is added to the container"
+                " limit rather than maximised with it, so reservation must include it."
+            ),
+            added_version="26.7.0",
+        ),
+    ]
+    image_memory_allowance: Annotated[
+        BinarySizeField,
+        Field(default=BinarySize.from_str("16g")),
+        BackendAIConfigMeta(
+            description=(
+                "Extra guest memory for the in-guest unpacked image, which lands in a"
+                " memory-backed filesystem sized at half the guest's memory."
+            ),
+            added_version="26.7.0",
+        ),
+    ]
+    host_overhead_memory: Annotated[
+        BinarySizeField,
+        Field(default=BinarySize.from_str("4g")),
+        BackendAIConfigMeta(
+            description=(
+                "Measured host-side cost per confidential sandbox. Reserved because the"
+                " hypervisor's resident set size does not account for guest memory under TDX."
+            ),
+            added_version="26.7.0",
+        ),
+    ]
+    vfio_vendor_ids: Annotated[
+        list[str],
+        Field(default_factory=lambda: ["0x10de"]),
+        BackendAIConfigMeta(
+            description="PCI vendor identifiers eligible for whole-device passthrough.",
+            added_version="26.7.0",
+        ),
+    ]
+    gpu_memory_bytes: Annotated[
+        BinarySizeField,
+        Field(default=BinarySize(0)),
+        BackendAIConfigMeta(
+            description=(
+                "Per-accelerator memory reported for scheduling. The management library reports"
+                " zero devices once a GPU is bound for passthrough, so it is configured."
+            ),
+            added_version="26.7.0",
+        ),
+    ]
+
+
 class AgentGlobalConfig(BaseConfigSchema):
     """
     Configuration shared across all agents (logging, etcd, API, etc.).
@@ -2234,6 +2451,20 @@ class AgentGlobalConfig(BaseConfigSchema):
             composite=CompositeType.FIELD,
         ),
     ]
+    confidential: Annotated[
+        ConfidentialConfig,
+        Field(default_factory=ConfidentialConfig),
+        BackendAIConfigMeta(
+            description=(
+                "Settings for the confidential-computing backend: the runtime handler and its"
+                " subprocess client, the measured configuration blob store, the key broker's"
+                " authorisation shim, session networking with its egress denies, provisioned"
+                " memory accounting, and whole-device accelerator passthrough."
+            ),
+            added_version="26.7.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
     plugins: Annotated[
         Any,
         Field(default_factory=dict),
@@ -2321,6 +2552,8 @@ class AgentSpecificConfig(BaseConfigSchema):
             case AgentBackend.DOCKER:
                 DockerExtraConfig.model_validate(self.container.model_dump())
             case AgentBackend.DUMMY:
+                pass
+            case AgentBackend.COCO:
                 pass
 
 
