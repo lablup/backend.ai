@@ -57,8 +57,7 @@ def test_output_is_accepted_at_any_level(
 def test_command_owning_the_name_keeps_its_own_output(
     runner: CliRunner, sample_cli: click.Group
 ) -> None:
-    """A command declaring its own `--output` is not given `output_option`, so its meaning
-    (a destination path, as in `admin export`) survives alongside the root-level flag."""
+    """A command declaring its own `--output` keeps its meaning (a destination path)."""
     result = runner.invoke(sample_cli, ["--output=json", "export", "-o", "out.csv"])
     assert result.exit_code == ExitCode.OK
     assert result.output.strip() == "json out.csv"

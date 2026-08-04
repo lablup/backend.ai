@@ -51,21 +51,9 @@ def _override_output_mode(
     return value
 
 
-# Accepts `--output` on the command itself, in addition to the root-level `--output`; the
-# command-level value wins. Apply it next to `pass_ctx_obj`, which is what supplies the
-# `CLIContext` the value is read through -- without that context the option does nothing.
-#
-# Do NOT apply it to a command that already declares its own `--output` (`admin export
-# -o/--output PATH` names a destination file); the two would collide and Click would leave
-# one of them dead in its long-option table with no error.
-#
-# It belongs on commands, never on groups: a group renders no result to format, while the
-# root keeps its own `--output` because that one configures the whole invocation.
-#
-# Wearing it buys formatting of *error* output, which every `pass_ctx_obj` command gets.
-# Whether the *result* is formatted depends on the command rendering through
-# `ctx.output.print_*` rather than `print()`/`tabulate` -- 71 of the 154 do today, and
-# converting the rest is #1925.
+# Apply next to `pass_ctx_obj`, which supplies the `CLIContext` the value is read through.
+# Do NOT apply to a command declaring its own `--output` (`admin export -o/--output PATH`):
+# Click registers both silently and leaves one dead in its long-option table.
 output_option = click.option(
     "--output",
     type=click.Choice([OutputMode.JSON.value, OutputMode.CONSOLE.value]),
@@ -77,12 +65,7 @@ output_option = click.option(
 
 
 def pass_ctx_obj[**P, T](f: Callable[Concatenate[CLIContext, P], T]) -> Callable[P, T]:
-    """
-    Pass the :class:`CLIContext` as the first argument of the decorated command callback.
-
-    Pair it with :data:`output_option` on commands that should accept ``--output``; that
-    option reads the mode through the context this decorator supplies.
-    """
+    """Pass the :class:`CLIContext` as the first argument of the decorated command callback."""
 
     def new_func(*args: P.args, **kwargs: P.kwargs) -> T:
         obj = get_current_context().obj

@@ -1,20 +1,13 @@
-"""
-Guards the `--output` surface of the real command tree.
-
-`output_option` is applied by hand on ~150 commands, so unlike an injected option it can be
-forgotten on a new command, or applied twice on one that already declares its own `--output`.
-Nothing in `extensions.py` prevents either -- this does.
-"""
+"""Guards the `--output` surface of the real command tree: `output_option` is applied by hand,
+so it can be forgotten on a new command or collide with a command's own `--output`."""
 
 from collections.abc import Callable, Iterator
 from typing import Any, cast
 
 import click
 
-# The client CLI loads its subtrees through `LazyGroup(import_name="ai.backend.client.cli.…")`,
-# and Pants' dependency inference cannot see those string literals. Importing each group for real
-# is what puts its module in the test sandbox; without this the walk below reaches 194 of the 630
-# leaf commands and reports success on the third it can see.
+# These imports are what puts the lazily-loaded subtrees in the test sandbox: Pants cannot infer
+# them from `LazyGroup(import_name="…")` strings, and without them the walk sees a third of the tree.
 from ai.backend.client.cli.deployment import deployment
 from ai.backend.client.cli.dotfile import dotfile
 from ai.backend.client.cli.fair_share import fair_share
@@ -54,15 +47,11 @@ _IMPORTED_SUBTREE_NAMES = frozenset({
     "server-logs",
     "service",
 })
-# `v2` is deliberately out of scope, not merely unimported: no v2 command uses `pass_ctx_obj` --
-# they render through `print_result()` -- so the invariant below has nothing to check there.
-# Its subgroups are lazily loaded in turn, so importing it would pull in ~40 further modules.
-# Giving v2 an `--output` at all is #13431.
+# No v2 command uses `pass_ctx_obj`, so there is nothing to check there. Giving v2 `--output` is #13431.
 _SKIPPED_SUBTREE_NAMES = frozenset({"v2"})
 
-# `pass_ctx_obj` wraps the command callback in a closure of this qualified name. `update_wrapper`
-# copies `__name__`/`__qualname__` from the wrapped function but never `__code__`, so this survives
-# the copy and identifies the decorator without production code carrying a marker for the test.
+# `update_wrapper` copies `__name__`/`__qualname__` but never `__code__`, so the closure's own
+# qualname survives decoration and identifies `pass_ctx_obj` without a marker in production code.
 _PASS_CTX_OBJ_CODE = "pass_ctx_obj.<locals>.new_func"
 
 
@@ -95,11 +84,8 @@ def _walk_leaf_commands(
 
 
 def test_every_lazy_subtree_is_accounted_for(cli_entrypoint: Callable[[], click.Group]) -> None:
-    """
-    Fails loudly when a `LazyGroup` is added, instead of letting the walk below quietly shrink.
-    Add the new subtree to the imports and to `_IMPORTED_SUBTREE_NAMES`, or to
-    `_SKIPPED_SUBTREE_NAMES` with a reason.
-    """
+    """A new `LazyGroup` must join the imports and `_IMPORTED_SUBTREE_NAMES`, or
+    `_SKIPPED_SUBTREE_NAMES` with a reason -- otherwise the walk below silently shrinks."""
     root = cast(click.Group, cli_entrypoint)
     lazy = {name for name, command in root.commands.items() if isinstance(command, LazyGroup)}
     assert lazy == _IMPORTED_SUBTREE_NAMES | _SKIPPED_SUBTREE_NAMES, (
@@ -111,11 +97,8 @@ def test_every_lazy_subtree_is_accounted_for(cli_entrypoint: Callable[[], click.
 def test_output_option_is_applied_wherever_it_belongs(
     cli_entrypoint: Callable[[], click.Group],
 ) -> None:
-    """
-    Every command holding a `CLIContext` accepts `--output`: either `output_option`, or its own
-    (`admin export -o/--output PATH`, a destination file). Never both -- Click registers the two
-    silently and leaves one dead in its long-option table.
-    """
+    """Every command holding a `CLIContext` accepts `--output` exactly once: either
+    `output_option` or its own (`admin export -o/--output PATH`), never both."""
     root = cast(click.Group, cli_entrypoint)
     ctx = click.Context(root)
     missing: list[str] = []
