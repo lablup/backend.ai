@@ -102,6 +102,26 @@ class EntityNotFoundError(RepositoryError, web.HTTPNotFound):
         )
 
 
+class AmbiguousEntityKeyError(RepositoryError, web.HTTPConflict):
+    """Raised when a lookup key matches more than one row.
+
+    The key a lookup resolves is expected to be unique. Matching several rows means
+    either the conditions are wrong or the constraint that should enforce it is
+    missing, and answering with an arbitrary one of them would hide both.
+    """
+
+    error_type = "https://api.backend.ai/probs/ambiguous-entity-key"
+    error_title = "Lookup key matched more than one entity."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DATABASE,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class RepositoryIntegrityError(RepositoryError, web.HTTPConflict):
     """Base class for integrity constraint violation errors.
 

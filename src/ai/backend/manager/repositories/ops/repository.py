@@ -9,6 +9,7 @@ to make the methods domain-specific, conversion included.
     | operation | spec                | what it carries                       |
     |-----------|---------------------|---------------------------------------|
     | get       | ``DataQuerier``     | row class, pk, ``to_data``            |
+    | find      | ``DataFinder``      | row class, key conditions, ``to_data``|
     | search    | ``Searcher``        | select, options, ``to_data``          |
     | create    | ``DataCreator``     | ``build_row``, ``to_data``            |
     | update    | ``DataUpdater``     | row class, pk, values, ``to_data``    |
@@ -47,7 +48,7 @@ from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.base.creator import DataCreator
 from ai.backend.manager.repositories.base.purger import DataBatchPurger, DataPurger
-from ai.backend.manager.repositories.base.querier import DataQuerier
+from ai.backend.manager.repositories.base.querier import DataFinder, DataQuerier
 from ai.backend.manager.repositories.base.searcher import Searcher, SearcherResult
 from ai.backend.manager.repositories.base.updater import DataBatchUpdater, DataUpdater
 from ai.backend.manager.repositories.base.upserter import DataUpserter
@@ -75,6 +76,18 @@ class OpsRepository[TData]:
                 raise EntityNotFoundError(
                     f"{querier.row_class().__name__} {querier.pk_value()} not found"
                 )
+            return data
+
+    async def find(self, finder: DataFinder[Any, TData]) -> TData:
+        """Read one entity by a non-primary key, raising if the key resolves to nothing.
+
+        A lookup has to produce an id — its result contract says so — so an absent
+        entity cannot be reported by returning ``None``.
+        """
+        async with self._ops.read_ops() as r:
+            data = await r.find_data(finder)
+            if data is None:
+                raise EntityNotFoundError(f"No {finder.row_class().__name__} matches the given key")
             return data
 
     async def search(

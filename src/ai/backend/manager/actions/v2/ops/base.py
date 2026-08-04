@@ -5,7 +5,7 @@ from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.base.creator import DataCreator
 from ai.backend.manager.repositories.base.purger import DataBatchPurger, DataPurger
-from ai.backend.manager.repositories.base.querier import DataQuerier
+from ai.backend.manager.repositories.base.querier import DataFinder, DataQuerier
 from ai.backend.manager.repositories.base.searcher import Searcher
 from ai.backend.manager.repositories.base.updater import DataBatchUpdater, DataUpdater
 from ai.backend.manager.repositories.base.upserter import DataUpserter
@@ -13,6 +13,7 @@ from ai.backend.manager.repositories.base.upserter import DataUpserter
 __all__ = (
     "OpsBackendAction",
     "GetOpsAction",
+    "LookupOpsAction",
     "CreateOpsAction",
     "BulkCreateOpsAction",
     "BatchUpdateOpsAction",
@@ -54,6 +55,20 @@ class GetOpsAction[TRow: Base, TData](OpsBackendAction):
     @abstractmethod
     def to_querier(self) -> DataQuerier[TRow, TData]:
         """Return the read spec this action executes."""
+        raise NotImplementedError
+
+
+class LookupOpsAction[TRow: Base, TData](OpsBackendAction):
+    """A read by a key that is not the entity's id.
+
+    The lookup shape's whole point is producing an id, so the spec has to say which
+    columns the key is and how the row becomes data; there is nothing on the action for
+    it to lean on the way the single-entity shape leans on ``entity_id()``.
+    """
+
+    @abstractmethod
+    def to_finder(self) -> DataFinder[TRow, TData]:
+        """Return the key-resolution spec this action executes."""
         raise NotImplementedError
 
 

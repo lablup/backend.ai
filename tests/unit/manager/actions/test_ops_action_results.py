@@ -1,9 +1,10 @@
 """Only a create's result names an entity; the other shapes are asked for nothing.
 
 The v2 shapes take entity type and entity id off the *action* — ``entity_type()`` on
-every shape, ``entity_id()`` on the single-entity and bulk ones. The scope-shaped ones are the
-exception: they target a scope, so the run reports what it reached through the result,
-and the ``data/`` type supplies the id by implementing ``EntityData``.
+every shape, ``entity_id()`` on the single-entity and bulk ones. The scope- and lookup-shaped ones are
+the exception: a scope run reports what it reached and a lookup reports the id its key
+resolved to, both through the result, and the ``data/`` type supplies the id by
+implementing ``EntityData``.
 """
 
 from __future__ import annotations
@@ -14,11 +15,13 @@ from typing import override
 
 from ai.backend.common.data.entity.types import EntityData
 from ai.backend.common.identifier.entity import EntityID
+from ai.backend.manager.actions.v2.lookup.base import BaseLookupActionResult
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     CreatedEntityOpsResult,
     EntitiesOpsResult,
     EntityOpsResult,
+    LookupOpsResult,
 )
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 
@@ -76,6 +79,20 @@ def test_create_result_works_for_a_name_keyed_domain() -> None:
     result = CreatedEntityOpsResult(data=data)
 
     assert result.entity_ids() == (uuid.uuid5(uuid.NAMESPACE_OID, "default"),)
+
+
+def test_lookup_result_reports_the_id_its_key_resolved_to() -> None:
+    entity_id = uuid.uuid4()
+
+    result: BaseLookupActionResult = LookupOpsResult(data=_PresetData(id=entity_id, name="default"))
+
+    assert result.resolved_entity_id() == entity_id
+
+
+def test_lookup_result_works_for_a_name_keyed_domain() -> None:
+    result = LookupOpsResult(data=_NameKeyedData(name="default"))
+
+    assert result.resolved_entity_id() == uuid.uuid5(uuid.NAMESPACE_OID, "default")
 
 
 def test_entity_result_carries_only_its_data() -> None:

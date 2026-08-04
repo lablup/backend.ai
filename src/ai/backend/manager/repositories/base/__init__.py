@@ -62,6 +62,7 @@ from .querier import (
     BatchQuerier,
     BatchQuerierResult,
     BatchQueryOptions,
+    DataFinder,
     DataQuerier,
     Querier,
     QuerierResult,
@@ -132,6 +133,7 @@ __all__ = [
     "CursorBackwardPagination",
     "PageInfoResult",
     # Querier
+    "DataFinder",
     "DataQuerier",
     "Querier",
     "QuerierResult",

@@ -4,10 +4,11 @@ Domains used to write a result type per operation whose only distinguishing feat
 the field name — ``allow_list=``, ``vfolder=``, ``image=`` — which is what forced a
 conversion step between the repository and the result. These replace all of them.
 
-There are four rather than one because the v2 shapes ask different things of a result.
+There are five rather than one because the v2 shapes ask different things of a result.
 A single-entity run is identified by its action, so its result owes nothing; a run over
-a scope has to name what it touched, which its action cannot know. Both scope results
-get that from the ``data/`` type, which says so by implementing :class:`EntityData`.
+a scope has to name what it touched and a lookup has to produce the id it resolved,
+neither of which the action can know. Those results get it from the ``data/`` type,
+which says so by implementing :class:`EntityData`.
 """
 
 from collections.abc import Sequence
@@ -16,11 +17,13 @@ from typing import override
 
 from ai.backend.common.data.entity.types import EntityData
 from ai.backend.common.identifier.entity import EntityID
+from ai.backend.manager.actions.v2.lookup.base import BaseLookupActionResult
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 
 __all__ = (
     "EntityOpsResult",
     "CreatedEntityOpsResult",
+    "LookupOpsResult",
     "EntitiesOpsResult",
     "BatchOpsResult",
 )
@@ -50,6 +53,19 @@ class CreatedEntityOpsResult[TData: EntityData](EntityOpsResult[TData], BaseScop
     @override
     def entity_ids(self) -> Sequence[EntityID]:
         return (self.data.entity_id(),)
+
+
+@dataclass
+class LookupOpsResult[TData: EntityData](EntityOpsResult[TData], BaseLookupActionResult):
+    """The entity a lookup resolved its key to.
+
+    A lookup declares no target — producing one is the point of the run — so the id
+    reaches the audit trail through the result, the same way a create's does.
+    """
+
+    @override
+    def resolved_entity_id(self) -> EntityID:
+        return self.data.entity_id()
 
 
 @dataclass

@@ -22,16 +22,21 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.types import EntityData, EntityType, ScopeRef, ScopeType
 from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction, LookupKey
+from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.base import (
     BatchPurgeOpsAction,
     BatchUpdateOpsAction,
     BulkCreateOpsAction,
     CreateOpsAction,
     GetOpsAction,
+    LookupOpsAction,
     PurgeOpsAction,
     SearchOpsAction,
     UpdateOpsAction,
@@ -42,6 +47,7 @@ from ai.backend.manager.actions.v2.ops.result import (
     CreatedEntityOpsResult,
     EntitiesOpsResult,
     EntityOpsResult,
+    LookupOpsResult,
 )
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
@@ -53,7 +59,7 @@ from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
 from ai.backend.manager.repositories.base.creator import DataCreator
 from ai.backend.manager.repositories.base.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.purger import DataBatchPurger, DataPurger
-from ai.backend.manager.repositories.base.querier import DataQuerier
+from ai.backend.manager.repositories.base.querier import DataFinder, DataQuerier
 from ai.backend.manager.repositories.base.searcher import Searcher, SearcherResult
 from ai.backend.manager.repositories.base.types import ConflictCheck
 from ai.backend.manager.repositories.base.updater import DataBatchUpdater, DataUpdater
@@ -66,6 +72,7 @@ from ai.backend.manager.services.ops.service import (
     CreateService,
     DeleteService,
     GetService,
+    LookupService,
     PurgeService,
     SearchService,
     UpdateService,
@@ -157,6 +164,23 @@ class _PresetPurger(DataPurger[RolePresetRow, _PresetData]):
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:
         return ()
+
+    @override
+    def to_data(self, row: RolePresetRow) -> _PresetData:
+        return _PresetData(id=row.id, name=row.name)
+
+
+@dataclass
+class _PresetByName(DataFinder[RolePresetRow, _PresetData]):
+    name: str
+
+    @override
+    def row_class(self) -> type[RolePresetRow]:
+        return RolePresetRow
+
+    @override
+    def conditions(self) -> Sequence[QueryCondition]:
+        return [lambda: RolePresetRow.name == self.name]
 
     @override
     def to_data(self, row: RolePresetRow) -> _PresetData:
@@ -433,6 +457,39 @@ class _UpsertAction(BaseSingleEntityAction, UpsertOpsAction[RolePresetRow, _Pres
         return Permission.UPDATE
 
 
+@dataclass(frozen=True)
+class _NameKey(LookupKey):
+    name: str
+
+    @override
+    def kind(self) -> str:
+        return "name"
+
+    @override
+    def to_dict(self) -> dict[str, Any]:
+        return {"name": self.name}
+
+
+@dataclass
+class _LookupAction(BaseLookupAction, LookupOpsAction[RolePresetRow, _PresetData]):
+    """Declares no target: producing one is the whole point of the run."""
+
+    finder: _PresetByName
+
+    @override
+    def to_finder(self) -> DataFinder[RolePresetRow, _PresetData]:
+        return self.finder
+
+    @override
+    def lookup_key(self) -> LookupKey:
+        return _NameKey(name=self.finder.name)
+
+    @classmethod
+    @override
+    def entity_type(cls) -> EntityType:
+        return _ENTITY_TYPE
+
+
 @dataclass
 class _BulkCreateAction(BaseScopeAction, BulkCreateOpsAction[RolePresetRow, _PresetData]):
     scope: ScopeRef
@@ -567,7 +624,7 @@ def stored() -> _PresetData:
 @pytest.fixture
 def repository(stored: _PresetData) -> MagicMock:
     mock = MagicMock(spec=OpsRepository)
-    for operation in ("get", "search", "create", "update", "upsert", "purge"):
+    for operation in ("get", "find", "search", "create", "update", "upsert", "purge"):
         setattr(mock, operation, AsyncMock(return_value=stored))
     for operation in ("bulk_create", "batch_update", "batch_purge"):
         setattr(mock, operation, AsyncMock(return_value=[stored]))
@@ -577,6 +634,18 @@ def repository(stored: _PresetData) -> MagicMock:
         )
     )
     return mock
+
+
+@pytest.fixture
+def authenticated_user() -> UserData:
+    return UserData(
+        user_id=uuid.uuid4(),
+        is_authorized=True,
+        is_admin=False,
+        is_superadmin=False,
+        role=UserRole.USER,
+        domain_name="default",
+    )
 
 
 @pytest.fixture
@@ -667,6 +736,36 @@ async def test_purge_forwards_the_action_s_purger(
 
     assert result.data == stored
     repository.purge.assert_awaited_once_with(purger)
+
+
+async def test_lookup_forwards_the_action_s_finder(
+    repository: MagicMock, stored: _PresetData
+) -> None:
+    service: LookupService[_PresetData] = LookupService(repository)
+    finder = _PresetByName(name="default")
+
+    result = await service.execute(_LookupAction(finder=finder))
+
+    assert result.data == stored
+    assert result.resolved_entity_id() == stored.id
+    repository.find.assert_awaited_once_with(finder)
+
+
+async def test_lookup_runs_under_the_lookup_processor(
+    repository: MagicMock, stored: _PresetData, authenticated_user: UserData
+) -> None:
+    # The lookup processor always puts the authentication gate first, so the run needs
+    # a user in context even though the action declares no target.
+    service: LookupService[_PresetData] = LookupService(repository)
+    processor: LookupActionProcessor[_LookupAction, LookupOpsResult[_PresetData]] = (
+        LookupActionProcessor(service.execute)
+    )
+
+    with with_user(authenticated_user):
+        result = await processor.run(_LookupAction(finder=_PresetByName(name="default")))
+
+    # The id the key resolved to is what reaches the audit trail.
+    assert result.resolved_entity_id() == stored.id
 
 
 async def test_bulk_create_forwards_every_creator(

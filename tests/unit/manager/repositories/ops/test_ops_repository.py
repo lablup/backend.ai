@@ -30,7 +30,10 @@ from ai.backend.manager.actions.v2.ops.base import SearchOpsAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.data.role_preset.types import RolePresetData
-from ai.backend.manager.errors.repository import EntityNotFoundError
+from ai.backend.manager.errors.repository import (
+    AmbiguousEntityKeyError,
+    EntityNotFoundError,
+)
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
@@ -38,7 +41,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import DataCreator
 from ai.backend.manager.repositories.base.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.purger import DataBatchPurger, DataPurger
-from ai.backend.manager.repositories.base.querier import DataQuerier
+from ai.backend.manager.repositories.base.querier import DataFinder, DataQuerier
 from ai.backend.manager.repositories.base.searcher import Searcher
 from ai.backend.manager.repositories.base.types import ConflictCheck
 from ai.backend.manager.repositories.base.updater import DataBatchUpdater, DataUpdater
@@ -207,6 +210,25 @@ class _PresetView(EntityData):
 
 
 @dataclass
+class _PresetByName(DataFinder[RolePresetRow, RolePresetData]):
+    """Resolves a preset by its name, the way a lookup action would."""
+
+    name: str
+
+    @override
+    def row_class(self) -> type[RolePresetRow]:
+        return RolePresetRow
+
+    @override
+    def conditions(self) -> Sequence[QueryCondition]:
+        return [lambda: RolePresetRow.name == self.name]
+
+    @override
+    def to_data(self, row: RolePresetRow) -> RolePresetData:
+        return row.to_data()
+
+
+@dataclass
 class _PresetSearcher(Searcher[RolePresetRow, _PresetView]):
     @override
     def build_select(self) -> sa.sql.Select[Any]:
@@ -273,6 +295,28 @@ class TestGet:
     async def test_missing_row_raises(self, repository: OpsRepository[RolePresetData]) -> None:
         with pytest.raises(EntityNotFoundError):
             await repository.get(_PresetQuerier(target=uuid.uuid4()))
+
+
+class TestFind:
+    async def test_a_unique_key_resolves(
+        self, repository: OpsRepository[RolePresetData], preset: RolePresetData
+    ) -> None:
+        found = await repository.find(_PresetByName(name="default"))
+
+        assert found.id == preset.id
+
+    async def test_an_unmatched_key_raises(self, repository: OpsRepository[RolePresetData]) -> None:
+        with pytest.raises(EntityNotFoundError):
+            await repository.find(_PresetByName(name="absent"))
+
+    async def test_an_ambiguous_key_raises(
+        self, repository: OpsRepository[RolePresetData], preset: RolePresetData
+    ) -> None:
+        # `name` carries no unique constraint, so the same name can land twice.
+        await repository.create(_PresetCreator(name="default", scope_type=RBACScopeType.PROJECT))
+
+        with pytest.raises(AmbiguousEntityKeyError):
+            await repository.find(_PresetByName(name="default"))
 
 
 class TestUpdate:

@@ -15,7 +15,10 @@ from typing import TYPE_CHECKING, Any, cast
 
 import sqlalchemy as sa
 
-from ai.backend.manager.errors.repository import EmptySearchScopeError
+from ai.backend.manager.errors.repository import (
+    AmbiguousEntityKeyError,
+    EmptySearchScopeError,
+)
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -36,6 +39,7 @@ from ai.backend.manager.repositories.base import (
     DataBatchPurger,
     DataBatchUpdater,
     DataCreator,
+    DataFinder,
     DataPurger,
     DataQuerier,
     DataUpdater,
@@ -125,6 +129,28 @@ class ReadOps:
         if result is None:
             return None
         return querier.to_data(result.row)
+
+    async def find_data[TRow: Base, TData](self, finder: DataFinder[TRow, TData]) -> TData | None:
+        """Fetch one row by a key that is not its primary key, as its ``data/`` type.
+
+        Reads at most two rows and rejects the second: a lookup key is expected to be
+        unique, so more than one match means the conditions are wrong or the constraint
+        that should enforce it is missing. Answering with an arbitrary one would hide
+        both. No count is computed, unlike the search path.
+        """
+        row_class = finder.row_class()
+        query = sa.select(row_class)
+        for condition in finder.conditions():
+            query = query.where(condition())
+        result = await self._sess.execute(query.limit(2))
+        rows = result.scalars().all()
+        if not rows:
+            return None
+        if len(rows) > 1:
+            raise AmbiguousEntityKeyError(
+                f"The given key matches more than one {row_class.__name__}"
+            )
+        return finder.to_data(rows[0])
 
     async def batch_query_in_global(
         self,

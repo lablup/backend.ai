@@ -21,6 +21,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     BulkCreateOpsAction,
     CreateOpsAction,
     GetOpsAction,
+    LookupOpsAction,
     PurgeOpsAction,
     SearchOpsAction,
     UpdateOpsAction,
@@ -31,11 +32,13 @@ from ai.backend.manager.actions.v2.ops.result import (
     CreatedEntityOpsResult,
     EntitiesOpsResult,
     EntityOpsResult,
+    LookupOpsResult,
 )
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 
 __all__ = (
     "GetService",
+    "LookupService",
     "SearchService",
     "CreateService",
     "BulkCreateService",
@@ -58,6 +61,18 @@ class GetService[TData]:
 
     async def execute(self, action: GetOpsAction[Any, TData]) -> EntityOpsResult[TData]:
         return EntityOpsResult(data=await self._repository.get(action.to_querier()))
+
+
+class LookupService[TData: EntityData]:
+    """Resolves the key the action's finder describes into an entity."""
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: LookupOpsAction[Any, TData]) -> LookupOpsResult[TData]:
+        return LookupOpsResult(data=await self._repository.find(action.to_finder()))
 
 
 class SearchService[TData: EntityData]:
