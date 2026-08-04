@@ -10367,6 +10367,27 @@
         "title": "IdleCheckerSpecInputDTO",
         "type": "object"
       },
+      "MetricLabelEntry": {
+        "description": "A key-value label entry for executing a query definition.",
+        "properties": {
+          "key": {
+            "description": "Label key",
+            "title": "Key",
+            "type": "string"
+          },
+          "value": {
+            "description": "Label value",
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "value"
+        ],
+        "title": "MetricLabelEntry",
+        "type": "object"
+      },
       "NetworkTimeoutSpecInputDTO": {
         "properties": {
           "max_network_inactivity_seconds": {
@@ -10440,6 +10461,20 @@
               }
             ],
             "title": "Threshold"
+          },
+          "filter_labels": {
+            "items": {
+              "$ref": "#/components/schemas/MetricLabelEntry"
+            },
+            "title": "Filter Labels",
+            "type": "array"
+          },
+          "group_labels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Group Labels",
+            "type": "array"
           }
         },
         "required": [
@@ -17856,27 +17891,6 @@
           }
         },
         "title": "ExecuteQueryDefinitionOptionsInput",
-        "type": "object"
-      },
-      "MetricLabelEntry": {
-        "description": "A key-value label entry for executing a query definition.",
-        "properties": {
-          "key": {
-            "description": "Label key",
-            "title": "Key",
-            "type": "string"
-          },
-          "value": {
-            "description": "Label value",
-            "title": "Value",
-            "type": "string"
-          }
-        },
-        "required": [
-          "key",
-          "value"
-        ],
-        "title": "MetricLabelEntry",
         "type": "object"
       },
       "QueryTimeRangeInputDTO": {
