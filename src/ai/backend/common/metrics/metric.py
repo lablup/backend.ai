@@ -381,6 +381,11 @@ class ActionMetricObserver:
                 "error_detail",
             ],
         )
+        self._action_lookup_count = Counter(
+            name="backendai_action_lookup_count",
+            documentation="Total number of external-key lookups, by the key's shape",
+            labelnames=["entity_type", "lookup_kind", "status"],
+        )
         self._action_duration_sec = Histogram(
             name="backendai_action_duration_sec",
             documentation="Duration of actions in seconds",
@@ -426,6 +431,24 @@ class ActionMetricObserver:
             operation=error_code.operation if error_code else "",
             error_detail=error_code.error_detail if error_code else "",
         ).observe(duration)
+
+    def observe_lookup(
+        self,
+        *,
+        entity_type: EntityType,
+        lookup_kind: str,
+        status: str,
+    ) -> None:
+        """Count one attempt to resolve an external key into an internal id.
+
+        Labelled by the key's shape, never its value. This counter is how much of the
+        legacy by-name access is left: once a lookup stops being called, it can go.
+        """
+        self._action_lookup_count.labels(
+            entity_type=entity_type,
+            lookup_kind=lookup_kind,
+            status=status,
+        ).inc()
 
     def observe_action_entity(
         self,

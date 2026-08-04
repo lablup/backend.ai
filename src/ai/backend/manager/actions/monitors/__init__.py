@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.v2.bulk.monitor.base import BulkActionMonitor
 from ai.backend.manager.actions.v2.global_scope.monitor.base import GlobalActionMonitor
+from ai.backend.manager.actions.v2.lookup.monitor.base import LookupActionMonitor
 from ai.backend.manager.actions.v2.scope.monitor.base import ScopeActionMonitor
 from ai.backend.manager.actions.v2.single_entity.monitor.base import SingleEntityActionMonitor
 
@@ -22,3 +23,4 @@ class ActionMonitors:
     bulk: list[BulkActionMonitor] = field(default_factory=list)
     scope: list[ScopeActionMonitor] = field(default_factory=list)
     global_scope: list[GlobalActionMonitor] = field(default_factory=list)
+    lookup: list[LookupActionMonitor] = field(default_factory=list)
