@@ -43,6 +43,8 @@ build_upstream() {
 		log "upstream rootfs already current for ${want}; BAI_CC_FORCE_UPSTREAM=1 rebuilds it"
 		return 0
 	fi
+	rm -rf "${lb}/build/rootfs-${variant}-stage-one" "${lb}/build/rootfs-${variant}-stage-one.tar.zst" \
+		"${BAI_CC_CACHE}/stage-one"
 	EXTRA_PKGS="${BAI_CC_EXTRA_PKGS}" \
 	REPO_COMPONENTS="${BAI_CC_REPO_COMPONENTS}" \
 	API_SERVER_REST_FEATURES="${BAI_CC_API_SERVER_REST_FEATURES}" \
