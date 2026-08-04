@@ -95,8 +95,6 @@ def _get_network_join_condition() -> sa.ColumnElement[bool]:
 
 class DomainRow(CreatedAtMixin, Base):  # type: ignore[misc]
     __tablename__ = "domains"
-    # Referenced by ``users``' composite foreign key on (domain_id, domain_name).
-    __table_args__ = (sa.UniqueConstraint("id", "name", name="uq_domains_id_name"),)
 
     name: Mapped[str] = mapped_column(
         "name", SlugType(length=64, allow_unicode=True, allow_dot=True), primary_key=True

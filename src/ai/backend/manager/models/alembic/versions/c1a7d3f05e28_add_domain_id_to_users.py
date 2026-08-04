@@ -41,21 +41,9 @@ def upgrade() -> None:
             WHERE u.domain_name = d.name
         """)
     )
-    # Referencing the pair needs a unique index over the pair; `id` and `name` are unique
-    # on their own, which does not cover it.
-    op.create_unique_constraint("uq_domains_id_name", "domains", ["id", "name"])
-    op.create_foreign_key(
-        "fk_users_domain_pair_domains",
-        "users",
-        "domains",
-        ["domain_id", "domain_name"],
-        ["id", "name"],
-    )
 
 
 def downgrade() -> None:
-    op.drop_constraint("fk_users_domain_pair_domains", "users", type_="foreignkey")
-    op.drop_constraint("uq_domains_id_name", "domains", type_="unique")
     op.drop_constraint("fk_users_domain_id_domains", "users", type_="foreignkey")
     op.drop_index(op.f("ix_users_domain_id"), table_name="users")
     op.drop_column("users", "domain_id")
