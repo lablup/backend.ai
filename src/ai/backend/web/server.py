@@ -26,7 +26,7 @@ from functools import partial
 from http import HTTPStatus
 from pathlib import Path
 from pprint import pprint
-from typing import Any, cast
+from typing import Any, Final, cast
 
 import aiohttp
 import aiohttp_cors
@@ -111,6 +111,8 @@ from .stats import WebStats, track_active_handlers, view_stats
 from .template import toml_scalar
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+PROXIED_HTTP_METHODS: Final = ("HEAD", "GET", "PUT", "POST", "PATCH", "DELETE")
 
 
 cache_patterns = {
@@ -1100,16 +1102,18 @@ async def webapp_ctx(
     )
     cors.add(app.router.add_route("POST", "/func/{path:auth/signup}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:auth/signout}", manager_web_handler))
-    # The manager serves these two without auth so a client can read config before it holds
+    # The manager serves these without auth so a client can read config before it holds
     # credentials. Proxying them through `manager_web_handler` would defeat that: it demands a
-    # browser session and answers 401 before the request ever leaves the webserver. Exact paths
-    # rather than a prefix, so widening the anonymous surface stays a deliberate edit.
+    # browser session and answers 401 before the request ever leaves the webserver.
+    # The v2 pattern matches any entity: `public` is reserved for anonymous operations in v2
+    # paths (manager `api/rest/v2/AGENTS.md`), so it never names a domain-level public resource.
     cors.add(
         app.router.add_route("POST", "/func/{path:admin/gql/strawberry/public}", anon_web_handler)
     )
-    cors.add(
-        app.router.add_route("POST", "/func/{path:v2/app-config/public/get}", anon_web_handler)
-    )
+    for method in PROXIED_HTTP_METHODS:
+        cors.add(
+            app.router.add_route(method, "/func/{path:v2/[^/]+/public/[^/]+$}", anon_web_handler)
+        )
     cors.add(
         app.router.add_route("GET", "/func/{path:stream/kernel/_/events}", manager_web_handler)
     )
@@ -1129,12 +1133,8 @@ async def webapp_ctx(
         cors.add(app.router.add_route("GET", "/func/admin/gql", supergraph_handler))
         cors.add(app.router.add_route("POST", "/func/admin/gql", supergraph_handler))
 
-    cors.add(app.router.add_route("HEAD", "/func/{path:.*$}", manager_web_handler))
-    cors.add(app.router.add_route("GET", "/func/{path:.*$}", manager_web_handler))
-    cors.add(app.router.add_route("PUT", "/func/{path:.*$}", manager_web_handler))
-    cors.add(app.router.add_route("POST", "/func/{path:.*$}", manager_web_handler))
-    cors.add(app.router.add_route("PATCH", "/func/{path:.*$}", manager_web_handler))
-    cors.add(app.router.add_route("DELETE", "/func/{path:.*$}", manager_web_handler))
+    for method in PROXIED_HTTP_METHODS:
+        cors.add(app.router.add_route(method, "/func/{path:.*$}", manager_web_handler))
     cors.add(app.router.add_route("GET", "/pipeline/{path:stream/.*$}", pipeline_websocket_handler))
     cors.add(app.router.add_route("POST", "/pipeline/{path:.*login/$}", pipeline_login_handler))
     cors.add(app.router.add_route("GET", "/pipeline/{path:.*$}", pipeline_handler))
