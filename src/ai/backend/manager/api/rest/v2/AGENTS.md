@@ -52,9 +52,8 @@ REST v2 Handler → Adapter (api/adapters/) → Processor → Service → Reposi
   `auth_required` middleware.
 
 **anonymous (`public`) — reserved segment:**
-- `POST /v2/{entity}/public/{operation}` (e.g. `/v2/app-config/public/get`). No auth middleware.
-- `public` means "no authentication required" and nothing else — never a domain notion of public
-  (`open_to_public` deployments, `is_public` services).
+- `POST /v2/{entity}/public/{operation}` (e.g. `/v2/app-config/public/get`). No auth middleware. `public` marks the missing
+  auth, never a property of the resource.
 - The webserver proxies exactly this shape anonymously by pattern (`web/server.py`), so adding a route here exposes it with no
   further edit. Two segments only — nothing nested below the operation.
 
