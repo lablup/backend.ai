@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import override
+from typing import cast, override
 
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.common.identifier.domain import DomainID
@@ -11,7 +11,7 @@ from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.user.types import BulkUserCreateResultData, UserCreateResultData
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.user.creators import UserCreateSpec
+from ai.backend.manager.repositories.user.creators import UserCreateSpec, UserCreatorSpec
 from ai.backend.manager.services.user.actions.base import (
     UserAction,
     UserScopeAction,
@@ -44,7 +44,9 @@ class CreateUserAction(UserScopeAction):
 
     @override
     def scope_id(self) -> str:
-        return str(self._domain_id)
+        # Stays on the name; the id form is target_element(), which is what RBAC reads.
+        spec = cast(UserCreatorSpec, self.creator.spec)
+        return spec.domain_name or ""
 
     @override
     def target_element(self) -> RBACElementRef:
@@ -65,7 +67,6 @@ class CreateUserActionResult(UserScopeActionResult):
 
     @override
     def scope_id(self) -> str:
-        # Reports the name while CreateUserAction reports the id; RBAC reads target_element().
         return self.data.user.domain_name or ""
 
 
