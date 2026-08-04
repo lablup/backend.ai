@@ -11,13 +11,13 @@ import aiohttp
 from multidict import CIMultiDict
 from yarl import URL
 
-from ai.backend.common.cc_storage import CAPABILITY_HEADER, FORMAT_ID
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.common.api_handlers import (
     BaseRequestModel,
     BaseResponseModel,
     BaseRootResponseModel,
 )
+from ai.backend.common.cc_storage import CAPABILITY_HEADER, FORMAT_ID
 
 from .auth import AuthStrategy
 from .config import ClientConfig

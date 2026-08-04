@@ -174,7 +174,8 @@ class FramedTransport(RunnerTransport):
         async with self._lock:
             if self._writer is None or self._writer.is_closing():
                 self._reader, self._writer = await self._dial()
-            assert self._reader is not None and self._writer is not None
+            if self._reader is None or self._writer is None:
+                raise ConnectionError("the channel transport did not yield a live stream pair")
             return self._reader, self._writer
 
     def _drop(self) -> None:

@@ -74,6 +74,7 @@ from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.kernel_runner import CHANNEL_PROTOCOL_VERSION
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
     AbuseReport,
@@ -101,9 +102,7 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.appproxy.types import CreateEndpointRequestBody
-from ai.backend.common.kernel_runner import CHANNEL_PROTOCOL_VERSION
 from ai.backend.manager.confidential.channel import ConfidentialChannel
-from ai.backend.manager.models.confidential.row import ConfidentialChannelRow
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageIdentifier
@@ -126,6 +125,7 @@ from ai.backend.manager.data.session.options import (
     SessionHandlerOptions,
 )
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.models.confidential.row import ConfidentialChannelRow
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.resource_slot import ResourceSlotRepository

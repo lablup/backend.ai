@@ -18,6 +18,15 @@ class BlockVolume:
     guest_path: Path
 
 
+def _allocate(backing: Path, size: int) -> None:
+    handle = os.open(backing, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        os.ftruncate(handle, size)
+    finally:
+        os.close(handle)
+    backing.chmod(0o600)
+
+
 async def _run(*argv: str) -> str:
     process = await asyncio.create_subprocess_exec(
         *argv, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
@@ -46,9 +55,7 @@ class BlockVolumeManager:
             if size <= 0:
                 continue
             backing = self._backing(kernel_id, guest_path)
-            with open(backing, "wb") as image:
-                os.truncate(image.fileno(), size)
-            os.chmod(backing, 0o600)
+            await asyncio.to_thread(_allocate, backing, size)
             loop = await _run("losetup", "--find", "--show", "--nooverlap", str(backing))
             volumes.append(BlockVolume(backing, Path(loop), guest_path))
         return volumes

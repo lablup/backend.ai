@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-
-import aiohttp
 from collections.abc import Awaitable
 from dataclasses import dataclass
 from uuid import UUID
+
+import aiohttp
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import HealthCheckStatus
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
@@ -17,12 +17,12 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.confidential.plane import ConfidentialPlane
 from ai.backend.manager.data.kernel.types import KernelInfo
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.scheduler import (
     KernelTerminationResult,
     SchedulerRepository,
     TerminatingSessionData,
 )
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 

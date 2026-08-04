@@ -44,7 +44,7 @@ def provision(folder: Path, capacity: int) -> Path:
     try:
         handle = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     except FileExistsError:
-        raise IntegrityImageRefusal(f"{folder} already carries an integrity-tier image")
+        raise IntegrityImageRefusal(f"{folder} already carries an integrity-tier image") from None
     try:
         os.ftruncate(handle, backing_size(capacity))
     finally:

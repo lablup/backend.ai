@@ -42,6 +42,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.confidential.storage import describe
 from ai.backend.manager.data.permission.types import (
     EntityType as PermissionEntityType,
 )
@@ -60,7 +61,6 @@ from ai.backend.manager.defs import (
     RESERVED_VFOLDERS,
     VFOLDER_DSTPATHS_MAP,
 )
-from ai.backend.manager.confidential.storage import describe
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.confidential import ImmutableEncryptionTier
@@ -470,7 +470,7 @@ class VFolderRow(Base):  # type: ignore[misc]
 
 
 @sa.event.listens_for(VFolderRow.encryption_tier, "set", active_history=True)
-def _refuse_tier_change(target: VFolderRow, value: Any, previous: Any, initiator: Any) -> None:
+def _refuse_tier_change(target: VFolderRow, value: Any, previous: Any, _initiator: Any) -> None:
     if previous not in (None, NO_VALUE) and previous != value:
         raise ImmutableEncryptionTier(
             extra_msg=f"folder {target.id} was created at the {previous} tier"

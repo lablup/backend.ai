@@ -8,7 +8,6 @@ from typing import Any, override
 
 from aiohttp import web
 
-
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,

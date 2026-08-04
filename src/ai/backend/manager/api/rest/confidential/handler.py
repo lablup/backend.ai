@@ -32,10 +32,10 @@ from ai.backend.manager.models.confidential.disclosure import confidential_capab
 from ai.backend.manager.models.confidential.row import ConfidentialDecisionRow
 from ai.backend.manager.models.confidential.types import DecisionVerdict
 from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
-from ai.backend.manager.models.vfolder import VFolderRow, VFolderStatusSet
-from ai.backend.manager.models.vfolder.row import query_accessible_vfolders
 from ai.backend.manager.models.scaling_group.types import ConfidentialScalingGroupOpts
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderRow, VFolderStatusSet
+from ai.backend.manager.models.vfolder.row import query_accessible_vfolders
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

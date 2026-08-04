@@ -14,9 +14,12 @@ from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
 from ai.backend.common.cc_storage import FORMAT_ID
 from ai.backend.common.types import VFolderConfidential, VFolderID, VFolderMount
+from ai.backend.manager.errors.confidential import (
+    FolderEncryptionMissing,
+    FolderEscrowUnreachable,
+)
+from ai.backend.manager.models.scaling_group.types import ConfidentialScalingGroupOpts
 
-from ..errors.confidential import FolderEscrowUnreachable, FolderEncryptionMissing
-from ..models.scaling_group.types import ConfidentialScalingGroupOpts
 from .broker import BrokerClient, BrokerTarget
 
 FOLDER_KEY_BYTES: Final = 32
@@ -51,7 +54,7 @@ class FolderKeyEscrow:
         }
         try:
             self._path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-            with open(self._path, "a") as backup:
+            with self._path.open("a") as backup:
                 backup.write(json.dumps(record, sort_keys=True) + "\n")
                 backup.flush()
                 os.fsync(backup.fileno())

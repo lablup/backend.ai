@@ -2,7 +2,6 @@ from typing import Self
 
 from ai.backend.common.metrics.safe import SafeCounter as Counter
 from ai.backend.common.metrics.safe import SafeGauge as Gauge
-
 from ai.backend.manager.models.confidential.types import DecisionActor, DecisionVerdict
 
 

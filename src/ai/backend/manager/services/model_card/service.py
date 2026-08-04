@@ -3,14 +3,14 @@ from uuid import UUID
 
 from ruamel.yaml import YAML
 
-from ai.backend.manager.confidential.catalogue import CatalogueReader
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.types import VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.confidential.catalogue import CatalogueReader
 from ai.backend.manager.data.model_card.types import ResourceRequirementEntry, VFolderScanData
 from ai.backend.manager.errors.storage import ModelCardParseError
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.model_card.repository import ModelCardRepository
 from ai.backend.manager.repositories.model_card.upserters import ModelCardScanUpserterSpec
 from ai.backend.manager.services.model_card.actions.available_presets import (

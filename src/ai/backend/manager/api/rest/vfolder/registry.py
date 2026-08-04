@@ -15,8 +15,8 @@ from ai.backend.manager.api.rest.middleware.auth import (
     superadmin_required,
 )
 from ai.backend.manager.api.rest.routing import RouteRegistry
-from ai.backend.manager.confidential.client_keys import enforce_client_format
 from ai.backend.manager.api.rest.types import RouteMiddleware, WebRequestHandler
+from ai.backend.manager.confidential.client_keys import enforce_client_format
 from ai.backend.manager.models.vfolder import (
     VFolderPermission,
     VFolderPermissionSetAlias,

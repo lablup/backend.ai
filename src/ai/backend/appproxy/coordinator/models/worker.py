@@ -25,10 +25,10 @@ from ai.backend.appproxy.common.types import (
     EndpointConfig,
     FrontendMode,
     ProxyProtocol,
-    UpstreamScheme,
     RouteInfo,
     SessionConfig,
     Slot,
+    UpstreamScheme,
 )
 from ai.backend.appproxy.coordinator.errors import MissingFrontendConfigError
 from ai.backend.common.exception import UnreachableError

@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from secrets import token_bytes
 from collections import defaultdict
 from collections.abc import Awaitable, Mapping
 from dataclasses import dataclass
 from itertools import groupby
+from secrets import token_bytes
 from typing import Any
 from uuid import UUID
 

@@ -71,26 +71,25 @@ from .blob import MeasuredBlobStore
 from .errors import (
     AcceleratorHooksRefused,
     FolderEncryptionMissing,
-    HostLogFolderRefused,
-    MountPlanMissing,
-    StorageBindRefused,
-    UnmanagedFolderRefused,
     FractionalAcceleratorRefused,
     HostConfigReadbackRefused,
+    HostLogFolderRefused,
+    HostPrivilegeWriteRefused,
     ImageDistroUnresolved,
     ImagePushRefused,
+    MountPlanMissing,
     MultiNodeSessionRefused,
-    HostPrivilegeWriteRefused,
     NetworkSetupFailed,
     RawCircuitRefused,
     ReleaseNotConfirmed,
+    StorageBindRefused,
+    UnmanagedFolderRefused,
 )
 from .kernel import CocoKernel
 from .netns import NetworkConfig, SessionNetwork, SessionNetworkManager
 from .relay import ChannelRelay, Circuit
 from .resources import ALLOC_LABEL, encode_allocations, resolve_char_devices
 from .runtime import AbstractRuntimeClient, NerdctlClient, RuntimeConfig
-from .volumes import BlockVolume, BlockVolumeManager
 from .spec import (
     GUEST_ENTRYPOINT,
     ContainerSpec,
@@ -98,6 +97,7 @@ from .spec import (
     build_annotations,
     guest_sourced_mounts,
 )
+from .volumes import BlockVolume, BlockVolumeManager
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

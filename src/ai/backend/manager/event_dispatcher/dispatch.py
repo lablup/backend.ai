@@ -51,6 +51,7 @@ from ai.backend.common.events.event_types.kernel.anycast import (
     KernelStartedAnycastEvent,
     KernelTerminatedAnycastEvent,
     KernelTerminatingAnycastEvent,
+    SessionChannelActivityAnycastEvent,
 )
 from ai.backend.common.events.event_types.kernel.broadcast import (
     KernelCancelledBroadcastEvent,
@@ -133,10 +134,6 @@ from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 from .handlers.agent import AgentEventHandler
-from ai.backend.common.events.event_types.kernel.anycast import (
-    SessionChannelActivityAnycastEvent,
-)
-
 from .handlers.idle_check import IdleCheckEventHandler
 from .handlers.image import ImageEventHandler
 from .handlers.kernel import KernelEventHandler

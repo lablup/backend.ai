@@ -31,12 +31,12 @@ from ai.backend.agent.stats import (
 from ai.backend.agent.types import Container, MountInfo
 from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.json import dump_json_str, load_json
-from ai.backend.common.types import MetricKey
 from ai.backend.common.types import (
     AcceleratorMetadata,
     DeviceId,
     DeviceModelInfo,
     DeviceName,
+    MetricKey,
     SlotName,
     SlotTypes,
 )

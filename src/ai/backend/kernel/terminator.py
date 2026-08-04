@@ -157,7 +157,8 @@ class TransportTerminator:
             self._zctx = None
 
     async def _install(self) -> None:
-        assert self._context is not None
+        if self._context is None:
+            raise ChannelUnavailable("no transport context to install a released identity into")
         members = await asyncio.to_thread(_fetch, self._api, self._resource)
         if self._keydir is None:
             self._keydir = Path(tempfile.mkdtemp(prefix="bai-channel-"))
@@ -216,7 +217,8 @@ class TransportTerminator:
             writer.close()
 
     async def _bridge(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
-        assert self._zctx is not None
+        if self._zctx is None:
+            raise ChannelUnavailable("no message context to bridge a client connection onto")
         push = self._zctx.socket(zmq.PUSH)
         push.setsockopt(zmq.LINGER, 0)
         push.connect(REPL_IN)

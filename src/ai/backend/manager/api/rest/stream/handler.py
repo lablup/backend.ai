@@ -41,8 +41,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.utils import call_non_bursty
 from ai.backend.manager.api.wsproxy import TCPProxy
 from ai.backend.manager.dto.context import RequestCtx
-from ai.backend.manager.errors.api import NotImplementedAPI
-from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.api import InvalidAPIParameters, NotImplementedAPI
 from ai.backend.manager.errors.kernel import InvalidStreamMode
 from ai.backend.manager.errors.resource import AppNotFound, NoCurrentTaskContext
 from ai.backend.manager.errors.service import AppServiceStartFailed

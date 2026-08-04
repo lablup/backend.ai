@@ -19,7 +19,7 @@ from .errors import RawCircuitRefused, RelayUnavailable
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def _splice_unavailable(*args: object, **kwargs: object) -> int:
+def _splice_unavailable(*_args: object, **_kwargs: object) -> int:
     raise RelayUnavailable(extra_msg=f"os.splice is absent on {sys.platform}")
 
 
@@ -33,7 +33,7 @@ GUEST_DIAL_TIMEOUT: Final = 10.0
 
 
 class Pump:
-    __slots__ = ("_source", "_sink", "_read_end", "_write_end", "_moved")
+    __slots__ = ("_moved", "_read_end", "_sink", "_source", "_write_end")
 
     def __init__(self, source: socket.socket, sink: socket.socket) -> None:
         self._source = source.fileno()
