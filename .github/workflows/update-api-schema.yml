@@ -68,14 +68,15 @@ jobs:
       run: |
         ./backend.ai mgr api dump-gql-schema --output docs/manager/graphql-reference/schema.graphql
         ./backend.ai mgr api dump-gql-schema --v2 --output docs/manager/graphql-reference/v2-schema.graphql
-        ./backend.ai mgr api dump-gql-schema --public --output docs/manager/graphql-reference/v2-public-schema.graphql
+        # TODO(BA-6592): re-enable together with the `public` subgraph in configs/graphql/.
+        # ./backend.ai mgr api dump-gql-schema --public --output docs/manager/graphql-reference/v2-public-schema.graphql
         ./backend.ai mgr api generate-supergraph --config configs/graphql/supergraph.yaml -o docs/manager/graphql-reference
         ./backend.ai mgr api dump-openapi --output docs/manager/rest-reference/openapi.json
     - name: Make commit message for changing change log file
       run: |
         git add docs/manager/graphql-reference/schema.graphql
         git add docs/manager/graphql-reference/v2-schema.graphql
-        git add docs/manager/graphql-reference/v2-public-schema.graphql
+        # git add docs/manager/graphql-reference/v2-public-schema.graphql
         git add docs/manager/graphql-reference/supergraph.graphql
         git add docs/manager/rest-reference/openapi.json
         author_name=$(git show -q --pretty='format:%an')
