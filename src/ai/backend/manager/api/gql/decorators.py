@@ -287,7 +287,11 @@ def gql_root_field(
     compose=True,
 )
 class Public:
-    """``@public`` on a field definition. Carried into the supergraph via ``@composeDirective``."""
+    """``@public`` on a field definition, carried into the supergraph.
+
+    Federation namespaces a composed directive by a spec ``@link`` URL, so the schema emits one.
+    Backend.AI publishes no such spec, so the library default stands in.
+    """
 
 
 def gql_public_root_field(
