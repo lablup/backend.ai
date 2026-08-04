@@ -1,0 +1,14 @@
+services:
+  kbs:
+    restart: unless-stopped
+    volumes:
+      - ${PKI_DIR:?set PKI_DIR}/listener:/etc/kbs/listener:ro
+      - ${BROKER_STATE}/token:/etc/kbs/token:ro
+      - ${BROKER_STATE}/admin:/etc/kbs/admin:ro
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "10"

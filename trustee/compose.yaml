@@ -1,0 +1,13 @@
+name: ${BROKER_PROJECT:?set BROKER_PROJECT; the rig already runs a broker under project trustee}
+
+services:
+  kbs:
+    image: ${KBS_IMAGE:?set KBS_IMAGE}
+    command: ["/usr/local/bin/kbs", "--config-file", "/opt/trustee/kbs-config.toml"]
+    network_mode: host
+    volumes:
+      - ${BROKER_STATE:?set BROKER_STATE}/kbs-config.toml:/opt/trustee/kbs-config.toml:ro
+      - ${BROKER_STATE}/storage:/opt/confidential-containers/storage
+      - /etc/sgx_default_qcnl.conf:/etc/sgx_default_qcnl.conf:ro
+    environment:
+      RUST_LOG: ${KBS_LOG:-info}

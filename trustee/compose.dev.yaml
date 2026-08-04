@@ -1,0 +1,5 @@
+services:
+  kbs:
+    restart: "no"
+    environment:
+      RUST_LOG: ${KBS_LOG:-debug}

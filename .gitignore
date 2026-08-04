@@ -164,3 +164,7 @@ backup.*.json
 /INSTALL-INFO
 .serena/
 .claude/worktrees/
+
+# Confidential computing host provisioning and key broker local state
+/trustee/.local/
+/host-setup/.state/
