@@ -101,6 +101,7 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.appproxy.types import CreateEndpointRequestBody
+from ai.backend.common.kernel_runner import CHANNEL_PROTOCOL_VERSION
 from ai.backend.manager.confidential.channel import ConfidentialChannel
 from ai.backend.manager.models.confidential.row import ConfidentialChannelRow
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -309,11 +310,11 @@ class AgentRegistry:
         self.db = db
         self.agent_cache = agent_cache
         self._agent_client_pool = agent_client_pool
-        self._channel = ConfidentialChannel(self.db, self.event_producer)
         self.valkey_stat = valkey_stat
         self.valkey_live = valkey_live
         self.valkey_image = valkey_image
         self.event_producer = event_producer
+        self._channel = ConfidentialChannel(db, event_producer)
         self._event_hub = event_hub
         self.storage_manager = storage_manager
         self.hook_plugin_ctx = hook_plugin_ctx
@@ -1556,6 +1557,21 @@ class AgentRegistry:
         async with self.db.begin_readonly_session() as db_session:
             row = await db_session.get(ConfidentialChannelRow, uuid.UUID(str(kernel_id)))
         return self._channel if row is not None else None
+
+    async def vouch_channel(self, kernel_id: KernelId) -> dict[str, Any] | None:
+        if await self._confidential(kernel_id) is None:
+            return None
+        row = await self._channel.vouch(kernel_id)
+        return {
+            "protocol": CHANNEL_PROTOCOL_VERSION,
+            "relay_addr": row.relay_addr,
+            "channel_port": row.channel_port,
+            "kernel_id": str(kernel_id),
+            "certificate_fingerprint": row.fingerprint,
+            "token": row.token,
+            "expires_at": row.expires_at.isoformat(),
+            "vouched_by": "manager",
+        }
 
     async def execute(
         self,

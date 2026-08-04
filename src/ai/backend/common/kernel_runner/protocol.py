@@ -486,7 +486,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     async def feed_list_files(self, container_path: str) -> dict[str, Any]:
         reply, _ = await self._guest_request(RunnerVerb.LIST_FILES, {"path": container_path})
         return {
-            "files": reply["files"],
+            "files": json.dumps(reply["files"]),
             "errors": reply.get("errors", ""),
             "abspath": reply["abspath"],
         }

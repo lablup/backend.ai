@@ -33,6 +33,7 @@ class GetStreamingSessionActionResult(BaseActionResult):
     repl_in_port: int
     repl_out_port: int
     service_ports: list[dict[str, Any]]
+    channel_vouch: dict[str, Any] | None = None
 
     @override
     def entity_id(self) -> str | None:

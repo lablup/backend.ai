@@ -45,6 +45,7 @@ from .intrinsic import (
 from .jupyter_client import aexecute_interactive
 from .logging import BraceStyleAdapter, setup_logger, setup_logger_basic
 from .service import ServiceParser
+from .terminator import TransportTerminator
 from .utils import TracebackSourceFilter, scan_proc_stats, wait_local_port_open
 
 logger = logging.getLogger()
@@ -1208,6 +1209,14 @@ class BaseRunner(metaclass=ABCMeta):
                     exc_info=result,
                 )
 
+        self._terminator = TransportTerminator()
+        try:
+            await self._terminator.start()
+        except Exception:
+            log.exception("refusing to serve the runner protocol without transport security")
+            os.kill(os.getpid(), signal.SIGTERM)
+            raise
+
         log.debug("start serving...")
         op_type = ""
         while True:
@@ -1270,6 +1279,7 @@ class BaseRunner(metaclass=ABCMeta):
                 log.exception("main_loop: unexpected error")
                 # we need to continue anyway unless we are shutting down
                 continue
+        await self._terminator.stop()
         user_input_server.close()
         await user_input_server.wait_closed()
         monitor_proc_task.cancel()
