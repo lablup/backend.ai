@@ -351,7 +351,7 @@ class ContainerRegistryRepository:
                 Creator(
                     spec=ContainerRegistryGroupCreatorSpec(
                         registry_id=registry_id,
-                        group_id=project_id,
+                        project_id=project_id,
                     )
                 )
             )

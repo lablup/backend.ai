@@ -98,7 +98,7 @@ class ContainerRegistryGroupCreatorSpec(
     """CreatorSpec for container registry group association."""
 
     registry_id: ContainerRegistryID
-    group_id: ProjectID
+    project_id: ProjectID
 
     @property
     @override
@@ -108,7 +108,7 @@ class ContainerRegistryGroupCreatorSpec(
                 violation_type=UniqueConstraintViolationError,
                 constraint_name="uq_registry_id_group_id",
                 error=ContainerRegistryGroupsAlreadyAssociated(
-                    f"Already associated groups for registry_id: {self.registry_id}, group_id: {self.group_id}"
+                    f"Already associated groups for registry_id: {self.registry_id}, project_id: {self.project_id}"
                 ),
             ),
         )
@@ -117,5 +117,5 @@ class ContainerRegistryGroupCreatorSpec(
     def build_row(self) -> AssociationContainerRegistriesGroupsRow:
         return AssociationContainerRegistriesGroupsRow(
             registry_id=self.registry_id,
-            group_id=self.group_id,
+            group_id=self.project_id,
         )
