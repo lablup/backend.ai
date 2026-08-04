@@ -187,7 +187,9 @@ class TestCreateUser:
 
         assert result.data.user.email == "new@example.com"
         assert result.data.keypair.access_key == "TESTKEY1234567890"
-        mock_user_repository.create_user_validated.assert_called_once_with(creator, None)
+        mock_user_repository.create_user_validated.assert_called_once_with(
+            creator, None, action._domain_id
+        )
 
     async def test_create_with_group_ids(
         self,
@@ -218,7 +220,9 @@ class TestCreateUser:
         result = await service.create_user(action)
 
         assert result.data.user.email == "new@example.com"
-        mock_user_repository.create_user_validated.assert_called_once_with(creator, group_ids)
+        mock_user_repository.create_user_validated.assert_called_once_with(
+            creator, group_ids, action._domain_id
+        )
 
     async def test_duplicate_email_raises_conflict(
         self,

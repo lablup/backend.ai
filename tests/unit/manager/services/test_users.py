@@ -169,7 +169,7 @@ class TestCreateUser:
 
         assert result.data.user.email == sample_user_data.email
         mock_user_repository.create_user_validated.assert_called_once_with(
-            action.creator, action.group_ids
+            action.creator, action.group_ids, action._domain_id
         )
 
     async def test_create_with_group_ids_passes_to_repository(
@@ -205,7 +205,7 @@ class TestCreateUser:
 
         assert result.data is not None
         mock_user_repository.create_user_validated.assert_called_once_with(
-            action.creator, group_ids
+            action.creator, group_ids, action._domain_id
         )
 
     async def test_create_with_duplicate_email_raises_error(
