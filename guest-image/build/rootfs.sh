@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 . "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
-need git make curl docker python3 tar
+need git make curl docker python3 tar objdump
 need_root "rootfs.sh"
 
 variant="$(kata_variant_suffix)"
@@ -100,6 +100,46 @@ stage_runner() {
 	cp -a "${src}/runner/terminfo.alpine3.8" "${stage}/opt/kernel/terminfo"
 }
 
+stage_needed_libs() {
+	local one="$1" obj="$2" so found rel
+	for so in $(objdump -p "$obj" 2>/dev/null | awk '/NEEDED/ {print $2}'); do
+		found="$(find "${one}/lib" "${one}/usr/lib" -name "$so" -print -quit 2>/dev/null)"
+		[ -n "$found" ] || die "stage-one has no ${so}, needed by ${obj#"${one}"/}"
+		rel="${found#"${one}"/}"
+		if [ ! -e "${stage}/${rel}" ]; then
+			install -D -m 0755 "$found" "${stage}/${rel}"
+			stage_needed_libs "$one" "$found"
+		fi
+	done
+}
+
+stage_one_root() {
+	local dir="${BAI_CC_KATA_SRC}/tools/packaging/kata-deploy/local-build/build/rootfs-${variant}-stage-one"
+	if [ -e "${dir}/usr/sbin/mount.nfs" ]; then
+		printf '%s' "$dir"
+		return 0
+	fi
+	local unpacked="${BAI_CC_CACHE}/stage-one"
+	if [ ! -e "${unpacked}/usr/sbin/mount.nfs" ]; then
+		[ -e "${dir}.tar.zst" ] || die "neither the stage-one tree nor its tarball is present"
+		mkdir -p "$unpacked"
+		tar --zstd -xf "${dir}.tar.zst" -C "$unpacked"
+	fi
+	printf '%s' "$unpacked"
+}
+
+stage_storage_clients() {
+	local one
+	one="$(stage_one_root)"
+	local rel
+	for rel in usr/sbin/mount.nfs usr/sbin/mount.nfs4 usr/sbin/mount.ceph usr/sbin/mount.cifs \
+		usr/sbin/rpcbind usr/sbin/rpc.statd usr/bin/gocryptfs usr/bin/fusermount3; do
+		[ -e "${one}/${rel}" ] || die "stage-one carries no ${rel}"
+		install -D -m 0755 "${one}/${rel}" "${stage}/${rel}"
+		stage_needed_libs "$one" "${one}/${rel}"
+	done
+}
+
 stage_overlay() {
 	cp -a "${BAI_CC_ROOT}/overlay/." "${stage}/"
 	find "${stage}/opt/kernel" "${stage}/usr/local/bin" -name '__pycache__' -type d -prune -exec rm -rf {} +
@@ -114,6 +154,7 @@ build_upstream
 stage_upstream_rootfs
 stage_krunner
 stage_runner
+stage_storage_clients
 stage_overlay
 canonicalise_tree "$stage"
 mkdir -p "${BAI_CC_OUT}"
