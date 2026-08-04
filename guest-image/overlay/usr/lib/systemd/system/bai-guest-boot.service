@@ -1,0 +1,17 @@
+[Unit]
+Description=Backend.AI confidential guest boot gate
+After=confidential-data-hub.service api-server-rest.service
+Wants=confidential-data-hub.service api-server-rest.service
+Before=kata-containers.target
+
+[Service]
+Type=exec
+Environment=LD_LIBRARY_PATH=/opt/backend.ai/lib
+ExecStart=/usr/local/bin/bai-guest-boot
+Restart=on-failure
+RestartSec=5
+RuntimeDirectory=backend.ai
+RuntimeDirectoryPreserve=yes
+
+[Install]
+WantedBy=multi-user.target

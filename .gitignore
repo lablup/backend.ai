@@ -164,3 +164,6 @@ backup.*.json
 /INSTALL-INFO
 .serena/
 .claude/worktrees/
+
+/guest-image/out/
+/guest-image/.cache/

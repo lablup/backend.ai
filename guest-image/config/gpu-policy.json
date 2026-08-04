@@ -1,0 +1,7 @@
+{
+  "required_gpu": {
+    "vbios": "@GPU_VBIOS@",
+    "driver": "@GPU_DRIVER@",
+    "cc_mode": "on"
+  }
+}

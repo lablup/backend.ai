@@ -24,6 +24,7 @@ pants_ignore = [
     "/plugins/",
     "/docs/",  # TODO: docs build config
     "/proposals/",
+    "/guest-image/",
     "*.log",
     "/tools/pants-plugins",
     "/wheelhouse/*/",

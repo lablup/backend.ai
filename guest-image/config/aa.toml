@@ -1,0 +1,7 @@
+[token_configs]
+
+  [token_configs.coco_as]
+  url = "@KBS_URL@"
+
+  [token_configs.kbs]
+  url = "@KBS_URL@"

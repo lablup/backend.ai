@@ -1,0 +1,5 @@
+api = "http://127.0.0.1:8006"
+time_resource = "@TIME_RESOURCE@"
+time_skew_bound = @TIME_SKEW_BOUND@
+time_reanchor_interval = @TIME_REANCHOR_INTERVAL@
+allow_sudo = @ALLOW_SUDO@
