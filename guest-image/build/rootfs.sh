@@ -81,6 +81,7 @@ stage_runner() {
 	local src="${BAI_CC_ROOT}/${BAI_CC_BACKENDAI_SRC}"
 	local sp="${stage}/opt/backend.ai/lib/python${BAI_CC_KRUNNER_PYVER}/site-packages/ai/backend"
 	install -d -m 0755 "$sp" "${stage}/opt/kernel"
+	rm -rf "${sp}/kernel" "${sp}/helpers"
 	cp -a "${src}/kernel" "${sp}/kernel"
 	cp -a "${src}/helpers" "${sp}/helpers"
 	find "$sp" -name '__pycache__' -type d -prune -exec rm -rf {} +
@@ -181,7 +182,7 @@ stage_overlay() {
 	find "${stage}/opt/kernel" "${stage}/usr/local/bin" -name '__pycache__' -type d -prune -exec rm -rf {} +
 	chmod 0755 "${stage}/usr/bin/kata-agent" \
 		"${stage}/opt/kernel/bai-cc-entrypoint" "${stage}/usr/local/bin/bai-guest-boot" \
-		"${stage}/usr/local/bin/bai-guest-storage" \
+		"${stage}/opt/kernel/bai-guest-storage" \
 		"${stage}/usr/local/bin/bai-tunnel-up" "${stage}/opt/kernel/bai-tunnel-bench"
 	install -d -m 0755 "${stage}/usr/lib/systemd/system/multi-user.target.wants"
 	ln -sf ../bai-guest-boot.service "${stage}/usr/lib/systemd/system/multi-user.target.wants/bai-guest-boot.service"

@@ -1,9 +1,10 @@
 #!/opt/backend.ai/bin/python
 import ctypes
 import json
+import mmap
 import os
 import pathlib
-import shutil
+import re
 import stat
 import subprocess
 import sys
@@ -13,7 +14,15 @@ import urllib.request
 
 STATE = pathlib.Path("/run/backend.ai")
 STAGING = pathlib.Path("/run/bai-storage")
+GUEST = pathlib.Path("/run/bai-guest")
+LOADER = GUEST / "lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"
+LIBRARY_PATH = ":".join([
+    f"{GUEST}/lib/x86_64-linux-gnu",
+    f"{GUEST}/lib/x86_64-linux-gnu/ceph",
+    f"{GUEST}/lib",
+])
 MAPPER = "bai-scratch"
+BLOCK = 4096
 HELPERS = {"nfs": "mount.nfs", "nfs4": "mount.nfs4", "ceph": "mount.ceph", "cifs": "mount.cifs"}
 GOCRYPTFS_FLAGS = ("-raw64", "-hkdf", "-longnames", "-noprealloc", "-allow_other")
 CC_STORAGE_FORMAT = "backend.ai/cc-storage/v1"
@@ -24,17 +33,33 @@ class Refusal(Exception):
 
 
 def tool(name):
-    found = shutil.which(name)
-    if found is None:
-        raise Refusal(f"the measured guest image carries no {name}")
-    return found
+    for base in ("sbin", "bin", "local/bin"):
+        found = GUEST / base / name
+        if found.is_file():
+            return str(found)
+    raise Refusal(f"the measured guest image delivers no {name} under {GUEST}")
+
+
+def note(message):
+    print(message, file=sys.stderr, flush=True)
+    try:
+        with open("/dev/console", "w") as console:
+            print(message, file=console, flush=True)
+    except OSError:
+        pass
 
 
 def run(argv, stdin=None):
-    result = subprocess.run(argv, input=stdin, capture_output=True)
+    name = pathlib.Path(argv[0]).name
+    note(f"backend.ai confidential storage runs {name}")
+    launch = [str(LOADER), "--library-path", LIBRARY_PATH, *argv]
+    result = subprocess.run(
+        launch, input=stdin, capture_output=True, env={**os.environ, "DM_DISABLE_UDEV": "1"}
+    )
     if result.returncode != 0:
         detail = result.stderr.decode(errors="replace").strip() or f"exit {result.returncode}"
-        raise Refusal(f"{argv[0]} failed: {detail}")
+        raise Refusal(f"{name} failed: {detail}")
+    return result.stdout.decode(errors="replace")
 
 
 def node(path, major, minor):
@@ -118,6 +143,20 @@ def mount_folder(api, scope, entry):
     layer(entry, name, cipher, target, key)
 
 
+def prime(mapped, plan):
+    marker = "Superblock backups stored on blocks:"
+    blocks = {0}
+    if marker in plan:
+        blocks.update(int(token) for token in re.findall(r"\d+", plan.split(marker, 1)[1]))
+    zeroes = mmap.mmap(-1, BLOCK)
+    handle = os.open(mapped, os.O_WRONLY | os.O_DIRECT)
+    try:
+        for block in sorted(blocks):
+            os.pwrite(handle, zeroes, block * BLOCK)
+    finally:
+        os.close(handle)
+
+
 def open_scratch(api, scope, scratch):
     device = scratch["device"]
     if not pathlib.Path(device).exists():
@@ -126,24 +165,24 @@ def open_scratch(api, scope, scratch):
     key = released_key(api, scope, scratch, "session scratch")
     cryptsetup = tool("cryptsetup")
     keyed = ["--batch-mode", "--key-file", "-", "--keyfile-size", "32"]
-    run([cryptsetup, "luksFormat", "--type", "luks2", "--integrity", "hmac-sha256",
-         "--integrity-no-wipe", *keyed, device], key)
+    run([cryptsetup, "luksFormat", "--type", "luks2", "--cipher", "aes-xts-plain64",
+         "--sector-size", str(BLOCK), "--integrity", "hmac-sha256", "--integrity-no-wipe",
+         "--integrity-no-journal", *keyed, device], key)
     run([cryptsetup, "open", *keyed, device, MAPPER], key)
-    run([tool("mkfs.ext4"), "-q", "-F", "-E", "nodiscard", f"/dev/mapper/{MAPPER}"])
+    mapped = f"/dev/mapper/{MAPPER}"
+    mkfs = tool("mkfs.ext4")
+    prime(mapped, run([mkfs, "-F", "-n", mapped]))
+    run([mkfs, "-q", "-F", "-E", "nodiscard,lazy_itable_init=0", mapped])
     target = pathlib.Path(scratch["target"])
     target.mkdir(mode=0o755, parents=True, exist_ok=True)
     kmount(f"/dev/mapper/{MAPPER}", target, "ext4", 0)
     os.chmod(target, 0o755)
+    os.chown(target, int(os.environ.get("LOCAL_USER_ID") or 9001),
+             int(os.environ.get("LOCAL_GROUP_ID") or 9001))
 
 
 def starve(reason):
-    message = f"backend.ai confidential kernel refuses its storage: {reason}"
-    print(message, file=sys.stderr, flush=True)
-    try:
-        with open("/dev/console", "w") as console:
-            print(message, file=console, flush=True)
-    except OSError:
-        pass
+    note(f"backend.ai confidential kernel refuses its storage: {reason}")
     while True:
         time.sleep(3600)
 
@@ -151,6 +190,8 @@ def starve(reason):
 def main():
     if not (STATE / "ready").is_file():
         raise Refusal("the guest never established attested wall-clock time")
+    if not LOADER.is_file():
+        raise Refusal(f"the measured guest toolchain was not delivered under {GUEST}")
     api = json.loads((STATE / "profile.json").read_text())["api"]
     resource = os.environ.get("BACKENDAI_CC_MOUNT_PLAN_URI")
     if not resource:
