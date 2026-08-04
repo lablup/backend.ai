@@ -22,19 +22,39 @@ checkout_kata() {
 		"${BAI_CC_KATA_SRC}/tools/packaging/kernel/configs/fragments/common/backendai.conf"
 }
 
+upstream_rootfs_dir() {
+	find "${BAI_CC_KATA_SRC}/tools/packaging/kata-deploy/local-build/build/rootfs-image-${variant}" \
+		-maxdepth 4 -type d -name "${BAI_CC_ROOTFS_DISTRO}_rootfs" -print -quit 2>/dev/null
+}
+
+upstream_stamp() {
+	printf '%s\0' "${BAI_CC_KATA_COMMIT}" "$variant" "${BAI_CC_ROOTFS_DISTRO}" \
+		"${BAI_CC_EXTRA_PKGS}" "${BAI_CC_REPO_COMPONENTS}" \
+		"${BAI_CC_API_SERVER_REST_FEATURES}" "${SOURCE_DATE_EPOCH}" \
+		| cat - "${BAI_CC_ROOT}/kernel/fragments/backendai.conf" | sha256sum | cut -d' ' -f1
+}
+
 build_upstream() {
 	local lb="${BAI_CC_KATA_SRC}/tools/packaging/kata-deploy/local-build"
+	local stamp="${BAI_CC_CACHE}/upstream.stamp" want
+	want="$(upstream_stamp)"
+	if [ "${BAI_CC_FORCE_UPSTREAM:-0}" != 1 ] && [ -n "$(upstream_rootfs_dir)" ] \
+		&& [ "$(cat "$stamp" 2>/dev/null)" = "$want" ]; then
+		log "upstream rootfs already current for ${want}; BAI_CC_FORCE_UPSTREAM=1 rebuilds it"
+		return 0
+	fi
 	EXTRA_PKGS="${BAI_CC_EXTRA_PKGS}" \
 	REPO_COMPONENTS="${BAI_CC_REPO_COMPONENTS}" \
 	API_SERVER_REST_FEATURES="${BAI_CC_API_SERVER_REST_FEATURES}" \
 	SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH}" \
 		make -C "$lb" "rootfs-image-${variant}-tarball"
+	mkdir -p "$(dirname "$stamp")"
+	printf '%s\n' "$want" > "$stamp"
 }
 
 stage_upstream_rootfs() {
 	local built
-	built="$(find "${BAI_CC_KATA_SRC}/tools/packaging/kata-deploy/local-build/build/rootfs-image-${variant}" \
-		-maxdepth 4 -type d -name "${BAI_CC_ROOTFS_DISTRO}_rootfs" -print -quit)"
+	built="$(upstream_rootfs_dir)"
 	[ -n "$built" ] || die "upstream rootfs directory not found for variant ${variant}"
 	rm -rf "$stage"
 	mkdir -p "$(dirname "$stage")"
