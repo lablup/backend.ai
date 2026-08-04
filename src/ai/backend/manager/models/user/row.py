@@ -438,6 +438,7 @@ class UserRow(Base):  # type: ignore[misc]
             created_at=self.created_at,
             modified_at=self.modified_at,
             domain_name=self.domain_name,
+            domain_id=self.domain_id,
             role=self.role,
             resource_policy=self.resource_policy,
             allowed_client_ip=[str(ip) for ip in self.allowed_client_ip]
