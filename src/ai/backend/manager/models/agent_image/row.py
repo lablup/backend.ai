@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.types import ImageID
+from ai.backend.common.types import AgentId, ImageID
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
@@ -22,7 +22,7 @@ class AgentImageRow(CreatedAtMixin, Base):  # type: ignore[misc]
 
     __tablename__ = "agent_images"
 
-    agent_id: Mapped[str] = mapped_column("agent_id", sa.String(length=64), primary_key=True)
+    agent_id: Mapped[AgentId] = mapped_column("agent_id", sa.String(length=64), primary_key=True)
     image_id: Mapped[ImageID] = mapped_column("image_id", GUID(ImageID), primary_key=True)
 
     __table_args__ = (
