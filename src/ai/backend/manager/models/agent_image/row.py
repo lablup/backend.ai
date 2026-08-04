@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
-
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -15,18 +13,19 @@ __all__ = ("AgentImageRow",)
 
 
 class AgentImageRow(CreatedAtMixin, Base):  # type: ignore[misc]
-    """One row per (agent, image) installation."""
+    """One row per (agent, image) installation.
+
+    Composite primary key: (agent_id, image_id). All writes go through
+    natural-key upsert and condition-based deletes, so no surrogate key
+    is needed.
+    """
 
     __tablename__ = "agent_images"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID(), primary_key=True, server_default=sa.text("uuid_generate_v4()")
-    )
-    agent_id: Mapped[str] = mapped_column("agent_id", sa.String(length=64), nullable=False)
-    image_id: Mapped[ImageID] = mapped_column("image_id", GUID(ImageID), nullable=False)
+    agent_id: Mapped[str] = mapped_column("agent_id", sa.String(length=64), primary_key=True)
+    image_id: Mapped[ImageID] = mapped_column("image_id", GUID(ImageID), primary_key=True)
 
     __table_args__ = (
-        sa.UniqueConstraint("agent_id", "image_id", name="uq_agent_images_agent_id_image_id"),
         sa.ForeignKeyConstraint(
             ["agent_id"],
             ["agents.id"],

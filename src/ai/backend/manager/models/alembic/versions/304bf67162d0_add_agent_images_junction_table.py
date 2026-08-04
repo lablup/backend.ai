@@ -24,7 +24,6 @@ depends_on = None
 def upgrade() -> None:
     op.create_table(
         "agent_images",
-        sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),
         sa.Column("agent_id", sa.String(length=64), nullable=False),
         sa.Column("image_id", GUID(), nullable=False),
         sa.Column(
@@ -33,8 +32,7 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_agent_images")),
-        sa.UniqueConstraint("agent_id", "image_id", name=op.f("uq_agent_images_agent_id_image_id")),
+        sa.PrimaryKeyConstraint("agent_id", "image_id", name=op.f("pk_agent_images")),
         sa.ForeignKeyConstraint(
             ["agent_id"],
             ["agents.id"],
