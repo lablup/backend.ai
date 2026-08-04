@@ -22929,7 +22929,11 @@ type UtilizationIdleCheckerThreshold
 {
   presetId: UUID!
   threshold: Decimal!
+
+  """Added in 26.9.0. Label filters injected into the preset query."""
   filterLabels: [MetricLabelEntry!]!
+
+  """Added in 26.9.0. Group-by labels injected into the preset query."""
   groupLabels: [String!]!
 }
 

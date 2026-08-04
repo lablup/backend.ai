@@ -10,6 +10,7 @@ from ai.backend.common.dto.manager.v2.idle_checker.types import IdleCheckerTypeD
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import MetricLabelEntryInfo
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionTypes
 
 
@@ -24,8 +25,14 @@ class NetworkTimeoutSpecInfo(BaseResponseModel):
 class UtilizationThresholdInfo(BaseResponseModel):
     preset_id: PrometheusQueryPresetID
     threshold: Decimal
-    filter_labels: list[MetricLabelEntryInfo]
-    group_labels: list[str]
+    filter_labels: list[MetricLabelEntryInfo] = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Label filters injected into the preset query."
+    )
+    group_labels: list[str] = Field(
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Group-by labels injected into the preset query."
+        )
+    )
 
 
 class UtilizationSpecInfo(BaseResponseModel):
