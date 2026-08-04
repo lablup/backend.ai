@@ -46,8 +46,8 @@ async def my_app_configs(
         added_version=NEXT_RELEASE_VERSION,
         description=(
             "Read the merged config for each of the given names from public fragments only. "
-            "Served on the anonymous endpoint as well, for pre-login clients that need config "
-            "before they have credentials."
+            "Served by the `public` subgraph without authentication, for pre-login clients that "
+            "need config before they have credentials."
         ),
     )
 )  # type: ignore[misc]

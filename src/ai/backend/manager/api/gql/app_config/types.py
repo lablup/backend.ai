@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from strawberry.federation.schema_directives import Shareable
 from strawberry.scalars import JSON
 
 from ai.backend.common.dto.manager.v2.app_config.response import AppConfigNode
@@ -26,6 +27,9 @@ __all__ = ("AppConfigGQL",)
     ),
     model=AppConfigNode,
     name="AppConfig",
+    # Both the `strawberry` subgraph (myAppConfigs) and the `public` one (publicAppConfigs)
+    # resolve this type, which federation rejects unless it is shareable.
+    directives=[Shareable()],
 )
 class AppConfigGQL(PydanticOutputMixin[AppConfigNode]):
     config_name: str = gql_field(description="Config name this view is for.")
