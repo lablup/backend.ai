@@ -141,6 +141,26 @@ stage_storage_clients() {
 	done
 }
 
+stage_fuse_driver() {
+	local src out built
+	src="$(cd "${BAI_CC_ROOT}/../rust" && pwd)"
+	out="${BAI_CC_CACHE}/rust"
+	built="${out}/target/${BAI_CC_RUST_TARGET}/release/bai-storage-fuse"
+	mkdir -p "$out"
+	docker run --rm --platform "${BAI_CC_RUST_PLATFORM}" \
+		-v "${src}:/src:ro" -v "${out}:/out" \
+		-e CARGO_HOME=/out/cargo -e CARGO_TARGET_DIR=/out/target \
+		-e SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH}" \
+		"${BAI_CC_RUST_IMAGE}" \
+		cargo build --locked --manifest-path /src/Cargo.toml \
+			-p bai-storage-fuse --release --target "${BAI_CC_RUST_TARGET}"
+	[ -x "$built" ] || die "the confidential storage driver did not build"
+	if objdump -p "$built" | grep -q NEEDED; then
+		die "bai-storage-fuse links against shared libraries; the staged driver must be static"
+	fi
+	install -D -m 0755 "$built" "${stage}/usr/local/bin/bai-storage-fuse"
+}
+
 stage_tunnel() {
 	local one rel
 	one="$(stage_one_root)"
@@ -169,6 +189,7 @@ stage_upstream_rootfs
 stage_krunner
 stage_runner
 stage_storage_clients
+stage_fuse_driver
 stage_tunnel
 stage_overlay
 canonicalise_tree "$stage"
