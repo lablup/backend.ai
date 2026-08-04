@@ -24,6 +24,7 @@ from ai.backend.manager.repositories.idle_checker.types import (
     InitialGracePeriodBatchData,
     SessionIdleCheckAssignmentData,
     SessionIdleCheckPair,
+    SessionIdleCheckTarget,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
@@ -109,6 +110,18 @@ class IdleCheckerRepository:
             pairs_to_create,
             pairs_to_delete,
         )
+
+    async def exclude_session_idle_checks(
+        self,
+        target: SessionIdleCheckTarget,
+    ) -> None:
+        await self._db_source.exclude_session_idle_checks(target)
+
+    async def include_session_idle_checks(
+        self,
+        target: SessionIdleCheckTarget,
+    ) -> None:
+        await self._db_source.include_session_idle_checks(target)
 
     async def batch_update_session_idle_check_phase(
         self,

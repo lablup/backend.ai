@@ -12,12 +12,13 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSpec, IdleCheckPhase
 from ai.backend.common.data.permission.types import ScopeType
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
+from ai.backend.common.identifier.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow
 from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.session.row import SessionRow
 
 
 @dataclass(frozen=True)
@@ -83,6 +84,49 @@ class IdleCheckBatchData:
 class SessionIdleCheckPair:
     session_id: SessionId
     checker_id: IdleCheckerID
+
+
+@dataclass(frozen=True)
+class SessionIdleCheckTarget:
+    """Sessions targeted under one assignment."""
+
+    assignment_id: IdleCheckerAssignmentID
+    session_ids: Sequence[SessionId]
+
+
+@dataclass(frozen=True)
+class SessionSearchScope(SearchScope):
+    """Sessions inside one bound ``(scope_type, scope_id)``; unmapped scope types
+    cover no sessions."""
+
+    scope_type: ScopeType
+    scope_id: uuid.UUID
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        scope_id = self.scope_id
+        column: sa.orm.attributes.InstrumentedAttribute[Any] | None
+        match self.scope_type:
+            case ScopeType.RESOURCE_GROUP:
+                column = SessionRow.resource_group_id
+            case ScopeType.PROJECT:
+                column = SessionRow.group_id
+            case ScopeType.DOMAIN:
+                column = SessionRow.domain_id
+            case _:
+                column = None
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if column is None:
+                return sa.false()
+            return column == scope_id
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return ()
 
 
 @dataclass(frozen=True)

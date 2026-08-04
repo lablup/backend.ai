@@ -63,6 +63,7 @@ class IdleCheckerUpdaterSpec(UpdaterSpec[IdleCheckerRow]):
 @dataclass
 class SessionIdleCheckPhaseBatchUpdaterSpec(BatchUpdaterSpec[SessionIdleCheckRow]):
     to_phase: IdleCheckPhase
+    message: str | None = None
 
     @property
     @override
@@ -71,7 +72,10 @@ class SessionIdleCheckPhaseBatchUpdaterSpec(BatchUpdaterSpec[SessionIdleCheckRow
 
     @override
     def build_values(self) -> dict[str, Any]:
-        return {"last_status": self.to_phase}
+        values: dict[str, Any] = {"last_status": self.to_phase}
+        if self.message is not None:
+            values["last_message"] = self.message
+        return values
 
 
 @dataclass

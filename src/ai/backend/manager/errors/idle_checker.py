@@ -17,6 +17,7 @@ __all__ = (
     "IdleCheckerAssignmentAlreadyExists",
     "IdleCheckerAssignmentNotFound",
     "IdleCheckerAssignmentScopeNotFound",
+    "IdleCheckerExclusionTargetMismatch",
     "IdleCheckerNotFound",
 )
 
@@ -34,6 +35,19 @@ class IdleCheckerAssignmentNotFound(ObjectNotFound):
 class IdleCheckerAssignmentScopeNotFound(ObjectNotFound):
     error_type = "https://api.backend.ai/probs/idle-checker-assignment-scope-not-found"
     object_name = "idle checker assignment scope"
+
+
+class IdleCheckerExclusionTargetMismatch(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/idle-checker-exclusion-target-mismatch"
+    error_title = "The session is not covered by the given idle checker assignment."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
 
 
 class IdleCheckerAssignmentAlreadyExists(BackendAIError, web.HTTPConflict):

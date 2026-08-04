@@ -16,7 +16,7 @@ from ai.backend.common.data.idle_checker.types import (
 )
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
+from ai.backend.common.identifier.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     ClusterMode,
@@ -26,6 +26,10 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.errors.idle_checker import (
+    IdleCheckerAssignmentNotFound,
+    IdleCheckerExclusionTargetMismatch,
+)
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.idle_checker.row import (
@@ -41,6 +45,7 @@ from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerR
 from ai.backend.manager.repositories.idle_checker.types import (
     IdleJudgmentData,
     SessionIdleCheckPair,
+    SessionIdleCheckTarget,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.testutils.db import with_tables
@@ -119,12 +124,13 @@ def _expired_check_session_row(
     scope: ScopeFixture,
     session_id: SessionId,
     status: SessionStatus,
+    session_type: SessionTypes = SessionTypes.INTERACTIVE,
 ) -> SessionRow:
     return SessionRow(
         id=session_id,
         creation_id=str(session_id)[:32],
         name=f"session-{session_id}",
-        session_type=SessionTypes.INTERACTIVE,
+        session_type=session_type,
         cluster_mode=ClusterMode.SINGLE_NODE,
         cluster_size=1,
         domain_name=scope.domain_name,
@@ -965,3 +971,347 @@ class TestFetchExpiredIdleChecks:
 
         assert batch.checks == ()
         assert terminated_session_with_expired_check not in check_session_ids
+
+
+@dataclass(frozen=True)
+class ExclusionRows:
+    assignment_id: IdleCheckerAssignmentID
+    checker_id: IdleCheckerID
+    active_session_id: SessionId
+    idle_expired_session_id: SessionId
+    rowless_session_id: SessionId
+    batch_session_id: SessionId
+    foreign_session_id: SessionId
+
+
+class TestSessionIdleCheckExclusions:
+    @pytest.fixture
+    async def database(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                ProjectResourcePolicyRow,
+                DomainRow,
+                GroupRow,
+                ScalingGroupRow,
+                SessionRow,
+                IdleCheckerRow,
+                IdleCheckerBindingRow,
+                SessionIdleCheckRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
+        return IdleCheckerRepository(DBOpsProvider(database))
+
+    @pytest.fixture
+    async def exclusion_rows(
+        self,
+        database: ExtendedAsyncSAEngine,
+    ) -> ExclusionRows:
+        scope = _expired_check_scope_fixture("exclusion")
+        foreign_scope = _expired_check_scope_fixture("exclusion-foreign")
+        assignment_id = IdleCheckerAssignmentID(uuid.uuid4())
+        checker_id = IdleCheckerID(uuid.uuid4())
+        active_session_id = SessionId(uuid.uuid4())
+        idle_expired_session_id = SessionId(uuid.uuid4())
+        rowless_session_id = SessionId(uuid.uuid4())
+        batch_session_id = SessionId(uuid.uuid4())
+        foreign_session_id = SessionId(uuid.uuid4())
+        async with database.begin_session() as db_sess:
+            for scope_row in _expired_check_scope_rows(scope):
+                db_sess.add(scope_row)
+            for scope_row in _expired_check_scope_rows(foreign_scope):
+                db_sess.add(scope_row)
+            for session_id in (active_session_id, idle_expired_session_id, rowless_session_id):
+                db_sess.add(_expired_check_session_row(scope, session_id, SessionStatus.RUNNING))
+            db_sess.add(
+                _expired_check_session_row(
+                    scope, batch_session_id, SessionStatus.RUNNING, SessionTypes.BATCH
+                )
+            )
+            db_sess.add(
+                _expired_check_session_row(foreign_scope, foreign_session_id, SessionStatus.RUNNING)
+            )
+            db_sess.add(_expired_check_checker_row(checker_id))
+            await db_sess.flush()
+            db_sess.add(
+                IdleCheckerBindingRow(
+                    id=assignment_id,
+                    scope_type=ScopeType.DOMAIN.value,
+                    scope_id=scope.domain_id,
+                    idle_checker_id=checker_id,
+                    enabled=True,
+                )
+            )
+            db_sess.add(
+                SessionIdleCheckRow(
+                    session_id=active_session_id,
+                    idle_checker_id=checker_id,
+                    expire_at=datetime(2026, 2, 1, tzinfo=UTC),
+                    last_status=IdleCheckPhase.ACTIVE,
+                    last_message="active judgment",
+                )
+            )
+            db_sess.add(
+                SessionIdleCheckRow(
+                    session_id=idle_expired_session_id,
+                    idle_checker_id=checker_id,
+                    expire_at=datetime(2026, 2, 1, tzinfo=UTC),
+                    last_status=IdleCheckPhase.IDLE_EXPIRED,
+                    last_message="idle expired judgment",
+                )
+            )
+        return ExclusionRows(
+            assignment_id=assignment_id,
+            checker_id=checker_id,
+            active_session_id=active_session_id,
+            idle_expired_session_id=idle_expired_session_id,
+            rowless_session_id=rowless_session_id,
+            batch_session_id=batch_session_id,
+            foreign_session_id=foreign_session_id,
+        )
+
+    async def test_exclude_marks_existing_and_missing_rows_excluded(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        exclusion_rows: ExclusionRows,
+    ) -> None:
+        session_ids = (
+            exclusion_rows.active_session_id,
+            exclusion_rows.idle_expired_session_id,
+            exclusion_rows.rowless_session_id,
+        )
+
+        await repository.exclude_session_idle_checks(
+            SessionIdleCheckTarget(
+                assignment_id=exclusion_rows.assignment_id,
+                session_ids=session_ids,
+            )
+        )
+
+        async with database.begin_readonly_session() as db_sess:
+            for session_id in session_ids:
+                row = await db_sess.get(
+                    SessionIdleCheckRow, (session_id, exclusion_rows.checker_id)
+                )
+                assert row is not None
+                assert row.last_status is IdleCheckPhase.EXCLUDED
+                assert row.expire_at is None
+                assert row.last_message == "Excluded from idle checks."
+
+    async def test_exclude_tolerates_duplicate_targets(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        exclusion_rows: ExclusionRows,
+    ) -> None:
+        await repository.exclude_session_idle_checks(
+            SessionIdleCheckTarget(
+                assignment_id=exclusion_rows.assignment_id,
+                session_ids=(exclusion_rows.active_session_id, exclusion_rows.active_session_id),
+            )
+        )
+
+        async with database.begin_readonly_session() as db_sess:
+            row = await db_sess.get(
+                SessionIdleCheckRow,
+                (exclusion_rows.active_session_id, exclusion_rows.checker_id),
+            )
+        assert row is not None
+        assert row.last_status is IdleCheckPhase.EXCLUDED
+
+    async def test_excluded_rows_invisible_to_judgment_grace_and_sweep(
+        self,
+        repository: IdleCheckerRepository,
+        exclusion_rows: ExclusionRows,
+    ) -> None:
+        await repository.exclude_session_idle_checks(
+            SessionIdleCheckTarget(
+                assignment_id=exclusion_rows.assignment_id,
+                session_ids=(
+                    exclusion_rows.active_session_id,
+                    exclusion_rows.idle_expired_session_id,
+                ),
+            )
+        )
+
+        judgment_batch = await repository.fetch_judgment_batch([SessionStatus.RUNNING])
+        grace_batch = await repository.fetch_initial_grace_period_checks([SessionStatus.RUNNING])
+        expired_batch = await repository.fetch_expired_idle_checks([SessionStatus.RUNNING])
+        assert judgment_batch.assignments == []
+        assert grace_batch.checks == ()
+        assert expired_batch.checks == ()
+
+    async def test_excluded_pair_stays_in_desired_and_current(
+        self,
+        repository: IdleCheckerRepository,
+        exclusion_rows: ExclusionRows,
+    ) -> None:
+        await repository.exclude_session_idle_checks(
+            SessionIdleCheckTarget(
+                assignment_id=exclusion_rows.assignment_id,
+                session_ids=(exclusion_rows.active_session_id,),
+            )
+        )
+
+        assignments = await repository.fetch_session_idle_check_assignments([SessionStatus.RUNNING])
+
+        pair = SessionIdleCheckPair(exclusion_rows.active_session_id, exclusion_rows.checker_id)
+        assert pair in assignments.desired_pairs
+        assert pair in assignments.current_pairs
+
+    async def test_include_restores_not_checked(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        exclusion_rows: ExclusionRows,
+    ) -> None:
+        await repository.exclude_session_idle_checks(
+            SessionIdleCheckTarget(
+                assignment_id=exclusion_rows.assignment_id,
+                session_ids=(exclusion_rows.active_session_id,),
+            )
+        )
+
+        await repository.include_session_idle_checks(
+            SessionIdleCheckTarget(
+                assignment_id=exclusion_rows.assignment_id,
+                session_ids=(exclusion_rows.active_session_id,),
+            )
+        )
+
+        async with database.begin_readonly_session() as db_sess:
+            row = await db_sess.get(
+                SessionIdleCheckRow,
+                (exclusion_rows.active_session_id, exclusion_rows.checker_id),
+            )
+        assert row is not None
+        assert row.last_status is IdleCheckPhase.NOT_CHECKED
+        assert row.expire_at is None
+        assert row.last_message == "Not checked yet."
+
+    async def test_include_does_not_touch_non_excluded_rows(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        exclusion_rows: ExclusionRows,
+    ) -> None:
+        await repository.include_session_idle_checks(
+            SessionIdleCheckTarget(
+                assignment_id=exclusion_rows.assignment_id,
+                session_ids=(exclusion_rows.idle_expired_session_id,),
+            )
+        )
+
+        async with database.begin_readonly_session() as db_sess:
+            row = await db_sess.get(
+                SessionIdleCheckRow,
+                (exclusion_rows.idle_expired_session_id, exclusion_rows.checker_id),
+            )
+        assert row is not None
+        assert row.last_status is IdleCheckPhase.IDLE_EXPIRED
+        assert row.last_message == "idle expired judgment"
+
+    async def test_rejects_session_outside_binding_scope_atomically(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        exclusion_rows: ExclusionRows,
+    ) -> None:
+        with pytest.raises(IdleCheckerExclusionTargetMismatch):
+            await repository.exclude_session_idle_checks(
+                SessionIdleCheckTarget(
+                    assignment_id=exclusion_rows.assignment_id,
+                    session_ids=(
+                        exclusion_rows.active_session_id,
+                        exclusion_rows.foreign_session_id,
+                    ),
+                )
+            )
+
+        async with database.begin_readonly_session() as db_sess:
+            valid_row = await db_sess.get(
+                SessionIdleCheckRow,
+                (exclusion_rows.active_session_id, exclusion_rows.checker_id),
+            )
+            foreign_row = await db_sess.get(
+                SessionIdleCheckRow,
+                (exclusion_rows.foreign_session_id, exclusion_rows.checker_id),
+            )
+        assert valid_row is not None
+        assert valid_row.last_status is IdleCheckPhase.ACTIVE
+        assert foreign_row is None
+
+    async def test_rejects_session_type_not_targeted_by_checker(
+        self,
+        repository: IdleCheckerRepository,
+        exclusion_rows: ExclusionRows,
+    ) -> None:
+        with pytest.raises(IdleCheckerExclusionTargetMismatch):
+            await repository.exclude_session_idle_checks(
+                SessionIdleCheckTarget(
+                    assignment_id=exclusion_rows.assignment_id,
+                    session_ids=(exclusion_rows.batch_session_id,),
+                )
+            )
+
+    async def test_exclude_rejects_unknown_assignment(
+        self,
+        repository: IdleCheckerRepository,
+        exclusion_rows: ExclusionRows,
+    ) -> None:
+        with pytest.raises(IdleCheckerAssignmentNotFound):
+            await repository.exclude_session_idle_checks(
+                SessionIdleCheckTarget(
+                    assignment_id=IdleCheckerAssignmentID(uuid.uuid4()),
+                    session_ids=(exclusion_rows.active_session_id,),
+                )
+            )
+
+    async def test_exclude_then_include_voids_pending_expiry(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        exclusion_rows: ExclusionRows,
+    ) -> None:
+        await repository.exclude_session_idle_checks(
+            SessionIdleCheckTarget(
+                assignment_id=exclusion_rows.assignment_id,
+                session_ids=(exclusion_rows.idle_expired_session_id,),
+            )
+        )
+        await repository.include_session_idle_checks(
+            SessionIdleCheckTarget(
+                assignment_id=exclusion_rows.assignment_id,
+                session_ids=(exclusion_rows.idle_expired_session_id,),
+            )
+        )
+
+        async with database.begin_readonly_session() as db_sess:
+            row = await db_sess.get(
+                SessionIdleCheckRow,
+                (exclusion_rows.idle_expired_session_id, exclusion_rows.checker_id),
+            )
+        assert row is not None
+        assert row.last_status is IdleCheckPhase.NOT_CHECKED
+        assert row.expire_at is None
+
+    async def test_include_rejects_unknown_assignment(
+        self,
+        repository: IdleCheckerRepository,
+        exclusion_rows: ExclusionRows,
+    ) -> None:
+        with pytest.raises(IdleCheckerAssignmentNotFound):
+            await repository.include_session_idle_checks(
+                SessionIdleCheckTarget(
+                    assignment_id=IdleCheckerAssignmentID(uuid.uuid4()),
+                    session_ids=(exclusion_rows.active_session_id,),
+                )
+            )

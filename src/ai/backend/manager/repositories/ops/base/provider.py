@@ -31,6 +31,8 @@ from ai.backend.manager.repositories.base import (
     BulkCreatorResultWithFailures,
     BulkPurgerResultWithFailures,
     BulkUpdaterResult,
+    BulkUpserter,
+    BulkUpserterResult,
     Creator,
     CreatorResult,
     DependentCreatorSpec,
@@ -53,6 +55,7 @@ from ai.backend.manager.repositories.base import (
     execute_bulk_dependent_creator,
     execute_bulk_purger_partial,
     execute_bulk_updater_partial,
+    execute_bulk_upserter,
     execute_creator,
     execute_dependent_creator,
     execute_next_value_creator,
@@ -254,6 +257,14 @@ class WriteOps(ReadOps):
     ) -> UpserterResult[TRow]:
         """Insert or update a single row on conflict."""
         return await execute_upserter(self._sess, upserter, index_elements=index_elements)
+
+    async def bulk_upsert[TRow: Base](
+        self,
+        bulk_upserter: BulkUpserter[TRow],
+        index_elements: list[str],
+    ) -> BulkUpserterResult:
+        """Insert or update multiple rows on conflict in a single statement."""
+        return await execute_bulk_upserter(self._sess, bulk_upserter, index_elements=index_elements)
 
     async def create_rbac_entity[TRow: Base](
         self, creator: RBACEntityCreator[TRow]
