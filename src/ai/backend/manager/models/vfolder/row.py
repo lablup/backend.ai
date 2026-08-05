@@ -678,6 +678,7 @@ async def query_accessible_vfolders(
                 "cloneable": row.vfolders_cloneable,
                 "status": row.vfolders_status,
                 "cur_size": row.vfolders_cur_size,
+                "encryption_tier": row.vfolders_encryption_tier,
             })
 
     entries: list[dict[str, Any]] = []
