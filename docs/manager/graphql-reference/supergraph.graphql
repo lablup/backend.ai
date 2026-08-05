@@ -8661,6 +8661,21 @@ type ImageV2IdentityInfo
   """Image namespace/path within the registry."""
   namespace: String!
 
+  """
+  Registry hostname, including the port when the registry declares one (e.g. 'cr.backend.ai', 'localhost:5000').
+  """
+  registry: String!
+
+  """
+  Full image tag as written in the image reference (e.g. '3.11-ubuntu20.04-cuda12.1').
+  """
+  tag: String
+
+  """
+  Base version parsed from the tag, i.e. the segment before the first platform tag (e.g. '3.11' for '3.11-ubuntu20.04').
+  """
+  version: String!
+
   """CPU architecture."""
   architecture: String!
 }

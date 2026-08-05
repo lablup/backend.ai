@@ -188,6 +188,7 @@ def sample_image_data() -> ImageData:
         image="test-project/python",
         created_at=datetime.now(tz=UTC),
         tag="3.9",
+        version="3.9",
         registry="registry.example.com",
         registry_id=UUID("12345678-1234-5678-1234-567812345678"),
         architecture="x86_64",

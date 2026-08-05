@@ -177,6 +177,7 @@ class ImageServiceBaseFixtures:
             image="test_project/python",
             project="test_project",
             tag="3.9-ubuntu20.04",
+            version="3.9",
             registry="registry.example.com",
             registry_id=container_registry_id,
             architecture="x86_64",

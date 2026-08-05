@@ -557,6 +557,7 @@ class ImageAdapter(BaseAdapter):
             registry_id=data.registry_id,
             project=data.project,
             tag=data.tag,
+            version=data.version,
             architecture=data.architecture,
             size_bytes=data.size_bytes,
             type=ImageTypeEnum(data.type.value),
@@ -572,6 +573,9 @@ class ImageAdapter(BaseAdapter):
             identity=ImageIdentityInfoDTO(
                 canonical_name=str(data.name),
                 namespace=data.image,
+                registry=data.registry,
+                tag=data.tag,
+                version=data.version,
                 architecture=data.architecture,
             ),
             metadata=ImageMetadataInfoDTO(
