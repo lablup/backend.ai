@@ -1085,6 +1085,30 @@
         "title": "ScopedAppConfigFragmentsByNamesInput",
         "type": "object"
       },
+      "ScopedPurgeAppConfigFragmentsByNamesInput": {
+        "description": "Purge the fragments written at one scope for the given config names.",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/AppConfigScopeRef",
+            "description": "Scope whose fragments to purge."
+          },
+          "config_names": {
+            "description": "Config names whose fragments to purge. All-or-nothing: a name the scope holds no fragment for purges nothing and is reported as not found.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Config Names",
+            "type": "array"
+          }
+        },
+        "required": [
+          "scope",
+          "config_names"
+        ],
+        "title": "ScopedPurgeAppConfigFragmentsByNamesInput",
+        "type": "object"
+      },
       "AppConfigFragmentUpsertItem": {
         "description": "One (config_name, config) pair to upsert at the request's scope.",
         "properties": {
@@ -1150,6 +1174,25 @@
           "config_names"
         ],
         "title": "MyAppConfigFragmentsByNamesInput",
+        "type": "object"
+      },
+      "MyPurgeAppConfigFragmentsByNamesInput": {
+        "description": "Purge the current user's own user-scope fragments for the given config names.",
+        "properties": {
+          "config_names": {
+            "description": "Config names whose fragments to purge. All-or-nothing: a name the scope holds no fragment for purges nothing and is reported as not found.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Config Names",
+            "type": "array"
+          }
+        },
+        "required": [
+          "config_names"
+        ],
+        "title": "MyPurgeAppConfigFragmentsByNamesInput",
         "type": "object"
       },
       "MyUpsertAppConfigFragmentsInput": {
@@ -41979,6 +42022,35 @@
         "description": "Read one scope's fragments for the given config names (auth, RBAC-authorized).\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/v2/app-config-fragments/scoped/by-names/bulk-delete": {
+      "post": {
+        "operationId": "v2/app-config-fragments.scoped_bulk_purge_by_names",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedPurgeAppConfigFragmentsByNamesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Purge one scope's fragments by config name, all-or-nothing (auth, RBAC-authorized).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/v2/app-config-fragments/scoped/bulk-upsert": {
       "post": {
         "operationId": "v2/app-config-fragments.scoped_bulk_upsert",
@@ -42035,6 +42107,35 @@
         },
         "parameters": [],
         "description": "Read the caller's own user-scope fragments for the given config names (auth).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config-fragments/my/by-names/bulk-delete": {
+      "post": {
+        "operationId": "v2/app-config-fragments.my_bulk_purge_by_names",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MyPurgeAppConfigFragmentsByNamesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Purge the caller's own user-scope fragments by config name, all-or-nothing (auth).\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/app-config-fragments/my/bulk-upsert": {
