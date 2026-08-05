@@ -28,16 +28,41 @@ from ai.backend.common.dto.manager.resource.request import (
     UsagePerPeriodQuery,
     WatcherAgentRequest,
 )
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.user import UserID
+from ai.backend.common.types import AccessKey, DefaultForUnspecified, ResourceSlot, SlotQuantity
 from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
-from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.api.rest.resource.handler import ResourceHandler
+from ai.backend.manager.data.auth.types import AuthenticatedKeypair, AuthenticatedUser
 from ai.backend.manager.data.manager_status.types import ManagerStatus
+from ai.backend.manager.data.resource.types import (
+    KeyPairResourcePolicyData,
+    UserResourcePolicyData,
+)
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.models.user import UserRole
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
+
+def _keypair_resource_policy() -> KeyPairResourcePolicyData:
+    return KeyPairResourcePolicyData(
+        name="default",
+        created_at=None,
+        default_for_unspecified=DefaultForUnspecified.LIMITED,
+        total_resource_slots=ResourceSlot(),
+        max_session_lifetime=0,
+        max_concurrent_sessions=10,
+        max_pending_session_count=None,
+        max_pending_session_resource_slots=None,
+        max_priority=None,
+        max_concurrent_sftp_sessions=2,
+        max_containers_per_session=1,
+        idle_timeout=3600,
+        allowed_vfolder_hosts={},
+    )
 
 
 @pytest.fixture
@@ -105,8 +130,24 @@ def authorized_request(mock_root_ctx: MagicMock) -> MagicMock:
     }.get(k, default)
     # Enable dict-like access for request["keypair"], request["user"]
     storage: dict[str, Any] = {
-        "user": {"uuid": uuid.uuid4(), "email": "test@example.com", "domain_name": "default"},
-        "keypair": {"access_key": "AKTEST"},
+        "user": AuthenticatedUser(
+            uuid=UserID(uuid.uuid4()),
+            email="test@example.com",
+            role=UserRole.USER,
+            domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
+            sudo_session_enabled=False,
+            main_access_key=None,
+            allowed_client_ip=None,
+            resource_policy=UserResourcePolicyData(name="default"),
+        ),
+        "keypair": AuthenticatedKeypair(
+            access_key=AccessKey("AKTEST"),
+            secret_key=None,
+            is_admin=False,
+            rate_limit=None,
+            resource_policy=_keypair_resource_policy(),
+        ),
         "is_admin": False,
         "is_superadmin": False,
     }
@@ -121,8 +162,24 @@ def superadmin_request(mock_root_ctx: MagicMock) -> MagicMock:
     req = MagicMock(spec=web.Request)
     req.app = {"_root.context": mock_root_ctx}
     storage: dict[str, Any] = {
-        "user": {"uuid": uuid.uuid4(), "email": "admin@example.com", "domain_name": "default"},
-        "keypair": {"access_key": "AKTEST"},
+        "user": AuthenticatedUser(
+            uuid=UserID(uuid.uuid4()),
+            email="admin@example.com",
+            role=UserRole.USER,
+            domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
+            sudo_session_enabled=False,
+            main_access_key=None,
+            allowed_client_ip=None,
+            resource_policy=UserResourcePolicyData(name="default"),
+        ),
+        "keypair": AuthenticatedKeypair(
+            access_key=AccessKey("AKTEST"),
+            secret_key=None,
+            is_admin=False,
+            rate_limit=None,
+            resource_policy=_keypair_resource_policy(),
+        ),
         "is_admin": True,
         "is_superadmin": True,
     }
@@ -298,7 +355,13 @@ class TestCheckPresets:
         )
         mock_req = MagicMock(spec=web.Request)
         storage: dict[str, Any] = {
-            "keypair": {"access_key": "AKTEST", "resource_policy": "default"},
+            "keypair": AuthenticatedKeypair(
+                access_key=AccessKey("AKTEST"),
+                secret_key=None,
+                is_admin=False,
+                rate_limit=None,
+                resource_policy=_keypair_resource_policy(),
+            ),
         }
         mock_req.__getitem__ = lambda _, key: storage[key]
         req_ctx = RequestCtx(request=mock_req)
@@ -351,7 +414,13 @@ class TestCheckPresets:
         )
         mock_req = MagicMock(spec=web.Request)
         storage: dict[str, Any] = {
-            "keypair": {"access_key": "AKTEST", "resource_policy": "default"},
+            "keypair": AuthenticatedKeypair(
+                access_key=AccessKey("AKTEST"),
+                secret_key=None,
+                is_admin=False,
+                rate_limit=None,
+                resource_policy=_keypair_resource_policy(),
+            ),
         }
         mock_req.__getitem__ = lambda _, key: storage[key]
         req_ctx = RequestCtx(request=mock_req)
