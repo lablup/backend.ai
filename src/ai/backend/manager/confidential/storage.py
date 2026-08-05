@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Final
 
+import sqlalchemy as sa
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
 from ai.backend.common.cc_storage import FORMAT_ID
@@ -17,8 +18,14 @@ from ai.backend.common.types import VFolderConfidential, VFolderID, VFolderMount
 from ai.backend.manager.errors.confidential import (
     FolderEncryptionMissing,
     FolderEscrowUnreachable,
+    ReleaseDenied,
+)
+from ai.backend.manager.models.scaling_group.row import (
+    ScalingGroupForDomainRow,
+    ScalingGroupRow,
 )
 from ai.backend.manager.models.scaling_group.types import ConfidentialScalingGroupOpts
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from .broker import BrokerClient, BrokerTarget
 
@@ -35,6 +42,56 @@ def folder_key_path(domain_name: str, folder_id: uuid.UUID) -> str:
 
 def folder_key_tag(vfid: VFolderID) -> str:
     return f"folder-key-{vfid.folder_id.hex}"
+
+
+async def custodian_of_domain(
+    db: ExtendedAsyncSAEngine, domain_name: str
+) -> ConfidentialScalingGroupOpts | None:
+    async with db.begin_readonly_session() as db_session:
+        rows = (
+            await db_session.scalars(
+                sa.select(ScalingGroupRow)
+                .join(
+                    ScalingGroupForDomainRow,
+                    ScalingGroupForDomainRow.scaling_group == ScalingGroupRow.name,
+                )
+                .where(ScalingGroupForDomainRow.domain == domain_name)
+            )
+        ).all()
+    serving = [(row.name, row.confidential) for row in rows if row.confidential.enabled]
+    if not serving:
+        return None
+    if len(serving) > 1:
+        raise ReleaseDenied(
+            extra_msg=(
+                f"domain {domain_name} is served by {len(serving)} confidential scaling groups"
+                f" ({', '.join(name for name, _ in serving)});"
+                " a tenant is a domain and must have exactly one"
+            )
+        )
+    group, opts = serving[0]
+    if not opts.folder_key_escrow_path or not opts.folder_key_escrow_key:
+        raise FolderEscrowUnreachable(
+            extra_msg=(
+                f"confidential scaling group {group}, which serves domain {domain_name},"
+                " names no folder-key escrow"
+            )
+        )
+    return opts
+
+
+async def opts_for_domain(
+    db: ExtendedAsyncSAEngine, domain_name: str
+) -> ConfidentialScalingGroupOpts:
+    opts = await custodian_of_domain(db, domain_name)
+    if opts is None:
+        raise ReleaseDenied(
+            extra_msg=(
+                f"domain {domain_name} is served by no confidential scaling group,"
+                " so it holds no folder keys"
+            )
+        )
+    return opts
 
 
 class FolderKeyEscrow:

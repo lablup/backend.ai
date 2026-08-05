@@ -178,6 +178,22 @@ class ClientFormatRefused(BackendAIError, web.HTTPPreconditionFailed):
         )
 
 
+class CrossDomainFolderKeyRefused(BackendAIError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/confidential-cross-domain-folder-key-refused"
+    error_title = (
+        "A confidential folder's key is never released outside the domain that owns the folder:"
+        " a tenant is a domain, and the released key cannot be revoked or rotated afterwards."
+    )
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.GRANT,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
 class ImmutableEncryptionTier(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/confidential-immutable-encryption-tier"
     error_title = "A folder's encryption tier is fixed at creation and cannot be changed."

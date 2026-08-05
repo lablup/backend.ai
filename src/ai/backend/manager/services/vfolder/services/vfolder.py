@@ -31,6 +31,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.confidential.plane import ConfidentialPlane
+from ai.backend.manager.confidential.storage import custodian_of_domain
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.group.types import ProjectResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
@@ -691,12 +692,14 @@ class VFolderService:
 
     async def _mint_folder_key(self, domain_name: str, vfid: VFolderID) -> None:
         plane = await self._plane()
-        for opts in (await plane.confidential_endpoints()).values():
+        opts = await custodian_of_domain(self._db, domain_name)
+        if opts is not None:
             await plane.custodian.mint(opts, domain_name, vfid.folder_id)
 
     async def _destroy_folder_key(self, domain_name: str, vfid: VFolderID) -> None:
         plane = await self._plane()
-        for opts in (await plane.confidential_endpoints()).values():
+        opts = await custodian_of_domain(self._db, domain_name)
+        if opts is not None:
             await plane.custodian.revoke(opts, domain_name, vfid.folder_id)
 
     async def _remove_vfolder_from_storage(self, vfolder_data: VFolderData) -> None:
