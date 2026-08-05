@@ -12,6 +12,7 @@ import pytest
 
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import ScalingGroupConflict
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, AgentSelectionStrategy, ResourceSlot, SessionTypes
 from ai.backend.manager.data.deployment.types import DeploymentOptions
@@ -129,6 +130,7 @@ class TestScalingGroupService:
             status=ScalingGroupStatus(
                 is_active=True,
                 is_public=True,
+                is_default=False,
             ),
             metadata=ScalingGroupMetadata(
                 description="Default scaling group",
@@ -155,7 +157,6 @@ class TestScalingGroupService:
                     config={},
                     agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
                     agent_selector_config={},
-                    enforce_spreading_endpoint_replica=False,
                     allow_fractional_resource_fragmentation=True,
                     route_cleanup_target_statuses=["unhealthy"],
                 ),
@@ -264,6 +265,7 @@ class TestScalingGroupService:
                 status=ScalingGroupStatus(
                     is_active=True,
                     is_public=True,
+                    is_default=False,
                 ),
                 metadata=ScalingGroupMetadata(
                     description=f"Scaling group {i}",
@@ -290,7 +292,6 @@ class TestScalingGroupService:
                         config={},
                         agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
                         agent_selector_config={},
-                        enforce_spreading_endpoint_replica=False,
                         allow_fractional_resource_fragmentation=True,
                         route_cleanup_target_statuses=["unhealthy"],
                     ),
@@ -446,15 +447,20 @@ class TestScalingGroupService:
         """Test associating a scaling group with domains"""
         mock_repository.associate_scaling_group_with_domains = AsyncMock(return_value=None)
 
+        resource_group_id = ResourceGroupID(uuid.uuid4())
+        domain_id = DomainID(uuid.uuid4())
+
         binder: RBACScopeBinder[ScalingGroupForDomainRow] = RBACScopeBinder(
             pairs=[
                 RBACScopeBindingPair(
                     spec=ScalingGroupForDomainCreatorSpec(
-                        scaling_group="test-sgroup",
-                        domain="test-domain",
+                        resource_group_id=resource_group_id,
+                        domain_id=domain_id,
                     ),
-                    entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, "test-sgroup"),
-                    scope_ref=RBACElementRef(RBACElementType.DOMAIN, "test-domain"),
+                    entity_ref=RBACElementRef(
+                        RBACElementType.RESOURCE_GROUP, str(resource_group_id)
+                    ),
+                    scope_ref=RBACElementRef(RBACElementType.DOMAIN, str(domain_id)),
                 )
             ]
         )
@@ -475,8 +481,8 @@ class TestScalingGroupService:
         mock_repository.disassociate_scaling_group_with_domains = AsyncMock(return_value=None)
 
         unbinder = ResourceGroupDomainEntityUnbinder(
-            scaling_groups=["test-sgroup"],
-            domain="test-domain",
+            resource_group_ids=[ResourceGroupID(uuid.uuid4())],
+            domain_id=DomainID(uuid.uuid4()),
         )
         action = DisassociateScalingGroupWithDomainsAction(unbinder=unbinder)
         result = await scaling_group_service.disassociate_scaling_group_with_domains(action)
@@ -494,13 +500,13 @@ class TestScalingGroupService:
         """Test associating a scaling group with keypairs"""
         mock_repository.associate_scaling_group_with_keypairs = AsyncMock(return_value=None)
 
-        scaling_group_name = "test-scaling-group"
+        resource_group_id = ResourceGroupID(uuid.uuid4())
         access_key = AccessKey("AKTEST1234567890")
 
         bulk_creator: BulkCreator[ScalingGroupForKeypairsRow] = BulkCreator(
             specs=[
                 ScalingGroupForKeypairsCreatorSpec(
-                    scaling_group=scaling_group_name,
+                    resource_group_id=resource_group_id,
                     access_key=access_key,
                 )
             ]
@@ -519,11 +525,11 @@ class TestScalingGroupService:
         """Test disassociating a scaling group from keypairs"""
         mock_repository.disassociate_scaling_group_with_keypairs = AsyncMock(return_value=None)
 
-        scaling_group_name = "test-scaling-group"
+        resource_group_id = ResourceGroupID(uuid.uuid4())
         access_key = AccessKey("AKTEST1234567890")
 
         purger: BatchPurger[ScalingGroupForKeypairsRow] = create_scaling_group_for_keypairs_purger(
-            scaling_group=scaling_group_name,
+            resource_group_id=resource_group_id,
             access_key=access_key,
         )
         action = DisassociateScalingGroupWithKeypairsAction(purger=purger)
@@ -542,17 +548,19 @@ class TestScalingGroupService:
         """Test associating a scaling group with user groups (projects)"""
         mock_repository.associate_scaling_group_with_user_groups = AsyncMock(return_value=None)
 
-        scaling_group_name = "test-scaling-group"
+        resource_group_id = ResourceGroupID(uuid.uuid4())
         project_id = uuid.uuid4()
 
         binder: RBACScopeBinder[ScalingGroupForProjectRow] = RBACScopeBinder(
             pairs=[
                 RBACScopeBindingPair(
                     spec=ScalingGroupForProjectCreatorSpec(
-                        scaling_group=scaling_group_name,
+                        resource_group_id=resource_group_id,
                         project=project_id,
                     ),
-                    entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, scaling_group_name),
+                    entity_ref=RBACElementRef(
+                        RBACElementType.RESOURCE_GROUP, str(resource_group_id)
+                    ),
                     scope_ref=RBACElementRef(RBACElementType.PROJECT, str(project_id)),
                 )
             ]
@@ -571,11 +579,11 @@ class TestScalingGroupService:
         """Test disassociating a scaling group from a user group (project)"""
         mock_repository.disassociate_scaling_group_with_user_groups = AsyncMock(return_value=None)
 
-        scaling_group_name = "test-scaling-group"
+        resource_group_id = ResourceGroupID(uuid.uuid4())
         project_id = uuid.uuid4()
 
         unbinder = ResourceGroupProjectEntityUnbinder(
-            scaling_groups=[scaling_group_name],
+            resource_group_ids=[resource_group_id],
             project=project_id,
         )
         action = DisassociateScalingGroupWithUserGroupsAction(unbinder=unbinder)
@@ -699,7 +707,7 @@ class TestGetWsproxyVersion:
         return ScalingGroupData(
             id=ResourceGroupID(uuid.uuid4()),
             name="gpu-group",
-            status=ScalingGroupStatus(is_active=True, is_public=True),
+            status=ScalingGroupStatus(is_active=True, is_public=True, is_default=False),
             metadata=ScalingGroupMetadata(
                 description="GPU group",
                 created_at=datetime.now(tz=UTC),
@@ -718,7 +726,6 @@ class TestGetWsproxyVersion:
                     config={},
                     agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
                     agent_selector_config={},
-                    enforce_spreading_endpoint_replica=False,
                     allow_fractional_resource_fragmentation=True,
                     route_cleanup_target_statuses=["unhealthy"],
                 ),
@@ -849,7 +856,7 @@ class TestListAllowedScalingGroups:
         return ScalingGroupData(
             id=ResourceGroupID(uuid.uuid4()),
             name=name,
-            status=ScalingGroupStatus(is_active=True, is_public=is_public),
+            status=ScalingGroupStatus(is_active=True, is_public=is_public, is_default=False),
             metadata=ScalingGroupMetadata(
                 description=f"{name} group",
                 created_at=datetime.now(tz=UTC),
@@ -866,7 +873,6 @@ class TestListAllowedScalingGroups:
                     config={},
                     agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
                     agent_selector_config={},
-                    enforce_spreading_endpoint_replica=False,
                     allow_fractional_resource_fragmentation=True,
                     route_cleanup_target_statuses=["unhealthy"],
                 ),

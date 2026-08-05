@@ -30,6 +30,7 @@ from ai.backend.common.data.permission.types import (
 )
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.actions.action.base import BaseActionTriggerMeta
 from ai.backend.manager.actions.action.bulk import BaseBulkAction
 from ai.backend.manager.actions.action.scope import BaseScopeAction
@@ -194,6 +195,7 @@ def _make_user_data(user_id: uuid.UUID, *, is_superadmin: bool) -> UserData:
         is_superadmin=is_superadmin,
         role=UserRole.SUPERADMIN if is_superadmin else UserRole.USER,
         domain_name=_TARGET_DOMAIN,
+        domain_id=DomainID(uuid.uuid4()),
     )
 
 
@@ -218,6 +220,7 @@ async def _seed_user_with_role(
         db_sess.add(
             UserRow(
                 uuid=user_id,
+                username=f"user-{suffix}",
                 email=f"user-{suffix}@test.com",
                 resource_policy=policy_name,
                 status=UserStatus.ACTIVE,

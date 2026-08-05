@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
@@ -10,9 +9,10 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
 )
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
 
-class EntityFieldRow(Base):  # type: ignore[misc]
+class EntityFieldRow(CreatedAtMixin, Base):  # type: ignore[misc]
     """Deprecated: No longer actively used. The field-scoped entity concept
     (RBACFieldCreator/RBACFieldPurger) was removed by BEP-1048.
     Kept only for the existing database table; will be dropped in a future migration.
@@ -54,10 +54,4 @@ class EntityFieldRow(Base):  # type: ignore[misc]
         "field_id",
         sa.String(64),
         nullable=False,
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
     )

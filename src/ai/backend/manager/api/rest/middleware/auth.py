@@ -662,7 +662,7 @@ async def _load_user_data(db: ExtendedAsyncSAEngine, user_id: UserID) -> UserDat
     row = await execute_with_retry(_query)
     if row is None:
         raise UserNotFound("Impersonation target user not found")
-    if row.role is None or row.domain_name is None:
+    if row.role is None or row.domain_name is None or row.domain_id is None:
         raise InternalServerError(f"Impersonation target user is misconfigured (user_id={user_id})")
     return UserData(
         user_id=row.uuid,
@@ -671,6 +671,7 @@ async def _load_user_data(db: ExtendedAsyncSAEngine, user_id: UserID) -> UserDat
         is_superadmin=row.role == UserRole.SUPERADMIN,
         role=row.role,
         domain_name=row.domain_name,
+        domain_id=row.domain_id,
     )
 
 
@@ -686,6 +687,7 @@ def _authenticated_user(request: web.Request) -> UserData | None:
         is_superadmin=request.get("is_superadmin", False),
         role=UserRole(user["role"]),
         domain_name=user["domain_name"],
+        domain_id=user["domain_id"],
     )
 
 

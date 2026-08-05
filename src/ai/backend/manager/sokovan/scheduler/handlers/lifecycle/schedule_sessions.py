@@ -11,7 +11,6 @@ from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
-from ai.backend.manager.data.sokovan import SessionWithKernels
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
@@ -19,11 +18,14 @@ from ai.backend.manager.sokovan.scheduler.results import (
     SessionExecutionResult,
     SessionTransitionInfo,
 )
+from ai.backend.manager.sokovan.scheduler.types import ScheduleType
+from ai.backend.manager.views.sokovan.lifecycle import SessionWithKernels
 
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
         SessionProvisioner,
     )
+    from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -32,7 +34,7 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
     """Handler for scheduling pending sessions.
 
     Following the DeploymentCoordinator pattern:
-    - Coordinator queries sessions with PENDING status per scaling group
+    - Coordinator queries sessions with PENDING status per resource group
     - Handler delegates to Provisioner for session scheduling
     - Successfully scheduled sessions are moved to SCHEDULED status
     - Coordinator broadcasts events after status transition
@@ -42,9 +44,11 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
         self,
         provisioner: SessionProvisioner,
         repository: SchedulerRepository,
+        scheduling_controller: SchedulingController,
     ) -> None:
         self._provisioner = provisioner
         self._repository = repository
+        self._scheduling_controller = scheduling_controller
 
     @classmethod
     @override
@@ -102,7 +106,7 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
         resource_group_id: ResourceGroupID,
         sessions: Sequence[SessionWithKernels],
     ) -> SessionExecutionResult:
-        """Schedule pending sessions for a scaling group.
+        """Schedule pending sessions for a resource group.
 
         Delegates to Provisioner's scheduling method which handles:
         - Resource allocation and agent selection
@@ -122,7 +126,7 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
         scheduling_data = await self._repository.get_scheduling_data(resource_group_id)
         if scheduling_data is None:
             log.debug(
-                "No scheduling data for scaling group {}. Skipping all sessions.",
+                "No scheduling data for resource group {}. Skipping all sessions.",
                 resource_group_id,
             )
             # All sessions are skipped when no scheduling data available
@@ -132,14 +136,34 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
             return result
 
         # Delegate to Provisioner with pre-fetched data
-        provision_time = await self._repository.get_db_now()
-        schedule_result = await self._provisioner.schedule_scaling_group(
-            scheduling_data, provision_time
-        )
+        schedule_result = await self._provisioner.schedule_resource_group(scheduling_data)
         scheduled_ids = set(schedule_result.scheduled_session_ids)
         failure_map = {
             failure.session_id: failure for failure in schedule_result.scheduling_failures
         }
+
+        # Reservation-backed placements: the sessions hold their resources
+        # (kernels already RESERVED) and wait for their victims; the victims
+        # enter the preemption flow (PREEMPTED branches by the group's mode).
+        reserved_ids = set(schedule_result.reserved_session_ids)
+        if reserved_ids:
+            await self._scheduling_controller.mark_sessions_status(
+                list(reserved_ids),
+                SessionStatus.RESERVED,
+                reason="preemption-reservation",
+            )
+            victim_ids = sorted({
+                victim_id
+                for entry in schedule_result.preemption_plan
+                for victim_id in entry.victim_session_ids
+            })
+            if victim_ids:
+                await self._scheduling_controller.mark_sessions_status(
+                    victim_ids,
+                    SessionStatus.PREEMPTED,
+                    reason="preempted-by-reservation",
+                )
+                await self._scheduling_controller.mark_scheduling_needed([ScheduleType.PREEMPTED])
 
         # Allocated sessions transition to SCHEDULED; failed attempts are reported
         # as failures so the coordinator can classify them (need_retry/expired/
@@ -150,6 +174,9 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
             session_id = session.session_info.identity.id
             if session_id in scheduled_ids:
                 result.successes.append(self._to_transition_info(session, "triggered-by-scheduler"))
+            elif session_id in reserved_ids:
+                # Marked RESERVED above; not a coordinator transition target.
+                result.skipped.append(self._to_transition_info(session, "preemption-reservation"))
             elif session_id in failure_map:
                 reason = failure_map[session_id].msg or "scheduling-failed"
                 result.failures.append(self._to_transition_info(session, reason))

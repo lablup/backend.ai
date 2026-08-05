@@ -18,7 +18,7 @@ from ai.backend.manager.models.clauses import QueryCondition
 
 @dataclass
 class ObservationResult:
-    """Result of kernel observation for a scaling group."""
+    """Result of kernel observation for a resource group."""
 
     observed_count: int
 
@@ -47,7 +47,7 @@ class KernelObserver(ABC):
         """Get query condition for kernel filtering.
 
         Args:
-            resource_group_id: The id of the scaling group being processed
+            resource_group_id: The id of the resource group being processed
 
         Returns:
             QueryCondition for filtering kernels to observe
@@ -63,7 +63,7 @@ class KernelObserver(ABC):
         """Observe the given kernels without changing their state.
 
         Args:
-            resource_group_id: The id of the scaling group being processed
+            resource_group_id: The id of the resource group being processed
             kernels: Kernels with full KernelInfo data
 
         Returns:

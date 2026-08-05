@@ -14,7 +14,9 @@ class SchedulerRepositories:
         repository = SchedulerRepository(
             args.db,
             args.valkey_stat_client,
+            args.valkey_schedule_client,
             args.config_provider,
+            args.storage_manager,
         )
 
         return cls(

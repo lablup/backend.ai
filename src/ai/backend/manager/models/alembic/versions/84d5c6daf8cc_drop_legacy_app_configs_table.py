@@ -36,7 +36,6 @@ def downgrade() -> None:
     # Recreate the predecessor table to allow `alembic downgrade` to
     # complete cleanly. Existing-row restoration is not attempted.
     app_config_scope_type = sa.Enum("DOMAIN", "PROJECT", "USER", name="app_config_scope_type")
-    app_config_scope_type.create(op.get_bind(), checkfirst=True)
     op.create_table(
         "app_configs",
         IDColumn(),

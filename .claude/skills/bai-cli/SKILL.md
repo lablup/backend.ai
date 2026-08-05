@@ -42,9 +42,9 @@ Check options with `--help`.
 - **domain**: user(get) · admin(search, create, update, delete, purge)
 - **user**: user(get, create, update, delete, search) · admin(create, delete, search)
 - **project**: user(get, assign-users, unassign-users · sub role: search) · admin(search, create, update, delete, purge)
-- **agent**: user(empty group) · admin(search, total-resources)
+- **agent**: user(empty group) · admin(search, total-resources, update-resource-group)
 - **image**: user(empty group) · admin(search, forget, purge, update · sub alias: create, remove, search)
-- **session**: user(enqueue, get, logs, project-search, start-service, shutdown-service, terminate, update) · admin(search · sub kernel: search) · my(search)
+- **session**: user(compute-schedule, enqueue, get, logs, project-search, start-service, shutdown-service, terminate, update) · admin(search · sub kernel: search) · my(search)
 
 ### Compute & Serving
 
@@ -55,7 +55,7 @@ Check options with `--help`.
 - **service-catalog**: user(empty group) · admin(search)
 - **runtime-variant**: user(get, search) · admin(get, search, create, update, delete, bulk-delete)
 - **runtime-variant-preset**: user(get, search) · admin(get, search, create, update, delete)
-- **scheduling-history**: sub session / deployment / route — each (search, search-scoped)
+- **scheduling-history**: sub session / kernel / deployment / route / replica-group — each (search, search-scoped)
 - **scheduling-handler**: admin(list)
 
 ### Storage
@@ -100,12 +100,15 @@ Check options with `--help`.
 
 - **audit-log**: user(search)
 - **fair-share**: sub domain / project / user — each (get, search)
+- **idle-checker-assignment**: user(scoped-search, update, purge) · admin(create, search)
 - **notification**: sub channel(get, search, delete), rule(get, search, delete)
 - **prometheus-query-definition**: user(get, search, execute) · admin(create, update, delete, preview)
 - **prometheus-query-definition-category**: user(get, search) · admin(create, delete)
 - **app-config**: user(get-domain, get-user, get-merged, delete-domain, delete-user)
 - **app-config-definition**: admin(create, get, search, purge)
 - **app-config-allow-list**: admin(create, get, search, update, purge)
+- **app-config-fragment**: user(get, update, purge, bulk-purge) · my(get, update) · admin(search)
+- **idle-checker**: admin(create, search, update, purge)
 - **export**: admin(list-reports, get-report, audit-logs, keypairs, projects, sessions, sessions-by-project, users, users-by-domain) · my(keypairs, sessions)
 
 ### Utilities (not entities)

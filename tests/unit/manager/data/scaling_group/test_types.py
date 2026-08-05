@@ -17,7 +17,6 @@ class TestScalingGroupSchedulerOptions:
             config={"key": "value"},
             agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
             agent_selector_config={"selector_key": "selector_value"},
-            enforce_spreading_endpoint_replica=True,
             allow_fractional_resource_fragmentation=False,
             route_cleanup_target_statuses=["terminated", "cancelled"],
         )
@@ -29,7 +28,6 @@ class TestScalingGroupSchedulerOptions:
         assert result["config"] == {"key": "value"}
         assert result["agent_selection_strategy"] == "dispersed"
         assert result["agent_selector_config"] == {"selector_key": "selector_value"}
-        assert result["enforce_spreading_endpoint_replica"] is True
         assert result["allow_fractional_resource_fragmentation"] is False
         assert result["route_cleanup_target_statuses"] == ["terminated", "cancelled"]
 
@@ -41,7 +39,6 @@ class TestScalingGroupSchedulerOptions:
             config={},
             agent_selection_strategy=AgentSelectionStrategy.CONCENTRATED,
             agent_selector_config={},
-            enforce_spreading_endpoint_replica=False,
             allow_fractional_resource_fragmentation=True,
             route_cleanup_target_statuses=[],
         )
@@ -61,7 +58,6 @@ class TestScalingGroupSchedulerOptions:
             config={"level1": {"level2": {"value": 123}}, "list_value": [1, 2, 3]},
             agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
             agent_selector_config={"nested": {"key": "value"}},
-            enforce_spreading_endpoint_replica=True,
             allow_fractional_resource_fragmentation=True,
             route_cleanup_target_statuses=["error"],
         )

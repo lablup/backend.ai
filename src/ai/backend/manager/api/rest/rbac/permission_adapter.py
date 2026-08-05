@@ -12,11 +12,11 @@ from ai.backend.common.dto.manager.rbac import (
     PermissionDTO,
 )
 from ai.backend.manager.data.permission.permission import PermissionData
-from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.repositories.base import Creator, Purger
 from ai.backend.manager.repositories.permission_controller.creators import (
     PermissionCreatorSpec,
 )
+from ai.backend.manager.repositories.permission_controller.purgers import PermissionPurgerSpec
 from ai.backend.manager.services.permission_contoller.actions.permission import (
     CreatePermissionAction,
     DeletePermissionAction,
@@ -54,5 +54,5 @@ class PermissionAdapter:
     @staticmethod
     def to_delete_permission_action(permission_id: uuid.UUID) -> DeletePermissionAction:
         """Convert permission_id to DeletePermissionAction."""
-        purger = Purger(row_class=PermissionRow, pk_value=permission_id)
+        purger = Purger(spec=PermissionPurgerSpec(permission_id=permission_id))
         return DeletePermissionAction(purger=purger)

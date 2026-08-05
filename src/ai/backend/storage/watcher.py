@@ -451,10 +451,8 @@ class WatcherClient:
         if self.output_listening_task and not self.output_listening_task.done():
             self.output_listening_task.cancel()
             await self.output_listening_task
-        if self.input_sock:
-            self.input_sock.close()
-        if self.output_sock:
-            self.output_sock.close()
+        self.input_sock.close()
+        self.output_sock.close()
 
     async def _listen_output(self) -> None:
         while True:

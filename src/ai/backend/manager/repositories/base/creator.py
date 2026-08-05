@@ -48,6 +48,32 @@ class CreatorSpec[TRow: Base](ABC):
         raise NotImplementedError
 
 
+class DataCreator[TRow: Base, TData](CreatorSpec[TRow], ABC):
+    """A creator spec that also says how the inserted row becomes data.
+
+    ``CreatorSpec`` stops at building the row, which leaves every caller converting it
+    by hand. Adding ``to_data`` here lets the ops layer return the ``data/`` type
+    directly, the way :class:`~ai.backend.manager.repositories.base.searcher.Searcher`
+    already does for batch reads.
+
+    Example:
+        class UserCreator(DataCreator[UserRow, UserData]):
+            def build_row(self) -> UserRow:
+                return UserRow(name=self._name)
+
+            def to_data(self, row: UserRow) -> UserData:
+                return row.to_data()
+
+        async with ops.write_ops() as w:
+            user = await w.create_data(UserCreator("Alice"))
+    """
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        """Convert the inserted row into its ``data/`` type."""
+        raise NotImplementedError
+
+
 class DependentCreatorSpec[TDependency, TRow: Base](ABC):
     """Abstract base class defining a row whose construction depends on a resolved value.
 

@@ -8,6 +8,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
     MetricArgs,
@@ -249,7 +250,7 @@ class ResourceUsageHistoryRepository:
     @resource_usage_history_repository_resilience.apply()
     async def get_aggregated_usage_by_user(
         self,
-        resource_group: str,
+        resource_group_id: ResourceGroupID,
         lookback_start: date,
         lookback_end: date,
     ) -> Mapping[tuple[uuid.UUID, uuid.UUID], ResourceSlot]:
@@ -260,13 +261,13 @@ class ResourceUsageHistoryRepository:
         calculation service.
         """
         return await self._db_source.get_aggregated_usage_by_user(
-            resource_group, lookback_start, lookback_end
+            resource_group_id, lookback_start, lookback_end
         )
 
     @resource_usage_history_repository_resilience.apply()
     async def get_aggregated_usage_by_project(
         self,
-        resource_group: str,
+        resource_group_id: ResourceGroupID,
         lookback_start: date,
         lookback_end: date,
     ) -> Mapping[uuid.UUID, ResourceSlot]:
@@ -276,13 +277,13 @@ class ResourceUsageHistoryRepository:
         lookback period for each project.
         """
         return await self._db_source.get_aggregated_usage_by_project(
-            resource_group, lookback_start, lookback_end
+            resource_group_id, lookback_start, lookback_end
         )
 
     @resource_usage_history_repository_resilience.apply()
     async def get_aggregated_usage_by_domain(
         self,
-        resource_group: str,
+        resource_group_id: ResourceGroupID,
         lookback_start: date,
         lookback_end: date,
     ) -> Mapping[str, ResourceSlot]:
@@ -292,7 +293,7 @@ class ResourceUsageHistoryRepository:
         lookback period for each domain.
         """
         return await self._db_source.get_aggregated_usage_by_domain(
-            resource_group, lookback_start, lookback_end
+            resource_group_id, lookback_start, lookback_end
         )
 
     # ==================== Bucket Delta Updates ====================
@@ -320,11 +321,11 @@ class ResourceUsageHistoryRepository:
     @resource_usage_history_repository_resilience.apply()
     async def update_bucket_entry_capacities(
         self,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
         capacity_by_slot: Mapping[str, Decimal],
     ) -> None:
         """Update capacity on usage_bucket_entries for a scaling group.
 
         Called after cluster capacity is fetched during fair share calculation.
         """
-        await self._db_source.update_bucket_entry_capacities(scaling_group, capacity_by_slot)
+        await self._db_source.update_bucket_entry_capacities(resource_group_id, capacity_by_slot)

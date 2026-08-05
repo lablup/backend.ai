@@ -1,6 +1,6 @@
 #!/usr/bin/env python
+import argparse
 import json
-import os
 import re
 import subprocess
 import sys
@@ -45,7 +45,7 @@ def get_pr_added_fragments(base_ref: str, base_path: Path) -> set[str]:
     return {Path(line).name for line in result.stdout.splitlines() if line.strip()}
 
 
-def main(pr_number: str) -> None:
+def main(pr_number: str, base_ref: str, dry_run: bool) -> None:
     news_types = read_news_types()
     base_path = Path("./changes")
     rx_unnumbered_fragment = re.compile(
@@ -55,10 +55,15 @@ def main(pr_number: str) -> None:
         r"^\d+\.(?P<type>" + "|".join(map(re.escape, news_types)) + r")(\.)?(md)?$"
     )
 
-    base_ref = os.getenv("GITHUB_BASE_REF") or ""
-    pr_added_fragments: set[str] | None = (
-        get_pr_added_fragments(base_ref, base_path) if base_ref else None
-    )
+    if base_ref:
+        print(f"Considering only the fragments added against origin/{base_ref}.", file=sys.stderr)
+        pr_added_fragments: set[str] | None = get_pr_added_fragments(base_ref, base_path)
+    else:
+        print(
+            "No --base-ref given; considering every fragment under ./changes.",
+            file=sys.stderr,
+        )
+        pr_added_fragments = None
     # Backport PRs (targeting release branches) carry fragments already
     # numbered for the original ``main`` PR; rewriting those prefixes would
     # erase the link back to the original change in release notes. Restrict
@@ -85,7 +90,7 @@ def main(pr_number: str) -> None:
         elif match := rx_unnumbered_fragment.search(file):
             unnumbered_fragments.append((file, match.group("type")))
         else:
-            print(f"{file} is an invalid news fragment filename.")
+            print(f"{file} is an invalid news fragment filename.", file=sys.stderr)
             sys.exit(1)
 
     # Plan all renames before touching disk so that collisions — both with
@@ -109,57 +114,73 @@ def main(pr_number: str) -> None:
             print(
                 f"Cannot rename {original} to {target}: another fragment in this PR "
                 f"also targets {target}. Remove or rename one of the conflicting "
-                f"fragments and retry."
+                f"fragments and retry.",
+                file=sys.stderr,
             )
             sys.exit(1)
         if (base_path / target).exists():
             print(
                 f"Cannot rename {original} to {target}: another fragment already "
                 f"occupies {target}. Remove or rename one of the conflicting "
-                f"fragments and retry."
+                f"fragments and retry.",
+                file=sys.stderr,
             )
             sys.exit(1)
         seen_targets.add(target)
 
     renamed_pairs: list[tuple[str, str]] = []
     for original, target, log_message in planned_renames:
-        (base_path / original).rename(base_path / target)
-        print(log_message)
+        if not dry_run:
+            (base_path / original).rename(base_path / target)
+        print(f"{'[dry-run] ' if dry_run else ''}{log_message}", file=sys.stderr)
         renamed_pairs.append((original, target))
 
     if renamed_pairs:
-        subprocess.run(
-            ["git", "rm", *(base_path / pair[0] for pair in renamed_pairs)],
-            check=False,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.STDOUT,
-        )
-        subprocess.run(
-            ["git", "add", *(base_path / pair[1] for pair in renamed_pairs)],
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=None,
-        )
-        with open(os.getenv("GITHUB_OUTPUT", os.devnull), "a") as ghoutput:
-            rename_results = [f"{pair[0]} -> {pair[1]}" for pair in renamed_pairs]
-            print(f"rename_results={json.dumps(rename_results)}", file=ghoutput)
-            print("has_renamed_pairs=true", file=ghoutput)
+        if not dry_run:
+            subprocess.run(
+                ["git", "rm", *(base_path / pair[0] for pair in renamed_pairs)],
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.STDOUT,
+            )
+            subprocess.run(
+                ["git", "add", *(base_path / pair[1] for pair in renamed_pairs)],
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=None,
+            )
     elif existing_fragments:
-        print(f"The news fragment(s) for the PR #{pr_number} already exists:")
+        print(f"The news fragment(s) for the PR #{pr_number} already exists:", file=sys.stderr)
         for file in existing_fragments:
-            print(file)
-        with open(os.getenv("GITHUB_OUTPUT", os.devnull), "a") as ghoutput:
-            print("has_renamed_pairs=false", file=ghoutput)
+            print(file, file=sys.stderr)
     else:
-        print("There are no unnumbered news fragments.")
-        with open(os.getenv("GITHUB_OUTPUT", os.devnull), "a") as ghoutput:
-            print("has_renamed_pairs=false", file=ghoutput)
+        print("There are no unnumbered news fragments.", file=sys.stderr)
+
+    print(json.dumps([f"{pair[0]} -> {pair[1]}" for pair in renamed_pairs]))
     sys.exit(0)
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print(f"Usage: python {sys.argv[0]} <PR Number>")
-        sys.exit(1)
-    pr_number = sys.argv[1]
-    main(pr_number)
+    parser = argparse.ArgumentParser(
+        description=(
+            "Rename the news fragments of a PR to carry its PR number, "
+            "printing the renames as a JSON array on stdout."
+        ),
+    )
+    parser.add_argument("pr_number", help="the PR number to assign")
+    parser.add_argument(
+        "--base-ref",
+        default="",
+        help=(
+            "the branch the PR targets; only the fragments this PR adds against "
+            "origin/<ref> are considered, and mismatched prefixes are rewritten "
+            "only for 'main'. Omitted: every fragment under ./changes is considered."
+        ),
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="print the planned renames without renaming anything or staging them",
+    )
+    args = parser.parse_args()
+    main(args.pr_number, args.base_ref, args.dry_run)

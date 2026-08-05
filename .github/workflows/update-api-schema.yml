@@ -68,12 +68,14 @@ jobs:
       run: |
         ./backend.ai mgr api dump-gql-schema --output docs/manager/graphql-reference/schema.graphql
         ./backend.ai mgr api dump-gql-schema --v2 --output docs/manager/graphql-reference/v2-schema.graphql
+        ./backend.ai mgr api dump-gql-schema --public --output docs/manager/graphql-reference/v2-public-schema.graphql
         ./backend.ai mgr api generate-supergraph --config configs/graphql/supergraph.yaml -o docs/manager/graphql-reference
         ./backend.ai mgr api dump-openapi --output docs/manager/rest-reference/openapi.json
     - name: Make commit message for changing change log file
       run: |
         git add docs/manager/graphql-reference/schema.graphql
         git add docs/manager/graphql-reference/v2-schema.graphql
+        git add docs/manager/graphql-reference/v2-public-schema.graphql
         git add docs/manager/graphql-reference/supergraph.graphql
         git add docs/manager/rest-reference/openapi.json
         author_name=$(git show -q --pretty='format:%an')
@@ -99,6 +101,42 @@ jobs:
       - uses: actions/checkout@v6
       - uses: graphql-hive/graphql-inspector@v4.0.0
         with:
-          schema: '${{ github.base_ref }}:docs/manager/graphql-reference/schema.graphql'
+          schema: '${{ github.base_ref }}:docs/manager/graphql-reference/supergraph.graphql'
           rules: |
             gql-inspector-checker.js
+
+  # A version branch inherits NEXT_RELEASE_VERSION from the cut PR, where it already
+  # points at the *next* version -- one this branch never releases.  New references
+  # added here must therefore spell out the version this branch will actually ship.
+  version-branch-added-version:
+    if: ${{ github.base_ref != 'main' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Reject NEXT_RELEASE_VERSION added on a version branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_REF: ${{ github.base_ref }}
+          PR_FILES_API: repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files
+        run: |
+          if [[ ! "$BASE_REF" =~ ^[0-9]{2}\.[0-9]{1,2}$ ]]; then
+            echo "'$BASE_REF' is not a version branch (YY.S); nothing to check."
+            exit 0
+          fi
+          added=$(gh api --paginate "$PR_FILES_API" --jq '
+            .[] | select(.patch != null) | .filename as $file
+            | .patch | split("\n")[]
+            | select(startswith("+") and (startswith("+++") | not))
+            | select(test("NEXT_RELEASE_VERSION"))
+            | "\($file): \(.[1:])"
+          ')
+          if [ -z "$added" ]; then
+            echo "No newly added NEXT_RELEASE_VERSION reference."
+            exit 0
+          fi
+          echo "Newly added NEXT_RELEASE_VERSION references:"
+          echo "$added"
+          echo "::error::NEXT_RELEASE_VERSION must not be added on version branch ${BASE_REF}: it resolves to a version this branch never releases. Write the version this branch will ship instead (e.g. added_version=\"${BASE_REF}.<patch>\"). Pre-existing references are left alone."
+          exit 1

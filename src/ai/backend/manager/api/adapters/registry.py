@@ -5,11 +5,15 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ai.backend.manager.api.adapters.agent.adapter import AgentAdapter
+from ai.backend.manager.api.adapters.app_config.adapter import AppConfigAdapter
 from ai.backend.manager.api.adapters.app_config_allow_list.adapter import (
     AppConfigAllowListAdapter,
 )
 from ai.backend.manager.api.adapters.app_config_definition.adapter import (
     AppConfigDefinitionAdapter,
+)
+from ai.backend.manager.api.adapters.app_config_fragment.adapter import (
+    AppConfigFragmentAdapter,
 )
 from ai.backend.manager.api.adapters.artifact.adapter import ArtifactAdapter
 from ai.backend.manager.api.adapters.artifact_registry.adapter import ArtifactRegistryAdapter
@@ -22,6 +26,10 @@ from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
 from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.api.adapters.fair_share.adapter import FairShareAdapter
 from ai.backend.manager.api.adapters.huggingface_registry.adapter import HuggingFaceRegistryAdapter
+from ai.backend.manager.api.adapters.idle_checker.adapter import IdleCheckerAdapter
+from ai.backend.manager.api.adapters.idle_checker_assignment.adapter import (
+    IdleCheckerAssignmentAdapter,
+)
 from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
 from ai.backend.manager.api.adapters.login_client_type.adapter import LoginClientTypeAdapter
 from ai.backend.manager.api.adapters.login_history.adapter import LoginHistoryAdapter
@@ -44,6 +52,7 @@ from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePoli
 from ai.backend.manager.api.adapters.resource_preset.adapter import ResourcePresetAdapter
 from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
 from ai.backend.manager.api.adapters.resource_usage.adapter import ResourceUsageAdapter
+from ai.backend.manager.api.adapters.retention_policy.adapter import RetentionPolicyAdapter
 from ai.backend.manager.api.adapters.role_preset.adapter import RolePresetAdapter
 from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
 from ai.backend.manager.api.adapters.runtime_variant_preset.adapter import (
@@ -78,6 +87,8 @@ class Adapters:
     def __init__(
         self,
         agent: AgentAdapter,
+        app_config: AppConfigAdapter,
+        app_config_fragment: AppConfigFragmentAdapter,
         app_config_allow_list: AppConfigAllowListAdapter,
         app_config_definition: AppConfigDefinitionAdapter,
         artifact: ArtifactAdapter,
@@ -88,6 +99,8 @@ class Adapters:
         domain: DomainAdapter,
         fair_share: FairShareAdapter,
         huggingface_registry: HuggingFaceRegistryAdapter,
+        idle_checker: IdleCheckerAdapter,
+        idle_checker_assignment: IdleCheckerAssignmentAdapter,
         image: ImageAdapter,
         login_client_type: LoginClientTypeAdapter,
         login_history: LoginHistoryAdapter,
@@ -104,6 +117,7 @@ class Adapters:
         resource_policy: ResourcePolicyAdapter,
         resource_preset: ResourcePresetAdapter,
         resource_slot: ResourceSlotAdapter,
+        retention_policy: RetentionPolicyAdapter,
         runtime_variant: RuntimeVariantAdapter,
         runtime_variant_preset: RuntimeVariantPresetAdapter,
         deployment_revision_preset: DeploymentRevisionPresetAdapter,
@@ -121,6 +135,8 @@ class Adapters:
         vfs_storage: VFSStorageAdapter,
     ) -> None:
         self.agent = agent
+        self.app_config = app_config
+        self.app_config_fragment = app_config_fragment
         self.app_config_allow_list = app_config_allow_list
         self.app_config_definition = app_config_definition
         self.artifact = artifact
@@ -131,6 +147,8 @@ class Adapters:
         self.domain = domain
         self.fair_share = fair_share
         self.huggingface_registry = huggingface_registry
+        self.idle_checker = idle_checker
+        self.idle_checker_assignment = idle_checker_assignment
         self.image = image
         self.login_client_type = login_client_type
         self.login_history = login_history
@@ -147,6 +165,7 @@ class Adapters:
         self.resource_policy = resource_policy
         self.resource_preset = resource_preset
         self.resource_slot = resource_slot
+        self.retention_policy = retention_policy
         self.runtime_variant = runtime_variant
         self.runtime_variant_preset = runtime_variant_preset
         self.deployment_revision_preset = deployment_revision_preset
@@ -183,6 +202,8 @@ class Adapters:
         """
         return cls(
             agent=AgentAdapter(processors),
+            app_config=AppConfigAdapter(processors),
+            app_config_fragment=AppConfigFragmentAdapter(processors),
             app_config_allow_list=AppConfigAllowListAdapter(processors),
             app_config_definition=AppConfigDefinitionAdapter(processors),
             artifact=ArtifactAdapter(processors),
@@ -193,6 +214,8 @@ class Adapters:
             domain=DomainAdapter(processors),
             fair_share=FairShareAdapter(processors),
             huggingface_registry=HuggingFaceRegistryAdapter(processors),
+            idle_checker=IdleCheckerAdapter(processors),
+            idle_checker_assignment=IdleCheckerAssignmentAdapter(processors),
             image=ImageAdapter(processors),
             login_client_type=LoginClientTypeAdapter(processors),
             login_history=LoginHistoryAdapter(processors),
@@ -211,6 +234,7 @@ class Adapters:
             resource_policy=ResourcePolicyAdapter(processors),
             resource_preset=ResourcePresetAdapter(processors),
             resource_slot=ResourceSlotAdapter(processors),
+            retention_policy=RetentionPolicyAdapter(processors),
             runtime_variant=RuntimeVariantAdapter(processors),
             runtime_variant_preset=RuntimeVariantPresetAdapter(processors),
             deployment_revision_preset=DeploymentRevisionPresetAdapter(processors),

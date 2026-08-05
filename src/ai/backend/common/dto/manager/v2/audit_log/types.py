@@ -20,6 +20,7 @@ class AuditLogStatus(StrEnum):
     ERROR = "error"
     UNKNOWN = "unknown"
     RUNNING = "running"
+    DENIED = "denied"
 
 
 class AuditLogOrderField(StrEnum):

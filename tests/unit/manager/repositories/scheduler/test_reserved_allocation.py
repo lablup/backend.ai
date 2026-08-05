@@ -30,8 +30,8 @@ from ai.backend.manager.repositories.scheduler.db_source.db_source import Schedu
 from .conftest import (
     create_pending_session_with_kernels,
     fetch_agent_resources,
-    make_allocation_batch,
     make_creation_info,
+    make_session_allocations,
     seed_agent_resources,
 )
 
@@ -70,12 +70,9 @@ class TestAllocateSessionsReservation:
             access_key=test_access_key,
             agent_assignments=[(test_agent_id, Decimal("2"), Decimal("4096"))],
         )
-        batch = make_allocation_batch(
+        batch = make_session_allocations(
             session_id=session_id,
-            scaling_group_name=test_scaling_group_name,
-            resource_group_id=test_scaling_group_id,
-            access_key=test_access_key,
-            kernel_assignments=[(kernel_ids[0], test_agent_id, Decimal("2"), Decimal("4096"))],
+            kernel_assignments=[(kernel_ids[0], test_agent_id)],
         )
 
         db_source = ScheduleDBSource(db_with_cleanup)
@@ -135,14 +132,11 @@ class TestAllocateSessionsReservation:
                 (test_agent_id, Decimal("3"), Decimal("2048")),
             ],
         )
-        batch = make_allocation_batch(
+        batch = make_session_allocations(
             session_id=session_id,
-            scaling_group_name=test_scaling_group_name,
-            resource_group_id=test_scaling_group_id,
-            access_key=test_access_key,
             kernel_assignments=[
-                (kernel_ids[0], test_agent_id, Decimal("2"), Decimal("4096")),
-                (kernel_ids[1], test_agent_id, Decimal("3"), Decimal("2048")),
+                (kernel_ids[0], test_agent_id),
+                (kernel_ids[1], test_agent_id),
             ],
         )
 
@@ -192,12 +186,9 @@ class TestAllocateSessionsReservation:
             access_key=test_access_key,
             agent_assignments=[(test_agent_id, Decimal("2"), Decimal("4096"))],
         )
-        batch = make_allocation_batch(
+        batch = make_session_allocations(
             session_id=session_id,
-            scaling_group_name=test_scaling_group_name,
-            resource_group_id=test_scaling_group_id,
-            access_key=test_access_key,
-            kernel_assignments=[(kernel_ids[0], test_agent_id, Decimal("2"), Decimal("4096"))],
+            kernel_assignments=[(kernel_ids[0], test_agent_id)],
         )
 
         db_source = ScheduleDBSource(db_with_cleanup)
@@ -243,12 +234,9 @@ class TestAllocateSessionsReservation:
             access_key=test_access_key,
             agent_assignments=[(test_agent_id, Decimal("2"), Decimal("4096"))],
         )
-        batch = make_allocation_batch(
+        batch = make_session_allocations(
             session_id=session_id,
-            scaling_group_name=test_scaling_group_name,
-            resource_group_id=test_scaling_group_id,
-            access_key=test_access_key,
-            kernel_assignments=[(kernel_ids[0], test_agent_id, Decimal("2"), Decimal("4096"))],
+            kernel_assignments=[(kernel_ids[0], test_agent_id)],
         )
 
         db_source = ScheduleDBSource(db_with_cleanup)
@@ -310,22 +298,16 @@ class TestAllocateSessionsReservation:
             agent_assignments=[(test_agent_id, Decimal("3"), Decimal("4096"))],
         )
 
-        batch_a = make_allocation_batch(
+        batch_a = make_session_allocations(
             session_id=session_a,
-            scaling_group_name=test_scaling_group_name,
-            resource_group_id=test_scaling_group_id,
-            access_key=test_access_key,
-            kernel_assignments=[(kernels_a[0], test_agent_id, Decimal("3"), Decimal("4096"))],
+            kernel_assignments=[(kernels_a[0], test_agent_id)],
         )
-        batch_b = make_allocation_batch(
+        batch_b = make_session_allocations(
             session_id=session_b,
-            scaling_group_name=test_scaling_group_name,
-            resource_group_id=test_scaling_group_id,
-            access_key=test_access_key,
-            kernel_assignments=[(kernels_b[0], test_agent_id, Decimal("3"), Decimal("4096"))],
+            kernel_assignments=[(kernels_b[0], test_agent_id)],
         )
         # Combine both session allocations into one batch.
-        batch_a.allocations.extend(batch_b.allocations)
+        batch_a.extend(batch_b)
 
         db_source = ScheduleDBSource(db_with_cleanup)
         result = await db_source.allocate_sessions(batch_a)
@@ -373,12 +355,9 @@ class TestReservedOnlyRelease:
             access_key=access_key,
             agent_assignments=[(agent_id, cpu, mem)],
         )
-        batch = make_allocation_batch(
+        batch = make_session_allocations(
             session_id=session_id,
-            scaling_group_name=scaling_group_name,
-            resource_group_id=resource_group_id,
-            access_key=access_key,
-            kernel_assignments=[(kernel_ids[0], agent_id, cpu, mem)],
+            kernel_assignments=[(kernel_ids[0], agent_id)],
         )
         result = await ScheduleDBSource(db).allocate_sessions(batch)
         assert result == [session_id]

@@ -9,8 +9,9 @@ from datetime import datetime
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.types import PreemptionOrder
 
-from .types import PreemptionMode, PreemptionOrder, SchedulerType
+from .types import PreemptionMode, SchedulerType
 
 __all__ = (
     "PreemptionConfigInfo",

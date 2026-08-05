@@ -99,7 +99,7 @@ would be:
    # NOTE: You cannot use network alias here. Write the actual IP address.
    rpc-listen-addr = { host = "10.20.30.10", port = 6001 }
    # id = "i-something-special"
-   scaling-group = "default"
+   initial-resource-group-name = "default"
    pid-file = "/home/bai/agent/agent.pid"
    event-loop = "uvloop"
    # allow-compute-plugins = ["ai.backend.accelerator.cuda_open"]

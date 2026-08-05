@@ -16,8 +16,11 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, foreign, joinedload, mapped_column, relationship, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
+from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -150,8 +153,8 @@ class UserRow(Base):  # type: ignore[misc]
     uuid: Mapped[uuid_mod.UUID] = mapped_column(
         "uuid", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    username: Mapped[str | None] = mapped_column(
-        "username", sa.String(length=64), unique=True, nullable=True
+    username: Mapped[str] = mapped_column(
+        "username", sa.String(length=64), unique=True, nullable=False
     )
     email: Mapped[str] = mapped_column(
         "email", sa.String(length=64), index=True, nullable=False, unique=True
@@ -190,10 +193,18 @@ class UserRow(Base):  # type: ignore[misc]
     integration_id: Mapped[str | None] = mapped_column(
         "integration_id", sa.String(length=512), nullable=True
     )
+    #: Deprecated: use ``domain_id``.
     domain_name: Mapped[str | None] = mapped_column(
         "domain_name",
         sa.String(length=64),
         sa.ForeignKey("domains.name"),
+        index=True,
+        nullable=True,
+    )
+    domain_id: Mapped[DomainID | None] = mapped_column(
+        "domain_id",
+        GUID,
+        sa.ForeignKey("domains.id"),
         index=True,
         nullable=True,
     )
@@ -297,6 +308,14 @@ class UserRow(Base):  # type: ignore[misc]
         back_populates="user_row",
         primaryjoin=_get_role_assignments_join_condition,
     )
+
+    @classmethod
+    def scope_id_expr(cls) -> SQLColumnExpression[ScopeID]:
+        return cls.uuid
+
+    @classmethod
+    def scope_name_expr(cls) -> SQLColumnExpression[str]:
+        return cls.username
 
     @classmethod
     def load_keypairs(cls) -> _AbstractLoad:
@@ -419,6 +438,7 @@ class UserRow(Base):  # type: ignore[misc]
             created_at=self.created_at,
             modified_at=self.modified_at,
             domain_name=self.domain_name,
+            domain_id=self.domain_id,
             role=self.role,
             resource_policy=self.resource_policy,
             allowed_client_ip=[str(ip) for ip in self.allowed_client_ip]

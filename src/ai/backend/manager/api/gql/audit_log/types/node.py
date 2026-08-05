@@ -13,7 +13,6 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.audit_log.response import AuditLogNode
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -38,6 +37,7 @@ class AuditLogStatusGQL(StrEnum):
     ERROR = "error"
     UNKNOWN = "unknown"
     RUNNING = "running"
+    DENIED = "denied"
 
 
 @gql_node_type(
@@ -61,7 +61,7 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
     )
     acted_as: UUID | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description=(
                 "UUID of the effective (acting) user the action ran as. "
                 "Differs from triggered_by only while a super admin is impersonating a target."
@@ -101,7 +101,7 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description=(
                 "The effective (acting) user the action ran as, resolved from acted_as UUID. "
                 "Differs from user only while a super admin is impersonating a target."

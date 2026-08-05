@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid as uuid_mod
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, cast
@@ -12,6 +13,8 @@ import sqlalchemy as sa
 from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common.exception import BackendAIError, UserNotFound
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -24,7 +27,7 @@ from ai.backend.manager.data.auth.login_session_types import (
     LoginSessionData,
     LoginSessionStatus,
 )
-from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
+from ai.backend.manager.data.auth.types import GroupMembershipData, UserCreationData, UserData
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.errors.auth import (
@@ -32,9 +35,10 @@ from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     GroupMembershipNotFoundError,
     LoginSessionNotFoundError,
-    UserCreationError,
 )
 from ai.backend.manager.errors.common import InternalServerError
+from ai.backend.manager.errors.user import UserCreationBadRequest
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
@@ -51,13 +55,10 @@ from ai.backend.manager.models.user import (
     users,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.pagination import NoPagination
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
-from ai.backend.manager.repositories.permission_controller.role_manager import (
-    RoleManager,
-    UserSystemRoleSpec,
-)
+from ai.backend.manager.repositories.ops.rbac.provider import FullUserCreation, RBACOpsProvider
+from ai.backend.manager.repositories.user.creators import UserCreatorSpec, UserScopeCreation
 
 auth_db_source_resilience = Resilience(
     policies=[
@@ -98,10 +99,11 @@ class AuthDBSource:
     """
 
     _db: ExtendedAsyncSAEngine
+    _rbac_ops_provider: RBACOpsProvider
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
-        self._role_manager = RoleManager()
+        self._rbac_ops_provider = RBACOpsProvider(db)
 
     @auth_db_source_resilience.apply()
     async def fetch_group_membership(self, group_id: UUID, user_id: UUID) -> GroupMembershipData:
@@ -136,44 +138,37 @@ class AuthDBSource:
     @auth_db_source_resilience.apply()
     async def insert_user_with_keypair(
         self,
-        user_data: dict[str, Any],
-        keypair_data: dict[str, Any],
-    ) -> UserData:
-        """Insert a new user with the default keypair."""
-        async with self._db.begin_session_read_committed() as db_session:
-            conn = await db_session.connection()
-
-            # Create user
-            query = users.insert().values(user_data)
-            result = await conn.execute(query)
-            if result.rowcount == 0:
-                raise UserCreationError("Failed to create user")
-
-            # Get created user
-            user_query = users.select().where(users.c.email == user_data["email"])
-            result = await conn.execute(user_query)
-            user_row = result.first()
-            if user_row is None:
-                raise UserCreationError("Failed to retrieve created user")
-
-            # Create keypair
-            keypair_data["user"] = user_row.uuid
-            keypair_query = keypairs.insert().values(keypair_data)
-            await conn.execute(keypair_query)
-
-            # Create RBAC system role and map user to role
-            role_spec = UserSystemRoleSpec(user_id=user_row.uuid)
-            role = await self._role_manager.create_system_role(db_session, role_spec)
-            user_role_creator = Creator(
-                spec=UserRoleCreatorSpec(user_id=user_row.uuid, role_id=role.id)
+        user_spec: UserCreatorSpec,
+        project_ids: Collection[ProjectID],
+        *,
+        keypair_resource_policy: str,
+        keypair_rate_limit: int,
+    ) -> UserCreationData:
+        """Provision a signup user in one transaction: the row, its default keypair,
+        and its domain/project (model-store included) scope enrollments."""
+        async with self._rbac_ops_provider.write_ops() as w:
+            domain_result = await w.batch_query_in_global(
+                sa.select(DomainRow.id).where(DomainRow.name == user_spec.domain_name),
+                BatchQuerier(pagination=NoPagination()),
             )
-            await execute_creator(db_session, user_role_creator)
+            if not domain_result.rows:
+                raise UserCreationBadRequest(f"Domain '{user_spec.domain_name}' does not exist.")
+            domain_id = DomainID(domain_result.rows[0].id)
+            user_spec.domain_id = domain_id
 
-            # Provision roles from active user-scope presets and assign the
-            # auto_assign ones to the new user.
-            await self._role_manager.create_preset_roles_for_user(db_session, user_row.uuid)
-
-            return self._user_row_to_data(user_row)
+            result = await w.create_full_user(
+                FullUserCreation(
+                    creation=UserScopeCreation(spec=user_spec),
+                    domain_id=domain_id,
+                    project_ids=project_ids,
+                    keypair_resource_policy=keypair_resource_policy,
+                    keypair_rate_limit=keypair_rate_limit,
+                )
+            )
+            return UserCreationData(
+                user=self._user_row_to_data(result.user_row),
+                keypair=result.keypair_row.to_data(),
+            )
 
     @auth_db_source_resilience.apply()
     async def modify_user_full_name(self, email: str, domain_name: str, full_name: str) -> None:

@@ -41,19 +41,24 @@ from ai.backend.manager.repositories.base import (
     Querier,
 )
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 from ai.backend.manager.repositories.role_preset.creators import (
     RolePermissionPresetDependentCreatorSpec,
     RolePresetCreatorSpec,
 )
+from ai.backend.manager.repositories.role_preset.purgers import (
+    RolePermissionPresetPurgerSpec,
+    RolePresetPurgerSpec,
+)
+from ai.backend.manager.repositories.role_preset.updaters import RolePresetUpdaterSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class RolePresetDBSource:
-    _ops: DBOpsProvider
+    _ops: RBACOpsProvider
 
-    def __init__(self, ops_provider: DBOpsProvider) -> None:
+    def __init__(self, ops_provider: RBACOpsProvider) -> None:
         self._ops = ops_provider
 
     async def create(
@@ -62,6 +67,8 @@ class RolePresetDBSource:
         permission_creator_specs: Sequence[RolePermissionPresetDependentCreatorSpec],
     ) -> RolePresetData:
         async with self._ops.write_ops() as w:
+            if creator_spec.role_name_template is not None:
+                w.validate_role_name_template(creator_spec.role_name_template)
             created = await w.create(Creator(spec=creator_spec))
             preset_row = created.row
             if permission_creator_specs:
@@ -108,6 +115,9 @@ class RolePresetDBSource:
         updater: Updater[RolePresetRow],
     ) -> RolePresetData:
         async with self._ops.write_ops() as w:
+            spec = updater.spec
+            if isinstance(spec, RolePresetUpdaterSpec) and spec.role_name_template.is_update():
+                w.validate_role_name_template(spec.role_name_template.value())
             result = await w.update(updater)
             if result is None:
                 raise RolePresetNotFound(f"Role preset with ID {updater.pk_value} not found.")
@@ -125,14 +135,14 @@ class RolePresetDBSource:
 
     async def purge(self, preset_id: RolePresetID) -> bool:
         async with self._ops.write_ops() as w:
-            result = await w.purge(Purger(row_class=RolePresetRow, pk_value=preset_id))
+            result = await w.purge(Purger(spec=RolePresetPurgerSpec(preset_id=preset_id)))
             return result is not None
 
     async def bulk_purge(
         self,
         ids: Sequence[RolePresetID],
     ) -> RolePresetBulkPurgeResult:
-        purgers = [Purger(row_class=RolePresetRow, pk_value=preset_id) for preset_id in ids]
+        purgers = [Purger(spec=RolePresetPurgerSpec(preset_id=preset_id)) for preset_id in ids]
         async with self._ops.write_ops() as w:
             result = await w.bulk_purge_partial(purgers)
         successes = [row.to_data() for row in result.successes]
@@ -155,7 +165,10 @@ class RolePresetDBSource:
         self,
         ids: Sequence[RolePermissionPresetID],
     ) -> RolePermissionPresetBulkRemoveResult:
-        purgers = [Purger(row_class=RolePermissionPresetRow, pk_value=perm_id) for perm_id in ids]
+        purgers = [
+            Purger(spec=RolePermissionPresetPurgerSpec(permission_preset_id=perm_id))
+            for perm_id in ids
+        ]
         async with self._ops.write_ops() as w:
             result = await w.bulk_purge_partial(purgers)
         successes = [row.to_data() for row in result.successes]

@@ -1,4 +1,5 @@
-from collections.abc import Mapping, Set
+import re
+from collections.abc import Mapping, Sequence, Set
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Self
@@ -30,6 +31,10 @@ class LabelMatcher:
     @classmethod
     def regex(cls, value: str) -> Self:
         return cls(value=value, operator=LabelOperator.REGEX)
+
+
+def regex_union(values: Sequence[str]) -> str:
+    return "|".join(re.escape(value).replace(r"\-", "-") for value in values)
 
 
 def _escape_label_value(value: str) -> str:

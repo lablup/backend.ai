@@ -757,31 +757,84 @@ the ``.tmp`` directory under the working copy root a tmpfs partition:
 Making a new release
 ~~~~~~~~~~~~~~~~~~~~
 
-* Update ``./VERSION`` file to set a new version number. (Remove the ending new
-  line, e.g., using ``set noeol`` in Vim.  This is also configured in
-  ``./editorconfig``)
+Every release is made by ``scripts/release.sh``.
+It writes ``VERSION``, consumes the news fragments into the version changelog,
+regenerates the sample configs and the API schema dumps, keeps the
+maintained-version registry in step, and leaves the result as a
+``release: <version>`` commit on a ``release/<version>`` branch.
+Do not edit ``VERSION`` or run towncrier by hand.
 
-* Run ``LOCKSET=towncrier/3.13.7 ./py -m towncrier`` to auto-generate the changelog.
+.. code-block:: console
 
-  - You may append ``--draft`` to see a preview of the changelog update without
-    actually modifying the filesystem.
+   $ scripts/release.sh 26.9.0rc1        # cut the 26.9 line off main
+   $ scripts/release.sh --lts 26.9.0rc1  # ... as a long-term support line
+   $ scripts/release.sh 26.9.0           # final release, on the 26.9 branch
+   $ scripts/release.sh 26.9.1           # patch release, on the 26.9 branch
 
-  - (WIP: `lablup/backend.ai#427 <https://github.com/lablup/backend.ai/pull/427>`_).
+The target version string alone tells the script what kind of release this is,
+so nothing has to be classified by hand.
 
-  - Alternatively, you can use the following command to automatically fetch the Python interpreter version
-    from ``pants.toml`` and generate the changelog:
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
 
-    .. code-block:: console
+   * - Target
+     - Run on
+     - What it is
+   * - ``X.Y.0rc1``
+     - ``main``
+     - Feature completion for ``X.Y``: this rc cuts the release line.  It is the
+       only target that registers ``X.Y`` in
+       ``.github/maintained-versions.yml``, and therefore the only one that
+       takes ``--lts``.  See `Making a new release branch`_.
+   * - later rcs, ``X.Y.0``, ``X.Y.Z``
+     - ``X.Y``
+     - Released from the version branch.  The fixes in it arrived as backports
+       from ``main``.
 
-       $ ./py -m towncrier --version $(yq '.python.interpreter_constraints[0] | split("==") | .[1]' pants.toml)
+What the script does, in the order that matters:
 
-* Make a new git commit with the commit message: "release: <version>".
+* ``VERSION`` is set to the target.  It records **the version that tree released
+  last**, so it always matches a tag; it is never a development placeholder.
 
-* Make an annotated tag to the commit with the message: "Release v<version>"
-  or "Pre-release v<version>" depending on the release version.
+* ``NEXT_RELEASE_VERSION`` references (``src/ai/backend/common/meta/meta.py``)
+  are frozen to the target, then ``pants fix``/``fmt`` clean up.  This is skipped
+  for pre-releases (``rc``/``a``/``b``/``dev``/``post``) so the placeholder
+  survives until the stable release is cut.
 
-* Push the commit and tag.  The GitHub Actions workflow will build the packages
-  and publish them to PyPI.
+* The news fragments in ``changes/`` are consumed into ``CHANGELOG/X.Y.md`` --
+  one changelog file per version branch, so two versions releasing on the same
+  day cannot conflict.  towncrier is skipped entirely when there is no fragment
+  to consume.  The root ``CHANGELOG.md`` archives the releases made before the
+  split and is never written to again.
+
+* ``.github/scripts/update-maintained-versions.sh`` registers the line when the
+  target is the ``X.Y.0rc1`` that cuts it, and retires the lines that are due in
+  the same pass.  Report its output: a retirement means that version stops
+  receiving backports and drops out of the installer channel selection.  See
+  :doc:`/dev/version-management-and-upgrades`.
+
+* After a sprint release (``X.Y.0``), ``NEXT_RELEASE_VERSION`` is advanced to the
+  next sprint as a separate ``chore:`` commit.  Set ``NEXT_DEV_VERSION`` to
+  override the computed default (e.g. ``NEXT_DEV_VERSION=27.1.0`` for a year
+  rollover).
+
+Then, by hand:
+
+* Open a pull request from ``release/<version>``.  Keep the ``release:`` title
+  prefix -- it is what excludes the PR from the news-fragment check and turns on
+  the release path in CI.
+
+* For a final release, consolidate the rc heading blocks of the same version into
+  the final one in ``CHANGELOG/X.Y.md`` before merging, so the released version's
+  notes are complete on their own.
+
+* After the merge, tag the merge commit with the bare version (``26.9.0``, no
+  ``v`` prefix, lightweight) and push the tag.  **Pushing the tag is what
+  publishes the release**: it triggers ``ci.yml``'s ``make-final-release``, which
+  builds the wheels and SCIEs and uploads them to the GitHub Release and PyPI.
+  Later rc tags are published the same way; the ``X.Y.0rc1`` that cuts a line is
+  the one exception -- a workflow tags it, as in `Making a new release branch`_.
 
 * When making a new major release, snapshot of prior release's final DB migration history
   should be dumped. This will later help to fill out missing gaps of DB revisions when
@@ -801,13 +854,113 @@ Making a new release
 Making a new release branch
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-This example shows the case when the current release is 24.03 and the next upcoming release is 24.09.
-It makes the main branch to stand for the upcoming release 24.09, by branching out the current release 24.03.
+A version branch is named ``YY.S`` -- the year and the sprint number, like
+``26.8``.  It is not created ahead of a release: **cutting the line and releasing
+its first rc are one action.**
 
-* Make a new git branch for the current release in the ``YY.MM`` format (like ``24.03``) from the main branch.
+* Run ``scripts/release.sh [--lts] X.Y.0rc1`` on ``main`` and merge the resulting
+  pull request, as in `Making a new release`_.  That single PR already contains
+  everything the branch needs: ``VERSION``, the frozen
+  ``NEXT_RELEASE_VERSION``, the regenerated schema dumps, ``CHANGELOG/X.Y.md``,
+  and the registry entry for ``X.Y``.
 
-* Update ``./VERSION`` file to indicate the next development version (like ``24.09.0dev0``).
+* Nothing is tagged or branched by hand.  On the merge, the
+  ``create-version-branch.yml`` workflow reads the ``release: X.Y.0rc1`` subject
+  of the merge commit and creates the tag ``X.Y.0rc1`` **and** the branch ``X.Y``
+  at that same commit in one push.  The branch therefore starts with zero commits
+  of its own, and ``X.Y.0rc1`` is a common ancestor of both branches -- never
+  tagged again from the branch.  A tag or branch that is already there is never
+  moved: the workflow fails instead, and cutting the line again means deleting
+  them first.
 
+* Nothing else is done to ``main``.  It keeps developing the next version, and
+  the release script has already pointed ``NEXT_RELEASE_VERSION`` at it.
+
+From the cut onwards the two branches follow different rules:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - On the version branch
+     - Why
+   * - Fixes arrive as backport pull requests from ``main``, never as direct
+       commits.
+     - Every change lands on ``main`` first; see
+       :doc:`/dev/version-management-and-upgrades`.
+   * - The GraphQL schema may be added to, but not broken.
+     - The ``supergraph.graphql`` published at the ``X.Y.0rc1`` tag is the lower
+       bound the WebUI builds against for the whole line.
+   * - Write the literal version the branch will ship (``added_version="X.Y.Z"``)
+       instead of ``NEXT_RELEASE_VERSION``.
+     - The branch inherited a placeholder pointing at a version it never
+       releases.  CI rejects newly added references and leaves existing ones
+       alone.
+   * - The WebUI bundle is pinned by its own ``chore: update webui to <x>`` pull
+       request.
+     - A release commit simply carries whatever bundle the branch holds, so the
+       WebUI never blocks a release.
+
+Finally, add the new branch to the repository ruleset below.
+
+Version branch rulesets
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Backport pull requests are opened with auto-merge on, so a version branch
+without required status checks would merge them untested.  Every maintained
+version branch is therefore covered by the ``Standard merge rule`` ruleset on the
+repository's *Settings* / *Rules* / *Rulesets* page -- the same one that protects
+``main``:
+
+.. code-block:: console
+
+   $ gh api repos/lablup/backend.ai/rulesets --jq '.[] | "\(.id)\t\(.name)"'
+   $ gh api repos/lablup/backend.ai/rulesets/<id>
+
+Keep its ref-name list in step with ``.github/maintained-versions.yml``: add
+``refs/heads/X.Y`` when the line is cut, drop it when the line retires.
+
+Required status checks:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 35 30 35
+
+   * - Check
+     - Workflow
+     - Covers
+   * - ``lint-and-typecheck``
+     - ``ci.yml``
+     - Lint, BUILD files, typecheck
+   * - ``test-unit-gate``, ``test-component-gate``, ``test-integration-gate``
+     - ``ci.yml``
+     - The three test tiers
+   * - ``check-alembic-migrations``
+     - ``ci.yml``
+     - No pending model changes without a migration
+   * - ``towncrier``
+     - ``timeline-check.yml``
+     - A news fragment exists (``release:`` pull requests are exempt)
+   * - ``GraphQL Inspector``
+     - ``update-api-schema.yml``
+     - The additive-only schema rule.  This is the check run the
+       ``graphql-hive/graphql-inspector`` action publishes, which carries the
+       verdict -- not the ``graphql-inspector`` job that hosts it.  Its escape
+       hatch is the action's built-in ``approved-breaking-change`` label, which
+       has to be created on the repository the first time a breaking change is
+       approved.
+
+.. note::
+
+   ``update-api-schema.yml`` only runs on pull requests touching
+   ``src/ai/backend/manager/models/**``, ``src/ai/backend/manager/api/**`` or
+   ``VERSION``.  A required check that never reports leaves the pull request
+   pending forever, so ``GraphQL Inspector`` can be marked required only once it
+   reports on every pull request -- the way ``ci.yml`` does it with its
+   ``test-*-gate`` jobs.
+
+The rest of the ruleset matches ``main``: squash merges only, linear history, one
+approving review, and no branch deletion or force push.
 
 Backporting to legacy per-pkg repositories
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -80,7 +80,8 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     ReplaceResourceGroupDefaultSessionOptionsPayload as ReplaceResourceGroupDefaultSessionOptionsPayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.types import PreemptionOrder
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -161,18 +162,18 @@ class PreemptionModeGQL(StrEnum):
     RESCHEDULE = "reschedule"
 
 
-@gql_enum(
+PreemptionOrderGQL: type[PreemptionOrder] = gql_enum(
     BackendAIGQLMeta(
         added_version="26.3.0",
-        description="Tie-breaking order for same-priority sessions during preemption.",
+        description=(
+            "Victim selection order for preemption. OLDEST/NEWEST break "
+            "same-priority ties by start time; FEWEST_SESSIONS evicts the "
+            "fewest sessions; SMALLEST_RESOURCES reclaims the least resources."
+        ),
     ),
+    PreemptionOrder,
     name="PreemptionOrder",
 )
-class PreemptionOrderGQL(StrEnum):
-    """Preemption order enumeration for GraphQL."""
-
-    OLDEST = "oldest"
-    NEWEST = "newest"
 
 
 @gql_pydantic_type(
@@ -188,22 +189,20 @@ class PreemptionConfigGQL(PydanticOutputMixin[PreemptionConfigInfo]):
 
     enabled: bool = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description="Whether preemption is enabled for this resource group (opt-in).",
         )
     )
     preemptible_priority: int = gql_field(
         description="Sessions with priority <= this value are eligible for preemption."
     )
-    order: PreemptionOrderGQL = gql_field(
-        description="Tie-breaking order for same-priority sessions during preemption."
-    )
+    order: PreemptionOrderGQL = gql_field(description="Victim selection order for preemption.")
     mode: PreemptionModeGQL = gql_field(
         description="How to preempt a session when preemption is triggered."
     )
     preemption_min_runtime: float = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description=(
                 "Minimum session runtime in seconds before it becomes preemptible (0 = disabled)."
             ),
@@ -325,13 +324,21 @@ class ResourceInfoGQL(PydanticOutputMixin[ResourceInfoNode]):
 @gql_node_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
-        description="Resource group with structured configuration",
+        description=(
+            "Resource group with structured configuration."
+            " Since 26.8.0, the node id value is the resource group UUID"
+            " instead of the name."
+        ),
     ),
     name="ResourceGroup",
 )
 class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
-    id: NodeID[str] = gql_field(
-        description="Relay-style global node identifier for the resource group"
+    id: NodeID[UUID] = gql_field(
+        description=(
+            "Relay-style global node identifier for the resource group."
+            " Since 26.8.0, the underlying value is the resource group UUID"
+            " instead of the name."
+        )
     )
     name: str = gql_field(
         description="Unique name identifying the resource group. Used as primary key and referenced by agents, sessions, and resource presets."
@@ -387,7 +394,9 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[ResourceGroupGQL | None]:
-        return await info.context.data_loaders.resource_group_loader.load_many(node_ids)
+        return await info.context.data_loaders.resource_group_by_id_loader.load_many([
+            ResourceGroupID(UUID(nid)) for nid in node_ids
+        ])
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -440,6 +449,7 @@ class ResourceGroupFilterGQL(PydanticInputMixin[ResourceGroupFilterDTO]):
     description: StringFilter | None = None
     is_active: bool | None = None
     is_public: bool | None = None
+    is_default: bool | None = None
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -466,7 +476,7 @@ class PreemptionConfigInput(PydanticInputMixin[PreemptionConfigInputDTO]):
 
     enabled: bool = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description="Whether preemption is enabled for this resource group (opt-in). Default is false.",
         ),
         default=False,
@@ -475,7 +485,7 @@ class PreemptionConfigInput(PydanticInputMixin[PreemptionConfigInputDTO]):
         description="Sessions with priority <= this value are preemptible. Default is 5.", default=5
     )
     order: PreemptionOrderGQL = gql_field(
-        description="Tie-breaking order for same-priority sessions (OLDEST, NEWEST). Default is OLDEST.",
+        description="Victim selection order for preemption. Default is OLDEST.",
         default=PreemptionOrderGQL.OLDEST,
     )
     mode: PreemptionModeGQL = gql_field(
@@ -484,7 +494,7 @@ class PreemptionConfigInput(PydanticInputMixin[PreemptionConfigInputDTO]):
     )
     preemption_min_runtime: float = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description=(
                 "Minimum session runtime in seconds before it becomes preemptible "
                 "(0 = disabled). Default is 0."
@@ -654,7 +664,12 @@ class CreateResourceGroupPayloadGQL(PydanticOutputMixin[CreateResourceGroupPaylo
     name="DeleteResourceGroupPayload",
 )
 class DeleteResourceGroupPayloadGQL(PydanticOutputMixin[DeleteResourceGroupPayloadDTO]):
-    id: str = gql_field(description="ID of the deleted resource group.")
+    id: UUID = gql_field(
+        description=(
+            "UUID of the deleted resource group."
+            " Since 26.8.0, the value is the UUID instead of the name."
+        )
+    )
 
 
 # Allow / Disallow types

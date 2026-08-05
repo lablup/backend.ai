@@ -8,6 +8,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.manager.models.base import GUID, Base
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
@@ -15,7 +16,7 @@ if TYPE_CHECKING:
 __all__ = ("LoginClientTypeRow",)
 
 
-class LoginClientTypeRow(Base):  # type: ignore[misc]
+class LoginClientTypeRow(CreatedAtMixin, Base):  # type: ignore[misc]
     __tablename__ = "login_client_types"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -23,12 +24,6 @@ class LoginClientTypeRow(Base):  # type: ignore[misc]
     )
     name: Mapped[str] = mapped_column("name", sa.String(length=64), nullable=False, unique=True)
     description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        nullable=False,
-    )
     modified_at: Mapped[datetime] = mapped_column(
         "modified_at",
         sa.DateTime(timezone=True),

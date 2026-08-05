@@ -12,6 +12,7 @@ from collections.abc import (
     Sequence,
 )
 from dataclasses import dataclass
+from datetime import timedelta
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
@@ -94,6 +95,13 @@ def ensure_all_tables_registered() -> None:
         if module_info.name in _SKIP_SUBPACKAGES:
             continue
         importlib.import_module(f"ai.backend.manager.models.{module_info.name}")
+        # A domain package may keep its __init__ empty (no Row re-export) and
+        # declare its table only in ``row.py``; import it so create_all sees it.
+        if module_info.ispkg:
+            try:
+                importlib.import_module(f"ai.backend.manager.models.{module_info.name}.row")
+            except ModuleNotFoundError:
+                pass
 
 
 pgsql_connect_opts = {
@@ -1072,6 +1080,19 @@ async def populate_fixture(
                                 del row[col.name]
                             else:
                                 row[col.name] = None
+                if isinstance(col.type, sa.Interval):
+                    # asyncpg encodes intervals only from datetime.timedelta.
+                    # Accept a kwargs dict (e.g. {"days": 365}) or a number of
+                    # seconds in the fixture JSON.
+                    for row in rows:
+                        if col.name in row and row[col.name] is not None:
+                            value = row[col.name]
+                            if isinstance(value, timedelta):
+                                continue
+                            if isinstance(value, Mapping):
+                                row[col.name] = timedelta(**value)
+                            else:
+                                row[col.name] = timedelta(seconds=value)
                 if isinstance(col.type, EnumType):
                     for row in rows:
                         if col.name in row:

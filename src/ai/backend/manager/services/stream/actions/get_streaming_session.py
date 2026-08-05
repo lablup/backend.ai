@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, override
 
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.stream.actions.base import StreamAction
@@ -26,8 +27,8 @@ class GetStreamingSessionAction(StreamAction):
 
 @dataclass(frozen=True)
 class GetStreamingSessionActionResult(BaseActionResult):
-    session_id: str
-    kernel_id: str
+    session_id: SessionId
+    kernel_id: KernelId
     kernel_host: str | None
     agent_addr: str | None
     repl_in_port: int
@@ -36,4 +37,4 @@ class GetStreamingSessionActionResult(BaseActionResult):
 
     @override
     def entity_id(self) -> str | None:
-        return self.session_id
+        return str(self.session_id)

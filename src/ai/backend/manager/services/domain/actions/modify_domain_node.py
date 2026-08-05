@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.domain.types import DomainData, UserInfo
@@ -13,8 +14,8 @@ from ai.backend.manager.services.domain.actions.base import DomainAction
 class ModifyDomainNodeAction(DomainAction):
     user_info: UserInfo
     updater: Updater[DomainRow]
-    sgroups_to_add: set[str] | None = None
-    sgroups_to_remove: set[str] | None = None
+    sgroup_ids_to_add: set[ResourceGroupID] | None = None
+    sgroup_ids_to_remove: set[ResourceGroupID] | None = None
 
     @override
     def entity_id(self) -> str | None:

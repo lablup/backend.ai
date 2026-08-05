@@ -41,6 +41,7 @@ class ScalingGroupStatus:
 
     is_active: bool
     is_public: bool
+    is_default: bool
 
 
 @dataclass
@@ -88,7 +89,6 @@ class ScalingGroupSchedulerOptions:
     config: Mapping[str, Any]
     agent_selection_strategy: AgentSelectionStrategy
     agent_selector_config: Mapping[str, Any]
-    enforce_spreading_endpoint_replica: bool
     allow_fractional_resource_fragmentation: bool
     route_cleanup_target_statuses: list[str]
     preemption: PreemptionConfig = dataclasses.field(default_factory=PreemptionConfig)
@@ -101,7 +101,6 @@ class ScalingGroupSchedulerOptions:
             "config": dict(self.config),
             "agent_selection_strategy": self.agent_selection_strategy.value,
             "agent_selector_config": dict(self.agent_selector_config),
-            "enforce_spreading_endpoint_replica": self.enforce_spreading_endpoint_replica,
             "allow_fractional_resource_fragmentation": self.allow_fractional_resource_fragmentation,
             "route_cleanup_target_statuses": self.route_cleanup_target_statuses,
             "preemption": {

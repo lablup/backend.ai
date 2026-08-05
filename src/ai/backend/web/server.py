@@ -26,7 +26,7 @@ from functools import partial
 from http import HTTPStatus
 from pathlib import Path
 from pprint import pprint
-from typing import Any, cast
+from typing import Any, Final, cast
 
 import aiohttp
 import aiohttp_cors
@@ -66,6 +66,7 @@ from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptio
 from ai.backend.common.health_checker.types import ComponentId
 from ai.backend.common.middlewares.exception import general_exception_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
+from ai.backend.common.networking import force_threaded_dns_resolver
 from ai.backend.common.web.session import (
     Session,
     extra_config_headers,
@@ -97,9 +98,9 @@ from . import __version__, user_agent
 from .auth import build_forwarding_headers, fill_forwarding_hdrs_to_api_session, get_client_ip
 from .errors import InvalidAPIConfigurationError, UnexpectedAuthResponseError
 from .proxy import (
+    apollo_router_handler,
     decrypt_payload,
     web_handler,
-    web_handler_with_jwt,
     web_plugin_handler,
     websocket_handler,
 )
@@ -110,6 +111,8 @@ from .stats import WebStats, track_active_handlers, view_stats
 from .template import toml_scalar
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+PROXIED_HTTP_METHODS: Final = ("HEAD", "GET", "PUT", "POST", "PATCH", "DELETE")
 
 
 cache_patterns = {
@@ -1099,6 +1102,11 @@ async def webapp_ctx(
     )
     cors.add(app.router.add_route("POST", "/func/{path:auth/signup}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:auth/signout}", manager_web_handler))
+    # `public` is a reserved anonymous segment in v2 paths (manager `api/rest/v2/AGENTS.md`).
+    for method in PROXIED_HTTP_METHODS:
+        cors.add(
+            app.router.add_route(method, "/func/{path:v2/[^/]+/public/[^/]+$}", anon_web_handler)
+        )
     cors.add(
         app.router.add_route("GET", "/func/{path:stream/kernel/_/events}", manager_web_handler)
     )
@@ -1110,20 +1118,15 @@ async def webapp_ctx(
 
     # Feature flag for using Apollo Router(Graphql Federation)
     if config.apollo_router.enabled:
-        # Use JWT authentication for Apollo Router if enabled, otherwise use HMAC
         supergraph_handler = partial(
-            web_handler_with_jwt,
+            apollo_router_handler,
             endpoint_pool=cast(HealthyEndpointPool, app["apollo_router_pool"]),
         )
         cors.add(app.router.add_route("GET", "/func/admin/gql", supergraph_handler))
         cors.add(app.router.add_route("POST", "/func/admin/gql", supergraph_handler))
 
-    cors.add(app.router.add_route("HEAD", "/func/{path:.*$}", manager_web_handler))
-    cors.add(app.router.add_route("GET", "/func/{path:.*$}", manager_web_handler))
-    cors.add(app.router.add_route("PUT", "/func/{path:.*$}", manager_web_handler))
-    cors.add(app.router.add_route("POST", "/func/{path:.*$}", manager_web_handler))
-    cors.add(app.router.add_route("PATCH", "/func/{path:.*$}", manager_web_handler))
-    cors.add(app.router.add_route("DELETE", "/func/{path:.*$}", manager_web_handler))
+    for method in PROXIED_HTTP_METHODS:
+        cors.add(app.router.add_route(method, "/func/{path:.*$}", manager_web_handler))
     cors.add(app.router.add_route("GET", "/pipeline/{path:stream/.*$}", pipeline_websocket_handler))
     cors.add(app.router.add_route("POST", "/pipeline/{path:.*login/$}", pipeline_login_handler))
     cors.add(app.router.add_route("GET", "/pipeline/{path:.*$}", pipeline_handler))
@@ -1289,6 +1292,7 @@ def main(
     debug: bool,
 ) -> None:
     """Start the webui host service as a foreground process."""
+    force_threaded_dns_resolver()
     # Delete this part when you remove --debug option
     raw_cfg = tomli.loads(Path(config_path).read_text(encoding="utf-8"))
 

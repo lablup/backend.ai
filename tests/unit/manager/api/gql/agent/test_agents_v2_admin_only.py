@@ -14,6 +14,7 @@ from aiohttp import web
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.api.gql.agent.resolver import agents_v2
 from ai.backend.manager.models.user import UserRole
 
@@ -57,6 +58,7 @@ class TestAgentsV2AdminOnly:
             is_superadmin=case.is_superadmin,
             role=case.role,
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
         )
         resolver_fn = agents_v2.base_resolver
         if case.expected == ExpectedResult.FORBIDDEN:

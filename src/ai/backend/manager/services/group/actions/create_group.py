@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.data.permission.types import RBACElementRef
@@ -17,6 +18,7 @@ from ai.backend.manager.services.group.actions.base import (
 class CreateGroupAction(GroupScopeAction):
     creator: Creator[GroupRow]
     _domain_name: str
+    _domain_id: DomainID
 
     @override
     @classmethod
@@ -33,7 +35,7 @@ class CreateGroupAction(GroupScopeAction):
 
     @override
     def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.DOMAIN, self._domain_name)
+        return RBACElementRef(RBACElementType.DOMAIN, str(self._domain_id))
 
 
 @dataclass

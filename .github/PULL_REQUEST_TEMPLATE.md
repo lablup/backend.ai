@@ -8,7 +8,8 @@ and how it affects the users and other developers.
 
 **Checklist:** (if applicable)
 
-- [ ] Milestone metadata specifying the target backport version
+- [ ] Backport targets: a `fix:` PR goes to every version in `.github/maintained-versions.yml` automatically.
+      A `Backport:` line here names the targets instead — some of them, other ones, or `none`.
 - [ ] Mention to the original issue
 - [ ] Installer updates including:
   - Fixtures for db schema changes

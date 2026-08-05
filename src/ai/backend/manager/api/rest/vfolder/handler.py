@@ -120,7 +120,6 @@ from ai.backend.manager.models.vfolder import (
     VFolderOwnershipType,
     VFolderPermission,
     VFolderPermissionSetAlias,
-    VFolderRow,
     VFolderStatusSet,
 )
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
@@ -1516,11 +1515,7 @@ class VFolderHandler:
 
         await self._vfolder.purge_vfolder.wait_for_complete(
             PurgeVFolderAction(
-                purger=RBACEntityPurger(
-                    row_class=VFolderRow,
-                    pk_value=folder_id,
-                    spec=VFolderPurgerSpec(vfolder_id=folder_id),
-                ),
+                purger=RBACEntityPurger(spec=VFolderPurgerSpec(vfolder_id=folder_id)),
             )
         )
 

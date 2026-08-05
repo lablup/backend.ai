@@ -112,6 +112,7 @@ class KeypairResourcePolicyConditions:
     by_max_pending_session_count = make_int_conditions(
         KeyPairResourcePolicyRow.max_pending_session_count
     )
+    by_max_priority = make_int_conditions(KeyPairResourcePolicyRow.max_priority)
 
     # ==================== Keypair Nested Filters ====================
 

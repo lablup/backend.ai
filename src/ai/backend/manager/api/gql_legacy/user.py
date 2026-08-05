@@ -19,6 +19,7 @@ from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
 from ai.backend.common.exception import UserNotFound
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.user.types import (
     UserData,
@@ -50,6 +51,7 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
+from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
 from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
 )
@@ -952,7 +954,9 @@ class UserInput(graphene.InputObjectType):  # type: ignore[misc]
     # When creating, you MUST set all fields.
     # When modifying, set the field to "None" to skip setting the value.
 
-    def to_action(self, email: str, graph_ctx: GraphQueryContext) -> CreateUserAction:
+    def to_action(
+        self, email: str, graph_ctx: GraphQueryContext, domain_id: DomainID
+    ) -> CreateUserAction:
         def value_or_none(value: Any) -> Any | None:
             return value if value is not Undefined else None
 
@@ -986,6 +990,7 @@ class UserInput(graphene.InputObjectType):  # type: ignore[misc]
                     container_gids=value_or_none(self.container_gids),
                 ),
             ),
+            _domain_id=domain_id,
             group_ids=value_or_none(self.group_ids),
         )
 
@@ -1147,7 +1152,12 @@ class CreateUser(graphene.Mutation):  # type: ignore[misc]
         validate_user_mutation_props(props)
 
         graph_ctx: GraphQueryContext = info.context
-        action: CreateUserAction = props.to_action(email, graph_ctx)
+        domain_data = (
+            await graph_ctx.processors.domain.get_domain.wait_for_complete(
+                GetDomainAction(domain_name=str(props.domain_name))
+            )
+        ).data
+        action: CreateUserAction = props.to_action(email, graph_ctx, domain_data.id)
 
         action_result = await graph_ctx.processors.user.create_user.wait_for_complete(action)
         keypair = KeyPair.from_data(action_result.data.keypair)

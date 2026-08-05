@@ -18,9 +18,11 @@ from sqlalchemy.engine import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship
+from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common import msgpack
 from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.domain.types import DomainData
@@ -33,6 +35,7 @@ from ai.backend.manager.models.base import (
     SlugType,
     VFolderHostPermissionColumn,
 )
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -90,7 +93,7 @@ def _get_network_join_condition() -> sa.ColumnElement[bool]:
     return DomainRow.name == foreign(NetworkRow.domain_name)
 
 
-class DomainRow(Base):  # type: ignore[misc]
+class DomainRow(CreatedAtMixin, Base):  # type: ignore[misc]
     __tablename__ = "domains"
 
     name: Mapped[str] = mapped_column(
@@ -105,9 +108,6 @@ class DomainRow(Base):  # type: ignore[misc]
     )
     description: Mapped[str | None] = mapped_column("description", sa.String(length=512))
     is_active: Mapped[bool] = mapped_column("is_active", sa.Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
-    )
     modified_at: Mapped[datetime] = mapped_column(
         "modified_at",
         sa.DateTime(timezone=True),
@@ -140,7 +140,11 @@ class DomainRow(Base):  # type: ignore[misc]
         back_populates="domain",
         foreign_keys="[SessionRow.domain_name]",
     )
-    users: Mapped[list[UserRow]] = relationship("UserRow", back_populates="domain")
+    users: Mapped[list[UserRow]] = relationship(
+        "UserRow",
+        back_populates="domain",
+        foreign_keys="[UserRow.domain_name]",
+    )
     groups: Mapped[list[GroupRow]] = relationship("GroupRow", back_populates="domain")
     sgroup_for_domains_rows: Mapped[list[ScalingGroupForDomainRow]] = relationship(
         "ScalingGroupForDomainRow",
@@ -151,6 +155,14 @@ class DomainRow(Base):  # type: ignore[misc]
         back_populates="domain_row",
         primaryjoin=_get_network_join_condition,
     )
+
+    @classmethod
+    def scope_id_expr(cls) -> SQLColumnExpression[ScopeID]:
+        return cls.id
+
+    @classmethod
+    def scope_name_expr(cls) -> SQLColumnExpression[str]:
+        return cls.name
 
     def to_data(self) -> DomainData:
         return row_to_data(self)

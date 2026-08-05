@@ -1,6 +1,6 @@
 """Tests for the action type system: ActionOperationType, EntityType, and enum enforcement."""
 
-from ai.backend.common.data.permission.types import EntityType, OperationType
+from ai.backend.common.data.permission.types import EntityType, OperationType, Permission
 from ai.backend.manager.actions.action.base import BaseAction
 from ai.backend.manager.actions.types import ActionOperationType
 
@@ -26,19 +26,54 @@ _REPRESENTATIVE_ACTION_CLASSES: list[type[BaseAction]] = [
 
 
 class TestActionOperationType:
-    def test_has_exactly_six_values(self) -> None:
+    def test_has_exactly_nine_values(self) -> None:
         values = list(ActionOperationType)
-        assert len(values) == 6
-        expected = {"get", "search", "create", "update", "delete", "purge"}
+        assert len(values) == 9
+        expected = {
+            "get",
+            "search",
+            "create",
+            "update",
+            "upsert",
+            "delete",
+            "purge",
+            "restore",
+            "lookup",
+        }
         assert {v.value for v in values} == expected
 
     def test_to_permission_operation_mapping(self) -> None:
         assert ActionOperationType.GET.to_permission_operation() == OperationType.READ
         assert ActionOperationType.SEARCH.to_permission_operation() == OperationType.READ
+        assert ActionOperationType.LOOKUP.to_permission_operation() == OperationType.READ
         assert ActionOperationType.CREATE.to_permission_operation() == OperationType.CREATE
         assert ActionOperationType.UPDATE.to_permission_operation() == OperationType.UPDATE
+        assert ActionOperationType.UPSERT.to_permission_operation() == OperationType.CREATE
         assert ActionOperationType.DELETE.to_permission_operation() == OperationType.SOFT_DELETE
         assert ActionOperationType.PURGE.to_permission_operation() == OperationType.HARD_DELETE
+        assert ActionOperationType.RESTORE.to_permission_operation() == OperationType.SOFT_DELETE
+
+    def test_to_permission_mapping(self) -> None:
+        assert ActionOperationType.GET.to_permission() == Permission.READ
+        assert ActionOperationType.SEARCH.to_permission() == Permission.READ
+        assert ActionOperationType.LOOKUP.to_permission() == Permission.READ
+        assert ActionOperationType.CREATE.to_permission() == Permission.CREATE
+        assert ActionOperationType.UPDATE.to_permission() == Permission.UPDATE
+        assert ActionOperationType.DELETE.to_permission() == Permission.SOFT_DELETE
+        assert ActionOperationType.PURGE.to_permission() == Permission.HARD_DELETE
+        assert ActionOperationType.RESTORE.to_permission() == Permission.SOFT_DELETE
+
+    def test_upsert_requires_both_create_and_update(self) -> None:
+        """An upsert may insert or overwrite, so neither bit alone is sufficient."""
+        required = ActionOperationType.UPSERT.to_permission()
+        assert required == Permission.CREATE | Permission.UPDATE
+        assert not Permission.CREATE.covers(required)
+        assert not Permission.UPDATE.covers(required)
+        assert (Permission.CREATE | Permission.UPDATE).covers(required)
+
+    def test_to_permission_covers_every_operation(self) -> None:
+        for op in ActionOperationType:
+            assert op.to_permission() != Permission.NONE
 
     def test_all_values_are_unique(self) -> None:
         values = [v.value for v in ActionOperationType]
@@ -58,7 +93,7 @@ class TestEntityType:
         scope_types = EntityType._scope_types()
         assert scope_types == {EntityType.USER, EntityType.PROJECT, EntityType.DOMAIN}
 
-    def test_resource_types_returns_original_nine(self) -> None:
+    def test_resource_types_returns_expected_set(self) -> None:
         resource_types = EntityType._resource_types()
         expected = {
             EntityType.VFOLDER,
@@ -66,7 +101,7 @@ class TestEntityType:
             EntityType.SESSION,
             EntityType.ARTIFACT,
             EntityType.ARTIFACT_REGISTRY,
-            EntityType.APP_CONFIG,
+            EntityType.APP_CONFIG_FRAGMENT,
             EntityType.NOTIFICATION_CHANNEL,
             EntityType.NOTIFICATION_RULE,
             EntityType.MODEL_DEPLOYMENT,
@@ -88,8 +123,8 @@ class TestEntityType:
 class TestAllActionClassesUseEnums:
     """Verify that representative concrete action classes return proper enum types.
 
-    These tests cover all six ActionOperationType values (GET, SEARCH, CREATE,
-    UPDATE, DELETE, PURGE) via representative concrete action classes.
+    These tests cover the operations concrete actions declare today (GET, SEARCH,
+    CREATE, UPDATE, DELETE, PURGE) via representative concrete action classes.
     """
 
     def test_entity_type_returns_enum(self) -> None:
@@ -109,9 +144,19 @@ class TestAllActionClassesUseEnums:
             )
 
     def test_covers_all_operation_types(self) -> None:
-        """Ensure the representative classes cover all six ActionOperationType values."""
+        """Ensure the representative classes cover every declarable operation.
+
+        ``RESTORE`` and ``UPSERT`` are excluded: no concrete action declares them
+        yet. The existing upsert actions still sit on the legacy base and are
+        re-declared once they move to the v2 bases. ``LOOKUP`` is excluded because
+        only the v2 lookup base declares it, and every class here is a legacy one.
+        """
+        expected = set(ActionOperationType) - {
+            ActionOperationType.RESTORE,
+            ActionOperationType.UPSERT,
+            ActionOperationType.LOOKUP,
+        }
         covered = {cls.operation_type() for cls in _REPRESENTATIVE_ACTION_CLASSES}
-        assert covered == set(ActionOperationType), (
-            f"Not all ActionOperationType values are covered. "
-            f"Missing: {set(ActionOperationType) - covered}"
+        assert covered == expected, (
+            f"Not all ActionOperationType values are covered. Missing: {expected - covered}"
         )

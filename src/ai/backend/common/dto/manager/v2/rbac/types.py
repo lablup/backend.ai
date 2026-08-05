@@ -86,6 +86,7 @@ class RBACElementTypeDTO(StrEnum):
     KEYPAIR = "keypair"
     NOTIFICATION_CHANNEL = "notification_channel"
     NETWORK = "network"
+    IDLE_CHECKER_ASSIGNMENT = "idle_checker_assignment"
     RESOURCE_GROUP = "resource_group"
     CONTAINER_REGISTRY = "container_registry"
     STORAGE_HOST = "storage_host"
@@ -109,6 +110,7 @@ class RBACElementTypeDTO(StrEnum):
     PROJECT_RESOURCE_POLICY = "project_resource_policy"
     ROLE = "role"
     AUDIT_LOG = "audit_log"
+    KERNEL_HISTORY = "kernel:history"
     EVENT_LOG = "event_log"
 
     # Admin page access control

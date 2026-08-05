@@ -32,6 +32,8 @@ from ai.backend.manager.repositories.base import (
     Updater,
     UpdaterSpec,
 )
+from ai.backend.manager.repositories.base.purger import PurgerSpec
+from ai.backend.manager.repositories.base.types import ConflictCheck
 from ai.backend.manager.repositories.ops import DBOpsProvider, ReadOps
 from ai.backend.testutils.db import with_tables
 
@@ -78,6 +80,23 @@ class ParentUpdaterSpec(UpdaterSpec[OpsTestParentRow]):
     @override
     def build_values(self) -> dict[str, Any]:
         return {"name": self.new_name}
+
+
+@dataclass
+class ParentPurgerSpec(PurgerSpec[OpsTestParentRow]):
+    parent_id: int
+
+    @override
+    def row_class(self) -> type[OpsTestParentRow]:
+        return OpsTestParentRow
+
+    @override
+    def pk_value(self) -> int:
+        return self.parent_id
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
 
 
 @dataclass(frozen=True)
@@ -158,7 +177,7 @@ class TestWriteRoundTrip:
         async with provider.write_ops() as w:
             created = await w.create(Creator(spec=ParentCreatorSpec(name="p1", domain_name="d1")))
             parent_id = created.row.id
-            await w.purge(Purger(row_class=OpsTestParentRow, pk_value=parent_id))
+            await w.purge(Purger(spec=ParentPurgerSpec(parent_id=parent_id)))
 
         async with provider.read_ops() as r:
             fetched = await r.query(Querier(row_class=OpsTestParentRow, pk_value=parent_id))

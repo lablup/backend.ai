@@ -33,9 +33,18 @@ jobs:
 
     - name: Check news fragments and assign the PR number
       id: assign_pr_number
+      env:
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        BASE_REF: ${{ github.base_ref }}
       run: |
         pip install tomlkit
-        python scripts/assign-pr-number.py ${{ github.event.pull_request.number }}
+        rename_results=$(python scripts/assign-pr-number.py "$PR_NUMBER" --base-ref "$BASE_REF")
+        echo "rename_results=$rename_results" >> "$GITHUB_OUTPUT"
+        if [ "$rename_results" = "[]" ]; then
+          echo "has_renamed_pairs=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "has_renamed_pairs=true" >> "$GITHUB_OUTPUT"
+        fi
 
     - name: Make commit message for changing change log file
       if: ${{ steps.assign_pr_number.outputs.has_renamed_pairs == 'true' }}

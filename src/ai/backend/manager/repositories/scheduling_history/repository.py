@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -11,8 +12,10 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentHistoryListResult,
+    ReplicaGroupHistoryListResult,
     RouteHistoryListResult,
 )
 from ai.backend.manager.data.kernel.types import (
@@ -21,6 +24,7 @@ from ai.backend.manager.data.kernel.types import (
 from ai.backend.manager.data.session.types import (
     SessionSchedulingHistoryListResult,
 )
+from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.base import BatchQuerier
 
 from .db_source import SchedulingHistoryDBSource
@@ -81,7 +85,7 @@ class SchedulingHistoryRepository:
         """Search session scheduling history within scope."""
         return await self._db_source.search_session_scoped_history(querier, scope)
 
-    # ========== Kernel History ==========
+    # ========== Kernel History (Admin) ==========
 
     @scheduling_history_repository_resilience.apply()
     async def search_kernel_history(
@@ -90,6 +94,25 @@ class SchedulingHistoryRepository:
     ) -> KernelSchedulingHistoryListResult:
         """Search kernel scheduling history with pagination."""
         return await self._db_source.search_kernel_history(querier)
+
+    # ========== Kernel History (Scoped) ==========
+
+    @scheduling_history_repository_resilience.apply()
+    async def resolve_session_id(self, kernel_id: KernelId) -> SessionId:
+        """Return the id of the session owning ``kernel_id``.
+
+        Raises ``KernelNotFound`` when no such kernel exists.
+        """
+        return await self._db_source.resolve_session_id(kernel_id)
+
+    @scheduling_history_repository_resilience.apply()
+    async def search_kernel_scoped_history(
+        self,
+        querier: BatchQuerier,
+        scopes: Sequence[SearchScope],
+    ) -> KernelSchedulingHistoryListResult:
+        """Search kernel history whose rows match any of ``scopes`` (OR)."""
+        return await self._db_source.search_kernel_scoped_history(querier, scopes)
 
     # ========== Deployment History (Admin) ==========
 
@@ -111,6 +134,27 @@ class SchedulingHistoryRepository:
     ) -> DeploymentHistoryListResult:
         """Search deployment history within scope."""
         return await self._db_source.search_deployment_scoped_history(querier, scope)
+
+    # ========== Replica Group History (Admin) ==========
+
+    @scheduling_history_repository_resilience.apply()
+    async def admin_search_replica_group_history(
+        self,
+        querier: BatchQuerier,
+    ) -> ReplicaGroupHistoryListResult:
+        """Search replica-group history with pagination (admin API)."""
+        return await self._db_source.admin_search_replica_group_history(querier)
+
+    # ========== Replica Group History (Scoped) ==========
+
+    @scheduling_history_repository_resilience.apply()
+    async def scoped_search_replica_group_history(
+        self,
+        querier: BatchQuerier,
+        scopes: Sequence[SearchScope],
+    ) -> ReplicaGroupHistoryListResult:
+        """Search replica-group history whose rows match any of ``scopes`` (OR)."""
+        return await self._db_source.scoped_search_replica_group_history(querier, scopes)
 
     # ========== Route History (Admin) ==========
 

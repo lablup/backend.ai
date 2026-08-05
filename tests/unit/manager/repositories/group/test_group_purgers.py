@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -27,6 +28,10 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models import PermissionRow, RoleRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -39,11 +44,15 @@ from ai.backend.manager.models.session import SessionRow, SessionStatus, Session
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
+from ai.backend.manager.repositories.base.rbac.entity_purger import (
+    RBACEntityPurger,
+    execute_rbac_entity_purger,
+)
 from ai.backend.manager.repositories.group.purgers import (
-    GroupBatchPurgerSpec,
     GroupEndpointBatchPurgerSpec,
     GroupKernelBatchPurgerSpec,
     GroupSessionBatchPurgerSpec,
+    ProjectPurgerSpec,
     SessionByIdsBatchPurgerSpec,
 )
 from ai.backend.testutils.db import with_tables
@@ -81,6 +90,9 @@ class TestGroupPurgersIntegration:
                 EndpointRow,
                 ReplicaGroupRow,
                 RoutingRow,
+                RoleRow,
+                PermissionRow,
+                AssociationScopesEntitiesRow,
             ],
         ):
             yield database_connection
@@ -497,9 +509,11 @@ class TestGroupPurgersIntegration:
 
         # Purge group
         async with db_with_cleanup.begin_session() as session:
-            purger = BatchPurger(spec=GroupBatchPurgerSpec(group_id=group_id), batch_size=1)
-            result = await execute_batch_purger(session, purger)
-            assert result.deleted_count == 1
+            purger = RBACEntityPurger(
+                spec=ProjectPurgerSpec(project_id=ProjectID(group_id)),
+            )
+            result = await execute_rbac_entity_purger(session, purger)
+            assert result is not None
 
         # Verify group is deleted
         async with db_with_cleanup.begin_session() as session:

@@ -25,6 +25,7 @@ from ai.backend.manager.repositories.scheduler.repository import SchedulerReposi
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.revision_draft import RevisionDraftReader
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
@@ -64,6 +65,7 @@ class AgentsInput:
     deployment_repository: DeploymentRepository
     deployment_revision_preset_repository: DeploymentRevisionPresetRepository | None
     runtime_variant_repository: RuntimeVariantRepository
+    agent_selector: AgentSelector
 
 
 @dataclass
@@ -110,6 +112,7 @@ class AgentsComposer(DependencyComposer[AgentsInput, AgentsResources]):
                 valkey_schedule=valkey_schedule,
                 network_plugin_ctx=setup_input.network_plugin_ctx,
                 hook_plugin_ctx=setup_input.hook_plugin_ctx,
+                agent_selector=setup_input.agent_selector,
             ),
         )
 

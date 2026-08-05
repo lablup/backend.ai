@@ -34,6 +34,11 @@ def resource_group() -> None:
     help="Filter by active status.",
 )
 @click.option(
+    "--is-default/--no-is-default",
+    default=None,
+    help="Filter by whether the resource group is the default one.",
+)
+@click.option(
     "--order-by",
     multiple=True,
     help="Order by field:direction (e.g., name:asc, created_at:desc).",
@@ -43,6 +48,7 @@ def search(
     offset: int | None,
     name_contains: str | None,
     is_active: bool | None,
+    is_default: bool | None,
     order_by: tuple[str, ...],
 ) -> None:
     """Search resource groups (superadmin only)."""
@@ -54,12 +60,13 @@ def search(
     from ai.backend.common.dto.manager.v2.resource_group.types import ResourceGroupOrderField
 
     filter_dto: ResourceGroupFilter | None = None
-    if name_contains is not None or is_active is not None:
+    if name_contains is not None or is_active is not None or is_default is not None:
         from ai.backend.common.dto.manager.query import StringFilter
 
         filter_dto = ResourceGroupFilter(
             name=StringFilter(contains=name_contains) if name_contains is not None else None,
             is_active=is_active,
+            is_default=is_default,
         )
 
     orders = (

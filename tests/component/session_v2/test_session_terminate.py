@@ -20,7 +20,7 @@ from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.dto.manager.v2.session.request import TerminateSessionsInput
 from ai.backend.common.types import SessionId
-from ai.backend.manager.repositories.scheduler.types.session import MarkTerminatingResult
+from ai.backend.manager.views.sokovan.session import MarkTerminatingResult
 
 if TYPE_CHECKING:
     from .conftest import SessionSeedData

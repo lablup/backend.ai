@@ -25,11 +25,55 @@ from ai.backend.common.message_queue.abc.queue import AbstractMessageQueue
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
+from ai.backend.manager.actions.audit_policy import AuditLogPolicy
+from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
+from ai.backend.manager.actions.v2 import validators as v2_validators
+from ai.backend.manager.actions.v2.bulk.monitor.audit_log import BulkActionAuditLogMonitor
+from ai.backend.manager.actions.v2.bulk.monitor.prometheus import BulkActionPrometheusMonitor
+from ai.backend.manager.actions.v2.bulk.monitor.reporter import BulkActionReporterMonitor
+from ai.backend.manager.actions.v2.bulk.validator.rbac import (
+    VirtualScopeBulkActionRBACValidator,
+)
+from ai.backend.manager.actions.v2.global_scope.monitor.audit_log import (
+    GlobalActionAuditLogMonitor,
+)
+from ai.backend.manager.actions.v2.global_scope.monitor.prometheus import (
+    GlobalActionPrometheusMonitor,
+)
+from ai.backend.manager.actions.v2.global_scope.monitor.reporter import (
+    GlobalActionReporterMonitor,
+)
+from ai.backend.manager.actions.v2.lookup.monitor.audit_log import LookupActionAuditLogMonitor
+from ai.backend.manager.actions.v2.lookup.monitor.prometheus import (
+    LookupActionPrometheusMonitor,
+)
+from ai.backend.manager.actions.v2.scope.monitor.audit_log import ScopeActionAuditLogMonitor
+from ai.backend.manager.actions.v2.scope.monitor.prometheus import ScopeActionPrometheusMonitor
+from ai.backend.manager.actions.v2.scope.monitor.reporter import ScopeActionReporterMonitor
+from ai.backend.manager.actions.v2.scope.validator.rbac import (
+    VirtualScopeScopeActionRBACValidator,
+)
+from ai.backend.manager.actions.v2.single_entity.monitor.audit_log import (
+    SingleEntityActionAuditLogMonitor,
+)
+from ai.backend.manager.actions.v2.single_entity.monitor.prometheus import (
+    SingleEntityActionPrometheusMonitor,
+)
+from ai.backend.manager.actions.v2.single_entity.monitor.reporter import (
+    SingleEntityActionReporterMonitor,
+)
+from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
+    VirtualScopeSingleEntityActionRBACValidator,
+)
 from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import LegacyRBACValidators, RBACValidators
+from ai.backend.manager.actions.validators.rbac import (
+    LegacyRBACValidators,
+    RBACValidators,
+    VirtualScopeRBACValidators,
+)
 from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.legacy import (
     LegacyScopeActionRBACValidator,
@@ -68,12 +112,11 @@ from ai.backend.manager.sokovan.deployment.route.route_controller import RouteCo
 from ai.backend.manager.sokovan.reconciler.coordinator import ReconcilerCoordinator
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
-from ai.backend.manager.types import DistributedLockFactory, SMTPTriggerPolicy
+from ai.backend.manager.types import SMTPTriggerPolicy
 
 from .agent_lost_checker import AgentLostCheckerDependency, AgentLostCheckerInput
 from .bgtask_registry import BgtaskRegistryDependency, BgtaskRegistryInput
 from .event_dispatcher import EventDispatcherDependency, EventDispatcherInput
-from .log_cleanup_timer import LogCleanupTimerDependency, LogCleanupTimerInput
 from .manager_status_watcher import ManagerStatusWatcherDependency, ManagerStatusWatcherInput
 from .processors import ProcessorsDependency, ProcessorsProviderInput
 from .stats_reporter import StatsReporterDependency, StatsReporterInput
@@ -130,9 +173,6 @@ class ProcessingInput:
 
     # BgtaskRegistry creation (additional)
     agent_client_pool: AgentClientPool
-
-    # Log cleanup timer
-    distributed_lock_factory: DistributedLockFactory
 
     # Lifecycle background tasks
     stats_monitor: StatsPluginContext
@@ -227,7 +267,38 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         reporter_hub = ReporterHub(ReporterHubArgs(reporters=action_reporters))
         reporter_monitor = ReporterMonitor(reporter_hub)
         prometheus_monitor = PrometheusMonitor()
-        audit_log_monitor = AuditLogMonitor(setup_input.repositories.audit_log.repository)
+        audit_log_repository = setup_input.repositories.audit_log.repository
+        audit_log_policy = AuditLogPolicy(
+            setup_input.config_provider.config.audit_log.record_read_operations
+        )
+        audit_log_monitor = AuditLogMonitor(audit_log_repository, audit_log_policy)
+        action_monitors = ActionMonitors(
+            legacy=[reporter_monitor, prometheus_monitor, audit_log_monitor],
+            single_entity=[
+                SingleEntityActionReporterMonitor(reporter_hub),
+                SingleEntityActionPrometheusMonitor(),
+                SingleEntityActionAuditLogMonitor(audit_log_repository, audit_log_policy),
+            ],
+            bulk=[
+                BulkActionReporterMonitor(reporter_hub),
+                BulkActionPrometheusMonitor(),
+                BulkActionAuditLogMonitor(audit_log_repository, audit_log_policy),
+            ],
+            scope=[
+                ScopeActionReporterMonitor(reporter_hub),
+                ScopeActionPrometheusMonitor(),
+                ScopeActionAuditLogMonitor(audit_log_repository, audit_log_policy),
+            ],
+            global_scope=[
+                GlobalActionReporterMonitor(reporter_hub),
+                GlobalActionPrometheusMonitor(),
+                GlobalActionAuditLogMonitor(audit_log_repository, audit_log_policy),
+            ],
+            lookup=[
+                LookupActionPrometheusMonitor(),
+                LookupActionAuditLogMonitor(audit_log_repository, audit_log_policy),
+            ],
+        )
 
         ssh_key_validator = SSHKeyValidator()
 
@@ -274,17 +345,34 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             scope=LegacyScopeActionRBACValidator(permission_controller_repository),
             single_entity=LegacySingleEntityActionRBACValidator(permission_controller_repository),
         )
+        virtual_scope_rbac_validators = VirtualScopeRBACValidators(
+            scope=VirtualScopeScopeActionRBACValidator(
+                permission_controller_repository, config_provider
+            ),
+            single_entity=VirtualScopeSingleEntityActionRBACValidator(
+                permission_controller_repository, config_provider
+            ),
+            bulk=VirtualScopeBulkActionRBACValidator(
+                permission_controller_repository, config_provider
+            ),
+        )
 
         processors = await stack.enter_dependency(
             ProcessorsDependency(),
             ProcessorsProviderInput(
                 service_args=service_args,
-                action_monitors=[reporter_monitor, prometheus_monitor, audit_log_monitor],
+                action_monitors=action_monitors,
                 event_hub=setup_input.event_hub,
                 event_fetcher=setup_input.event_fetcher,
                 validators=ActionValidators(
                     rbac=rbac_validators,
                     legacy_rbac=legacy_rbac_validators,
+                    virtual_scope_rbac=virtual_scope_rbac_validators,
+                ),
+                v2_validators=v2_validators.ActionValidators(
+                    single_entity=[virtual_scope_rbac_validators.single_entity],
+                    bulk=[virtual_scope_rbac_validators.bulk],
+                    scope=[virtual_scope_rbac_validators.scope],
                 ),
             ),
         )
@@ -293,6 +381,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         dispatchers = Dispatchers(
             DispatcherArgs(
                 valkey_container_log=setup_input.valkey_container_log,
+                valkey_live=setup_input.valkey_live,
                 valkey_stat=setup_input.valkey_stat,
                 valkey_stream=setup_input.valkey_stream,
                 schedule_coordinator=setup_input.schedule_coordinator,
@@ -316,15 +405,6 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         )
         dispatchers.dispatch(event_dispatcher)
         await event_dispatcher.start()
-
-        # Step 3.5: Create and start log cleanup timer
-        await stack.enter_dependency(
-            LogCleanupTimerDependency(),
-            LogCleanupTimerInput(
-                distributed_lock_factory=setup_input.distributed_lock_factory,
-                event_producer=setup_input.event_producer,
-            ),
-        )
 
         # Step 4: Create BgtaskRegistry
         await stack.enter_dependency(

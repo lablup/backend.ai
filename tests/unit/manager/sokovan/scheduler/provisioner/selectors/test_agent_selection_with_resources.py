@@ -1,30 +1,82 @@
-"""Test agent selection with ResourceRequirements."""
+"""Test batch agent selection (``AgentSelector.select_agents_for_batch_requirements``)."""
 
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, SessionTypes
-from ai.backend.manager.data.sokovan import AgentInfo
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
-    ConcentratedAgentSelector,
+from ai.backend.common.identifier.architecture import ArchName
+from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.types import (
+    AgentId,
+    AgentSelectionStrategy,
+    ClusterMode,
+    PreemptionOrder,
+    SessionId,
 )
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.dispersed import (
-    DispersedAgentSelector,
-)
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
     BatchAgentSelectionFailedError,
+    NoAgentsInResourceGroupError,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import (
+    create_agent_selector,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
-    AgentSelectionConfig,
     AgentSelectionCriteria,
     AgentSelector,
-    KernelResourceSpec,
-    SessionMetadata,
+    PlacementPlan,
 )
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.tracker import AgentStateTracker
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import ResourceRequirements
+from ai.backend.manager.views.sokovan.agent import AgentInfo, AgentLimit
+from ai.backend.manager.views.sokovan.workload import ResourceRequest
+
+NO_LIMIT = AgentLimit(max_container_count=None)
+
+
+def _req(
+    slots: Mapping[str, str],
+    arch: str = "x86_64",
+    containers: int = 1,
+) -> ResourceRequirements:
+    return ResourceRequirements(
+        requested_slots=ResourceRequest(
+            slots={ResourceSlotName(name): Decimal(amount) for name, amount in slots.items()}
+        ),
+        required_architecture=ArchName(arch),
+        container_count=containers,
+    )
+
+
+def _criteria(
+    requirements: list[ResourceRequirements],
+    *,
+    policy: AgentSelectionPolicy = AgentSelectionPolicy.STRICT,
+    designated_agent_ids: list[AgentId] | None = None,
+) -> AgentSelectionCriteria:
+    return AgentSelectionCriteria(
+        session_id=SessionId(uuid.uuid4()),
+        resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
+        requirements=requirements,
+        agent_selection_policy=policy,
+        designated_agent_ids=designated_agent_ids,
+        job_priority=0,
+        victim_candidates=None,
+        session_group=None,
+    )
+
+
+def _trackers(agents: list[AgentInfo]) -> list[AgentStateTracker]:
+    return [AgentStateTracker(original_agent=agent) for agent in agents]
+
+
+def _selector() -> AgentSelector:
+    return create_agent_selector(["cpu", "mem"])
 
 
 class TestAgentSelectionWithResources:
@@ -34,262 +86,231 @@ class TestAgentSelectionWithResources:
         self,
         agents_for_resource_requirements_test: list[AgentInfo],
     ) -> None:
-        """Test single-node selection with aggregated resources."""
-        # Create session metadata
-        session_metadata = SessionMetadata(
-            session_id=SessionId(uuid.uuid4()),
-            session_type=SessionTypes.INTERACTIVE,
-            scaling_group="default",
-            cluster_mode=ClusterMode.SINGLE_NODE,
+        """Single-node placement aggregates the per-kernel requirements."""
+        plan = PlacementPlan.from_items(
+            [
+                _req({"cpu": "4", "mem": "8192"}),
+                _req({"cpu": "2", "mem": "4096"}),
+            ],
+            ClusterMode.SINGLE_NODE,
         )
+        criteria = _criteria(plan.requirements())
 
-        # Create kernel requirements that need aggregation
-        kernel_reqs = {
-            uuid.uuid4(): KernelResourceSpec(
-                requested_slots=ResourceSlot({
-                    "cpu": Decimal("4"),
-                    "mem": Decimal("8192"),
-                }),
-                required_architecture="x86_64",
-            ),
-            uuid.uuid4(): KernelResourceSpec(
-                requested_slots=ResourceSlot({
-                    "cpu": Decimal("2"),
-                    "mem": Decimal("4096"),
-                }),
-                required_architecture="x86_64",
-            ),
-        }
-
-        criteria = AgentSelectionCriteria(
-            session_metadata=session_metadata,
-            kernel_requirements=kernel_reqs,
-        )
-
-        config = AgentSelectionConfig(
-            max_container_count=None,
-            enforce_spreading_endpoint_replica=False,
-        )
-
-        # Use concentrated selector
-        strategy = ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
-        selector = AgentSelector(strategy)
-
-        # Total requested: 6 CPU, 12288 memory
-        # Available resources:
-        # - agent-low: 1 CPU, 2048 memory (insufficient)
-        # - agent-medium: 4 CPU, 8192 memory (insufficient)
-        # - agent-high: 14 CPU, 28672 memory (sufficient)
-
-        # Use batch selection API
-        selections = await selector.select_agents_for_batch_requirements(
-            agents_for_resource_requirements_test,
+        # Total requested: 6 CPU, 12288 mem -> only agent-high fits
+        selections = await _selector().select_agents_for_batch_requirements(
+            AgentSelectionStrategy.CONCENTRATED,
+            _trackers(agents_for_resource_requirements_test),
             criteria,
-            config,
-            designated_agent_ids=None,
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
-        # For single-node, there should be one selection with aggregated resources
         assert len(selections) == 1
-        selected_agent = selections[0].selected_agent
-
-        # Only agent-high has enough resources for aggregated requirements
-        assert selected_agent.agent_id == AgentId("agent-high")
+        assert selections[0].selected_agent.agent_id == AgentId("agent-high")
 
     async def test_multi_node_selection_individual_resources(
         self,
         agents_for_resource_requirements_test: list[AgentInfo],
     ) -> None:
-        """Test multi-node selection with individual kernel resources."""
-        session_metadata = SessionMetadata(
-            session_id=SessionId(uuid.uuid4()),
-            session_type=SessionTypes.BATCH,
-            scaling_group="default",
-            cluster_mode=ClusterMode.MULTI_NODE,
+        """Multi-node placement keeps one selection per kernel requirement."""
+        plan = PlacementPlan.from_items(
+            [
+                _req({"cpu": "1", "mem": "2048"}),
+                _req({"cpu": "3", "mem": "6144"}),
+            ],
+            ClusterMode.MULTI_NODE,
         )
+        criteria = _criteria(plan.requirements())
 
-        # Create kernels with different resource needs
-        kernel_reqs = {
-            uuid.uuid4(): KernelResourceSpec(
-                requested_slots=ResourceSlot({
-                    "cpu": Decimal("1"),
-                    "mem": Decimal("2048"),
-                }),
-                required_architecture="x86_64",
-            ),
-            uuid.uuid4(): KernelResourceSpec(
-                requested_slots=ResourceSlot({
-                    "cpu": Decimal("3"),
-                    "mem": Decimal("6144"),
-                }),
-                required_architecture="x86_64",
-            ),
-        }
-
-        criteria = AgentSelectionCriteria(
-            session_metadata=session_metadata,
-            kernel_requirements=kernel_reqs,
-        )
-
-        config = AgentSelectionConfig(
-            max_container_count=None,
-            enforce_spreading_endpoint_replica=False,
-        )
-
-        # Use dispersed selector for spreading
-        strategy = DispersedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
-        selector = AgentSelector(strategy)
-
-        # Use batch selection API
-        selections = await selector.select_agents_for_batch_requirements(
-            agents_for_resource_requirements_test,
+        selections = await _selector().select_agents_for_batch_requirements(
+            AgentSelectionStrategy.DISPERSED,
+            _trackers(agents_for_resource_requirements_test),
             criteria,
-            config,
-            designated_agent_ids=None,
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
-        # For multi-node, should have 2 selections (one per kernel)
         assert len(selections) == 2
+        assert all(sel.selected_agent.agent_id is not None for sel in selections)
 
-        # Both requirements can be satisfied by any agent
-        # Dispersed selector should prefer agents with more available resources
-        selected_agents = [sel.selected_agent.agent_id for sel in selections]
-        assert all(agent_id is not None for agent_id in selected_agents)
-
-    async def test_designated_agent_with_resource_requirements(
+    async def test_designated_agent_strict_fails_without_capacity(
         self,
         agents_for_designated_agent_test: list[AgentInfo],
     ) -> None:
-        """Test designated agent selection respects resource requirements."""
-        session_metadata = SessionMetadata(
-            session_id=SessionId(uuid.uuid4()),
-            session_type=SessionTypes.INTERACTIVE,
-            scaling_group="default",
-            cluster_mode=ClusterMode.SINGLE_NODE,
+        """STRICT designation narrows the pool first, so the failure reports
+        the designated agent's own resource shortfall."""
+        criteria = _criteria(
+            [_req({"cpu": "4", "mem": "8192"})],
+            policy=AgentSelectionPolicy.STRICT,
+            designated_agent_ids=[AgentId("designated")],
         )
 
-        # Request more than designated agent has
-        kernel_id = uuid.uuid4()
-        kernel_spec = KernelResourceSpec(
-            requested_slots=ResourceSlot({
-                "cpu": Decimal("4"),
-                "mem": Decimal("8192"),
-            }),
-            required_architecture="x86_64",
-        )
-
-        criteria = AgentSelectionCriteria(
-            session_metadata=session_metadata,
-            kernel_requirements={kernel_id: kernel_spec},
-        )
-
-        config = AgentSelectionConfig(max_container_count=None)
-
-        strategy = ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
-        selector = AgentSelector(strategy)
-
-        # Try to select designated agent
         with pytest.raises(BatchAgentSelectionFailedError) as exc_info:
-            await selector.select_agents_for_batch_requirements(
-                agents_for_designated_agent_test,
+            await _selector().select_agents_for_batch_requirements(
+                AgentSelectionStrategy.CONCENTRATED,
+                _trackers(agents_for_designated_agent_test),
                 criteria,
-                config,
-                designated_agent_ids=[AgentId("designated")],
+                NO_LIMIT,
+                PreemptionOrder.OLDEST,
             )
 
-        # Should report a failure because designated agent lacks resources
-        assert len(exc_info.value.errors) == 1
-        message = exc_info.value.errors[0].extra_msg or ""
-        assert "no designated agent is compatible" in message
-        assert "designated agent 'designated'" in message
-        assert "insufficient resources" in message
-        # Aggregated detail lines must be split with newlines, not "; ".
-        assert "; " not in message
-        assert "\n" in message
+        assert len(exc_info.value.failures) == 1
+        failure = exc_info.value.failures[0]
+        # The designated agent survived the exclusion stage but ran out of
+        # resources; the shortfall is measured against it, not "other".
+        assert failure.filter_name == "resource"
+        assert failure.missing_slots
+        assert all(amount > 0 for amount in failure.missing_slots.values())
+
+    async def test_designated_agent_preferred_falls_back(
+        self,
+        agents_for_designated_agent_test: list[AgentInfo],
+    ) -> None:
+        """PREFERRED designation falls back to other compatible agents."""
+        criteria = _criteria(
+            [_req({"cpu": "4", "mem": "8192"})],
+            policy=AgentSelectionPolicy.PREFERRED,
+            designated_agent_ids=[AgentId("designated")],
+        )
+
+        selections = await _selector().select_agents_for_batch_requirements(
+            AgentSelectionStrategy.CONCENTRATED,
+            _trackers(agents_for_designated_agent_test),
+            criteria,
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
+        )
+
+        assert len(selections) == 1
+        assert selections[0].selected_agent.agent_id == AgentId("other")
+
+    async def test_designated_agent_with_capacity_is_selected(
+        self,
+        agents_for_designated_agent_test: list[AgentInfo],
+    ) -> None:
+        """A designated agent with capacity takes precedence over the strategy."""
+        criteria = _criteria(
+            [_req({"cpu": "1", "mem": "1024"})],
+            policy=AgentSelectionPolicy.STRICT,
+            designated_agent_ids=[AgentId("designated")],
+        )
+
+        selections = await _selector().select_agents_for_batch_requirements(
+            AgentSelectionStrategy.CONCENTRATED,
+            _trackers(agents_for_designated_agent_test),
+            criteria,
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
+        )
+
+        assert len(selections) == 1
+        assert selections[0].selected_agent.agent_id == AgentId("designated")
 
     async def test_container_limit_with_resource_requirements(
         self,
         agents_for_container_limit_test: list[AgentInfo],
     ) -> None:
-        """Test that container limits are respected with resource requirements."""
-        kernel_id = uuid.uuid4()
-        kernel_spec = KernelResourceSpec(
-            requested_slots=ResourceSlot({
-                "cpu": Decimal("2"),
-                "mem": Decimal("4096"),
-            }),
-            required_architecture="x86_64",
-        )
+        """Agents at the container limit are excluded from selection."""
+        criteria = _criteria([_req({"cpu": "2", "mem": "4096"})])
 
-        session_metadata = SessionMetadata(
-            session_id=SessionId(uuid.uuid4()),
-            session_type=SessionTypes.BATCH,
-            scaling_group="default",
-            cluster_mode=ClusterMode.SINGLE_NODE,
-        )
-
-        criteria = AgentSelectionCriteria(
-            session_metadata=session_metadata,
-            kernel_requirements={kernel_id: kernel_spec},
-        )
-
-        config = AgentSelectionConfig(
-            max_container_count=10,  # Set limit
-            enforce_spreading_endpoint_replica=False,
-        )
-
-        strategy = ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
-        selector = AgentSelector(strategy)
-
-        selections = await selector.select_agents_for_batch_requirements(
-            agents_for_container_limit_test,
+        selections = await _selector().select_agents_for_batch_requirements(
+            AgentSelectionStrategy.CONCENTRATED,
+            _trackers(agents_for_container_limit_test),
             criteria,
-            config,
-            designated_agent_ids=None,
+            AgentLimit(max_container_count=10),
+            PreemptionOrder.OLDEST,
         )
 
-        # Should select "available" agent since "busy" is at container limit
         assert len(selections) == 1
         assert selections[0].selected_agent.agent_id == AgentId("available")
 
-    async def test_architecture_mismatch_with_resource_requirements(
+    async def test_architecture_requirement_is_enforced(
         self,
         agents_for_architecture_test: list[AgentInfo],
     ) -> None:
-        """Test that architecture requirements are enforced."""
-        kernel_id = uuid.uuid4()
-        kernel_spec = KernelResourceSpec(
-            requested_slots=ResourceSlot({
-                "cpu": Decimal("2"),
-                "mem": Decimal("4096"),
-            }),
-            required_architecture="aarch64",  # Require ARM
-        )
+        """Only agents matching the required architecture are considered."""
+        criteria = _criteria([_req({"cpu": "2", "mem": "4096"}, arch="aarch64")])
 
-        session_metadata = SessionMetadata(
-            session_id=SessionId(uuid.uuid4()),
-            session_type=SessionTypes.INTERACTIVE,
-            scaling_group="default",
-            cluster_mode=ClusterMode.SINGLE_NODE,
-        )
-
-        criteria = AgentSelectionCriteria(
-            session_metadata=session_metadata,
-            kernel_requirements={kernel_id: kernel_spec},
-        )
-
-        config = AgentSelectionConfig(max_container_count=None)
-
-        strategy = ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
-        selector = AgentSelector(strategy)
-
-        selections = await selector.select_agents_for_batch_requirements(
-            agents_for_architecture_test,
+        selections = await _selector().select_agents_for_batch_requirements(
+            AgentSelectionStrategy.CONCENTRATED,
+            _trackers(agents_for_architecture_test),
             criteria,
-            config,
-            designated_agent_ids=None,
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
-        # Should select ARM agent
         assert len(selections) == 1
         assert selections[0].selected_agent.agent_id == AgentId("arm")
+
+    async def test_empty_requirements_returns_empty(
+        self,
+        agents_for_resource_requirements_test: list[AgentInfo],
+    ) -> None:
+        """A session with no kernels yields an empty selection list."""
+        criteria = _criteria([])
+
+        selections = await _selector().select_agents_for_batch_requirements(
+            AgentSelectionStrategy.CONCENTRATED,
+            _trackers(agents_for_resource_requirements_test),
+            criteria,
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
+        )
+
+        assert selections == []
+
+    async def test_no_trackers_raises_resource_group_error(self) -> None:
+        """An empty agent pool raises NoAgentsInResourceGroupError."""
+        criteria = _criteria([_req({"cpu": "1", "mem": "1024"})])
+
+        with pytest.raises(NoAgentsInResourceGroupError):
+            await _selector().select_agents_for_batch_requirements(
+                AgentSelectionStrategy.CONCENTRATED, [], criteria, NO_LIMIT, PreemptionOrder.OLDEST
+            )
+
+    async def test_success_commits_allocations_into_trackers(
+        self,
+        agents_for_designated_agent_test: list[AgentInfo],
+    ) -> None:
+        """A successful batch folds the allocation into the tracker state."""
+        trackers = _trackers(agents_for_designated_agent_test)
+        criteria = _criteria([_req({"cpu": "4", "mem": "8192"})])
+
+        selections = await _selector().select_agents_for_batch_requirements(
+            AgentSelectionStrategy.CONCENTRATED,
+            trackers,
+            criteria,
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
+        )
+
+        selected_id = selections[0].selected_agent.agent_id
+        selected_tracker = next(t for t in trackers if t.original_agent.agent_id == selected_id)
+        assert selected_tracker.committed_slots[ResourceSlotName("cpu")] == Decimal("4")
+        assert selected_tracker.committed_containers == 1
+        assert selected_tracker.pending_slots == {}
+
+    async def test_failure_rolls_back_pending_allocations(
+        self,
+        agents_for_resource_requirements_test: list[AgentInfo],
+    ) -> None:
+        """All-or-nothing: a partially placeable batch leaves trackers unchanged."""
+        trackers = _trackers(agents_for_resource_requirements_test)
+        criteria = _criteria([
+            _req({"cpu": "1", "mem": "1024"}),  # placeable
+            _req({"cpu": "100", "mem": "999999"}),  # impossible
+        ])
+
+        with pytest.raises(BatchAgentSelectionFailedError):
+            await _selector().select_agents_for_batch_requirements(
+                AgentSelectionStrategy.CONCENTRATED,
+                trackers,
+                criteria,
+                NO_LIMIT,
+                PreemptionOrder.OLDEST,
+            )
+
+        for tracker in trackers:
+            assert tracker.pending_slots == {}
+            assert tracker.committed_slots == {}
+            assert tracker.committed_containers == 0

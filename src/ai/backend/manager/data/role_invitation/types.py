@@ -4,6 +4,7 @@ import enum
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from functools import lru_cache
 
 
 class RoleInvitationState(enum.StrEnum):
@@ -11,6 +12,16 @@ class RoleInvitationState(enum.StrEnum):
     ACCEPTED = "accepted"
     REJECTED = "rejected"
     CANCELED = "canceled"
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def declined_states(cls) -> frozenset[RoleInvitationState]:
+        """Terminal states that did not grant a role (rejected / canceled).
+
+        ACCEPTED is excluded: acceptance writes a durable ``user_roles`` row, but
+        the invitation record is kept rather than purged as history.
+        """
+        return frozenset((cls.REJECTED, cls.CANCELED))
 
 
 @dataclass(frozen=True)

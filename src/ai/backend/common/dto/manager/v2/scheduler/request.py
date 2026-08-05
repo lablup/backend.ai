@@ -9,8 +9,10 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
 from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum
+from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.types import AgentId
 
 __all__ = (
     "ComputeScheduleInput",
@@ -55,4 +57,19 @@ class ComputeScheduleInput(BaseRequestModel):
     )
     resource_group_id: ResourceGroupID = Field(
         description="Target resource group to compute the scheduling against.",
+    )
+    designated_agent_ids: list[AgentId] | None = Field(
+        default=None,
+        description=(
+            "Restrict the fitting check to these agents, with the same "
+            "semantics as the scheduling path. Null means no restriction."
+        ),
+    )
+    agent_selection_policy: AgentSelectionPolicyEnum | None = Field(
+        default=None,
+        description=(
+            "How `designated_agent_ids` is enforced (STRICT fails without "
+            "capacity, PREFERRED falls back). Null inherits the resource "
+            "group default."
+        ),
     )

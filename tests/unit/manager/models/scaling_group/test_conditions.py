@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncGenerator
 
 import pytest
@@ -81,32 +82,42 @@ class TestScalingGroupConditionsCursor:
 
     def test_by_cursor_forward_returns_callable(self) -> None:
         """Test that by_cursor_forward returns a callable QueryCondition."""
-        condition = ScalingGroupConditions.by_cursor_forward("test-name")
+        condition = ScalingGroupConditions.by_cursor_forward(str(uuid.uuid4()))
         assert callable(condition)
 
     def test_by_cursor_forward_returns_column_element(self) -> None:
         """Test that by_cursor_forward() returns a SQLAlchemy ColumnElement."""
-        condition = ScalingGroupConditions.by_cursor_forward("cursor-value")
+        condition = ScalingGroupConditions.by_cursor_forward(str(uuid.uuid4()))
         result = condition()
         # Result should be a SQLAlchemy expression
         assert isinstance(result, sa.sql.expression.ColumnElement)
 
+    def test_by_cursor_forward_rejects_non_uuid_cursor(self) -> None:
+        """Test that by_cursor_forward rejects a non-UUID cursor value."""
+        with pytest.raises(ValueError):
+            ScalingGroupConditions.by_cursor_forward("not-a-uuid")
+
     def test_by_cursor_backward_returns_callable(self) -> None:
         """Test that by_cursor_backward returns a callable QueryCondition."""
-        condition = ScalingGroupConditions.by_cursor_backward("test-name")
+        condition = ScalingGroupConditions.by_cursor_backward(str(uuid.uuid4()))
         assert callable(condition)
 
     def test_by_cursor_backward_returns_column_element(self) -> None:
         """Test that by_cursor_backward() returns a SQLAlchemy ColumnElement."""
-        condition = ScalingGroupConditions.by_cursor_backward("cursor-value")
+        condition = ScalingGroupConditions.by_cursor_backward(str(uuid.uuid4()))
         result = condition()
         # Result should be a SQLAlchemy expression
         assert isinstance(result, sa.sql.expression.ColumnElement)
 
+    def test_by_cursor_backward_rejects_non_uuid_cursor(self) -> None:
+        """Test that by_cursor_backward rejects a non-UUID cursor value."""
+        with pytest.raises(ValueError):
+            ScalingGroupConditions.by_cursor_backward("not-a-uuid")
+
     def test_by_cursor_forward_uses_closure(self) -> None:
         """Test that by_cursor_forward captures the value in closure."""
-        value1 = "value-a"
-        value2 = "value-b"
+        value1 = str(uuid.uuid4())
+        value2 = str(uuid.uuid4())
 
         condition1 = ScalingGroupConditions.by_cursor_forward(value1)
         condition2 = ScalingGroupConditions.by_cursor_forward(value2)
@@ -115,15 +126,13 @@ class TestScalingGroupConditionsCursor:
         result1 = condition1()
         result2 = condition2()
 
-        # Compiled SQL should show different values
-        assert str(result1.compile(compile_kwargs={"literal_binds": True})) != str(
-            result2.compile(compile_kwargs={"literal_binds": True})
-        )
+        # Bound parameters should show different values
+        assert result1.compile().params != result2.compile().params
 
     def test_by_cursor_backward_uses_closure(self) -> None:
         """Test that by_cursor_backward captures the value in closure."""
-        value1 = "value-a"
-        value2 = "value-b"
+        value1 = str(uuid.uuid4())
+        value2 = str(uuid.uuid4())
 
         condition1 = ScalingGroupConditions.by_cursor_backward(value1)
         condition2 = ScalingGroupConditions.by_cursor_backward(value2)
@@ -132,10 +141,8 @@ class TestScalingGroupConditionsCursor:
         result1 = condition1()
         result2 = condition2()
 
-        # Compiled SQL should show different values
-        assert str(result1.compile(compile_kwargs={"literal_binds": True})) != str(
-            result2.compile(compile_kwargs={"literal_binds": True})
-        )
+        # Bound parameters should show different values
+        assert result1.compile().params != result2.compile().params
 
 
 class TestScalingGroupOrdersCursor:

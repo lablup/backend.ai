@@ -30,10 +30,12 @@ from ai.backend.manager.models.app_config_definition.conditions import (
     AppConfigDefinitionConditions,
 )
 from ai.backend.manager.models.app_config_definition.orders import AppConfigDefinitionOrders
-from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.app_config_definition.creators import (
     AppConfigDefinitionCreatorSpec,
+)
+from ai.backend.manager.repositories.app_config_definition.purgers import (
+    AppConfigDefinitionPurgerSpec,
 )
 from ai.backend.manager.repositories.base import (
     Purger,
@@ -41,6 +43,9 @@ from ai.backend.manager.repositories.base import (
     negate_conditions,
 )
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.services.app_config_definition.actions.admin_search import (
+    AdminSearchAppConfigDefinitionsAction,
+)
 from ai.backend.manager.services.app_config_definition.actions.create import (
     CreateAppConfigDefinitionAction,
 )
@@ -49,9 +54,6 @@ from ai.backend.manager.services.app_config_definition.actions.get import (
 )
 from ai.backend.manager.services.app_config_definition.actions.purge import (
     PurgeAppConfigDefinitionAction,
-)
-from ai.backend.manager.services.app_config_definition.actions.search import (
-    SearchAppConfigDefinitionsAction,
 )
 
 
@@ -101,10 +103,10 @@ class AppConfigDefinitionAdapter(BaseAdapter):
             pagination_spec=_get_app_config_definition_pagination_spec(),
             limit=len(ids),
         )
-        action_result = await self._processors.app_config_definition.search.wait_for_complete(
-            SearchAppConfigDefinitionsAction(querier=querier)
+        action_result = await self._processors.app_config_definition.admin_search.wait_for_complete(
+            AdminSearchAppConfigDefinitionsAction(querier=querier)
         )
-        node_map = {node.id: node for node in map(self._data_to_node, action_result.data)}
+        node_map = {node.id: node for node in map(self._data_to_node, action_result.items)}
         return [node_map.get(definition_id) for definition_id in ids]
 
     async def admin_search(
@@ -123,11 +125,11 @@ class AppConfigDefinitionAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.app_config_definition.search.wait_for_complete(
-            SearchAppConfigDefinitionsAction(querier=querier)
+        action_result = await self._processors.app_config_definition.admin_search.wait_for_complete(
+            AdminSearchAppConfigDefinitionsAction(querier=querier)
         )
         return SearchAppConfigDefinitionsPayload(
-            items=[self._data_to_node(item) for item in action_result.data],
+            items=[self._data_to_node(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -136,7 +138,9 @@ class AppConfigDefinitionAdapter(BaseAdapter):
     async def admin_purge(
         self, input: PurgeAppConfigDefinitionInput
     ) -> PurgeAppConfigDefinitionPayload:
-        purger = Purger(row_class=AppConfigDefinitionRow, pk_value=AppConfigDefinitionID(input.id))
+        purger = Purger(
+            spec=AppConfigDefinitionPurgerSpec(definition_id=AppConfigDefinitionID(input.id))
+        )
         action_result = await self._processors.app_config_definition.purge.wait_for_complete(
             PurgeAppConfigDefinitionAction(purger=purger)
         )

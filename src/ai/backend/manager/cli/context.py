@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from ai.backend.logging import AbstractLogger
     from ai.backend.logging.types import LogLevel
     from ai.backend.manager.config.bootstrap import BootstrapConfig
+    from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.config.unified import ManagerUnifiedConfig
 
     from .types import RedisConnectionSet
@@ -115,6 +116,61 @@ async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerUnifiedConfig]
         redis_config = await etcd_loader.load()
         unified_config = ManagerUnifiedConfig(**redis_config)
     yield unified_config
+
+
+@contextlib.asynccontextmanager
+async def config_provider_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerConfigProvider]:
+    """Build a full ManagerConfigProvider for one-shot CLI commands.
+
+    Mirrors ``dependencies.config.provider.ConfigProviderDependency`` so CLI
+    entry points (e.g. ``clear-history``) can reuse repositories that depend on
+    the provider. The etcd watcher is terminated on exit.
+    """
+    from ai.backend.common.configs.loader import (
+        ConfigOverrider,
+        EtcdConfigLoader,
+        EtcdConfigWatcher,
+        LoaderChain,
+        TomlConfigLoader,
+    )
+    from ai.backend.common.etcd import AsyncEtcd
+    from ai.backend.logging.types import LogLevel
+    from ai.backend.manager.config.loader.legacy_etcd_loader import (
+        LegacyEtcdLoader,
+        LegacyEtcdVolumesLoader,
+    )
+    from ai.backend.manager.config.provider import ManagerConfigProvider
+
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
+    etcd_config_data = bootstrap_config.etcd.to_dataclass()
+    async with AsyncEtcd.create_from_config(etcd_config_data) as etcd:
+        loaders: list[Any] = []
+        if cli_ctx.config_path is not None:
+            loaders.append(TomlConfigLoader(cli_ctx.config_path, "manager"))
+        legacy_etcd_loader = LegacyEtcdLoader(etcd)
+        loaders.append(legacy_etcd_loader)
+        loaders.append(LegacyEtcdVolumesLoader(etcd))
+        loaders.append(EtcdConfigLoader(etcd, prefix="ai/backend/config/common"))
+        loaders.append(EtcdConfigLoader(etcd, prefix="ai/backend/config/manager"))
+        overrides: list[tuple[tuple[str, ...], Any]] = [
+            (("debug", "enabled"), cli_ctx.log_level == LogLevel.DEBUG),
+        ]
+        if cli_ctx.log_level != LogLevel.NOTSET:
+            overrides += [
+                (("logging", "level"), cli_ctx.log_level),
+                (("logging", "pkg-ns", "ai.backend"), cli_ctx.log_level),
+            ]
+        loaders.append(ConfigOverrider(overrides))
+
+        config_provider = await ManagerConfigProvider.create(
+            LoaderChain(loaders),
+            EtcdConfigWatcher(etcd),
+            legacy_etcd_loader,
+        )
+        try:
+            yield config_provider
+        finally:
+            await config_provider.terminate()
 
 
 @contextlib.asynccontextmanager

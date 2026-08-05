@@ -26,9 +26,12 @@ The same strategy applies to all components:
    an existing migration that has already been released. Editing `down_revision` is
    allowed only when inserting a backport migration into the main branch chain before
    the change is merged (see Step 2 below).
-4. **Linear chain** -- The migration chain must always remain linear (single head).
-   Never create merge migrations. If multiple heads appear after inserting a backport,
-   fix the `down_revision` pointers instead.
+4. **Single head** -- The migration chain must resolve to a single head. Keep it linear
+   by fixing `down_revision` pointers when *your own unmerged* migration diverged; use an
+   empty merge migration only when *main itself* already has two or more released heads.
+   When merging released heads, do **not** edit the existing migrations'
+   `revision`/`down_revision` pointers — they may already be released.
+   Generate the empty merge migration with `./py -m alembic merge heads`.
 
 ### Backport Procedure
 

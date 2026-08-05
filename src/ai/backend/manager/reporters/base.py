@@ -3,7 +3,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from ai.backend.common.data.permission.types import EntityType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.identifier.action import ActionID
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 
 
@@ -11,7 +12,7 @@ from ai.backend.manager.actions.types import ActionOperationType, OperationStatu
 class StartedActionMessage:
     """Message indicating that an action has started."""
 
-    action_id: uuid.UUID
+    action_id: ActionID
     action_type: str
     entity_id: str | uuid.UUID | None
     request_id: str | None
@@ -26,7 +27,7 @@ class StartedActionMessage:
 class FinishedActionMessage:
     """Message indicating that an action has finished."""
 
-    action_id: uuid.UUID
+    action_id: ActionID
     action_type: str
     entity_id: str | uuid.UUID | None  # TODO: Make this required?
     request_id: str | None

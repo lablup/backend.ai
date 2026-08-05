@@ -59,11 +59,11 @@ class SearchProjectsByDomainAction(ProjectScopeAction):
 
     @override
     def scope_id(self) -> str:
-        return self.scope.domain_name
+        return str(self.scope.domain_id)
 
     @override
     def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.DOMAIN, self.scope.domain_name)
+        return RBACElementRef(RBACElementType.DOMAIN, str(self.scope.domain_id))
 
 
 @dataclass

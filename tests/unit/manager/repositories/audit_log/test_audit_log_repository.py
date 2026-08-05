@@ -14,12 +14,14 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
-from ai.backend.manager.actions.types import OperationStatus
+from ai.backend.manager.actions.types import ActionKind, OperationStatus
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.models.audit_log import AuditLogRow
-from ai.backend.manager.repositories.audit_log import AuditLogCreatorSpec, AuditLogRepository
+from ai.backend.manager.repositories.audit_log import AuditLogRepository
+from ai.backend.manager.repositories.audit_log.creators import GlobalAuditLogCreatorSpec
 from ai.backend.manager.repositories.audit_log.options import AuditLogConditions
 from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
+from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:
@@ -48,7 +50,7 @@ class TestAuditLogRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AuditLogRepository:
         """Create an AuditLogRepository instance"""
-        return AuditLogRepository(db=db_with_cleanup)
+        return AuditLogRepository(DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
     async def sample_audit_logs_for_filtering(
@@ -66,14 +68,13 @@ class TestAuditLogRepository:
 
         for entity_type, operation, status in test_data:
             creator = Creator(
-                spec=AuditLogCreatorSpec(
+                spec=GlobalAuditLogCreatorSpec(
                     action_id=uuid.uuid4(),
                     entity_type=entity_type,
                     operation=operation,
                     created_at=now,
                     description=f"{entity_type} {operation}",
                     status=status,
-                    entity_id=None,
                     request_id=None,
                     triggered_by=None,
                     acted_as=None,
@@ -97,14 +98,13 @@ class TestAuditLogRepository:
 
         for operation in operations:
             creator = Creator(
-                spec=AuditLogCreatorSpec(
+                spec=GlobalAuditLogCreatorSpec(
                     action_id=uuid.uuid4(),
                     entity_type="session",
                     operation=operation,
                     created_at=now,
                     description=f"Operation {operation}",
                     status=OperationStatus.SUCCESS,
-                    entity_id=None,
                     request_id=None,
                     triggered_by=None,
                     acted_as=None,
@@ -127,14 +127,13 @@ class TestAuditLogRepository:
 
         for i in range(25):
             creator = Creator(
-                spec=AuditLogCreatorSpec(
+                spec=GlobalAuditLogCreatorSpec(
                     action_id=uuid.uuid4(),
                     entity_type="session",
                     operation=f"operation_{i:02d}",
                     created_at=now,
                     description=f"Operation {i}",
                     status=OperationStatus.SUCCESS,
-                    entity_id=None,
                     request_id=None,
                     triggered_by=None,
                     acted_as=None,
@@ -168,21 +167,23 @@ class TestAuditLogRepository:
                 created_at=now,
                 description=f"Operation {i}",
                 status=status,
+                action_kind=ActionKind.GLOBAL,
                 entity_id=None,
+                lookup_kind=None,
+                lookup_key=None,
                 request_id=None,
                 triggered_by=None,
                 acted_as=None,
                 duration=None,
             )
             creator = Creator(
-                spec=AuditLogCreatorSpec(
+                spec=GlobalAuditLogCreatorSpec(
                     action_id=data.action_id,
                     entity_type=data.entity_type,
                     operation=data.operation,
                     created_at=data.created_at,
                     description=data.description,
                     status=data.status,
-                    entity_id=data.entity_id,
                     request_id=data.request_id,
                     triggered_by=data.triggered_by,
                     acted_as=data.acted_as,
@@ -257,14 +258,13 @@ class TestAuditLogRepository:
         for _ in range(2):
             acted_as = uuid.uuid4()
             creator = Creator(
-                spec=AuditLogCreatorSpec(
+                spec=GlobalAuditLogCreatorSpec(
                     action_id=uuid.uuid4(),
                     entity_type="session",
                     operation="update",
                     created_at=now,
                     description=f"acted by {acted_as}",
                     status=OperationStatus.SUCCESS,
-                    entity_id=None,
                     request_id=None,
                     triggered_by="super-admin",
                     acted_as=acted_as,

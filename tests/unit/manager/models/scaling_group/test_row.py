@@ -8,13 +8,14 @@ import pytest
 from pydantic import ValidationError
 
 from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.schema.resource_group import PreemptionConfig
 from ai.backend.common.types import (
     AgentSelectionStrategy,
     PreemptionMode,
     PreemptionOrder,
     SessionTypes,
 )
-from ai.backend.manager.models.scaling_group.row import PreemptionConfig, ScalingGroupOpts
+from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts
 
 
 class TestScalingGroupOptsDefaults:

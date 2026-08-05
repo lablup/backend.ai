@@ -22,6 +22,7 @@ from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
+    Final,
     Literal,
     NewType,
     NotRequired,
@@ -68,12 +69,14 @@ from .exception import (
 # ``from ai.backend.common.types import ImageID`` sites keep working and
 # will be removed once call sites are migrated.
 from .identifier.image import ImageID
+from .identifier.resource_slot import ResourceSlotName
 from .identifier.vfolder import VFolderUUID
 from .models.minilang.mount import MountPointParser
 
 __all__ = (
     "MODEL_SERVICE_RUNTIME_PROFILES",
     "PID",
+    "REDIS_PASSWORD_MASK",
     "AbstractPermission",
     "AbuseReport",
     "AbuseReportValue",
@@ -175,7 +178,7 @@ __all__ = (
 
 
 if TYPE_CHECKING:
-    from ai.backend.common.configs.redis import RedisConfig
+    from ai.backend.common.configs.redis import RedisConfig, SingleRedisConfig
     from ai.backend.common.data.vfolder.types import VFolderMountData
     from ai.backend.common.dto.manager.v2.common import BinarySizeInfo
 
@@ -405,7 +408,6 @@ RuleId = NewType("RuleId", UUID)
 SessionId = NewType("SessionId", UUID)
 KernelId = NewType("KernelId", UUID)
 ImageAlias = NewType("ImageAlias", str)
-ArchName = NewType("ArchName", str)
 Subdomain = NewType("Subdomain", str)
 
 ResourceGroupID = NewType("ResourceGroupID", str)
@@ -1409,14 +1411,16 @@ class ResourceSlotEntry(BackendAISchema):
     layers without re-shaping.
     """
 
-    resource_type: str = Field(description="Resource type identifier (e.g., 'cpu', 'mem').")
+    resource_type: ResourceSlotName = Field(
+        description="Resource type identifier (e.g., 'cpu', 'mem')."
+    )
     quantity: str = Field(description="Quantity of the resource as a decimal string.")
 
     @classmethod
     def from_resource_slot(cls, slot: ResourceSlot) -> list[ResourceSlotEntry]:
         """Project a legacy ``ResourceSlot`` into an entry list."""
         return [
-            cls(resource_type=str(k), quantity=_stringify_number(Decimal(v)))
+            cls(resource_type=ResourceSlotName(str(k)), quantity=_stringify_number(Decimal(v)))
             for k, v in slot.items()
             if v is not None
         ]
@@ -2191,12 +2195,20 @@ class RedisProfileTarget:
         )
 
 
+REDIS_PASSWORD_MASK: Final = "********"
+
+
 def safe_print_redis_config(config: RedisConfig) -> str:
     safe_config = copy.deepcopy(config)
-    if config.password is not None:
-        safe_config.password = "********"
-    if config.sentinel_password is not None:
-        safe_config.sentinel_password = "********"
+    # The overrides carry their own credentials, so they must be masked as well.
+    masking_targets: list[SingleRedisConfig] = [safe_config]
+    if safe_config.override_configs is not None:
+        masking_targets.extend(safe_config.override_configs.values())
+    for target in masking_targets:
+        if target.password is not None:
+            target.password = REDIS_PASSWORD_MASK
+        if target.sentinel_password is not None:
+            target.sentinel_password = REDIS_PASSWORD_MASK
     return str(safe_config)
 
 
@@ -2248,8 +2260,18 @@ class PreemptionMode(enum.StrEnum):
 
 
 class PreemptionOrder(enum.StrEnum):
+    """Victim selection order for preemption.
+
+    OLDEST/NEWEST break same-priority ties by start time; FEWEST_SESSIONS
+    evicts the fewest sessions; SMALLEST_RESOURCES reclaims the least
+    resources. The deficit-aware orders are computed against the pending
+    session being placed.
+    """
+
     OLDEST = "oldest"
     NEWEST = "newest"
+    FEWEST_SESSIONS = "fewest-sessions"
+    SMALLEST_RESOURCES = "smallest-resources"
 
 
 class SchedulerStatus(TypedDict):

@@ -74,17 +74,40 @@ else
   echo "Setting up uid and gid: $USER_ID:$GROUP_ID"
   USER_NAME=$(getent passwd $USER_ID | cut -d: -f1)
   GROUP_NAME=$(getent group $GROUP_ID | cut -d: -f1)
+  # NOTE: A committed image may carry a "work" user/group with stale ids. Renumber them by
+  #       editing the files directly; usermod -u/-g recursively chowns the home directory.
+  renumber_group() {
+    sed -i "s/^$1:\([^:]*\):[0-9]*:/$1:\1:$2:/" /etc/group
+  }
+  renumber_user() {
+    sed -i "s/^$1:\([^:]*\):[0-9]*:[0-9]*:/$1:\1:$2:$3:/" /etc/passwd
+  }
   if [ -f /bin/ash ]; then  # for alpine (busybox)
     if [ -z "$GROUP_NAME" ]; then
       GROUP_NAME=work
-      addgroup -g $GROUP_ID $GROUP_NAME
+      if getent group $GROUP_NAME > /dev/null 2>&1; then
+        renumber_group $GROUP_NAME $GROUP_ID
+      else
+        addgroup -g $GROUP_ID $GROUP_NAME \
+          || echo "WARNING: failed to create the group '$GROUP_NAME' with gid $GROUP_ID"
+      fi
     fi
     if [ -z "$USER_NAME" ]; then
       USER_NAME=work
-      adduser -s /bin/ash -h "/home/$USER_NAME" -H -D -u $USER_ID -G $GROUP_NAME -g "User" $USER_NAME
+      if getent passwd $USER_NAME > /dev/null 2>&1; then
+        renumber_user $USER_NAME $USER_ID $GROUP_ID
+      else
+        adduser -s /bin/ash -h "/home/$USER_NAME" -H -D -u $USER_ID -G $GROUP_NAME -g "User" $USER_NAME \
+          || echo "WARNING: failed to create the user '$USER_NAME' with uid $USER_ID"
+      fi
       usermod -aG shadow $USER_NAME
-      addgroup --gid 1002 grpread
+      if ! getent group grpread > /dev/null 2>&1; then
+        addgroup -g 1002 grpread
+      fi
       usermod -aG grpread $USER_NAME
+    else
+      renumber_user $USER_NAME $USER_ID $GROUP_ID
+      usermod -aG shadow $USER_NAME
     fi
     export SHELL=/bin/ash
   else  # for other distros (ubuntu, centos, etc.)
@@ -92,28 +115,49 @@ else
     unset LD_PRELOAD
     if [ -z "$GROUP_NAME" ]; then
       GROUP_NAME=work
-      groupadd -g $GROUP_ID $GROUP_NAME
+      if getent group $GROUP_NAME > /dev/null 2>&1; then
+        renumber_group $GROUP_NAME $GROUP_ID
+      else
+        groupadd -g $GROUP_ID $GROUP_NAME \
+          || echo "WARNING: failed to create the group '$GROUP_NAME' with gid $GROUP_ID"
+      fi
     fi
     if [ -z "$USER_NAME" ]; then
       USER_NAME=work
-      useradd -s /bin/bash -d "/home/$USER_NAME" -M -r -u $USER_ID -g $GROUP_NAME -o -c "User" $USER_NAME
+      if getent passwd $USER_NAME > /dev/null 2>&1; then
+        renumber_user $USER_NAME $USER_ID $GROUP_ID
+      else
+        useradd -s /bin/bash -d "/home/$USER_NAME" -M -r -u $USER_ID -g $GROUP_NAME -o -c "User" $USER_NAME \
+          || echo "WARNING: failed to create the user '$USER_NAME' with uid $USER_ID"
+      fi
       usermod -aG shadow $USER_NAME
-      addgroup --gid 1002 grpread
+      if ! getent group grpread > /dev/null 2>&1; then
+        addgroup --gid 1002 grpread
+      fi
       usermod -aG 1002 $USER_NAME
     else
-      # The image has an existing user name for the given uid.
-      # Merge the image's existing home directory into the bind-mounted "/home/work" from the scratch space.
-      # NOTE: Since the image layer and the scratch directory may reside in different filesystems,
-      #       we cannot use hard-links to reduce the copy overhead.
-      #       It assumes that the number/size of files in the image's home directory is not very large.
-      cp -Rp "/home/$USER_NAME/*" /home/work/
-      cp -Rp "/home/$USER_NAME/.*" /home/work/
-      # Rename the user to "work" and let it use "/home/work" as the new home directory.
-      usermod -s /bin/bash -d /home/work -l work -g $GROUP_NAME $USER_NAME
-      USER_NAME=work
+      if [ "$USER_NAME" != "work" ]; then
+        # The image has an existing user name for the given uid.
+        # Merge the image's existing home directory into the bind-mounted "/home/work" from the scratch space.
+        # NOTE: Since the image layer and the scratch directory may reside in different filesystems,
+        #       we cannot use hard-links to reduce the copy overhead.
+        #       It assumes that the number/size of files in the image's home directory is not very large.
+        cp -Rp "/home/$USER_NAME/*" /home/work/
+        cp -Rp "/home/$USER_NAME/.*" /home/work/
+        # Rename the user to "work" and let it use "/home/work" as the new home directory.
+        usermod -s /bin/bash -d /home/work -l work $USER_NAME
+        USER_NAME=work
+        renumber_user $USER_NAME $USER_ID $GROUP_ID
+      else
+        renumber_user $USER_NAME $USER_ID $GROUP_ID
+      fi
       usermod -aG shadow $USER_NAME
     fi
     export SHELL=/bin/bash
+  fi
+  if [ "$(getent passwd $USER_NAME | cut -d: -f3-4)" != "$USER_ID:$GROUP_ID" ]; then
+    echo "ERROR: /etc/passwd entry for '$USER_NAME' does not match $USER_ID:$GROUP_ID"
+    exit 1
   fi
   export LD_LIBRARY_PATH="/opt/backend.ai/lib:$LD_LIBRARY_PATH"
   export HOME="/home/$USER_NAME"
@@ -165,13 +209,15 @@ else
         if ! getent group "$gid" > /dev/null 2>&1; then
           echo "Creating group with GID $gid"
           addgroup --gid "$gid" "group$gid"
-          if usermod -aG "$gid" $USER_NAME 2>/dev/null; then
-            echo "Added $USER_NAME to group$gid"
-          else
-            echo "Failed to add $USER_NAME to group$gid"
-          fi
         else
           echo "Group with GID $gid already exists"
+        fi
+
+        # Ensure membership even when the group pre-exists (e.g., baked into a committed image)
+        if usermod -aG "$gid" $USER_NAME 2>/dev/null; then
+          echo "Added $USER_NAME to group with GID $gid"
+        else
+          echo "Failed to add $USER_NAME to group with GID $gid"
         fi
       fi
     done

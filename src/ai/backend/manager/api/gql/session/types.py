@@ -51,7 +51,6 @@ from ai.backend.common.dto.manager.v2.session.types import (
     ProjectSessionScope,
     SessionStatusFilter,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID, SessionId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
 from ai.backend.manager.api.gql.common.types import (
@@ -83,6 +82,7 @@ from ai.backend.manager.api.gql.kernel.types import (
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
+from ai.backend.manager.api.gql.session_options.types import AgentSelectionPolicyGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 from ai.backend.manager.errors.user import UserNotFound
@@ -105,7 +105,9 @@ class SessionV2StatusGQL(StrEnum):
     CREATING = "CREATING"
     RUNNING = "RUNNING"
     DEPRIORITIZING = "DEPRIORITIZING"
+    RESERVED = "RESERVED"
     PREEMPTED = "PREEMPTED"
+    RESCHEDULING = "RESCHEDULING"
     TERMINATING = "TERMINATING"
     TERMINATED = "TERMINATED"
     CANCELLED = "CANCELLED"
@@ -211,6 +213,20 @@ class SessionV2MetadataInfoGQL:
     )
     cluster_size: int = gql_field(description="Number of nodes in the cluster.")
     priority: int = gql_field(description="Scheduling priority of the session.")
+    job_priority: int = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.0",
+            description=(
+                "Preemption priority among the owner's own sessions. A pending "
+                "session may reclaim another session's resources only when both "
+                "belong to the same user and the other session's value is "
+                "strictly lower, so equal values never preempt each other; among "
+                "the eligible sessions the lowest value is reclaimed first. "
+                "Independent of `priority`, which orders the pending queue and "
+                "takes no part in this comparison."
+            ),
+        )
+    )
     is_preemptible: bool = gql_field(
         description="Whether this session is eligible for preemption by higher-priority sessions."
     )
@@ -469,7 +485,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description=(
                 "Resource allocation (requested / used / allocated) computed on-demand "
                 "from the resource_allocations table. Unlike the deprecated eager "
@@ -623,13 +639,13 @@ class EnqueueSessionInputGQL(PydanticInputMixin[EnqueueSessionInputDTO]):
     )
     resource_group: str | None = gql_field(
         default=None,
-        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use resource_group_id instead. Resource group name.",
+        description="Deprecated since 26.8.0. Use resource_group_id instead. Resource group name.",
         deprecation_reason="Use resource_group_id instead.",
     )
     resource_group_id: ID | None = gql_added_field(
         BackendAIGQLMeta(
             description="Resource group UUID. Auto-selected if omitted.",
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
         ),
         default=None,
     )
@@ -652,9 +668,20 @@ class EnqueueSessionInputGQL(PydanticInputMixin[EnqueueSessionInputDTO]):
     bootstrap_script: str | None = gql_field(default=None, description="Bootstrap script.")
 
     priority: int = gql_field(default=10, description="Scheduling priority (0-100).")
+    job_priority: int = gql_field(
+        default=0,
+        description="Scope-local preemption priority among the requester's own sessions.",
+    )
     is_preemptible: bool = gql_field(default=True, description="Whether preemptible.")
     dependencies: list[ID] | None = gql_field(default=None, description="Dependent session IDs.")
     agent_list: list[str] | None = gql_field(default=None, description="Designated agent IDs.")
+    agent_selection_policy: AgentSelectionPolicyGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            description=("How agent_list is enforced. null inherits the resource group default."),
+            added_version="26.8.0",
+        ),
+        default=None,
+    )
     attach_network: ID | None = gql_field(default=None, description="Network UUID to attach.")
 
     tag: str | None = gql_field(default=None, description="User-defined tag.")

@@ -29,6 +29,9 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 
@@ -58,6 +61,30 @@ async def project_with_rbac_rows(
                 is_active=True,
                 domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
+            )
+        )
+        virtual_scope_id = uuid.uuid4()
+        await conn.execute(
+            sa.insert(VirtualScopeRow.__table__).values(
+                id=virtual_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=project_id,
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                entity_type=EntityType.PROJECT,
+                entity_id=project_id,
+                permission_cap=None,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=project_id,
+                permission_cap=None,
             )
         )
         await conn.execute(
@@ -142,6 +169,12 @@ async def project_with_rbac_rows(
         await conn.execute(
             RoleRow.__table__.delete().where(
                 RoleRow.__table__.c.id.in_([admin_role_id, member_role_id])
+            )
+        )
+        await conn.execute(
+            VirtualScopeRow.__table__.delete().where(
+                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
+                VirtualScopeRow.__table__.c.scope_id == project_id,
             )
         )
         await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == project_id))

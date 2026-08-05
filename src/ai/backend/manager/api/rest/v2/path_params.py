@@ -94,6 +94,14 @@ class AppConfigDefinitionIdPathParam(BaseRequestModel):
     app_config_definition_id: UUID = Field(description="App config definition UUID")
 
 
+class AppConfigFragmentIdPathParam(BaseRequestModel):
+    fragment_id: UUID = Field(description="App config fragment UUID")
+
+
+class IdleCheckerIdPathParam(BaseRequestModel):
+    idle_checker_id: UUID = Field(description="Idle checker UUID")
+
+
 class ReplicaIdPathParam(BaseRequestModel):
     replica_id: UUID = Field(description="Replica UUID")
 
@@ -120,3 +128,7 @@ class AccessKeyPathParam(BaseRequestModel):
 
 class InvitationIdPathParam(BaseRequestModel):
     invitation_id: UUID = Field(description="Invitation UUID")
+
+
+class IdleCheckerAssignmentIdPathParam(BaseRequestModel):
+    idle_checker_assignment_id: UUID = Field(description="Idle checker assignment UUID")

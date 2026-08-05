@@ -1,0 +1,12 @@
+type Query {
+  _service: _Service!
+
+  """Added in 26.9.0. Returns 'pong'"""
+  ping: String!
+}
+
+scalar _Any
+
+type _Service {
+  sdl: String!
+}

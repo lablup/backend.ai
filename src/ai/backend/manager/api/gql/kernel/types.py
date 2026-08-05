@@ -26,7 +26,6 @@ from ai.backend.common.dto.manager.v2.kernel.response import (
 from ai.backend.common.dto.manager.v2.kernel.types import (
     KernelStatusFilter,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import AgentId, KernelId, SessionTypes
 from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
@@ -46,6 +45,13 @@ if TYPE_CHECKING:
         KernelResourceAllocationFilterGQL,
         KernelResourceAllocationOrderByGQL,
         ResourceAllocationConnectionGQL,
+    )
+    from ai.backend.manager.api.gql.scheduling_history.resolver import (
+        KernelSchedulingHistoryConnectionGQL,
+    )
+    from ai.backend.manager.api.gql.scheduling_history.types import (
+        KernelSchedulingHistoryFilterGQL,
+        KernelSchedulingHistoryOrderByGQL,
     )
     from ai.backend.manager.api.gql.session.types import SessionV2GQL
 
@@ -74,6 +80,7 @@ class KernelV2StatusGQL(StrEnum):
     """GraphQL enum for kernel status."""
 
     PENDING = "PENDING"
+    RESERVED = "RESERVED"
     SCHEDULED = "SCHEDULED"
     PREPARING = "PREPARING"
     PREPARED = "PREPARED"
@@ -217,7 +224,7 @@ class ResourceAllocationGQL(PydanticOutputMixin[ResourceAllocationGQLDTO]):
     )
     allocated: ResourceSlotGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description=(
                 "The resource slots actually allocated, computed from the "
                 "resource_allocations table. Unlike `used`, this persists after the "
@@ -410,7 +417,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description=(
                 "Resource allocation (requested / used / allocated) computed on-demand "
                 "from the resource_allocations table. Unlike the deprecated eager "
@@ -553,6 +560,88 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
                 start_cursor=edges[0].cursor if edges else None,
                 end_cursor=edges[-1].cursor if edges else None,
             ),
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.0",
+            description="Scheduling history of this kernel with pagination support.",
+        )
+    )  # type: ignore[misc]
+    async def scheduling_histories(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            KernelSchedulingHistoryFilterGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.scheduling_history.types"),
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                KernelSchedulingHistoryOrderByGQL,
+                strawberry.lazy("ai.backend.manager.api.gql.scheduling_history.types"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> (
+        Annotated[
+            KernelSchedulingHistoryConnectionGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.scheduling_history.resolver"),
+        ]
+        | None
+    ):
+        """Fetch the scheduling history of this kernel."""
+        from uuid import UUID
+
+        from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+        from ai.backend.common.dto.manager.v2.scheduling_history.request import (
+            ScopedSearchKernelHistoriesInput,
+        )
+        from ai.backend.common.dto.manager.v2.scheduling_history.types import (
+            KernelHistoryScopeDTO,
+        )
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.scheduling_history.resolver import (
+            KernelSchedulingHistoryConnectionGQL,
+            KernelSchedulingHistoryEdgeGQL,
+        )
+        from ai.backend.manager.api.gql.scheduling_history.types import (
+            KernelSchedulingHistoryGQL,
+        )
+
+        result = await info.context.adapters.scheduling_history.scoped_search_kernel_history(
+            ScopedSearchKernelHistoriesInput(
+                scope=KernelHistoryScopeDTO(kernel=[UUIDScope(value=UUID(str(self.id)))]),
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            )
+        )
+        nodes = [KernelSchedulingHistoryGQL.from_pydantic(item) for item in result.items]
+        edges = [
+            KernelSchedulingHistoryEdgeGQL(node=node, cursor=encode_cursor(str(node.id)))
+            for node in nodes
+        ]
+        return KernelSchedulingHistoryConnectionGQL(
+            edges=edges,
+            page_info=strawberry.relay.PageInfo(
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=result.total_count,
         )
 
     @classmethod

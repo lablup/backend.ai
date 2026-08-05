@@ -24,7 +24,7 @@ class PurgeScalingGroupAction(ScalingGroupAction):
 
     @override
     def entity_id(self) -> str | None:
-        return str(self.purger.pk_value)
+        return str(self.purger.spec.pk_value())
 
 
 @dataclass(frozen=True)

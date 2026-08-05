@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
@@ -41,6 +40,7 @@ from ai.backend.manager.models.base import (
     StrEnumType,
     URLColumn,
 )
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 from ai.backend.manager.models.runtime_variant_preset.types import RuntimeVariantPresetValueEntry
 
 if TYPE_CHECKING:
@@ -79,7 +79,7 @@ def _get_routings_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     return DeploymentRevisionRow.id == foreign(RoutingRow.revision)
 
 
-class DeploymentRevisionRow(Base):  # type: ignore[misc]
+class DeploymentRevisionRow(CreatedAtMixin, Base):  # type: ignore[misc]
     """
     Represents a deployment revision (K8s ReplicaSet equivalent).
 
@@ -239,14 +239,6 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
         GUID(DeploymentPresetID),
         sa.ForeignKey("deployment_revision_presets.id", ondelete="SET NULL"),
         nullable=True,
-    )
-
-    # Metadata
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        nullable=False,
     )
 
     # Normalized resource slot rows

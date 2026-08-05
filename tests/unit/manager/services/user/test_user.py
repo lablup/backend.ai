@@ -11,6 +11,7 @@ from uuid import UUID
 import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.validators import ActionValidators
@@ -114,6 +115,7 @@ class TestUserServiceCompatibility:
                     status=UserStatus.ACTIVE,
                 )
             ),
+            _domain_id=DomainID(uuid.uuid4()),
         )
 
         await user_service.create_user(action)
@@ -146,6 +148,7 @@ class TestUserServiceCompatibility:
                     container_gids=[2000, 2001],
                 )
             ),
+            _domain_id=DomainID(uuid.uuid4()),
         )
 
         await user_service.create_user(action)

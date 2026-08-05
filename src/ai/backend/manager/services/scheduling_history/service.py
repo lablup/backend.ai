@@ -2,6 +2,18 @@ from __future__ import annotations
 
 from ai.backend.manager.repositories.scheduling_history import SchedulingHistoryRepository
 
+from .actions.global_search_replica_group_history import (
+    GlobalSearchReplicaGroupHistoryAction,
+    GlobalSearchReplicaGroupHistoryActionResult,
+)
+from .actions.resolve_kernel_session import (
+    ResolveKernelSessionAction,
+    ResolveKernelSessionActionResult,
+)
+from .actions.scoped_search_replica_group_history import (
+    ScopedSearchReplicaGroupHistoryAction,
+    ScopedSearchReplicaGroupHistoryActionResult,
+)
 from .actions.search_deployment_history import (
     SearchDeploymentHistoryAction,
     SearchDeploymentHistoryActionResult,
@@ -9,6 +21,14 @@ from .actions.search_deployment_history import (
 from .actions.search_deployment_scoped_history import (
     SearchDeploymentScopedHistoryAction,
     SearchDeploymentScopedHistoryActionResult,
+)
+from .actions.search_kernel_history import (
+    SearchKernelHistoryAction,
+    SearchKernelHistoryActionResult,
+)
+from .actions.search_kernel_scoped_history import (
+    SearchKernelScopedHistoryAction,
+    SearchKernelScopedHistoryActionResult,
 )
 from .actions.search_route_history import (
     SearchRouteHistoryAction,
@@ -54,6 +74,22 @@ class SchedulingHistoryService:
             has_previous_page=result.has_previous_page,
         )
 
+    async def search_kernel_history(
+        self,
+        action: SearchKernelHistoryAction,
+    ) -> SearchKernelHistoryActionResult:
+        """Searches kernel scheduling history (admin API)."""
+        result = await self._repository.search_kernel_history(
+            querier=action.querier,
+        )
+
+        return SearchKernelHistoryActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
     async def search_deployment_history(
         self,
         action: SearchDeploymentHistoryAction,
@@ -65,6 +101,22 @@ class SchedulingHistoryService:
 
         return SearchDeploymentHistoryActionResult(
             histories=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def global_search_replica_group_history(
+        self,
+        action: GlobalSearchReplicaGroupHistoryAction,
+    ) -> GlobalSearchReplicaGroupHistoryActionResult:
+        """Searches replica-group scheduling history across every scope."""
+        result = await self._repository.admin_search_replica_group_history(
+            querier=action.querier,
+        )
+
+        return GlobalSearchReplicaGroupHistoryActionResult(
+            items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
@@ -105,6 +157,32 @@ class SchedulingHistoryService:
             has_previous_page=result.has_previous_page,
         )
 
+    async def resolve_kernel_session(
+        self,
+        action: ResolveKernelSessionAction,
+    ) -> ResolveKernelSessionActionResult:
+        """Resolves the session owning a kernel; raises KernelNotFound if absent."""
+        session_id = await self._repository.resolve_session_id(action.kernel_id)
+        return ResolveKernelSessionActionResult(session_id=session_id)
+
+    async def search_kernel_scoped_history(
+        self,
+        action: SearchKernelScopedHistoryAction,
+    ) -> SearchKernelScopedHistoryActionResult:
+        """Searches kernel scheduling history within the caller's authorized scopes."""
+        result = await self._repository.search_kernel_scoped_history(
+            querier=action.querier,
+            scopes=[action.target.to_search_scope()],
+        )
+
+        return SearchKernelScopedHistoryActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            target=action.target,
+        )
+
     async def search_deployment_scoped_history(
         self,
         action: SearchDeploymentScopedHistoryAction,
@@ -120,6 +198,24 @@ class SchedulingHistoryService:
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
+        )
+
+    async def scoped_search_replica_group_history(
+        self,
+        action: ScopedSearchReplicaGroupHistoryAction,
+    ) -> ScopedSearchReplicaGroupHistoryActionResult:
+        """Searches replica-group scheduling history within the caller's authorized scope."""
+        result = await self._repository.scoped_search_replica_group_history(
+            querier=action.querier,
+            scopes=[action.target.to_search_scope()],
+        )
+
+        return ScopedSearchReplicaGroupHistoryActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            target=action.target,
         )
 
     async def search_route_scoped_history(

@@ -1,14 +1,30 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.permission.types import EntityType
+from ai.backend.manager.actions.action.global_action import BaseGlobalAction
 from ai.backend.manager.actions.action.scope import BaseScopeAction, BaseScopeActionResult
 from ai.backend.manager.actions.action.single_entity import (
     BaseSingleEntityAction,
     BaseSingleEntityActionResult,
 )
 from ai.backend.manager.actions.action.types import FieldData
+
+
+@dataclass
+class AppConfigDefinitionGlobalAction(BaseGlobalAction):
+    """Base for super-admin global actions on app config definitions (admin search).
+
+    A system-wide search belongs to no RBAC scope, so it is gated by the SUPERADMIN role
+    rather than resolved against a scope chain.
+    """
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.APP_CONFIG_DEFINITION
 
 
 class AppConfigDefinitionScopeAction(BaseScopeAction):

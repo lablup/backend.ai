@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 from uuid import UUID
@@ -12,6 +13,7 @@ from sqlalchemy.engine import CursorResult
 
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
+from ai.backend.manager.repositories.base.types import ConflictCheck
 
 from .integrity import parse_integrity_error
 
@@ -22,21 +24,94 @@ TRow = TypeVar("TRow", bound=Base)
 
 
 # =============================================================================
+# Purge Precondition Validation
+# =============================================================================
+
+
+async def validate_conflict_checks(
+    db_sess: SASession,
+    conflict_checks: Sequence[ConflictCheck],
+) -> None:
+    """Validate conflict checks in a single query, raising the first failing check's error."""
+    if not conflict_checks:
+        return
+
+    select_clauses = [
+        sa.exists().where(check.condition()).label(f"conflict_{i}")
+        for i, check in enumerate(conflict_checks)
+    ]
+    result = await db_sess.execute(sa.select(*select_clauses))
+    row = result.mappings().one()
+
+    for i, check in enumerate(conflict_checks):
+        if row[f"conflict_{i}"]:
+            raise check.error
+
+
+# =============================================================================
 # Single-row Purger (by PK)
 # =============================================================================
 
 
-@dataclass
-class Purger[TRow: Base]:
-    """Single-row delete by primary key.
+class PurgerSpec[TRow: Base](ABC):
+    """Abstract base class defining a single-row purge target."""
 
-    Attributes:
-        row_class: ORM class for table access and PK detection.
-        pk_value: Primary key value to identify the target row.
+    @abstractmethod
+    def row_class(self) -> type[TRow]:
+        """Return the ORM class for table access and PK detection."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def pk_value(self) -> UUID | str | int:
+        """Return the primary key value identifying the target row."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        """Return rows that must not exist before deletion (empty if none)."""
+        raise NotImplementedError
+
+
+class DataPurger[TRow: Base, TData](PurgerSpec[TRow], ABC):
+    """A purger spec that also says how the deleted row becomes data.
+
+    ``PurgerSpec`` is already self-contained about what to delete; this adds the
+    conversion so the ops layer returns the ``data/`` type of the row it removed
+    instead of the row itself.
+
+    Example:
+        class UserPurger(DataPurger[UserRow, UserData]):
+            def row_class(self) -> type[UserRow]:
+                return UserRow
+
+            def pk_value(self) -> UUID:
+                return self._user_id
+
+            def conflict_checks(self) -> Sequence[ConflictCheck]:
+                return ()
+
+            def to_data(self, row: UserRow) -> UserData:
+                return row.to_data()
+
+        async with ops.write_ops() as w:
+            removed = await w.purge_data(UserPurger(user_id))
     """
 
-    row_class: type[TRow]
-    pk_value: UUID | str | int
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        """Convert the deleted row into its ``data/`` type."""
+        raise NotImplementedError
+
+
+@dataclass
+class Purger[TRow: Base]:
+    """Bundles purger spec for single-row delete operations.
+
+    Attributes:
+        spec: PurgerSpec implementation defining what to delete.
+    """
+
+    spec: PurgerSpec[TRow]
 
 
 @dataclass
@@ -95,29 +170,19 @@ async def execute_purger[TRow: Base](
 ) -> PurgerResult[TRow] | None:
     """Execute DELETE for a single row by primary key.
 
-    Args:
-        db_sess: Database session (must be writable)
-        purger: Purger containing row_class and pk_value
+    The spec's ``conflict_checks`` are validated in a single query before
+    deletion.
 
     Returns:
         PurgerResult containing the deleted row, or None if no row matched
 
     Raises:
+        BackendAIError: The error declared by the first failing conflict check.
         RepositoryIntegrityError: If the DELETE violates a database constraint
-            (e.g., foreign key). This is a safety-net fallback; callers should
-            use ``existence_checks`` before invoking the purger to provide
-            user-friendly error messages.
-
-    Example:
-        purger = Purger(
-            row_class=SessionRow,
-            pk_value=session_id,
-        )
-        result = await execute_purger(db_sess, purger)
-        if result:
-            print(result.row.id)  # Deleted row
+            not covered by ``conflict_checks``.
     """
-    row_class = purger.row_class
+    spec = purger.spec
+    row_class = spec.row_class()
     table = row_class.__table__
     pk_columns = list(table.primary_key.columns)
 
@@ -126,7 +191,9 @@ async def execute_purger[TRow: Base](
             f"Purger only supports single-column primary keys (table: {table.name})",
         )
 
-    stmt = sa.delete(table).where(pk_columns[0] == purger.pk_value).returning(*table.columns)
+    await validate_conflict_checks(db_sess, spec.conflict_checks())
+
+    stmt = sa.delete(table).where(pk_columns[0] == spec.pk_value()).returning(*table.columns)
 
     try:
         result = await db_sess.execute(stmt)
@@ -166,6 +233,39 @@ class BatchPurgerSpec[TRow: Base](ABC):
                 SessionRow.status == SessionStatus.TERMINATED
             )
         """
+        raise NotImplementedError
+
+    @abstractmethod
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        """Return rows that must not exist before deletion (empty if none)."""
+        raise NotImplementedError
+
+
+class DataBatchPurger[TRow: Base, TData](BatchPurgerSpec[TRow], ABC):
+    """A batch purger that also says how each deleted row becomes data.
+
+    ``BatchPurgerSpec`` is already self-contained about what to delete; this adds the
+    conversion so the operation returns the entities it removed rather than a count,
+    which is what the scope shape reports through its result.
+
+    Example:
+        class PurgeOldSessions(DataBatchPurger[SessionRow, SessionData]):
+            def build_subquery(self) -> sa.sql.Select[tuple[SessionRow]]:
+                return sa.select(SessionRow).where(SessionRow.terminated_at < self._cutoff)
+
+            def conflict_checks(self) -> Sequence[ConflictCheck]:
+                return ()
+
+            def to_data(self, row: SessionRow) -> SessionData:
+                return row.to_data()
+
+        async with ops.write_ops() as w:
+            removed = await w.batch_purge_data(PurgeOldSessions(cutoff))
+    """
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        """Convert one deleted row into its ``data/`` type."""
         raise NotImplementedError
 
 
@@ -225,9 +325,9 @@ async def execute_bulk_purger_partial[TRow: Base](
 
     Example:
         purgers = [
-            Purger(SessionRow, session_id_1),
-            Purger(SessionRow, session_id_2),
-            Purger(SessionRow, session_id_with_fk_constraint),  # Fails
+            Purger(spec=SessionPurgerSpec(session_id_1)),
+            Purger(spec=SessionPurgerSpec(session_id_2)),
+            Purger(spec=SessionPurgerSpec(session_id_with_fk_constraint)),  # Fails
         ]
         result = await execute_bulk_purger_partial(db_sess, purgers)
 
@@ -247,7 +347,8 @@ async def execute_bulk_purger_partial[TRow: Base](
         # If this row fails, only this savepoint is rolled back, not the entire session
         try:
             async with db_sess.begin_nested():
-                row_class = purger.row_class
+                spec = purger.spec
+                row_class = spec.row_class()
                 table = row_class.__table__
                 pk_columns = list(table.primary_key.columns)
 
@@ -256,9 +357,11 @@ async def execute_bulk_purger_partial[TRow: Base](
                         f"Purger only supports single-column primary keys (table: {table.name})",
                     )
 
+                await validate_conflict_checks(db_sess, spec.conflict_checks())
+
                 stmt = (
                     sa.delete(table)
-                    .where(pk_columns[0] == purger.pk_value)
+                    .where(pk_columns[0] == spec.pk_value())
                     .returning(*table.columns)
                 )
 
@@ -300,6 +403,9 @@ async def execute_batch_purger[TRow: Base](
 ) -> BatchPurgerResult:
     """Execute bulk delete with batch purger.
 
+    The spec's ``conflict_checks`` are validated in a single query before
+    deletion starts.
+
     Args:
         db_sess: Database session (must be writable)
         purger: BatchPurger containing spec and batch configuration
@@ -308,10 +414,9 @@ async def execute_batch_purger[TRow: Base](
         BatchPurgerResult containing the total count of deleted rows
 
     Raises:
+        BackendAIError: The error declared by the first failing conflict check.
         RepositoryIntegrityError: If the DELETE violates a database constraint
-            (e.g., foreign key). This is a safety-net fallback; callers should
-            use ``existence_checks`` before invoking the purger to provide
-            user-friendly error messages.
+            (e.g., foreign key) not covered by the spec's ``conflict_checks``.
 
     Note:
         This performs a hard delete. For soft delete, implement
@@ -333,10 +438,15 @@ async def execute_batch_purger[TRow: Base](
         purger = BatchPurger(spec=OldSessionBatchPurgerSpec(cutoff_date))
         result = await execute_batch_purger(db_sess, purger)
     """
-    # Extract table and PK columns from the subquery
+    # Resolve the target table from the mapped entity rather than the query's
+    # FROM clause: an entity with an eager (``lazy="joined"``) relationship
+    # compiles to an _ORMJoin whose primary_key is a ColumnSet, not a Table.
     base_subquery = purger.spec.build_subquery()
-    table = cast(sa.Table, base_subquery.froms[0])
+    entity = base_subquery.column_descriptions[0]["entity"]
+    table = sa.inspect(entity).local_table
     pk_columns = list(table.primary_key.columns)
+
+    await validate_conflict_checks(db_sess, purger.spec.conflict_checks())
 
     total_deleted = 0
 

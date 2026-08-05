@@ -56,10 +56,6 @@ class UnschedulableReasonHintInfo(BaseResponseModel):
         default=None,
         description="Subtract these slots to fit the best-fitting node.",
     )
-    available_archs: list[str] | None = Field(
-        default=None,
-        description="Architectures that actually exist among the scheduling targets.",
-    )
 
 
 class ComputeScheduleKernelResultInfo(BaseResponseModel):

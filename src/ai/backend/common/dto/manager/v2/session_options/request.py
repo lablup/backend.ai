@@ -23,9 +23,9 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.v2.common import (
     BinarySizeInput,
+    MountItemInput,
     ResourceSlotEntryInput,
 )
-from ai.backend.common.dto.manager.v2.session.request import MountItemInput
 from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum
 from ai.backend.common.dto.manager.v2.session_options.types import (
     AgentSelectionPolicyEnum,

@@ -1,9 +1,10 @@
+from collections.abc import Collection
 from datetime import datetime
-from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -14,7 +15,10 @@ from ai.backend.manager.data.auth.login_session_types import (
     LoginHistoryData,
     LoginSessionData,
 )
-from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
+from ai.backend.manager.data.auth.types import (
+    GroupMembershipData,
+    UserCreationData,
+)
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.scopes import SearchScope
@@ -27,6 +31,7 @@ from ai.backend.manager.repositories.auth.db_source.db_source import (
     LoginSessionCreationResult,
 )
 from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 
 auth_repository_resilience = Resilience(
     policies=[
@@ -52,10 +57,18 @@ class AuthRepository:
     @auth_repository_resilience.apply()
     async def create_user_with_keypair(
         self,
-        user_data: dict[str, Any],
-        keypair_data: dict[str, Any],
-    ) -> UserData:
-        return await self._db_source.insert_user_with_keypair(user_data, keypair_data)
+        user_spec: UserCreatorSpec,
+        project_ids: Collection[ProjectID],
+        *,
+        keypair_resource_policy: str,
+        keypair_rate_limit: int,
+    ) -> UserCreationData:
+        return await self._db_source.insert_user_with_keypair(
+            user_spec,
+            project_ids,
+            keypair_resource_policy=keypair_resource_policy,
+            keypair_rate_limit=keypair_rate_limit,
+        )
 
     @auth_repository_resilience.apply()
     async def update_user_full_name(self, email: str, domain_name: str, full_name: str) -> None:

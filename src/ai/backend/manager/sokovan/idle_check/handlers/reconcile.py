@@ -2,31 +2,30 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Mapping
+from datetime import datetime
 from typing import override
 
-from ai.backend.common.data.idle_checker.types import CheckerType
+from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckPhase
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.repositories.idle_checker.types import (
     IdleCheckBatchData,
     IdleCheckerDefinitionData,
+    IdleJudgmentData,
 )
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
+    IdleActivityDecision,
     IdleChecker,
+    IdleCheckerContext,
 )
-from ai.backend.manager.sokovan.idle_check.types import (
-    IdleCheckReconcileInfo,
-    IdleCheckReport,
-    IdleCheckResult,
-    IdleReason,
-)
+from ai.backend.manager.sokovan.idle_check.types import IdleCheckReconcileInfo, IdleCheckResult
 from ai.backend.manager.sokovan.reconciler.base import ReconcilerHandler
 
 
 class IdleCheckReconcileHandler(ReconcilerHandler[IdleCheckReconcileInfo, IdleCheckResult]):
-    """Drive checker-axis judgments and merge idle reasons into session reports."""
+    """Drive checker-axis judgments for persistence by the applier."""
 
     _checkers: Mapping[CheckerType, IdleChecker]
 
@@ -36,22 +35,41 @@ class IdleCheckReconcileHandler(ReconcilerHandler[IdleCheckReconcileInfo, IdleCh
     @override
     async def execute(self, reconcile_info: IdleCheckReconcileInfo) -> IdleCheckResult:
         assignments_by_type = self._assignments_by_type(reconcile_info.batch)
-        reasons_by_session: defaultdict[SessionId, list[IdleReason]] = defaultdict(list)
+        context = IdleCheckerContext(current_time=reconcile_info.now())
+        all_judgments: list[IdleJudgmentData] = []
         for checker_type, assignments in assignments_by_type.items():
             checker = self._checkers.get(checker_type)
             if checker is None:
                 continue
-            judgments = await checker.judge(assignments)
-            for judgment in judgments:
-                if not judgment.is_idle:
-                    continue
-                reasons_by_session[judgment.session_id].append(
-                    IdleReason(checker_id=judgment.checker_id, message=judgment.message)
+            decisions = await checker.judge(
+                assignments,
+                context=context,
+            )
+            for decision in decisions:
+                all_judgments.append(
+                    self._build_judgment(decision, current_time=context.current_time)
                 )
-        reports: list[IdleCheckReport] = []
-        for session_id, reasons in reasons_by_session.items():
-            reports.append(IdleCheckReport(session_id=session_id, reasons=reasons))
-        return IdleCheckResult(reports=reports)
+        return IdleCheckResult(judgments=all_judgments)
+
+    def _build_judgment(
+        self,
+        decision: IdleActivityDecision,
+        *,
+        current_time: datetime,
+    ) -> IdleJudgmentData:
+        if decision.is_active:
+            status = IdleCheckPhase.ACTIVE
+        elif decision.expire_at <= current_time:
+            status = IdleCheckPhase.IDLE_EXPIRED
+        else:
+            status = IdleCheckPhase.IDLE
+        return IdleJudgmentData(
+            session_id=decision.session_id,
+            checker_id=decision.checker_id,
+            status=status,
+            expire_at=decision.expire_at,
+            message=decision.message,
+        )
 
     def _assignments_by_type(
         self, batch: IdleCheckBatchData
@@ -61,12 +79,10 @@ class IdleCheckReconcileHandler(ReconcilerHandler[IdleCheckReconcileInfo, IdleCh
         sessions_by_checker: defaultdict[IdleCheckerID, dict[SessionId, IdleCheckSession]] = (
             defaultdict(dict)
         )
-        for target in batch.targets:
-            for bound in target.checkers:
-                definitions[bound.checker.checker_id] = bound.checker
-                sessions_by_checker[bound.checker.checker_id][target.session.session_id] = (
-                    target.session
-                )
+        for assignment in batch.assignments:
+            checker_id = assignment.checker.checker_id
+            definitions[checker_id] = assignment.checker
+            sessions_by_checker[checker_id][assignment.session.session_id] = assignment.session
         assignments_by_type: defaultdict[CheckerType, list[CheckerAssignment]] = defaultdict(list)
         for checker_id, definition in definitions.items():
             assignments_by_type[definition.checker_type].append(

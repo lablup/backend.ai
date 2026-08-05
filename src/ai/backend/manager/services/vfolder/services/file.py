@@ -76,8 +76,6 @@ class VFolderFileService:
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
-        if not vfolder_data:
-            raise VFolderInvalidParameter("VFolder not found")
 
         # Check host permissions
         allowed_vfolder_types = (
@@ -126,8 +124,6 @@ class VFolderFileService:
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
-        if not vfolder_data:
-            raise VFolderInvalidParameter("VFolder not found")
 
         # Check host permissions
         allowed_vfolder_types = (
@@ -248,8 +244,6 @@ class VFolderFileService:
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
-        if not vfolder_data:
-            raise VFolderInvalidParameter("VFolder not found")
 
         # Check host permissions
         allowed_vfolder_types = (
@@ -292,9 +286,6 @@ class VFolderFileService:
             action.vfolder_uuid, user.id, user.domain_name
         )
 
-        if not vfolder_data:
-            raise VFolderInvalidParameter("The specified vfolder is not accessible.")
-
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
         )
@@ -324,9 +315,6 @@ class VFolderFileService:
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
-
-        if not vfolder_data:
-            raise VFolderInvalidParameter("The specified vfolder is not accessible.")
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
@@ -365,8 +353,6 @@ class VFolderFileService:
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
-        if not vfolder_data:
-            raise VFolderInvalidParameter("VFolder not found")
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
@@ -400,8 +386,6 @@ class VFolderFileService:
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
-        if not vfolder_data:
-            raise VFolderInvalidParameter("VFolder not found")
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
@@ -466,8 +450,6 @@ class VFolderFileService:
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_id, user.id, user.domain_name
         )
-        if not vfolder_data:
-            raise VFolderInvalidParameter("VFolder not found")
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
@@ -494,8 +476,6 @@ class VFolderFileService:
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_id, user.id, user.domain_name
         )
-        if not vfolder_data:
-            raise VFolderInvalidParameter("VFolder not found")
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
@@ -521,8 +501,6 @@ class VFolderFileService:
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_id, user.id, user.domain_name
         )
-        if not vfolder_data:
-            raise VFolderInvalidParameter("The specified vfolder is not accessible.")
 
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
@@ -551,8 +529,6 @@ class VFolderFileService:
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_id, user.id, user.domain_name
         )
-        if not vfolder_data:
-            raise VFolderInvalidParameter("VFolder not found")
 
         # Host permission check — resolved from user_id
         await self._vfolder_repository.ensure_host_permission_allowed_by_user(

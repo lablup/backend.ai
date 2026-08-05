@@ -8,7 +8,6 @@ from datetime import datetime
 from typing import override
 from uuid import UUID
 
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.reconciler.types import (
     BaseReconcilerCategory,
@@ -17,7 +16,10 @@ from ai.backend.manager.data.reconciler.types import (
 )
 from ai.backend.manager.data.session.options import HandlerPolicyResolver
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.repositories.idle_checker.types import IdleCheckBatchData
+from ai.backend.manager.repositories.idle_checker.types import (
+    IdleCheckBatchData,
+    IdleJudgmentData,
+)
 from ai.backend.manager.sokovan.reconciler.base import (
     BaseReconcilerInfo,
     BaseReconcilerKind,
@@ -28,7 +30,8 @@ from ai.backend.manager.sokovan.reconciler.base import (
 
 
 class IdleCheckCategory(BaseReconcilerCategory):
-    IDLE = "idle"
+    IDLE_CHECK = "idle_check"
+    SESSION_IDLE_CHECK = "session_idle_check"
 
 
 class IdleCheckKind(BaseReconcilerKind):
@@ -47,7 +50,8 @@ class IdleCheckReconcileInfo(BaseReconcilerInfo):
 
     @override
     def entity_ids(self) -> Sequence[UUID]:
-        return [target.session.session_id for target in self.batch.targets]
+        session_ids = (assignment.session.session_id for assignment in self.batch.assignments)
+        return list(dict.fromkeys(session_ids))
 
     @override
     def now(self) -> datetime:
@@ -78,29 +82,13 @@ class IdleCheckDecision(ReconcilerDecision):
         return self.handler_policy
 
 
-@dataclass(frozen=True)
-class IdleReason:
-    """One checker's grounds for judging a session idle."""
-
-    checker_id: IdleCheckerID
-    message: str
-
-
-@dataclass(frozen=True)
-class IdleCheckReport:
-    """One session judged idle and every checker's reason for it."""
-
-    session_id: SessionId
-    reasons: Sequence[IdleReason]
-
-
 @dataclass
 class IdleCheckResult(BaseReconcilerResult):
-    reports: list[IdleCheckReport] = field(default_factory=list)
+    judgments: list[IdleJudgmentData] = field(default_factory=list)
 
     @override
     def processed_count(self) -> int:
-        return len(self.reports)
+        return len(self.judgments)
 
     @override
     def failed_count(self) -> int:
@@ -108,5 +96,4 @@ class IdleCheckResult(BaseReconcilerResult):
 
     @override
     def decisions(self) -> Sequence[ReconcilerDecision]:
-        # Idle output is a termination list, not per-entity retryable outcomes.
         return ()

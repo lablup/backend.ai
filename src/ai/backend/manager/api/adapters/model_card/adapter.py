@@ -73,6 +73,7 @@ from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.model_card.creators import ModelCardCreatorSpec
+from ai.backend.manager.repositories.model_card.purgers import ModelCardPurgerSpec
 from ai.backend.manager.repositories.model_card.types import (
     ProjectModelCardSearchScope,
     VFolderModelCardSearchScope,
@@ -419,7 +420,7 @@ class ModelCardAdapter(BaseAdapter):
     ) -> DeleteModelCardPayload:
         result = await self._processors.model_card.delete.wait_for_complete(
             DeleteModelCardAction(
-                purger=Purger(row_class=ModelCardRow, pk_value=card_id),
+                purger=Purger(spec=ModelCardPurgerSpec(card_id=card_id)),
                 options=options,
             )
         )
@@ -447,7 +448,7 @@ class ModelCardAdapter(BaseAdapter):
     ) -> BulkDeleteModelCardActionResult:
         return await self._processors.model_card.bulk_delete.wait_for_complete(
             BulkDeleteModelCardAction(
-                purgers=[Purger(row_class=ModelCardRow, pk_value=card_id) for card_id in card_ids],
+                purgers=[Purger(spec=ModelCardPurgerSpec(card_id=card_id)) for card_id in card_ids],
                 options=options,
             )
         )

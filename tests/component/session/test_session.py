@@ -20,7 +20,7 @@ from ai.backend.common.dto.manager.session.response import (
     MatchSessionsResponse,
 )
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.repositories.scheduler.types.session import MarkTerminatingResult
+from ai.backend.manager.views.sokovan.session import MarkTerminatingResult
 
 from .conftest import SessionSeedData
 

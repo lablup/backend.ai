@@ -46,6 +46,7 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.group.db_source import GroupDBSource
+from ai.backend.manager.repositories.ops.rbac.provider import RBACWriteOps
 from ai.backend.testutils.db import with_tables
 
 
@@ -524,7 +525,7 @@ class TestGroupDBSourceDeleteEndpoints:
     ) -> None:
         """Test successful deletion of endpoints with routing entries"""
         async with db_with_cleanup.begin_session() as session:
-            await group_db_source._delete_group_endpoints(session, test_group)
+            await group_db_source._delete_group_endpoints(RBACWriteOps(session), test_group)
             await session.commit()
 
         async with db_with_cleanup.begin_session() as session:
@@ -550,7 +551,7 @@ class TestGroupDBSourceDeleteEndpoints:
         session_id = inactive_endpoint_with_session_and_routing.session_id
 
         async with db_with_cleanup.begin_session() as session:
-            await group_db_source._delete_group_endpoints(session, test_group)
+            await group_db_source._delete_group_endpoints(RBACWriteOps(session), test_group)
             await session.commit()
 
         async with db_with_cleanup.begin_session() as session:
@@ -579,7 +580,7 @@ class TestGroupDBSourceDeleteEndpoints:
         """Test that active endpoints raise an exception"""
         with pytest.raises(ProjectHasActiveEndpointsError):
             async with db_with_cleanup.begin_session() as session:
-                await group_db_source._delete_group_endpoints(session, test_group)
+                await group_db_source._delete_group_endpoints(RBACWriteOps(session), test_group)
 
         async with db_with_cleanup.begin_session() as session:
             endpoints_result = await session.execute(
@@ -595,7 +596,7 @@ class TestGroupDBSourceDeleteEndpoints:
     ) -> None:
         """Test deletion with no endpoints (should complete without errors)"""
         async with db_with_cleanup.begin_session() as session:
-            await group_db_source._delete_group_endpoints(session, test_group)
+            await group_db_source._delete_group_endpoints(RBACWriteOps(session), test_group)
             await session.commit()
 
     async def test_delete_group_endpoints_no_synchronize_session_error(
@@ -615,7 +616,7 @@ class TestGroupDBSourceDeleteEndpoints:
         session_ids = multiple_endpoints_with_sessions.session_ids
 
         async with db_with_cleanup.begin_session() as session:
-            await group_db_source._delete_group_endpoints(session, test_group)
+            await group_db_source._delete_group_endpoints(RBACWriteOps(session), test_group)
             await session.commit()
 
         async with db_with_cleanup.begin_session() as session:

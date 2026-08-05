@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
-
 import sqlalchemy as sa
 from sqlalchemy.orm import (
     Mapped,
@@ -16,9 +14,10 @@ from ai.backend.manager.models.base import (
     Base,
     StrEnumType,
 )
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 
-class RolePresetRow(Base):  # type: ignore[misc]
+class RolePresetRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     __tablename__ = "role_presets"
     __table_args__ = (
         sa.Index(
@@ -32,6 +31,9 @@ class RolePresetRow(Base):  # type: ignore[misc]
         "id", GUID(RolePresetID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     name: Mapped[str] = mapped_column("name", sa.String(64), nullable=False)
+    role_name_template: Mapped[str | None] = mapped_column(
+        "role_name_template", sa.Text, nullable=True
+    )
     scope_type: Mapped[ScopeType] = mapped_column(
         "scope_type", StrEnumType(ScopeType, length=32), nullable=False
     )
@@ -44,21 +46,12 @@ class RolePresetRow(Base):  # type: ignore[misc]
     deleted: Mapped[bool] = mapped_column(
         "deleted", sa.Boolean, nullable=False, server_default=sa.false()
     )
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
-        nullable=False,
-    )
 
     def to_data(self) -> RolePresetData:
         return RolePresetData(
             id=self.id,
             name=self.name,
+            role_name_template=self.role_name_template,
             scope_type=self.scope_type.to_element(),
             auto_assign=self.auto_assign,
             deleted=self.deleted,

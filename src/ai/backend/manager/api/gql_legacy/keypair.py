@@ -632,10 +632,4 @@ class DeleteKeyPair(graphene.Mutation):  # type: ignore[misc]
             if (await db_session.scalar(user_query) or 0) > 0:
                 return DeleteKeyPair(False, "the keypair is used as main access key by any user")
         delete_query = sa.delete(keypairs).where(keypairs.c.access_key == access_key)
-        result = await simple_db_mutate(cls, ctx, delete_query)
-        if result.ok:
-            await ctx.valkey_stat.delete_keypair_concurrency(
-                access_key=str(access_key),
-                is_private=False,
-            )
-        return result
+        return await simple_db_mutate(cls, ctx, delete_query)

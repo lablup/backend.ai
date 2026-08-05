@@ -11,6 +11,7 @@ from ai.backend.common.contexts.user import with_triggered_user, with_user
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import ErrorCode
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.actions.action import (
     BaseAction,
     BaseActionResult,
@@ -18,6 +19,7 @@ from ai.backend.manager.actions.action import (
     BaseActionTriggerMeta,
     ProcessResult,
 )
+from ai.backend.manager.actions.audit_policy import AuditLogPolicy
 from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
@@ -181,7 +183,7 @@ class TestAuditLogMonitorExclusionAtSetupTime:
 
     @pytest.fixture
     def audit_log_monitor(self, mock_audit_log_repository: MagicMock) -> AuditLogMonitor:
-        return AuditLogMonitor(repository=mock_audit_log_repository)
+        return AuditLogMonitor(repository=mock_audit_log_repository, policy=AuditLogPolicy([]))
 
     @pytest.fixture
     def mock_action(self) -> MockAction:
@@ -213,6 +215,7 @@ def _make_user(user_id: UUID, is_superadmin: bool = False) -> UserData:
         is_superadmin=is_superadmin,
         role=UserRole.SUPERADMIN if is_superadmin else UserRole.USER,
         domain_name="default",
+        domain_id=DomainID(uuid4()),
     )
 
 
@@ -228,7 +231,7 @@ class TestAuditLogMonitorActorIdentities:
 
     @pytest.fixture
     def audit_log_monitor(self, mock_audit_log_repository: MagicMock) -> AuditLogMonitor:
-        return AuditLogMonitor(repository=mock_audit_log_repository)
+        return AuditLogMonitor(repository=mock_audit_log_repository, policy=AuditLogPolicy([]))
 
     def _result(self) -> ProcessResult:
         now = datetime.now(tz=UTC)

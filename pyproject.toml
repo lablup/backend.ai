@@ -5,6 +5,10 @@ dynamic = ["version"]
 
 [tool.towncrier]
 package = "ai.backend.manager"  # reference point for getting __version__
+# Releases go to the per-version-branch file instead: scripts/run-towncrier.py
+# overrides this with CHANGELOG/<version>.md on every run. The value is kept
+# because towncrier picks the markdown template from this suffix, and because
+# dropping it would fall back to NEWS.rst.
 filename = "CHANGELOG.md"
 directory = "changes/"
 title_format = ""  # embedded inside the template
@@ -334,7 +338,12 @@ namespace_packages = true
 explicit_package_bases = true
 python_executable = "dist/export/python/virtualenvs/python-default/3.13.7/bin/python"
 disable_error_code = ["typeddict-unknown-key", "import-untyped"]
-enable_error_code = ["possibly-undefined", "explicit-override"]
+enable_error_code = [
+    "possibly-undefined",
+    "explicit-override",
+    "truthy-iterable",
+    "truthy-bool",
+]
 warn_unreachable = true
 
 # Disable errors in client CLI, web server, and tests

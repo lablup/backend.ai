@@ -784,6 +784,133 @@ enum AppConfigDefinitionOrderField {
   UPDATED_AT
 }
 
+"""
+Added in 26.8.0. One config document written at a single scope, merged by rank at resolve time.
+"""
+type AppConfigFragment implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Config name the fragment belongs to."""
+  configName: String!
+
+  """Scope the fragment is written at (public | domain | user)."""
+  scopeType: AppConfigScopeType!
+
+  """Scope identifier: the domain id or user id; null for public scope."""
+  scopeId: UUID
+
+  """The fragment's JSON config document."""
+  config: JSON!
+
+  """Creation timestamp (UTC)."""
+  createdAt: DateTime!
+
+  """Last update timestamp (UTC)."""
+  updatedAt: DateTime!
+}
+
+"""Added in 26.8.0. Paginated connection for app config fragments."""
+type AppConfigFragmentConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [AppConfigFragmentEdge!]!
+
+  """Total number of app config fragments matching the query criteria."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type AppConfigFragmentEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: AppConfigFragment!
+}
+
+"""Added in 26.8.0. Filter input for querying app config fragments."""
+input AppConfigFragmentFilter {
+  """Filter by config name."""
+  configName: StringFilter = null
+
+  """Filter by scope type."""
+  scopeType: AppConfigFragmentScopeTypeFilter = null
+
+  """Filter by creation datetime."""
+  createdAt: DateTimeFilter = null
+
+  """Filter by last update datetime."""
+  updatedAt: DateTimeFilter = null
+
+  """Match all of the given sub-filters."""
+  AND: [AppConfigFragmentFilter!] = null
+
+  """Match any of the given sub-filters."""
+  OR: [AppConfigFragmentFilter!] = null
+
+  """Negate the given sub-filters."""
+  NOT: [AppConfigFragmentFilter!] = null
+}
+
+"""Added in 26.8.0. Specifies ordering for app config fragment results."""
+input AppConfigFragmentOrderBy {
+  """The field to order by."""
+  field: AppConfigFragmentOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.8.0. Fields available for ordering app config fragment results.
+"""
+enum AppConfigFragmentOrderField {
+  CONFIG_NAME
+  SCOPE_TYPE
+  CREATED_AT
+  UPDATED_AT
+}
+
+"""Added in 26.8.0. Filter input for the fragment scope_type enum field."""
+input AppConfigFragmentScopeTypeFilter {
+  """Exact scope type match."""
+  equals: AppConfigScopeType = null
+
+  """Match any of the provided scope types."""
+  in: [AppConfigScopeType!] = null
+
+  """Exclude exact scope type match."""
+  notEquals: AppConfigScopeType = null
+
+  """Exclude any of the provided scope types."""
+  notIn: [AppConfigScopeType!] = null
+}
+
+"""
+Added in 26.8.0. One (config_name, config) pair to upsert at the request's scope.
+"""
+input AppConfigFragmentUpsertItem {
+  """Registered config name."""
+  configName: String!
+
+  """The fragment's JSON config document."""
+  config: JSON!
+}
+
+"""
+Added in 26.8.0. One app config scope: its kind, and its owner id for the kinds that have one.
+"""
+input AppConfigScopeRef {
+  """Scope the fragments are written at (public | domain | user)."""
+  scopeType: AppConfigScopeType!
+
+  """Scope identifier: the domain id or user id; null for public scope."""
+  scopeId: UUID = null
+}
+
 enum AppConfigScopeType {
   PUBLIC
   DOMAIN
@@ -1244,6 +1371,7 @@ enum AuditLogStatus {
   ERROR
   UNKNOWN
   RUNNING
+  DENIED
 }
 
 """Added in 24.09.0. Filter for audit log status field."""
@@ -2151,6 +2279,16 @@ input ComputeScheduleInput {
   kernels: [ComputeScheduleKernelResourceInput!]!
   clusterMode: SessionClusterMode!
   resourceGroupId: ID!
+
+  """
+  Restrict the fitting check to these agents, with the same semantics as the scheduling path. Null means no restriction.
+  """
+  designatedAgentIds: [String!] = null
+
+  """
+  How designated agents are enforced (STRICT fails without capacity, PREFERRED falls back). Null inherits the resource group default.
+  """
+  agentSelectionPolicy: SessionAgentSelectionPolicy = null
 }
 
 """
@@ -2189,6 +2327,14 @@ type ComputeSchedulePayload {
 extend type ComputeSessionNode implements Node @key(fields: "id") {
   """The Globally Unique ID of this object"""
   id: ID!
+}
+
+"""
+Added in 26.8.0. How to clean up sessions that conflict with an agent's resource-group change.
+"""
+enum ConflictingSessionCleanupPolicy {
+  TERMINATE
+  RESCHEDULE
 }
 
 extend type ContainerRegistryNode implements Node @key(fields: "id") {
@@ -2583,6 +2729,55 @@ type CreateHuggingFaceRegistryPayload {
 }
 
 """
+Added in 26.8.0. Binds a global idle checker to a single scope. Requires permission on the given scope (subject to RBAC).
+"""
+input CreateIdleCheckerAssignmentInput {
+  """Scope the checker is bound to."""
+  scope: IdleCheckerScopeRef!
+
+  """Idle checker to bind."""
+  idleCheckerId: UUID!
+
+  """Whether the assignment participates in idle checking."""
+  enabled: Boolean! = true
+}
+
+"""
+Added in 26.8.0. Returns the created idle checker assignment. The node contains the server-assigned identifier and timestamps.
+"""
+type CreateIdleCheckerAssignmentPayload {
+  idleCheckerAssignment: IdleCheckerAssignment!
+}
+
+"""Added in 26.8.0. Defines a reusable global idle checker specification."""
+input CreateIdleCheckerInput {
+  """Idle checker name."""
+  name: String!
+
+  """Idle checker description."""
+  description: String = null
+
+  """Checker implementation type."""
+  checkerType: IdleCheckerInputType!
+
+  """Target session types."""
+  targetSessionTypes: [SessionTypes!]!
+
+  """Initial grace period in seconds."""
+  initialGracePeriodSeconds: Int! = 0
+
+  """Typed checker specification."""
+  checkerSpec: IdleCheckerSpecInput!
+}
+
+"""
+Added in 26.8.0. Returns the created global idle checker definition. The node contains the server-assigned identifier and timestamps.
+"""
+type CreateIdleCheckerPayload {
+  idleChecker: IdleChecker!
+}
+
+"""
 Added in 26.4.4. A keypair returned at creation time, including its one-time secret key.
 """
 type CreateKeypairPayload {
@@ -2620,6 +2815,11 @@ input CreateKeypairResourcePolicyInput {
 
   """Maximum pending sessions. Null means unlimited."""
   maxPendingSessionCount: Int = null
+
+  """
+  Added in 26.8.0. Highest scheduling priority a session created with this policy may declare. Null means uncapped.
+  """
+  maxPriority: Int = null
 
   """Maximum pending session resource slots."""
   maxPendingSessionResourceSlots: [ResourceSlotEntryInput!] = null
@@ -2895,6 +3095,24 @@ input CreateResourcePresetV2Input {
 
   """Resource group name. If null, the preset is global."""
   resourceGroupName: String = null
+}
+
+"""Added in 26.8.0. Create retention policy input."""
+input CreateRetentionPolicyInput {
+  """Retention category, validated against the fixed catalog."""
+  category: RetentionCategory!
+
+  """Retention period in days."""
+  retentionPeriodDays: Int!
+
+  """Whether this policy is active."""
+  enabled: Boolean! = true
+}
+
+"""Added in 26.8.0. Create retention policy payload."""
+type CreateRetentionPolicyPayload {
+  """The created retention policy."""
+  policy: RetentionPolicy!
 }
 
 """
@@ -3671,14 +3889,20 @@ type DeleteReservoirRegistryPayload {
 
 """Added in 26.4.2. Payload for resource group deletion."""
 type DeleteResourceGroupPayload {
-  """Name of the deleted resource group."""
-  id: String!
+  """UUID of the deleted resource group."""
+  id: UUID!
 }
 
 """Added in 26.4.2. Payload for resource preset deletion."""
 type DeleteResourcePresetPayload {
   """UUID of the deleted resource preset."""
   id: String!
+}
+
+"""Added in 26.8.0. Delete retention policy payload."""
+type DeleteRetentionPolicyPayload {
+  """ID of the deleted retention policy."""
+  id: UUID!
 }
 
 """Added in 26.3.0. Input for soft-deleting a role"""
@@ -4759,6 +4983,9 @@ input EnqueueSessionInput {
   """Scheduling priority (0-100)."""
   priority: Int! = 10
 
+  """Scope-local preemption priority among the requester's own sessions."""
+  jobPriority: Int! = 0
+
   """Whether preemptible."""
   isPreemptible: Boolean! = true
 
@@ -4767,6 +4994,11 @@ input EnqueueSessionInput {
 
   """Designated agent IDs."""
   agentList: [String!] = null
+
+  """
+  Added in 26.8.0. How agent_list is enforced. null inherits the resource group default.
+  """
+  agentSelectionPolicy: SessionAgentSelectionPolicy = null
 
   """Network UUID to attach."""
   attachNetwork: ID = null
@@ -5168,6 +5400,305 @@ type HuggingFaceRegistryEdge {
 
   """The item at the end of the edge"""
   node: HuggingFaceRegistry!
+}
+
+"""
+Added in 26.8.0. Represents a reusable idle checker definition independent of its bindings. It includes target session types, a grace period, and typed checker settings.
+"""
+type IdleChecker implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Idle checker name."""
+  name: String!
+
+  """Optional description."""
+  description: String
+
+  """Checker implementation type."""
+  checkerType: IdleCheckerType!
+
+  """Session types evaluated by this checker."""
+  targetSessionTypes: [SessionTypes!]!
+
+  """Initial grace period in seconds."""
+  initialGracePeriodSeconds: Int!
+
+  """Typed idle checker specification."""
+  spec: IdleCheckerSpec!
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime!
+}
+
+"""
+Added in 26.8.0. Represents one association between a scope and a reusable idle checker. The scope and checker are the assignment's immutable identity; the enabled flag controls whether the association participates.
+"""
+type IdleCheckerAssignment implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Kind of the bound scope."""
+  scopeType: IdleCheckerScopeType!
+
+  """Scope identifier, interpreted according to the scope type."""
+  scopeId: UUID!
+
+  """ID of the bound idle checker."""
+  idleCheckerId: UUID!
+
+  """Whether the assignment participates in idle checking."""
+  enabled: Boolean!
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime!
+
+  """The bound idle checker definition."""
+  idleChecker: IdleChecker!
+}
+
+"""
+Added in 26.8.0. Provides a paginated collection of idle checker assignments. The count reports all records matching the supplied filter.
+"""
+type IdleCheckerAssignmentConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [IdleCheckerAssignmentEdge!]!
+
+  """Total number of matching idle checker assignments."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type IdleCheckerAssignmentEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: IdleCheckerAssignment!
+}
+
+"""
+Added in 26.8.0. Defines criteria for searching idle checker assignments. Nested logical fields can combine or negate multiple criteria.
+"""
+input IdleCheckerAssignmentFilter {
+  """Scope type filter."""
+  scopeType: IdleCheckerScopeTypeFilter = null
+
+  """Scope identifier filter."""
+  scopeId: UUIDFilter = null
+
+  """Bound idle checker ID filter."""
+  idleCheckerId: UUIDFilter = null
+
+  """Filter by the enabled flag."""
+  enabled: Boolean = null
+
+  """Creation timestamp filter."""
+  createdAt: DateTimeFilter = null
+
+  """Update timestamp filter."""
+  updatedAt: DateTimeFilter = null
+
+  """Match all nested filters."""
+  AND: [IdleCheckerAssignmentFilter!] = null
+
+  """Match any nested filter."""
+  OR: [IdleCheckerAssignmentFilter!] = null
+
+  """Negate nested filters."""
+  NOT: [IdleCheckerAssignmentFilter!] = null
+}
+
+"""
+Added in 26.8.0. Defines one ordering rule for an idle checker assignment search. Multiple rules are applied in the order they are supplied.
+"""
+input IdleCheckerAssignmentOrderBy {
+  """Order field."""
+  field: IdleCheckerAssignmentOrderField!
+
+  """Order direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.8.0. Lists fields that can determine idle checker assignment result order. Each field is paired with an ascending or descending direction.
+"""
+enum IdleCheckerAssignmentOrderField {
+  SCOPE_TYPE
+  ENABLED
+  CREATED_AT
+  UPDATED_AT
+}
+
+"""
+Added in 26.8.0. Scope for the scoped idle checker assignment query. All items are OR'd; the item list must not be empty.
+"""
+input IdleCheckerAssignmentScope {
+  """Scope-tagged items (OR across all items)."""
+  items: [IdleCheckerScopeRef!]!
+}
+
+"""
+Added in 26.8.0. Provides a paginated collection of global idle checker definitions. The count reports all records matching the supplied filter.
+"""
+type IdleCheckerConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [IdleCheckerEdge!]!
+
+  """Total number of matching idle checkers."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type IdleCheckerEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: IdleChecker!
+}
+
+"""
+Added in 26.8.0. Defines criteria for searching registered idle checkers. Nested logical fields can combine or negate multiple criteria.
+"""
+input IdleCheckerFilter {
+  """Name filter."""
+  name: StringFilter = null
+
+  """Checker type filter."""
+  checkerType: IdleCheckerTypeFilter = null
+
+  """Creation timestamp filter."""
+  createdAt: DateTimeFilter = null
+
+  """Update timestamp filter."""
+  updatedAt: DateTimeFilter = null
+
+  """Match all nested filters."""
+  AND: [IdleCheckerFilter!] = null
+
+  """Match any nested filter."""
+  OR: [IdleCheckerFilter!] = null
+
+  """Negate nested filters."""
+  NOT: [IdleCheckerFilter!] = null
+}
+
+"""
+Added in 26.8.0. Lists checker implementations accepted by create and update operations. Only implementations fully supported by this API version are exposed.
+"""
+enum IdleCheckerInputType {
+  SESSION_LIFETIME
+  NETWORK_TIMEOUT
+  UTILIZATION
+}
+
+"""
+Added in 26.8.0. Defines one ordering rule for an idle checker search. Multiple rules are applied in the order they are supplied.
+"""
+input IdleCheckerOrderBy {
+  """Order field."""
+  field: IdleCheckerOrderField!
+
+  """Order direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.8.0. Lists fields that can determine idle checker result order. Each field is paired with an ascending or descending direction.
+"""
+enum IdleCheckerOrderField {
+  NAME
+  CHECKER_TYPE
+  CREATED_AT
+  UPDATED_AT
+}
+
+"""
+Added in 26.8.0. References a single scope as a typed (scopeType, scopeId) pair. The identifier is interpreted according to the scope type.
+"""
+input IdleCheckerScopeRef {
+  """Kind of the scope."""
+  scopeType: IdleCheckerScopeType!
+
+  """Scope identifier, interpreted according to the scope type."""
+  scopeId: UUID!
+}
+
+"""
+Added in 26.8.0. Identifies the kind of scope an idle checker assignment applies to. The value determines how the scope identifier is interpreted.
+"""
+enum IdleCheckerScopeType {
+  DOMAIN
+  PROJECT
+  RESOURCE_GROUP
+}
+
+"""
+Added in 26.8.0. Filters idle checker assignments by their scope type. Use either an exact value or a list of accepted values.
+"""
+input IdleCheckerScopeTypeFilter {
+  """Exact scope type."""
+  equals: IdleCheckerScopeType = null
+
+  """Allowed scope types."""
+  in: [IdleCheckerScopeType!] = null
+}
+
+"""
+Added in 26.8.0. Contains the settings used by an idle checker implementation.
+"""
+type IdleCheckerSpec {
+  type: IdleCheckerType!
+  sessionLifetime: SessionLifetimeIdleCheckerSpec
+  network: NetworkTimeoutIdleCheckerSpec
+  utilization: UtilizationIdleCheckerSpec
+}
+
+"""
+Added in 26.8.0. Supplies the implementation-specific settings for an idle checker. Exactly one checker-specific field must be provided.
+"""
+input IdleCheckerSpecInput @oneOf {
+  """Session-lifetime checker settings."""
+  sessionLifetime: SessionLifetimeIdleCheckerSpecInput
+
+  """Network-timeout checker settings."""
+  network: NetworkTimeoutIdleCheckerSpecInput
+
+  """Utilization checker settings."""
+  utilization: UtilizationIdleCheckerSpecInput
+}
+
+"""
+Added in 26.8.0. Identifies the implementation used to evaluate an idle condition. The value determines how the checker specification is interpreted.
+"""
+enum IdleCheckerType {
+  SESSION_LIFETIME
+  NETWORK_TIMEOUT
+  UTILIZATION
+}
+
+"""
+Added in 26.8.0. Filters idle checkers by their implementation type. Use either an exact value or a list of accepted values.
+"""
+input IdleCheckerTypeFilter {
+  """Exact checker type."""
+  equals: IdleCheckerType = null
+
+  """Allowed checker types."""
+  in: [IdleCheckerType!] = null
 }
 
 """
@@ -5605,6 +6136,94 @@ enum KernelResourceAllocationOrderField {
   USED
 }
 
+"""Added in 26.8.0. Kernel scheduling history record."""
+type KernelSchedulingHistory implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  kernelId: ID!
+  sessionId: ID!
+  phase: String!
+  fromStatus: String
+  toStatus: String
+  result: SchedulingResult!
+  errorCode: String
+  message: String
+  attempts: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""Added in 26.8.0. Kernel scheduling history connection."""
+type KernelSchedulingHistoryConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [KernelSchedulingHistoryEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type KernelSchedulingHistoryEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: KernelSchedulingHistory!
+}
+
+"""Added in 26.8.0. Filter for kernel scheduling history"""
+input KernelSchedulingHistoryFilter {
+  id: UUIDFilter = null
+  kernelId: UUIDFilter = null
+  sessionId: UUIDFilter = null
+  phase: StringFilter = null
+  fromStatus: [String!] = null
+  toStatus: [String!] = null
+  result: SchedulingResultFilter = null
+  errorCode: StringFilter = null
+  message: StringFilter = null
+  createdAt: DateTimeFilter = null
+  updatedAt: DateTimeFilter = null
+  AND: [KernelSchedulingHistoryFilter!] = null
+  OR: [KernelSchedulingHistoryFilter!] = null
+  NOT: [KernelSchedulingHistoryFilter!] = null
+}
+
+"""Added in 26.8.0. Order by specification for kernel scheduling history"""
+input KernelSchedulingHistoryOrderBy {
+  field: KernelSchedulingHistoryOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in 26.8.0. Fields available for ordering kernel scheduling history
+"""
+enum KernelSchedulingHistoryOrderField {
+  CREATED_AT
+  UPDATED_AT
+  PHASE
+  FROM_STATUS
+  TO_STATUS
+  RESULT
+  ATTEMPTS
+}
+
+"""
+Added in 26.8.0. Scope for kernel scheduling history query. All items are OR'd; raises an error if every field is empty.
+"""
+input KernelScope {
+  """
+  Kernel IDs to get history for. The scoped search is single-target for now, so exactly one item is accepted across all fields.
+  """
+  kernel: [UUIDScope!] = null
+
+  """
+  Session IDs to get the history of every owned kernel for. The scoped search is single-target for now, so exactly one item is accepted across all fields.
+  """
+  session: [UUIDScope!] = null
+}
+
 """
 Added in 26.2.0. Represents a kernel (compute container) in Backend.AI.
 """
@@ -5666,6 +6285,11 @@ type KernelV2 implements Node {
 
   """Added in 26.3.0. Per-slot resource allocation for this kernel."""
   resourceAllocations(filter: KernelResourceAllocationFilter = null, orderBy: [KernelResourceAllocationOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): ResourceAllocationConnection
+
+  """
+  Added in 26.8.0. Scheduling history of this kernel with pagination support.
+  """
+  schedulingHistories(filter: KernelSchedulingHistoryFilter = null, orderBy: [KernelSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelSchedulingHistoryConnection
 }
 
 """
@@ -5806,6 +6430,7 @@ type KernelV2SessionInfo {
 """Added in 26.2.0. Status of a kernel in its lifecycle."""
 enum KernelV2Status {
   PENDING
+  RESERVED
   SCHEDULED
   PREPARING
   PREPARED
@@ -5990,6 +6615,11 @@ type KeypairResourcePolicyV2 implements Node {
   """Maximum pending sessions. Null means unlimited."""
   maxPendingSessionCount: Int
 
+  """
+  Added in 26.8.0. Highest scheduling priority a session created with this policy may declare. Null means uncapped.
+  """
+  maxPriority: Int
+
   """Maximum resource slots for pending sessions. Null means unlimited."""
   maxPendingSessionResourceSlots: [ResourceLimitEntry!]
 
@@ -6041,6 +6671,9 @@ input KeypairResourcePolicyV2Filter {
   maxConcurrentSftpSessions: IntFilter = null
   maxPendingSessionCount: IntFilter = null
 
+  """Added in 26.8.0. Filter by the max scheduling priority ceiling."""
+  maxPriority: IntFilter = null
+
   """
   Added in 26.4.4. Filter policies by their assigned keypairs. A policy matches if at least one of its keypairs satisfies the conditions.
   """
@@ -6077,6 +6710,7 @@ enum KeypairResourcePolicyV2OrderField {
   IDLE_TIMEOUT
   MAX_CONCURRENT_SFTP_SESSIONS
   MAX_PENDING_SESSION_COUNT
+  MAX_PRIORITY
 }
 
 """Added in 26.4.2. Input for listing files in a virtual folder."""
@@ -6683,6 +7317,11 @@ type ModelDeployment implements Node {
   """The replicas of this entity."""
   replicas(filter: ReplicaFilter = null, orderBy: [ReplicaOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelReplicaConnection
 
+  """
+  Added in 26.8.0. The scheduling history of this deployment's replica groups. This is the per-replica-group scaling status that the deprecated ``scaling_state`` field points to.
+  """
+  replicaGroupHistories(filter: ReplicaGroupHistoryFilter = null, orderBy: [ReplicaGroupHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ReplicaGroupHistoryConnection
+
   """The auto scaling rules of this entity."""
   autoScalingRules(filter: AutoScalingRuleFilter = null, orderBy: [AutoScalingRuleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AutoScalingRuleConnection
 
@@ -7287,6 +7926,41 @@ type MoveFileV2Payload {
 
 type Mutation {
   """
+  Added in 26.8.0. Change the resource group of an agent (superadmin only). Sessions still running on the agent under the old resource group are cleaned up per the given policy; without force, the change is rejected with a conflict error when such sessions exist.
+  """
+  adminUpdateAgentResourceGroup(input: UpdateAgentResourceGroupInput!): UpdateAgentResourceGroupPayload
+
+  """
+  Added in 26.8.0. Creates a global idle checker definition (super admin only).
+  """
+  adminCreateIdleChecker(input: CreateIdleCheckerInput!): CreateIdleCheckerPayload!
+
+  """
+  Added in 26.8.0. Updates a global idle checker definition (super admin only).
+  """
+  adminUpdateIdleChecker(input: UpdateIdleCheckerInput!): UpdateIdleCheckerPayload!
+
+  """
+  Added in 26.8.0. Permanently removes a global idle checker (super admin only).
+  """
+  adminPurgeIdleChecker(input: PurgeIdleCheckerInput!): PurgeIdleCheckerPayload!
+
+  """
+  Added in 26.8.0. Binds a global idle checker to a scope (super admin only).
+  """
+  adminCreateIdleCheckerAssignment(input: CreateIdleCheckerAssignmentInput!): CreateIdleCheckerAssignmentPayload!
+
+  """
+  Added in 26.8.0. Updates an idle checker assignment's enabled state. Requires permission on the assignment's scope (subject to RBAC).
+  """
+  updateIdleCheckerAssignment(input: UpdateIdleCheckerAssignmentInput!): UpdateIdleCheckerAssignmentPayload!
+
+  """
+  Added in 26.8.0. Permanently removes an idle checker assignment. Requires permission on the assignment's scope (subject to RBAC).
+  """
+  purgeIdleCheckerAssignment(input: PurgeIdleCheckerAssignmentInput!): PurgeIdleCheckerAssignmentPayload!
+
+  """
   Added in 26.7.0. Register a new app config allow-list entry (super admin only).
   """
   adminCreateAppConfigAllowList(input: CreateAppConfigAllowListInput!): CreateAppConfigAllowListPayload
@@ -7300,6 +7974,16 @@ type Mutation {
   Added in 26.8.0. Update an app config allow-list entry's rank by id (super admin only).
   """
   adminUpdateAppConfigAllowList(input: UpdateAppConfigAllowListInput!): UpdateAppConfigAllowListPayload
+
+  """
+  Added in 26.8.0. Upsert many app config fragments at one scope (insert, or replace config on conflict), all-or-nothing. RBAC-authorized at that scope.
+  """
+  scopedUpsertAppConfigFragments(input: ScopedUpsertAppConfigFragmentsInput!): [AppConfigFragment!]!
+
+  """
+  Added in 26.8.0. Upsert many app config fragments at the current user's own user scope, all-or-nothing.
+  """
+  myUpsertAppConfigFragments(input: MyUpsertAppConfigFragmentsInput!): [AppConfigFragment!]!
 
   """
   Added in 25.14.0. Scan external registries to discover available artifacts. Searches HuggingFace or Reservoir registries for artifacts matching the specified criteria and registers them in the system with SCANNED status. The artifacts become available for import but are not downloaded until explicitly imported. This is the first step in the artifact workflow: Scan → Import → Use
@@ -7954,6 +8638,20 @@ type Mutation {
   """Added in 26.4.2. Delete multiple runtime variants (superadmin only)."""
   adminDeleteRuntimeVariants(input: DeleteRuntimeVariantsInput!): DeleteRuntimeVariantsPayload
 
+  """Added in 26.8.0. Create a retention policy (superadmin only)."""
+  adminCreateRetentionPolicy(input: CreateRetentionPolicyInput!): CreateRetentionPolicyPayload
+
+  """Added in 26.8.0. Update a retention policy (superadmin only)."""
+  adminUpdateRetentionPolicy(input: UpdateRetentionPolicyInput!): UpdateRetentionPolicyPayload
+
+  """Added in 26.8.0. Delete a retention policy (superadmin only)."""
+  adminDeleteRetentionPolicy(id: UUID!): DeleteRetentionPolicyPayload
+
+  """
+  Added in 26.8.0. Purge (permanently remove) a retention policy (superadmin only).
+  """
+  adminPurgeRetentionPolicy(id: UUID!): PurgeRetentionPolicyPayload
+
   """Added in 26.4.2. Create a runtime variant preset (superadmin only)."""
   adminCreateRuntimeVariantPreset(input: CreateRuntimeVariantPresetInput!): CreateRuntimeVariantPresetPayload
 
@@ -8070,9 +8768,30 @@ type MyStorageHostPermissionsPayload {
   items: [StorageHostPermission!]!
 }
 
+"""
+Added in 26.8.0. Upsert many fragments at the current user's own user scope.
+"""
+input MyUpsertAppConfigFragmentsInput {
+  """The (config_name, config) pairs to upsert."""
+  items: [AppConfigFragmentUpsertItem!]!
+}
+
 extend type NetworkNode implements Node @key(fields: "id") {
   """The Globally Unique ID of this object"""
   id: ID!
+}
+
+"""
+Added in 26.8.0. Configures the maximum period without active network traffic.
+"""
+type NetworkTimeoutIdleCheckerSpec {
+  maxNetworkInactivitySeconds: Int!
+}
+
+"""Added in 26.8.0. Supplies settings for a network-timeout checker."""
+input NetworkTimeoutIdleCheckerSpecInput {
+  """Maximum network inactivity period in seconds."""
+  maxNetworkInactivitySeconds: Int!
 }
 
 """An object with a Globally Unique ID"""
@@ -8487,7 +9206,7 @@ type PreemptionConfig {
   """Sessions with priority <= this value are eligible for preemption."""
   preemptiblePriority: Int!
 
-  """Tie-breaking order for same-priority sessions during preemption."""
+  """Victim selection order for preemption."""
   order: PreemptionOrder!
 
   """How to preempt a session when preemption is triggered."""
@@ -8509,9 +9228,7 @@ input PreemptionConfigInput {
   """Sessions with priority <= this value are preemptible. Default is 5."""
   preemptiblePriority: Int! = 5
 
-  """
-  Tie-breaking order for same-priority sessions (OLDEST, NEWEST). Default is OLDEST.
-  """
+  """Victim selection order for preemption. Default is OLDEST."""
   order: PreemptionOrder! = OLDEST
 
   """How to preempt sessions (TERMINATE, RESCHEDULE). Default is TERMINATE."""
@@ -8532,11 +9249,13 @@ enum PreemptionMode {
 }
 
 """
-Added in 26.3.0. Tie-breaking order for same-priority sessions during preemption.
+Added in 26.3.0. Victim selection order for preemption. OLDEST/NEWEST break same-priority ties by start time; FEWEST_SESSIONS evicts the fewest sessions; SMALLEST_RESOURCES reclaims the least resources.
 """
 enum PreemptionOrder {
   OLDEST
   NEWEST
+  FEWEST_SESSIONS
+  SMALLEST_RESOURCES
 }
 
 """Added in 26.4.2. A resource preset with its availability status."""
@@ -9484,10 +10203,42 @@ type PurgeDomainPayload {
   purged: Boolean!
 }
 
+"""Added in 26.8.0. Identifies the idle checker assignment to purge."""
+input PurgeIdleCheckerAssignmentInput {
+  """Idle checker assignment ID to purge."""
+  id: UUID!
+}
+
+"""
+Added in 26.8.0. Confirms that an idle checker assignment was permanently removed. The returned identifier refers to the deleted assignment.
+"""
+type PurgeIdleCheckerAssignmentPayload {
+  id: UUID!
+}
+
+"""Added in 26.8.0. Identifies the idle checker to purge."""
+input PurgeIdleCheckerInput {
+  """Idle checker ID to purge."""
+  id: UUID!
+}
+
+"""
+Added in 26.8.0. Confirms that an idle checker was permanently removed. The returned identifier refers to the deleted checker.
+"""
+type PurgeIdleCheckerPayload {
+  id: UUID!
+}
+
 """Added in 26.4.2. Payload for project permanent deletion mutation."""
 type PurgeProjectPayload {
   """Whether the purge was successful."""
   purged: Boolean!
+}
+
+"""Added in 26.8.0. Purge retention policy payload."""
+type PurgeRetentionPolicyPayload {
+  """ID of the purged retention policy."""
+  id: UUID!
 }
 
 """Added in 26.3.0. Input for purging a role"""
@@ -9574,6 +10325,39 @@ type Query {
   Added in 26.7.0. Search app config allow-list entries with filtering, ordering, and pagination (super admin only).
   """
   adminAppConfigAllowLists(filter: AppConfigAllowListFilter = null, orderBy: [AppConfigAllowListOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AppConfigAllowListConnection
+
+  """Added in 26.8.0. Get a single app config fragment by id."""
+  appConfigFragment(id: UUID!): AppConfigFragment
+
+  """
+  Added in 26.8.0. Search app config fragments across every scope with filtering, ordering, and pagination (super admin only).
+  """
+  adminAppConfigFragments(filter: AppConfigFragmentFilter = null, orderBy: [AppConfigFragmentOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AppConfigFragmentConnection
+
+  """
+  Added in 26.8.0. Searches global idle checker definitions with filtering, ordering, and pagination (super admin only).
+  """
+  adminIdleCheckers(filter: IdleCheckerFilter = null, orderBy: [IdleCheckerOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): IdleCheckerConnection!
+
+  """
+  Added in 26.8.0. Searches idle checker assignments across all scopes with filtering, ordering, and pagination (super admin only).
+  """
+  adminIdleCheckerAssignments(filter: IdleCheckerAssignmentFilter = null, orderBy: [IdleCheckerAssignmentOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): IdleCheckerAssignmentConnection!
+
+  """
+  Added in 26.8.0. Searches idle checker assignments within the given scopes. All scope items are OR'd, at least one item is required, and each item requires permission on that scope (subject to RBAC).
+  """
+  scopedIdleCheckerAssignments(scope: IdleCheckerAssignmentScope!, filter: IdleCheckerAssignmentFilter = null, orderBy: [IdleCheckerAssignmentOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): IdleCheckerAssignmentConnection!
+
+  """
+  Added in 26.8.0. Read the fragments written at one scope for the given config names — the current values, to inspect before editing them. Answered position by position, null where the scope holds no fragment for that name. RBAC-authorized at that scope.
+  """
+  scopedAppConfigFragmentsByNames(scope: AppConfigScopeRef!, configNames: [String!]!): [AppConfigFragment]!
+
+  """
+  Added in 26.8.0. Read the current user's own user-scope fragments for the given config names, position by position, null where the scope holds no fragment for that name.
+  """
+  myAppConfigFragmentsByNames(configNames: [String!]!): [AppConfigFragment]!
 
   """
   Added in 25.14.0. Retrieve a specific artifact by its ID. Returns detailed information about the artifact including its metadata, registry information, and availability status.
@@ -9701,11 +10485,19 @@ type Query {
   """Added in 26.4.2. List session scheduling history (admin only)"""
   adminSessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection
 
+  """Added in 26.8.0. List kernel scheduling history (superadmin only)"""
+  adminKernelSchedulingHistories(filter: KernelSchedulingHistoryFilter = null, orderBy: [KernelSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelSchedulingHistoryConnection
+
   """Added in 25.16.0. List all deployments (superadmin only)."""
   adminDeployments(filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection
 
   """Added in 26.4.2. List deployment history (admin only)"""
   adminDeploymentHistories(filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection
+
+  """
+  Added in 26.8.0. List replica-group scheduling history (superadmin only)
+  """
+  adminReplicaGroupHistories(filter: ReplicaGroupHistoryFilter = null, orderBy: [ReplicaGroupHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ReplicaGroupHistoryConnection
 
   """Added in 26.4.2. List route history (admin only)"""
   adminRouteHistories(filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection
@@ -9982,11 +10774,19 @@ type Query {
   """Added in 26.2.0. Get scheduling history for a specific session."""
   sessionScopedSchedulingHistories(scope: SessionScope!, filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection
 
+  """Added in 26.8.0. Get scheduling history for a specific kernel."""
+  scopedKernelSchedulingHistories(scope: KernelScope!, filter: KernelSchedulingHistoryFilter = null, orderBy: [KernelSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelSchedulingHistoryConnection
+
   """Added in 26.2.0. Get scheduling history for a specific deployment."""
   deploymentScopedSchedulingHistories(scope: DeploymentScope!, filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection
 
   """Added in 26.2.0. Get scheduling history for a specific route."""
   routeScopedSchedulingHistories(scope: RouteScope!, filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection
+
+  """
+  Added in 26.8.0. Get scheduling history for the replica groups of a specific deployment.
+  """
+  scopedReplicaGroupHistories(scope: ReplicaGroupHistoryScope!, filter: ReplicaGroupHistoryFilter = null, orderBy: [ReplicaGroupHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ReplicaGroupHistoryConnection
 
   """Added in 26.2.0. List resource groups"""
   resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection @deprecated(reason: "Use admin_resource_groups instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
@@ -10191,6 +10991,14 @@ type Query {
 
   """Added in 26.4.2. Get a single runtime variant by ID."""
   runtimeVariant(id: UUID!): RuntimeVariant
+
+  """Added in 26.8.0. Search retention policies (superadmin only)."""
+  adminRetentionPolicies(filter: RetentionPolicyFilter = null, orderBy: [RetentionPolicyOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RetentionPolicyConnection
+
+  """
+  Added in 26.8.0. Get a single retention policy by ID (superadmin only).
+  """
+  adminRetentionPolicy(id: UUID!): RetentionPolicy
 
   """Added in 26.4.2. Search runtime variant presets."""
   runtimeVariantPresets(filter: RuntimeVariantPresetFilter = null, orderBy: [RuntimeVariantPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RuntimeVariantPresetConnection
@@ -10455,6 +11263,7 @@ enum RBACElementType {
   KEYPAIR
   NOTIFICATION_CHANNEL
   NETWORK
+  IDLE_CHECKER_ASSIGNMENT
   RESOURCE_GROUP
   CONTAINER_REGISTRY
   STORAGE_HOST
@@ -10476,6 +11285,7 @@ enum RBACElementType {
   PROJECT_RESOURCE_POLICY
   ROLE
   AUDIT_LOG
+  KERNEL_HISTORY
   EVENT_LOG
   PROJECT_ADMIN_PAGE
   DOMAIN_ADMIN_PAGE
@@ -10729,6 +11539,103 @@ input ReplicaFilter {
   NOT: [ReplicaFilter!] = null
 }
 
+"""Added in 26.8.0. Replica-group scheduling history record."""
+type ReplicaGroupHistory implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  deploymentId: ID!
+  category: ReplicaGroupHistoryCategory!
+  phase: String!
+  fromStatus: String
+  toStatus: String
+  result: SchedulingResult!
+  errorCode: String
+  message: String
+  subSteps: [SubStepResultGQL!]!
+  attempts: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  """The deployment the replica group belongs to."""
+  deployment: ModelDeployment
+}
+
+"""
+Added in 26.8.0. Handler category that produced a replica-group history row
+"""
+enum ReplicaGroupHistoryCategory {
+  LIFECYCLE
+  SCALING
+}
+
+"""Added in 26.8.0. Replica-group scheduling history connection."""
+type ReplicaGroupHistoryConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ReplicaGroupHistoryEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ReplicaGroupHistoryEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ReplicaGroupHistory!
+}
+
+"""Added in 26.8.0. Filter for replica-group scheduling history"""
+input ReplicaGroupHistoryFilter {
+  id: UUIDFilter = null
+  deploymentId: UUIDFilter = null
+  category: [ReplicaGroupHistoryCategory!] = null
+  phase: StringFilter = null
+  fromStatus: [String!] = null
+  toStatus: [String!] = null
+  result: SchedulingResultFilter = null
+  errorCode: StringFilter = null
+  message: StringFilter = null
+  createdAt: DateTimeFilter = null
+  updatedAt: DateTimeFilter = null
+  AND: [ReplicaGroupHistoryFilter!] = null
+  OR: [ReplicaGroupHistoryFilter!] = null
+  NOT: [ReplicaGroupHistoryFilter!] = null
+}
+
+"""
+Added in 26.8.0. Order by specification for replica-group scheduling history
+"""
+input ReplicaGroupHistoryOrderBy {
+  field: ReplicaGroupHistoryOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in 26.8.0. Fields available for ordering replica-group scheduling history
+"""
+enum ReplicaGroupHistoryOrderField {
+  CREATED_AT
+  UPDATED_AT
+  PHASE
+  FROM_STATUS
+  TO_STATUS
+  RESULT
+  ATTEMPTS
+}
+
+"""
+Added in 26.8.0. Scope for replica-group scheduling history query. All items are OR'd; raises an error if every field is empty.
+"""
+input ReplicaGroupHistoryScope {
+  """
+  Deployment IDs to get the history of every owned replica group for. The scoped search is single-target for now, so exactly one item is accepted across all fields.
+  """
+  deployment: [UUIDScope!] = null
+}
+
 """
 Added in 26.4.4. This enum represents the health check status of a replica.
 """
@@ -10902,7 +11809,9 @@ input ResourceConfigInput {
   resourceOpts: ResourceOptsInput = null
 }
 
-"""Added in 26.1.0. Resource group with structured configuration"""
+"""
+Added in 26.1.0. Resource group with structured configuration. Since 26.8.0, the node id value is the resource group UUID instead of the name.
+"""
 type ResourceGroup implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -10980,6 +11889,7 @@ input ResourceGroupFilter {
   description: StringFilter = null
   isActive: Boolean = null
   isPublic: Boolean = null
+  isDefault: Boolean = null
   AND: [ResourceGroupFilter!] = null
   OR: [ResourceGroupFilter!] = null
   NOT: [ResourceGroupFilter!] = null
@@ -11053,6 +11963,11 @@ type ResourceGroupStatus {
 
   """Whether the resource group is publicly accessible to all users."""
   isPublic: Boolean!
+
+  """
+  Whether this is the default resource group. At most one resource group is the default at a time; an agent registering for the first time without a resolvable resource group name falls back to it.
+  """
+  isDefault: Boolean!
 }
 
 """
@@ -11381,6 +12296,90 @@ Added in 26.4.4. Payload returned after restoring a virtual folder from trash.
 type RestoreVFolderPayload {
   """ID of the restored virtual folder"""
   id: UUID!
+}
+
+"""
+Added in 26.8.0. Retention category identifying a code-side cleanup procedure.
+"""
+enum RetentionCategory {
+  LOGS
+  LOGIN
+  RECONCILE_HISTORY
+  ROLES_INVITATIONS
+  DEPLOYMENTS
+  SESSIONS
+  USAGE_RECORDS
+  USAGE_BUCKETS
+}
+
+"""
+Added in 26.8.0. A per-category retention policy: admin-tunable cleanup settings for accumulating DB records.
+"""
+type RetentionPolicy implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Retention category."""
+  category: RetentionCategory!
+
+  """Retention period in days; records older than now - period are purged."""
+  retentionPeriodDays: Int!
+
+  """Whether this policy is active."""
+  enabled: Boolean!
+
+  """When this policy was last swept (read-only observability field)."""
+  lastSweptAt: DateTime
+
+  """Timestamp when this policy was created."""
+  createdAt: DateTime!
+
+  """Timestamp of the last modification."""
+  updatedAt: DateTime!
+}
+
+"""Added in 26.8.0. Paginated list of retention policies."""
+type RetentionPolicyConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RetentionPolicyEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RetentionPolicyEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: RetentionPolicy!
+}
+
+"""Added in 26.8.0. Filter for retention policies."""
+input RetentionPolicyFilter {
+  """Category filter."""
+  category: RetentionCategory = null
+
+  """Enabled filter."""
+  enabled: Boolean = null
+}
+
+"""Added in 26.8.0. Order specification."""
+input RetentionPolicyOrderBy {
+  """Field to order by."""
+  field: RetentionPolicyOrderField!
+
+  """ASC or DESC."""
+  direction: String! = "ASC"
+}
+
+"""Added in 26.8.0. Order fields for retention policies."""
+enum RetentionPolicyOrderField {
+  CATEGORY
+  CREATED_AT
+  LAST_SWEPT_AT
 }
 
 """
@@ -12179,6 +13178,16 @@ type RuntimeVariant implements Node {
   """
   description: String
 
+  """
+  Added in 26.8.0. Whether legacy model configuration files in the model vfolder participate in revision resolution.
+  """
+  readsVfolderConfigFiles: Boolean!
+
+  """
+  Added in 26.8.0. Model definition defaults stored for this runtime variant.
+  """
+  defaultModelDefinition: RuntimeVariantModelDefinition!
+
   """Timestamp when this runtime variant was registered."""
   createdAt: DateTime!
 
@@ -12218,6 +13227,77 @@ input RuntimeVariantFilter {
 
   """Added in 26.7.0. Negate the given sub-filters."""
   NOT: [RuntimeVariantFilter!] = null
+}
+
+"""
+Added in 26.8.0. Default model configuration stored for a runtime variant.
+"""
+type RuntimeVariantModelConfig {
+  """Default model name."""
+  name: String
+
+  """Default model path."""
+  modelPath: String
+
+  """Default model service configuration."""
+  service: RuntimeVariantModelServiceConfig
+
+  """Default model metadata."""
+  metadata: ModelMetadata
+}
+
+"""
+Added in 26.8.0. Model definition defaults stored for a runtime variant.
+"""
+type RuntimeVariantModelDefinition {
+  """Default model configurations supplied by the runtime variant."""
+  models: [RuntimeVariantModelConfig!]
+}
+
+"""
+Added in 26.8.0. Default health-check settings stored for a runtime variant.
+"""
+type RuntimeVariantModelHealthCheck {
+  """Whether health checks are enabled."""
+  enable: Boolean
+
+  """Health-check interval in seconds."""
+  interval: Float
+
+  """Health-check endpoint path."""
+  path: String
+
+  """Maximum number of retries."""
+  maxRetries: Int
+
+  """Maximum time to wait for a health check."""
+  maxWaitTime: Float
+
+  """Expected healthy HTTP status code."""
+  expectedStatusCode: Int
+
+  """Initial health-check grace period in seconds."""
+  initialDelay: Float
+}
+
+"""
+Added in 26.8.0. Default model service configuration stored for a runtime variant.
+"""
+type RuntimeVariantModelServiceConfig {
+  """Actions to run before starting the model service."""
+  preStartActions: [PreStartAction!]
+
+  """Command that starts the model service."""
+  command: String
+
+  """Shell used to run the command."""
+  shell: String
+
+  """Model service port."""
+  port: Int
+
+  """Default model service health-check settings."""
+  healthCheck: RuntimeVariantModelHealthCheck
 }
 
 """Added in 26.4.2. Order specification."""
@@ -12621,6 +13701,17 @@ type ScopeResourceUsageV2 {
   assignable: [ResourceLimitEntry!]!
 }
 
+"""
+Added in 26.8.0. Upsert many fragments at one scope; the scope is named once for all items.
+"""
+input ScopedUpsertAppConfigFragmentsInput {
+  """Scope the fragments are written at."""
+  scope: AppConfigScopeRef!
+
+  """The (config_name, config) pairs to upsert."""
+  items: [AppConfigFragmentUpsertItem!]!
+}
+
 """Added in 26.3.0. A registered service instance in the catalog."""
 type ServiceCatalog implements Node {
   """The Globally Unique ID of this object"""
@@ -12797,6 +13888,21 @@ enum SessionFailurePolicy {
   STRICT
   BOOT_ALL
   TOLERANT
+}
+
+"""
+Added in 26.8.0. Configures the maximum lifetime of a running session. The checker expires a session after the configured duration is reached.
+"""
+type SessionLifetimeIdleCheckerSpec {
+  maxLifetimeSeconds: Int!
+}
+
+"""
+Added in 26.8.0. Supplies settings for a session-lifetime checker. The lifetime is measured in seconds from the session's effective start.
+"""
+input SessionLifetimeIdleCheckerSpecInput {
+  """Maximum session lifetime in seconds."""
+  maxLifetimeSeconds: Int!
 }
 
 """Added in 26.4.2. A virtual folder mount specification."""
@@ -13057,6 +14163,11 @@ type SessionV2MetadataInfo {
   priority: Int!
 
   """
+  Preemption priority among the owner's own sessions. A pending session may reclaim another session's resources only when both belong to the same user and the other session's value is strictly lower, so equal values never preempt each other; among the eligible sessions the lowest value is reclaimed first. Independent of `priority`, which orders the pending queue and takes no part in this comparison.
+  """
+  jobPriority: Int!
+
+  """
   Whether this session is eligible for preemption by higher-priority sessions.
   """
   isPreemptible: Boolean!
@@ -13140,7 +14251,9 @@ enum SessionV2Status {
   CREATING
   RUNNING
   DEPRIORITIZING
+  RESERVED
   PREEMPTED
+  RESCHEDULING
   TERMINATING
   TERMINATED
   CANCELLED
@@ -13483,9 +14596,47 @@ Added in 26.8.0. What the caller could change so an unschedulable kernel would f
 type UnschedulableReasonHint {
   """Subtract these slots to fit the best-fitting node."""
   requiredReduction: [ResourceSlotEntry!]
+}
 
-  """Architectures that actually exist among the scheduling targets."""
-  availableArchs: [String!]
+"""Added in 26.8.0. Input for changing the resource group of an agent."""
+input UpdateAgentResourceGroupInput {
+  """ID of the agent to move."""
+  agentId: String!
+
+  """UUID of the target resource group to move the agent into."""
+  resourceGroupId: UUID!
+
+  """
+  How to handle sessions still running on the agent under the old resource group. Defaults to TERMINATE, which is currently the only supported policy.
+  """
+  policy: ConflictingSessionCleanupPolicy = null
+
+  """
+  When false, the change is rejected with a conflict error if the agent still has active sessions. When true, the group is changed anyway and the conflicting sessions are cleaned up per the policy.
+  """
+  force: Boolean! = false
+}
+
+"""Added in 26.8.0. Result of changing the resource group of an agent."""
+type UpdateAgentResourceGroupPayload {
+  """ID of the agent whose resource group was changed."""
+  agentId: String!
+
+  """UUID of the new resource group."""
+  resourceGroupId: UUID!
+
+  """Cleanup policy applied to the conflicting sessions."""
+  policy: ConflictingSessionCleanupPolicy!
+
+  """
+  IDs of the sessions that were still running on the agent under the old resource group at the time of the change.
+  """
+  conflictingSessionIds: [UUID!]!
+
+  """
+  IDs of the conflicting sessions that were actually transitioned to TERMINATING by the applied policy. Their container cleanup proceeds asynchronously.
+  """
+  terminatingSessionIds: [UUID!]!
 }
 
 """
@@ -13779,7 +14930,7 @@ input UpdateDomainInput {
   name: String = null
 
   """New description."""
-  description: String = null
+  description: String
 
   """Updated active status."""
   isActive: Boolean = null
@@ -13788,7 +14939,7 @@ input UpdateDomainInput {
   allowedDockerRegistries: [String!] = null
 
   """New external integration identifier."""
-  integrationName: String = null
+  integrationName: String
 }
 
 """Added in 25.14.0. """
@@ -13803,6 +14954,56 @@ input UpdateHuggingFaceRegistryInput {
 type UpdateHuggingFaceRegistryPayload {
   """Updated HuggingFace registry"""
   huggingfaceRegistry: HuggingFaceRegistry!
+}
+
+"""
+Added in 26.8.0. Updates an idle checker assignment's enabled state. The bound scope and checker are immutable; rebind by purging and recreating.
+"""
+input UpdateIdleCheckerAssignmentInput {
+  """Idle checker assignment ID to update."""
+  id: UUID!
+
+  """New enabled state."""
+  enabled: Boolean!
+}
+
+"""
+Added in 26.8.0. Returns the idle checker assignment after an update is applied. The node reflects the complete persisted state, including unchanged fields.
+"""
+type UpdateIdleCheckerAssignmentPayload {
+  idleCheckerAssignment: IdleCheckerAssignment!
+}
+
+"""
+Added in 26.8.0. Applies a partial update to an existing idle checker. Only fields supplied by the caller are replaced.
+"""
+input UpdateIdleCheckerInput {
+  """Idle checker ID to update."""
+  id: UUID!
+
+  """New name."""
+  name: String
+
+  """
+  New description; omit it to keep the current value or pass null to clear.
+  """
+  description: String
+
+  """New target session types."""
+  targetSessionTypes: [SessionTypes!]
+
+  """New initial grace period."""
+  initialGracePeriodSeconds: Int
+
+  """New checker specification."""
+  checkerSpec: IdleCheckerSpecInput
+}
+
+"""
+Added in 26.8.0. Returns the idle checker after an update is applied. The node reflects the complete persisted state, including unchanged fields.
+"""
+type UpdateIdleCheckerPayload {
+  idleChecker: IdleChecker!
 }
 
 """
@@ -13822,10 +15023,15 @@ input UpdateKeypairResourcePolicyInput {
   maxConcurrentSessions: Int = null
 
   """Updated max pending sessions."""
-  maxPendingSessionCount: Int = null
+  maxPendingSessionCount: Int
+
+  """
+  Added in 26.8.0. Updated max scheduling priority. Set to null to clear (uncapped).
+  """
+  maxPriority: Int
 
   """Updated max pending session resource slots."""
-  maxPendingSessionResourceSlots: [ResourceSlotEntryInput!] = null
+  maxPendingSessionResourceSlots: [ResourceSlotEntryInput!]
 
   """Updated max concurrent SFTP sessions."""
   maxConcurrentSftpSessions: Int = null
@@ -13854,7 +15060,7 @@ input UpdateLoginClientTypeInput {
   name: String = null
 
   """Updated description. Pass null to clear, omit to leave unchanged."""
-  description: String = null
+  description: String
 }
 
 """Added in 26.4.2. Payload for login client type update."""
@@ -14020,13 +15226,13 @@ input UpdateProjectInput {
   name: String = null
 
   """New description."""
-  description: String = null
+  description: String
 
   """Updated active status."""
   isActive: Boolean = null
 
   """New external integration identifier."""
-  integrationName: String = null
+  integrationName: String
 
   """New resource policy name."""
   resourcePolicy: String = null
@@ -14177,6 +15383,27 @@ input UpdateResourcePresetV2Input {
   resourceGroupName: String = null
 }
 
+"""Added in 26.8.0. Update retention policy input."""
+input UpdateRetentionPolicyInput {
+  """Retention policy ID."""
+  id: UUID!
+
+  """New category."""
+  category: RetentionCategory = null
+
+  """New retention period in days."""
+  retentionPeriodDays: Int = null
+
+  """Toggle enabled."""
+  enabled: Boolean = null
+}
+
+"""Added in 26.8.0. Update retention policy payload."""
+type UpdateRetentionPolicyPayload {
+  """The updated retention policy."""
+  policy: RetentionPolicy!
+}
+
 """Added in 26.3.0. Input for updating a role"""
 input UpdateRoleInput {
   id: UUID!
@@ -14291,7 +15518,7 @@ input UpdateUserResourcePolicyInput {
   """
   Added in 26.4.2. Updated maximum number of concurrent authenticated login sessions per user. Set to null to clear (unlimited). Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.
   """
-  maxConcurrentLogins: Int = null
+  maxConcurrentLogins: Int
 
   """Updated max quota scope size."""
   maxQuotaScopeSize: BinarySizeInput = null
@@ -15209,6 +16436,52 @@ input UserWeightInputItem {
   Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
   """
   weight: Decimal = null
+}
+
+"""
+Added in 26.8.0. Configures how long a session may remain underutilized.
+"""
+type UtilizationIdleCheckerSpec {
+  maxUnderutilizedDurationSeconds: Int!
+  threshold: UtilizationIdleCheckerThreshold!
+}
+
+"""Added in 26.8.0. Supplies settings for a utilization checker."""
+input UtilizationIdleCheckerSpecInput {
+  """Maximum underutilized duration in seconds."""
+  maxUnderutilizedDurationSeconds: Int!
+
+  """Preset-backed utilization threshold."""
+  threshold: UtilizationIdleCheckerThresholdInput!
+}
+
+"""Added in 26.8.0. Defines a preset-backed utilization threshold."""
+type UtilizationIdleCheckerThreshold {
+  presetId: UUID!
+  threshold: Decimal!
+
+  """Added in 26.9.0. Label filters injected into the preset query."""
+  filterLabels: [MetricLabelEntry!]!
+
+  """Added in 26.9.0. Group-by labels injected into the preset query."""
+  groupLabels: [String!]!
+}
+
+"""Added in 26.8.0. Supplies a preset-backed utilization threshold."""
+input UtilizationIdleCheckerThresholdInput {
+  """Prometheus query preset ID."""
+  presetId: UUID!
+
+  """Underutilization threshold."""
+  threshold: Decimal!
+
+  """Added in 26.9.0. Label filters injected into the preset query."""
+  filterLabels: [MetricLabelEntryInput!]! = []
+
+  """
+  Added in 26.9.0. Group-by labels injected into the preset query. Per-session mapping requires 'session_id'; when included, the query is also scoped to the sessions under evaluation.
+  """
+  groupLabels: [String!]! = ["session_id"]
 }
 
 """Added in 25.16.0. VFS Storage configuration."""

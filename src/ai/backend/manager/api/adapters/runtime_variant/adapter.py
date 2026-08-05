@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     CreateRuntimeVariantPayload,
     DeleteRuntimeVariantPayload,
     DeleteRuntimeVariantsPayload,
+    RuntimeVariantModelDefinitionInfo,
     RuntimeVariantNode,
     SearchRuntimeVariantsPayload,
     UpdateRuntimeVariantPayload,
@@ -52,8 +53,8 @@ from ai.backend.manager.types import OptionalState, TriState
 
 def _runtime_variant_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=RuntimeVariantOrders.id(ascending=False),
-        backward_order=RuntimeVariantOrders.id(ascending=True),
+        forward_order=RuntimeVariantOrders.created_at(ascending=False),
+        backward_order=RuntimeVariantOrders.created_at(ascending=True),
         forward_condition_factory=RuntimeVariantConditions.by_cursor_forward,
         backward_condition_factory=RuntimeVariantConditions.by_cursor_backward,
         tiebreaker_order=RuntimeVariantRow.name.asc(),
@@ -231,6 +232,11 @@ class RuntimeVariantAdapter(BaseAdapter):
             id=data.id,
             name=data.name,
             description=data.description,
+            reads_vfolder_config_files=data.reads_vfolder_config_files,
+            default_model_definition=RuntimeVariantModelDefinitionInfo.model_validate(
+                data.default_model_definition,
+                from_attributes=True,
+            ),
             created_at=data.created_at,
             updated_at=data.updated_at,
         )

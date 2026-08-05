@@ -4,6 +4,8 @@ from collections.abc import Sequence
 
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -13,22 +15,20 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
 )
-from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.app_config_fragment.db_source import (
     AppConfigFragmentDBSource,
 )
-from ai.backend.manager.repositories.app_config_fragment.types import (
-    AppConfigScopeArguments,
+from ai.backend.manager.repositories.app_config_fragment.purgers import (
+    AppConfigFragmentPurgerSpec,
+)
+from ai.backend.manager.repositories.app_config_fragment.upserters import (
+    AppConfigFragmentUpserterSpec,
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    BulkCreator,
-    Creator,
-    Purger,
-    Updater,
 )
-from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 
 __all__ = ("AppConfigFragmentRepository",)
 
@@ -57,24 +57,22 @@ class AppConfigFragmentRepository:
 
     _db_source: AppConfigFragmentDBSource
 
-    def __init__(self, ops_provider: DBOpsProvider) -> None:
+    def __init__(self, ops_provider: RBACOpsProvider) -> None:
         self._db_source = AppConfigFragmentDBSource(ops_provider)
 
     @app_config_fragment_repository_resilience.apply()
-    async def create(self, creator: Creator[AppConfigFragmentRow]) -> AppConfigFragmentData:
-        return await self._db_source.create(creator)
+    async def bulk_upsert(
+        self, specs: Sequence[AppConfigFragmentUpserterSpec]
+    ) -> list[AppConfigFragmentData]:
+        return await self._db_source.bulk_upsert(specs)
 
     @app_config_fragment_repository_resilience.apply()
     async def get_by_id(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentData:
         return await self._db_source.get_by_id(fragment_id)
 
     @app_config_fragment_repository_resilience.apply()
-    async def update(self, updater: Updater[AppConfigFragmentRow]) -> AppConfigFragmentData:
-        return await self._db_source.update(updater)
-
-    @app_config_fragment_repository_resilience.apply()
-    async def purge(self, purger: Purger[AppConfigFragmentRow]) -> AppConfigFragmentData:
-        return await self._db_source.purge(purger)
+    async def purge(self, purger_spec: AppConfigFragmentPurgerSpec) -> AppConfigFragmentData:
+        return await self._db_source.purge(purger_spec)
 
     @app_config_fragment_repository_resilience.apply()
     async def admin_search(self, querier: BatchQuerier) -> AppConfigFragmentSearchResult:
@@ -87,28 +85,14 @@ class AppConfigFragmentRepository:
         return await self._db_source.scoped_search(querier, scopes)
 
     @app_config_fragment_repository_resilience.apply()
-    async def bulk_create(
-        self,
-        bulk_creator: BulkCreator[AppConfigFragmentRow],
-    ) -> AppConfigFragmentBulkResult:
-        return await self._db_source.bulk_create(bulk_creator)
-
-    @app_config_fragment_repository_resilience.apply()
-    async def bulk_update(
-        self,
-        updaters: Sequence[Updater[AppConfigFragmentRow]],
-    ) -> AppConfigFragmentBulkResult:
-        return await self._db_source.bulk_update(updaters)
-
-    @app_config_fragment_repository_resilience.apply()
     async def bulk_purge(
         self,
-        purgers: Sequence[Purger[AppConfigFragmentRow]],
+        purger_specs: Sequence[AppConfigFragmentPurgerSpec],
     ) -> AppConfigFragmentBulkResult:
-        return await self._db_source.bulk_purge(purgers)
+        return await self._db_source.bulk_purge(purger_specs)
 
     @app_config_fragment_repository_resilience.apply()
     async def list_visible_fragments_bulk(
-        self, config_names: list[str], scope: AppConfigScopeArguments
+        self, config_names: list[str], user_id: UserID | None, domain_id: DomainID | None
     ) -> list[AppConfigFragmentData]:
-        return await self._db_source.list_visible_fragments_bulk(config_names, scope)
+        return await self._db_source.list_visible_fragments_bulk(config_names, user_id, domain_id)

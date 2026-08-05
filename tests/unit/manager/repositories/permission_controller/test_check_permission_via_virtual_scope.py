@@ -13,8 +13,8 @@ from dataclasses import dataclass, field
 
 import pytest
 
+from ai.backend.common.data.entity.types import EntityRef, EntityType, ScopeType
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.common.entity.types import EntityRef, EntityType, ScopeType
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.identifier.virtual_scope import VirtualScopeID
@@ -28,7 +28,7 @@ from ai.backend.manager.data.permission.types import (
 from ai.backend.manager.data.permission.types import (
     ScopeType as PermScopeType,
 )
-from ai.backend.manager.data.permission.virtual_scope import VirtualScopePermissionCheckKey
+from ai.backend.manager.data.permission.virtual_scope import EntityPermissionCheckKey
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent import AgentRow
 
@@ -145,6 +145,7 @@ class TestCheckPermissionViaVirtualScope:
             db_sess.add(policy)
             user = UserRow(
                 uuid=ids.user_id,
+                username=f"user-{ids.user_id.hex[:8]}",
                 email="testuser@test.com",
                 resource_policy="test-rbac-policy",
                 status=UserStatus.ACTIVE,
@@ -295,6 +296,35 @@ class TestCheckPermissionViaVirtualScope:
                 False,
                 id="inactive-role-denied",
             ),
+            # A multi-bit requirement (UPSERT wants CREATE | UPDATE) is a subset
+            # test: holding one of its bits must not pass.
+            pytest.param(
+                VSChainSpec(granted=Permission.READ | Permission.CREATE),
+                Permission.CREATE | Permission.UPDATE,
+                False,
+                id="mask-denied-with-create-only",
+            ),
+            pytest.param(
+                VSChainSpec(granted=Permission.READ | Permission.UPDATE),
+                Permission.CREATE | Permission.UPDATE,
+                False,
+                id="mask-denied-with-update-only",
+            ),
+            pytest.param(
+                VSChainSpec(granted=Permission.CREATE | Permission.UPDATE),
+                Permission.CREATE | Permission.UPDATE,
+                True,
+                id="mask-permitted-with-both-bits",
+            ),
+            pytest.param(
+                VSChainSpec(
+                    granted=Permission.CREATE | Permission.UPDATE,
+                    entity_cap=Permission.CREATE,
+                ),
+                Permission.CREATE | Permission.UPDATE,
+                False,
+                id="mask-denied-when-cap-clips-one-bit",
+            ),
         ],
         indirect=["chain"],
     )
@@ -305,11 +335,11 @@ class TestCheckPermissionViaVirtualScope:
         permission: Permission,
         expected: bool,
     ) -> None:
-        key = VirtualScopePermissionCheckKey(
+        key = EntityPermissionCheckKey(
             user_id=chain.user_id,
             entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=chain.entity_id),
         )
-        result = await db_source.check_permission_via_virtual_scope(key, permission)
+        result = await db_source.check_single_entity_permission_via_virtual_scope(key, permission)
         assert result is expected
 
     @pytest.mark.parametrize(
@@ -338,7 +368,7 @@ class TestCheckPermissionViaVirtualScope:
         chain: VSChainFixture,
         expected: Permission,
     ) -> None:
-        key = VirtualScopePermissionCheckKey(
+        key = EntityPermissionCheckKey(
             user_id=chain.user_id,
             entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=chain.entity_id),
         )
@@ -355,11 +385,11 @@ class TestCheckPermissionViaVirtualScope:
         db_source: PermissionDBSource,
         chain: VSChainFixture,
     ) -> None:
-        reachable = VirtualScopePermissionCheckKey(
+        reachable = EntityPermissionCheckKey(
             user_id=chain.user_id,
             entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=chain.entity_id),
         )
-        unreachable = VirtualScopePermissionCheckKey(
+        unreachable = EntityPermissionCheckKey(
             user_id=chain.user_id,
             entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=uuid.uuid4()),
         )
@@ -367,6 +397,30 @@ class TestCheckPermissionViaVirtualScope:
             [reachable, unreachable], Permission.READ
         )
         assert result == {reachable: True, unreachable: False}
+
+    @pytest.mark.parametrize(
+        ("chain",),
+        [
+            pytest.param(
+                VSChainSpec(granted=Permission.CREATE),
+                id="bulk-mask",
+            )
+        ],
+        indirect=["chain"],
+    )
+    async def test_bulk_check_requires_every_bit_of_the_mask(
+        self,
+        db_source: PermissionDBSource,
+        chain: VSChainFixture,
+    ) -> None:
+        reachable = EntityPermissionCheckKey(
+            user_id=chain.user_id,
+            entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=chain.entity_id),
+        )
+        result = await db_source.check_bulk_permission_via_virtual_scope(
+            [reachable], Permission.CREATE | Permission.UPDATE
+        )
+        assert result == {reachable: False}
 
     @pytest.mark.parametrize(
         ("chain",),
@@ -378,9 +432,11 @@ class TestCheckPermissionViaVirtualScope:
         db_source: PermissionDBSource,
         chain: VSChainFixture,
     ) -> None:
-        key = VirtualScopePermissionCheckKey(
+        key = EntityPermissionCheckKey(
             user_id=UserID(uuid.uuid4()),
             entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=chain.entity_id),
         )
-        result = await db_source.check_permission_via_virtual_scope(key, Permission.READ)
+        result = await db_source.check_single_entity_permission_via_virtual_scope(
+            key, Permission.READ
+        )
         assert result is False

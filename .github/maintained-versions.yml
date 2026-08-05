@@ -1,0 +1,17 @@
+# The release versions maintained by this repository.
+#
+# Every entry must have a release branch of the same name, and every entry
+# receives the backport of a `fix:` pull request merged into `main`.
+#
+# `lts: true` marks a long-term support line, supported through `retire_after`.
+# A regular line has no date: it lives only while it is the newest line there is.
+# The newest maintained version drives the edge installer channel, the newest
+# LTS one the stable channel.
+#
+# Maintained by `.github/scripts/update-maintained-versions.sh`, run when a
+# release branch is cut. Edit by hand only to correct a date.
+versions:
+  - version: "26.8"
+  - version: "26.4"
+    lts: true
+    retire_after: "2027-04-30"

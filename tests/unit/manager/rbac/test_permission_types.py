@@ -118,7 +118,7 @@ class TestEntityType:
         assert member_accessible == expected
 
     def test_rbac_entity_types_are_categorized(self) -> None:
-        """Test that RBAC scope and resource types have no overlap and cover the original 12 types."""
+        """Test that RBAC scope and resource types have no overlap and cover all 13 types."""
         scope_types = EntityType._scope_types()
         resource_types = EntityType._resource_types()
 
@@ -136,7 +136,7 @@ class TestEntityType:
             EntityType.SESSION,
             EntityType.ARTIFACT,
             EntityType.ARTIFACT_REGISTRY,
-            EntityType.APP_CONFIG,
+            EntityType.APP_CONFIG_FRAGMENT,
             EntityType.NOTIFICATION_CHANNEL,
             EntityType.NOTIFICATION_RULE,
             EntityType.MODEL_DEPLOYMENT,

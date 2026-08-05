@@ -24,7 +24,11 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship, selectinload
 
-from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
+from ai.backend.common.defs import (
+    MODEL_VFOLDER_LENGTH_LIMIT,
+    RESERVED_VFOLDER_PATTERNS,
+    RESERVED_VFOLDERS,
+)
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     QuotaScopeID,
@@ -53,11 +57,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOwnershipType,
 )
 from ai.backend.manager.data.vfolder.types import VFolderMountPermission as VFolderPermission
-from ai.backend.manager.defs import (
-    RESERVED_VFOLDER_PATTERNS,
-    RESERVED_VFOLDERS,
-    is_noop_host,
-)
+from ai.backend.manager.defs import is_noop_host
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.storage import (
@@ -181,6 +181,12 @@ class VFolderStatusSet(enum.StrEnum):
     INACCESSIBLE = "inaccessible"
     """Represents VFolder which is now completely removed from storage and only its record is being kept"""
 
+    OWNER_PURGABLE = "owner-purgable"
+    """Represents VFolder whose storage payload must be reclaimed when its owning
+    user or group is purged. Unlike DELETABLE, this includes folders in the trash
+    bin and folders whose previous deletion stalled or failed, since the owner row
+    is removed right after and any skipped folder becomes a permanent orphan."""
+
 
 vfolder_status_map: Final[dict[VFolderStatusSet, set[VFolderOperationStatus]]] = {
     VFolderStatusSet.ALL: {
@@ -227,6 +233,14 @@ vfolder_status_map: Final[dict[VFolderStatusSet, set[VFolderOperationStatus]]] =
     },
     VFolderStatusSet.INACCESSIBLE: {
         VFolderOperationStatus.DELETE_COMPLETE,
+    },
+    # DELETE_COMPLETE is excluded: its storage payload is already gone, so there
+    # is nothing left to reclaim on owner purge.
+    VFolderStatusSet.OWNER_PURGABLE: {
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.DELETE_PENDING,
+        VFolderOperationStatus.DELETE_ONGOING,
+        VFolderOperationStatus.DELETE_ERROR,
     },
 }
 

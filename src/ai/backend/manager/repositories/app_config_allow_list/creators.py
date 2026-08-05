@@ -1,4 +1,4 @@
-"""CreatorSpec implementations for app config allow-list repository."""
+"""DataCreator implementations for app config allow-list repository."""
 
 from __future__ import annotations
 
@@ -6,13 +6,14 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.manager.data.app_config_allow_list.types import AppConfigAllowListData
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
-from ai.backend.manager.repositories.base import CreatorSpec
+from ai.backend.manager.repositories.base.creator import DataCreator
 
 
 @dataclass
-class AppConfigAllowListCreatorSpec(CreatorSpec[AppConfigAllowListRow]):
-    """CreatorSpec for an app config allow-list entry.
+class AppConfigAllowListCreator(DataCreator[AppConfigAllowListRow, AppConfigAllowListData]):
+    """Creator for an app config allow-list entry.
 
     ``rank`` is the merge priority every fragment under the entry carries; when not
     given, it falls back to the scope type's default (public=100, domain=200,
@@ -31,3 +32,7 @@ class AppConfigAllowListCreatorSpec(CreatorSpec[AppConfigAllowListRow]):
             scope_type=self.scope_type,
             rank=rank,
         )
+
+    @override
+    def to_data(self, row: AppConfigAllowListRow) -> AppConfigAllowListData:
+        return row.to_data()

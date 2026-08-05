@@ -1,11 +1,12 @@
-import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TypeVar, override
 
-from ai.backend.common.data.permission.types import EntityType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.permission.types import EntityType as LegacyEntityType
 from ai.backend.common.exception import ErrorCode
+from ai.backend.common.identifier.action import ActionID
 from ai.backend.manager.actions.types import ActionOperationType, ActionSpec, OperationStatus
 from ai.backend.manager.data.common.types import SearchResult
 
@@ -20,7 +21,7 @@ class BaseAction(ABC):
 
     @classmethod
     @abstractmethod
-    def entity_type(cls) -> EntityType:
+    def entity_type(cls) -> LegacyEntityType:
         raise NotImplementedError
 
     @classmethod
@@ -31,14 +32,14 @@ class BaseAction(ABC):
     @classmethod
     def spec(cls) -> ActionSpec:
         return ActionSpec(
-            entity_type=cls.entity_type(),
+            entity_type=EntityType(cls.entity_type()),
             operation_type=cls.operation_type(),
         )
 
 
 @dataclass
 class BaseActionTriggerMeta:
-    action_id: uuid.UUID
+    action_id: ActionID
     started_at: datetime
 
 
@@ -59,7 +60,7 @@ class SearchActionResult[T](BaseActionResult):
 
 @dataclass
 class BaseActionResultMeta:
-    action_id: uuid.UUID
+    action_id: ActionID
     entity_id: str | None
     status: OperationStatus
     description: str

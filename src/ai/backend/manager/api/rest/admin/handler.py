@@ -153,8 +153,11 @@ class AdminHandler:
             ),
         )
         if result.errors:
+            # Severity-classified logging is done by GQLExceptionMiddleware;
+            # keep a debug trace here for errors that bypass resolvers
+            # (e.g. query parse/validation errors).
             for e in result.errors:
-                log.error("ADMIN.GQL Exception: {}", e.formatted)
+                log.debug("ADMIN.GQL Exception: {}", e.formatted)
                 log.debug("{}", "".join(traceback.format_exception(e)))
         return result
 
@@ -189,10 +192,7 @@ class AdminHandler:
         params = body.parsed
         result = await self._handle_gql_common(request_ctx, params)
         if result.errors:
-            errors = []
-            for e in result.errors:
-                errors.append(e.formatted)
-                log.error("ADMIN.GQL Exception: {}", e.formatted)
+            errors = [e.formatted for e in result.errors]
             raise BackendGQLError(extra_data=errors)
         resp = GraphQLResponse(data=result.data)
         return APIResponse.build(HTTPStatus.OK, resp)
@@ -246,11 +246,10 @@ class AdminHandler:
         self,
         body: BodyParam[GraphQLRequest],
     ) -> APIResponse:
-        """Anonymous (unauthenticated) GraphQL endpoint.
+        """Execute a GraphQL query without credentials.
 
-        Registered without ``auth_required`` so unauthenticated callers reach it. It serves a
-        separate ``PublicQueries`` schema that contains only public fields, so private fields are
-        physically absent and cannot be queried (no runtime gate needed). Authenticated routes are
-        unaffected.
+        Serves the public schema, which holds only the fields that are safe to read anonymously;
+        every other field is absent from it and cannot be queried here. The full schema is at
+        ``POST /admin/gql/strawberry`` and requires authentication.
         """
         return await self._execute_strawberry(body.parsed, schema=self._public_strawberry_schema)

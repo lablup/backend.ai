@@ -29,8 +29,10 @@ from sqlalchemy.orm import (
     selectinload,
 )
 from sqlalchemy.orm.strategy_options import _AbstractLoad
+from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common import msgpack
+from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.group.types import GroupData, ProjectType
@@ -255,6 +257,14 @@ class GroupRow(Base):  # type: ignore[misc]
         back_populates="group_row",
         primaryjoin=_get_association_container_registries_groups_join_condition,
     )
+
+    @classmethod
+    def scope_id_expr(cls) -> SQLColumnExpression[ScopeID]:
+        return cls.id
+
+    @classmethod
+    def scope_name_expr(cls) -> SQLColumnExpression[str]:
+        return cls.name
 
     def to_data(self) -> GroupData:
         return GroupData(
@@ -486,7 +496,7 @@ async def resolve_groups(
     db_conn: SAConnection,
     domain_name: str,
     values: Iterable[uuid.UUID],
-) -> Iterable[uuid.UUID]: ...
+) -> Sequence[uuid.UUID]: ...
 
 
 @overload
@@ -494,14 +504,14 @@ async def resolve_groups(
     db_conn: SAConnection,
     domain_name: str,
     values: Iterable[str],
-) -> Iterable[uuid.UUID]: ...
+) -> Sequence[uuid.UUID]: ...
 
 
 async def resolve_groups(
     db_conn: SAConnection,
     domain_name: str,
     values: Iterable[uuid.UUID] | Iterable[str],
-) -> Iterable[uuid.UUID]:
+) -> Sequence[uuid.UUID]:
     listed_val = [*values]
     match listed_val:
         case [uuid.UUID(), *_]:

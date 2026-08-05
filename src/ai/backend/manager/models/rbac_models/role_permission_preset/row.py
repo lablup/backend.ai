@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
-
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -17,9 +15,10 @@ from ai.backend.manager.models.base import (
     Base,
     StrEnumType,
 )
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
 
-class RolePermissionPresetRow(Base):  # type: ignore[misc]
+class RolePermissionPresetRow(CreatedAtMixin, Base):  # type: ignore[misc]
     __tablename__ = "role_permission_presets"
     __table_args__ = (
         sa.UniqueConstraint(
@@ -47,9 +46,6 @@ class RolePermissionPresetRow(Base):  # type: ignore[misc]
     )
     operation: Mapped[OperationType] = mapped_column(
         "operation", StrEnumType(OperationType, length=32), nullable=False
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
 
     def to_data(self) -> RolePermissionPresetData:

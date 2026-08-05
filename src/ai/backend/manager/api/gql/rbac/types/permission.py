@@ -77,6 +77,8 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationTypeFilter as OperationTypeFilterDTO,
 )
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
@@ -202,12 +204,15 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
                 # DataLoader already returns ProjectV2GQL | None via from_pydantic conversion
                 return await data_loaders.project_loader.load(UUID(self.scope_id))
             case RBACElementType.DOMAIN:
-                return await data_loaders.domain_loader.load(self.scope_id)
+                # DataLoader already returns DomainV2GQL | None via from_pydantic conversion
+                return await data_loaders.domain_by_id_loader.load(DomainID(UUID(self.scope_id)))
             case RBACElementType.ROLE:
                 # DataLoader already returns RoleGQL | None via from_pydantic conversion
                 return await data_loaders.role_loader.load(UUID(self.scope_id))
             case RBACElementType.RESOURCE_GROUP:
-                return await data_loaders.resource_group_loader.load(self.scope_id)
+                return await data_loaders.resource_group_by_id_loader.load(
+                    ResourceGroupID(UUID(self.scope_id))
+                )
             case RBACElementType.MODEL_DEPLOYMENT:
                 # DataLoader already returns ModelDeployment | None via from_pydantic conversion
                 return await data_loaders.deployment_loader.load(UUID(self.scope_id))
@@ -239,6 +244,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
                 | RBACElementType.KEYPAIR_RESOURCE_POLICY
                 | RBACElementType.PROJECT_RESOURCE_POLICY
                 | RBACElementType.AUDIT_LOG
+                | RBACElementType.KERNEL_HISTORY
                 | RBACElementType.EVENT_LOG
                 | RBACElementType.NOTIFICATION_RULE
                 | RBACElementType.AGENT
@@ -255,6 +261,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
                 | RBACElementType.VFOLDER_DATA
                 | RBACElementType.SESSION_APP_SERVICE
                 | RBACElementType.USER_EMAIL
+                | RBACElementType.IDLE_CHECKER_ASSIGNMENT
             ):
                 return None
 

@@ -6,16 +6,26 @@ from dataclasses import dataclass
 from typing import Any, override
 from uuid import UUID
 
+import sqlalchemy as sa
+
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.replica import ReplicaID
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.errors.deployment import EndpointNotFound
-from ai.backend.manager.errors.kernel import SessionNotFound
+from ai.backend.manager.errors.kernel import (
+    KernelNotFound,
+    SessionNotFound,
+)
 from ai.backend.manager.errors.service import RouteNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scheduling_history.conditions import (
     DeploymentHistoryConditions,
+    KernelSchedulingHistoryConditions,
     RouteHistoryConditions,
     SessionSchedulingHistoryConditions,
 )
@@ -24,7 +34,10 @@ from ai.backend.manager.models.session import SessionRow
 
 __all__ = (
     "SessionSchedulingHistorySearchScope",
+    "KernelKernelHistorySearchScope",
+    "SessionKernelHistorySearchScope",
     "DeploymentHistorySearchScope",
+    "DeploymentReplicaGroupHistorySearchScope",
     "RouteHistorySearchScope",
 )
 
@@ -62,6 +75,72 @@ class SessionSchedulingHistorySearchScope(SearchScope):
         ]
 
 
+# Kernel Scheduling History Scope
+
+
+@dataclass(frozen=True)
+class KernelKernelHistorySearchScope(SearchScope):
+    """Scope for kernel scheduling history search bounded by one kernel.
+
+    Not reachable yet: kernels hold no RBAC permission records of their own, so
+    a kernel-keyed query is authorized on the owning session and narrowed with a
+    ``kernel_id`` condition instead. This is what it should scope by once
+    virtual scopes land.
+    """
+
+    kernel_id: KernelId
+    """Required. The kernel to search history for."""
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        """Convert scope to a query condition for KernelSchedulingHistoryRow."""
+        return KernelSchedulingHistoryConditions.by_kernel_id_filter(
+            UUIDEqualMatchSpec(value=self.kernel_id, negated=False)
+        )
+
+    @property
+    @override
+    def existence_checks(self) -> list[ExistenceCheck[Any]]:
+        """Check that the kernel exists."""
+        return [
+            ExistenceCheck(
+                column=KernelRow.id,
+                value=self.kernel_id,
+                error=KernelNotFound(str(self.kernel_id)),
+            ),
+        ]
+
+
+@dataclass(frozen=True)
+class SessionKernelHistorySearchScope(SearchScope):
+    """Scope for kernel scheduling history search bounded by the owning session.
+
+    Returns the history of every kernel belonging to the session.
+    """
+
+    session_id: SessionId
+    """Required. The session whose kernels' history is searched."""
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        """Convert scope to a query condition for KernelSchedulingHistoryRow."""
+        return KernelSchedulingHistoryConditions.by_session_id_filter(
+            UUIDEqualMatchSpec(value=self.session_id, negated=False)
+        )
+
+    @property
+    @override
+    def existence_checks(self) -> list[ExistenceCheck[Any]]:
+        """Check that the session exists."""
+        return [
+            ExistenceCheck(
+                column=SessionRow.id,
+                value=self.session_id,
+                error=SessionNotFound(str(self.session_id)),
+            ),
+        ]
+
+
 # Deployment History Scope
 
 
@@ -81,6 +160,41 @@ class DeploymentHistorySearchScope(SearchScope):
         return DeploymentHistoryConditions.by_deployment_id_filter(
             UUIDEqualMatchSpec(value=self.deployment_id, negated=False)
         )
+
+    @property
+    @override
+    def existence_checks(self) -> list[ExistenceCheck[Any]]:
+        """Check that the deployment (endpoint) exists."""
+        return [
+            ExistenceCheck(
+                column=EndpointRow.id,
+                value=self.deployment_id,
+                error=EndpointNotFound(str(self.deployment_id)),
+            ),
+        ]
+
+
+# Replica Group History Scope
+
+
+@dataclass(frozen=True)
+class DeploymentReplicaGroupHistorySearchScope(SearchScope):
+    """Scope for replica-group history search bounded by the owning deployment.
+
+    Returns the history of every replica group belonging to the deployment.
+    """
+
+    deployment_id: DeploymentID
+    """Required. The deployment whose replica groups' history is searched."""
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        """Convert scope to a query condition for ReplicaGroupHistoryRow."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ReplicaGroupHistoryRow.deployment_id == self.deployment_id
+
+        return inner
 
     @property
     @override

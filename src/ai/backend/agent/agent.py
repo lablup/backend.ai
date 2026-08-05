@@ -19,6 +19,7 @@ from collections.abc import (
     AsyncGenerator,
     Awaitable,
     Callable,
+    Collection,
     Coroutine,
     Generator,
     Iterable,
@@ -300,7 +301,7 @@ P = ParamSpec("P")
 KernelIdContainerPair = tuple[KernelId, Container]
 
 
-def update_additional_gids(environ: MutableMapping[str, str], gids: Iterable[int]) -> None:
+def update_additional_gids(environ: MutableMapping[str, str], gids: Collection[int]) -> None:
     if not gids:
         return
     if orig_additional_gids := environ.get("ADDITIONAL_GIDS"):
@@ -1277,7 +1278,7 @@ class AbstractAgent[
             agent_info = AgentInfo(
                 ip=str(self.rpc_addr.host),
                 region=self.local_config.agent.region,
-                scaling_group=self.local_config.agent.scaling_group,
+                scaling_group=self.local_config.agent.initial_resource_group_name,
                 addr=f"tcp://{self.rpc_addr}",
                 public_key=self.agent_public_key,
                 public_host=str(self._get_public_host()),
@@ -1566,9 +1567,6 @@ class AbstractAgent[
         # existing containers still hold ports from the old range.
         self.port_pool.release_many(host_ports)
 
-    def update_scaling_group(self, scaling_group: str) -> None:
-        self.local_config.update(agent_update={"scaling_group": scaling_group})
-
     async def _clean_kernel_registry_loop(self) -> None:
         # TODO: After reducing `kernel_registry` dependencies and roles, this kind of tasks should be deprecated
         cleanup_tasks: set[asyncio.Task[None]] = set()
@@ -1836,6 +1834,16 @@ class AbstractAgent[
                     )
                     for kernel_id, container in dead_containers:
                         if kernel_id in self.restarting_kernels:
+                            continue
+                        # A kernel we still track but that already left RUNNING is
+                        # being torn down by its own destroy flow, which reports the
+                        # real termination reason. Kernels missing from the registry
+                        # (e.g. after an agent restart) must still be picked up here.
+                        tracked_kernel = self.kernel_registry.get(kernel_id)
+                        if (
+                            tracked_kernel is not None
+                            and tracked_kernel.state != KernelLifecycleStatus.RUNNING
+                        ):
                             continue
                         log.info(
                             "detected dead container during lifeycle sync (k:{}, c:{})",

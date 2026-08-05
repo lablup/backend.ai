@@ -15,6 +15,7 @@ import pytest
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.keypair.types import KeyPairData
@@ -88,6 +89,7 @@ class TestCreateUser:
             created_at=datetime.now(tz=UTC),
             modified_at=datetime.now(tz=UTC),
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
             role=UserRole.USER,
             resource_policy="default",
             allowed_client_ip=None,
@@ -160,6 +162,7 @@ class TestCreateUser:
                 )
             ),
             group_ids=None,
+            _domain_id=DomainID(uuid.uuid4()),
         )
 
         result = await service.create_user(action)
@@ -195,6 +198,7 @@ class TestCreateUser:
                 )
             ),
             group_ids=group_ids,
+            _domain_id=DomainID(uuid.uuid4()),
         )
 
         result = await service.create_user(action)
@@ -225,6 +229,7 @@ class TestCreateUser:
                     domain_name="default",
                 )
             ),
+            _domain_id=DomainID(uuid.uuid4()),
         )
 
         with pytest.raises(InvalidAPIParameters):
@@ -268,6 +273,7 @@ class TestModifyUser:
             created_at=datetime.now(tz=UTC),
             modified_at=datetime.now(tz=UTC),
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
             role=UserRole.USER,
             resource_policy="default",
             allowed_client_ip=None,
@@ -431,6 +437,7 @@ class TestPurgeUser:
             created_at=datetime.now(tz=UTC),
             modified_at=datetime.now(tz=UTC),
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
             role=UserRole.USER,
             resource_policy="default",
             allowed_client_ip=None,

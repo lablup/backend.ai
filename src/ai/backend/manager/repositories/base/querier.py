@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -46,6 +47,99 @@ class QuerierResult[TRow: Base]:
     """Result of executing a single-row query operation."""
 
     row: TRow
+
+
+class DataFinder[TRow: Base, TData](ABC):
+    """Reads one entity by a key that is not its primary key.
+
+    A lookup resolves an external key — a name, an email within a domain, a canonical
+    plus an architecture — and those are unique constraints rather than primary keys, so
+    :class:`Querier` cannot express them: it carries a single ``pk_value`` and derives
+    the WHERE from the table's primary key.
+
+    Conditions rather than a SELECT, unlike :class:`~...searcher.Searcher`, so one spec
+    stays one table. A key that needs a join — an image resolved through its alias table
+    — is a domain repository method, not this.
+
+    What separates it from a search is the expected cardinality, which is why
+    ``find_data`` reads at most two rows and rejects the second: matching more than one
+    means the key is not unique, and answering with an arbitrary one would hide that.
+
+    Example:
+        class UserByEmail(DataFinder[UserRow, UserData]):
+            def row_class(self) -> type[UserRow]:
+                return UserRow
+
+            def conditions(self) -> Sequence[QueryCondition]:
+                return [
+                    lambda: UserRow.email == self._email,
+                    lambda: UserRow.domain_name == self._domain,
+                ]
+
+            def to_data(self, row: UserRow) -> UserData:
+                return row.to_data()
+
+        async with ops.read_ops() as r:
+            user = await r.find_data(UserByEmail(email, domain))
+    """
+
+    @abstractmethod
+    def row_class(self) -> type[TRow]:
+        """Return the ORM class the key resolves within."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def conditions(self) -> Sequence[QueryCondition]:
+        """Return the key's conditions, AND combined."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        """Convert the matched row into its ``data/`` type."""
+        raise NotImplementedError
+
+
+class DataQuerier[TRow: Base, TData](ABC):
+    """Reads one entity: which row to fetch, and how that row becomes data.
+
+    Self-contained counterpart of :class:`Querier`, in the same sense
+    :class:`~ai.backend.manager.repositories.base.searcher.Searcher` is one for batch
+    queries. Carrying ``to_data`` is the point: the ops layer returns the ``data/`` type
+    and the ORM row never leaves it, so no caller has to know that rows have a
+    ``to_data`` at all.
+
+    Subclasses live in the domain repository, which is what lets ``to_data`` name its
+    row class directly.
+
+    Example:
+        class UserQuerier(DataQuerier[UserRow, UserData]):
+            def row_class(self) -> type[UserRow]:
+                return UserRow
+
+            def pk_value(self) -> UUID:
+                return self._user_id
+
+            def to_data(self, row: UserRow) -> UserData:
+                return row.to_data()
+
+        async with ops.read_ops() as r:
+            user = await r.query_data(UserQuerier(user_id))
+    """
+
+    @abstractmethod
+    def row_class(self) -> type[TRow]:
+        """Return the ORM class for table access and PK detection."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def pk_value(self) -> UUID | str | int:
+        """Return the primary key value identifying the target row."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        """Convert the fetched row into its ``data/`` type."""
+        raise NotImplementedError
 
 
 async def execute_querier[TRow: Base](
@@ -94,6 +188,18 @@ async def execute_querier[TRow: Base](
 # =============================================================================
 # Batch Querier (with pagination)
 # =============================================================================
+
+
+class BatchQueryOptions(Protocol):
+    """The filtering, ordering, and pagination options a batch query reads.
+
+    Both :class:`BatchQuerier` and :class:`Searcher` satisfy this, so a batch query
+    runs against either while the two remain separate classes.
+    """
+
+    pagination: QueryPagination
+    conditions: list[QueryCondition]
+    orders: list[QueryOrder]
 
 
 @dataclass
@@ -151,7 +257,7 @@ async def _validate_scope(
 
 def _apply_batch_querier(
     query: sa.sql.Select[Any],
-    querier: BatchQuerier,
+    querier: BatchQueryOptions,
     or_conditions: Sequence[QueryCondition],
 ) -> _QueryPair:
     """Apply query conditions, orders, and pagination to a SQLAlchemy select statement.
@@ -195,7 +301,7 @@ def _apply_batch_querier(
 async def execute_batch_querier(
     db_sess: SASession,
     query: sa.sql.Select[Any],
-    querier: BatchQuerier,
+    querier: BatchQueryOptions,
     scopes: Sequence[SearchScope] = (),
 ) -> BatchQuerierResult[Row[Any]]:
     """Execute query with batch querier and return rows with total_count and pagination info.

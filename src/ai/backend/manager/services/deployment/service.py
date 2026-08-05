@@ -352,7 +352,7 @@ def _convert_route_info_to_replica_data(route: RouteInfo) -> ModelReplicaData:
     return ModelReplicaData(
         id=route.route_id,
         deployment_id=route.deployment_id,
-        revision_id=route.revision_id or route.deployment_id,
+        revision_id=route.revision_id,
         session_id=route.session_id,
         readiness_status=readiness,
         liveness_status=liveness,
@@ -1067,7 +1067,7 @@ class DeploymentService:
             id=token_row.id,
             token=token_row.token,
             expires_at=token_row.expires_at,
-            created_at=token_row.created_at or datetime.now(UTC),
+            created_at=token_row.created_at,
         )
         return CreateAccessTokenActionResult(data=data)
 

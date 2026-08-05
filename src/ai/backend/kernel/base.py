@@ -308,8 +308,7 @@ class BaseRunner(metaclass=ABCMeta):
             # allow remaining logs to be flushed.
             await asyncio.sleep(0.1)
             try:
-                if self.outsock:
-                    self.outsock.close()
+                self.outsock.close()
                 await self._shutdown_jupyter_kernel()
             finally:
                 self._log_task.cancel()

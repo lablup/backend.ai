@@ -5,7 +5,6 @@ import enum
 import logging
 from collections.abc import AsyncIterator, Callable, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
-from dataclasses import dataclass, field
 from datetime import datetime
 from functools import partial
 from typing import (
@@ -36,10 +35,11 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
-from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
+from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -339,31 +339,6 @@ async def _match_sessions_by_name(
     return result.scalars().all()
 
 
-COMPUTE_CONCURRENCY_USED_KEY_PREFIX = "keypair.concurrency_used."
-SYSTEM_CONCURRENCY_USED_KEY_PREFIX = "keypair.sftp_concurrency_used."
-
-
-@dataclass
-class ConcurrencyUsed:
-    access_key: AccessKey
-    compute_session_ids: set[SessionId] = field(default_factory=set)
-    system_session_ids: set[SessionId] = field(default_factory=set)
-
-    @property
-    def compute_concurrency_used_key(self) -> str:
-        return f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}{self.access_key}"
-
-    @property
-    def system_concurrency_used_key(self) -> str:
-        return f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}{self.access_key}"
-
-    def to_cnt_map(self) -> Mapping[str, int]:
-        return {
-            self.compute_concurrency_used_key: len(self.compute_session_ids),
-            self.system_concurrency_used_key: len(self.system_session_ids),
-        }
-
-
 class KernelLoadingStrategy(enum.StrEnum):
     ALL_KERNELS = "all"
     MAIN_KERNEL_ONLY = "main"
@@ -424,6 +399,15 @@ class SessionRow(Base):  # type: ignore[misc]
         default=True,
         server_default=sa.text("true"),
     )
+    # Scope-local preemption priority among the owner's own sessions,
+    # decoupled from the global scheduler ``priority``.
+    job_priority: Mapped[int] = mapped_column(
+        "job_priority",
+        sa.Integer(),
+        nullable=False,
+        default=JOB_PRIORITY_DEFAULT,
+        server_default=sa.text(str(JOB_PRIORITY_DEFAULT)),
+    )
 
     cluster_mode: Mapped[str] = mapped_column(
         "cluster_mode",
@@ -449,6 +433,24 @@ class SessionRow(Base):  # type: ignore[misc]
     )
     designated_agent_ids: Mapped[list[str] | None] = mapped_column(
         "designated_agent_ids", sa.ARRAY(sa.String), nullable=True
+    )
+    # The placement group this session belongs to. NULL (the default) means no
+    # placement constraint. ON DELETE SET NULL: a group may be swept before its
+    # members, and a placement already made is never revisited.
+    # `use_alter` keeps the FK out of the CREATE TABLE so table subsets that
+    # omit ``session_groups`` still build.
+    session_group_id: Mapped[SessionGroupID | None] = mapped_column(
+        "session_group_id",
+        GUID(SessionGroupID),
+        sa.ForeignKey(
+            "session_groups.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_sessions_session_group_id_session_groups",
+        ),
+        index=True,
+        nullable=True,
+        default=None,
     )
     kernels: Mapped[list[KernelRow]] = relationship("KernelRow", back_populates="session")
 
@@ -554,8 +556,14 @@ class SessionRow(Base):  # type: ignore[misc]
     terminated_at: Mapped[datetime | None] = mapped_column(
         "terminated_at", sa.DateTime(timezone=True), nullable=True, default=sa.null(), index=True
     )
+    # Actual execution start time, written at the RUNNING transition.
     starts_at: Mapped[datetime | None] = mapped_column(
         "starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null()
+    )
+    # Reserved start time requested at enqueue (batch sessions); the scheduler
+    # holds the session until this time. Never overwritten after enqueue.
+    requested_starts_at: Mapped[datetime | None] = mapped_column(
+        "requested_starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null()
     )
     status: Mapped[SessionStatus] = mapped_column(
         "status",
@@ -755,6 +763,7 @@ class SessionRow(Base):  # type: ignore[misc]
             name=self.name,
             session_type=self.session_type,
             priority=self.priority,
+            job_priority=self.job_priority,
             is_preemptible=self.is_preemptible,
             cluster_mode=ClusterMode(self.cluster_mode),
             cluster_size=self.cluster_size,

@@ -94,7 +94,13 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ProjectDeploymentScope as ProjectDeploymentScopeDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+from ai.backend.common.dto.manager.v2.scheduling_history.request import (
+    ScopedSearchReplicaGroupHistoriesInput,
+)
+from ai.backend.common.dto.manager.v2.scheduling_history.types import (
+    ReplicaGroupHistoryScopeDTO,
+)
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     NullableDateTimeFilter,
@@ -168,6 +174,16 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
     from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
     from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
+
+    # Kept lazy below: a runtime import closes the scheduling_history -> rbac
+    # -> deployment cycle.
+    from ai.backend.manager.api.gql.scheduling_history.resolver import (
+        ReplicaGroupHistoryConnectionGQL,
+    )
+    from ai.backend.manager.api.gql.scheduling_history.types import (
+        ReplicaGroupHistoryFilterGQL,
+        ReplicaGroupHistoryOrderByGQL,
+    )
     from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
 DeploymentStatusGQL: type[ModelDeploymentStatus] = gql_enum(
@@ -492,6 +508,85 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
             ),
         )
 
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.0",
+            description=(
+                "The scheduling history of this deployment's replica groups. This is the"
+                " per-replica-group scaling status that the deprecated ``scaling_state``"
+                " field points to."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def replica_group_histories(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            ReplicaGroupHistoryFilterGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.scheduling_history.types"),
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                ReplicaGroupHistoryOrderByGQL,
+                strawberry.lazy("ai.backend.manager.api.gql.scheduling_history.types"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> (
+        Annotated[
+            ReplicaGroupHistoryConnectionGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.scheduling_history.resolver"),
+        ]
+        | None
+    ):
+        from ai.backend.manager.api.gql.scheduling_history.resolver import (
+            ReplicaGroupHistoryConnectionGQL,
+            ReplicaGroupHistoryEdgeGQL,
+        )
+        from ai.backend.manager.api.gql.scheduling_history.types import (
+            ReplicaGroupHistoryGQL,
+        )
+
+        payload = (
+            await info.context.adapters.scheduling_history.scoped_search_replica_group_history(
+                ScopedSearchReplicaGroupHistoriesInput(
+                    scope=ReplicaGroupHistoryScopeDTO(
+                        deployment=[UUIDScope(value=UUID(str(self.id)))]
+                    ),
+                    filter=filter.to_pydantic() if filter else None,
+                    order=[o.to_pydantic() for o in order_by] if order_by else None,
+                    first=first,
+                    after=after,
+                    last=last,
+                    before=before,
+                    limit=limit,
+                    offset=offset,
+                )
+            )
+        )
+        nodes = [ReplicaGroupHistoryGQL.from_pydantic(item) for item in payload.items]
+        edges = [
+            ReplicaGroupHistoryEdgeGQL(node=node, cursor=encode_cursor(str(node.id)))
+            for node in nodes
+        ]
+        return ReplicaGroupHistoryConnectionGQL(
+            count=payload.total_count,
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+        )
+
     @gql_field(description="The auto scaling rules of this entity.")  # type: ignore[misc]
     async def auto_scaling_rules(
         self,
@@ -622,7 +717,7 @@ class ProjectDeploymentScopeGQL(PydanticInputMixin[ProjectDeploymentScopeDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter deployments by conditions on their replicas.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
     ),
     name="ReplicaNestedFilter",
 )
@@ -689,7 +784,7 @@ class DeploymentFilter(PydanticInputMixin[DeploymentFilterDTO]):
     )
     replicas: ReplicaNestedFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description="Filter by conditions on deployment replicas.",
         ),
         default=None,

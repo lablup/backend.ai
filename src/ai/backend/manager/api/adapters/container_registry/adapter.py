@@ -23,6 +23,7 @@ from ai.backend.common.dto.manager.v2.container_registry.response import (
     UpdateContainerRegistryPayload,
 )
 from ai.backend.common.dto.manager.v2.container_registry.types import ContainerRegistryTypeFilter
+from ai.backend.common.identifier.container_registry import ContainerRegistryID
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
@@ -44,6 +45,9 @@ from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.container_registry.creators import (
     ContainerRegistryCreatorSpec,
+)
+from ai.backend.manager.repositories.container_registry.purgers import (
+    ContainerRegistryPurgerSpec,
 )
 from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
@@ -184,8 +188,7 @@ class ContainerRegistryAdapter(BaseAdapter):
     ) -> DeleteContainerRegistryPayload:
         """Delete a container registry (superadmin only). This is a hard delete."""
         purger: Purger[ContainerRegistryRow] = Purger(
-            row_class=ContainerRegistryRow,
-            pk_value=input.id,
+            spec=ContainerRegistryPurgerSpec(registry_id=ContainerRegistryID(input.id))
         )
         await self._processors.container_registry.delete_container_registry.wait_for_complete(
             DeleteContainerRegistryAction(purger=purger)

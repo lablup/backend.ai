@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 from typing import Self
 
 import sqlalchemy as sa
@@ -20,9 +19,10 @@ from ai.backend.manager.models.base import (
     IntFlagType,
     StrEnumType,
 )
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
 
-class PermissionRow(Base):  # type: ignore[misc]
+class PermissionRow(CreatedAtMixin, Base):  # type: ignore[misc]
     __tablename__ = "permissions"
     __table_args__ = (
         sa.Index("ix_permissions_role_scope", "role_id", "scope_type", "scope_id"),
@@ -64,9 +64,6 @@ class PermissionRow(Base):  # type: ignore[misc]
     )
     permission: Mapped[Permission] = mapped_column(
         "permission", IntFlagType(Permission), nullable=False
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
 
     @classmethod

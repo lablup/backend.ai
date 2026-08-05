@@ -20,6 +20,7 @@ from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.exception import UnknownImageReference
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import AgentId, ImageCanonical, ImageID, SlotName
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
@@ -89,6 +90,7 @@ from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.image.service import ImageService
 from ai.backend.manager.services.image.types import ImageRefData
 from ai.backend.manager.types import OptionalState, TriState
+from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 
 
 class ImageServiceBaseFixtures:
@@ -135,6 +137,7 @@ class ImageServiceBaseFixtures:
         mock_bulk = MagicMock(spec=BulkActionRBACValidator)
         mock_bulk.validate = AsyncMock()
         validators = ActionValidators(
+            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
             rbac=RBACValidators(scope=mock_scope, single_entity=mock_single_entity, bulk=mock_bulk),
         )
         return ImageProcessors(image_service, [], validators)
@@ -217,6 +220,7 @@ class ImageServiceBaseFixtures:
             is_superadmin=True,
             role=UserRole.SUPERADMIN,
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
         )
 
     @pytest.fixture
@@ -229,6 +233,7 @@ class ImageServiceBaseFixtures:
             is_superadmin=False,
             role=UserRole.USER,
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
         )
 
 

@@ -514,6 +514,20 @@
   # Added in 25.8.0
   [reporter.action-monitors]
 
+# Audit log recording policy. Mutating operations are always recorded, as are
+# failures and permission denials; this section only opts successful read
+# operations in.
+# Added in 26.9.0
+[audit-log]
+  # Opt-in list: a read operation is recorded only if it is named here. The
+  # default is an empty list, so successful reads are not recorded at all and
+  # read volume stays off until an operator turns it on. A listed operation is
+  # recorded for every entity type. Must be 'get' or 'search': mutating
+  # operations are always recorded and listing them here is rejected. Failed and
+  # denied reads are recorded either way.
+  # Added in 26.9.0
+  record-read-operations = []
+
 # System-wide configuration settings. Controls general Backend.AI system
 # behavior that affects all components. These settings typically apply globally
 # across the entire installation.
@@ -1101,3 +1115,25 @@
   # overload from too many simultaneous export operations.
   # Added in 26.1.0
   max-concurrent-exports = 10
+
+# DB record retention sweep configuration. Controls the leader-cron sweep that
+# deletes accumulated records past each enabled retention policy's age boundary,
+# including tick cadence, delete chunk size, and an optional per-tick budget.
+# Added in 26.7.0
+[retention]
+  # Interval in seconds between retention sweep ticks. A single tick loads all
+  # enabled retention policies and purges records older than each policy's
+  # boundary. The sweep runs only on the leader manager.
+  # Added in 26.7.0
+  sweep-interval = 3600.0
+  # Number of rows deleted per chunk during a sweep. Each category's tables are
+  # drained in delete-and-advance chunks of this size so a large backlog never
+  # becomes a single huge DELETE.
+  # Added in 26.7.0
+  batch-size = 1000
+  # Optional upper bound on the total rows deleted in one tick, enforced across
+  # categories at category boundaries: once a tick's cumulative deletions reach
+  # this budget the remaining categories are deferred to the next tick. Null
+  # means no budget (every enabled category is fully drained each tick).
+  # Added in 26.7.0
+  ## per-tick-budget = 100000

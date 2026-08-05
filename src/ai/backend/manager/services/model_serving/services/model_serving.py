@@ -33,6 +33,7 @@ from ai.backend.common.identifier.domain import DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.identifier.vfolder import VFolderUUID
@@ -53,9 +54,11 @@ from ai.backend.manager.data.deployment.types import (
     ModelRevisionSpec,
     ModelRevisionSpecDraft,
     MountMetadata,
-    ResourceSpecDraft,
     RevisionDraft,
     RouteHealthStatus,
+)
+from ai.backend.manager.data.deployment.types import (
+    ResourceSpecDraft as DeploymentResourceSpecDraft,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.types import (
@@ -71,11 +74,13 @@ from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
     KernelResourceInput,
+    ResourceSpecDraft,
     SchedulingTargetDraft,
     SessionClassificationDraft,
     SessionIdentityDraft,
     SessionNetworkDraft,
     SessionOptionsDraft,
+    SessionResourceSpecDraft,
     SessionScopeDraft,
     SessionSpecDraft,
 )
@@ -285,7 +290,8 @@ class ModelServingService:
         if not resources:
             return ()
         return tuple(
-            ResourceSlotEntry(resource_type=str(k), quantity=str(v)) for k, v in resources.items()
+            ResourceSlotEntry(resource_type=ResourceSlotName(str(k)), quantity=str(v))
+            for k, v in resources.items()
         )
 
     async def list_serve(self, action: ListModelServiceAction) -> ListModelServiceActionResult:
@@ -382,7 +388,7 @@ class ModelServingService:
                 canonical=action.image,
                 architecture=action.architecture,
             ),
-            resource_spec=ResourceSpecDraft(
+            resource_spec=DeploymentResourceSpecDraft(
                 cluster_mode=action.cluster_mode,
                 cluster_size=action.cluster_size,
                 resource_slots=action.config.resources,
@@ -475,12 +481,35 @@ class ModelServingService:
             )
 
         draft = SessionSpecDraft(
-            identity=SessionIdentityDraft(
-                session_id=SessionID(uuid.uuid4()),
-                creation_id=session_creation_id,
-                session_name=session_name,
-                access_key=AccessKey(service_prepare_ctx.owner_access_key),
-                user_uuid=created_user.uuid,
+            resource_spec=SessionResourceSpecDraft(
+                identity=SessionIdentityDraft(
+                    session_id=SessionID(uuid.uuid4()),
+                    creation_id=session_creation_id,
+                    session_name=session_name,
+                    access_key=AccessKey(service_prepare_ctx.owner_access_key),
+                    user_uuid=created_user.uuid,
+                ),
+                classification=SessionClassificationDraft(
+                    session_type=SessionTypes.INFERENCE,
+                    tag=action.tag,
+                ),
+                network=SessionNetworkDraft(),
+                callback_url=callback_url,
+                resource=ResourceSpecDraft(
+                    options=SessionOptionsDraft(
+                        priority=SESSION_PRIORITY_DEFAULT,
+                        is_preemptible=False,
+                        cluster_mode=action.cluster_mode,
+                        cluster_size=action.cluster_size,
+                        scheduling_target=SchedulingTargetDraft(),
+                        kernel_groups=kernel_groups,
+                        handler_options=None,
+                    ),
+                ),
+                internal_data_extras=InternalDataExtras(
+                    sudo_session_enabled=sudo_session_enabled,
+                    model_definition_path=service_prepare_ctx.model_definition_path,
+                ),
             ),
             scope=SessionScopeDraft(
                 domain_id=domain_id,
@@ -488,25 +517,6 @@ class ModelServingService:
                 project_id=ProjectID(service_prepare_ctx.group_id),
                 resource_group_id=resource_group_id,
                 resource_group_name=resource_group_name,
-            ),
-            classification=SessionClassificationDraft(
-                session_type=SessionTypes.INFERENCE,
-                tag=action.tag,
-            ),
-            network=SessionNetworkDraft(),
-            callback_url=callback_url,
-            options=SessionOptionsDraft(
-                priority=SESSION_PRIORITY_DEFAULT,
-                is_preemptible=False,
-                cluster_mode=action.cluster_mode,
-                cluster_size=action.cluster_size,
-                scheduling_target=SchedulingTargetDraft(),
-                kernel_groups=kernel_groups,
-                handler_options=None,
-            ),
-            internal_data_extras=InternalDataExtras(
-                sudo_session_enabled=sudo_session_enabled,
-                model_definition_path=service_prepare_ctx.model_definition_path,
             ),
         )
 

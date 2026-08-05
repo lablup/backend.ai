@@ -228,7 +228,7 @@ class TestShareVFolderAction:
         vfolder_uuid: uuid.UUID,
     ) -> None:
         mock_user_repo.get_user_by_uuid = AsyncMock(return_value=_make_user_data(user_uuid))
-        mock_vfolder_repo.get_by_id_validated = AsyncMock(return_value=None)
+        mock_vfolder_repo.get_by_id_validated = AsyncMock(side_effect=VFolderNotFound())
 
         action = ShareVFolderAction(
             user_uuid=user_uuid,

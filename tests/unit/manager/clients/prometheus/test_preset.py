@@ -114,14 +114,14 @@ class TestMetricPresetRender:
                 window="",
                 expected='rate(node_cpu_seconds_total{mode!="idle"}[5m])',
             ),
-            # Raw matcher coexists with all placeholders + label injection.
+            # Static and injected matchers coexist in one selector.
             RenderTestCase(
-                id="raw_matcher_with_all_placeholders",
-                template='sum by ({group_by})(rate(metric{mode!="idle"}{{{labels}}}[{window}]))',
+                id="static_matcher_with_all_placeholders",
+                template='sum by ({group_by})(rate(metric{{mode!="idle",{labels}}}[{window}]))',
                 labels={"job": LabelMatcher.exact("api")},
                 group_by=frozenset({"instance"}),
                 window="5m",
-                expected='sum by (instance)(rate(metric{mode!="idle"}{job="api"}[5m]))',
+                expected='sum by (instance)(rate(metric{mode!="idle",job="api"}[5m]))',
             ),
             # Grafana paste with no {labels} placeholder — provided labels must
             # be silently ignored, raw matcher must survive.
@@ -210,6 +210,10 @@ class TestValidateQueryTemplate:
             pytest.param(
                 "sum by ({group_by})(metric{{{labels}}}[{window}])",
                 id="with_placeholders",
+            ),
+            pytest.param(
+                'sum by (session_id)(metric{{value_type="current",{labels}}})',
+                id="static_and_dynamic_labels",
             ),
             pytest.param(
                 'count(metric{a="1",b=~"x|y"})',

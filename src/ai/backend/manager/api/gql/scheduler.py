@@ -20,7 +20,6 @@ from ai.backend.common.dto.manager.v2.scheduler import (
 from ai.backend.common.events.event_types.session.broadcast import SchedulingBroadcastEvent
 from ai.backend.common.events.hub.propagators.bypass import AsyncBypassPropagator
 from ai.backend.common.events.types import EventDomain
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.gql.common_types import (
@@ -38,8 +37,8 @@ from ai.backend.manager.api.gql.decorators import (
     gql_subscription,
 )
 from ai.backend.manager.api.gql.session.types import SessionClusterModeGQL
+from ai.backend.manager.api.gql.session_options.types import AgentSelectionPolicyGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.errors.common import ServiceUnavailable
 from ai.backend.manager.errors.kernel import InvalidSessionId
 
 from .session_federation import Session
@@ -160,7 +159,7 @@ async def scheduling_events_by_session(
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Per-kernel resource request for a compute-schedule. The image is "
             "optional when a resource-group default supplies it downstream."
@@ -175,7 +174,7 @@ class ComputeScheduleKernelResourceInputGQL(PydanticInputMixin[ComputeScheduleKe
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Compute a session's scheduling against a resource group without provisioning.",
     ),
     name="ComputeScheduleInput",
@@ -184,11 +183,26 @@ class ComputeScheduleInputGQL(PydanticInputMixin[ComputeScheduleInput]):
     kernels: list[ComputeScheduleKernelResourceInputGQL]
     cluster_mode: SessionClusterModeGQL
     resource_group_id: strawberry.ID
+    designated_agent_ids: list[str] | None = gql_field(
+        default=None,
+        description=(
+            "Restrict the fitting check to these agents, with the same "
+            "semantics as the scheduling path. Null means no restriction."
+        ),
+    )
+    agent_selection_policy: AgentSelectionPolicyGQL | None = gql_field(
+        default=None,
+        description=(
+            "How designated agents are enforced (STRICT fails without "
+            "capacity, PREFERRED falls back). Null inherits the resource "
+            "group default."
+        ),
+    )
 
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "What the caller could change so an unschedulable kernel would fit. "
             "Present only when the kernel could not be scheduled."
@@ -199,12 +213,11 @@ class ComputeScheduleInputGQL(PydanticInputMixin[ComputeScheduleInput]):
 )
 class UnschedulableReasonHintGQL:
     required_reduction: list[ResourceSlotEntryGQL] | None
-    available_archs: list[str] | None
 
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Compute-schedule outcome for a single kernel. Results correspond positionally "
             "to the requested kernels."
@@ -222,7 +235,7 @@ class ComputeScheduleKernelResultGQL:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Result of a compute-schedule request.",
     ),
     model=ComputeSchedulePayload,
@@ -234,7 +247,7 @@ class ComputeSchedulePayloadGQL:
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Compute whether a session could be created on a resource group, "
             "without actually provisioning it. Checks each kernel's resource "
@@ -247,5 +260,6 @@ async def compute_schedule(
     input: ComputeScheduleInputGQL,
     info: Info[StrawberryGQLContext],
 ) -> ComputeSchedulePayloadGQL | None:
-    # Schema-only surface: the adapter wiring lands in a follow-up.
-    raise ServiceUnavailable("Compute schedule is not yet available.")
+    payload = await info.context.adapters.session.compute_schedule(input.to_pydantic())
+    result: ComputeSchedulePayloadGQL = ComputeSchedulePayloadGQL.from_pydantic(payload)  # type: ignore[attr-defined]
+    return result

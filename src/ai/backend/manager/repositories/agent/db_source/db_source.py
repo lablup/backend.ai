@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.exception import AgentNotFound
@@ -18,10 +21,13 @@ from ai.backend.manager.data.agent.types import (
     UpsertResult,
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
-from ai.backend.manager.errors.resource import ScalingGroupNotFound
+from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
+from ai.backend.manager.errors.agent import AgentHasConflictingSessions
+from ai.backend.manager.errors.resource import ScalingGroupNotFound, UnresolvableResourceGroup
 from ai.backend.manager.models.agent import ADMIN_PERMISSIONS as ADMIN_AGENT_PERMISSIONS
 from ai.backend.manager.models.agent import AgentRow, agents
 from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -92,23 +98,8 @@ class AgentDBSource:
                 raise AgentNotFound(f"Agent with id {agent_id} not found")
             return agent_row.to_data()
 
-    async def _resolve_scaling_group_id(
-        self, session: "AsyncSession", scaling_group_name: str
-    ) -> ResourceGroupID:
-        scaling_group_id = await session.scalar(
-            sa.select(ScalingGroupRow.id).where(ScalingGroupRow.name == scaling_group_name)
-        )
-        if scaling_group_id is None:
-            log.error("Scaling group named [{}] does not exist.", scaling_group_name)
-            raise ScalingGroupNotFound(scaling_group_name)
-        return ResourceGroupID(scaling_group_id)
-
     async def upsert_agent_with_state(self, upsert_data: AgentHeartbeatUpsert) -> UpsertResult:
         async with self._db.begin_session_read_committed() as session:
-            resource_group_id = await self._resolve_scaling_group_id(
-                session, upsert_data.metadata.scaling_group
-            )
-
             query = (
                 sa.select(AgentRow).where(AgentRow.id == upsert_data.metadata.id).with_for_update()
             )
@@ -116,21 +107,69 @@ class AgentDBSource:
             agent_data = row.to_heartbeat_update_data() if row is not None else None
             upsert_result = UpsertResult.from_state_comparison(agent_data, upsert_data)
 
-            stmt = pg_insert(agents).values({
-                **upsert_data.insert_fields,
-                "resource_group_id": resource_group_id,
-            })
-            final_query = stmt.on_conflict_do_update(
-                index_elements=["id"],
-                set_={
-                    **upsert_data.update_fields,
-                    "resource_group_id": resource_group_id,
-                },
-            )
-
-            await session.execute(final_query)
+            if row is None:
+                await self._insert_new_agent(session, upsert_data)
+            else:
+                await session.execute(
+                    sa.update(agents)
+                    .where(agents.c.id == upsert_data.metadata.id)
+                    .values(upsert_data.update_fields)
+                )
 
             return upsert_result
+
+    async def _insert_new_agent(
+        self, session: AsyncSession, upsert_data: AgentHeartbeatUpsert
+    ) -> None:
+        resource_group_name = upsert_data.metadata.scaling_group
+        group_filter: sa.ColumnElement[bool]
+        group_order: sa.ColumnElement[Any]
+        if resource_group_name is not None:
+            group_filter = sa.or_(
+                ScalingGroupRow.name == resource_group_name,
+                ScalingGroupRow.is_default,
+            )
+            group_order = sa.case((ScalingGroupRow.name == resource_group_name, 0), else_=1)
+        else:
+            group_filter = ScalingGroupRow.is_default.is_(True)
+            group_order = sa.asc(ScalingGroupRow.name)
+        group_select = (
+            sa.select(
+                *[
+                    sa.literal(value, type_=agents.c[key].type).label(key)
+                    for key, value in upsert_data.insert_fields.items()
+                ],
+                ScalingGroupRow.name.label("scaling_group"),
+                ScalingGroupRow.id.label("resource_group_id"),
+            )
+            .select_from(ScalingGroupRow)
+            .where(group_filter)
+            .order_by(group_order)
+            .limit(1)
+        )
+        stmt = (
+            pg_insert(agents)
+            .from_select(
+                [*upsert_data.insert_fields.keys(), "scaling_group", "resource_group_id"],
+                group_select,
+            )
+            # Guard a rare race where a concurrent registration inserted first
+            .on_conflict_do_update(
+                index_elements=["id"],
+                set_={**upsert_data.update_fields},
+            )
+            .returning(agents.c.id)
+        )
+        affected = (await session.execute(stmt)).scalar_one_or_none()
+        if affected is None:
+            if resource_group_name is not None:
+                raise UnresolvableResourceGroup(
+                    f"Scaling group '{resource_group_name}' not found "
+                    "and no default scaling group is set."
+                )
+            raise UnresolvableResourceGroup(
+                "No initial resource group name is configured and no default scaling group is set."
+            )
 
     async def update_agent_status_exit(self, updater: Updater[AgentRow]) -> None:
         async with self._db.begin_session() as session:
@@ -156,6 +195,63 @@ class AgentDBSource:
     async def update_agent_status(self, updater: Updater[AgentRow]) -> None:
         async with self._db.begin_session() as session:
             await execute_updater(session, updater)
+
+    async def update_resource_group(
+        self,
+        agent_id: AgentId,
+        resource_group_id: ResourceGroupID,
+        *,
+        force: bool,
+    ) -> list[KernelInfo]:
+        """
+        Change the agent's resource group, gating on the kernels running on it.
+
+        Finds the active kernels on the agent. If any exist and ``force`` is not
+        set, raises without changing anything. Otherwise updates the agent's group
+        (name + id columns) and returns those kernels so the caller can transition
+        their sessions. The lookup, the check, and the update run in one transaction.
+        Raises ScalingGroupNotFound when no resource group matches
+        ``resource_group_id``, and AgentNotFound when no agent row matches
+        ``agent_id``.
+        """
+        active_statuses = (
+            KernelStatus.resource_occupied_statuses() | KernelStatus.resource_requested_statuses()
+        )
+        async with self._db.begin_session_read_committed() as session:
+            resource_group_name = await session.scalar(
+                sa.select(ScalingGroupRow.name).where(ScalingGroupRow.id == resource_group_id)
+            )
+            if resource_group_name is None:
+                raise ScalingGroupNotFound(str(resource_group_id))
+
+            rows = (
+                (
+                    await session.execute(
+                        sa.select(KernelRow).where(
+                            KernelRow.agent == agent_id,
+                            KernelRow.status.in_(active_statuses),
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            kernels = [row.to_kernel_info() for row in rows]
+            if kernels and not force:
+                distinct_sessions = len({kernel.session.session_id for kernel in kernels})
+                raise AgentHasConflictingSessions(agent_id, distinct_sessions)
+
+            result = await session.execute(
+                sa.update(agents)
+                .where(agents.c.id == agent_id)
+                .values(
+                    resource_group_id=resource_group_id,
+                    scaling_group=resource_group_name,
+                )
+            )
+            if cast(CursorResult[Any], result).rowcount == 0:
+                raise AgentNotFound(f"Agent with id {agent_id} not found")
+        return kernels
 
     async def search_agents(
         self,

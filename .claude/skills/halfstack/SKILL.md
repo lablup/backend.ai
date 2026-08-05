@@ -52,7 +52,7 @@ only the **required** services start. To include optional ones, pass `--profile 
 | Service | Image | Purpose | Profile |
 |---------|-------|---------|---------|
 | `backendai-half-db` | postgres:16.3-alpine | Main database | (required) |
-| `backendai-half-redis` | valkey/valkey:9.1.0-alpine | Cache / pub-sub | (required) |
+| `backendai-half-redis` | valkey/valkey:9.1.1-alpine | Cache / pub-sub | (required) |
 | `backendai-half-etcd` | etcd v3.5 | Config store | (required) |
 | `backendai-half-apollo-router` | Hive Gateway | GraphQL federation (manager has 2 GQL servers federated through this) | (required) |
 | `backendai-half-prometheus` | Prometheus | Metrics — manager queries it for deployment autoscale rule evaluation | (required) |

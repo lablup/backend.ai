@@ -23,10 +23,12 @@ Applies to every generated artifact — docs, code comments, BEPs, PR descriptio
 
 **Core Documents (Read directly):**
 - `tests/AGENTS.md` — Testing guidelines and strategies
+- `.github/AGENTS.md` — CI workflows and the helper scripts they call, in `.github/scripts/` and `scripts/`
 - `BUILDING.md` — Build system, quality enforcement, BUILD policies
 - `src/ai/backend/manager/models/alembic/README.md` — Alembic migration backport strategy
 - `README.md` — Project overview and architecture
 - `proposals/README.md` — BEP (Backend.AI Enhancement Proposals)
+- `scripts/README.md` — Index of `scripts/` by when each one runs and who calls it
 
 **Skills (Invoke with `/skill-name`):**
 
@@ -42,7 +44,7 @@ When to use:
 - Docker/halfstack issues → `/halfstack`
 - Checking/applying DB migrations → `/db-migrate`
 - Running component servers directly → `/local-dev`
-- Submitting PR → `/submit`
+- Submitting PR (backport targeting) → `/submit`
 - Preparing release → `/release`
 
 Skills source: `.claude/skills/{name}/SKILL.md`

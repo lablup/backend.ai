@@ -34,6 +34,10 @@ RESERVED_VFOLDERS = [
     ".jupyter",
     ".tmux.conf",
     ".ssh",
+    # The agent always bind-mounts the scratch directory at /home/work,
+    # so mounting a vfolder exactly there makes dockerd reject the container
+    # with "Duplicate mount point: /home/work".
+    "/home/work",
     "/bin",
     "/boot",
     "/dev",

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
@@ -16,6 +17,8 @@ from ai.backend.common.dto.manager.v2.fair_share.response import (
     GetDomainFairSharePayload,
     SearchDomainFairSharesPayload,
 )
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.api.adapters.fair_share.adapter import FairShareAdapter
 from ai.backend.manager.api.gql.fair_share.resolver import domain as domain_resolver
@@ -45,6 +48,7 @@ def mock_superadmin_user() -> UserData:
         is_superadmin=True,
         role=UserRole.SUPERADMIN,
         domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
     )
 
 
@@ -58,6 +62,7 @@ def mock_regular_user() -> UserData:
         is_superadmin=False,
         role=UserRole.USER,
         domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
     )
 
 
@@ -68,6 +73,7 @@ def sample_domain_fair_share_data() -> DomainFairShareData:
     today = now.date()
     return DomainFairShareData(
         resource_group="default",
+        resource_group_id=ResourceGroupID(UUID("880e8400-e29b-41d4-a716-446655440003")),
         domain_name="test-domain",
         data=FairShareData(
             spec=FairShareSpec(

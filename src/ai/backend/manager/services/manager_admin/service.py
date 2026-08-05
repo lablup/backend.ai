@@ -28,6 +28,17 @@ if TYPE_CHECKING:
 
 __all__ = ("ManagerAdminService",)
 
+# etcd keys backing the system announcement. The message and the enabled flag
+# are stored under separate subpaths of ``manager/announcement`` so that
+# disabling an announcement only flips the flag and keeps the stored message
+# (re-enabling does not require retyping). Older deployments stored a bare
+# message string directly at ``manager/announcement``; ``get_announcement``
+# reads each subpath on its own and falls back to that legacy key for whichever
+# one is absent, and the first write migrates to the split layout.
+_ANNOUNCEMENT_KEY = "manager/announcement"
+_ANNOUNCEMENT_MESSAGE_KEY = "manager/announcement/message"
+_ANNOUNCEMENT_ENABLED_KEY = "manager/announcement/enabled"
+
 
 @dataclass
 class ManagerAdminService:
@@ -81,24 +92,51 @@ class ManagerAdminService:
         return UpdateManagerStatusActionResult()
 
     async def get_announcement(self, action: GetAnnouncementAction) -> GetAnnouncementActionResult:
-        """Get the current announcement from etcd."""
-        data = await self._etcd.get("manager/announcement")
-        if data is None:
-            return GetAnnouncementActionResult(enabled=False, message="")
-        return GetAnnouncementActionResult(enabled=True, message=data)
+        """Get the current announcement from etcd.
+
+        Each subpath key is read on its own; whichever one is absent falls back
+        to the legacy single key, whose bare presence denotes an enabled
+        announcement. Absent everywhere means "no announcement".
+        """
+        message = await self._etcd.get(_ANNOUNCEMENT_MESSAGE_KEY)
+        enabled_flag = await self._etcd.get(_ANNOUNCEMENT_ENABLED_KEY)
+        if message is None or enabled_flag is None:
+            legacy_message = await self._etcd.get(_ANNOUNCEMENT_KEY)
+            if message is None:
+                message = legacy_message
+            if enabled_flag is None:
+                enabled_flag = "true" if legacy_message is not None else "false"
+        return GetAnnouncementActionResult(enabled=enabled_flag == "true", message=message or "")
 
     async def update_announcement(
         self, action: UpdateAnnouncementAction
     ) -> UpdateAnnouncementActionResult:
-        """Update the announcement in etcd."""
-        if action.enabled:
-            if not action.message:
-                raise InvalidAPIParameters(
-                    extra_msg="Empty message not allowed to enable announcement"
-                )
-            await self._etcd.put("manager/announcement", action.message)
+        """Update the announcement in etcd.
+
+        The message is retained across enable/disable: disabling only flips the
+        enabled flag and keeps the stored message, so re-enabling does not
+        require retyping it. Enabling still requires a non-empty message; pass an
+        explicit empty message to clear the stored text.
+        """
+        if action.enabled and not action.message:
+            raise InvalidAPIParameters(extra_msg="Empty message not allowed to enable announcement")
+        # A request without a message (e.g. a plain disable) preserves the
+        # existing text, so read the current message before rewriting the keys.
+        if action.message is None:
+            current = await self.get_announcement(GetAnnouncementAction())
+            message = current.message
         else:
-            await self._etcd.delete("manager/announcement")
+            message = action.message
+        # Replace the whole announcement subtree in a single transaction: the two
+        # subpath keys are written and every other key under the prefix is
+        # removed, so the legacy single key (superseded by the split keys) is
+        # dropped as part of the same write rather than in a separate step.
+        await self._etcd.atomic_replace_prefixes({
+            _ANNOUNCEMENT_KEY: {
+                "message": message,
+                "enabled": "true" if action.enabled else "false",
+            },
+        })
         return UpdateAnnouncementActionResult()
 
     async def perform_scheduler_ops(

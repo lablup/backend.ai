@@ -12,6 +12,15 @@
 - **Do NOT edit the revision of a released migration** — do not modify the `revision`/`down_revision` of an
   already-released migration. Editing `down_revision` is allowed only when inserting a backport into the main chain before merge.
 
+## Diverged heads
+
+- **Your migration diverged from main** (main has a single head; your `down_revision` points to an older revision):
+  repoint your **own unmerged** migration's `down_revision` to the current head. No merge migration.
+- **main itself has two or more heads** (independent migrations merged without reconciling): add an **empty merge
+  migration** whose `down_revision` is the tuple of the heads (`down_revision = ("<head_a>", "<head_b>")`, with
+  `upgrade`/`downgrade` = `pass`), then chain new migrations on top of it. Do NOT edit the diverged migrations'
+  `down_revision` to linearize them — they may already be released.
+
 ## Forward direction (under consideration)
 
 - Avoid adding alembic migrations in a backport where possible. If you must, place the corresponding version on the backport

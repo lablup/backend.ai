@@ -33,6 +33,7 @@ REST v2 Handler → Adapter (api/adapters/) → Processor → Service → Reposi
 - superadmin only: `admin_` prefix + `superadmin_required` middleware.
 - scoped: currently a `{scope}_` prefix. **Forward direction (under consideration):** unify to `scoped_` and receive the scope as a request field (see below).
 - self-service: `/v2/{entity}/my/` — the entity comes first, `my` is the scope qualifier.
+- anonymous: `/v2/{entity}/public/` — no auth middleware. `public` is reserved for this (see below).
 
 **search — always two variants:**
 - `POST /v2/{entity}/search`: superadmin only, no scope — system-wide query.
@@ -49,6 +50,12 @@ REST v2 Handler → Adapter (api/adapters/) → Processor → Service → Reposi
 **self-service (`my`):**
 - `POST /v2/{entity}/my/{operation}` (e.g. `/v2/keypairs/my/search`). The adapter resolves the user via `current_user()`.
   `auth_required` middleware.
+
+**anonymous (`public`) — reserved segment:**
+- `POST /v2/{entity}/public/{operation}` (e.g. `/v2/app-config/public/get`). No auth middleware. `public` marks the missing
+  auth, never a property of the resource.
+- The webserver proxies exactly this shape anonymously by pattern (`web/server.py`), so adding a route here exposes it with no
+  further edit. Two segments only — nothing nested below the operation.
 
 **create / update / get / delete / purge — criteria for splitting out `admin_`:**
 - admin-only entities: a single `admin_`.

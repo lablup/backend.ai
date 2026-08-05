@@ -12,6 +12,7 @@ from sqlalchemy.engine import CursorResult
 
 from ai.backend.manager.errors.repository import UpsertEmptyResultError
 from ai.backend.manager.models.base import Base
+from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -34,6 +35,14 @@ class UpserterSpec[TRow: Base](ABC):
         """Return the ORM class for table access and result reconstruction."""
         raise NotImplementedError
 
+    @property
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        """Constraint violations to map to domain errors, other than the conflict target.
+
+        Empty by default; an unmatched error raises RepositoryIntegrityError.
+        """
+        return ()
+
     @abstractmethod
     def build_insert_values(self) -> dict[str, Any]:
         """Build column name to value mapping for INSERT.
@@ -51,6 +60,47 @@ class UpserterSpec[TRow: Base](ABC):
             Dict with column values to update on conflict
             (may be subset of insert values)
         """
+        raise NotImplementedError
+
+
+class DataUpserter[TRow: Base, TData](UpserterSpec[TRow], ABC):
+    """An upserter spec that names its conflict target and how the row becomes data.
+
+    ``UpserterSpec`` says only what to insert and what to set on conflict, leaving
+    ``index_elements`` as a separate argument and the conversion to the caller. Carrying
+    both here makes it self-contained, so the ops layer returns the ``data/`` type and
+    the ORM row never leaves it.
+
+    Example:
+        class ConfigUpserter(DataUpserter[ConfigRow, ConfigData]):
+            @property
+            def row_class(self) -> type[ConfigRow]:
+                return ConfigRow
+
+            def index_elements(self) -> list[str]:
+                return ["key"]
+
+            def build_insert_values(self) -> dict[str, Any]:
+                return {"key": self._key, "value": self._value}
+
+            def build_update_values(self) -> dict[str, Any]:
+                return {"value": self._value}
+
+            def to_data(self, row: ConfigRow) -> ConfigData:
+                return row.to_data()
+
+        async with ops.write_ops() as w:
+            config = await w.upsert_data(ConfigUpserter("setting", "enabled"))
+    """
+
+    @abstractmethod
+    def index_elements(self) -> list[str]:
+        """Return the column names conflict detection keys on."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        """Convert the inserted-or-updated row into its ``data/`` type."""
         raise NotImplementedError
 
 

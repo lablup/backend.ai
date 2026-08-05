@@ -12,6 +12,7 @@ import sqlalchemy as sa
 from graphql import Undefined, UndefinedType
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
+from ai.backend.common.identifier.container_registry import ContainerRegistryID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
@@ -33,6 +34,9 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.container_registry.creators import ContainerRegistryCreatorSpec
+from ai.backend.manager.repositories.container_registry.purgers import (
+    ContainerRegistryPurgerSpec,
+)
 from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
 )
@@ -516,7 +520,9 @@ class DeleteContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
         result = (
             await ctx.processors.container_registry.delete_container_registry.wait_for_complete(
                 DeleteContainerRegistryAction(
-                    purger=Purger(row_class=ContainerRegistryRow, pk_value=reg_id)
+                    purger=Purger(
+                        spec=ContainerRegistryPurgerSpec(registry_id=ContainerRegistryID(reg_id))
+                    )
                 )
             )
         )

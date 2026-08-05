@@ -44,6 +44,7 @@ from ai.backend.common.dto.manager.v2.session_options import (
 )
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     BinarySize,
@@ -177,7 +178,10 @@ def _resource_entry_list_from_input(
     """Project DTO resource-slot input entries into the data-layer
     :class:`ResourceSlotEntry` list used by ``KernelExecutionSpec``.
     """
-    return [ResourceSlotEntry(resource_type=e.resource_type, quantity=e.quantity) for e in entries]
+    return [
+        ResourceSlotEntry(resource_type=ResourceSlotName(e.resource_type), quantity=e.quantity)
+        for e in entries
+    ]
 
 
 def _resource_opts_from_input(value: ResourceOptsInput | None) -> ResourceOpts:

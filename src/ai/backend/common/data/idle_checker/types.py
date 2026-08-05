@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import enum
-from typing import Self
+from decimal import Decimal
+from typing import Final, Self
 
 from pydantic import Field, model_validator
 
+from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.types import BackendAISchema
+
+# Metric label carrying the session UUID; grouping by it enables per-session mapping.
+SESSION_ID_LABEL: Final = "session_id"
 
 
 class CheckerType(enum.StrEnum):
@@ -16,25 +21,89 @@ class CheckerType(enum.StrEnum):
     UTILIZATION = "utilization"
 
 
-class SessionLifetimeSpec(BackendAISchema):
-    """Config for ``CheckerType.SESSION_LIFETIME``.
+class IdleCheckPhase(enum.StrEnum):
+    NOT_CHECKED = "not_checked"
+    READY_TO_CHECK = "ready_to_check"
+    ACTIVE = "active"
+    IDLE = "idle"
+    IDLE_EXPIRED = "idle_expired"
 
-    Concrete fields (e.g. max lifetime) land with the checker-logic stories.
-    """
+
+class MetricLabel(BackendAISchema):
+    """Single metric label key-value pair."""
+
+    key: str = Field(description="Label key.")
+    value: str = Field(description="Label value.")
+
+
+class UtilizationThresholdEntry(BackendAISchema):
+    """One preset-backed session utilization threshold."""
+
+    preset_id: PrometheusQueryPresetID = Field(
+        description="Prometheus query preset used to evaluate utilization."
+    )
+    threshold: Decimal = Field(
+        description="Underutilization threshold compared against the preset's query result.",
+    )
+    filter_labels: list[MetricLabel] = Field(
+        default_factory=list,
+        description="Label filters injected into the preset's {labels} placeholder.",
+    )
+    group_labels: list[str] = Field(
+        default_factory=lambda: [SESSION_ID_LABEL],
+        description=(
+            "Labels injected into the preset's {group_by} placeholder. "
+            "Must include 'session_id' for per-session values to be mapped. "
+            "When 'session_id' is grouped, the checker adds a session_id filter that "
+            "limits the query to the sessions being evaluated; a user-provided "
+            "'session_id' entry in filter_labels takes precedence over it."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _validate_unique_filter_label_keys(self) -> Self:
+        keys = [label.key for label in self.filter_labels]
+        if len(keys) != len(set(keys)):
+            raise ValueError("filter_labels must not contain duplicate keys.")
+        return self
+
+
+class SessionLifetimeSpec(BackendAISchema):
+    """Config for ``CheckerType.SESSION_LIFETIME``."""
+
+    max_lifetime_seconds: int = Field(
+        ge=1,
+        description=(
+            "Maximum time in seconds that a session may remain running. "
+            "This is the sole lifetime limit used by the reconciler idle checker."
+        ),
+    )
 
 
 class NetworkTimeoutSpec(BackendAISchema):
-    """Config for ``CheckerType.NETWORK_TIMEOUT``.
+    """Config for ``CheckerType.NETWORK_TIMEOUT``."""
 
-    Concrete fields land with the checker-logic stories.
-    """
+    max_network_inactivity_seconds: int = Field(
+        ge=1,
+        description=(
+            "Maximum time in seconds that an interactive session may have neither recent "
+            "network access nor an active connection."
+        ),
+    )
 
 
 class UtilizationSpec(BackendAISchema):
-    """Config for ``CheckerType.UTILIZATION``.
+    """Config for ``CheckerType.UTILIZATION``."""
 
-    Concrete fields land with the checker-logic stories.
-    """
+    max_underutilized_duration_seconds: int = Field(
+        ge=1,
+        description=(
+            "Maximum duration that the configured utilization conditions may remain satisfied."
+        ),
+    )
+    threshold: UtilizationThresholdEntry = Field(
+        description="Preset-backed utilization threshold evaluated for the session.",
+    )
 
 
 class IdleCheckerSpec(BackendAISchema):
