@@ -396,7 +396,7 @@ class ContainerRegistryRepository:
         registry_scope = ScopeRef(scope_type=CONTAINER_REGISTRY_SCOPE_TYPE, scope_id=registry_id)
         project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id)
         await ops.ensure_scope(project_scope)
-        await ops.bulk_add_entity_members(
+        await ops.add_bulk_members(
             EntityMembersAddition(
                 scope=project_scope,
                 members=[

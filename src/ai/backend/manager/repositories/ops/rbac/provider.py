@@ -969,7 +969,7 @@ class RBACWriteOps(WriteOps):
         )
         await self._sess.execute(stmt)
 
-    async def bulk_add_scope_members(
+    async def add_bulk_scope_members(
         self,
         scope: ScopeRef,
         members: Sequence[ScopeRef],
@@ -990,7 +990,7 @@ class RBACWriteOps(WriteOps):
         if not members:
             return
         virtual_scope_ids = await self._resolve_virtual_scope_ids(members)
-        await self.bulk_add_entity_members(
+        await self.add_bulk_members(
             EntityMembersAddition(
                 scope=scope,
                 members=[
@@ -1007,13 +1007,13 @@ class RBACWriteOps(WriteOps):
             virtual_scope_ids,
         )
 
-    async def bulk_add_scope_members_partial(
+    async def add_bulk_scope_members_partial(
         self,
         scope: ScopeRef,
         members: Sequence[ScopeRef],
         permission_cap: Permission | None = None,
     ) -> ScopeMembersResultWithFailures:
-        """Attach member scopes as :meth:`bulk_add_scope_members` does, isolating each
+        """Attach member scopes as :meth:`add_bulk_scope_members` does, isolating each
         member for partial success.
 
         A member's membership, association, and binding share one savepoint, so a
@@ -1184,15 +1184,13 @@ class RBACWriteOps(WriteOps):
         member = ScopeUserMember(user_id=user_id)
         domain_scope = ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=full_creation.domain_id)
         await self.ensure_scope(domain_scope)
-        await self.bulk_add_entity_members(
-            EntityMembersAddition(scope=domain_scope, members=[member])
-        )
+        await self.add_bulk_members(EntityMembersAddition(scope=domain_scope, members=[member]))
         for project_id in await self._domain_member_project_ids(
             full_creation.domain_id, full_creation.project_ids
         ):
             project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id)
             await self.ensure_scope(project_scope)
-            await self.bulk_add_entity_members(
+            await self.add_bulk_members(
                 EntityMembersAddition(scope=project_scope, members=[member])
             )
 
@@ -1219,7 +1217,7 @@ class RBACWriteOps(WriteOps):
         )
         return [ProjectID(row) for row in (await self._sess.scalars(stmt)).all()]
 
-    async def bulk_add_entity_members(
+    async def add_bulk_members(
         self,
         addition: EntityMembersAddition,
     ) -> None:
@@ -1240,11 +1238,11 @@ class RBACWriteOps(WriteOps):
         ])
         await self._grant_member_auto_assign_roles(scope, members)
 
-    async def bulk_add_entity_members_partial(
+    async def add_bulk_members_partial(
         self,
         addition: EntityMembersAddition,
     ) -> EntityMembersResultWithFailures:
-        """Add members as :meth:`bulk_add_entity_members` does, isolating each member
+        """Add members as :meth:`add_bulk_members` does, isolating each member
         for partial success.
 
         A member's membership and association share one savepoint, so a failed member

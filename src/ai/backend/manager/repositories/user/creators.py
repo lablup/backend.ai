@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 class UserScopeCreation(ScopeCreation[UserRow]):
     """Creates a user row and the scope the user becomes; the user is granted its own
     scope's roles. Domain/project scope associations are written by the enrollment
-    step (``bulk_add_entity_members``), not by this creator."""
+    step (``add_bulk_members``), not by this creator."""
 
     spec: CreatorSpec[UserRow]
 
