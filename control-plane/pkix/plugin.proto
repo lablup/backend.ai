@@ -1,0 +1,77 @@
+// Copyright (c) 2026 by Trustee Contributors
+//
+// SPDX-License-Identifier: Apache-2.0
+//
+
+// Reserved Field Convention:
+// When removing a field, add its number AND name to `reserved` statements.
+// This prevents accidental reuse of field numbers, which causes silent
+// wire-format corruption with old clients. See protobuf.dev/best-practices.
+
+syntax = "proto3";
+package kbs.plugin.v1;
+
+// KbsPlugin defines the gRPC interface for external KBS plugins.
+//
+// External plugins receive HTTP requests from KBS, process them, and return
+// HTTP responses. This allows extending KBS with custom endpoints without
+// modifying the core codebase.
+service KbsPlugin {
+    // Handle processes an HTTP request and returns an HTTP response.
+    rpc Handle(PluginRequest) returns (PluginResponse) {};
+
+    // ValidateAuth asks the plugin whether admin authentication is required
+    // for a specific request. KBS calls this before enforcing authentication
+    // and before Handle.
+    rpc ValidateAuth(ValidateAuthRequest) returns (ValidateAuthResponse) {};
+
+    // NeedsEncryption asks the plugin whether its Handle response should be
+    // JWE-encrypted with the TEE's ephemeral public key.
+    rpc NeedsEncryption(NeedsEncryptionRequest) returns (NeedsEncryptionResponse) {};
+}
+
+// PluginRequest carries the HTTP request details from KBS to the plugin.
+message PluginRequest {
+    bytes body = 1;
+    map<string, string> query = 2;
+    // Path segments after the backend name. For /kbs/v0/external/my-plugin/foo/bar,
+    // this is ['foo', 'bar'] (the backend name is stripped by KBS before forwarding).
+    repeated string path = 3;
+    string method = 4;
+    // Reserved for future AttestationContext.
+    reserved 5;
+    reserved "attestation_context";
+}
+
+message ValidateAuthRequest {
+    bytes body = 1;
+    map<string, string> query = 2;
+    repeated string path = 3;
+    string method = 4;
+}
+
+message NeedsEncryptionRequest {
+    bytes body = 1;
+    map<string, string> query = 2;
+    repeated string path = 3;
+    string method = 4;
+}
+
+message PluginResponse {
+    bytes body = 1;
+    // HTTP status code hint. 0 or 2xx: body returned as-is.
+    // Non-2xx: KBS treats the call as a plugin error (caller receives 401).
+    int32 status_code = 2;
+    // Content-Type hint. Reserved for future use; currently ignored by KBS.
+    string content_type = 3;
+}
+
+message ValidateAuthResponse {
+    bool requires_admin_auth = 1;
+}
+
+message NeedsEncryptionResponse {
+    // true  = KBS JWE-encrypts the Handle response with the TEE public key.
+    // false = KBS returns the Handle response body as-is.
+    bool requires_payload_encryption = 1;
+}

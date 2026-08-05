@@ -1,6 +1,12 @@
 #!/bin/sh
 set -eu
 
+for word in $(cat /proc/cmdline); do
+    case "$word" in
+    BACKENDAI_*=*) export "$word" ;;
+    esac
+done
+
 DEVICE=${BACKENDAI_STATE_DEVICE:-/dev/disk/by-partlabel/backendai-state}
 NAME=${BACKENDAI_STATE_NAME:-backendai-state}
 URL=${BACKENDAI_KBS_URL:?BACKENDAI_KBS_URL is not set in the measured command line}
@@ -8,6 +14,14 @@ KEY_PATH=${BACKENDAI_KEY_PATH:-default/control-plane/state-disk-key}
 MAC_PATH=${BACKENDAI_MAC_PATH:-default/control-plane/state-header-mac}
 WORK=$(mktemp -d)
 trap 'shred -u "$WORK"/* 2>/dev/null || true; rm -rf "$WORK"' EXIT
+
+export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+modprobe tdx_guest 2>/dev/null || true
+mountpoint -q /sys/kernel/config || mount -t configfs configfs /sys/kernel/config
+for _ in $(seq 60); do
+    ip route 2>/dev/null | grep -q '^default' && break
+    sleep 1
+done
 
 fetch() {
     if ! kbs-client --url "$URL" get-resource --path "$1" | base64 -d > "$2"; then

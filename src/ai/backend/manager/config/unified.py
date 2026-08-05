@@ -1142,6 +1142,25 @@ class ManagerConfig(BaseConfigSchema):
             deprecation_hint="Use aiomonitor_termui_port instead.",
         ),
     ]
+    aiomonitor_enabled: Annotated[
+        bool,
+        Field(
+            default=True,
+            validation_alias=AliasChoices("aiomonitor-enabled", "aiomonitor_enabled"),
+            serialization_alias="aiomonitor-enabled",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Whether to start the aiomonitor debugging console at all. "
+                "It exposes a telnet terminal and a web UI that can inspect and interact with "
+                "live async tasks, so a deployment that must not carry an introspection surface, "
+                "such as a manager inside a confidential VM, has to be able to switch it off "
+                "rather than merely firewall its ports."
+            ),
+            added_version="26.7.0",
+            example=ConfigExample(local="true", prod="true"),
+        ),
+    ]
     aiomonitor_termui_port: Annotated[
         int,
         Field(

@@ -7,7 +7,7 @@ import sys
 import threading
 import time
 
-from .clock import TrustedClock, claims, platform_status
+from .clock import TrustedClock, claims, measurements, platform_status
 from .errors import BrokerUnreachable, EmptySecret, PolicyError, ReleaseDenied
 from .identity import material
 from .kbs import Kbs
@@ -53,11 +53,26 @@ def collect(kbs, broker, table):
 def episode(kbs, broker, table, clock, log):
     token = kbs.attest()
     body = claims(token)
-    clock.take(body)
+    observed = time.time()
+    attested = clock.take(body)
+    print(
+        f"credential-broker: wall clock read {observed:.0f}, attestation says "
+        f"{attested:.0f}, clock now {time.time():.0f}",
+        file=sys.stderr,
+        flush=True,
+    )
     status = platform_status(body)
+    quoted = measurements(body)
     log.record("platform", json.dumps(status, sort_keys=True), "credential-broker", "")
     with open(os.path.join(broker["identity_dir"], "platform-status.json"), "w") as f:
-        json.dump(status, f, sort_keys=True)
+        json.dump({"appraisal": status, "measurements": quoted}, f, sort_keys=True)
+    print(
+        "credential-broker: appraisal " + json.dumps(status, sort_keys=True),
+        file=sys.stderr,
+        flush=True,
+    )
+    for field, value in sorted(quoted.items()):
+        print(f"credential-broker: {field}={value}", file=sys.stderr, flush=True)
     return collect(kbs, broker, table)
 
 
@@ -81,8 +96,9 @@ def main(argv=None):
     kbs = Kbs(
         broker["url"],
         broker["client"],
-        broker.get("certificate_plugin", "plugin/pkix"),
+        broker.get("certificate_plugin", "external/pkix"),
         broker.get("timeout_seconds", 30),
+        broker["identity_dir"],
     )
     clock = TrustedClock(broker.get("clock_skew_bound_seconds", 60))
 

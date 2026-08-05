@@ -5,7 +5,7 @@ socket = "/run/backendai-credentials.sock"
 template_dir = "/usr/share/backendai/credential-templates"
 identity_dir = "/run/backendai-credentials"
 decision_log = "/var/log/backendai-credentials.jsonl"
-certificate_plugin = "plugin/pkix"
+certificate_plugin = "external/pkix"
 timeout_seconds = 30
 boot_attempts = 5
 boot_backoff_seconds = 5
@@ -24,6 +24,21 @@ name = "rpc-keypair"
 resource = "default/control-plane/rpc-keypair"
 
 [[credential]]
+unit = "backendai-etcdprobe.service"
+name = "manager.toml"
+render = "manager.toml.in"
+
+[[credential]]
+unit = "backendai-manager-schema.service"
+name = "alembic.ini"
+render = "alembic.ini.in"
+
+[[credential]]
+unit = "backendai-manager-schema.service"
+name = "password"
+resource = "default/control-plane/postgres-password"
+
+[[credential]]
 unit = "backendai-manager.service"
 name = "tls.key"
 identity = "manager"
@@ -36,6 +51,17 @@ sans = [
 
 [[credential]]
 unit = "backendai-manager.service"
+name = "tls.crt"
+identity = "manager"
+part = "chain"
+subject = "/CN=manager.control.backend.ai"
+sans = [
+  "DNS:manager.control.backend.ai",
+  "URI:spiffe://backend.ai/domain/default/control-plane/manager",
+]
+
+[[credential]]
+unit = "backendai-manager-selfcheck.service"
 name = "tls.crt"
 identity = "manager"
 part = "chain"
@@ -78,7 +104,17 @@ name = "password"
 resource = "default/control-plane/postgres-password"
 
 [[credential]]
+unit = "backendai-postgresql-bootstrap.service"
+name = "password"
+resource = "default/control-plane/postgres-password"
+
+[[credential]]
 unit = "backendai-etcd.service"
+name = "root-password"
+resource = "default/control-plane/etcd-root-password"
+
+[[credential]]
+unit = "backendai-etcd-bootstrap.service"
 name = "root-password"
 resource = "default/control-plane/etcd-root-password"
 

@@ -22,6 +22,7 @@ user = "root"
 password = "@@default/control-plane/etcd-root-password@@"
 
 [proxy_coordinator]
+ipc_base_path = "/run/backendai/coordinator/ipc"
 tls_listen = true
 tls_advertised = true
 tls_cert = "/run/credentials/backendai-appproxy-coordinator.service/tls.crt"
@@ -42,7 +43,7 @@ jwt_secret = "@@default/control-plane/coordinator-jwt-secret@@"
 
 [permit_hash]
 secret = "@@default/control-plane/coordinator-permit-hash-secret@@"
-digest_mod = "SHA256"
+digest_mod = "sha256"
 
 [logging]
 level = "INFO"

@@ -10,8 +10,9 @@ Group=etcd
 LoadCredential=root-password:/run/backendai-credentials.sock
 ExecStartPre=/usr/lib/backendai/credential-guard root-password
 ExecStart=/usr/bin/etcd --name state-bundle --data-dir /var/lib/backendai/etcd --listen-client-urls http://127.0.0.1:2379 --advertise-client-urls http://127.0.0.1:2379 --listen-peer-urls http://127.0.0.1:2380 --initial-advertise-peer-urls http://127.0.0.1:2380 --initial-cluster state-bundle=http://127.0.0.1:2380 --auto-compaction-retention 1
-ExecStartPost=/usr/lib/backendai/datastore-bootstrap etcd-sync
 Restart=on-failure
+StandardOutput=journal+console
+StandardError=journal+console
 UMask=0077
 NoNewPrivileges=yes
 PrivateTmp=yes

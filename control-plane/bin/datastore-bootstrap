@@ -9,11 +9,19 @@ require() {
     [ -s "$1" ] || { echo "datastore-bootstrap: $1 is missing or empty" >&2; exit 78; }
 }
 
+await() {
+    for _ in $(seq 60); do
+        "$@" > /dev/null 2>&1 && return 0
+        sleep 1
+    done
+    echo "datastore-bootstrap: $1 stayed unreachable" >&2
+    exit 75
+}
+
 case "$1" in
 postgres-init)
     require "${CREDENTIALS_DIRECTORY}/password"
     if [ ! -s "${PGDATA}/PG_VERSION" ]; then
-        install -d -m 0700 -o postgres -g postgres "$PGDATA"
         "${PGBIN}/initdb" -D "$PGDATA" --auth-local=scram-sha-256 \
             --auth-host=scram-sha-256 --username=postgres \
             --pwfile="${CREDENTIALS_DIRECTORY}/password" --data-checksums
@@ -21,11 +29,17 @@ postgres-init)
     ;;
 postgres-sync)
     require "${CREDENTIALS_DIRECTORY}/password"
-    printf "\\\\set pw \`cat %s\`\nALTER ROLE postgres PASSWORD :'pw';\n" \
-        "${CREDENTIALS_DIRECTORY}/password" |
-        "${PGBIN}/psql" -v ON_ERROR_STOP=1 -q -d postgres
+    PGHOST=/run/backendai
+    PGPORT=5432
+    PGUSER=postgres
+    PGDATABASE=postgres
+    PGPASSWORD=$(cat "${CREDENTIALS_DIRECTORY}/password")
+    export PGHOST PGPORT PGUSER PGDATABASE PGPASSWORD
+    await "${PGBIN}/pg_isready" -q
+    printf "ALTER ROLE postgres PASSWORD :'pw';\n" |
+        "${PGBIN}/psql" -v ON_ERROR_STOP=1 -q -v pw="$PGPASSWORD"
     for name in backend appproxy; do
-        "${PGBIN}/psql" -v ON_ERROR_STOP=1 -q -d postgres -tAc \
+        "${PGBIN}/psql" -v ON_ERROR_STOP=1 -q -tAc \
             "SELECT 1 FROM pg_database WHERE datname='${name}'" | grep -q 1 ||
             "${PGBIN}/createdb" "$name"
     done
@@ -33,9 +47,27 @@ postgres-sync)
 etcd-sync)
     require "${CREDENTIALS_DIRECTORY}/root-password"
     password=$(cat "${CREDENTIALS_DIRECTORY}/root-password")
+    await curl -fsS -o /dev/null http://127.0.0.1:2379/health
     $ETCDCTL user add root --new-user-password="$password" 2>/dev/null ||
-        $ETCDCTL --user "root:${password}" user passwd root --new-user-password="$password"
+        printf '%s\n%s\n' "$password" "$password" |
+            $ETCDCTL --user "root:${password}" user passwd root --interactive=true
     $ETCDCTL --user "root:${password}" auth enable 2>/dev/null || true
+    ;;
+manager-schema)
+    require "${CREDENTIALS_DIRECTORY}/alembic.ini"
+    require "${CREDENTIALS_DIRECTORY}/password"
+    PGHOST=127.0.0.1
+    PGPORT=5432
+    PGUSER=postgres
+    PGDATABASE=backend
+    PGPASSWORD=$(cat "${CREDENTIALS_DIRECTORY}/password")
+    export PGHOST PGPORT PGUSER PGDATABASE PGPASSWORD
+    await "${PGBIN}/pg_isready" -q
+    "${PGBIN}/psql" -tAc \
+        "SELECT 1 FROM information_schema.tables WHERE table_name='alembic_version'" |
+        grep -q 1 ||
+        /usr/lib/backendai/backendai-manager mgr schema oneshot \
+            -f "${CREDENTIALS_DIRECTORY}/alembic.ini"
     ;;
 *)
     echo "datastore-bootstrap: unknown action $1" >&2

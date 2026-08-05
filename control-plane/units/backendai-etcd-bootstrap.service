@@ -1,0 +1,31 @@
+[Unit]
+Description=Backend.AI state bundle etcd role and authentication bootstrap
+Requires=backendai-credentials.service backendai-etcd.service
+After=backendai-credentials.service backendai-etcd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=etcd
+Group=etcd
+LoadCredential=root-password:/run/backendai-credentials.sock
+ExecStart=/usr/lib/backendai/credential-guard root-password
+ExecStart=/usr/lib/backendai/datastore-bootstrap etcd-sync
+StandardOutput=journal+console
+StandardError=journal+console
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateMounts=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

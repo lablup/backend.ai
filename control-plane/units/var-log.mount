@@ -1,0 +1,15 @@
+[Unit]
+Description=Backend.AI volatile log area
+DefaultDependencies=no
+Conflicts=umount.target
+Before=umount.target local-fs.target
+After=systemd-remount-fs.service
+
+[Mount]
+What=tmpfs
+Where=/var/log
+Type=tmpfs
+Options=mode=0755,nosuid,nodev,noexec,size=256M
+
+[Install]
+WantedBy=local-fs.target

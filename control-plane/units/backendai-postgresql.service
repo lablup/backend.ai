@@ -11,11 +11,12 @@ LoadCredential=password:/run/backendai-credentials.sock
 ExecStartPre=/usr/lib/backendai/credential-guard password
 ExecStartPre=/usr/lib/backendai/datastore-bootstrap postgres-init
 ExecStart=/usr/lib/postgresql/16/bin/postgres -D /var/lib/backendai/postgresql -c listen_addresses=127.0.0.1 -c port=5432 -c unix_socket_directories=/run/backendai
-ExecStartPost=/usr/lib/backendai/datastore-bootstrap postgres-sync
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 RuntimeDirectory=backendai
 RuntimeDirectoryPreserve=yes
+StandardOutput=journal+console
+StandardError=journal+console
 UMask=0077
 NoNewPrivileges=yes
 PrivateTmp=yes
