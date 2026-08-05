@@ -1701,6 +1701,7 @@ class VfolderRepository:
                     "unmanaged_path": None,
                     "cloneable": vfolder_info.cloneable,
                     "quota_scope_id": vfolder_info.target_quota_scope_id,
+                    "encryption_tier": vfolder_info.encryption_tier,
                 }
                 query = sa.insert(vfolders).values(**insert_values)
                 await db_session.execute(query)

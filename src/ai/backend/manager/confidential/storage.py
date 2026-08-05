@@ -168,6 +168,19 @@ class FolderKeyCustodian:
         await self._broker.put_resource(BrokerTarget.of(opts), resource_path, key)
         return resource_path
 
+    async def inherit(
+        self,
+        opts: ConfidentialScalingGroupOpts,
+        domain_name: str,
+        source_id: uuid.UUID,
+        folder_id: uuid.UUID,
+    ) -> str:
+        key = self.release(opts, domain_name, source_id)
+        resource_path = folder_key_path(domain_name, folder_id)
+        self.escrow(opts).append(resource_path, key)
+        await self._broker.put_resource(BrokerTarget.of(opts), resource_path, key)
+        return resource_path
+
     async def revoke(
         self, opts: ConfidentialScalingGroupOpts, domain_name: str, folder_id: uuid.UUID
     ) -> bool:

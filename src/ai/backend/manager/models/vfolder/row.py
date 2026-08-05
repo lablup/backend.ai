@@ -294,6 +294,7 @@ class VFolderCloneInfo(NamedTuple):
     email: str
     user_id: uuid.UUID
     cloneable: bool
+    encryption_tier: str | None
 
 
 class VFolderRow(Base):  # type: ignore[misc]
