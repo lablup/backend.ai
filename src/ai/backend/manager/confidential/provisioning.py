@@ -3,13 +3,14 @@ from __future__ import annotations
 import logging
 import secrets
 import uuid
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Final
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.confidential.admission import check_admission_belt
@@ -37,7 +38,7 @@ from ai.backend.manager.models.scaling_group.types import (
     ConfidentialScalingGroupOpts,
 )
 from ai.backend.manager.models.session import DEAD_SESSION_STATUSES, SessionRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -68,6 +69,10 @@ class SessionResourceProvisioner:
         self._broker = broker
         self._shim = shim
 
+    async def _settle(self, txn_func: Callable[[SASession], Awaitable[None]]) -> None:
+        async with self._db.connect() as conn:
+            await execute_with_txn_retry(txn_func, self._db.begin_session, conn)
+
     async def provision(
         self,
         opts: ConfidentialScalingGroupOpts,
@@ -96,14 +101,16 @@ class SessionResourceProvisioner:
         nonce = held or secrets.token_urlsafe(24)
         target = BrokerTarget.of(opts)
         await self._broker.put_resource(target, TIME_RESOURCE, attested_time())
-        written: list[str] = []
+        written: list[tuple[str, SessionResourceKind]] = []
         for tag, (kind, payload) in resources.items():
             path = await self._shim.authorise_session_path(
                 domain_name, session_id, nonce, f"{domain_name}/{session_id}.{nonce}/{tag}"
             )
             await self._broker.put_resource(target, path, payload)
-            written.append(path)
-            async with self._db.begin_session() as db_session:
+            written.append((path, kind))
+
+        async def _record(db_session: SASession) -> None:
+            for path, kind in written:
                 await db_session.execute(
                     pg_insert(ConfidentialSessionResourceRow)
                     .values(
@@ -114,14 +121,14 @@ class SessionResourceProvisioner:
                     )
                     .on_conflict_do_nothing(constraint="uq_conf_resource_path")
                 )
-            await self._shim.record(
-                actor=DecisionActor.MANAGER,
-                verdict=DecisionVerdict.ALLOWED,
-                resource_path=path,
-                session_id=session_id,
-                nonce=nonce,
-            )
-        async with self._db.begin_session() as db_session:
+                await self._shim.record(
+                    actor=DecisionActor.MANAGER,
+                    verdict=DecisionVerdict.ALLOWED,
+                    resource_path=path,
+                    session_id=session_id,
+                    nonce=nonce,
+                    db_session=db_session,
+                )
             await db_session.execute(
                 sa.delete(ConfidentialNonceRow).where(ConfidentialNonceRow.session_id == session_id)
             )
@@ -136,12 +143,14 @@ class SessionResourceProvisioner:
                     quota=member_count,
                 )
             )
+
+        await self._settle(_record)
         return SessionProvisioning(
             session_id=session_id,
             nonce=nonce,
             quota=member_count,
             shim_url=f"{opts.shim_public_addr.rstrip('/')}/kbs/v0",
-            resource_paths=written,
+            resource_paths=[path for path, _ in written],
         )
 
     async def _destroy(
@@ -193,7 +202,8 @@ class SessionResourceProvisioner:
         for row in rows:
             if await self._destroy(endpoints, row):
                 destroyed += 1
-        async with self._db.begin_session() as db_session:
+
+        async def _release(db_session: SASession) -> None:
             await db_session.execute(
                 sa.delete(ConfidentialNonceRow).where(ConfidentialNonceRow.session_id == session_id)
             )
@@ -202,6 +212,8 @@ class SessionResourceProvisioner:
                     ConfidentialGuestClaimRow.session_id == session_id
                 )
             )
+
+        await self._settle(_release)
         return destroyed
 
     async def reconcile(self, endpoints: Mapping[str, ConfidentialScalingGroupOpts]) -> int:
@@ -218,15 +230,19 @@ class SessionResourceProvisioner:
                 ).all()
             )
         swept = 0
+        stranded: set[uuid.UUID] = set()
         for row in orphans:
             if not await self._destroy(endpoints, row):
                 continue
-            async with self._db.begin_session() as db_session:
-                await db_session.execute(
-                    sa.delete(ConfidentialNonceRow).where(
-                        ConfidentialNonceRow.session_id == row.session_id
-                    )
-                )
+            stranded.add(row.session_id)
             swept += 1
+
+        async def _release(db_session: SASession) -> None:
+            await db_session.execute(
+                sa.delete(ConfidentialNonceRow).where(ConfidentialNonceRow.session_id.in_(stranded))
+            )
+
+        if stranded:
+            await self._settle(_release)
         ConfidentialMetricObserver.instance().observe_orphans_swept(swept)
         return swept

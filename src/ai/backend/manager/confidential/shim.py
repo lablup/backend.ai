@@ -13,6 +13,7 @@ import sqlalchemy as sa
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.manager.confidential.broker import BrokerClient, BrokerTarget
 from ai.backend.manager.confidential.payloads import TIME_RESOURCE
@@ -38,7 +39,7 @@ from ai.backend.manager.models.confidential.types import (
     SessionResourceKind,
 )
 from ai.backend.manager.models.scaling_group.types import ConfidentialScalingGroupOpts
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 RCAR_SESSION_COOKIE: Final = "kbs-session-id"
 RELAYED_REQUEST_HEADERS: Final = frozenset({
@@ -183,19 +184,22 @@ class AuthorisationShim:
         failing_clause: str | None = None,
         session_id: uuid.UUID | None = None,
         nonce: str | None = None,
+        db_session: SASession | None = None,
     ) -> None:
-        async with self._db.begin_session() as db_session:
-            db_session.add(
-                ConfidentialDecisionRow(
-                    actor=actor,
-                    verdict=verdict,
-                    resource_path=resource_path,
-                    measurement=measurement,
-                    failing_clause=failing_clause,
-                    session_id=session_id,
-                    nonce=nonce,
-                )
-            )
+        row = ConfidentialDecisionRow(
+            actor=actor,
+            verdict=verdict,
+            resource_path=resource_path,
+            measurement=measurement,
+            failing_clause=failing_clause,
+            session_id=session_id,
+            nonce=nonce,
+        )
+        if db_session is not None:
+            db_session.add(row)
+        else:
+            async with self._db.begin_session() as own_session:
+                own_session.add(row)
         ConfidentialMetricObserver.instance().observe_decision(actor, verdict)
 
     async def authorise_session_path(
@@ -241,7 +245,7 @@ class AuthorisationShim:
             raise ReferenceValueRejected(extra_msg=refusal)
 
     async def _release_claim(self, nonce: str, guest: str) -> None:
-        async with self._db.begin_session() as db_session:
+        async def _drop(db_session: SASession) -> None:
             await db_session.execute(
                 sa.delete(ConfidentialGuestClaimRow).where(
                     (ConfidentialGuestClaimRow.nonce == nonce)
@@ -249,8 +253,11 @@ class AuthorisationShim:
                 )
             )
 
+        async with self._db.connect() as conn:
+            await execute_with_txn_retry(_drop, self._db.begin_session, conn)
+
     async def _consume(self, nonce: str, claimant: Claimant) -> tuple[uuid.UUID, bool]:
-        async with self._db.begin_session() as db_session:
+        async def _claim(db_session: SASession) -> tuple[uuid.UUID, bool]:
             bound = await db_session.scalar(
                 sa.select(ConfidentialNonceRow)
                 .where(ConfidentialNonceRow.nonce == nonce)
@@ -284,7 +291,10 @@ class AuthorisationShim:
                         )
                     )
                     return bound.session_id, True
-        raise NonceQuotaExhausted(extra_msg="no live claim slot remains for this session nonce")
+            raise NonceQuotaExhausted(extra_msg="no live claim slot remains for this session nonce")
+
+        async with self._db.connect() as conn:
+            return await execute_with_txn_retry(_claim, self._db.begin_session, conn)
 
     async def _entitling_session(
         self, guest: str, domain_name: str, folder_id: uuid.UUID
