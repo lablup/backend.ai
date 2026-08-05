@@ -89,14 +89,14 @@ def purge(config_names: tuple[str, ...]) -> None:
     neighbouring config.
     """
     from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
-        MyPurgeAppConfigFragmentsByNamesInput,
+        MyBulkPurgeAppConfigFragmentsByNamesInput,
     )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.app_config_fragment.my_purge_app_config_fragments_by_names(
-                MyPurgeAppConfigFragmentsByNamesInput(config_names=list(config_names))
+            result = await registry.app_config_fragment.my_bulk_purge_app_config_fragments_by_names(
+                MyBulkPurgeAppConfigFragmentsByNamesInput(config_names=list(config_names))
             )
             print_result(result)
         finally:

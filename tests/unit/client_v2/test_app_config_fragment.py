@@ -17,18 +17,18 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AppConfigScopeRef,
     BulkPurgeAppConfigFragmentInput,
     MyAppConfigFragmentsByNamesInput,
-    MyPurgeAppConfigFragmentsByNamesInput,
+    MyBulkPurgeAppConfigFragmentsByNamesInput,
     MyUpsertAppConfigFragmentsInput,
     ScopedAppConfigFragmentsByNamesInput,
-    ScopedPurgeAppConfigFragmentsByNamesInput,
+    ScopedBulkPurgeAppConfigFragmentsByNamesInput,
     ScopedUpsertAppConfigFragmentsInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     AppConfigFragmentNode,
     AppConfigFragmentsByNamesPayload,
     BulkPurgeAppConfigFragmentPayload,
+    BulkPurgeAppConfigFragmentsByNamesPayload,
     PurgeAppConfigFragmentPayload,
-    PurgeAppConfigFragmentsByNamesPayload,
     SearchAppConfigFragmentPayload,
     UpsertAppConfigFragmentsPayload,
 )
@@ -155,8 +155,8 @@ class TestScopedPurgeByNames:
     ) -> None:
         mock_response.json = AsyncMock(return_value={"items": [str(fragment_id)]})
 
-        result = await client.scoped_purge_app_config_fragments_by_names(
-            ScopedPurgeAppConfigFragmentsByNamesInput(
+        result = await client.scoped_bulk_purge_app_config_fragments_by_names(
+            ScopedBulkPurgeAppConfigFragmentsByNamesInput(
                 scope=AppConfigScopeRef(
                     scope_type=AppConfigScopeType.USER,
                     scope_id=AppConfigScopeID(_USER_SCOPE_ID),
@@ -168,7 +168,7 @@ class TestScopedPurgeByNames:
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "POST"
         assert str(call_args[0][1]).endswith("/v2/app-config-fragments/scoped/by-names/bulk-delete")
-        assert isinstance(result, PurgeAppConfigFragmentsByNamesPayload)
+        assert isinstance(result, BulkPurgeAppConfigFragmentsByNamesPayload)
         assert result.items == [fragment_id]
 
 
@@ -227,14 +227,14 @@ class TestMyPurgeByNames:
     ) -> None:
         mock_response.json = AsyncMock(return_value={"items": [str(fragment_id)]})
 
-        result = await client.my_purge_app_config_fragments_by_names(
-            MyPurgeAppConfigFragmentsByNamesInput(config_names=["theme"])
+        result = await client.my_bulk_purge_app_config_fragments_by_names(
+            MyBulkPurgeAppConfigFragmentsByNamesInput(config_names=["theme"])
         )
 
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "POST"
         assert str(call_args[0][1]).endswith("/v2/app-config-fragments/my/by-names/bulk-delete")
-        assert isinstance(result, PurgeAppConfigFragmentsByNamesPayload)
+        assert isinstance(result, BulkPurgeAppConfigFragmentsByNamesPayload)
         assert result.items == [fragment_id]
 
 

@@ -161,7 +161,7 @@ def purge_by_names(
     `update` do, so no fragment id has to be resolved first.
     """
     from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
-        ScopedPurgeAppConfigFragmentsByNamesInput,
+        ScopedBulkPurgeAppConfigFragmentsByNamesInput,
     )
 
     scope = _resolve_scope(scope_type, scope_id)
@@ -169,9 +169,11 @@ def purge_by_names(
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.app_config_fragment.scoped_purge_app_config_fragments_by_names(
-                ScopedPurgeAppConfigFragmentsByNamesInput(
-                    scope=scope, config_names=list(config_names)
+            result = (
+                await registry.app_config_fragment.scoped_bulk_purge_app_config_fragments_by_names(
+                    ScopedBulkPurgeAppConfigFragmentsByNamesInput(
+                        scope=scope, config_names=list(config_names)
+                    )
                 )
             )
             print_result(result)

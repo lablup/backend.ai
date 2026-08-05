@@ -9,18 +9,18 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AdminSearchAppConfigFragmentInput,
     BulkPurgeAppConfigFragmentInput,
     MyAppConfigFragmentsByNamesInput,
-    MyPurgeAppConfigFragmentsByNamesInput,
+    MyBulkPurgeAppConfigFragmentsByNamesInput,
     MyUpsertAppConfigFragmentsInput,
     ScopedAppConfigFragmentsByNamesInput,
-    ScopedPurgeAppConfigFragmentsByNamesInput,
+    ScopedBulkPurgeAppConfigFragmentsByNamesInput,
     ScopedUpsertAppConfigFragmentsInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     AppConfigFragmentNode,
     AppConfigFragmentsByNamesPayload,
     BulkPurgeAppConfigFragmentPayload,
+    BulkPurgeAppConfigFragmentsByNamesPayload,
     PurgeAppConfigFragmentPayload,
-    PurgeAppConfigFragmentsByNamesPayload,
     SearchAppConfigFragmentPayload,
     UpsertAppConfigFragmentsPayload,
 )
@@ -56,10 +56,10 @@ class V2AppConfigFragmentClient(BaseDomainClient):
             response_model=AppConfigFragmentsByNamesPayload,
         )
 
-    async def scoped_purge_app_config_fragments_by_names(
+    async def scoped_bulk_purge_app_config_fragments_by_names(
         self,
-        request: ScopedPurgeAppConfigFragmentsByNamesInput,
-    ) -> PurgeAppConfigFragmentsByNamesPayload:
+        request: ScopedBulkPurgeAppConfigFragmentsByNamesInput,
+    ) -> BulkPurgeAppConfigFragmentsByNamesPayload:
         """Purge one scope's fragments for the given config names, all-or-nothing.
 
         A name the scope holds no fragment for purges nothing and is reported as not found.
@@ -68,7 +68,7 @@ class V2AppConfigFragmentClient(BaseDomainClient):
             "POST",
             f"{_PATH}/scoped/by-names/bulk-delete",
             request=request,
-            response_model=PurgeAppConfigFragmentsByNamesPayload,
+            response_model=BulkPurgeAppConfigFragmentsByNamesPayload,
         )
 
     async def scoped_bulk_upsert_app_config_fragments(
@@ -109,10 +109,10 @@ class V2AppConfigFragmentClient(BaseDomainClient):
             response_model=UpsertAppConfigFragmentsPayload,
         )
 
-    async def my_purge_app_config_fragments_by_names(
+    async def my_bulk_purge_app_config_fragments_by_names(
         self,
-        request: MyPurgeAppConfigFragmentsByNamesInput,
-    ) -> PurgeAppConfigFragmentsByNamesPayload:
+        request: MyBulkPurgeAppConfigFragmentsByNamesInput,
+    ) -> BulkPurgeAppConfigFragmentsByNamesPayload:
         """Purge the caller's own user-scope fragments for the given config names.
 
         All-or-nothing: a name the caller holds no fragment for purges nothing and is
@@ -122,7 +122,7 @@ class V2AppConfigFragmentClient(BaseDomainClient):
             "POST",
             f"{_PATH}/my/by-names/bulk-delete",
             request=request,
-            response_model=PurgeAppConfigFragmentsByNamesPayload,
+            response_model=BulkPurgeAppConfigFragmentsByNamesPayload,
         )
 
     # --- By id ---
