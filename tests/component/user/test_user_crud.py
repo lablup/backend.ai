@@ -23,13 +23,13 @@ from ai.backend.common.dto.manager.user import (
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.models.group import GroupRow, ProjectType
-from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.models.user import users
+from ai.backend.manager.models.user import UserRow, users
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
@@ -75,13 +75,13 @@ class TestUserCreateCrud:
         async with db_engine.begin() as conn:
             marked = (
                 await conn.execute(
-                    sa.select(keypairs.c.access_key).where(
-                        (keypairs.c.user == str(result.user.id)) & keypairs.c.is_main
+                    sa.select(KeyPairRow.access_key).where(
+                        (KeyPairRow.user == str(result.user.id)) & KeyPairRow.is_main
                     )
                 )
             ).scalars()
             main_access_key = await conn.scalar(
-                sa.select(users.c.main_access_key).where(users.c.uuid == str(result.user.id))
+                sa.select(UserRow.main_access_key).where(UserRow.uuid == str(result.user.id))
             )
         assert main_access_key is not None
         assert marked.all() == [main_access_key]

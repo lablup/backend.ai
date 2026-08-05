@@ -779,12 +779,14 @@ class UserDBSource:
         # Clearing the previous marker needs its own statement: a partial unique index
         # allows a user only one marked keypair.
         await session.execute(
-            sa.update(keypairs)
-            .where((keypairs.c.user == keypair_row.user) & keypairs.c.is_main)
+            sa.update(KeyPairRow)
+            .where((KeyPairRow.user == keypair_row.user) & KeyPairRow.is_main)
             .values(is_main=False)
         )
         await session.execute(
-            sa.update(keypairs).where(keypairs.c.access_key == main_access_key).values(is_main=True)
+            sa.update(KeyPairRow)
+            .where(KeyPairRow.access_key == main_access_key)
+            .values(is_main=True)
         )
         await session.execute(
             sa.update(users).where(users.c.email == email).values(main_access_key=main_access_key)
@@ -1307,6 +1309,7 @@ class UserDBSource:
                             KeyPairRow.access_key,
                             KeyPairRow.user,
                             KeyPairRow.is_active,
+                            KeyPairRow.is_main,
                         ),
                     )
                 )
@@ -1323,12 +1326,14 @@ class UserDBSource:
             # Clearing the previous marker needs its own statement: a partial unique index
             # allows a user only one marked keypair.
             await session.execute(
-                sa.update(keypairs)
-                .where((keypairs.c.user == user_uuid) & keypairs.c.is_main)
+                sa.update(KeyPairRow)
+                .where((KeyPairRow.user == user_uuid) & KeyPairRow.is_main)
                 .values(is_main=False)
             )
             await session.execute(
-                sa.update(keypairs).where(keypairs.c.access_key == access_key).values(is_main=True)
+                sa.update(KeyPairRow)
+                .where(KeyPairRow.access_key == access_key)
+                .values(is_main=True)
             )
             await session.execute(
                 sa.update(users).where(users.c.uuid == user_uuid).values(main_access_key=access_key)

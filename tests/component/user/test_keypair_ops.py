@@ -20,8 +20,8 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.user.handler import UserHandler
 from ai.backend.manager.api.rest.user.registry import register_user_routes
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.user import users
+from ai.backend.manager.models.keypair import KeyPairRow, keypairs
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.user.processors import UserProcessors
 
@@ -331,13 +331,13 @@ class TestUpdateMyKeypair:
             async with db_engine.begin() as conn:
                 marked = (
                     await conn.execute(
-                        sa.select(keypairs.c.access_key).where(
-                            (keypairs.c.user == user_uuid) & keypairs.c.is_main
+                        sa.select(KeyPairRow.access_key).where(
+                            (KeyPairRow.user == user_uuid) & KeyPairRow.is_main
                         )
                     )
                 ).scalars()
                 main_access_key = await conn.scalar(
-                    sa.select(users.c.main_access_key).where(users.c.uuid == user_uuid)
+                    sa.select(UserRow.main_access_key).where(UserRow.uuid == user_uuid)
                 )
             assert marked.all() == [new_access_key], "Exactly the new keypair should be marked main"
             assert main_access_key == new_access_key
