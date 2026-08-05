@@ -495,9 +495,9 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
             async with host_lock("attestation"):
                 await self.runtime.start(container_id)
                 await self.runtime.wait_running(container_id, self.settings.container_start_timeout)
-                await _wait_for_port(
-                    str(network.guest_addr), CHANNEL_PORT, self.settings.attestation_timeout
-                )
+            await _wait_for_port(
+                str(network.guest_addr), CHANNEL_PORT, self.settings.attestation_timeout
+            )
         except Exception as e:
             raise ContainerCreationError(container_id, str(e)) from e
         for service_port in kernel_obj.service_ports:
