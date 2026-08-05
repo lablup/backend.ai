@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -8,7 +9,10 @@ import pytest
 from aiohttp import web
 
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
+from ai.backend.common.types import AccessKey, DefaultForUnspecified, ResourceSlot
 from ai.backend.manager.api.rest.ratelimit.handler import _rlim_window, make_rlim_middleware
+from ai.backend.manager.data.auth.types import AuthenticatedKeypair
+from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.errors.api import RateLimitExceeded
 
 
@@ -30,6 +34,24 @@ class RateLimitExceedCase:
     rate_limit: int | None
     rolling_count: int
     description: str = ""
+
+
+def _keypair_resource_policy() -> KeyPairResourcePolicyData:
+    return KeyPairResourcePolicyData(
+        name="default",
+        created_at=None,
+        default_for_unspecified=DefaultForUnspecified.LIMITED,
+        total_resource_slots=ResourceSlot(),
+        max_session_lifetime=0,
+        max_concurrent_sessions=10,
+        max_pending_session_count=None,
+        max_pending_session_resource_slots=None,
+        max_priority=None,
+        max_concurrent_sftp_sessions=2,
+        max_containers_per_session=1,
+        idle_timeout=3600,
+        allowed_vfolder_hosts={},
+    )
 
 
 class TestRlimMiddleware:
@@ -62,23 +84,30 @@ class TestRlimMiddleware:
         return request
 
     @pytest.fixture
-    def mock_request_authorized(self) -> web.Request:
-        """Mock request for authorized user."""
-        request = MagicMock(spec=web.Request)
-        keypair_data = {
-            "rate_limit": 30000,
-            "access_key": "AKIAIOSFODNN7EXAMPLE",
-        }
+    def authorized_request_factory(self) -> Callable[[int | None], web.Request]:
+        """Build a mock request whose keypair carries the given rate limit."""
 
-        def getitem(key: Any) -> Any:
-            if key == "is_authorized":
-                return True
-            if key == "keypair":
-                return keypair_data
-            return None
+        def _make(rate_limit: int | None) -> web.Request:
+            request = MagicMock(spec=web.Request)
+            keypair = AuthenticatedKeypair(
+                access_key=AccessKey("AKIAIOSFODNN7EXAMPLE"),
+                secret_key=None,
+                is_admin=False,
+                rate_limit=rate_limit,
+                resource_policy=_keypair_resource_policy(),
+            )
 
-        request.__getitem__ = MagicMock(side_effect=getitem)
-        return request
+            def getitem(key: Any) -> Any:
+                if key == "is_authorized":
+                    return True
+                if key == "keypair":
+                    return keypair
+                return None
+
+            request.__getitem__ = MagicMock(side_effect=getitem)
+            return request
+
+        return _make
 
     async def test_anonymous_query_returns_default_headers(
         self,
@@ -138,13 +167,13 @@ class TestRlimMiddleware:
         self,
         middleware: Any,
         mock_valkey_client: MagicMock,
-        mock_request_authorized: web.Request,
+        authorized_request_factory: Callable[[int | None], web.Request],
         mock_handler: AsyncMock,
         test_case: RateLimitSuccessCase,
     ) -> None:
         """Authorized requests within rate limit succeed and return correct headers."""
         # Arrange
-        mock_request_authorized["keypair"]["rate_limit"] = test_case.rate_limit
+        mock_request_authorized = authorized_request_factory(test_case.rate_limit)
         mock_valkey_client.execute_rate_limit_logic = AsyncMock(
             return_value=test_case.rolling_count
         )
@@ -191,13 +220,13 @@ class TestRlimMiddleware:
         self,
         middleware: Any,
         mock_valkey_client: MagicMock,
-        mock_request_authorized: web.Request,
+        authorized_request_factory: Callable[[int | None], web.Request],
         mock_handler: AsyncMock,
         test_case: RateLimitExceedCase,
     ) -> None:
         """Authorized requests exceeding rate limit raise RateLimitExceeded."""
         # Arrange
-        mock_request_authorized["keypair"]["rate_limit"] = test_case.rate_limit
+        mock_request_authorized = authorized_request_factory(test_case.rate_limit)
         mock_valkey_client.execute_rate_limit_logic = AsyncMock(
             return_value=test_case.rolling_count
         )
