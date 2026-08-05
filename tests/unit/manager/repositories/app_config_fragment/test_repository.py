@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.data.app_config.types import AppConfigScope, AppConfigScopeType
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.exception import BackendAIError, UserNotFound
@@ -589,7 +589,9 @@ class TestPurgeByConfigNames:
         scope_owners: None,
     ) -> None:
         purged = await repository.purge_by_config_names(
-            AppConfigScope(scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID),
+            AppConfigFragmentSearchScope(
+                scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
+            ),
             ["theme"],
         )
 
@@ -617,7 +619,9 @@ class TestPurgeByConfigNames:
         # `menu` exists, but only at the public scope, so the caller's user scope holds none.
         with pytest.raises(AppConfigFragmentNotFound):
             await repository.purge_by_config_names(
-                AppConfigScope(scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID),
+                AppConfigFragmentSearchScope(
+                    scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
+                ),
                 ["theme", "menu"],
             )
 
@@ -650,7 +654,9 @@ class TestPurgeByConfigNames:
         ]
 
         purged = await repository.purge_by_config_names(
-            AppConfigScope(scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID),
+            AppConfigFragmentSearchScope(
+                scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
+            ),
             ["theme"],
         )
 

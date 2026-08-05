@@ -3,11 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.app_config.types import AppConfigScope
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.repositories.app_config_fragment.types import (
+    AppConfigFragmentSearchScope,
+)
 from ai.backend.manager.services.app_config_fragment.actions.base import (
     AppConfigFragmentScopeAction,
     AppConfigFragmentScopeActionResult,
@@ -23,7 +25,7 @@ class PurgeAppConfigFragmentsByNamesAction(AppConfigFragmentScopeAction):
     upsert crosses, rather than the per-fragment gate a purge by id crosses.
     """
 
-    scope: AppConfigScope
+    scope: AppConfigFragmentSearchScope
     config_names: list[str]
 
     @override
@@ -52,7 +54,7 @@ class PurgeAppConfigFragmentsByNamesAction(AppConfigFragmentScopeAction):
 class PurgeAppConfigFragmentsByNamesActionResult(AppConfigFragmentScopeActionResult):
     fragments: list[AppConfigFragmentData]
     #: The scope the purge ran at, carried only to report the RBAC scope.
-    _scope: AppConfigScope
+    _scope: AppConfigFragmentSearchScope
 
     @override
     def scope_type(self) -> ScopeType:

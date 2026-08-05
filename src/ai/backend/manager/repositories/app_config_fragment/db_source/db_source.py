@@ -6,7 +6,6 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.app_config.types import AppConfigScope
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
@@ -32,9 +31,6 @@ from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentR
 from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
     AppConfigFragmentPurgerSpec,
-)
-from ai.backend.manager.repositories.app_config_fragment.types import (
-    AppConfigFragmentSearchScope,
 )
 from ai.backend.manager.repositories.app_config_fragment.upserters import (
     AppConfigFragmentUpserterSpec,
@@ -159,7 +155,7 @@ class AppConfigFragmentDBSource:
     @app_config_fragment_db_source_resilience.apply()
     async def purge_by_config_names(
         self,
-        scope: AppConfigScope,
+        scope: SearchScope,
         config_names: Sequence[str],
     ) -> list[AppConfigFragmentData]:
         """Purge one scope's fragments for ``config_names``, all-or-nothing.
@@ -175,12 +171,9 @@ class AppConfigFragmentDBSource:
             pagination=NoPagination(),
             conditions=[AppConfigFragmentConditions.by_config_names(requested)],
         )
-        search_scope = AppConfigFragmentSearchScope(
-            scope_type=scope.scope_type, scope_id=scope.scope_id
-        )
         async with self._rbac_ops_provider.write_ops() as w:
             found = await w.batch_query_with_scopes(
-                sa.select(AppConfigFragmentRow), querier, [search_scope]
+                sa.select(AppConfigFragmentRow), querier, [scope]
             )
             rows = {
                 row.AppConfigFragmentRow.config_name: row.AppConfigFragmentRow for row in found.rows

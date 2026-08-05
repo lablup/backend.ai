@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from ai.backend.common.data.app_config.types import AppConfigScope
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.identifier.domain import DomainID
@@ -77,7 +76,7 @@ class AppConfigFragmentRepository:
 
     @app_config_fragment_repository_resilience.apply()
     async def purge_by_config_names(
-        self, scope: AppConfigScope, config_names: Sequence[str]
+        self, scope: SearchScope, config_names: Sequence[str]
     ) -> list[AppConfigFragmentData]:
         return await self._db_source.purge_by_config_names(scope, config_names)
 
