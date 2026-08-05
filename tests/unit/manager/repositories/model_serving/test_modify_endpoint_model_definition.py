@@ -180,6 +180,7 @@ class TestModifyEndpointModelDefinitionRefresh:
                     is_admin=True,
                     user=user_id,
                     resource_policy="default",
+                    is_main=True,
                 )
             )
             await sess.flush()

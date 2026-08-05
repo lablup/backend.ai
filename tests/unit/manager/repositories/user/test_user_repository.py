@@ -23,7 +23,12 @@ from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import ReadableCIDR, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.errors.user import UserConflict, UserCreationBadRequest, UserNotFound
+from ai.backend.manager.errors.user import (
+    KeyPairForbidden,
+    UserConflict,
+    UserCreationBadRequest,
+    UserNotFound,
+)
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -84,6 +89,20 @@ class UserWithGroup:
     email: str
     user_uuid: uuid.UUID
     group_id: str
+
+
+@dataclass(frozen=True)
+class UserWithMarkedKeypair:
+    """A user whose main keypair is known only by the ``keypairs.is_main`` marker.
+
+    ``users.main_access_key`` is deliberately left unset — the state the old
+    ``ON DELETE SET NULL`` foreign key produced whenever any keypair was deleted.
+    """
+
+    user_uuid: uuid.UUID
+    main_access_key: str
+    main_resource_policy: str
+    secondary_access_key: str
 
 
 def create_test_password_info(password: str = "test_password") -> PasswordInfo:
@@ -371,6 +390,146 @@ class TestUserRepository:
             email=created_result.user.email,
             user_uuid=created_result.user.uuid,
             group_id=sample_group_id,
+        )
+
+    @pytest.fixture
+    async def user_with_marked_keypair(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_domain: DomainFixtureData,
+        user_resource_policy: str,
+        default_keypair_resource_policy: str,
+    ) -> UserWithMarkedKeypair:
+        """Seed a user with a marked main keypair and a second, unmarked one."""
+        main_policy = f"main-kp-policy-{uuid.uuid4().hex[:8]}"
+        data = UserWithMarkedKeypair(
+            user_uuid=uuid.uuid4(),
+            main_access_key=f"AKMAIN{uuid.uuid4().hex[:14].upper()}",
+            main_resource_policy=main_policy,
+            secondary_access_key=f"AKSEC{uuid.uuid4().hex[:15].upper()}",
+        )
+        email = f"test-{uuid.uuid4().hex[:8]}@example.com"
+        async with db_with_cleanup.begin_session() as session:
+            session.add(
+                KeyPairResourcePolicyRow(
+                    name=main_policy,
+                    total_resource_slots=ResourceSlot(),
+                    max_concurrent_sessions=10,
+                    max_session_lifetime=0,
+                    max_pending_session_count=5,
+                    max_pending_session_resource_slots=ResourceSlot(),
+                    max_concurrent_sftp_sessions=5,
+                    max_containers_per_session=1,
+                    idle_timeout=0,
+                )
+            )
+            session.add(
+                UserRow(
+                    uuid=data.user_uuid,
+                    username=f"testuser-{uuid.uuid4().hex[:8]}",
+                    email=email,
+                    password=create_test_password_info("test_password"),
+                    need_password_change=False,
+                    full_name="Test User",
+                    description="Test Description",
+                    status=UserStatus.ACTIVE,
+                    status_info="admin-requested",
+                    domain_name=sample_domain.domain_name,
+                    role=UserRole.USER,
+                    resource_policy=user_resource_policy,
+                )
+            )
+            await session.flush()
+            session.add(
+                KeyPairRow(
+                    access_key=data.main_access_key,
+                    secret_key=f"SK{uuid.uuid4().hex[:38]}",
+                    user_id=email,
+                    user=data.user_uuid,
+                    is_active=True,
+                    is_admin=False,
+                    is_main=True,
+                    resource_policy=main_policy,
+                    rate_limit=1000,
+                )
+            )
+            session.add(
+                KeyPairRow(
+                    access_key=data.secondary_access_key,
+                    secret_key=f"SK{uuid.uuid4().hex[:38]}",
+                    user_id=email,
+                    user=data.user_uuid,
+                    is_active=True,
+                    is_admin=False,
+                    resource_policy=default_keypair_resource_policy,
+                    rate_limit=2000,
+                )
+            )
+            await session.commit()
+        return data
+
+    async def test_issue_my_keypair_inherits_from_the_marked_keypair(
+        self,
+        user_repository: UserRepository,
+        user_with_marked_keypair: UserWithMarkedKeypair,
+    ) -> None:
+        """The settings come from the marked keypair, not from any other one the user owns."""
+        result = await user_repository.issue_my_keypair(user_with_marked_keypair.user_uuid)
+
+        assert result.keypair.resource_policy_name == user_with_marked_keypair.main_resource_policy
+        assert result.keypair.rate_limit == 1000
+
+    async def test_revoke_my_keypair_rejects_the_marked_keypair(
+        self,
+        user_repository: UserRepository,
+        user_with_marked_keypair: UserWithMarkedKeypair,
+    ) -> None:
+        with pytest.raises(KeyPairForbidden):
+            await user_repository.revoke_my_keypair(
+                user_with_marked_keypair.user_uuid,
+                user_with_marked_keypair.main_access_key,
+            )
+
+    async def test_revoke_my_keypair_allows_an_unmarked_keypair(
+        self,
+        user_repository: UserRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        user_with_marked_keypair: UserWithMarkedKeypair,
+    ) -> None:
+        await user_repository.revoke_my_keypair(
+            user_with_marked_keypair.user_uuid,
+            user_with_marked_keypair.secondary_access_key,
+        )
+
+        async with db_with_cleanup.begin_readonly_session() as session:
+            remaining = (
+                await session.scalars(
+                    sa.select(KeyPairRow.access_key).where(
+                        KeyPairRow.user == user_with_marked_keypair.user_uuid
+                    )
+                )
+            ).all()
+        assert list(remaining) == [user_with_marked_keypair.main_access_key]
+
+    async def test_switching_the_main_keypair_moves_what_the_readers_follow(
+        self,
+        user_repository: UserRepository,
+        user_with_marked_keypair: UserWithMarkedKeypair,
+    ) -> None:
+        """After a switch the former main keypair is revocable and the new one is not."""
+        await user_repository.switch_my_main_access_key(
+            user_with_marked_keypair.user_uuid,
+            user_with_marked_keypair.secondary_access_key,
+        )
+
+        with pytest.raises(KeyPairForbidden):
+            await user_repository.revoke_my_keypair(
+                user_with_marked_keypair.user_uuid,
+                user_with_marked_keypair.secondary_access_key,
+            )
+        await user_repository.revoke_my_keypair(
+            user_with_marked_keypair.user_uuid,
+            user_with_marked_keypair.main_access_key,
         )
 
     async def test_get_by_email_validated_success(

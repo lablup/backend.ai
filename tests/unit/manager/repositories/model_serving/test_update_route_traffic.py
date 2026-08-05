@@ -171,6 +171,7 @@ async def test_user_id(db_with_cleanup: ExtendedAsyncSAEngine, test_domain: str)
                 is_admin=True,
                 user=user_id,
                 resource_policy="default",
+                is_main=True,
             )
         )
         await sess.flush()

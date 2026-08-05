@@ -40,7 +40,6 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.vfolder.admin_repository import VFolderAdminRepository
 from ai.backend.manager.services.auth.processors import AuthProcessors
@@ -148,33 +147,6 @@ def _configure_clone_storage_mock(storage_manager: StorageSessionManager) -> Asy
 
 
 @pytest.fixture()
-async def set_main_access_key(
-    db_engine: SAEngine,
-    admin_user_fixture: Any,
-) -> AsyncIterator[None]:
-    """Populate main_access_key on the admin user so that the
-    ``main_keypair`` ORM relationship resolves correctly.
-
-    The global ``admin_user_fixture`` does not set this column, but the
-    clone flow needs it to look up ``allowed_vfolder_hosts`` from the
-    user's keypair resource policy.
-    """
-    async with db_engine.begin() as conn:
-        await conn.execute(
-            sa.update(users)
-            .where(users.c.uuid == str(admin_user_fixture.user_uuid))
-            .values(main_access_key=admin_user_fixture.keypair.access_key)
-        )
-    yield
-    async with db_engine.begin() as conn:
-        await conn.execute(
-            sa.update(users)
-            .where(users.c.uuid == str(admin_user_fixture.user_uuid))
-            .values(main_access_key=None)
-        )
-
-
-@pytest.fixture()
 async def cloneable_project_vfolder(
     vfolder_factory: VFolderFactory,
     admin_user_fixture: Any,
@@ -260,7 +232,6 @@ class TestVFolderClonePolicyCheck:
         self,
         admin_registry: BackendAIClientRegistry,
         vfolder_factory: VFolderFactory,
-        set_main_access_key: None,
         user_policy_capped_at_1: None,
         cloneable_project_vfolder: VFolderFixtureData,
     ) -> None:
@@ -289,7 +260,6 @@ class TestVFolderClonePolicyCheck:
         self,
         admin_registry: BackendAIClientRegistry,
         vfolder_factory: VFolderFactory,
-        set_main_access_key: None,
         user_policy_unlimited_project_capped_at_1: None,
         cloneable_project_vfolder: VFolderFixtureData,
         storage_manager: StorageSessionManager,
@@ -331,7 +301,6 @@ class TestVFolderCloneResponseFormat:
         self,
         admin_registry: BackendAIClientRegistry,
         vfolder_factory: VFolderFactory,
-        set_main_access_key: None,
         user_policy_unlimited_project_capped_at_1: None,
         cloneable_project_vfolder: VFolderFixtureData,
         storage_manager: StorageSessionManager,
@@ -372,7 +341,6 @@ class TestVFolderCloneV2PolicyCheck:
         self,
         admin_v2_registry: V2ClientRegistry,
         vfolder_factory: VFolderFactory,
-        set_main_access_key: None,
         user_policy_capped_at_1: None,
         cloneable_project_vfolder: VFolderFixtureData,
     ) -> None:
@@ -390,7 +358,6 @@ class TestVFolderCloneV2PolicyCheck:
         self,
         admin_v2_registry: V2ClientRegistry,
         vfolder_factory: VFolderFactory,
-        set_main_access_key: None,
         user_policy_unlimited_project_capped_at_1: None,
         cloneable_project_vfolder: VFolderFixtureData,
         storage_manager: StorageSessionManager,

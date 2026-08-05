@@ -1226,21 +1226,19 @@ class UserDBSource:
                 await session.scalars(
                     sa.select(UserRow)
                     .where(UserRow.uuid == user_uuid)
-                    .options(load_only(UserRow.main_access_key, UserRow.email))
+                    .options(load_only(UserRow.email))
                 )
             ).first()
             if not user_row:
                 raise UserNotFound(f"User {user_uuid} not found")
 
-            main_kp_row: KeyPairRow | None = None
-            if user_row.main_access_key:
-                main_kp_row = (
-                    await session.scalars(
-                        sa.select(KeyPairRow)
-                        .where(KeyPairRow.access_key == user_row.main_access_key)
-                        .options(noload("*"))
-                    )
-                ).first()
+            main_kp_row = (
+                await session.scalars(
+                    sa.select(KeyPairRow)
+                    .where((KeyPairRow.user == user_uuid) & KeyPairRow.is_main)
+                    .options(noload("*"))
+                )
+            ).first()
 
             if main_kp_row:
                 keypair_creator = KeyPairCreator(
@@ -1290,15 +1288,7 @@ class UserDBSource:
                 raise KeyPairNotFound(f"Keypair {access_key} not found")
             if kp_row.user != user_uuid:
                 raise KeyPairForbidden("Cannot revoke another user's keypair")
-
-            user_row = (
-                await session.scalars(
-                    sa.select(UserRow)
-                    .where(UserRow.uuid == user_uuid)
-                    .options(load_only(UserRow.main_access_key))
-                )
-            ).first()
-            if user_row and user_row.main_access_key == access_key:
+            if kp_row.is_main:
                 raise KeyPairForbidden(
                     "Cannot revoke the main access key. Switch main access key first."
                 )
@@ -1459,21 +1449,12 @@ class UserDBSource:
                 await session.scalars(
                     sa.select(KeyPairRow)
                     .where(KeyPairRow.access_key == access_key)
-                    .options(load_only(KeyPairRow.access_key, KeyPairRow.user))
+                    .options(load_only(KeyPairRow.access_key, KeyPairRow.user, KeyPairRow.is_main))
                 )
             ).first()
             if not kp_row:
                 raise KeyPairNotFound(f"Keypair {access_key} not found")
-
-            # Prevent deleting a keypair that is set as main access key
-            user_row = (
-                await session.scalars(
-                    sa.select(UserRow)
-                    .where(UserRow.uuid == kp_row.user)
-                    .options(load_only(UserRow.main_access_key))
-                )
-            ).first()
-            if user_row and user_row.main_access_key == access_key:
+            if kp_row.is_main:
                 raise KeyPairForbidden("Cannot delete a keypair set as the user's main access key.")
 
             await session.execute(sa.delete(keypairs).where(keypairs.c.access_key == access_key))

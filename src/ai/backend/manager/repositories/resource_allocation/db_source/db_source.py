@@ -85,7 +85,7 @@ class ResourceAllocationDBSource:
                     sa.join(
                         UserRow,
                         KeyPairRow,
-                        UserRow.main_access_key == KeyPairRow.access_key,
+                        (KeyPairRow.user == UserRow.uuid) & KeyPairRow.is_main,
                     ).join(
                         KeyPairResourcePolicyRow,
                         KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,

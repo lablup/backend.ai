@@ -132,7 +132,7 @@ def _get_keypairs_join_condition() -> Any:
 def _get_main_keypair_join_condition() -> Any:
     from ai.backend.manager.models.keypair import KeyPairRow
 
-    return KeyPairRow.access_key == foreign(UserRow.main_access_key)
+    return (foreign(KeyPairRow.user) == UserRow.uuid) & KeyPairRow.is_main
 
 
 class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
@@ -261,7 +261,8 @@ class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     main_keypair: Mapped[KeyPairRow | None] = relationship(
         "KeyPairRow",
         primaryjoin=_get_main_keypair_join_condition,
-        foreign_keys="UserRow.main_access_key",
+        foreign_keys="KeyPairRow.user",
+        viewonly=True,
     )
 
     vfolder_rows: Mapped[list[VFolderRow]] = relationship(
@@ -367,8 +368,6 @@ class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         return rows[0]
 
     def get_main_keypair_row(self) -> KeyPairRow | None:
-        # `cast()` requires import of KeyPairRow
-
         keypair_candidate: KeyPairRow | None = None
         main_keypair_row = self.main_keypair
         if main_keypair_row is None:
@@ -379,7 +378,8 @@ class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
                     keypair_candidate = row
                     break
             if keypair_candidate is not None:
-                self.main_keypair = keypair_candidate
+                keypair_candidate.is_main = True
+                self.main_access_key = keypair_candidate.access_key
         else:
             keypair_candidate = main_keypair_row
         return keypair_candidate

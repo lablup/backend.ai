@@ -7,7 +7,6 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
 import pytest
-import sqlalchemy as sa
 
 from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -39,7 +38,6 @@ class KeypairSpec:
 class UserSeed:
     user_uuid: uuid.UUID
     domain_name: str
-    main_access_key: str | None
     keypairs: list[KeypairSpec]
 
 
@@ -50,7 +48,7 @@ class TestResolveUserAndActiveAccessKey:
     replicas were persisting non-deterministic and potentially inactive
     access keys into sessions.access_key. The contract under test is:
 
-    1. A keypair matching users.main_access_key wins when active.
+    1. The keypair marked ``is_main`` wins when active.
     2. Missing user vs no-active-keypair raise different exceptions.
     """
 
@@ -131,14 +129,8 @@ class TestResolveUserAndActiveAccessKey:
                         is_active=kp.is_active,
                         resource_policy=kp_policy,
                         created_at=kp.created_at,
+                        is_main=kp.is_main,
                     )
-                )
-            await sess.flush()
-            if spec.main_access_key is not None:
-                await sess.execute(
-                    sa.update(UserRow)
-                    .where(UserRow.uuid == spec.user_uuid)
-                    .values(main_access_key=spec.main_access_key)
                 )
             await sess.commit()
 
@@ -149,12 +141,12 @@ class TestResolveUserAndActiveAccessKey:
             result = await db_source._resolve_user_and_active_access_key(sess, user_uuid)
         return result.access_key
 
-    async def test_picks_main_access_key_when_active(
+    async def test_picks_the_main_keypair_when_active(
         self,
         db: ExtendedAsyncSAEngine,
         db_source: DeploymentDBSource,
     ) -> None:
-        # main_access_key wins over a newer active key.
+        # The main keypair wins over a newer active key.
         user_uuid = uuid.uuid4()
         now = datetime.now(tz=UTC)
         main_key = "AK" + "M" * 18
@@ -164,9 +156,13 @@ class TestResolveUserAndActiveAccessKey:
             UserSeed(
                 user_uuid=user_uuid,
                 domain_name=f"d-{uuid.uuid4().hex[:8]}",
-                main_access_key=main_key,
                 keypairs=[
-                    KeypairSpec(main_key, is_active=True, created_at=now - timedelta(days=10)),
+                    KeypairSpec(
+                        main_key,
+                        is_active=True,
+                        created_at=now - timedelta(days=10),
+                        is_main=True,
+                    ),
                     KeypairSpec(other_active, is_active=True, created_at=now),
                 ],
             ),
@@ -188,7 +184,6 @@ class TestResolveUserAndActiveAccessKey:
             UserSeed(
                 user_uuid=user_uuid,
                 domain_name=f"d-{uuid.uuid4().hex[:8]}",
-                main_access_key=None,
                 keypairs=[
                     KeypairSpec("AK" + "X" * 18, is_active=False, created_at=now),
                 ],

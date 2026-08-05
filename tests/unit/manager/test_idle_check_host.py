@@ -1,11 +1,11 @@
 """
 Tests for ``IdleCheckerHost.do_idle_check()`` against a real database.
 
-The idle policy is resolved through ``users.main_access_key`` — a real foreign
-key — instead of the kernel's own ``access_key``, which a keypair deletion can
-leave orphaned. A kernel whose policy cannot be resolved, or whose checker
-raises, must not stop the remaining kernels of the same cycle from being
-checked.
+The idle policy is resolved through the user's main keypair — the one marked
+``keypairs.is_main`` — instead of the kernel's own ``access_key``, which a
+keypair deletion can leave orphaned. A kernel whose policy cannot be resolved,
+or whose checker raises, must not stop the remaining kernels of the same cycle
+from being checked.
 """
 
 from __future__ import annotations
@@ -19,7 +19,6 @@ from typing import Any, ClassVar, override
 from unittest.mock import MagicMock
 
 import pytest
-import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.engine import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -303,7 +302,7 @@ class TestDoIdleCheck:
         user_resource_policy_name: str,
         main_keypair_idle_timeout: int | None,
     ) -> tuple[uuid.UUID, AccessKey | None]:
-        """Create a user; ``None`` idle timeout leaves ``main_access_key`` unset."""
+        """Create a user; ``None`` idle timeout leaves the user without a main keypair."""
         user_uuid = uuid.uuid4()
         async with db.begin_session() as db_sess:
             db_sess.add(
@@ -321,14 +320,8 @@ class TestDoIdleCheck:
         if main_keypair_idle_timeout is None:
             return user_uuid, None
         access_key = await self._create_keypair(
-            db, user_uuid=user_uuid, idle_timeout=main_keypair_idle_timeout
+            db, user_uuid=user_uuid, idle_timeout=main_keypair_idle_timeout, is_main=True
         )
-        async with db.begin_session() as db_sess:
-            await db_sess.execute(
-                sa.update(UserRow)
-                .where(UserRow.uuid == user_uuid)
-                .values(main_access_key=access_key)
-            )
         return user_uuid, access_key
 
     async def _create_keypair(
@@ -337,6 +330,7 @@ class TestDoIdleCheck:
         *,
         user_uuid: uuid.UUID,
         idle_timeout: int,
+        is_main: bool = False,
     ) -> AccessKey:
         policy_name = await self._create_keypair_policy(db, idle_timeout)
         access_key = AccessKey(f"AKTEST{uuid.uuid4().hex[:14]}")
@@ -349,6 +343,7 @@ class TestDoIdleCheck:
                     user_id=str(user_uuid),
                     is_active=True,
                     is_admin=False,
+                    is_main=is_main,
                     resource_policy=policy_name,
                 )
             )
@@ -445,7 +440,7 @@ class TestDoIdleCheck:
         host.add_checker(checker)
         return host
 
-    async def test_policy_resolved_via_main_access_key(
+    async def test_policy_resolved_via_main_keypair(
         self,
         db: ExtendedAsyncSAEngine,
         domain: tuple[DomainID, str],
