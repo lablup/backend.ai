@@ -14,7 +14,16 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import Mapped, foreign, joinedload, mapped_column, relationship, selectinload
+from sqlalchemy.orm import (
+    Mapped,
+    column_property,
+    declared_attr,
+    foreign,
+    joinedload,
+    mapped_column,
+    relationship,
+    selectinload,
+)
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 from sqlalchemy.sql.expression import SQLColumnExpression
 
@@ -227,6 +236,23 @@ class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         "container_gids", sa.ARRAY(sa.Integer), nullable=True, server_default=sa.null()
     )
 
+    @declared_attr
+    def main_keypair_access_key(cls) -> Mapped[str | None]:
+        """The access key of the keypair marked as this user's main one.
+
+        A scalar subquery rather than a relationship attribute so that it loads
+        with the row itself — ``to_data()`` runs on rows that were fetched
+        without any loader options.
+        """
+        from ai.backend.manager.models.keypair import KeyPairRow
+
+        return column_property(
+            sa.select(KeyPairRow.access_key)
+            .where((KeyPairRow.user == cls.uuid) & KeyPairRow.is_main)
+            .correlate_except(KeyPairRow)
+            .scalar_subquery()
+        )
+
     # Relationships
     sessions: Mapped[list[SessionRow]] = relationship(
         "SessionRow",
@@ -411,7 +437,7 @@ class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
             totp_activated=self.totp_activated,
             totp_activated_at=self.totp_activated_at,
             sudo_session_enabled=self.sudo_session_enabled,
-            main_access_key=self.main_access_key,
+            main_access_key=self.main_keypair_access_key,
             container_uid=self.container_uid,
             container_main_gid=self.container_main_gid,
             container_gids=self.container_gids,
