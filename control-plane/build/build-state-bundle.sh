@@ -114,7 +114,8 @@ systemctl enable tmp.mount var-log.mount var-lib-backendai.mount \
     backendai-credentials.service backendai-postgresql.service \
     backendai-postgresql-bootstrap.service backendai-etcd.service \
     backendai-etcd-bootstrap.service backendai-valkey.service \
-    backendai-manager-schema.service backendai-etcdprobe.service backendai-manager.service \
+    backendai-manager-schema.service backendai-appproxy-schema.service \
+    backendai-etcdprobe.service backendai-manager.service \
     backendai-manager-selfcheck.service \
     backendai-appproxy-coordinator.service backendai-state-backup.timer
 : > /etc/machine-id

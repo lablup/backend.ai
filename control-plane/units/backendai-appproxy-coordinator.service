@@ -1,7 +1,7 @@
 [Unit]
 Description=Backend.AI app-proxy coordinator
-Requires=backendai-credentials.service backendai-postgresql-bootstrap.service backendai-valkey.service
-After=backendai-credentials.service backendai-postgresql-bootstrap.service backendai-valkey.service backendai-manager.service
+Requires=backendai-credentials.service backendai-appproxy-schema.service backendai-postgresql-bootstrap.service backendai-valkey.service
+After=backendai-credentials.service backendai-appproxy-schema.service backendai-postgresql-bootstrap.service backendai-valkey.service backendai-manager.service
 
 [Service]
 Type=simple

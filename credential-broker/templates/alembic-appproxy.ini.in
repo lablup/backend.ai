@@ -1,0 +1,32 @@
+[alembic]
+script_location = ai.backend.appproxy.coordinator.models:alembic
+sqlalchemy.url = postgresql+asyncpg://postgres:@@url:default/control-plane/postgres-password@@@127.0.0.1:5432/appproxy
+
+[loggers]
+keys = root,alembic
+
+[handlers]
+keys = console
+
+[formatters]
+keys = generic
+
+[logger_root]
+level = WARNING
+handlers = console
+qualname =
+
+[logger_alembic]
+level = INFO
+handlers =
+qualname = alembic
+
+[handler_console]
+class = StreamHandler
+args = (sys.stderr,)
+level = NOTSET
+formatter = generic
+
+[formatter_generic]
+format = %(levelname)-5.5s [%(name)s] %(message)s
+datefmt = %H:%M:%S

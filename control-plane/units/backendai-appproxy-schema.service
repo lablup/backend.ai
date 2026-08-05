@@ -1,0 +1,38 @@
+[Unit]
+Description=Backend.AI app-proxy coordinator database schema
+Requires=backendai-credentials.service backendai-postgresql-bootstrap.service
+After=backendai-credentials.service backendai-postgresql-bootstrap.service
+Before=backendai-appproxy-coordinator.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=backendai
+Group=backendai
+LoadCredential=alembic-appproxy.ini:/run/backendai-credentials.sock
+LoadCredential=password:/run/backendai-credentials.sock
+ExecStart=/usr/lib/backendai/credential-guard alembic-appproxy.ini password
+ExecStart=/usr/lib/backendai/datastore-bootstrap coordinator-schema
+WorkingDirectory=/var/lib/backendai/coordinator
+Environment=HOME=/var/lib/backendai/coordinator
+Environment=SCIE_BASE=/var/lib/backendai/coordinator/.scie
+TimeoutStartSec=600
+StandardOutput=journal+console
+StandardError=journal+console
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateMounts=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/backendai/coordinator
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
