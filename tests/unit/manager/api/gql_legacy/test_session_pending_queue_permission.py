@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from collections.abc import Callable
 from enum import Enum, auto
 from unittest.mock import AsyncMock, MagicMock
@@ -7,9 +8,27 @@ from unittest.mock import AsyncMock, MagicMock
 import graphene
 import pytest
 
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.api.gql_legacy.schema import Query
+from ai.backend.manager.data.auth.types import AuthenticatedUser
+from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.models.user import UserRole
+
+
+def _authenticated_user(role: UserRole) -> AuthenticatedUser:
+    return AuthenticatedUser(
+        uuid=UserID(uuid.uuid4()),
+        email="test@example.com",
+        role=role,
+        domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
+        sudo_session_enabled=False,
+        main_access_key=None,
+        allowed_client_ip=None,
+        resource_policy=UserResourcePolicyData(name="default"),
+    )
 
 
 class ExpectedResult(Enum):
@@ -22,7 +41,7 @@ class TestSessionPendingQueuePermission:
     def make_info(self) -> Callable[[UserRole], graphene.ResolveInfo]:
         def _make(role: UserRole) -> graphene.ResolveInfo:
             ctx = MagicMock()
-            ctx.user = {"role": role}
+            ctx.user = _authenticated_user(role)
             ctx.valkey_schedule = AsyncMock()
             ctx.valkey_schedule.get_pending_queue = AsyncMock(return_value=[])
             ctx.db = MagicMock()
