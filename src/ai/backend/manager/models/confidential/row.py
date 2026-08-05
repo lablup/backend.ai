@@ -106,9 +106,6 @@ class ConfidentialNonceRow(Base):  # type: ignore[misc]
         "profile_version", sa.String(length=64), nullable=False
     )
     quota: Mapped[int] = mapped_column("quota", sa.Integer, nullable=False)
-    claims_used: Mapped[int] = mapped_column(
-        "claims_used", sa.Integer, nullable=False, server_default=sa.text("0")
-    )
     created_at: Mapped[datetime] = mapped_column(
         "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
     )
@@ -119,6 +116,9 @@ class ConfidentialGuestClaimRow(Base):  # type: ignore[misc]
     nonce: Mapped[str] = mapped_column("nonce", sa.String(length=128), primary_key=True)
     guest: Mapped[str] = mapped_column("guest", sa.String(length=128), primary_key=True)
     session_id: Mapped[uuid.UUID] = mapped_column("session_id", GUID, nullable=False, index=True)
+    expires_at: Mapped[datetime] = mapped_column(
+        "expires_at", sa.DateTime(timezone=True), nullable=False, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
     )

@@ -83,7 +83,6 @@ def upgrade() -> None:
         sa.Column("image_digest", sa.String(length=256), nullable=False),
         sa.Column("profile_version", sa.String(length=64), nullable=False),
         sa.Column("quota", sa.Integer, nullable=False),
-        sa.Column("claims_used", sa.Integer, nullable=False, server_default=sa.text("0")),
         sa.Column(
             "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
         ),
@@ -93,6 +92,7 @@ def upgrade() -> None:
         sa.Column("nonce", sa.String(length=128), primary_key=True),
         sa.Column("guest", sa.String(length=128), primary_key=True),
         sa.Column("session_id", GUID, nullable=False, index=True),
+        sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False, index=True),
         sa.Column(
             "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
         ),

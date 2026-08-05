@@ -5,14 +5,14 @@ import binascii
 import hashlib
 import json
 import uuid
+from datetime import UTC, datetime, timedelta
 from http.cookies import SimpleCookie
-from typing import Any, Final, cast
+from typing import Any, Final, NamedTuple
 
 import sqlalchemy as sa
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.engine import CursorResult
 
 from ai.backend.manager.confidential.broker import BrokerClient, BrokerTarget
 from ai.backend.manager.errors.confidential import (
@@ -41,6 +41,7 @@ RELAYED_REQUEST_HEADERS: Final = frozenset({
     "authorization",
 })
 RELAYED_RESPONSE_HEADERS: Final = frozenset({"content-type", "set-cookie", "www-authenticate"})
+UNDATED_CLAIM_LEASE: Final = timedelta(minutes=5)
 
 _QUOTE_HEADER_LEN: Final = 48
 _MR_TD: Final = slice(136, 184)
@@ -92,7 +93,19 @@ def _pubkey_digest(pubkey: Any) -> str:
     return hashlib.sha256(rendered).hexdigest()
 
 
-def attested_guest(headers: dict[str, str]) -> str | None:
+class Claimant(NamedTuple):
+    guest: str
+    expires_at: datetime
+
+
+def _token_expiry(claims: Any) -> datetime:
+    moment = claims.get("exp") if isinstance(claims, dict) else None
+    if not isinstance(moment, (int, float)) or isinstance(moment, bool):
+        return datetime.now(UTC) + UNDATED_CLAIM_LEASE
+    return datetime.fromtimestamp(moment, UTC)
+
+
+def attested_guest(headers: dict[str, str]) -> Claimant | None:
     for key, value in headers.items():
         if key.lower() != "authorization":
             continue
@@ -110,7 +123,7 @@ def attested_guest(headers: dict[str, str]) -> str | None:
         pubkey = _tee_pubkey(claims)
         if pubkey is None:
             continue
-        return _pubkey_digest(pubkey)
+        return Claimant(_pubkey_digest(pubkey), _token_expiry(claims))
     return None
 
 
@@ -209,20 +222,6 @@ class AuthorisationShim:
             )
             raise ReferenceValueRejected(extra_msg=refusal)
 
-    async def _claim(self, nonce: str) -> uuid.UUID | None:
-        async with self._db.begin_session() as db_session:
-            claimed = await db_session.execute(
-                sa.update(ConfidentialNonceRow)
-                .where(
-                    (ConfidentialNonceRow.nonce == nonce)
-                    & (ConfidentialNonceRow.claims_used < ConfidentialNonceRow.quota)
-                )
-                .values(claims_used=ConfidentialNonceRow.claims_used + 1)
-                .returning(ConfidentialNonceRow.session_id)
-                .execution_options(synchronize_session=False)
-            )
-            return claimed.scalar_one_or_none()
-
     async def _release_claim(self, nonce: str, guest: str) -> None:
         async with self._db.begin_session() as db_session:
             await db_session.execute(
@@ -231,37 +230,43 @@ class AuthorisationShim:
                     & (ConfidentialGuestClaimRow.guest == guest)
                 )
             )
-            await db_session.execute(
-                sa.update(ConfidentialNonceRow)
-                .where(
-                    (ConfidentialNonceRow.nonce == nonce) & (ConfidentialNonceRow.claims_used > 0)
-                )
-                .values(claims_used=ConfidentialNonceRow.claims_used - 1)
-            )
 
-    async def _consume(self, nonce: str, guest: str) -> tuple[uuid.UUID, bool]:
-        async with self._db.begin_readonly_session() as db_session:
-            recorded = await db_session.scalar(
-                sa.select(ConfidentialGuestClaimRow.session_id).where(
-                    (ConfidentialGuestClaimRow.nonce == nonce)
-                    & (ConfidentialGuestClaimRow.guest == guest)
-                )
-            )
-        if recorded is not None:
-            return recorded, False
-        session_id = await self._claim(nonce)
-        if session_id is None:
-            raise NonceQuotaExhausted(extra_msg="no claim slot remains for this session nonce")
+    async def _consume(self, nonce: str, claimant: Claimant) -> tuple[uuid.UUID, bool]:
         async with self._db.begin_session() as db_session:
-            inserted = await db_session.execute(
-                pg_insert(ConfidentialGuestClaimRow)
-                .values(nonce=nonce, guest=guest, session_id=session_id)
-                .on_conflict_do_nothing()
+            bound = await db_session.scalar(
+                sa.select(ConfidentialNonceRow)
+                .where(ConfidentialNonceRow.nonce == nonce)
+                .with_for_update()
             )
-        if cast(CursorResult[Any], inserted).rowcount == 0:
-            await self._release_claim(nonce, guest)
-            return session_id, False
-        return session_id, True
+            if bound is not None:
+                held = await db_session.scalar(
+                    sa.select(ConfidentialGuestClaimRow).where(
+                        (ConfidentialGuestClaimRow.nonce == nonce)
+                        & (ConfidentialGuestClaimRow.guest == claimant.guest)
+                    )
+                )
+                if held is not None:
+                    held.expires_at = claimant.expires_at
+                    return bound.session_id, False
+                live = await db_session.scalar(
+                    sa.select(sa.func.count())
+                    .select_from(ConfidentialGuestClaimRow)
+                    .where(
+                        (ConfidentialGuestClaimRow.nonce == nonce)
+                        & (ConfidentialGuestClaimRow.expires_at > sa.func.now())
+                    )
+                )
+                if live < bound.quota:
+                    db_session.add(
+                        ConfidentialGuestClaimRow(
+                            nonce=nonce,
+                            guest=claimant.guest,
+                            session_id=bound.session_id,
+                            expires_at=claimant.expires_at,
+                        )
+                    )
+                    return bound.session_id, True
+        raise NonceQuotaExhausted(extra_msg="no live claim slot remains for this session nonce")
 
     async def relay_attest(
         self,
@@ -324,7 +329,7 @@ class AuthorisationShim:
     ) -> tuple[int, bytes, dict[str, str]]:
         nonce = path_nonce(resource_path)
         bearer = attested_guest(headers)
-        if bearer is not None and not await self._is_witnessed(bearer, opts.broker_endpoint):
+        if bearer is not None and not await self._is_witnessed(bearer.guest, opts.broker_endpoint):
             await self.record(
                 actor=DecisionActor.GUEST,
                 verdict=DecisionVerdict.DENIED,
@@ -333,11 +338,14 @@ class AuthorisationShim:
                 nonce=nonce,
             )
             raise ShimRefusal(extra_msg="this shim never witnessed the presented token attest")
-        guest = rcar_session(headers) or bearer
+        session = rcar_session(headers)
+        claimant = bearer or (
+            None if session is None else Claimant(session, datetime.now(UTC) + UNDATED_CLAIM_LEASE)
+        )
         session_id: uuid.UUID | None = None
         consumed = False
         if nonce is not None:
-            if guest is None:
+            if claimant is None:
                 await self.record(
                     actor=DecisionActor.GUEST,
                     verdict=DecisionVerdict.DENIED,
@@ -347,7 +355,7 @@ class AuthorisationShim:
                 )
                 raise ShimRefusal(extra_msg="an unattested fetch cannot claim a session nonce")
             try:
-                session_id, consumed = await self._consume(nonce, guest)
+                session_id, consumed = await self._consume(nonce, claimant)
             except NonceQuotaExhausted:
                 await self.record(
                     actor=DecisionActor.GUEST,
@@ -366,8 +374,8 @@ class AuthorisationShim:
                 headers=headers,
             )
         except BrokerUnreachable:
-            if consumed and nonce is not None and guest is not None:
-                await self._release_claim(nonce, guest)
+            if consumed and nonce is not None and claimant is not None:
+                await self._release_claim(nonce, claimant.guest)
             await self.record(
                 actor=DecisionActor.GUEST,
                 verdict=DecisionVerdict.UNREACHABLE,
