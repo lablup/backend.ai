@@ -454,7 +454,7 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
         if confidential.get("tunnel_resource") and confidential.get("peers_resource"):
             env["BACKENDAI_CC_TUNNEL_URI"] = confidential["tunnel_resource"]
             env["BACKENDAI_CC_PEERS_URI"] = confidential["peers_resource"]
-            env["BACKENDAI_CC_TUNNEL_BASE"] = str(network.subnet[2])
+            env["BACKENDAI_CC_TUNNEL_BASE"] = str(network.subnet[1])
         if confidential.get("channel_resource"):
             env["BACKENDAI_CC_CHANNEL_URI"] = confidential["channel_resource"]
         plan_resource = confidential.get("mount_plan_resource")
