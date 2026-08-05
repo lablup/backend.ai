@@ -16,6 +16,11 @@ for path in \
 	opt/kernel/su-exec opt/kernel/dropbearmulti usr/local/bin/bai-guest-boot \
 	opt/kernel/bai-guest-storage usr/local/bin/bai-storage-fuse \
 	usr/bin/wg usr/sbin/ip usr/local/bin/bai-tunnel-up opt/kernel/bai-tunnel-bench \
+	usr/sbin/xtables-nft-multi usr/local/bin/bai-guest-egress \
+	usr/lib/x86_64-linux-gnu/xtables/libxt_standard.so \
+	usr/lib/x86_64-linux-gnu/xtables/libxt_tcp.so \
+	usr/lib/x86_64-linux-gnu/xtables/libxt_udp.so \
+	usr/lib/x86_64-linux-gnu/xtables/libxt_conntrack.so \
 	etc/kata-opa/default-policy.rego
 do
 	if [ -e "${stage}/${path}" ] || [ -e "${stage}/usr/${path}" ]; then

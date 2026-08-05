@@ -178,13 +178,29 @@ stage_tunnel() {
 	done
 }
 
+stage_egress() {
+	local one rel
+	one="$(stage_one_root)"
+	for rel in ${BAI_CC_EGRESS_BINS}; do
+		[ -e "${one}/${rel}" ] || die "stage-one carries no ${rel}, needed by the guest egress filter"
+		install -D -m 0755 "${one}/${rel}" "${stage}/${rel}"
+		stage_needed_libs "$one" "${one}/${rel}"
+	done
+	for rel in ${BAI_CC_EGRESS_MATCHES}; do
+		[ -e "${one}/${BAI_CC_XTABLES_DIR}/${rel}" ] \
+			|| die "stage-one carries no xtables extension ${rel}, which iptables loads at runtime"
+		install -D -m 0755 "${one}/${BAI_CC_XTABLES_DIR}/${rel}" \
+			"${stage}/${BAI_CC_XTABLES_DIR}/${rel}"
+	done
+}
+
 stage_overlay() {
 	mv "${stage}/usr/bin/kata-agent" "${stage}/usr/bin/kata-agent.real"
 	cp -a "${BAI_CC_ROOT}/overlay/." "${stage}/"
 	find "${stage}/opt/kernel" "${stage}/usr/local/bin" -name '__pycache__' -type d -prune -exec rm -rf {} +
 	chmod 0755 "${stage}/usr/bin/kata-agent" \
 		"${stage}/opt/kernel/bai-cc-entrypoint" "${stage}/usr/local/bin/bai-guest-boot" \
-		"${stage}/opt/kernel/bai-guest-storage" \
+		"${stage}/opt/kernel/bai-guest-storage" "${stage}/usr/local/bin/bai-guest-egress" \
 		"${stage}/usr/local/bin/bai-tunnel-up" "${stage}/opt/kernel/bai-tunnel-bench"
 	rm -rf "${stage}/usr/lib/systemd" "${stage}/etc/dcgm-exporter"
 	rm -f "${stage}/usr/sbin/ntpd"
@@ -202,6 +218,7 @@ stage_runner
 stage_storage_clients
 stage_fuse_driver
 stage_tunnel
+stage_egress
 stage_overlay
 canonicalise_tree "$stage"
 mkdir -p "${BAI_CC_OUT}"
