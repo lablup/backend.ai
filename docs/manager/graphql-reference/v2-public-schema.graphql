@@ -6,11 +6,11 @@ schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@shareab
 Added in 26.9.0. The merged config for one config name: every fragment visible to the caller, deep-merged in ascending allow-list rank order.
 """
 type AppConfig @shareable {
-  """Config name this view is for."""
+  """Added in 26.9.0. Config name this view is for."""
   configName: String!
 
   """
-  Every fragment visible to the caller, deep-merged in ascending allow-list rank order. Empty when nothing visible contributes, or when everything that did was empty. Read the fragment API for the per-scope values behind it.
+  Added in 26.9.0. Every fragment visible to the caller, deep-merged in ascending allow-list rank order. Empty when nothing visible contributes, or when everything that did was empty. Read the fragment API for the per-scope values behind it.
   """
   config: JSON!
 }
@@ -30,7 +30,7 @@ type Query {
   Added in 26.9.0. Read the merged config for each of the given names from public fragments only. Served by the `public` subgraph without authentication, for pre-login clients that need config before they have credentials.
   """
   publicAppConfigs(
-    """Config names to read merges for."""
+    """Added in 26.9.0. Config names to read merges for."""
     configNames: [String!]!
   ): [AppConfig!]!
 }
