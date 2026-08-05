@@ -179,13 +179,30 @@ def gql_pydantic_interface[PydanticModel: BaseModel](
     Use for interface types where all implementors share a common Pydantic
     model structure.
     """
-    return strawberry.experimental.pydantic.interface(
+    decorate = strawberry.experimental.pydantic.interface(
         model=model,
         name=name,
         description=_build_description(meta),
         directives=directives,
         use_pydantic_alias=use_pydantic_alias,
     )
+
+    def wrap(cls: Any) -> type[StrawberryTypeFromPydantic[PydanticModel]]:
+        # Strawberry rebuilds every resolver-less field from the Pydantic model and takes the
+        # description off the model, so a description declared here would otherwise be dropped.
+        declared_descriptions = {
+            attr_name: attr.description
+            for attr_name, attr in vars(cls).items()
+            if isinstance(attr, StrawberryField) and attr.description is not None
+        }
+        decorated = decorate(cls)
+        for field_definition in get_object_definition(decorated, strict=True).fields:
+            description = declared_descriptions.get(field_definition.python_name)
+            if description is not None:
+                field_definition.description = description
+        return decorated
+
+    return wrap
 
 
 @dataclass_transform(
