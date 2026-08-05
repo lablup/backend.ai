@@ -1,6 +1,7 @@
 #!/opt/backend.ai/bin/python
 import ipaddress
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -25,8 +26,8 @@ def fetch(api, resource):
         raise Refused(f"the broker did not release {resource}: {error}")
 
 
-def run(*args, feed=None):
-    result = subprocess.run(args, input=feed, capture_output=True)
+def run(*args):
+    result = subprocess.run(args, capture_output=True)
     if result.returncode != 0:
         detail = result.stderr.decode().strip()
         raise Refused(f"{' '.join(args)} exited {result.returncode}: {detail}")
@@ -66,7 +67,16 @@ def main():
             f"Endpoint = {base + peer['cluster_idx']}:{port}\nPersistentKeepalive = 25\n"
         )
     run(IP, "link", "add", LINK, "type", "wireguard")
-    run(WG, "setconf", LINK, "/dev/stdin", feed="\n".join(config).encode())
+    conf = pathlib.Path("/run/bai-tunnel.conf")
+    handle = os.open(conf, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        os.write(handle, "\n".join(config).encode())
+    finally:
+        os.close(handle)
+    try:
+        run(WG, "setconf", LINK, str(conf))
+    finally:
+        conf.unlink(missing_ok=True)
     run(IP, "addr", "add", f"{mine['tunnel_addr']}/32", "dev", LINK)
     run(IP, "link", "set", LINK, "mtu", str(carrier_mtu("eth0") - 80), "up")
     for peer in peers:
