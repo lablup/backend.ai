@@ -81,7 +81,8 @@ def fetch(api, resource):
         with urllib.request.urlopen(url, timeout=60) as response:
             payload = response.read()
     except urllib.error.HTTPError as error:
-        raise Refusal(f"the broker refused {resource} with {error.code}")
+        detail = error.read().decode(errors="replace").strip()
+        raise Refusal(f"the broker refused {resource} with {error.code}: {detail}")
     except OSError as error:
         raise Refusal(f"the broker at {api} was unreachable for {resource}: {error}")
     if not payload:
