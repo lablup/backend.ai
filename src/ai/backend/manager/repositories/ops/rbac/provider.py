@@ -1161,7 +1161,7 @@ class RBACWriteOps(WriteOps):
         await self._bulk_create_dependent_ignore_conflicts(
             [
                 ScopeBindingCreatorSpec(
-                    owner=member_scope, scope=scope, permission_cap=permission_cap
+                    anchor_scope=member_scope, bound_scope=scope, permission_cap=permission_cap
                 )
                 for member_scope in member_scopes
             ],

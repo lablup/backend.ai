@@ -149,8 +149,7 @@ class AssociationScopesEntitiesCreatorSpec(CreatorSpec[AssociationScopesEntities
 
 @dataclass
 class EntityMembershipCreatorSpec(DependentCreatorSpec[VirtualScopeID, EntityMembershipRow]):
-    """Membership of an entity in a virtual scope; the virtual scope id is resolved
-    by the caller at execution time and passed as the dependency."""
+    """Membership of an entity in the virtual scope given as the dependency."""
 
     entity_ref: EntityRef
     permission_cap: Permission | None = None
@@ -169,18 +168,17 @@ class EntityMembershipCreatorSpec(DependentCreatorSpec[VirtualScopeID, EntityMem
 class ScopeBindingCreatorSpec(
     DependentCreatorSpec[Mapping[ScopeRef, VirtualScopeID], ScopeBindingRow]
 ):
-    """Binding of ``scope`` into ``owner``'s virtual scope; the owner→virtual-scope-id
-    mapping is resolved by the caller at execution time and passed as the dependency."""
+    """Binding of ``bound_scope`` into ``anchor_scope``'s virtual scope."""
 
-    owner: ScopeRef
-    scope: ScopeRef
+    anchor_scope: ScopeRef
+    bound_scope: ScopeRef
     permission_cap: Permission | None = None
 
     @override
     def build_row(self, dependency: Mapping[ScopeRef, VirtualScopeID]) -> ScopeBindingRow:
         return ScopeBindingRow(
-            virtual_scope_id=dependency[self.owner],
-            scope_type=self.scope.scope_type,
-            scope_id=self.scope.scope_id,
+            virtual_scope_id=dependency[self.anchor_scope],
+            scope_type=self.bound_scope.scope_type,
+            scope_id=self.bound_scope.scope_id,
             permission_cap=self.permission_cap,
         )
