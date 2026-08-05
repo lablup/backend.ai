@@ -1576,6 +1576,7 @@ class AgentRegistry:
             "token": row.token,
             "expires_at": row.expires_at.isoformat(),
             "vouched_by": "manager",
+            "single_consumer": True,
         }
 
     async def execute(
