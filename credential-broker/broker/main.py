@@ -53,7 +53,14 @@ def collect(kbs, broker, table):
 def episode(kbs, broker, table, clock, log):
     token = kbs.attest()
     body = claims(token)
-    clock.take(body)
+    observed = time.time()
+    attested = clock.take(body)
+    print(
+        f"credential-broker: wall clock read {observed:.0f}, attestation says "
+        f"{attested:.0f}, clock now {time.time():.0f}",
+        file=sys.stderr,
+        flush=True,
+    )
     status = platform_status(body)
     quoted = measurements(body)
     log.record("platform", json.dumps(status, sort_keys=True), "credential-broker", "")
