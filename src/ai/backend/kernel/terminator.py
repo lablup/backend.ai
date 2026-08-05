@@ -114,6 +114,7 @@ class TransportTerminator:
         self._servers: list[asyncio.Server] = []
         self._zctx: zmq.asyncio.Context | None = None
         self._live: asyncio.Task[Any] | None = None
+        self._holder: str | None = None
 
     async def start(self) -> None:
         if not self._resource or not PROFILE_PATH.is_file():
@@ -149,6 +150,7 @@ class TransportTerminator:
         if self._live is not None:
             self._live.cancel()
             self._live = None
+            self._holder = None
         for server in self._servers:
             server.close()
         self._servers.clear()
@@ -186,34 +188,57 @@ class TransportTerminator:
             self._nonces.popitem(last=False)
         return None
 
-    async def _greet(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> bool:
-        refusal = self._admit(json.loads((await _read_frames(reader))[0]))
+    async def _greet(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> str | None:
+        hello = json.loads((await _read_frames(reader))[0])
+        refusal = self._admit(hello)
         if refusal is not None:
             await _write_frames(
                 writer, [json.dumps({"ok": False, "error": refusal}).encode("utf-8")]
             )
             log.warning("terminator: {}", refusal)
-            return False
+            return None
         epoch = self._epoch
         self._epoch += 1
-        await _write_frames(writer, [json.dumps({"ok": True, "epoch": epoch}).encode("utf-8")])
-        return True
+        await _write_frames(
+            writer,
+            [
+                json.dumps({
+                    "ok": True,
+                    "epoch": epoch,
+                    "displaced": self._holder,
+                    "single_consumer": True,
+                }).encode("utf-8")
+            ],
+        )
+        return str(hello.get("peer") or "an unnamed peer")
 
     async def _channel(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         try:
-            if not await self._greet(reader, writer):
+            peer = await self._greet(reader, writer)
+            if peer is None:
                 return
             displaced = self._live
             if displaced is not None:
+                log.warning(
+                    "terminator: {} displaced the live channel held by {}; the guest bridges one"
+                    " consumer onto the single runner socket pair, so the displaced peer loses"
+                    " whatever it had in flight",
+                    peer,
+                    self._holder,
+                )
                 displaced.cancel()
                 await asyncio.gather(displaced, return_exceptions=True)
             self._live = asyncio.current_task()
+            self._holder = peer
             await self._bridge(reader, writer)
         except (OSError, EOFError, ValueError, IndexError, ChannelUnavailable) as e:
             log.warning("terminator: the channel dropped ({})", e)
         finally:
             if self._live is asyncio.current_task():
                 self._live = None
+                self._holder = None
             writer.close()
 
     async def _bridge(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:

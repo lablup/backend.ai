@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import uuid
 from collections.abc import Awaitable, Callable, Mapping
 from datetime import UTC, datetime
@@ -117,6 +118,7 @@ class ConfidentialChannel:
                     guest_port=row.channel_port,
                     certificate_fingerprint=row.fingerprint,
                     token=row.token,
+                    peer=f"manager process {os.getpid()}",
                 ),
                 client_features=default_client_features,
             )
@@ -130,7 +132,10 @@ class ConfidentialChannel:
             await runner.close()
 
     async def _dialled(
-        self, kernel_id: KernelId, verb: Callable[[ChannelCodeRunner], Awaitable[_T]]
+        self,
+        kernel_id: KernelId,
+        verb: Callable[[ChannelCodeRunner], Awaitable[_T]],
+        retriable: Callable[[], bool] | None = None,
     ) -> _T:
         last: Exception | None = None
         for _ in range(REDIAL_ATTEMPTS):
@@ -140,6 +145,8 @@ class ConfidentialChannel:
             except ChannelNotEstablished as e:
                 last = e
                 await self.release(kernel_id)
+                if retriable is not None and not retriable():
+                    break
                 continue
             await self._record_epoch(kernel_id, runner.epoch)
             return answer
@@ -169,7 +176,10 @@ class ConfidentialChannel:
         api_version: int = default_api_version,
         flush_timeout: float = 2.0,
     ) -> NextResult:
+        fed = False
+
         async def run(runner: ChannelCodeRunner) -> NextResult:
+            nonlocal fed
             await runner.attach_output_queue(run_id)
             match mode:
                 case "query":
@@ -182,9 +192,10 @@ class ConfidentialChannel:
                     pass
                 case _:
                     raise StaleAnswerRefused(extra_msg=f"unknown execution mode {mode!r}")
+            fed = True
             return await runner.get_next_result(api_ver=api_version, flush_timeout=flush_timeout)
 
-        return await self._dialled(kernel_id, run)
+        return await self._dialled(kernel_id, run, lambda: not fed)
 
     async def check_status(self, kernel_id: KernelId) -> dict[str, float]:
         status = await self._dialled(kernel_id, lambda r: r.feed_and_get_status())
