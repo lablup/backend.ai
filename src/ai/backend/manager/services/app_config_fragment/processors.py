@@ -29,6 +29,10 @@ from ai.backend.manager.services.app_config_fragment.actions.purge import (
     PurgeAppConfigFragmentAction,
     PurgeAppConfigFragmentActionResult,
 )
+from ai.backend.manager.services.app_config_fragment.actions.purge_by_names import (
+    PurgeAppConfigFragmentsByNamesAction,
+    PurgeAppConfigFragmentsByNamesActionResult,
+)
 from ai.backend.manager.services.app_config_fragment.actions.scoped_search import (
     ScopedSearchAppConfigFragmentAction,
     ScopedSearchAppConfigFragmentActionResult,
@@ -51,6 +55,9 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
     ]
     purge: SingleEntityActionProcessor[
         PurgeAppConfigFragmentAction, PurgeAppConfigFragmentActionResult
+    ]
+    purge_by_names: ScopeActionProcessor[
+        PurgeAppConfigFragmentsByNamesAction, PurgeAppConfigFragmentsByNamesActionResult
     ]
     bulk_purge: BulkActionProcessor[
         BulkPurgeAppConfigFragmentAction, BulkPurgeAppConfigFragmentActionResult
@@ -79,6 +86,9 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
         self.purge = SingleEntityActionProcessor(
             service.purge, action_monitors, validators=[validators.rbac.single_entity]
         )
+        self.purge_by_names = ScopeActionProcessor(
+            service.purge_by_names, action_monitors, validators=[validators.rbac.scope]
+        )
         self.bulk_purge = BulkActionProcessor(
             service.bulk_purge, monitors=action_monitors, validators=[validators.rbac.bulk]
         )
@@ -91,5 +101,6 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
             AdminSearchAppConfigFragmentAction.spec(),
             ScopedSearchAppConfigFragmentAction.spec(),
             PurgeAppConfigFragmentAction.spec(),
+            PurgeAppConfigFragmentsByNamesAction.spec(),
             BulkPurgeAppConfigFragmentAction.spec(),
         ]

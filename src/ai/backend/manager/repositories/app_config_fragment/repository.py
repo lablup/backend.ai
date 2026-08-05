@@ -75,6 +75,12 @@ class AppConfigFragmentRepository:
         return await self._db_source.purge(purger_spec)
 
     @app_config_fragment_repository_resilience.apply()
+    async def purge_by_config_names(
+        self, scope: SearchScope, config_names: Sequence[str]
+    ) -> list[AppConfigFragmentData]:
+        return await self._db_source.purge_by_config_names(scope, config_names)
+
+    @app_config_fragment_repository_resilience.apply()
     async def admin_search(self, querier: BatchQuerier) -> AppConfigFragmentSearchResult:
         return await self._db_source.admin_search(querier)
 
