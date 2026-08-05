@@ -170,10 +170,14 @@ class FolderKeyCustodian:
 
     async def revoke(
         self, opts: ConfidentialScalingGroupOpts, domain_name: str, folder_id: uuid.UUID
-    ) -> None:
+    ) -> bool:
         resource_path = folder_key_path(domain_name, folder_id)
-        self.escrow(opts).append(resource_path, b"")
+        escrow = self.escrow(opts)
+        if escrow.held(resource_path) is None:
+            return False
         await self._broker.destroy_resource(BrokerTarget.of(opts), resource_path)
+        escrow.append(resource_path, b"")
+        return True
 
     def release(
         self, opts: ConfidentialScalingGroupOpts, domain_name: str, folder_id: uuid.UUID

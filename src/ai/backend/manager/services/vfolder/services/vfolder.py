@@ -696,11 +696,12 @@ class VFolderService:
         if opts is not None:
             await plane.custodian.mint(opts, domain_name, vfid.folder_id)
 
-    async def _destroy_folder_key(self, domain_name: str, vfid: VFolderID) -> None:
+    async def _destroy_folder_key(self, vfolder_data: VFolderData) -> None:
+        domain_name = vfolder_data.domain_name
         plane = await self._plane()
         opts = await custodian_of_domain(self._db, domain_name)
         if opts is not None:
-            await plane.custodian.revoke(opts, domain_name, vfid.folder_id)
+            await plane.custodian.revoke(opts, domain_name, vfolder_data.id)
 
     async def _remove_vfolder_from_storage(self, vfolder_data: VFolderData) -> None:
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
@@ -736,15 +737,14 @@ class VFolderService:
         )
         if result.failures:
             raise result.failures[0].exception
-        await self._destroy_folder_key(
-            user.domain_name, VFolderID(vfolder_data.quota_scope_id, vfolder_data.id)
-        )
+        await self._destroy_folder_key(vfolder_data)
         await self._remove_vfolder_from_storage(vfolder_data)
         return DeleteForeverVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def purge(self, action: PurgeVFolderAction) -> PurgeVFolderActionResult:
         """Purge a DELETE_COMPLETE vfolder from DB (admin only)."""
         data = await self._vfolder_repository.purge_vfolder(action.purger)
+        await self._destroy_folder_key(data)
         return PurgeVFolderActionResult(vfolder_uuid=data.id)
 
     async def force_delete(
@@ -761,6 +761,7 @@ class VFolderService:
         result = await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
         if result.failures:
             raise result.failures[0].exception
+        await self._destroy_folder_key(vfolder_data)
         await self._remove_vfolder_from_storage(vfolder_data)
         return ForceDeleteVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
@@ -1910,6 +1911,7 @@ class VFolderService:
         )
         if result.failures:
             raise result.failures[0].exception
+        await self._destroy_folder_key(vfolder_data)
         await self._remove_vfolder_from_storage(vfolder_data)
         return PurgeVFolderV2ActionResult(vfolder_id=action.vfolder_id)
 
