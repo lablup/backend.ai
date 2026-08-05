@@ -182,7 +182,7 @@ class UserDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             user_row = await self._get_user_by_email(session, email)
-            return UserData.from_row(user_row)
+            return UserData.from_row(user_row, user_row.main_keypair_access_key)
 
     async def create_user_validated(
         self, creator: Creator[UserRow], group_ids: list[str] | None
@@ -345,7 +345,14 @@ class UserDBSource:
                 await self._update_user_groups(
                     session, updated_user.uuid, updated_user.domain_name, group_ids
                 )
-            return UserData.from_row(updated_user)
+            return UserData.from_row(
+                updated_user,
+                await session.scalar(
+                    sa.select(KeyPairRow.access_key).where(
+                        (KeyPairRow.user == updated_user.uuid) & KeyPairRow.is_main
+                    )
+                ),
+            )
 
     async def bulk_update_users_validated(
         self,
@@ -455,7 +462,14 @@ class UserDBSource:
             await self._update_user_groups(
                 session, updated_user.uuid, updated_user.domain_name, group_ids
             )
-        return UserData.from_row(updated_user)
+        return UserData.from_row(
+            updated_user,
+            await session.scalar(
+                sa.select(KeyPairRow.access_key).where(
+                    (KeyPairRow.user == updated_user.uuid) & KeyPairRow.is_main
+                )
+            ),
+        )
 
     async def update_user_by_uuid_validated(
         self,

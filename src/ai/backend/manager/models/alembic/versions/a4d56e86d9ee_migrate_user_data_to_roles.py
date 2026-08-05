@@ -84,7 +84,7 @@ class RoleCreator:
         role_inputs: list[dict[str, Any]] = []
         role_name_user_id_map: dict[str, uuid.UUID] = {}
         for row in rows:
-            data = UserData.from_row(row)
+            data = UserData.from_row(row, row.main_access_key)
             role_input = get_user_self_role_creation_input(data)
             role_inputs.append(role_input.to_dict())
             role_name_user_id_map[role_input.name] = data.id
@@ -214,7 +214,7 @@ class RoleMapper:
                 break
             role_name_user_id_map: dict[str, uuid.UUID] = {}
             for row in rows:
-                data = UserData.from_row(row)
+                data = UserData.from_row(row, row.main_access_key)
                 role_input = get_user_self_role_creation_input(data)
                 role_name_user_id_map[role_input.name] = data.id
 
