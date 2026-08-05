@@ -18,6 +18,7 @@ ENVIRONMENT = {
 }
 CHAIN = "BAI-EGRESS"
 DNS_PORT = "53"
+TUNNEL_PORT = "51820"
 CARRIER_ATTEMPTS = 600
 CARRIER_INTERVAL = 0.2
 IPV6_KNOBS = (
@@ -117,6 +118,10 @@ def bound():
                 " where nothing can tell it apart from a peer member of this session"
             )
     iptables("-I", CHAIN, "1", "-d", str(subnet), "!", "-o", "lo", "-j", "DROP")
+    iptables(
+        "-I", CHAIN, "1", "-d", str(subnet), "-p", "udp",
+        "--sport", TUNNEL_PORT, "--dport", TUNNEL_PORT, "-j", "ACCEPT",
+    )
     iptables(
         "-I", CHAIN, "1", "-d", f"{gateway}/32",
         "-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-j", "ACCEPT",
