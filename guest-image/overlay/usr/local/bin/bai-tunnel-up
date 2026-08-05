@@ -1,5 +1,4 @@
 #!/opt/backend.ai/bin/python
-import ipaddress
 import json
 import os
 import pathlib
@@ -51,7 +50,6 @@ def main():
     api = json.loads((STATE / "profile.json").read_text())["api"]
     own = fetch(api, request["tunnel"])
     directory = fetch(api, request["peers"])
-    base = ipaddress.ip_address(request["base"])
     port = directory["port"]
     peers = directory["peers"]
     mine = next((p for p in peers if p["cluster_idx"] == own["cluster_idx"]), None)
@@ -64,7 +62,7 @@ def main():
         config.append(
             f"[Peer]\nPublicKey = {peer['public_key']}\n"
             f"AllowedIPs = {peer['tunnel_addr']}/32\n"
-            f"Endpoint = {base + peer['cluster_idx']}:{port}\nPersistentKeepalive = 25\n"
+            f"Endpoint = {peer['endpoint']}\nPersistentKeepalive = 25\n"
         )
     run(IP, "link", "add", LINK, "type", "wireguard")
     conf = pathlib.Path("/run/bai-tunnel.conf")

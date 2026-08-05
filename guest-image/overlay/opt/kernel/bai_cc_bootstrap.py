@@ -61,7 +61,6 @@ def tunnel():
     request = {
         "tunnel": os.environ.get("BACKENDAI_CC_TUNNEL_URI", ""),
         "peers": os.environ.get("BACKENDAI_CC_PEERS_URI", ""),
-        "base": os.environ.get("BACKENDAI_CC_TUNNEL_BASE", ""),
     }
     if not request["tunnel"]:
         return
