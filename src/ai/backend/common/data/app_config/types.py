@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import enum
+from dataclasses import dataclass
 
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.common.identifier.app_config import AppConfigScopeID
 
-__all__ = ("AppConfigScopeType",)
+__all__ = (
+    "AppConfigScope",
+    "AppConfigScopeType",
+)
 
 
 class AppConfigScopeType(enum.StrEnum):
@@ -72,3 +76,11 @@ class AppConfigScopeType(enum.StrEnum):
                 return 200
             case AppConfigScopeType.USER:
                 return 300
+
+
+@dataclass(frozen=True)
+class AppConfigScope:
+    """One scope an app config is written at — a kind and the owner it names."""
+
+    scope_type: AppConfigScopeType
+    scope_id: AppConfigScopeID | None

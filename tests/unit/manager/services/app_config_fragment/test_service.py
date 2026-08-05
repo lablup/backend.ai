@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import AppConfigScope, AppConfigScopeType
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
@@ -325,7 +325,7 @@ class TestAppConfigFragmentService:
         case: _RBACScopeCase,
     ) -> None:
         mock_repository.purge_by_config_names = AsyncMock(return_value=[scoped_fragment])
-        scope = AppConfigFragmentSearchScope(scope_type=case.scope_type, scope_id=case.scope_id)
+        scope = AppConfigScope(scope_type=case.scope_type, scope_id=case.scope_id)
 
         result = await service.purge_by_names(
             PurgeAppConfigFragmentsByNamesAction(scope=scope, config_names=["theme"])
