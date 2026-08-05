@@ -24,7 +24,7 @@ LIBRARY_PATH = ":".join([
 ])
 MAPPER = "bai-scratch"
 BLOCK = 4096
-HELPERS = {"nfs4": "mount.nfs4", "ceph": "mount.ceph", "cifs": "mount.cifs"}
+HELPERS = {"nfs": "mount.nfs", "nfs4": "mount.nfs4", "ceph": "mount.ceph", "cifs": "mount.cifs"}
 GOCRYPTFS_FLAGS = ("-raw64", "-hkdf", "-longnames", "-noprealloc", "-allow_other")
 CC_STORAGE_FORMAT = "backend.ai/cc-storage/v1"
 
@@ -114,16 +114,15 @@ def shim_fusermount():
 
 def transport(entry, cipher):
     kind = entry.get("kind")
-    if kind == "nfs":
-        raise Refusal(
-            f"folder {entry['name']} asks for NFSv3, which needs a portmapper this measured"
-            " guest does not run; export it as nfs4"
-        )
     if kind not in HELPERS:
         raise Refusal(f"folder {entry['name']} names transport {kind!r}, which is not baked in")
     options = [entry["options"]] if entry.get("options") else []
     if entry.get("read_only"):
         options.append("ro")
+    if kind == "nfs":
+        # Both mount.nfs and the kernel take the rightmost of lock/nolock, so this has to stay
+        # last: ahead of the operator's options it would let a stray "lock" demand rpc.statd.
+        options.append("nolock")
     argv = [tool(HELPERS[kind]), entry["source"], str(cipher)]
     if options:
         argv += ["-o", ",".join(options)]
@@ -136,7 +135,6 @@ def layer(entry, name, cipher, target, key):
         argv = [tool("bai-storage-fuse"), "-allow-other"]
     elif fmt == "gocryptfs":
         argv = [tool("gocryptfs"), "-masterkey", "stdin", *GOCRYPTFS_FLAGS]
-        shim_fusermount()
     else:
         raise Refusal(
             f"folder {name} is written in {fmt!r},"
@@ -148,6 +146,7 @@ def layer(entry, name, cipher, target, key):
 
 
 def mount_folder(api, scope, entry):
+    shim_fusermount()
     name = entry["name"]
     descriptor = entry.get("encryption")
     if not descriptor:
