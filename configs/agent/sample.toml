@@ -176,21 +176,21 @@
   # are loaded except those in block_compute_plugins. Plugin names use Python
   # package notation (e.g., 'ai.backend.accelerator.cuda').
   # Added in 25.12.0
-  ## allow-compute-plugins = "[\"ai.backend.accelerator.cuda\", \"ai.backend.accelerator.rocm\"]"
+  ## allow-compute-plugins = ["ai.backend.accelerator.cuda", "ai.backend.accelerator.rocm"]
   # Blocklist of compute plugin names that should not be loaded by this agent.
   # Plugins in this list are excluded even if discovered. Use to disable
   # specific accelerators or features on certain nodes.
   # Added in 25.12.0
-  ## block-compute-plugins = "[\"ai.backend.accelerator.mock\"]"
+  ## block-compute-plugins = ["ai.backend.accelerator.mock"]
   # Allowlist of network plugin names that can be loaded by this agent. Network
   # plugins provide custom networking configurations for containers. If set,
   # only plugins in this list are loaded.
   # Added in 25.12.0
-  ## allow-network-plugins = "[\"ai.backend.network.overlay\"]"
+  ## allow-network-plugins = ["ai.backend.network.overlay"]
   # Blocklist of network plugin names that should not be loaded by this agent.
   # Use to disable specific network configurations on certain nodes.
   # Added in 25.12.0
-  ## block-network-plugins = "[\"ai.backend.network.legacy\"]"
+  ## block-network-plugins = ["ai.backend.network.legacy"]
   # Directory path for storing temporary image commit data. Used when users
   # commit their running containers as new images. Requires sufficient disk
   # space for container filesystem layers.
