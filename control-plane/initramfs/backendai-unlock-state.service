@@ -1,9 +1,9 @@
 [Unit]
 Description=Backend.AI attested unlock of the state volume
 DefaultDependencies=no
-After=network-online.target
+After=dracut-initqueue.service network-online.target
 Wants=network-online.target
-Before=initrd-root-device.target sysroot.mount
+Before=initrd.target initrd-parse-etc.service
 Conflicts=shutdown.target initrd-switch-root.target
 
 [Service]

@@ -13,7 +13,6 @@ case "$1" in
 postgres-init)
     require "${CREDENTIALS_DIRECTORY}/password"
     if [ ! -s "${PGDATA}/PG_VERSION" ]; then
-        install -d -m 0700 -o postgres -g postgres "$PGDATA"
         "${PGBIN}/initdb" -D "$PGDATA" --auth-local=scram-sha-256 \
             --auth-host=scram-sha-256 --username=postgres \
             --pwfile="${CREDENTIALS_DIRECTORY}/password" --data-checksums
