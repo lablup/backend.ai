@@ -16,6 +16,13 @@ CAPABILITY_DISCLOSURE = (
     " one: the key broker protocol offers no way to attest a running broker."
 )
 
+METADATA_EGRESS_DISCLOSURE = (
+    "Metadata egress is not a scaling-group setting and takes no session launch flag. The agent"
+    " rejects traffic from the guest bridge to the metadata endpoint and the management networks"
+    " named in its own configuration, which no tenant input reaches, and a launch option naming a"
+    " metadata endpoint is refused rather than accepted and ignored."
+)
+
 NONCE_RESIDUAL_DISCLOSURE = (
     "The launch nonce binds a session with a claim quota equal to its member count. It preserves"
     " cross-session isolation and does not provide member-against-member isolation within a"
@@ -38,7 +45,6 @@ class ConfidentialScalingGroupOpts(BackendAISchema):
     insecure_development: bool = False
     tcb_grace_period: timedelta = timedelta(days=7)
     admission_limit_per_image: int = 1
-    metadata_egress_allowlist: list[str] = Field(default_factory=list)
     folder_key_escrow_path: str = ""
     folder_key_escrow_key: str = ""
     channel_relay_port: int = 6021

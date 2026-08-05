@@ -74,6 +74,7 @@ from .errors import (
     HostConfigReadbackRefused,
     HostLogFolderRefused,
     HostPrivilegeWriteRefused,
+    LaunchOptionRefused,
     ImageDistroUnresolved,
     ImagePushRefused,
     MountPlanMissing,
@@ -109,6 +110,7 @@ KERNELSPEC_LABEL = "ai.backend.coco.kernelspec"
 ACTIVITY_REPORT_INTERVAL = 30.0
 CHANNEL_PORT = 2010
 SELF_ENCRYPTING_SERVICES = frozenset({"sshd", "ssh", "sftp"})
+REFUSED_RESOURCE_OPTS = frozenset({"metadata_egress_allowlist"})
 
 
 @dataclass(frozen=True)
@@ -258,6 +260,12 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
 
     @override
     async def prepare_resource_spec(self) -> tuple[KernelResourceSpec, Mapping[str, Any] | None]:
+        resource_opts = self.kernel_config.get("resource_opts") or {}
+        refused = sorted(
+            key for key in resource_opts if key.replace("-", "_") in REFUSED_RESOURCE_OPTS
+        )
+        if refused:
+            raise LaunchOptionRefused(extra_msg=", ".join(refused))
         slots = ResourceSlot.from_json(self.kernel_config["resource_slots"])
         if SlotName("cpu") not in slots:
             raise UnsupportedResource("cpu slot is required")
@@ -285,7 +293,7 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
             mounts=[],
             scratch_disk_size=0,
         )
-        return resource_spec, self.kernel_config.get("resource_opts", {})
+        return resource_spec, resource_opts
 
     @override
     async def prepare_scratch(self) -> None:
@@ -458,7 +466,8 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
         digest = await self.runtime.resolve_image(image["canonical"], image.get("digest") or "")
         blob = self.blob_store.select(digest)
         cpu_alloc = kernel_obj.resource_spec.allocations.get(DeviceName("cpu"), {})
-        cpuset = ",".join(sorted(str(core) for core in cpu_alloc.get(SlotName("cpu"), {})))
+        cores = cpu_alloc.get(SlotName("cpu"), {})
+        cpuset = ",".join(sorted(str(core) for core in cores))
         confidential = self.internal_data.get("confidential") or {}
         if self.internal_data.get("sudo_session_enabled"):
             raise HostPrivilegeWriteRefused(
@@ -500,6 +509,7 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
                 blob.annotation_value,
                 self.image_ref.canonical,
                 self._guest_base_memory,
+                len(cores) or 1,
             ),
             devices=self._char_devices,
             block_devices=[(v.loop, v.guest_path) for v in self._block_volumes],

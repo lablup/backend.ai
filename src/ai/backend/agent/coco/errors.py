@@ -38,6 +38,11 @@ class SessionCommitRefused(_CocoRefusal):
     error_title = "Session commit is dead: image layers unpack in the guest, never on the host."
 
 
+class LaunchOptionRefused(_CocoRefusal):
+    error_type = _PREFIX + "launch-option-refused"
+    error_title = "Resource options the confidential runtime does not act on are refused, never dropped."
+
+
 class HostFileTransferRefused(_CocoRefusal):
     error_type = _PREFIX + "host-file-transfer-refused"
     error_title = "Host-side file transfer is dead: it becomes an in-guest verb over the channel."
