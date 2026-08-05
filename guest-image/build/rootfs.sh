@@ -136,13 +136,14 @@ stage_storage_clients() {
 	local one
 	one="$(stage_one_root)"
 	local rel
-	for rel in usr/sbin/mount.nfs usr/sbin/mount.nfs4 usr/sbin/mount.ceph usr/sbin/mount.cifs \
+	for rel in usr/sbin/mount.nfs usr/sbin/mount.ceph usr/sbin/mount.cifs \
 		usr/bin/gocryptfs usr/bin/fusermount3 \
 		usr/sbin/cryptsetup usr/sbin/mkfs.ext4; do
 		[ -e "${one}/${rel}" ] || die "stage-one carries no ${rel}"
 		install -D -m 0755 "${one}/${rel}" "${stage}/${rel}"
 		stage_needed_libs "$one" "${one}/${rel}"
 	done
+	ln -sf mount.nfs "${stage}/usr/sbin/mount.nfs4"
 }
 
 stage_fuse_driver() {
