@@ -90,6 +90,9 @@ sed "s|^url = .*|url = \"${BACKENDAI_KBS_URL}\"|" \
     "${REPO}/credential-broker/policy/state-bundle.toml" > "$ROOT/etc/backendai/credential-policy.toml"
 chmod 0644 "$ROOT/etc/backendai/credential-policy.toml"
 install -m 0755 "${TREE}"/bin/* "$ROOT/usr/lib/backendai/"
+rm -f "$ROOT"/usr/lib/systemd/system/backendai-*.service \
+      "$ROOT"/usr/lib/systemd/system/backendai-*.timer \
+      "$ROOT"/etc/systemd/system/*.wants/backendai-*
 install -m 0644 "${TREE}"/units/*.service "${TREE}"/units/*.timer "${TREE}"/units/*.mount \
     "$ROOT/usr/lib/systemd/system/"
 install -m 0644 "${TREE}/units/backendai-state.conf" "$ROOT/usr/lib/tmpfiles.d/"
