@@ -33,9 +33,7 @@ async def my_app_configs(
     info: Info[StrawberryGQLContext],
     config_names: Annotated[
         list[str],
-        strawberry.argument(
-            description=f"Added in {NEXT_RELEASE_VERSION}. Config names to read merges for."
-        ),
+        strawberry.argument(description="Added in 26.9.0. Config names to read merges for."),
     ],
 ) -> list[AppConfigGQL]:
     payload = await info.context.adapters.app_config.my_get_app_configs(
@@ -58,9 +56,7 @@ async def public_app_configs(
     info: Info[StrawberryGQLContext],
     config_names: Annotated[
         list[str],
-        strawberry.argument(
-            description=f"Added in {NEXT_RELEASE_VERSION}. Config names to read merges for."
-        ),
+        strawberry.argument(description="Added in 26.9.0. Config names to read merges for."),
     ],
 ) -> list[AppConfigGQL]:
     payload = await info.context.adapters.app_config.public_get_app_configs(
