@@ -17,6 +17,7 @@ from ai.backend.manager.errors.confidential import BrokerUnreachable
 from ai.backend.manager.metrics.confidential import ConfidentialMetricObserver
 from ai.backend.manager.models.confidential.row import (
     ConfidentialPolicyJournalRow,
+    ConfidentialReferenceValueRow,
     ConfidentialTcbGraceRow,
 )
 from ai.backend.manager.models.scaling_group.types import ConfidentialScalingGroupOpts
@@ -25,16 +26,23 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 CPU_BODY: Final = 'input.submods.cpu0["ear.veraison.annotated-evidence"].tdx.quote.body'
+CPU_STATUS: Final = 'input.submods.cpu0["ear.status"]'
 GPU_EVIDENCE: Final = 'input.submods.gpu0["ear.veraison.annotated-evidence"].nvidia'
 CPU_MEASUREMENT_FIELDS: Final = ("mr_td", "rtmr_1", "rtmr_2", "mr_config_id")
+RVPS_FIELDS: Final = ("mr_td", "rtmr_1", "rtmr_2", "xfam", "tdvfkernel", "tdvfkernelparams")
 
 
 def endpoint_lock_key(endpoint: str) -> int:
     return int.from_bytes(hashlib.sha256(endpoint.encode("utf-8")).digest()[:8], "big") >> 1
 
 
-def _rule(measurements: dict[str, Any]) -> str:
-    lines = [f"    body := {CPU_BODY}"]
+def _rule(measurements: dict[str, Any], statuses: tuple[str, ...]) -> str:
+    if len(statuses) == 1:
+        lines = [f'    {CPU_STATUS} == "{statuses[0]}"']
+    else:
+        allowed = ", ".join(f'"{status}"' for status in statuses)
+        lines = [f"    {CPU_STATUS} in {{{allowed}}}"]
+    lines.append(f"    body := {CPU_BODY}")
     for field in CPU_MEASUREMENT_FIELDS:
         value = measurements.get(field)
         if value:
@@ -49,6 +57,16 @@ def _rule(measurements: dict[str, Any]) -> str:
             lines.append(f'    gpu["{key}"] == {rendered}')
     body = "\n".join(lines)
     return f"allow if {{\n{body}\n}}"
+
+
+def reference_payload(rows: list[ConfidentialReferenceValueRow]) -> bytes:
+    values: dict[str, list[Any]] = {field: [] for field in RVPS_FIELDS}
+    for row in rows:
+        for field in RVPS_FIELDS:
+            value = row.measurements.get(field)
+            if value and value not in values[field]:
+                values[field].append(value)
+    return json.dumps(values, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
 class ReleasePolicyComposer:
@@ -103,6 +121,28 @@ class ReleasePolicyComposer:
         ConfidentialMetricObserver.instance().observe_tcb_grace(opts.broker_endpoint, True)
         return row
 
+    async def enforce_grace_expiry(self, opts: ConfidentialScalingGroupOpts) -> bool:
+        endpoint = opts.broker_endpoint
+        async with self._db.begin_readonly_session() as db_session:
+            row = await db_session.get(ConfidentialTcbGraceRow, endpoint)
+            if row is None or row.resolved_at is not None or row.expires_at > datetime.now(UTC):
+                return False
+            last_upload = await db_session.scalar(
+                sa.select(sa.func.max(ConfidentialPolicyJournalRow.uploaded_at)).where(
+                    ConfidentialPolicyJournalRow.endpoint == endpoint
+                )
+            )
+        if last_upload is not None and last_upload >= row.expires_at:
+            return False
+        await self.compose_and_upload(opts)
+        log.warning(
+            "confidential: trusted-computing-base grace window on {} expired at {};"
+            " a hard-deny release policy is now uploaded",
+            endpoint,
+            row.expires_at,
+        )
+        return True
+
     async def close_grace(self, endpoint: str) -> None:
         async with self._db.begin_session() as db_session:
             row = await db_session.get(ConfidentialTcbGraceRow, endpoint)
@@ -114,10 +154,14 @@ class ReleasePolicyComposer:
         await self._references.close_expired_windows(endpoint)
         grace = await self.grace(endpoint)
         hard_denied = grace is not None and grace.expires_at <= datetime.now(UTC)
+        statuses = ("affirming",) if grace is None else ("affirming", "warning")
         rules = (
             []
             if hard_denied
-            else [_rule(row.measurements) for row in await self._references.admissible(endpoint)]
+            else [
+                _rule(row.measurements, statuses)
+                for row in await self._references.admissible(endpoint)
+            ]
         )
         return "\n\n".join(["package policy", "import rego.v1", "default allow = false", *rules])
 
@@ -135,6 +179,10 @@ class ReleasePolicyComposer:
                 await db_session.flush()
                 journal_id = journal.id
             try:
+                await self._broker.register_reference_value(
+                    BrokerTarget.of(opts),
+                    reference_payload(await self._references.admissible(endpoint)),
+                )
                 await self._broker.upload_release_policy(BrokerTarget.of(opts), document)
             except BrokerUnreachable as e:
                 async with self._db.begin_session() as db_session:
