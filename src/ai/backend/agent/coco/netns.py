@@ -17,6 +17,9 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 RULE_TAG = "bai-coco"
 TUNNEL_SUBNET = ipaddress.IPv4Network("10.252.0.0/16")
 TUNNEL_PORT = 51820
+OUT_CHAIN = "BAIF-OUT"
+IN_CHAIN = "BAIF-IN"
+INPUT_CHAIN = "BAII"
 
 
 @dataclass(frozen=True)
@@ -139,16 +142,21 @@ class SessionNetworkManager:
             for denied in self._config.denied_networks
         ]
 
-    def _forward_rules(self, bridge: str) -> list[str]:
+    def _out_rules(self, bridge: str) -> list[str]:
+        shim = self._config.shim_host
+        return [
+            f"-o {bridge} -s {shim}/32 -j ACCEPT",
+            f"-i {bridge} -o {bridge} -j ACCEPT",
+            f"-o {bridge} -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT",
+            f"-o {bridge} -j DROP",
+        ]
+
+    def _in_rules(self, bridge: str) -> list[str]:
         shim = self._config.shim_host
         return [
             f"-i {bridge} -d {shim}/32 -j ACCEPT",
-            f"-o {bridge} -s {shim}/32 -j ACCEPT",
-            f"-i {bridge} -o {bridge} -j ACCEPT",
             *self._deny_rules(bridge),
             f"-i {bridge} ! -o {bridge} -j ACCEPT",
-            f"-o {bridge} -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT",
-            f"-o {bridge} -j DROP",
         ]
 
     def _input_rules(self, bridge: str) -> list[str]:
@@ -166,14 +174,29 @@ class SessionNetworkManager:
             *self._deny_rules(bridge),
         ]
 
+    async def _ensure_frame(self) -> None:
+        comment = f"-m comment --comment {RULE_TAG}:frame".split()
+        for chain in (OUT_CHAIN, IN_CHAIN, INPUT_CHAIN):
+            await self._run("iptables", "-N", chain, check=False)
+        forward = await self._run("iptables", "-S", "FORWARD", check=False)
+        if f"-j {IN_CHAIN}" not in forward:
+            await self._run("iptables", "-I", "FORWARD", "1", "-j", IN_CHAIN, *comment)
+        if f"-j {OUT_CHAIN}" not in forward:
+            await self._run("iptables", "-I", "FORWARD", "1", "-j", OUT_CHAIN, *comment)
+        incoming = await self._run("iptables", "-S", "INPUT", check=False)
+        if f"-j {INPUT_CHAIN}" not in incoming:
+            await self._run("iptables", "-I", "INPUT", "1", "-j", INPUT_CHAIN, *comment)
+
     async def _install_rules(self, bridge: str, subnet: ipaddress.IPv4Network) -> None:
         comment = f"-m comment --comment {RULE_TAG}:{bridge}".split()
+        await self._ensure_frame()
         for chain, rules in (
-            ("FORWARD", self._forward_rules(bridge)),
-            ("INPUT", self._input_rules(bridge)),
+            (OUT_CHAIN, self._out_rules(bridge)),
+            (IN_CHAIN, self._in_rules(bridge)),
+            (INPUT_CHAIN, self._input_rules(bridge)),
         ):
-            for position, rule in enumerate(rules, start=1):
-                await self._run("iptables", "-I", chain, str(position), *rule.split(), *comment)
+            for rule in rules:
+                await self._run("iptables", "-A", chain, *rule.split(), *comment)
         nat = ["iptables", "-t", "nat", "-I"]
         await self._run(
             *nat, *f"POSTROUTING 1 -s {subnet} ! -o {bridge} -j MASQUERADE".split(), *comment
@@ -266,8 +289,10 @@ class SessionNetworkManager:
             await self._run(
                 "iptables",
                 "-I",
+                OUT_CHAIN,
+                "1",
                 *(
-                    f"FORWARD 1 -o {network.bridge} -d {network.guest_addr}/32"
+                    f"-o {network.bridge} -d {network.guest_addr}/32"
                     f" -p udp --dport {TUNNEL_PORT} -j ACCEPT"
                 ).split(),
                 *comment,
