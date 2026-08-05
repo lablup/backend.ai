@@ -297,8 +297,9 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
         if ClusterMode(cluster_info["mode"]) is ClusterMode.MULTI_NODE:
             raise MultiNodeSessionRefused(extra_msg=str(self.session_id))
+        confidential = self.internal_data.get("confidential") or {}
         self.network = await self.network_manager.create(
-            self.kernel_id, self.session_id, self.kernel_config.get("cluster_idx", 0)
+            self.kernel_id, self.session_id, int(confidential.get("member_idx", 1))
         )
 
     @override

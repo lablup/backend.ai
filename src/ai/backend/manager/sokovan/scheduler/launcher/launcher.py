@@ -651,21 +651,25 @@ class SessionLauncher:
             )
         resources: dict[str, tuple[SessionResourceKind, bytes]] = {}
         identities: dict[KernelId, ChannelIdentity] = {}
+        member_index = {
+            kernel.kernel_id: member_idx
+            for member_idx, kernel in enumerate(
+                sorted(
+                    session.kernels,
+                    key=lambda k: (k.cluster_role != "main", k.cluster_role, k.cluster_idx),
+                ),
+                start=1,
+            )
+        }
         if len(session.kernels) > 1:
             resources.update(
                 tunnel_resources([
                     TunnelMember(
                         kernel.kernel_id,
-                        member_idx,
+                        member_index[kernel.kernel_id],
                         kernel.cluster_hostname or f"{kernel.cluster_role}{kernel.cluster_idx}",
                     )
-                    for member_idx, kernel in enumerate(
-                        sorted(
-                            session.kernels,
-                            key=lambda k: (k.cluster_role != "main", k.cluster_role, k.cluster_idx),
-                        ),
-                        start=1,
-                    )
+                    for kernel in session.kernels
                 ])
             )
         for kernel in session.kernels:
@@ -755,6 +759,7 @@ class SessionLauncher:
                 "residual": provisioning.residual,
                 "tunnel_resource": provisioning.path_of(f"tunnel-{kernel.kernel_id}"),
                 "peers_resource": provisioning.path_of(PEER_DIRECTORY_TAG),
+                "member_idx": member_index[kernel.kernel_id],
             }
             for kernel in session.kernels
         }
