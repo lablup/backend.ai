@@ -160,7 +160,7 @@ class ConfidentialMeasuredBlobRow(Base):  # type: ignore[misc]
     profile_version: Mapped[str] = mapped_column(
         "profile_version", sa.String(length=64), primary_key=True
     )
-    blob_digest: Mapped[str] = mapped_column("blob_digest", sa.String(length=71), nullable=False)
+    blob_digest: Mapped[str] = mapped_column("blob_digest", sa.String(length=96), nullable=False)
     blob: Mapped[bytes] = mapped_column("blob", sa.LargeBinary, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False

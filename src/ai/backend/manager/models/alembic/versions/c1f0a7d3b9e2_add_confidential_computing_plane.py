@@ -120,7 +120,7 @@ def upgrade() -> None:
         sa.Column("endpoint", sa.String(length=1024), primary_key=True),
         sa.Column("image_digest", sa.String(length=256), primary_key=True),
         sa.Column("profile_version", sa.String(length=64), primary_key=True),
-        sa.Column("blob_digest", sa.String(length=71), nullable=False),
+        sa.Column("blob_digest", sa.String(length=96), nullable=False),
         sa.Column("blob", sa.LargeBinary, nullable=False),
         sa.Column(
             "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
