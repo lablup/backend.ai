@@ -106,6 +106,9 @@ class ConfidentialNonceRow(Base):  # type: ignore[misc]
         "profile_version", sa.String(length=64), nullable=False
     )
     quota: Mapped[int] = mapped_column("quota", sa.Integer, nullable=False)
+    reference_value_id: Mapped[uuid.UUID | None] = mapped_column(
+        "reference_value_id", GUID, nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
     )
@@ -128,6 +131,9 @@ class ConfidentialAttestedGuestRow(Base):  # type: ignore[misc]
     __tablename__ = "confidential_attested_guests"
     guest: Mapped[str] = mapped_column("guest", sa.String(length=128), primary_key=True)
     endpoint: Mapped[str] = mapped_column("endpoint", sa.String(length=1024), primary_key=True)
+    reference_value_id: Mapped[uuid.UUID | None] = mapped_column(
+        "reference_value_id", GUID, nullable=True
+    )
     witnessed_at: Mapped[datetime] = mapped_column(
         "witnessed_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
     )
