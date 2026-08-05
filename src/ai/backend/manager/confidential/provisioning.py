@@ -19,6 +19,7 @@ from ai.backend.manager.confidential.shim import AuthorisationShim
 from ai.backend.manager.errors.confidential import BrokerUnreachable
 from ai.backend.manager.metrics.confidential import ConfidentialMetricObserver
 from ai.backend.manager.models.confidential.row import (
+    ConfidentialGuestClaimRow,
     ConfidentialNonceRow,
     ConfidentialSessionResourceRow,
 )
@@ -129,7 +130,6 @@ class SessionResourceProvisioner:
                     image_digest=image_digest,
                     profile_version=profile_version,
                     quota=member_count,
-                    claims_used=0,
                 )
             )
         return SessionProvisioning(
@@ -155,7 +155,7 @@ class SessionResourceProvisioner:
             )
         destroyed = 0
         for row in rows:
-            await self._broker.destroy_resource(target, row.resource_path)
+            await self._broker.destroy_resource(target, row.resource_path, missing_ok=True)
             async with self._db.begin_session() as db_session:
                 await db_session.execute(
                     sa.update(ConfidentialSessionResourceRow)
@@ -166,6 +166,11 @@ class SessionResourceProvisioner:
         async with self._db.begin_session() as db_session:
             await db_session.execute(
                 sa.delete(ConfidentialNonceRow).where(ConfidentialNonceRow.session_id == session_id)
+            )
+            await db_session.execute(
+                sa.delete(ConfidentialGuestClaimRow).where(
+                    ConfidentialGuestClaimRow.session_id == session_id
+                )
             )
         return destroyed
 
@@ -188,7 +193,9 @@ class SessionResourceProvisioner:
             if opts is None:
                 continue
             try:
-                await self._broker.destroy_resource(BrokerTarget.of(opts), row.resource_path)
+                await self._broker.destroy_resource(
+                    BrokerTarget.of(opts), row.resource_path, missing_ok=True
+                )
             except BrokerUnreachable:
                 continue
             async with self._db.begin_session() as db_session:
