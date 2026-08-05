@@ -102,12 +102,6 @@ class SessionResourceProvisioner:
         target = BrokerTarget.of(opts)
         await self._broker.put_resource(target, TIME_RESOURCE, attested_time())
         written: list[tuple[str, SessionResourceKind]] = []
-        for tag, (kind, payload) in resources.items():
-            path = await self._shim.authorise_session_path(
-                domain_name, session_id, nonce, f"{domain_name}/{session_id}.{nonce}/{tag}"
-            )
-            await self._broker.put_resource(target, path, payload)
-            written.append((path, kind))
 
         async def _record(db_session: SASession) -> None:
             for path, kind in written:
@@ -144,7 +138,16 @@ class SessionResourceProvisioner:
                 )
             )
 
-        await self._settle(_record)
+        try:
+            for tag, (kind, payload) in resources.items():
+                path = await self._shim.authorise_session_path(
+                    domain_name, session_id, nonce, f"{domain_name}/{session_id}.{nonce}/{tag}"
+                )
+                await self._broker.put_resource(target, path, payload)
+                written.append((path, kind))
+        finally:
+            if written:
+                await self._settle(_record)
         return SessionProvisioning(
             session_id=session_id,
             nonce=nonce,
