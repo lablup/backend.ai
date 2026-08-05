@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import uuid
 from collections.abc import Awaitable, Callable, Mapping
 from datetime import UTC, datetime
@@ -11,7 +12,17 @@ import sqlalchemy as sa
 
 from ai.backend.common.dto.agent.response import CodeCompletionResp
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.events.event_types.session.anycast import (
+    SessionFailureAnycastEvent,
+    SessionSuccessAnycastEvent,
+)
+from ai.backend.common.events.event_types.session.broadcast import (
+    SessionFailureBroadcastEvent,
+    SessionSuccessBroadcastEvent,
+)
 from ai.backend.common.kernel_runner import (
+    RUN_ID_FOR_BATCH_JOB,
     AbstractCodeRunner,
     ChannelEndpoint,
     ChannelNotEstablished,
@@ -64,6 +75,7 @@ class ConfidentialChannel:
         self._db = db
         self._event_producer = event_producer
         self._runners: dict[KernelId, ChannelCodeRunner] = {}
+        self._batches: set[asyncio.Task[None]] = set()
         self._lock = asyncio.Lock()
 
     async def vouch(self, kernel_id: KernelId) -> ConfidentialChannelRow:
@@ -106,6 +118,7 @@ class ConfidentialChannel:
                     guest_port=row.channel_port,
                     certificate_fingerprint=row.fingerprint,
                     token=row.token,
+                    peer=f"manager process {os.getpid()}",
                 ),
                 client_features=default_client_features,
             )
@@ -119,7 +132,10 @@ class ConfidentialChannel:
             await runner.close()
 
     async def _dialled(
-        self, kernel_id: KernelId, verb: Callable[[ChannelCodeRunner], Awaitable[_T]]
+        self,
+        kernel_id: KernelId,
+        verb: Callable[[ChannelCodeRunner], Awaitable[_T]],
+        retriable: Callable[[], bool] | None = None,
     ) -> _T:
         last: Exception | None = None
         for _ in range(REDIAL_ATTEMPTS):
@@ -129,6 +145,8 @@ class ConfidentialChannel:
             except ChannelNotEstablished as e:
                 last = e
                 await self.release(kernel_id)
+                if retriable is not None and not retriable():
+                    break
                 continue
             await self._record_epoch(kernel_id, runner.epoch)
             return answer
@@ -158,7 +176,10 @@ class ConfidentialChannel:
         api_version: int = default_api_version,
         flush_timeout: float = 2.0,
     ) -> NextResult:
+        fed = False
+
         async def run(runner: ChannelCodeRunner) -> NextResult:
+            nonlocal fed
             await runner.attach_output_queue(run_id)
             match mode:
                 case "query":
@@ -171,9 +192,10 @@ class ConfidentialChannel:
                     pass
                 case _:
                     raise StaleAnswerRefused(extra_msg=f"unknown execution mode {mode!r}")
+            fed = True
             return await runner.get_next_result(api_ver=api_version, flush_timeout=flush_timeout)
 
-        return await self._dialled(kernel_id, run)
+        return await self._dialled(kernel_id, run, lambda: not fed)
 
     async def check_status(self, kernel_id: KernelId) -> dict[str, float]:
         status = await self._dialled(kernel_id, lambda r: r.feed_and_get_status())
@@ -228,6 +250,76 @@ class ConfidentialChannel:
     async def get_logs(self, kernel_id: KernelId) -> dict[str, Any]:
         return await self._dialled(kernel_id, lambda r: r.feed_get_logs())
 
+    def trigger_batch(
+        self,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        startup_command: str,
+        timeout_seconds: float | None,
+    ) -> None:
+        task = asyncio.create_task(
+            self.run_batch(kernel_id, session_id, startup_command, timeout_seconds)
+        )
+        self._batches.add(task)
+        task.add_done_callback(self._batches.discard)
+
+    async def run_batch(
+        self,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        startup_command: str,
+        timeout_seconds: float | None,
+    ) -> None:
+        mode = "batch"
+        opts: dict[str, Any] = {"exec": startup_command}
+        try:
+            async with asyncio.timeout(timeout_seconds):
+                while True:
+                    result = await self.execute(
+                        kernel_id,
+                        RUN_ID_FOR_BATCH_JOB,
+                        mode,
+                        "",
+                        opts=opts,
+                        api_version=3,
+                        flush_timeout=1.0,
+                    )
+                    if result["status"] == "finished":
+                        await self._conclude(session_id, int(result["exitCode"] or 0))
+                        return
+                    if result["status"] == "exec-timeout":
+                        break
+                    mode, opts = "continue", {"exec": ""}
+        except TimeoutError:
+            pass
+        except ChannelNotEstablished as e:
+            log.warning("the batch run of session {} lost its guest channel ({})", session_id, e)
+            await self._conclude(session_id, -1, KernelLifecycleEventReason.SELF_TERMINATED)
+            return
+        await self._conclude(session_id, -2, KernelLifecycleEventReason.TASK_TIMEOUT)
+
+    async def _conclude(
+        self,
+        session_id: SessionId,
+        exit_code: int,
+        reason: KernelLifecycleEventReason = KernelLifecycleEventReason.TASK_FINISHED,
+    ) -> None:
+        if exit_code == 0 and reason is KernelLifecycleEventReason.TASK_FINISHED:
+            await self._event_producer.anycast_and_broadcast_event(
+                SessionSuccessAnycastEvent(session_id, reason, 0),
+                SessionSuccessBroadcastEvent(session_id, reason, 0),
+            )
+            return
+        if reason is KernelLifecycleEventReason.TASK_FINISHED:
+            reason = KernelLifecycleEventReason.TASK_FAILED
+        await self._event_producer.anycast_and_broadcast_event(
+            SessionFailureAnycastEvent(session_id, reason, exit_code),
+            SessionFailureBroadcastEvent(session_id, reason, exit_code),
+        )
+
     async def close(self) -> None:
+        for task in list(self._batches):
+            task.cancel()
+        await asyncio.gather(*self._batches, return_exceptions=True)
         for kernel_id in list(self._runners):
             await self.release(kernel_id)

@@ -7,6 +7,7 @@ and internally dispatch to session-type specific logic.
 from __future__ import annotations
 
 import logging
+import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import override
@@ -21,10 +22,13 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.confidential.tunnel import CONFIDENTIAL_NETWORK_PREFIX
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.confidential.channel import ConfidentialChannel
 from ai.backend.manager.data.sokovan import SessionWithKernels
 from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.errors.resource import AgentNotAllocated
+from ai.backend.manager.models.confidential.row import ConfidentialChannelRow
 from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 
@@ -53,6 +57,8 @@ class RunningHookDependencies:
     """Dependencies for RunningTransitionHook."""
 
     agent_client_pool: AgentClientPool
+    confidential_channel: ConfidentialChannel
+    db: ExtendedAsyncSAEngine
 
 
 class RunningTransitionHook(StatusTransitionHook):
@@ -103,6 +109,14 @@ class RunningTransitionHook(StatusTransitionHook):
             )
 
         session_id = session.session_info.identity.id
+        session_batch_timeout = session.session_info.lifecycle.batch_timeout
+        timeout_seconds = (
+            float(session_batch_timeout) if session_batch_timeout is not None else None
+        )
+        async with self._deps.db.begin_readonly_session() as db_session:
+            confidential = (
+                await db_session.get(ConfidentialChannelRow, uuid.UUID(str(main_kernel.id)))
+            ) is not None
         pool = RecorderContext[SessionId].current_pool()
         recorder = pool.recorder(session_id)
         with recorder.phase(
@@ -113,14 +127,21 @@ class RunningTransitionHook(StatusTransitionHook):
                 "trigger_batch_execution",
                 success_detail=f"Triggered batch execution on agent {agent_id}",
             ):
-                async with self._deps.agent_client_pool.acquire(agent_id) as client:
-                    session_batch_timeout = session.session_info.lifecycle.batch_timeout
-                    await client.trigger_batch_execution(
-                        session_id,
+                if confidential:
+                    self._deps.confidential_channel.trigger_batch(
                         main_kernel.id,
+                        session_id,
                         main_kernel.runtime.startup_command or "",
-                        float(session_batch_timeout) if session_batch_timeout is not None else None,
+                        timeout_seconds,
                     )
+                else:
+                    async with self._deps.agent_client_pool.acquire(agent_id) as client:
+                        await client.trigger_batch_execution(
+                            session_id,
+                            main_kernel.id,
+                            main_kernel.runtime.startup_command or "",
+                            timeout_seconds,
+                        )
         log.info(
             "Successfully triggered batch execution for session {} on agent {}",
             session_id,

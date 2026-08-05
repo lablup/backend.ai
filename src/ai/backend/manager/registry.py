@@ -219,6 +219,7 @@ class AgentRegistry:
     webhook_ptask_group: aiotools.PersistentTaskGroup
     _client_pool: ClientPool
     _agent_client_pool: AgentClientPool
+    _channel: ConfidentialChannel
 
     @staticmethod
     def _mount_entries_from_creation_config(
@@ -1556,6 +1557,10 @@ class AgentRegistry:
             else:
                 pass
 
+    @property
+    def confidential_channel(self) -> ConfidentialChannel:
+        return self._channel
+
     async def _confidential(self, kernel_id: KernelId) -> ConfidentialChannel | None:
         async with self.db.begin_readonly_session() as db_session:
             row = await db_session.get(ConfidentialChannelRow, uuid.UUID(str(kernel_id)))
@@ -1574,6 +1579,7 @@ class AgentRegistry:
             "token": row.token,
             "expires_at": row.expires_at.isoformat(),
             "vouched_by": "manager",
+            "single_consumer": True,
         }
 
     async def execute(
@@ -1623,6 +1629,14 @@ class AgentRegistry:
         session: SessionRow,
     ) -> None:
         async with handle_session_exception("trigger_batch_execution"):
+            if (channel := await self._confidential(session.main_kernel.id)) is not None:
+                channel.trigger_batch(
+                    session.main_kernel.id,
+                    SessionId(session.id),
+                    session.main_kernel.startup_command or "",
+                    float(session.batch_timeout) if session.batch_timeout is not None else None,
+                )
+                return None
             agent_id = session.main_kernel.agent
             if agent_id is None:
                 raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")
@@ -1766,6 +1780,8 @@ class AgentRegistry:
                 if kernel_id is not None
                 else session.main_kernel
             )
+            if (channel := await self._confidential(kernel.id)) is not None:
+                return str((await channel.get_logs(kernel.id))["logs"])
             if kernel.agent is None:
                 raise InstanceNotFound(
                     "Kernel has not been assigned to an agent.", extra_data={"kernel_id": kernel_id}

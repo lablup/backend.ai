@@ -108,7 +108,7 @@ KERNELSPEC_LABEL = "ai.backend.coco.kernelspec"
 
 ACTIVITY_REPORT_INTERVAL = 30.0
 CHANNEL_PORT = 2010
-SELF_ENCRYPTING_SERVICES = frozenset({"sshd"})
+SELF_ENCRYPTING_SERVICES = frozenset({"sshd", "ssh", "sftp"})
 
 
 @dataclass(frozen=True)
@@ -242,6 +242,7 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
         self.network_manager = network_manager
         self.network = None
         self._container_memory = 0
+        self._guest_base_memory = 0
         self._mounts: list[MountSpec] = []
         self._char_devices: list[Path] = []
         self._block_volumes: list[BlockVolume] = []
@@ -266,12 +267,12 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
                 raise FractionalAcceleratorRefused(extra_msg=str(slot_name))
         current_resource_slots.set(known_slot_types)
         slots = slots.normalize_slots(ignore_unknown=True)
-        requested_memory = int(slots[SlotName("mem")])
-        self._container_memory = requested_memory + self.settings.image_memory_allowance
+        self._container_memory = int(slots[SlotName("mem")])
+        self._guest_base_memory = (
+            self.settings.runtime_default_memory + self.settings.image_memory_allowance
+        )
         slots[SlotName("mem")] = Decimal(
-            self.settings.runtime_default_memory
-            + self._container_memory
-            + self.settings.host_overhead_memory
+            self._guest_base_memory + self._container_memory + self.settings.host_overhead_memory
         )
         resource_spec = KernelResourceSpec(
             allocations={},
@@ -493,6 +494,7 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
                 self.settings.blob_annotation_key,
                 blob.annotation_value,
                 self.image_ref.canonical,
+                self._guest_base_memory,
             ),
             devices=self._char_devices,
             block_devices=[(v.loop, v.guest_path) for v in self._block_volumes],

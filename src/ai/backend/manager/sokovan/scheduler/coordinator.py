@@ -1695,7 +1695,7 @@ class ScheduleCoordinator:
             SchedulerTaskSpec(
                 ScheduleType.START,
                 short_interval=2.0,
-                long_interval=300.0,
+                long_interval=900.0,
                 initial_delay=30.0,
             ),
             SchedulerTaskSpec(

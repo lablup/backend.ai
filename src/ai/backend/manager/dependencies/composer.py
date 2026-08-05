@@ -282,6 +282,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 prometheus_client=system.prometheus_client,
                 prometheus_query_preset_repository=domain.repositories.prometheus_query_preset.repository,
                 runtime_variant_repository=domain.repositories.runtime_variant.repository,
+                confidential_channel=agents.registry.confidential_channel,
             ),
         )
 

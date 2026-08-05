@@ -103,6 +103,7 @@ class ChannelEndpoint:
     guest_port: int
     certificate_fingerprint: str
     token: str
+    peer: str = "the manager"
 
 
 class FramedTransport(RunnerTransport):
@@ -151,12 +152,27 @@ class FramedTransport(RunnerTransport):
                     )
                 nonce = secrets.token_hex(32)
                 await _write_frames(
-                    writer, [json.dumps({"token": endpoint.token, "nonce": nonce}).encode("utf-8")]
+                    writer,
+                    [
+                        json.dumps({
+                            "token": endpoint.token,
+                            "nonce": nonce,
+                            "peer": endpoint.peer,
+                        }).encode("utf-8")
+                    ],
                 )
                 hello = json.loads((await _read_frames(reader))[0])
                 if not hello.get("ok"):
                     raise ChannelIdentityRefused(
                         extra_msg=f"the guest refused the dial: {hello.get('error')}"
+                    )
+                if (displaced := hello.get("displaced")) is not None:
+                    log.warning(
+                        "{} took the guest channel of kernel {} away from {}; the guest admits one"
+                        " consumer at a time, so that peer lost whatever it had in flight",
+                        endpoint.peer,
+                        endpoint.kernel_id,
+                        displaced,
                     )
                 epoch = int(hello["epoch"])
                 if epoch <= self._epoch:

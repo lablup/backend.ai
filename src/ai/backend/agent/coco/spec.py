@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 IMAGE_NAME_ANNOTATION = "io.kubernetes.cri.image-name"
+GUEST_MEMORY_ANNOTATION = "io.katacontainers.config.hypervisor.default_memory"
 GUEST_ENTRYPOINT = "/opt/kernel/bai-cc-entrypoint"
 GUEST_MOUNT_CAPABILITY = "SYS_ADMIN"
 
@@ -79,9 +80,10 @@ class ContainerSpec:
 
 
 def build_annotations(
-    blob_annotation_key: str, blob_value: str, image_canonical: str
+    blob_annotation_key: str, blob_value: str, image_canonical: str, guest_base_memory: int
 ) -> dict[str, str]:
     return {
         blob_annotation_key: blob_value,
         IMAGE_NAME_ANNOTATION: image_canonical,
+        GUEST_MEMORY_ANNOTATION: str(guest_base_memory >> 20),
     }

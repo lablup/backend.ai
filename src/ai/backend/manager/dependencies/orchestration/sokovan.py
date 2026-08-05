@@ -20,6 +20,7 @@ from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.confidential.channel import ConfidentialChannel
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
@@ -87,6 +88,7 @@ class SokovanOrchestratorInput:
     # Runtime variant lookup (used by deployment executor to resolve id→name
     # at the AppProxy wire boundary)
     runtime_variant_repository: RuntimeVariantRepository
+    confidential_channel: ConfidentialChannel
 
 
 class SokovanOrchestratorDependency(
@@ -126,6 +128,7 @@ class SokovanOrchestratorDependency(
             setup_input.agent_client_pool,
             setup_input.network_plugin_ctx,
             setup_input.valkey_schedule,
+            setup_input.confidential_channel,
         )
 
         # Create HTTP client pool for deployment operations
