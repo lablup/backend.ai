@@ -32,10 +32,11 @@ def upgrade() -> None:
     )
     op.get_bind().execute(
         sa.text("""
-            UPDATE keypairs k
+            UPDATE keypairs
             SET is_main = true
-            FROM users u
-            WHERE u.main_access_key = k.access_key AND u.uuid = k."user"
+            FROM users
+            WHERE users.main_access_key = keypairs.access_key
+              AND users.uuid = keypairs."user"
         """)
     )
     op.create_index(
