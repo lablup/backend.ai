@@ -137,12 +137,22 @@ class ReferenceValueStore:
             return row
 
     async def sessions_on(self, row: ConfidentialReferenceValueRow) -> list[uuid.UUID]:
+        if any(
+            other.id != row.id
+            and other.image_digest == row.image_digest
+            and other.profile_version == row.profile_version
+            for other in await self.admissible(row.endpoint)
+        ):
+            return []
         async with self._db.begin_readonly_session() as db_session:
             sessions = await db_session.scalars(
-                sa.select(ConfidentialNonceRow.session_id).where(
+                sa.select(ConfidentialNonceRow.session_id)
+                .join(SessionRow, SessionRow.id == ConfidentialNonceRow.session_id)
+                .where(
                     (ConfidentialNonceRow.endpoint == row.endpoint)
                     & (ConfidentialNonceRow.image_digest == row.image_digest)
                     & (ConfidentialNonceRow.profile_version == row.profile_version)
+                    & SessionRow.status.not_in(DEAD_SESSION_STATUSES)
                 )
             )
             return list(sessions.all())

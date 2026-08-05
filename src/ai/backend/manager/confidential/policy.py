@@ -45,7 +45,11 @@ def _rule(measurements: dict[str, Any], statuses: tuple[str, ...]) -> str:
     lines.append(f"    body := {CPU_BODY}")
     for field in CPU_MEASUREMENT_FIELDS:
         value = measurements.get(field)
-        if value:
+        if isinstance(value, list):
+            if value:
+                admitted = ", ".join(json.dumps(entry) for entry in value)
+                lines.append(f"    body.{field} in {{{admitted}}}")
+        elif value:
             lines.append(f'    body.{field} == "{value}"')
     gpu = measurements.get("gpu")
     if isinstance(gpu, dict) and gpu:
@@ -64,8 +68,9 @@ def reference_payload(rows: list[ConfidentialReferenceValueRow]) -> bytes:
     for row in rows:
         for field in RVPS_FIELDS:
             value = row.measurements.get(field)
-            if value and value not in values[field]:
-                values[field].append(value)
+            for entry in value if isinstance(value, list) else [value]:
+                if entry and entry not in values[field]:
+                    values[field].append(entry)
     return json.dumps(values, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 

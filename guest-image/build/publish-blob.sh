@@ -27,6 +27,16 @@ readback="$(cat "$index")"
 verify="sha256:$(sha256_of "${store}/blobs/$(slug "$address")")"
 [ "$verify" = "$address" ] || die "published blob hashes to $verify, indexed as $address"
 
+mixed=""
+for entry in "${store}"/by-image/*; do
+	[ -e "$entry" ] || continue
+	other="$(cat "$entry")"
+	[ "$other" = "$address" ] || mixed="${mixed} $(basename "$entry")=${other}"
+done
+if [ -n "$mixed" ] && [ "${BAI_CC_ALLOW_MIXED:-0}" != "1" ]; then
+	die "the store still indexes${mixed} at another blob; a guest launched from those images would present an mr_config_id this build never registered, so publish this blob for them too, or set BAI_CC_ALLOW_MIXED=1 if their measured configuration is meant to differ"
+fi
+
 log "published $blob"
 log "  content address $address"
 log "  image digest    $image_digest"
