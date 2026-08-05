@@ -27,10 +27,10 @@ __all__ = (
     "AppConfigScopeRef",
     "BulkPurgeAppConfigFragmentInput",
     "MyAppConfigFragmentsByNamesInput",
-    "MyPurgeAppConfigFragmentsByNamesInput",
+    "MyBulkPurgeAppConfigFragmentsByNamesInput",
     "MyUpsertAppConfigFragmentsInput",
     "ScopedAppConfigFragmentsByNamesInput",
-    "ScopedPurgeAppConfigFragmentsByNamesInput",
+    "ScopedBulkPurgeAppConfigFragmentsByNamesInput",
     "ScopedSearchAppConfigFragmentInput",
     "ScopedUpsertAppConfigFragmentsInput",
 )
@@ -82,7 +82,7 @@ class MyAppConfigFragmentsByNamesInput(BaseRequestModel):
     )
 
 
-class ScopedPurgeAppConfigFragmentsByNamesInput(BaseRequestModel):
+class ScopedBulkPurgeAppConfigFragmentsByNamesInput(BaseRequestModel):
     """Purge the fragments written at one scope for the given config names."""
 
     scope: AppConfigScopeRef = Field(description="Scope whose fragments to purge.")
@@ -95,7 +95,7 @@ class ScopedPurgeAppConfigFragmentsByNamesInput(BaseRequestModel):
     )
 
 
-class MyPurgeAppConfigFragmentsByNamesInput(BaseRequestModel):
+class MyBulkPurgeAppConfigFragmentsByNamesInput(BaseRequestModel):
     """Purge the current user's own user-scope fragments for the given config names."""
 
     config_names: list[str] = Field(

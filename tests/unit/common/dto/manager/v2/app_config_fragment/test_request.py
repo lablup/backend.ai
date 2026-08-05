@@ -13,10 +13,10 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AppConfigFragmentUpsertItem,
     AppConfigScopeRef,
     BulkPurgeAppConfigFragmentInput,
-    MyPurgeAppConfigFragmentsByNamesInput,
+    MyBulkPurgeAppConfigFragmentsByNamesInput,
     MyUpsertAppConfigFragmentsInput,
     ScopedAppConfigFragmentsByNamesInput,
-    ScopedPurgeAppConfigFragmentsByNamesInput,
+    ScopedBulkPurgeAppConfigFragmentsByNamesInput,
     ScopedUpsertAppConfigFragmentsInput,
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
@@ -154,7 +154,7 @@ class TestAppConfigFragmentsByNamesInput:
             })
 
 
-class TestScopedPurgeAppConfigFragmentsByNamesInput:
+class TestScopedBulkPurgeAppConfigFragmentsByNamesInput:
     """The scoped purge names the scope like the by-names read does, plus the names to purge."""
 
     @pytest.mark.parametrize(
@@ -167,7 +167,7 @@ class TestScopedPurgeAppConfigFragmentsByNamesInput:
         ids=lambda case: case.scope_type.value,
     )
     def test_scope_id_matching_its_scope_type_is_accepted(self, case: _ScopeCase) -> None:
-        req = ScopedPurgeAppConfigFragmentsByNamesInput(
+        req = ScopedBulkPurgeAppConfigFragmentsByNamesInput(
             scope=AppConfigScopeRef(scope_type=case.scope_type, scope_id=case.scope_id),
             config_names=["theme"],
         )
@@ -177,31 +177,31 @@ class TestScopedPurgeAppConfigFragmentsByNamesInput:
 
     def test_scope_id_disagreeing_with_its_scope_type_is_rejected(self) -> None:
         with pytest.raises(BackendAISchemaValidationFailed):
-            ScopedPurgeAppConfigFragmentsByNamesInput.model_validate({
+            ScopedBulkPurgeAppConfigFragmentsByNamesInput.model_validate({
                 "scope": {"scope_type": AppConfigScopeType.DOMAIN, "scope_id": None},
                 "config_names": ["theme"],
             })
 
     def test_an_empty_batch_is_rejected(self) -> None:
         with pytest.raises(BackendAISchemaValidationFailed):
-            ScopedPurgeAppConfigFragmentsByNamesInput.model_validate({
+            ScopedBulkPurgeAppConfigFragmentsByNamesInput.model_validate({
                 "scope": {"scope_type": AppConfigScopeType.PUBLIC, "scope_id": None},
                 "config_names": [],
             })
 
 
-class TestMyPurgeAppConfigFragmentsByNamesInput:
+class TestMyBulkPurgeAppConfigFragmentsByNamesInput:
     """The self-service purge names configs, not ids, and carries no scope."""
 
     def test_config_names_alone_are_a_complete_body(self) -> None:
-        req = MyPurgeAppConfigFragmentsByNamesInput(config_names=["theme"])
+        req = MyBulkPurgeAppConfigFragmentsByNamesInput(config_names=["theme"])
 
         assert req.config_names == ["theme"]
         assert not hasattr(req, "scope_type")
 
     def test_an_empty_batch_is_rejected(self) -> None:
         with pytest.raises(BackendAISchemaValidationFailed):
-            MyPurgeAppConfigFragmentsByNamesInput.model_validate({"config_names": []})
+            MyBulkPurgeAppConfigFragmentsByNamesInput.model_validate({"config_names": []})
 
 
 class TestBulkPurgeAppConfigFragmentInput:

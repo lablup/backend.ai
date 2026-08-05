@@ -18,7 +18,7 @@ __all__ = (
     "AppConfigFragmentsByNamesPayload",
     "BulkPurgeAppConfigFragmentPayload",
     "PurgeAppConfigFragmentPayload",
-    "PurgeAppConfigFragmentsByNamesPayload",
+    "BulkPurgeAppConfigFragmentsByNamesPayload",
     "SearchAppConfigFragmentPayload",
     "UpsertAppConfigFragmentsPayload",
 )
@@ -54,7 +54,7 @@ class PurgeAppConfigFragmentPayload(BaseResponseModel):
     id: AppConfigFragmentID = Field(description="Id of the purged app config fragment.")
 
 
-class PurgeAppConfigFragmentsByNamesPayload(BaseResponseModel):
+class BulkPurgeAppConfigFragmentsByNamesPayload(BaseResponseModel):
     """Payload for an all-or-nothing purge of the fragments one scope holds for config names."""
 
     items: list[AppConfigFragmentID] = Field(

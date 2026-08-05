@@ -1085,7 +1085,7 @@
         "title": "ScopedAppConfigFragmentsByNamesInput",
         "type": "object"
       },
-      "ScopedPurgeAppConfigFragmentsByNamesInput": {
+      "ScopedBulkPurgeAppConfigFragmentsByNamesInput": {
         "description": "Purge the fragments written at one scope for the given config names.",
         "properties": {
           "scope": {
@@ -1106,7 +1106,7 @@
           "scope",
           "config_names"
         ],
-        "title": "ScopedPurgeAppConfigFragmentsByNamesInput",
+        "title": "ScopedBulkPurgeAppConfigFragmentsByNamesInput",
         "type": "object"
       },
       "AppConfigFragmentUpsertItem": {
@@ -1176,7 +1176,7 @@
         "title": "MyAppConfigFragmentsByNamesInput",
         "type": "object"
       },
-      "MyPurgeAppConfigFragmentsByNamesInput": {
+      "MyBulkPurgeAppConfigFragmentsByNamesInput": {
         "description": "Purge the current user's own user-scope fragments for the given config names.",
         "properties": {
           "config_names": {
@@ -1192,7 +1192,7 @@
         "required": [
           "config_names"
         ],
-        "title": "MyPurgeAppConfigFragmentsByNamesInput",
+        "title": "MyBulkPurgeAppConfigFragmentsByNamesInput",
         "type": "object"
       },
       "MyUpsertAppConfigFragmentsInput": {
@@ -42042,7 +42042,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ScopedPurgeAppConfigFragmentsByNamesInput"
+                "$ref": "#/components/schemas/ScopedBulkPurgeAppConfigFragmentsByNamesInput"
               }
             }
           }
@@ -42129,7 +42129,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/MyPurgeAppConfigFragmentsByNamesInput"
+                "$ref": "#/components/schemas/MyBulkPurgeAppConfigFragmentsByNamesInput"
               }
             }
           }

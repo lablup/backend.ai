@@ -16,10 +16,10 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AppConfigFragmentUpsertItem,
     BulkPurgeAppConfigFragmentInput,
     MyAppConfigFragmentsByNamesInput,
-    MyPurgeAppConfigFragmentsByNamesInput,
+    MyBulkPurgeAppConfigFragmentsByNamesInput,
     MyUpsertAppConfigFragmentsInput,
     ScopedAppConfigFragmentsByNamesInput,
-    ScopedPurgeAppConfigFragmentsByNamesInput,
+    ScopedBulkPurgeAppConfigFragmentsByNamesInput,
     ScopedSearchAppConfigFragmentInput,
     ScopedUpsertAppConfigFragmentsInput,
 )
@@ -27,8 +27,8 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     AppConfigFragmentBulkErrorInfo,
     AppConfigFragmentNode,
     BulkPurgeAppConfigFragmentPayload,
+    BulkPurgeAppConfigFragmentsByNamesPayload,
     PurgeAppConfigFragmentPayload,
-    PurgeAppConfigFragmentsByNamesPayload,
     SearchAppConfigFragmentPayload,
     UpsertAppConfigFragmentsPayload,
 )
@@ -68,6 +68,9 @@ from ai.backend.manager.services.app_config_fragment.actions.admin_search import
 from ai.backend.manager.services.app_config_fragment.actions.bulk_purge import (
     BulkPurgeAppConfigFragmentAction,
 )
+from ai.backend.manager.services.app_config_fragment.actions.bulk_purge_by_names import (
+    BulkPurgeAppConfigFragmentsByNamesAction,
+)
 from ai.backend.manager.services.app_config_fragment.actions.bulk_upsert import (
     BulkUpsertAppConfigFragmentsAction,
 )
@@ -76,9 +79,6 @@ from ai.backend.manager.services.app_config_fragment.actions.get import (
 )
 from ai.backend.manager.services.app_config_fragment.actions.purge import (
     PurgeAppConfigFragmentAction,
-)
-from ai.backend.manager.services.app_config_fragment.actions.purge_by_names import (
-    PurgeAppConfigFragmentsByNamesAction,
 )
 from ai.backend.manager.services.app_config_fragment.actions.scoped_search import (
     ScopedSearchAppConfigFragmentAction,
@@ -178,9 +178,9 @@ class AppConfigFragmentAdapter(BaseAdapter):
             ],
         )
 
-    async def scoped_purge_app_config_fragments_by_names(
-        self, input: ScopedPurgeAppConfigFragmentsByNamesInput
-    ) -> PurgeAppConfigFragmentsByNamesPayload:
+    async def scoped_bulk_purge_app_config_fragments_by_names(
+        self, input: ScopedBulkPurgeAppConfigFragmentsByNamesInput
+    ) -> BulkPurgeAppConfigFragmentsByNamesPayload:
         """Purge the fragments written at the scope named in ``input`` for ``config_names``.
 
         RBAC-authorized at that scope, so a caller purges only a scope they may write.
@@ -188,16 +188,20 @@ class AppConfigFragmentAdapter(BaseAdapter):
         scope = AppConfigFragmentSearchScope(
             scope_type=input.scope.scope_type, scope_id=input.scope.scope_id
         )
-        action_result = await self._processors.app_config_fragment.purge_by_names.wait_for_complete(
-            PurgeAppConfigFragmentsByNamesAction(scope=scope, config_names=input.config_names)
+        action_result = (
+            await self._processors.app_config_fragment.bulk_purge_by_names.wait_for_complete(
+                BulkPurgeAppConfigFragmentsByNamesAction(
+                    scope=scope, config_names=input.config_names
+                )
+            )
         )
-        return PurgeAppConfigFragmentsByNamesPayload(
+        return BulkPurgeAppConfigFragmentsByNamesPayload(
             items=[fragment.id for fragment in action_result.fragments]
         )
 
-    async def my_purge_app_config_fragments_by_names(
-        self, input: MyPurgeAppConfigFragmentsByNamesInput
-    ) -> PurgeAppConfigFragmentsByNamesPayload:
+    async def my_bulk_purge_app_config_fragments_by_names(
+        self, input: MyBulkPurgeAppConfigFragmentsByNamesInput
+    ) -> BulkPurgeAppConfigFragmentsByNamesPayload:
         """Purge the current user's own ``user``-scope fragments for ``config_names``.
 
         Calls ``current_user()`` internally — the caller does not pass a scope.
@@ -208,10 +212,14 @@ class AppConfigFragmentAdapter(BaseAdapter):
         scope = AppConfigFragmentSearchScope(
             scope_type=AppConfigScopeType.USER, scope_id=AppConfigScopeID(me.user_id)
         )
-        action_result = await self._processors.app_config_fragment.purge_by_names.wait_for_complete(
-            PurgeAppConfigFragmentsByNamesAction(scope=scope, config_names=input.config_names)
+        action_result = (
+            await self._processors.app_config_fragment.bulk_purge_by_names.wait_for_complete(
+                BulkPurgeAppConfigFragmentsByNamesAction(
+                    scope=scope, config_names=input.config_names
+                )
+            )
         )
-        return PurgeAppConfigFragmentsByNamesPayload(
+        return BulkPurgeAppConfigFragmentsByNamesPayload(
             items=[fragment.id for fragment in action_result.fragments]
         )
 
