@@ -8,6 +8,7 @@ returned as ``APIResponse`` objects.
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import uuid
 from http import HTTPStatus
@@ -226,8 +227,8 @@ class VFolderHandler:
         req: RequestCtx,
     ) -> APIResponse:
         params = body.parsed
-        user_role = req.request["user"]["role"]
-        keypair_resource_policy = req.request["keypair"]["resource_policy"]
+        user_role = req.request["user"].role
+        keypair_resource_policy = dataclasses.asdict(req.request["keypair"].resource_policy)
 
         group_id_or_name: str | uuid.UUID | None = None
         if params.group_id is not None:
@@ -387,7 +388,7 @@ class VFolderHandler:
             ctx.user_email,
             ctx.access_key,
         )
-        resource_policy = req.request["keypair"]["resource_policy"]
+        resource_policy = dataclasses.asdict(req.request["keypair"].resource_policy)
 
         result = await self._vfolder.list_hosts.wait_for_complete(
             ListHostsAction(
@@ -534,7 +535,7 @@ class VFolderHandler:
         resolved = await self._vfolder.get_accessible_vfolder.wait_for_complete(
             GetAccessibleVFolderAction(
                 user_uuid=ctx.user_uuid,
-                user_role=req.request["user"]["role"],
+                user_role=req.request["user"].role,
                 domain_name=ctx.user_domain,
                 is_admin=req.request["is_admin"],
                 perm=VFolderPermissionSetAlias.READABLE,
@@ -549,7 +550,7 @@ class VFolderHandler:
             params.id,
         )
 
-        user_role = req.request["user"]["role"]
+        user_role = req.request["user"].role
         vfid = str(VFolderID.from_row(vfolder_row))
 
         result = await self._vfolder.get_quota.wait_for_complete(
@@ -580,7 +581,7 @@ class VFolderHandler:
         resolved = await self._vfolder.get_accessible_vfolder.wait_for_complete(
             GetAccessibleVFolderAction(
                 user_uuid=ctx.user_uuid,
-                user_role=req.request["user"]["role"],
+                user_role=req.request["user"].role,
                 domain_name=ctx.user_domain,
                 is_admin=req.request["is_admin"],
                 perm=VFolderPermissionSetAlias.READABLE,
@@ -597,8 +598,8 @@ class VFolderHandler:
             params.id,
         )
 
-        user_role = req.request["user"]["role"]
-        resource_policy = req.request["keypair"]["resource_policy"]
+        user_role = req.request["user"].role
+        resource_policy = dataclasses.asdict(req.request["keypair"].resource_policy)
         vfid = str(VFolderID.from_row(vfolder_row))
 
         result = await self._vfolder.update_quota.wait_for_complete(
@@ -631,7 +632,7 @@ class VFolderHandler:
         resolved = await self._vfolder.get_accessible_vfolder.wait_for_complete(
             GetAccessibleVFolderAction(
                 user_uuid=ctx.user_uuid,
-                user_role=req.request["user"]["role"],
+                user_role=req.request["user"].role,
                 domain_name=ctx.user_domain,
                 is_admin=req.request["is_admin"],
                 perm=VFolderPermissionSetAlias.READABLE,
@@ -669,7 +670,7 @@ class VFolderHandler:
         resolved = await self._vfolder.get_accessible_vfolder.wait_for_complete(
             GetAccessibleVFolderAction(
                 user_uuid=ctx.user_uuid,
-                user_role=req.request["user"]["role"],
+                user_role=req.request["user"].role,
                 domain_name=ctx.user_domain,
                 is_admin=req.request["is_admin"],
                 perm=VFolderPermissionSetAlias.READABLE,
@@ -828,7 +829,7 @@ class VFolderHandler:
         result = await self._vfolder_file.download_file.wait_for_complete(
             CreateDownloadSessionAction(
                 user_uuid=vfctx.user_uuid,
-                keypair_resource_policy=req.request["keypair"]["resource_policy"],
+                keypair_resource_policy=dataclasses.asdict(req.request["keypair"].resource_policy),
                 vfolder_uuid=row["id"],
                 path=params.path,
                 archive=params.archive,
@@ -863,7 +864,7 @@ class VFolderHandler:
         )
         result = await self._vfolder_file.create_archive_download_session.wait_for_complete(
             CreateArchiveDownloadSessionAction(
-                keypair_resource_policy=req.request["keypair"]["resource_policy"],
+                keypair_resource_policy=dataclasses.asdict(req.request["keypair"].resource_policy),
                 vfolder_uuid=row["id"],
                 files=files,
                 filename=filename,
@@ -895,7 +896,7 @@ class VFolderHandler:
         result = await self._vfolder_file.upload_file.wait_for_complete(
             CreateUploadSessionAction(
                 user_uuid=vfctx.user_uuid,
-                keypair_resource_policy=req.request["keypair"]["resource_policy"],
+                keypair_resource_policy=dataclasses.asdict(req.request["keypair"].resource_policy),
                 vfolder_uuid=row["id"],
                 path=params.path,
                 size=str(params.size),
@@ -929,7 +930,7 @@ class VFolderHandler:
         await self._vfolder_file.rename_file.wait_for_complete(
             RenameFileAction(
                 user_uuid=vfctx.user_uuid,
-                keypair_resource_policy=req.request["keypair"]["resource_policy"],
+                keypair_resource_policy=dataclasses.asdict(req.request["keypair"].resource_policy),
                 vfolder_uuid=row["id"],
                 target_path=params.target_path,
                 new_name=params.new_name,
@@ -1154,7 +1155,7 @@ class VFolderHandler:
         )
         result = await self._vfolder_invite.invite_vfolder.wait_for_complete(
             InviteVFolderAction(
-                keypair_resource_policy=req.request["keypair"]["resource_policy"],
+                keypair_resource_policy=dataclasses.asdict(req.request["keypair"].resource_policy),
                 user_uuid=vfctx.user_uuid,
                 vfolder_uuid=row["id"],
                 mount_permission=perm,
@@ -1281,7 +1282,7 @@ class VFolderHandler:
             ShareVFolderAction(
                 user_uuid=vfctx.user_uuid,
                 vfolder_uuid=row["id"],
-                resource_policy=req.request["keypair"]["resource_policy"],
+                resource_policy=dataclasses.asdict(req.request["keypair"].resource_policy),
                 permission=VFolderPermission(params.permission.value),
                 emails=params.emails,
             )
@@ -1313,7 +1314,7 @@ class VFolderHandler:
             UnshareVFolderAction(
                 user_uuid=vfctx.user_uuid,
                 vfolder_uuid=row["id"],
-                resource_policy=req.request["keypair"]["resource_policy"],
+                resource_policy=dataclasses.asdict(req.request["keypair"].resource_policy),
                 emails=params.emails,
             )
         )
@@ -1331,7 +1332,7 @@ class VFolderHandler:
         req: RequestCtx,
     ) -> APIResponse:
         params = body.parsed
-        resource_policy = req.request["keypair"]["resource_policy"]
+        resource_policy = dataclasses.asdict(req.request["keypair"].resource_policy)
         folder_id = params.vfolder_id
 
         log.info(
@@ -1362,13 +1363,13 @@ class VFolderHandler:
         ctx: UserContext,
         req: RequestCtx,
     ) -> APIResponse:
-        resource_policy = req.request["keypair"]["resource_policy"]
+        resource_policy = dataclasses.asdict(req.request["keypair"].resource_policy)
         folder_name = req.request.match_info["name"]
 
         resolved = await self._vfolder.get_accessible_vfolder.wait_for_complete(
             GetAccessibleVFolderAction(
                 user_uuid=ctx.user_uuid,
-                user_role=req.request["user"]["role"],
+                user_role=req.request["user"].role,
                 domain_name=ctx.user_domain,
                 is_admin=req.request["is_admin"],
                 perm=VFolderPermissionSetAlias.READABLE,
@@ -1411,7 +1412,7 @@ class VFolderHandler:
         resolved = await self._vfolder.get_accessible_vfolder.wait_for_complete(
             GetAccessibleVFolderAction(
                 user_uuid=ctx.user_uuid,
-                user_role=req.request["user"]["role"],
+                user_role=req.request["user"].role,
                 domain_name=ctx.user_domain,
                 is_admin=req.request["is_admin"],
                 perm=VFolderPermissionSetAlias.READABLE,
@@ -1506,7 +1507,7 @@ class VFolderHandler:
             ctx.access_key,
             folder_id,
         )
-        user_role = req.request["user"]["role"]
+        user_role = req.request["user"].role
         if user_role not in (
             UserRole.ADMIN,
             UserRole.SUPERADMIN,

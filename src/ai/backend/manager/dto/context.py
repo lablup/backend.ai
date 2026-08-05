@@ -43,11 +43,11 @@ class UserContext(MiddlewareParam):
     @classmethod
     async def from_request(cls, request: web.Request) -> Self:
         return cls(
-            user_uuid=request["user"]["uuid"],
-            user_email=request["user"]["email"],
-            user_domain=request["user"]["domain_name"],
-            user_role=request["user"]["role"],
-            access_key=request["keypair"]["access_key"],
+            user_uuid=request["user"].uuid,
+            user_email=request["user"].email,
+            user_domain=request["user"].domain_name,
+            user_role=request["user"].role,
+            access_key=request["keypair"].access_key,
             is_admin=request["is_admin"],
             is_superadmin=request["is_superadmin"],
         )
@@ -74,8 +74,8 @@ class VFolderAuthContext(MiddlewareParam):
     @classmethod
     async def from_request(cls, request: web.Request) -> Self:
         return cls(
-            user_uuid=request["user"]["uuid"],
-            user_email=request["user"]["email"],
-            access_key=request["keypair"]["access_key"],
+            user_uuid=request["user"].uuid,
+            user_email=request["user"].email,
+            access_key=request["keypair"].access_key,
             vfolder_row=request["vfolder_row"],
         )

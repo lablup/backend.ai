@@ -8,6 +8,7 @@ extracted by ``_wrap_api_handler`` and responses are returned as
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final
@@ -115,7 +116,7 @@ class ResourceHandler:
         req: RequestCtx,
     ) -> APIResponse:
         params = body.parsed
-        resource_policy = req.request["keypair"]["resource_policy"]
+        resource_policy = dataclasses.asdict(req.request["keypair"].resource_policy)
         log.info(
             "CHECK_PRESETS (ak:{}, g:{}, sg:{})",
             ctx.access_key,

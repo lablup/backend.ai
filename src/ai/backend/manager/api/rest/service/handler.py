@@ -8,6 +8,7 @@ returned as ``APIResponse`` objects.
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final
@@ -364,7 +365,7 @@ class ServiceHandler:
                     domain=params.domain_name,
                     project=validation_result.group_id,
                     resource_group=validation_result.scaling_group,
-                    created_user=request["user"]["uuid"],
+                    created_user=request["user"].uuid,
                     session_owner=validation_result.owner_uuid,
                     created_at=None,
                     revision_history_limit=10,
@@ -479,15 +480,15 @@ class ServiceHandler:
         request = req.request
         log.info(
             "SERVE.SCALE (email:{}, ak:{}, s:{})",
-            request["user"]["email"],
-            request["keypair"]["access_key"],
+            request["user"].email,
+            request["keypair"].access_key,
             path_params.service_id,
         )
 
         action = ScaleServiceReplicasAction(
-            max_session_count_per_model_session=request["user"]["resource_policy"][
-                "max_session_count_per_model_session"
-            ],
+            max_session_count_per_model_session=request[
+                "user"
+            ].resource_policy.max_session_count_per_model_session,
             service_id=path_params.service_id,
             to=params.to,
         )
@@ -647,9 +648,9 @@ class ServiceHandler:
     ) -> ValidateModelServiceActionResult:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
+                requester_access_key=request["keypair"].access_key,
+                requester_role=request["user"].role,
+                requester_domain=request["user"].domain_name,
                 owner_access_key=params.owner_access_key,
             )
         )
@@ -660,10 +661,10 @@ class ServiceHandler:
         action = ValidateModelServiceAction(
             requester_access_key=requester_access_key,
             owner_access_key=owner_access_key,
-            requester_uuid=request["user"]["uuid"],
-            requester_role=request["user"]["role"],
-            requester_domain=request["user"]["domain_name"],
-            keypair_resource_policy=request["keypair"]["resource_policy"],
+            requester_uuid=request["user"].uuid,
+            requester_role=request["user"].role,
+            requester_domain=request["user"].domain_name,
+            keypair_resource_policy=dataclasses.asdict(request["keypair"].resource_policy),
             domain_name=params.domain_name,
             group_name=params.group_name,
             config=ServiceConfig(
@@ -682,9 +683,9 @@ class ServiceHandler:
             ),
             replicas=params.replicas,
             runtime_variant=params.runtime_variant,
-            max_session_count_per_model_session=request["user"]["resource_policy"][
-                "max_session_count_per_model_session"
-            ],
+            max_session_count_per_model_session=request[
+                "user"
+            ].resource_policy.max_session_count_per_model_session,
             owner_access_key_override=AccessKey(params.owner_access_key)
             if params.owner_access_key
             else None,
@@ -783,8 +784,8 @@ class ServiceHandler:
                 resources=params.config.resources,
                 resource_opts=params.config.resource_opts,
             ),
-            request_user_id=request["user"]["uuid"],
-            sudo_session_enabled=request["user"]["sudo_session_enabled"],
+            request_user_id=request["user"].uuid,
+            sudo_session_enabled=request["user"].sudo_session_enabled,
             model_service_prepare_ctx=ModelServicePrepareCtx(
                 model_vfolder_id=validation_result.model_vfolder_id,
                 model_definition_path=validation_result.model_definition_path,
