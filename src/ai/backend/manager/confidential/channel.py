@@ -10,6 +10,7 @@ from typing import Any, Final, TypeVar, override
 
 import sqlalchemy as sa
 
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.dto.agent.response import CodeCompletionResp
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
@@ -33,9 +34,11 @@ from ai.backend.common.kernel_runner import (
     default_api_version,
     default_client_features,
 )
+from ai.backend.common.legacy_inference_env import LegacyInferenceEnvTranslator
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.confidential.row import ConfidentialChannelRow
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -75,7 +78,7 @@ class ConfidentialChannel:
         self._db = db
         self._event_producer = event_producer
         self._runners: dict[KernelId, ChannelCodeRunner] = {}
-        self._batches: set[asyncio.Task[None]] = set()
+        self._driven: set[asyncio.Task[None]] = set()
         self._lock = asyncio.Lock()
 
     async def vouch(self, kernel_id: KernelId) -> ConfidentialChannelRow:
@@ -260,8 +263,8 @@ class ConfidentialChannel:
         task = asyncio.create_task(
             self.run_batch(kernel_id, session_id, startup_command, timeout_seconds)
         )
-        self._batches.add(task)
-        task.add_done_callback(self._batches.discard)
+        self._driven.add(task)
+        task.add_done_callback(self._driven.discard)
 
     async def run_batch(
         self,
@@ -298,6 +301,60 @@ class ConfidentialChannel:
             return
         await self._conclude(session_id, -2, KernelLifecycleEventReason.TASK_TIMEOUT)
 
+    def trigger_model_service(self, kernel_id: KernelId, session_id: SessionId) -> None:
+        task = asyncio.create_task(self.run_model_service(kernel_id, session_id))
+        self._driven.add(task)
+        task.add_done_callback(self._driven.discard)
+
+    async def run_model_service(self, kernel_id: KernelId, session_id: SessionId) -> None:
+        try:
+            await self._serve_models(kernel_id, session_id)
+        except Exception as e:
+            await self._forsake(session_id, f"the model services were not started: {e}")
+
+    async def _serve_models(self, kernel_id: KernelId, session_id: SessionId) -> None:
+        async with self._db.begin_readonly_session() as db_session:
+            kernel = await db_session.get(KernelRow, uuid.UUID(str(kernel_id)))
+        if kernel is None:
+            return
+        inlined = (kernel.internal_data or {}).get("model_definition")
+        if not inlined:
+            await self._forsake(session_id, "no model definition reached the kernel")
+            return
+        definition = ModelDefinition.model_validate(inlined)
+        environ = dict(
+            entry.split("=", 1) for entry in (kernel.environ or []) if "=" in entry
+        )
+        definition = definition.with_args_appended(
+            LegacyInferenceEnvTranslator.to_cli_args(environ)
+        )
+        for model in definition.models:
+            if model.service is None or not model.service.start_command:
+                await self._forsake(
+                    session_id, f"model {model.name} names no service to start"
+                )
+                return
+            log.info(
+                "starting model service {} of kernel {} over the guest channel",
+                model.name,
+                kernel_id,
+            )
+            result = await self.start_model_service(kernel_id, model.model_dump(mode="json"))
+            if result.get("status") == "failed":
+                await self._forsake(
+                    session_id,
+                    f"model {model.name} did not come up: {result.get('error') or 'no detail'}",
+                )
+                return
+
+    async def _forsake(self, session_id: SessionId, detail: str) -> None:
+        log.error("session {} will not serve its models: {}", session_id, detail)
+        reason = KernelLifecycleEventReason.FAILED_TO_START
+        await self._event_producer.anycast_and_broadcast_event(
+            SessionFailureAnycastEvent(session_id, reason, -1),
+            SessionFailureBroadcastEvent(session_id, reason, -1),
+        )
+
     async def _conclude(
         self,
         session_id: SessionId,
@@ -318,8 +375,8 @@ class ConfidentialChannel:
         )
 
     async def close(self) -> None:
-        for task in list(self._batches):
+        for task in list(self._driven):
             task.cancel()
-        await asyncio.gather(*self._batches, return_exceptions=True)
+        await asyncio.gather(*self._driven, return_exceptions=True)
         for kernel_id in list(self._runners):
             await self.release(kernel_id)

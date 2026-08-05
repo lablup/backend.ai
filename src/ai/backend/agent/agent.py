@@ -69,7 +69,6 @@ from ai.backend.agent.errors import (
 )
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.health.heartbeat import HeartbeatTask
-from ai.backend.agent.legacy_inference_env import LegacyInferenceEnvTranslator
 from ai.backend.agent.metrics.metric import (
     StatScope,
     StatTaskObserver,
@@ -178,6 +177,7 @@ from ai.backend.common.json import (
     dump_json_str,
     load_json,
 )
+from ai.backend.common.legacy_inference_env import LegacyInferenceEnvTranslator
 from ai.backend.common.lock import FileLock
 from ai.backend.common.log.types import (
     ContainerLogData,
@@ -3217,7 +3217,18 @@ class AbstractAgent[
                     if relay_addr:
                         kernel_creation_info["channel_relay_addr"] = str(relay_addr)
 
-                    if ctx.kernel_config["cluster_role"] in ("main", "master") and model_definition:
+                    serves_models = (
+                        ctx.kernel_config["cluster_role"] in ("main", "master")
+                        and model_definition is not None
+                    )
+                    if serves_models and kernel_obj.channel_terminated:
+                        log.info(
+                            "create_kernel(kernel:{}, session:{}) leaves the model services to the"
+                            " manager, which holds the guest-terminated channel",
+                            kernel_id,
+                            session_id,
+                        )
+                    elif serves_models and model_definition:
                         populated_models = await self._apply_image_cmd_fallback(
                             model_definition.models,
                             ctx.image_ref.canonical,
@@ -3305,7 +3316,16 @@ class AbstractAgent[
         model: ModelConfig,
     ) -> None:
         log.debug("starting model service of model {}", model.name)
-        result = await kernel_obj.start_model_service(model.model_dump(mode="json"))
+        try:
+            result = await kernel_obj.start_model_service(model.model_dump(mode="json"))
+        except Exception:
+            log.exception(
+                "Model service of model {} could not be requested for kernel {} (session {}).",
+                model.name,
+                kernel_obj.kernel_id,
+                kernel_obj.session_id,
+            )
+            result = {"status": "failed"}
         if result["status"] == "failed":
             log.error(
                 "Model service failed to start for kernel {} (session {}). Destroying kernel.",
