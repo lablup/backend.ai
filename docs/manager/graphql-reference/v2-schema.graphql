@@ -5744,6 +5744,11 @@ type ImageV2 implements Node {
   registryId: UUID!
 
   """
+  Added in 26.9.0. Container registry this image is served from. Returns null if the registry has been removed.
+  """
+  registry: ContainerRegistryV2
+
+  """
   Added in 26.3.0. Timestamp of the most recent session created with this image. Returns null if the image has never been used.
   """
   lastUsed: DateTime
@@ -5868,11 +5873,6 @@ type ImageV2IdentityInfo {
 
   """Image namespace/path within the registry."""
   namespace: String!
-
-  """
-  Registry hostname, including the port when the registry declares one (e.g. 'cr.backend.ai', 'localhost:5000').
-  """
-  registry: String!
 
   """
   Full image tag as written in the image reference (e.g. '3.11-ubuntu20.04-cuda12.1').
