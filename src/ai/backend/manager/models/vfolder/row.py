@@ -469,6 +469,17 @@ class VFolderRow(Base):  # type: ignore[misc]
             encryption_tier=self.encryption_tier,
         )
 
+    @staticmethod
+    def refuse_immutable_updates(values: Mapping[str, Any]) -> None:
+        if "encryption_tier" in values:
+            raise ImmutableEncryptionTier(
+                extra_msg=(
+                    "a folder's encryption tier is fixed when it is created; the folder holds"
+                    " one key and the format carries no re-key, so a tier change would strand"
+                    " every byte already written"
+                )
+            )
+
 
 @sa.event.listens_for(VFolderRow.encryption_tier, "set", active_history=True)
 def _refuse_tier_change(target: VFolderRow, value: Any, previous: Any, _initiator: Any) -> None:

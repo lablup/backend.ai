@@ -230,6 +230,9 @@ async def execute_updater[TRow: Base](
             "Updater only supports single-column primary keys",
         )
     values = updater.spec.build_values()
+    refuse_immutable = getattr(row_class, "refuse_immutable_updates", None)
+    if refuse_immutable is not None:
+        refuse_immutable(values)
 
     if not values:
         # No columns to update: return the current row if it exists so callers can tell
