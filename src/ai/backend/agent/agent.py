@@ -3213,6 +3213,9 @@ class AbstractAgent[
                         "agent_addr": kernel_config["agent_addr"],
                         "attached_devices": attached_devices,
                     }
+                    relay_addr = kernel_obj.data.get("channel_relay_addr")
+                    if relay_addr:
+                        kernel_creation_info["channel_relay_addr"] = str(relay_addr)
 
                     if ctx.kernel_config["cluster_role"] in ("main", "master") and model_definition:
                         populated_models = await self._apply_image_cmd_fallback(
