@@ -388,8 +388,13 @@ class TOMLGenerator:
         """
         type_lower = type_name.lower()
 
-        # List/tuple conversion - parse JSON array string like '["a", "b"]'
-        if "list" in type_lower or "sequence" in type_lower or "tuple" in type_lower:
+        # List/tuple/set conversion - parse JSON array string like '["a", "b"]'
+        if (
+            "list" in type_lower
+            or "sequence" in type_lower
+            or "tuple" in type_lower
+            or "set" in type_lower  # set[str], frozenset[str]
+        ):
             if example.startswith("["):
                 try:
                     return json.loads(example)

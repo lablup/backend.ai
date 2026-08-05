@@ -252,12 +252,12 @@
   # exactly which plugins are active in production. Leave as None to load all
   # available plugins except disabled_plugins.
   # Added in 25.8.0
-  ## allowed-plugins = "[\"example.plugin.what.you.want\"]"
+  ## allowed-plugins = ["example.plugin.what.you.want"]
   # List of plugins to explicitly disable (blacklist). These plugins won't be
   # loaded even if they're installed. Useful for disabling problematic or
   # unwanted plugins without uninstalling.
   # Added in 25.8.0
-  ## disabled-plugins = "[\"example.plugin.what.you.want\"]"
+  ## disabled-plugins = ["example.plugin.what.you.want"]
   # Whether to hide detailed agent information in API responses. When enabled,
   # agent details are obscured in user-facing APIs. Recommended for multi-tenant
   # environments to improve security and privacy.
