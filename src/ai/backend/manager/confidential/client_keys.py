@@ -5,8 +5,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Final, Protocol
 
-import sqlalchemy as sa
-
 from ai.backend.common.cc_storage import (
     CAPABILITY_HEADER,
     FORMAT_ID,
@@ -14,13 +12,12 @@ from ai.backend.common.cc_storage import (
     TIER_DISCLOSURE,
     FolderKeyMaterial,
 )
-from ai.backend.manager.confidential.storage import FolderKeyCustodian
-from ai.backend.manager.errors.confidential import ClientFormatRefused, ReleaseDenied
-from ai.backend.manager.models.confidential.row import ConfidentialClientReleaseRow
-from ai.backend.manager.models.scaling_group.row import (
-    ScalingGroupForDomainRow,
-    ScalingGroupRow,
+from ai.backend.manager.confidential.storage import FolderKeyCustodian, opts_for_domain
+from ai.backend.manager.errors.confidential import (
+    ClientFormatRefused,
+    CrossDomainFolderKeyRefused,
 )
+from ai.backend.manager.models.confidential.row import ConfidentialClientReleaseRow
 from ai.backend.manager.models.scaling_group.types import ConfidentialScalingGroupOpts
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -92,26 +89,7 @@ class ClientKeyRelease:
         self._custody = custody
 
     async def opts_for_domain(self, domain_name: str) -> ConfidentialScalingGroupOpts:
-        async with self._db.begin_readonly_session() as db_session:
-            rows = (
-                await db_session.scalars(
-                    sa.select(ScalingGroupRow)
-                    .join(
-                        ScalingGroupForDomainRow,
-                        ScalingGroupForDomainRow.scaling_group == ScalingGroupRow.name,
-                    )
-                    .where(ScalingGroupForDomainRow.domain == domain_name)
-                )
-            ).all()
-        confidential = [row.confidential for row in rows if row.confidential.enabled]
-        if len(confidential) != 1:
-            raise ReleaseDenied(
-                extra_msg=(
-                    f"domain {domain_name} is served by {len(confidential)} confidential scaling"
-                    " groups; a tenant is a domain and must have exactly one"
-                )
-            )
-        return confidential[0]
+        return await opts_for_domain(self._db, domain_name)
 
     async def release(
         self,
@@ -121,9 +99,18 @@ class ClientKeyRelease:
         tier: str,
         requester_id: uuid.UUID,
         requester: str,
+        requester_domain: str,
         session_id: uuid.UUID | None,
         declared_format: str | None,
     ) -> ClientRelease:
+        if requester_domain != domain_name:
+            raise CrossDomainFolderKeyRefused(
+                extra_msg=(
+                    f"{requester} belongs to domain {requester_domain} and folder {vfolder_id}"
+                    f" belongs to domain {domain_name}; a grant across that boundary does not"
+                    " carry the key, and no revocation or re-key exists to undo one that did"
+                )
+            )
         if declared_format != FORMAT_ID:
             raise ClientFormatRefused(
                 extra_msg=(

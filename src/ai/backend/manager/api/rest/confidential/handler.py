@@ -272,6 +272,7 @@ class ConfidentialHandler:
             tier=folder.encryption_tier,
             requester_id=ctx.user_uuid,
             requester=ctx.user_email,
+            requester_domain=ctx.user_domain,
             session_id=body.parsed.session_id,
             declared_format=req.request.headers.get(CAPABILITY_HEADER),
         )
