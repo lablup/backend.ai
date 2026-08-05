@@ -136,10 +136,9 @@ stage_storage_clients() {
 	local one
 	one="$(stage_one_root)"
 	local rel
-	for rel in usr/sbin/mount.nfs4 usr/sbin/mount.ceph usr/sbin/mount.cifs \
-		usr/sbin/integritysetup usr/sbin/losetup usr/sbin/resize2fs \
+	for rel in usr/sbin/mount.nfs usr/sbin/mount.nfs4 usr/sbin/mount.ceph usr/sbin/mount.cifs \
 		usr/bin/gocryptfs usr/bin/fusermount3 \
-		usr/sbin/cryptsetup usr/sbin/dmsetup usr/sbin/mkfs.ext4 usr/sbin/blkid; do
+		usr/sbin/cryptsetup usr/sbin/mkfs.ext4; do
 		[ -e "${one}/${rel}" ] || die "stage-one carries no ${rel}"
 		install -D -m 0755 "${one}/${rel}" "${stage}/${rel}"
 		stage_needed_libs "$one" "${one}/${rel}"
@@ -184,9 +183,11 @@ stage_overlay() {
 		"${stage}/opt/kernel/bai-cc-entrypoint" "${stage}/usr/local/bin/bai-guest-boot" \
 		"${stage}/opt/kernel/bai-guest-storage" \
 		"${stage}/usr/local/bin/bai-tunnel-up" "${stage}/opt/kernel/bai-tunnel-bench"
-	install -d -m 0755 "${stage}/usr/lib/systemd/system/multi-user.target.wants"
-	ln -sf ../bai-guest-boot.service "${stage}/usr/lib/systemd/system/multi-user.target.wants/bai-guest-boot.service"
-	ln -sf ../bai-tunnel-up.path "${stage}/usr/lib/systemd/system/multi-user.target.wants/bai-tunnel-up.path"
+	rm -rf "${stage}/usr/lib/systemd" "${stage}/etc/dcgm-exporter"
+	rm -f "${stage}/usr/sbin/ntpd"
+	rm -f "${stage}/etc/kata-opa/allow-all.rego" "${stage}/etc/kata-opa/default-policy.rego"
+	install -D -m 0644 "${BAI_CC_ROOT}/policy/deny-all.rego" \
+		"${stage}/etc/kata-opa/default-policy.rego"
 	rm -f "${stage}"/opt/kernel/libbaihook.*.so "${stage}"/opt/kernel/jail.*.bin
 }
 

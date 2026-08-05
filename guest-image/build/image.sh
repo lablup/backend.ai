@@ -53,9 +53,10 @@ printf 'root_hash=%s,salt=%s,data_blocks=%s,data_block_size=%s,hash_block_size=%
 	"$root_hash" "${BAI_CC_VERITY_SALT}" "$data_blocks" "$bs" "$bs" \
 	> "${BAI_CC_OUT}/kernel_verity_params.txt"
 
-kernel="$(find "${BAI_CC_KATA_SRC}/tools/packaging/kata-deploy/local-build/build" \
-	-name 'vmlinuz*.container' -print -quit)"
-[ -n "$kernel" ] && cp -f "$kernel" "${BAI_CC_OUT}/vmlinuz.container"
+kernel="$(find "${BAI_CC_KATA_SRC}/tools/packaging/kata-deploy/local-build/build/kernel-${BAI_CC_KERNEL_FLAVOUR}" \
+	-name 'vmlinuz*.container' -print -quit 2>/dev/null)"
+[ -n "$kernel" ] || die "no vmlinuz*.container under kernel-${BAI_CC_KERNEL_FLAVOUR}"
+cp -f "$kernel" "${BAI_CC_OUT}/vmlinuz.container"
 
 log "image $(sha256_of "$image")"
 log "$(cat "${BAI_CC_OUT}/kernel_verity_params.txt")"

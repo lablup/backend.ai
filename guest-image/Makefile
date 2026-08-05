@@ -30,7 +30,7 @@ verify:
 	for f in $(BUILD)/*.sh; do bash -n "$$f" || exit 1; done
 	bash -n overlay/opt/kernel/bai-cc-entrypoint
 	python3 -m py_compile overlay/opt/kernel/bai_cc_bootstrap.py overlay/usr/local/bin/bai-guest-boot \
-		overlay/usr/local/bin/bai-integrity-mount overlay/opt/kernel/bai-guest-storage
+		overlay/usr/local/bin/bai-tunnel-up overlay/opt/kernel/bai-guest-storage
 
 clean:
 	rm -rf $(OUT)
