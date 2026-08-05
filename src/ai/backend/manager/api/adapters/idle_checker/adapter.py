@@ -10,6 +10,7 @@ from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
+    MetricLabel,
     NetworkTimeoutSpec,
     SessionLifetimeSpec,
     UtilizationSpec,
@@ -233,8 +234,8 @@ class IdleCheckerAdapter(BaseAdapter):
                             preset_id=utilization.threshold.preset_id,
                             threshold=utilization.threshold.threshold,
                             filter_labels=[
-                                MetricLabelEntryInfo(key=key, value=value)
-                                for key, value in utilization.threshold.filter_labels.items()
+                                MetricLabelEntryInfo(key=label.key, value=label.value)
+                                for label in utilization.threshold.filter_labels
                             ],
                             group_labels=utilization.threshold.group_labels,
                         ),
@@ -267,9 +268,10 @@ class IdleCheckerAdapter(BaseAdapter):
                 threshold=UtilizationThresholdEntry(
                     preset_id=utilization.threshold.preset_id,
                     threshold=utilization.threshold.threshold,
-                    filter_labels={
-                        entry.key: entry.value for entry in utilization.threshold.filter_labels
-                    },
+                    filter_labels=[
+                        MetricLabel(key=entry.key, value=entry.value)
+                        for entry in utilization.threshold.filter_labels
+                    ],
                     group_labels=utilization.threshold.group_labels,
                 ),
             ),

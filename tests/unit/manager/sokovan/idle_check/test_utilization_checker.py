@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
+    MetricLabel,
     SessionLifetimeSpec,
     UtilizationSpec,
     UtilizationThresholdEntry,
@@ -80,6 +81,34 @@ class TestUtilizationSpec:
                 ),
             )
 
+    def test_rejects_duplicate_filter_label_keys(self) -> None:
+        with pytest.raises(ValidationError):
+            UtilizationThresholdEntry(
+                preset_id=PrometheusQueryPresetID(uuid4()),
+                threshold=Decimal("10"),
+                filter_labels=[
+                    MetricLabel(key="container_metric_name", value="cpu_util"),
+                    MetricLabel(key="container_metric_name", value="mem"),
+                ],
+            )
+
+    def test_query_key_canonicalizes_label_order(self) -> None:
+        preset_id = PrometheusQueryPresetID(uuid4())
+
+        def entry(filter_order: list[tuple[str, str]], group: list[str]) -> SessionUtilizationQuery:
+            return SessionUtilizationQuery.from_threshold(
+                UtilizationThresholdEntry(
+                    preset_id=preset_id,
+                    threshold=Decimal("10"),
+                    filter_labels=[MetricLabel(key=k, value=v) for k, v in filter_order],
+                    group_labels=group,
+                )
+            )
+
+        assert entry([("a", "1"), ("b", "2")], ["session_id", "device"]) == entry(
+            [("b", "2"), ("a", "1")], ["device", "session_id", "device"]
+        )
+
 
 class TestUtilizationChecker:
     @pytest.fixture()
@@ -114,7 +143,10 @@ class TestUtilizationChecker:
                             threshold=UtilizationThresholdEntry(
                                 preset_id=preset_id,
                                 threshold=threshold,
-                                filter_labels=filter_labels or {},
+                                filter_labels=[
+                                    MetricLabel(key=key, value=value)
+                                    for key, value in (filter_labels or {}).items()
+                                ],
                             ),
                         ),
                     ),

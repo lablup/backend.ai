@@ -57,14 +57,17 @@ metric_repository_resilience = Resilience(
 class MetricRepository:
     _prometheus_client: PrometheusClient
     _prometheus_query_preset_db_source: PrometheusQueryPresetDBSource
+    _default_timewindow: str
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
         prometheus_client: PrometheusClient,
+        default_timewindow: str,
     ) -> None:
         self._prometheus_client = prometheus_client
         self._prometheus_query_preset_db_source = PrometheusQueryPresetDBSource(db)
+        self._default_timewindow = default_timewindow
 
     async def query_container_metric_metadata(self) -> list[str]:
         return await self._prometheus_client.fetch_available_container_metric_names()
@@ -181,7 +184,7 @@ class MetricRepository:
                     template=preset.query_template,
                     labels=filter_labels,
                     group_by=set(query.group_labels),
-                    window=preset.time_window or "",
+                    window=preset.time_window or self._default_timewindow,
                 ),
                 time_range=None,
                 time=evaluation_time.isoformat(),

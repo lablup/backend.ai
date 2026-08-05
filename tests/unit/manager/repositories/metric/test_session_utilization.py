@@ -117,6 +117,7 @@ class TestSessionUtilizationMetrics:
             return MetricRepository(
                 db=MagicMock(),
                 prometheus_client=prometheus_client,
+                default_timewindow="30s",
             )
 
     async def test_queries_stored_preset_with_spec_labels(
@@ -153,6 +154,25 @@ class TestSessionUtilizationMetrics:
             time_range=None,
             time=_EVALUATION_TIME.isoformat(),
         )
+
+    async def test_window_falls_back_to_server_default(
+        self,
+        repository: MetricRepository,
+        prometheus_client: MagicMock,
+        preset_db_source: MagicMock,
+        preset: PrometheusQueryPresetData,
+    ) -> None:
+        preset_db_source.search.return_value = _preset_result(replace(preset, time_window=None))
+        query = _query(PrometheusQueryPresetID(preset.id))
+        prometheus_client.execute_preset.return_value = _response([])
+
+        await repository.query_session_utilization_metrics(
+            {query: [SessionId(uuid4())]},
+            _EVALUATION_TIME,
+        )
+
+        sent_preset = prometheus_client.execute_preset.await_args.args[0]
+        assert sent_preset.window == "30s"
 
     async def test_scopes_query_to_deduplicated_session_batch(
         self,

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Self
@@ -32,15 +31,17 @@ class SessionUtilizationQuery:
     """Hashable batching key: one Prometheus query per (preset, labels) combination."""
 
     preset_id: PrometheusQueryPresetID
-    filter_labels: Sequence[tuple[str, str]]
-    group_labels: Sequence[str]
+    filter_labels: tuple[tuple[str, str], ...]
+    group_labels: tuple[str, ...]
 
     @classmethod
     def from_threshold(cls, threshold: UtilizationThresholdEntry) -> Self:
         return cls(
             preset_id=threshold.preset_id,
-            filter_labels=tuple(sorted(threshold.filter_labels.items())),
-            group_labels=tuple(threshold.group_labels),
+            filter_labels=tuple(
+                sorted((label.key, label.value) for label in threshold.filter_labels)
+            ),
+            group_labels=tuple(sorted(set(threshold.group_labels))),
         )
 
 
