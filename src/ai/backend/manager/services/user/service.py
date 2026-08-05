@@ -182,7 +182,9 @@ class UserService:
         user_info_ctx = UserInfoContext(
             uuid=admin_user.uuid,
             email=admin_user.email,
-            main_access_key=AccessKey(admin_user.main_access_key or ""),
+            main_access_key=AccessKey(admin_user.main_access_key)
+            if admin_user.main_access_key
+            else None,
         )
         # Reuse the internal UUID-based purge logic shared with bulk_purge_users
         bulk_action = BulkPurgeUserAction(
@@ -226,6 +228,14 @@ class UserService:
                 "Terminate those kernels first.",
             )
 
+        # Nothing is mutated until the delegation target is known to be usable.
+        delegate_ownership = action.delegate_endpoint_ownership.optional_value()
+        target_main_access_key = action.user_info_ctx.main_access_key
+        if delegate_ownership and target_main_access_key is None:
+            raise UserPurgeFailure(
+                "Cannot delegate endpoint ownership to a user without a main access key.",
+            )
+
         # Handle shared vfolders migration
         if action.purge_shared_vfolders.optional_value():
             await self._user_repository.migrate_shared_vfolders(
@@ -235,11 +245,11 @@ class UserService:
             )
 
         # Handle endpoint ownership delegation
-        if action.delegate_endpoint_ownership.optional_value():
+        if delegate_ownership and target_main_access_key is not None:
             await self._user_repository.delegate_endpoint_ownership(
                 user_uuid=user_uuid,
                 target_user_uuid=action.user_info_ctx.uuid,
-                target_main_access_key=action.user_info_ctx.main_access_key,
+                target_main_access_key=target_main_access_key,
             )
             await self._user_repository.delete_endpoints(
                 user_uuid=user_uuid,
@@ -288,6 +298,14 @@ class UserService:
                 "Terminate those kernels first.",
             )
 
+        # Nothing is mutated until the delegation target is known to be usable.
+        delegate_ownership = action.delegate_endpoint_ownership.optional_value()
+        target_main_access_key = user_info_ctx.main_access_key
+        if delegate_ownership and target_main_access_key is None:
+            raise UserPurgeFailure(
+                "Cannot delegate endpoint ownership to a user without a main access key.",
+            )
+
         # Handle shared vfolders migration
         if action.purge_shared_vfolders.optional_value():
             await self._user_repository.migrate_shared_vfolders(
@@ -297,11 +315,11 @@ class UserService:
             )
 
         # Handle endpoint ownership delegation
-        if action.delegate_endpoint_ownership.optional_value():
+        if delegate_ownership and target_main_access_key is not None:
             await self._user_repository.delegate_endpoint_ownership(
                 user_uuid=user_uuid,
                 target_user_uuid=user_info_ctx.uuid,
-                target_main_access_key=user_info_ctx.main_access_key,
+                target_main_access_key=target_main_access_key,
             )
             await self._user_repository.delete_endpoints(
                 user_uuid=user_uuid,
@@ -338,7 +356,9 @@ class UserService:
         user_info_ctx = UserInfoContext(
             uuid=admin_user.uuid,
             email=admin_user.email,
-            main_access_key=AccessKey(admin_user.main_access_key or ""),
+            main_access_key=AccessKey(admin_user.main_access_key)
+            if admin_user.main_access_key
+            else None,
         )
 
         purged_user_ids: list[UUID] = []

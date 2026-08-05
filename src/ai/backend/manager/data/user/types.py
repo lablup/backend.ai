@@ -57,7 +57,7 @@ class UserStatus(enum.StrEnum):
 class UserInfoContext:
     uuid: UUID
     email: str
-    main_access_key: AccessKey
+    main_access_key: AccessKey | None
 
 
 @dataclass(frozen=True)
