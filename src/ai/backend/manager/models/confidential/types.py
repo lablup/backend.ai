@@ -7,6 +7,7 @@ class ReferenceValueState(enum.StrEnum):
     ACTIVE = "active"
     SUPERSEDED = "superseded"
     RETIRED = "retired"
+    INVALID = "invalid"
 
 
 class DecisionActor(enum.StrEnum):
