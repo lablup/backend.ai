@@ -20,6 +20,7 @@ from sqlalchemy.orm import (
 from sqlalchemy.sql.expression import false, true
 
 from ai.backend.common.auth import PublicKey
+from ai.backend.common.identifier.agent import AgentUUID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SlotName, SlotTypes
 from ai.backend.manager.data.agent.types import (
@@ -67,6 +68,13 @@ __all__: Sequence[str] = (
 class AgentRow(Base):  # type: ignore[misc]
     __tablename__ = "agents"
 
+    uuid: Mapped[AgentUUID] = mapped_column(
+        "uuid",
+        GUID(AgentUUID),
+        unique=True,
+        nullable=False,
+        server_default=sa.text("uuid_generate_v4()"),
+    )
     id: Mapped[str] = mapped_column("id", sa.String(length=64), primary_key=True)
     status: Mapped[AgentStatus] = mapped_column(
         "status", EnumType(AgentStatus), nullable=False, index=True, default=AgentStatus.ALIVE
