@@ -12,12 +12,18 @@ from ai.backend.common.cc_storage import (
     TIER_DISCLOSURE,
     FolderKeyMaterial,
 )
-from ai.backend.manager.confidential.storage import FolderKeyCustodian, opts_for_domain
+from ai.backend.manager.confidential.shim import AuthorisationShim
+from ai.backend.manager.confidential.storage import (
+    FolderKeyCustodian,
+    folder_key_path,
+    opts_for_domain,
+)
 from ai.backend.manager.errors.confidential import (
     ClientFormatRefused,
     CrossDomainFolderKeyRefused,
 )
 from ai.backend.manager.models.confidential.row import ConfidentialClientReleaseRow
+from ai.backend.manager.models.confidential.types import DecisionActor, DecisionVerdict
 from ai.backend.manager.models.scaling_group.types import ConfidentialScalingGroupOpts
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -84,12 +90,30 @@ class ClientRelease:
 
 
 class ClientKeyRelease:
-    def __init__(self, db: ExtendedAsyncSAEngine, custody: FolderKeyCustody) -> None:
+    def __init__(
+        self, db: ExtendedAsyncSAEngine, custody: FolderKeyCustody, shim: AuthorisationShim
+    ) -> None:
         self._db = db
         self._custody = custody
+        self._shim = shim
 
     async def opts_for_domain(self, domain_name: str) -> ConfidentialScalingGroupOpts:
         return await opts_for_domain(self._db, domain_name)
+
+    async def _decide(
+        self,
+        verdict: DecisionVerdict,
+        resource_path: str,
+        session_id: uuid.UUID | None,
+        failing_clause: str | None = None,
+    ) -> None:
+        await self._shim.record(
+            actor=DecisionActor.CLIENT,
+            verdict=verdict,
+            resource_path=resource_path,
+            failing_clause=failing_clause,
+            session_id=session_id,
+        )
 
     async def release(
         self,
@@ -103,21 +127,22 @@ class ClientKeyRelease:
         session_id: uuid.UUID | None,
         declared_format: str | None,
     ) -> ClientRelease:
+        resource_path = folder_key_path(domain_name, vfolder_id)
         if requester_domain != domain_name:
-            raise CrossDomainFolderKeyRefused(
-                extra_msg=(
-                    f"{requester} belongs to domain {requester_domain} and folder {vfolder_id}"
-                    f" belongs to domain {domain_name}; a grant across that boundary does not"
-                    " carry the key, and no revocation or re-key exists to undo one that did"
-                )
+            refusal = (
+                f"{requester} belongs to domain {requester_domain} and folder {vfolder_id}"
+                f" belongs to domain {domain_name}; a grant across that boundary does not"
+                " carry the key, and no revocation or re-key exists to undo one that did"
             )
+            await self._decide(DecisionVerdict.DENIED, resource_path, session_id, refusal)
+            raise CrossDomainFolderKeyRefused(extra_msg=refusal)
         if declared_format != FORMAT_ID:
-            raise ClientFormatRefused(
-                extra_msg=(
-                    f"the caller declared {declared_format!r} in {CAPABILITY_HEADER};"
-                    f" {FORMAT_ID} is required to hold a key for an encrypted folder"
-                )
+            refusal = (
+                f"the caller declared {declared_format!r} in {CAPABILITY_HEADER};"
+                f" {FORMAT_ID} is required to hold a key for an encrypted folder"
             )
+            await self._decide(DecisionVerdict.DENIED, resource_path, session_id, refusal)
+            raise ClientFormatRefused(extra_msg=refusal)
         opts = await self.opts_for_domain(domain_name)
         material = await self._custody.material(opts, domain_name, vfolder_id, tier)
         scope = f"session:{session_id}" if session_id is not None else "client"
@@ -135,6 +160,7 @@ class ClientKeyRelease:
                     expires_at=expires_at,
                 )
             )
+        await self._decide(DecisionVerdict.ALLOWED, resource_path, session_id)
         return ClientRelease(material=material, scope=scope, expires_at=expires_at)
 
 

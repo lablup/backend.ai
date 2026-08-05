@@ -12,6 +12,7 @@ class ReferenceValueState(enum.StrEnum):
 class DecisionActor(enum.StrEnum):
     MANAGER = "manager"
     GUEST = "guest"
+    CLIENT = "client"
 
 
 class DecisionVerdict(enum.StrEnum):
