@@ -70,8 +70,14 @@ def blast(host):
 
 
 def throughput(peer_idx):
-    result = {name: blast(host) for name, host in endpoints(peer_idx).items()}
-    result["cipher_cost"] = 1.0 - result["tunnel"] / result["bridge"]
+    result = {}
+    for name, host in endpoints(peer_idx).items():
+        try:
+            result[name] = blast(host)
+        except OSError as refusal:
+            result[name] = f"{host}: {type(refusal).__name__}: {refusal}"
+    if all(isinstance(rate, float) for rate in result.values()):
+        result["cipher_cost"] = 1.0 - result["tunnel"] / result["bridge"]
     print(json.dumps(result, indent=2))
 
 
