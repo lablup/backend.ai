@@ -278,7 +278,7 @@ class AgentNode(graphene.ObjectType):  # type: ignore[misc]
         last: int | None = None,
     ) -> ConnectionResolverResult[AgentNode]:
         graph_ctx: GraphQueryContext = info.context
-        if graph_ctx.user["role"] != UserRole.SUPERADMIN:
+        if graph_ctx.user.role != UserRole.SUPERADMIN:
             return ConnectionResolverResult([], None, None, None, 0)
         _filter_arg = (
             FilterExprArg(filter_expr, QueryFilterParser(_queryfilter_fieldspec))
@@ -311,10 +311,8 @@ class AgentNode(graphene.ObjectType):  # type: ignore[misc]
         )
         async with graph_ctx.db.connect() as db_conn:
             user = graph_ctx.user
-            if user["role"] != UserRole.SUPERADMIN:
-                client_ctx = ClientContext(
-                    graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
-                )
+            if user.role != UserRole.SUPERADMIN:
+                client_ctx = ClientContext(graph_ctx.db, user.domain_name, user.uuid, user.role)
                 permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope, permission)
                 cond = permission_ctx.query_condition
                 if cond is None:

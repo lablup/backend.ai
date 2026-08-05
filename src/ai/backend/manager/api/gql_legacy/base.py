@@ -535,7 +535,7 @@ def privileged_query(required_role: UserRole) -> Callable[..., Any]:
             from ai.backend.manager.models.user import UserRole
 
             ctx: GraphQueryContext = info.context
-            if ctx.user["role"] != UserRole.SUPERADMIN:
+            if ctx.user.role != UserRole.SUPERADMIN:
                 raise GenericForbidden("superadmin privilege required")
             return await func(root, info, *args, **kwargs)
 
@@ -571,14 +571,14 @@ def scoped_query(
             from ai.backend.manager.models.user import UserRole
 
             ctx: GraphQueryContext = info.context
-            client_role = ctx.user["role"]
+            client_role = ctx.user.role
             if user_key == "access_key":
                 client_user_id = ctx.access_key
             elif user_key == "email":
-                client_user_id = ctx.user["email"]
+                client_user_id = ctx.user.email
             else:
-                client_user_id = ctx.user["uuid"]
-            client_domain = ctx.user["domain_name"]
+                client_user_id = str(ctx.user.uuid)
+            client_domain = ctx.user.domain_name
             domain_name = kwargs.get("domain_name")
             group_id = kwargs.get("group_id") or kwargs.get("project_id")
             user_id = kwargs.get(user_key)
@@ -634,12 +634,12 @@ def privileged_mutation(
             ctx: GraphQueryContext = info.context
             permitted = False
             if required_role == UserRole.SUPERADMIN:
-                if ctx.user["role"] == required_role:
+                if ctx.user.role == required_role:
                     permitted = True
             elif required_role == UserRole.ADMIN:
-                if ctx.user["role"] == UserRole.SUPERADMIN:
+                if ctx.user.role == UserRole.SUPERADMIN:
                     permitted = True
-                elif ctx.user["role"] == UserRole.USER:
+                elif ctx.user.role == UserRole.USER:
                     permitted = False
                 else:
                     if target_func is None:
@@ -654,14 +654,14 @@ def privileged_mutation(
                         )
                     permit_chains = []
                     if target_domain is not None:
-                        if ctx.user["domain_name"] == target_domain:
+                        if ctx.user.domain_name == target_domain:
                             permit_chains.append(True)
                     if target_group is not None:
                         async with ctx.db.begin() as conn:
                             # check if the group is part of the requester's domain.
                             query = groups.select().where(
                                 (groups.c.id == target_group)
-                                & (groups.c.domain_name == ctx.user["domain_name"]),
+                                & (groups.c.domain_name == ctx.user.domain_name),
                             )
                             result = await conn.execute(query)
                             if result.rowcount > 0:

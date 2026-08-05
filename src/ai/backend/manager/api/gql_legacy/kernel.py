@@ -159,7 +159,7 @@ class KernelNode(graphene.ObjectType):  # type: ignore[misc]
     @classmethod
     def from_row(cls, ctx: GraphQueryContext, row: KernelRow) -> Self:
         # TODO: Replace 'hide-agents' option to RBAC
-        is_superadmin = ctx.user["role"] == UserRole.SUPERADMIN
+        is_superadmin = ctx.user.role == UserRole.SUPERADMIN
         if is_superadmin:
             hide_agents = False
         else:
@@ -266,7 +266,7 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
             raise DataTransformationFailed("Kernel row is None")
         from ai.backend.manager.models.user import UserRole
 
-        is_superadmin = ctx.user["role"] == UserRole.SUPERADMIN
+        is_superadmin = ctx.user.role == UserRole.SUPERADMIN
         if is_superadmin:
             hide_agents = False
         else:
@@ -697,7 +697,7 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
         from ai.backend.manager.models.user import UserRole
 
         mega = 2**20
-        is_superadmin = ctx.user["role"] == UserRole.SUPERADMIN
+        is_superadmin = ctx.user.role == UserRole.SUPERADMIN
         if is_superadmin:
             hide_agents = False
         else:
