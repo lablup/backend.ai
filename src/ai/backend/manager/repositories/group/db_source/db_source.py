@@ -17,7 +17,7 @@ from sqlalchemy.engine import CursorResult
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.types import EntityRef, ScopeRef
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.data.permission.types import RBACElementType
@@ -113,6 +113,7 @@ from ai.backend.manager.repositories.ops.rbac.provider import (
     RBACWriteOps,
     ScopeCreation,
     ScopeDeletion,
+    ScopeEntityMember,
     ScopeMember,
 )
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
@@ -183,15 +184,28 @@ class GroupDBSource:
 
         Domain/resource-policy existence and name-uniqueness are enforced by the group
         row's DB constraints, mapped to domain errors via the spec's
-        integrity_error_checks. The domain scope is bound to the new project's virtual
-        scope so domain-scoped permissions reach the project's entities.
+        integrity_error_checks. The new project joins its domain scope as a member.
         """
         spec = cast(GroupCreatorSpec, creator.spec)
         async with self._rbac_ops_provider.write_ops() as w:
             domain_id = await self._get_domain_id(w, spec.domain_name)
             creation = ProjectScopeCreation(spec=spec, domain_id=domain_id)
             domain_scope = ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=domain_id)
-            return (await w.create_scope(creation, bound_scope=domain_scope)).row.to_data()
+            data = (await w.create_scope(creation)).row.to_data()
+            await w.ensure_scope(domain_scope)
+            await w.add_bulk_members(
+                EntityMembersAddition(
+                    scope=domain_scope,
+                    members=[
+                        ScopeEntityMember(
+                            ref=EntityRef(
+                                entity_type=PROJECT_ENTITY_TYPE, entity_id=ProjectID(data.id)
+                            )
+                        )
+                    ],
+                )
+            )
+            return data
 
     async def _get_domain_id(self, w: RBACWriteOps, domain_name: str) -> DomainID:
         result = await w.batch_query_in_global(
@@ -221,7 +235,7 @@ class GroupDBSource:
                 if user_update_mode == "add":
                     await self._add_users_to_project(w, project_id, user_ids)
                 elif user_update_mode == "remove":
-                    await w.remove_entity_members(
+                    await w.remove_bulk_members(
                         ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
                         [
                             EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=uid)
@@ -708,7 +722,7 @@ class GroupDBSource:
             assigned_ids = {row.uuid for row in assigned_rows}
             unassigned_users = [row.to_data() for row in assigned_rows]
 
-            await w.remove_entity_members(
+            await w.remove_bulk_members(
                 ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ProjectID(unbinder.project_id)),
                 [
                     EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=UserID(uid))
@@ -747,7 +761,7 @@ class GroupDBSource:
     async def unbind_user_from_project(self, user_id: UserID, project_id: ProjectID) -> None:
         """Remove a user from a project (membership writes only)."""
         async with self._rbac_ops_provider.write_ops() as w:
-            await w.remove_entity_members(
+            await w.remove_bulk_members(
                 ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
                 [EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=user_id)],
             )
