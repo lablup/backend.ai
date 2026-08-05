@@ -347,12 +347,8 @@ class ExtraVFolderMountInfoGQL:
         BackendAIGQLMeta(
             added_version="26.4.4",
             description=(
-                "The concrete permission snapshot fixed at revision-write time. "
-                "``INHERIT`` policies are resolved against the vfolder's current "
-                "permission at that point, so this value is immutable and does "
-                "not change when the vfolder's permission later changes. ``None`` "
-                "when the caller left it unset to inherit the vfolder's stored "
-                "permission at session-creation time."
+                "The concrete permission snapshot fixed at revision-write time; "
+                "later vfolder permission changes do not retroactively affect it."
             ),
         ),
     )
@@ -437,12 +433,9 @@ class ModelServiceConfigGQL:
         default=None,
     )
     start_command: list[str] | None = gql_field(
-        description=(
-            "Command to start the model service. Do not set together with `command`; when "
-            "both are set, `command` takes precedence and this field is ignored."
-        ),
+        description="Command to start the model service.",
         default=None,
-        deprecation_reason="Deprecated since 26.7.0. Use `command` instead.",
+        deprecation_reason="Use `command` instead.",
     )
     shell: str | None = gql_field(
         description=(
