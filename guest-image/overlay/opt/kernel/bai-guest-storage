@@ -15,6 +15,7 @@ import urllib.request
 STATE = pathlib.Path("/run/backend.ai")
 STAGING = pathlib.Path("/run/bai-storage")
 GUEST = pathlib.Path("/run/bai-guest")
+SHIMS = pathlib.Path("/run/bai-shims")
 LOADER = GUEST / "lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"
 LIBRARY_PATH = ":".join([
     f"{GUEST}/lib/x86_64-linux-gnu",
@@ -23,7 +24,7 @@ LIBRARY_PATH = ":".join([
 ])
 MAPPER = "bai-scratch"
 BLOCK = 4096
-HELPERS = {"nfs": "mount.nfs", "nfs4": "mount.nfs4", "ceph": "mount.ceph", "cifs": "mount.cifs"}
+HELPERS = {"nfs4": "mount.nfs4", "ceph": "mount.ceph", "cifs": "mount.cifs"}
 GOCRYPTFS_FLAGS = ("-raw64", "-hkdf", "-longnames", "-noprealloc", "-allow_other")
 CC_STORAGE_FORMAT = "backend.ai/cc-storage/v1"
 
@@ -53,9 +54,9 @@ def run(argv, stdin=None):
     name = pathlib.Path(argv[0]).name
     note(f"backend.ai confidential storage runs {name}")
     launch = [str(LOADER), "--library-path", LIBRARY_PATH, *argv]
-    result = subprocess.run(
-        launch, input=stdin, capture_output=True, env={**os.environ, "DM_DISABLE_UDEV": "1"}
-    )
+    env = {**os.environ, "DM_DISABLE_UDEV": "1"}
+    env["PATH"] = SHIMS.as_posix() + ":" + env.get("PATH", "")
+    result = subprocess.run(launch, input=stdin, capture_output=True, env=env)
     if result.returncode != 0:
         detail = result.stderr.decode(errors="replace").strip() or f"exit {result.returncode}"
         raise Refusal(f"{name} failed: {detail}")
@@ -99,8 +100,25 @@ def released_key(api, scope, descriptor, subject):
     return key
 
 
+def shim_fusermount():
+    # gocryptfs execs fusermount3 by name with an environment of exactly _FUSE_COMMFD=3, so
+    # neither our loader wrapping nor LD_LIBRARY_PATH reaches it. PATH is the only lever, and
+    # what it finds has to stand on its own.
+    SHIMS.mkdir(mode=0o755, parents=True, exist_ok=True)
+    shim = SHIMS / "fusermount3"
+    shim.write_text(
+        f'#!/bin/sh\nexec {LOADER} --library-path {LIBRARY_PATH} {tool("fusermount3")} "$@"\n'
+    )
+    shim.chmod(0o755)
+
+
 def transport(entry, cipher):
     kind = entry.get("kind")
+    if kind == "nfs":
+        raise Refusal(
+            f"folder {entry['name']} asks for NFSv3, which needs a portmapper this measured"
+            " guest does not run; export it as nfs4"
+        )
     if kind not in HELPERS:
         raise Refusal(f"folder {entry['name']} names transport {kind!r}, which is not baked in")
     options = [entry["options"]] if entry.get("options") else []
@@ -118,6 +136,7 @@ def layer(entry, name, cipher, target, key):
         argv = [tool("bai-storage-fuse"), "-allow-other"]
     elif fmt == "gocryptfs":
         argv = [tool("gocryptfs"), "-masterkey", "stdin", *GOCRYPTFS_FLAGS]
+        shim_fusermount()
     else:
         raise Refusal(
             f"folder {name} is written in {fmt!r},"

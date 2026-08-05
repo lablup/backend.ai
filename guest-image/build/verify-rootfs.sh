@@ -8,7 +8,7 @@ fail=0
 report() { printf '%-6s %s\n' "$1" "$2"; [ "$1" = "ok" ] || fail=1; }
 
 for path in \
-	sbin/mount.nfs sbin/mount.nfs4 sbin/mount.ceph sbin/cryptsetup \
+	sbin/mount.nfs4 sbin/mount.ceph sbin/cryptsetup \
 	sbin/integritysetup sbin/losetup sbin/mkfs.ext4 sbin/resize2fs \
 	usr/local/bin/bai-integrity-mount \
 	usr/bin/gocryptfs usr/bin/fusermount3 usr/bin/kata-agent \
