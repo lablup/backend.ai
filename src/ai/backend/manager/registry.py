@@ -220,6 +220,7 @@ class AgentRegistry:
     _client_pool: ClientPool
     _agent_client_pool: AgentClientPool
     _channel: ConfidentialChannel
+    _docker: aiodocker.Docker | None
 
     @staticmethod
     def _mount_entries_from_creation_config(
@@ -308,7 +309,7 @@ class AgentRegistry:
         manager_secret_key: SecretKey,
     ) -> None:
         self.config_provider = config_provider
-        self.docker = aiodocker.Docker()
+        self._docker = None
         self.db = db
         self.agent_cache = agent_cache
         self._agent_client_pool = agent_client_pool
@@ -329,6 +330,13 @@ class AgentRegistry:
         self.rpc_auth_manager_public_key = manager_public_key
         self.rpc_auth_manager_secret_key = manager_secret_key
         self._client_pool = ClientPool(tcp_client_session_factory)
+
+    @property
+    def docker(self) -> aiodocker.Docker:
+        """Open the local container runtime on first use, since a control plane has none."""
+        if self._docker is None:
+            self._docker = aiodocker.Docker()
+        return self._docker
 
     async def init(self) -> None:
         self.heartbeat_lock = asyncio.Lock()
