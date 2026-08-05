@@ -20,7 +20,7 @@ from ai.backend.common.data.permission.types import (
     ScopeType,
 )
 from ai.backend.common.identifier.user import UserID
-from ai.backend.common.types import ReadableCIDR, ResourceSlot
+from ai.backend.common.types import AccessKey, ReadableCIDR, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.user import (
@@ -99,10 +99,10 @@ class UserWithMarkedKeypair:
     ``ON DELETE SET NULL`` foreign key produced whenever any keypair was deleted.
     """
 
-    user_uuid: uuid.UUID
-    main_access_key: str
+    user_uuid: UserID
+    main_access_key: AccessKey
     main_resource_policy: str
-    secondary_access_key: str
+    secondary_access_key: AccessKey
 
 
 def create_test_password_info(password: str = "test_password") -> PasswordInfo:
@@ -403,10 +403,10 @@ class TestUserRepository:
         """Seed a user with a marked main keypair and a second, unmarked one."""
         main_policy = f"main-kp-policy-{uuid.uuid4().hex[:8]}"
         data = UserWithMarkedKeypair(
-            user_uuid=uuid.uuid4(),
-            main_access_key=f"AKMAIN{uuid.uuid4().hex[:14].upper()}",
+            user_uuid=UserID(uuid.uuid4()),
+            main_access_key=AccessKey(f"AKMAIN{uuid.uuid4().hex[:14].upper()}"),
             main_resource_policy=main_policy,
-            secondary_access_key=f"AKSEC{uuid.uuid4().hex[:15].upper()}",
+            secondary_access_key=AccessKey(f"AKSEC{uuid.uuid4().hex[:15].upper()}"),
         )
         email = f"test-{uuid.uuid4().hex[:8]}@example.com"
         async with db_with_cleanup.begin_session() as session:

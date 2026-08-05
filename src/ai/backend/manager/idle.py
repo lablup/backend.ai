@@ -71,7 +71,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from .defs import DEFAULT_ROLE, LockID
 from .errors.kernel import IdlePolicyNotFound
 from .models.kernel import LIVE_STATUS, kernels
-from .models.keypair import KeyPairRow, keypairs
+from .models.keypair import keypairs
 from .models.resource_policy import keypair_resource_policies
 from .models.user import users
 from .types import DistributedLockFactory
@@ -261,8 +261,8 @@ class IdleCheckerHost:
         errors: list[BaseException] = []
         async with self._db.begin_readonly() as conn:
             j = sa.join(kernels, users, kernels.c.user_uuid == users.c.uuid).outerjoin(
-                KeyPairRow,
-                (KeyPairRow.user == users.c.uuid) & KeyPairRow.is_main,
+                keypairs,
+                (keypairs.c.user == users.c.uuid) & keypairs.c.is_main,
             )
             query = (
                 sa.select(
@@ -276,7 +276,7 @@ class IdleCheckerHost:
                     kernels.c.requested_slots,
                     kernels.c.cluster_size,
                     users.c.created_at.label("user_created_at"),
-                    KeyPairRow.access_key.label("main_access_key"),
+                    keypairs.c.access_key.label("main_access_key"),
                 )
                 .select_from(j)
                 .where(

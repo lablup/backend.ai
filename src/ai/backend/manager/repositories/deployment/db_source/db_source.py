@@ -140,7 +140,7 @@ from ai.backend.manager.models.endpoint import (
 from ai.backend.manager.models.group import GroupRow, groups
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_slot.row import (
     DeploymentRevisionResourceSlotRow,
@@ -2089,14 +2089,14 @@ class DeploymentDBSource:
         # Preference order: the main keypair, then latest created_at,
         # then access_key lexicographic order as a final stable tie-break.
         active_stmt = (
-            sa.select(UserRow, KeyPairRow.access_key)
-            .select_from(sa.join(UserRow, KeyPairRow, UserRow.uuid == KeyPairRow.user))
+            sa.select(UserRow, keypairs.c.access_key)
+            .select_from(sa.join(UserRow, keypairs, UserRow.uuid == keypairs.c.user))
             .where(UserRow.uuid == user_uuid)
-            .where(KeyPairRow.is_active.is_(True))
+            .where(keypairs.c.is_active.is_(True))
             .order_by(
-                KeyPairRow.is_main.desc(),
-                KeyPairRow.created_at.desc(),
-                KeyPairRow.access_key.asc(),
+                keypairs.c.is_main.desc(),
+                keypairs.c.created_at.desc(),
+                keypairs.c.access_key.asc(),
             )
             .limit(1)
         )
