@@ -52,6 +52,9 @@ class ImageNode(BaseResponseModel):
     registry_id: UUID = Field(description="Registry ID")
     project: str | None = Field(default=None, description="Project (namespace) within registry")
     tag: str | None = Field(default=None, description="Image tag")
+    version: str = Field(
+        description="Base version parsed from the tag (e.g. '3.11' for '3.11-ubuntu20.04')"
+    )
     architecture: str = Field(description="Target CPU architecture")
     size_bytes: int = Field(description="Image size in bytes")
     type: ImageTypeEnum = Field(description="Image type category")
@@ -156,6 +159,16 @@ class ImageIdentityInfoDTO(BaseResponseModel):
 
     canonical_name: str = Field(description="Full canonical name of the image.")
     namespace: str = Field(description="Image namespace/path within the registry.")
+    registry: str = Field(
+        description="Registry hostname, including the port when the registry declares one (e.g. 'cr.backend.ai', 'localhost:5000')."
+    )
+    tag: str | None = Field(
+        default=None,
+        description="Full image tag as written in the image reference (e.g. '3.11-ubuntu20.04-cuda12.1').",
+    )
+    version: str = Field(
+        description="Base version parsed from the tag, i.e. the segment before the first platform tag (e.g. '3.11' for '3.11-ubuntu20.04')."
+    )
     architecture: str = Field(description="CPU architecture.")
 
 

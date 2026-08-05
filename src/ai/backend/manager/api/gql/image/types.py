@@ -41,6 +41,7 @@ from ai.backend.common.dto.manager.v2.image.types import (
     ImageResourceLimitGQLInfo,
     ImageTagInfo,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
@@ -186,6 +187,24 @@ class ImageV2IdentityInfoGQL:
     canonical_name: strawberry.auto
     namespace: strawberry.auto
     architecture: strawberry.auto
+    registry: str = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Registry hostname, including the port when the registry declares one (e.g. 'cr.backend.ai', 'localhost:5000').",
+        ),
+    )
+    tag: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Full image tag as written in the image reference (e.g. '3.11-ubuntu20.04-cuda12.1').",
+        ),
+    )
+    version: str = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Base version parsed from the tag, i.e. the segment before the first platform tag (e.g. '3.11' for '3.11-ubuntu20.04').",
+        ),
+    )
 
 
 @gql_pydantic_type(
