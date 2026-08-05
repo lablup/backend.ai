@@ -270,6 +270,7 @@ async def cross_domain_fixture(
 ) -> AsyncIterator[_CrossDomainFixtureData]:
     """Create a second domain with its own domain-admin and regular user."""
     domain_name = f"other-domain-{secrets.token_hex(6)}"
+    domain_id = uuid.uuid4()
     group_id = uuid.uuid4()
     group_name = f"other-group-{secrets.token_hex(6)}"
 
@@ -298,6 +299,7 @@ async def cross_domain_fixture(
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.insert(domains).values(
+                id=domain_id,
                 name=domain_name,
                 description=f"Cross-domain test {domain_name}",
                 is_active=True,
@@ -356,6 +358,7 @@ async def cross_domain_fixture(
                 status=UserStatus.ACTIVE,
                 status_info="admin-requested",
                 domain_name=domain_name,
+                domain_id=domain_id,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.ADMIN,
             )
@@ -396,6 +399,7 @@ async def cross_domain_fixture(
                 status=UserStatus.ACTIVE,
                 status_info="admin-requested",
                 domain_name=domain_name,
+                domain_id=domain_id,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.USER,
             )
