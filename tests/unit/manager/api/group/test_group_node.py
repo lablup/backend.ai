@@ -5,6 +5,7 @@ Tests allowed_vfolder_hosts JSON serialization in CreateGroup mutation.
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 from http import HTTPStatus
 from typing import Any
@@ -16,15 +17,33 @@ import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestClient
 
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import (
     ResourceSlot,
     VFolderHostPermission,
     VFolderHostPermissionMap,
 )
 from ai.backend.manager.api.gql_legacy.group import CreateGroup, GroupNode
+from ai.backend.manager.data.auth.types import AuthenticatedUser
 from ai.backend.manager.data.group.types import GroupData, ProjectType
+from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.group.actions.create_group import CreateGroupActionResult
+
+
+def _authenticated_user(role: UserRole) -> AuthenticatedUser:
+    return AuthenticatedUser(
+        uuid=UserID(uuid.uuid4()),
+        email="test@example.com",
+        role=role,
+        domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
+        sudo_session_enabled=False,
+        main_access_key=None,
+        allowed_client_ip=None,
+        resource_policy=UserResourcePolicyData(name="default"),
+    )
 
 
 class TestCreateGroupMutation:
@@ -80,10 +99,7 @@ class TestCreateGroupMutation:
             return_value=MagicMock(data=domain_data)
         )
         # Required for privileged_mutation decorator
-        ctx.user = {
-            "role": UserRole.SUPERADMIN,
-            "domain_name": "default",
-        }
+        ctx.user = _authenticated_user(UserRole.SUPERADMIN)
         return ctx
 
     @pytest.fixture

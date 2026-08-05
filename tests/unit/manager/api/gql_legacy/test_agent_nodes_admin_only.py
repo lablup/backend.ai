@@ -12,10 +12,28 @@ from unittest.mock import MagicMock
 import graphene
 import pytest
 
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.api.gql_legacy.agent import AgentNode
+from ai.backend.manager.data.auth.types import AuthenticatedUser
 from ai.backend.manager.data.permission.permission_defs import AgentPermission
+from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.models.rbac import SystemScope
 from ai.backend.manager.models.user import UserRole
+
+
+def _authenticated_user(role: UserRole) -> AuthenticatedUser:
+    return AuthenticatedUser(
+        uuid=UserID(uuid.uuid4()),
+        email="test@example.com",
+        role=role,
+        domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
+        sudo_session_enabled=False,
+        main_access_key=None,
+        allowed_client_ip=None,
+        resource_policy=UserResourcePolicyData(name="default"),
+    )
 
 
 class ExpectedResult(Enum):
@@ -28,11 +46,7 @@ class TestAgentNodesAdminOnly:
     def make_info(self) -> Callable[..., MagicMock]:
         def _make(role: UserRole) -> graphene.ResolveInfo:
             ctx = MagicMock()
-            ctx.user = {
-                "role": role,
-                "domain_name": "default",
-                "uuid": uuid.uuid4(),
-            }
+            ctx.user = _authenticated_user(role)
             info = MagicMock(spec=graphene.ResolveInfo)
             info.context = ctx
             return info
