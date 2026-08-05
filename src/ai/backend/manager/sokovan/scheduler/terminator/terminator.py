@@ -77,15 +77,14 @@ class SessionTerminator:
         if not endpoints:
             return
         for session in terminating_sessions:
-            for opts in endpoints.values():
-                try:
-                    await plane.provisioner.teardown(opts, session.session_id)
-                except Exception:
-                    log.exception(
-                        "confidential: session-scoped resources for {} survive teardown and"
-                        " must be swept by the reconciler",
-                        session.session_id,
-                    )
+            try:
+                await plane.provisioner.teardown(endpoints, session.session_id)
+            except Exception:
+                log.exception(
+                    "confidential: session-scoped resources for {} survive teardown and"
+                    " must be swept by the reconciler",
+                    session.session_id,
+                )
 
     async def _terminate_sessions_internal(
         self,

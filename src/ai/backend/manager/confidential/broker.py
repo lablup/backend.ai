@@ -96,15 +96,8 @@ class BrokerClient:
             content_type="application/octet-stream",
         )
 
-    async def destroy_resource(
-        self, target: BrokerTarget, resource_path: str, *, missing_ok: bool = False
-    ) -> None:
-        try:
-            await self._admin(target, f"/kbs/v0/resource/{resource_path}", method="DELETE")
-        except (BrokerRejected, ReleaseDenied):
-            if not missing_ok:
-                raise
-            log.warning("confidential: {} held no {} to destroy", target.endpoint, resource_path)
+    async def destroy_resource(self, target: BrokerTarget, resource_path: str) -> None:
+        await self._admin(target, f"/kbs/v0/resource/{resource_path}", method="DELETE")
 
     async def upload_release_policy(self, target: BrokerTarget, document: str) -> None:
         await self._admin(

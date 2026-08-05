@@ -170,8 +170,9 @@ class ConfidentialHandler:
         row = await self._plane.references.retire(parsed.reference_value_id)
         affected = await self._plane.references.sessions_on(row)
         content_hash = await self._plane.policy.compose_and_upload(opts)
+        endpoints = await self._plane.confidential_endpoints()
         for session_id in affected:
-            await self._plane.provisioner.teardown(opts, session_id)
+            await self._plane.provisioner.teardown(endpoints, session_id)
         return APIResponse.build(
             HTTPStatus.OK,
             _Payload(
