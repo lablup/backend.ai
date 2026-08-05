@@ -1,7 +1,7 @@
 """add client key release audit and the per-folder encryption tier
 
 Revision ID: d2e4a6c80b57
-Revises: d3e1b7a90c4f
+Revises: c1f0a7d3b9e2
 Create Date: 2026-08-04
 
 """
@@ -12,7 +12,7 @@ from alembic import op
 from ai.backend.manager.models.base import GUID
 
 revision = "d2e4a6c80b57"
-down_revision = "d3e1b7a90c4f"
+down_revision = "c1f0a7d3b9e2"
 branch_labels = None
 depends_on = None
 

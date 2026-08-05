@@ -14,19 +14,14 @@ from typing import IO, Final, Protocol, cast, override
 FORMAT_ID: Final = "backend.ai/cc-storage/v1"
 CAPABILITY_HEADER: Final = "X-BackendAI-Storage-Format"
 CONCURRENT_TIER: Final = "concurrent"
-INTEGRITY_TIER: Final = "integrity"
-TIERS: Final = (CONCURRENT_TIER, INTEGRITY_TIER)
-TAMPER_EVIDENT: Final = {CONCURRENT_TIER: False, INTEGRITY_TIER: True}
+TIERS: Final = (CONCURRENT_TIER,)
+TAMPER_EVIDENT: Final = {CONCURRENT_TIER: False}
 TIER_DISCLOSURE: Final = {
     CONCURRENT_TIER: (
         "Content and names are encrypted against the storage operator. Modification of any stored"
         " byte, frame reordering, truncation and extension are detected on read. Deletion of a whole"
         " file, rollback of a whole file to an earlier version, and the shape of the tree are not"
-        " detected."
-    ),
-    INTEGRITY_TIER: (
-        "Content and names are encrypted and the folder is tamper-evident under an exclusive mount"
-        " lease, so only one session may hold it at a time."
+        " detected. No tamper-evident tier is offered."
     ),
 }
 
