@@ -13,6 +13,7 @@ re-export used by rest/etcd/handler.py.
 
 from __future__ import annotations
 
+import dataclasses
 import uuid
 from decimal import Decimal
 from http import HTTPStatus
@@ -375,7 +376,7 @@ class TestCheckPresets:
         call_args = mock_processors.resource_preset.check_presets.wait_for_complete.call_args
         action = call_args[0][0]
         assert action.access_key == "AKTEST"
-        assert action.resource_policy == "default"
+        assert action.resource_policy == dataclasses.asdict(_keypair_resource_policy())
         assert action.domain_name == "default"
         assert action.user_id == user_uuid
         assert action.group == "test-group"
