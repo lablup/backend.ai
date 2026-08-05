@@ -656,10 +656,16 @@ class SessionLauncher:
                 tunnel_resources([
                     TunnelMember(
                         kernel.kernel_id,
-                        kernel.cluster_idx,
+                        member_idx,
                         kernel.cluster_hostname or f"{kernel.cluster_role}{kernel.cluster_idx}",
                     )
-                    for kernel in session.kernels
+                    for member_idx, kernel in enumerate(
+                        sorted(
+                            session.kernels,
+                            key=lambda k: (k.cluster_role != "main", k.cluster_role, k.cluster_idx),
+                        ),
+                        start=1,
+                    )
                 ])
             )
         for kernel in session.kernels:
