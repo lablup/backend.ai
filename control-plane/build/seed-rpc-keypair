@@ -1,0 +1,22 @@
+#!/bin/sh
+set -eu
+
+ARTIFACT=${1:?usage: seed-rpc-keypair <manager-artifact> <output-file>}
+OUT=${2:?usage: seed-rpc-keypair <manager-artifact> <output-file>}
+
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
+
+HOME="$WORK" SCIE_BASE="${WORK}/scie" \
+    "$ARTIFACT" mgr generate-rpc-keypair "$WORK" manager > /dev/null
+install -m 0600 "${WORK}/manager.key_secret" "$OUT"
+
+HOME="$WORK" SCIE_BASE="${WORK}/scie" PEX_INTERPRETER=1 "$ARTIFACT" -c '
+import sys
+from zmq.auth.certs import load_certificate
+public, secret = load_certificate(sys.argv[1])
+if not public or not secret:
+    raise SystemExit("seed-rpc-keypair: the certificate carries no key pair")
+print("seed-rpc-keypair: %s holds a CURVE secret certificate with public key %s"
+      % (sys.argv[1], public.decode()))
+' "$OUT"
