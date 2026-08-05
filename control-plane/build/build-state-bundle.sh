@@ -110,7 +110,7 @@ id -u etcd >/dev/null 2>&1 || useradd --system --home-dir /var/lib/backendai/etc
 id -u valkey >/dev/null 2>&1 || useradd --system --home-dir /var/lib/backendai/valkey --create-home valkey
 install -d -m 0700 -o postgres -g postgres /var/lib/backendai/postgresql
 install -d -m 0750 -o backendai -g backendai /var/lib/backendai/manager /var/lib/backendai/coordinator
-systemctl enable var-log.mount var-lib-backendai.mount \
+systemctl enable tmp.mount var-log.mount var-lib-backendai.mount \
     backendai-credentials.service backendai-postgresql.service \
     backendai-postgresql-bootstrap.service backendai-etcd.service \
     backendai-etcd-bootstrap.service backendai-valkey.service \
@@ -175,6 +175,8 @@ CHECK
     fi
     echo "build-state-bundle: the introspection console survives inside an interpreter binary; the measured configuration switches it off and the artifact honours that switch" >&2
 fi
+[ -L "$ROOT/etc/systemd/system/local-fs.target.wants/tmp.mount" ] ||
+    fail "no writable /tmp is mounted in the image; valkey-glide puts its socket there and would wait on it forever"
 if [ -e "$ROOT/usr/sbin/sshd" ] || [ -e "$ROOT/usr/bin/sshd" ]; then
     fail "a secure shell daemon survived in the image"
 fi
