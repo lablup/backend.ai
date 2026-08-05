@@ -1,0 +1,27 @@
+[Unit]
+Description=Backend.AI confidential bring-up etcd read probe
+Requires=backendai-credentials.service backendai-etcd-bootstrap.service
+After=backendai-credentials.service backendai-etcd-bootstrap.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=backendai
+Group=backendai
+LoadCredential=manager.toml:/run/backendai-credentials.sock
+RuntimeDirectory=backendai/manager
+RuntimeDirectoryPreserve=yes
+WorkingDirectory=/var/lib/backendai/manager
+Environment=HOME=/var/lib/backendai/manager
+Environment=SCIE_BASE=/var/lib/backendai/manager/.scie
+ExecStart=/bin/sh -c 'timeout 120 /usr/lib/backendai/backendai-manager mgr -f ${CREDENTIALS_DIRECTORY}/manager.toml etcd get config; echo "etcdprobe: exit $?"'
+TimeoutStartSec=240
+StandardOutput=journal+console
+StandardError=journal+console
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

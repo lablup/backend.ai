@@ -24,6 +24,11 @@ name = "rpc-keypair"
 resource = "default/control-plane/rpc-keypair"
 
 [[credential]]
+unit = "backendai-etcdprobe.service"
+name = "manager.toml"
+render = "manager.toml.in"
+
+[[credential]]
 unit = "backendai-manager-schema.service"
 name = "alembic.ini"
 render = "alembic.ini.in"
