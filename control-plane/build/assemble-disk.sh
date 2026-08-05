@@ -16,6 +16,9 @@ ROOTHASH=$(awk '/Root hash:/ { print $3 }' "${BUNDLE}/verity.txt")
 guid() {
     printf '%s-%s-%s-%s-%s' "${1:0:8}" "${1:8:4}" "${1:12:4}" "${1:16:4}" "${1:20:12}"
 }
+derive() {
+    printf '%s' "$1" | sha256sum | cut -c1-32
+}
 mib() {
     echo $(( ( $(stat -c %s "$1") + 1048575 ) / 1048576 ))
 }
@@ -27,11 +30,13 @@ rm -f "$DISK"
 truncate -s $(( (ESP_MIB + ROOT_MIB + HASH_MIB + STATE_MIB + 4) * 1048576 )) "$DISK"
 sgdisk --clear \
     -n "1:1M:+${ESP_MIB}M" -t 1:EF00 -c 1:esp \
+        -u "1:$(guid "$(derive "esp:${ROOTHASH}")")" \
     -n "2:0:+${ROOT_MIB}M" -t 2:4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709 \
         -u "2:$(guid "${ROOTHASH:0:32}")" -c 2:root \
     -n "3:0:+${HASH_MIB}M" -t 3:2C7357ED-EBD2-46D9-AEC1-23D437EC2BF5 \
         -u "3:$(guid "${ROOTHASH:32:32}")" -c 3:root-verity \
     -n "4:0:+${STATE_MIB}M" -t 4:0FC63DAF-8483-4772-8E79-3D69D8477DE4 -c 4:backendai-state \
+        -u "4:$(guid "$(derive "state:${ROOTHASH}")")" \
     "$DISK" > /dev/null
 
 truncate -s "${ESP_MIB}M" "${BUNDLE}/esp.img"

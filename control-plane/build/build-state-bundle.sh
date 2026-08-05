@@ -154,7 +154,12 @@ if [ "$SCRUBBED" = true ]; then
         fail "an introspection console implementation survived in the image"
     fi
 else
-    echo "build-state-bundle: a self-contained interpreter binary carries its own copy of the introspection console that this scrub cannot reach; recording the image as unscrubbed" >&2
+    grep -q '^aiomonitor-enabled = false' \
+        "$ROOT/usr/share/backendai/credential-templates/manager.toml.in" ||
+        fail "the measured manager configuration does not disable the introspection console"
+    grep -qa 'aiomonitor-enabled' "$ROOT/usr/lib/backendai/backendai-manager" ||
+        fail "the manager artifact predates the introspection-console switch, so setting it in the configuration would be silently ignored; rebuild the manager from a tree that carries manager.aiomonitor-enabled"
+    echo "build-state-bundle: the introspection console survives inside an interpreter binary; the measured configuration switches it off and the artifact honours that switch" >&2
 fi
 if [ -e "$ROOT/usr/sbin/sshd" ] || [ -e "$ROOT/usr/bin/sshd" ]; then
     fail "a secure shell daemon survived in the image"

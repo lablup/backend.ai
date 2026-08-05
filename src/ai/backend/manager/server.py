@@ -321,7 +321,10 @@ async def server_main(
             loop_error_handler=functools.partial(handle_loop_error),
         )
 
-        await manager_init_stack.enter_async_context(aiomonitor_ctx())
+        if boostrap_config.manager.aiomonitor_enabled:
+            await manager_init_stack.enter_async_context(aiomonitor_ctx())
+        else:
+            log.info("the aiomonitor introspection console is disabled by configuration")
 
         # Initialize all dependencies via the Composer (replaces individual cleanup contexts)
         dep_stack = DependencyBuilderStack()
