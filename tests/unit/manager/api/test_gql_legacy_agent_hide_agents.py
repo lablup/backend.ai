@@ -34,7 +34,6 @@ class TestAgentSummaryHideAgents:
             domain_name="default",
             domain_id=DomainID(uuid.uuid4()),
             sudo_session_enabled=False,
-            main_access_key=None,
             allowed_client_ip=None,
             resource_policy=UserResourcePolicyData(name="default"),
         )
@@ -55,7 +54,6 @@ class TestAgentSummaryHideAgents:
             domain_name="default",
             domain_id=DomainID(uuid.uuid4()),
             sudo_session_enabled=False,
-            main_access_key=None,
             allowed_client_ip=None,
             resource_policy=UserResourcePolicyData(name="default"),
         )
