@@ -557,7 +557,6 @@ class ImageAdapter(BaseAdapter):
             registry_id=data.registry_id,
             project=data.project,
             tag=data.tag,
-            version=data.version,
             architecture=data.architecture,
             size_bytes=data.size_bytes,
             type=ImageTypeEnum(data.type.value),
