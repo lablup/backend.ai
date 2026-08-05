@@ -15,6 +15,11 @@ from .hostlock import host_lock
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 RULE_TAG = "bai-coco"
+TUNNEL_SUBNET = ipaddress.IPv4Network("10.252.0.0/16")
+TUNNEL_PORT = 51820
+OUT_CHAIN = "BAIF-OUT"
+IN_CHAIN = "BAIF-IN"
+INPUT_CHAIN = "BAII"
 
 
 @dataclass(frozen=True)
@@ -137,16 +142,21 @@ class SessionNetworkManager:
             for denied in self._config.denied_networks
         ]
 
-    def _forward_rules(self, bridge: str) -> list[str]:
+    def _out_rules(self, bridge: str) -> list[str]:
+        shim = self._config.shim_host
+        return [
+            f"-o {bridge} -s {shim}/32 -j ACCEPT",
+            f"-i {bridge} -o {bridge} -j ACCEPT",
+            f"-o {bridge} -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT",
+            f"-o {bridge} -j DROP",
+        ]
+
+    def _in_rules(self, bridge: str) -> list[str]:
         shim = self._config.shim_host
         return [
             f"-i {bridge} -d {shim}/32 -j ACCEPT",
-            f"-o {bridge} -s {shim}/32 -j ACCEPT",
-            f"-i {bridge} -o {bridge} -j ACCEPT",
             *self._deny_rules(bridge),
             f"-i {bridge} ! -o {bridge} -j ACCEPT",
-            f"-o {bridge} -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT",
-            f"-o {bridge} -j DROP",
         ]
 
     def _input_rules(self, bridge: str) -> list[str]:
@@ -164,14 +174,29 @@ class SessionNetworkManager:
             *self._deny_rules(bridge),
         ]
 
+    async def _ensure_frame(self) -> None:
+        comment = f"-m comment --comment {RULE_TAG}:frame".split()
+        for chain in (OUT_CHAIN, IN_CHAIN, INPUT_CHAIN):
+            await self._run("iptables", "-N", chain, check=False)
+        forward = await self._run("iptables", "-S", "FORWARD", check=False)
+        if f"-j {IN_CHAIN}" not in forward:
+            await self._run("iptables", "-I", "FORWARD", "1", "-j", IN_CHAIN, *comment)
+        if f"-j {OUT_CHAIN}" not in forward:
+            await self._run("iptables", "-I", "FORWARD", "1", "-j", OUT_CHAIN, *comment)
+        incoming = await self._run("iptables", "-S", "INPUT", check=False)
+        if f"-j {INPUT_CHAIN}" not in incoming:
+            await self._run("iptables", "-I", "INPUT", "1", "-j", INPUT_CHAIN, *comment)
+
     async def _install_rules(self, bridge: str, subnet: ipaddress.IPv4Network) -> None:
         comment = f"-m comment --comment {RULE_TAG}:{bridge}".split()
+        await self._ensure_frame()
         for chain, rules in (
-            ("FORWARD", self._forward_rules(bridge)),
-            ("INPUT", self._input_rules(bridge)),
+            (OUT_CHAIN, self._out_rules(bridge)),
+            (IN_CHAIN, self._in_rules(bridge)),
+            (INPUT_CHAIN, self._input_rules(bridge)),
         ):
-            for position, rule in enumerate(rules, start=1):
-                await self._run("iptables", "-I", chain, str(position), *rule.split(), *comment)
+            for rule in rules:
+                await self._run("iptables", "-A", chain, *rule.split(), *comment)
         nat = ["iptables", "-t", "nat", "-I"]
         await self._run(
             *nat, *f"POSTROUTING 1 -s {subnet} ! -o {bridge} -j MASQUERADE".split(), *comment
@@ -190,8 +215,8 @@ class SessionNetworkManager:
             if ipaddress.ip_address(upstream).is_loopback:
                 await self._run("sysctl", "-q", "-w", f"net.ipv4.conf.{bridge}.route_localnet=1")
 
-    async def _remove_rules(self, bridge: str) -> None:
-        needle = f'--comment "{RULE_TAG}:{bridge}"'
+    async def _remove_rules(self, label: str) -> None:
+        needle = f'--comment "{RULE_TAG}:{label}"'
         for table in ("filter", "nat"):
             listing = await self._run("iptables", "-t", table, "-S", check=False)
             for line in listing.splitlines():
@@ -247,6 +272,32 @@ class SessionNetworkManager:
         await self.assert_shim_reachable(network)
         return network
 
+    async def expose_tunnel(self, network: SessionNetwork, advertise: str, port: int) -> None:
+        comment = f"-m comment --comment {RULE_TAG}:{network.namespace}".split()
+        async with self._lock, host_lock("netns"):
+            await self._run(
+                "iptables",
+                "-t",
+                "nat",
+                "-I",
+                *(
+                    f"PREROUTING 1 -d {advertise}/32 -p udp --dport {port}"
+                    f" -j DNAT --to-destination {network.guest_addr}:{TUNNEL_PORT}"
+                ).split(),
+                *comment,
+            )
+            await self._run(
+                "iptables",
+                "-I",
+                OUT_CHAIN,
+                "1",
+                *(
+                    f"-o {network.bridge} -d {network.guest_addr}/32"
+                    f" -p udp --dport {TUNNEL_PORT} -j ACCEPT"
+                ).split(),
+                *comment,
+            )
+
     async def assert_shim_reachable(self, network: SessionNetwork) -> None:
         shim = f"{self._config.shim_host}:{self._config.shim_port}"
         proc = await asyncio.create_subprocess_exec(
@@ -275,6 +326,7 @@ class SessionNetworkManager:
         async with self._lock, host_lock("netns"):
             await self._run("ip", "netns", "delete", namespace, check=False)
             await self._run("ip", "link", "delete", veth_name(kernel_id), check=False)
+            await self._remove_rules(namespace)
             resolver = self._config.netns_dir / namespace
             (resolver / "resolv.conf").unlink(missing_ok=True)
             try:

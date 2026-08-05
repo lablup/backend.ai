@@ -87,6 +87,7 @@ from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.errors.resource_slot import AgentResourceCapacityExceeded
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.confidential.row import ConfidentialChannelRow
 from ai.backend.manager.models.domain import DomainRow, domains, query_domain_dotfiles
 from ai.backend.manager.models.group import GroupRow, query_group_dotfiles
 from ai.backend.manager.models.image import ImageRow
@@ -2202,6 +2203,13 @@ class ScheduleDBSource:
             await self._allocate_kernel_resources(
                 db_sess, KernelId(kernel_id), agent_id, occupied_slots
             )
+            if creation_info.channel_relay_addr:
+                channel_row = await db_sess.get(ConfidentialChannelRow, kernel_id)
+                if channel_row is not None:
+                    host, _, port = creation_info.channel_relay_addr.rpartition(":")
+                    if host in ("", "0.0.0.0", "::"):
+                        host = channel_row.relay_addr.rpartition(":")[0]
+                    channel_row.relay_addr = f"{host}:{port}"
             return True
 
     async def _allocate_kernel_resources(

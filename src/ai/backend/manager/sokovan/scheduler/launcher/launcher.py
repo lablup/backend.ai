@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import logging
 from collections import defaultdict
 from collections.abc import Awaitable, Mapping
@@ -46,6 +47,7 @@ from ai.backend.manager.confidential.payloads import (
 from ai.backend.manager.confidential.plane import ConfidentialPlane
 from ai.backend.manager.confidential.storage import folder_key_tag, mount_plan
 from ai.backend.manager.confidential.tunnel import (
+    CONFIDENTIAL_NETWORK_PREFIX,
     PEER_DIRECTORY_TAG,
     TunnelMember,
     tunnel_resources,
@@ -67,10 +69,13 @@ from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
 )
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.confidential.row import ConfidentialChannelRow
 from ai.backend.manager.models.confidential.types import SessionResourceKind
+from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
+from ai.backend.manager.models.scaling_group.types import ConfidentialScalingGroupOpts
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -80,6 +85,13 @@ from ai.backend.manager.repositories.scheduler import (
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+def _loopback_host(host: str) -> bool:
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return host == "localhost"
 
 
 @dataclass
@@ -533,6 +545,11 @@ class SessionLauncher:
                     "mode": "bridge",
                     "network_name": network_name,
                 }
+            elif session.cluster_mode == ClusterMode.MULTI_NODE and await self._confidential_enabled(
+                session
+            ):
+                network_name = f"{CONFIDENTIAL_NETWORK_PREFIX}{session.session_id}"
+                network_config = {"mode": "bridge", "network_name": network_name}
             elif session.cluster_mode == ClusterMode.MULTI_NODE:
                 # Create overlay network for multi-node sessions
                 driver = self._config_provider.config.network.inter_container.default_driver
@@ -641,14 +658,6 @@ class SessionLauncher:
             raise ConfidentialCapabilityRefused(
                 extra_msg=f"no admissible reference value covers image digest {digest}"
             )
-        if len({kernel.agent_id for kernel in session.kernels}) > 1:
-            raise ConfidentialCapabilityRefused(
-                extra_msg=(
-                    f"session {session.session_id} spans several agents; a confidential cluster"
-                    " session is single-node, because its inter-kernel tunnel rides one host bridge"
-                    " and inter-node bytes would cross the underlay bare"
-                )
-            )
         resources: dict[str, tuple[SessionResourceKind, bytes]] = {}
         identities: dict[KernelId, ChannelIdentity] = {}
         member_index = {
@@ -661,17 +670,12 @@ class SessionLauncher:
                 start=1,
             )
         }
+        tunnel_ports: dict[KernelId, int] = {}
         if len(session.kernels) > 1:
-            resources.update(
-                tunnel_resources([
-                    TunnelMember(
-                        kernel.kernel_id,
-                        member_index[kernel.kernel_id],
-                        kernel.cluster_hostname or f"{kernel.cluster_role}{kernel.cluster_idx}",
-                    )
-                    for kernel in session.kernels
-                ])
+            members, tunnel_ports = await self._allocate_tunnel_members(
+                session, opts, member_index
             )
+            resources.update(tunnel_resources(members))
         for kernel in session.kernels:
             resources[f"config-{kernel.kernel_id}"] = (
                 SessionResourceKind.SESSION_CONFIG,
@@ -733,6 +737,7 @@ class SessionLauncher:
                     "endpoint": opts.broker_endpoint,
                     "resource_path": provisioning.path_of(f"channel-{kernel.kernel_id}") or "",
                     "relay_addr": f"{relay_host}:{opts.channel_relay_port}",
+                    "tunnel_port": tunnel_ports.get(kernel.kernel_id),
                     "channel_port": opts.channel_guest_port,
                     "fingerprint": identity.fingerprint,
                     "token": identity.token,
@@ -759,10 +764,83 @@ class SessionLauncher:
                 "residual": provisioning.residual,
                 "tunnel_resource": provisioning.path_of(f"tunnel-{kernel.kernel_id}"),
                 "peers_resource": provisioning.path_of(PEER_DIRECTORY_TAG),
+                "tunnel_ingress_port": tunnel_ports.get(kernel.kernel_id),
                 "member_idx": member_index[kernel.kernel_id],
             }
             for kernel in session.kernels
         }
+
+    async def _confidential_enabled(self, session: SessionDataForStart) -> bool:
+        async with self._db.begin_readonly_session() as db_session:
+            group = await db_session.get(ScalingGroupRow, session.kernels[0].scaling_group)
+        return group is not None and group.confidential.enabled
+
+    async def _allocate_tunnel_members(
+        self,
+        session: SessionDataForStart,
+        opts: ConfidentialScalingGroupOpts,
+        member_index: Mapping[KernelId, int],
+    ) -> tuple[list[TunnelMember], dict[KernelId, int]]:
+        ordered = sorted(session.kernels, key=lambda k: member_index[k.kernel_id])
+        agent_ids = {kernel.agent_id for kernel in ordered if kernel.agent_id}
+        async with self._db.begin_readonly_session() as db_session:
+            advertised = {
+                row.id: row.public_host
+                for row in (
+                    await db_session.execute(
+                        sa.select(AgentRow.id, AgentRow.public_host).where(
+                            AgentRow.id.in_(agent_ids)
+                        )
+                    )
+                ).all()
+            }
+            taken = (
+                await db_session.execute(
+                    sa.select(KernelRow.agent, ConfidentialChannelRow.tunnel_port)
+                    .select_from(ConfidentialChannelRow)
+                    .join(KernelRow, KernelRow.id == ConfidentialChannelRow.kernel_id)
+                    .where(
+                        KernelRow.agent.in_(agent_ids)
+                        & ConfidentialChannelRow.tunnel_port.is_not(None)
+                        & KernelRow.status.not_in([KernelStatus.TERMINATED, KernelStatus.CANCELLED])
+                    )
+                )
+            ).all()
+        in_use: defaultdict[str, set[int]] = defaultdict(set)
+        for agent, port in taken:
+            reachable = advertised.get(AgentId(agent))
+            if reachable:
+                in_use[reachable].add(port)
+        low, high = opts.tunnel_port_range
+        members: list[TunnelMember] = []
+        ports: dict[KernelId, int] = {}
+        for kernel in ordered:
+            member_idx = member_index[kernel.kernel_id]
+            agent_id = kernel.agent_id
+            host = advertised.get(agent_id) if agent_id else None
+            if agent_id is None or not host or _loopback_host(host):
+                raise ConfidentialCapabilityRefused(
+                    extra_msg=(
+                        f"kernel {kernel.kernel_id} sits on agent {agent_id}, which advertises no"
+                        " routable tunnel ingress host; set agent.public-host on that agent"
+                    )
+                )
+            port = next((p for p in range(low, high + 1) if p not in in_use[host]), None)
+            if port is None:
+                raise ConfidentialCapabilityRefused(
+                    extra_msg=f"host {host} has no free tunnel ingress port in {low}-{high}"
+                )
+            in_use[host].add(port)
+            ports[kernel.kernel_id] = port
+            members.append(
+                TunnelMember(
+                    kernel.kernel_id,
+                    member_idx,
+                    kernel.cluster_hostname or f"{kernel.cluster_role}{kernel.cluster_idx}",
+                    f"{host}:{port}",
+                )
+            )
+        return members, ports
 
     async def _create_cluster_ssh_keypair(self) -> ClusterSSHKeyPair:
         """

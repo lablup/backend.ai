@@ -192,6 +192,7 @@ class KernelCreationInfo:
     stdout_port: int | None = None
     service_ports: list[int] = field(default_factory=list)
     kernel_host: str | None = None
+    channel_relay_addr: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> KernelCreationInfo:
@@ -206,6 +207,7 @@ class KernelCreationInfo:
             stdout_port=data.get("stdout_port"),
             service_ports=data.get("service_ports", []),
             kernel_host=data.get("kernel_host"),
+            channel_relay_addr=data.get("channel_relay_addr"),
         )
 
     def get_resource_allocations(self) -> ResourceSlot:

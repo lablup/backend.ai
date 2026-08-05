@@ -103,6 +103,7 @@ from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.appproxy.types import CreateEndpointRequestBody
 from ai.backend.manager.confidential.channel import ConfidentialChannel
+from ai.backend.manager.confidential.tunnel import CONFIDENTIAL_NETWORK_PREFIX
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageIdentifier
@@ -1540,6 +1541,8 @@ class AgentRegistry:
             elif ClusterMode(session.cluster_mode) == ClusterMode.MULTI_NODE:
                 if network_ref_name is None:
                     raise ValueError("network_id should not be None!")
+                if network_ref_name.startswith(CONFIDENTIAL_NETWORK_PREFIX):
+                    return
                 if self.config_provider.config.network.inter_container.default_driver is None:
                     raise ValueError("No inter-container network driver is configured.")
 

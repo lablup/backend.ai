@@ -1935,6 +1935,7 @@ class KernelCreationResult(TypedDict):
     stdout_port: int  # legacy
     scaling_group: str
     agent_addr: str
+    channel_relay_addr: NotRequired[str]
 
 
 class KernelCreationConfig(TypedDict):

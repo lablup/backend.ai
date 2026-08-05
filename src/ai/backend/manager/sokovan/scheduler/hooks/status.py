@@ -19,6 +19,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentClientPool
+from ai.backend.manager.confidential.tunnel import CONFIDENTIAL_NETWORK_PREFIX
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.sokovan import SessionWithKernels
 from ai.backend.manager.errors.common import ServerMisconfiguredError
@@ -176,7 +177,9 @@ class TerminatedTransitionHook(StatusTransitionHook):
             ):
                 if cluster_mode == ClusterMode.SINGLE_NODE:
                     await self._destroy_local_network(session, network_id)
-                elif cluster_mode == ClusterMode.MULTI_NODE:
+                elif cluster_mode == ClusterMode.MULTI_NODE and not network_id.startswith(
+                    CONFIDENTIAL_NETWORK_PREFIX
+                ):
                     await self._destroy_overlay_network(session_id, network_id)
 
     async def _destroy_local_network(self, session: SessionWithKernels, network_id: str) -> None:

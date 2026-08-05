@@ -2360,6 +2360,17 @@ class ConfidentialConfig(BaseConfigSchema):
             added_version="26.7.0",
         ),
     ]
+    vfio_pci_addresses: Annotated[
+        list[str],
+        Field(default_factory=list),
+        BackendAIConfigMeta(
+            description=(
+                "PCI addresses this agent claims for passthrough. Empty claims every eligible"
+                " device, which is wrong as soon as two agents share the host."
+            ),
+            added_version="26.7.0",
+        ),
+    ]
     gpu_memory_bytes: Annotated[
         BinarySizeField,
         Field(default=BinarySize(0)),

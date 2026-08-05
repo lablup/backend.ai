@@ -43,6 +43,7 @@ class ConfidentialScalingGroupOpts(BackendAISchema):
     folder_key_escrow_key: str = ""
     channel_relay_port: int = 6021
     channel_guest_port: int = 2010
+    tunnel_port_range: tuple[int, int] = (51821, 51899)
 
     @property
     def confidential_capable(self) -> bool:
