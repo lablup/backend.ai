@@ -124,7 +124,11 @@ class UserSecurityInfoGQL:
     """User security settings and authentication configuration."""
 
     allowed_client_ip: list[str] | None = gql_field(
-        description="List of allowed client IP addresses or CIDR ranges. If set, login is restricted to these IP addresses."
+        description=(
+            "List of allowed client IP addresses or CIDR ranges. If set, login is restricted to "
+            "these IP addresses. Supports both IPv4 and IPv6 formats "
+            "(e.g., '192.168.1.0/24', '::1')."
+        )
     )
     totp_activated: bool | None = gql_field(
         description="Whether TOTP (Time-based One-Time Password) two-factor authentication is enabled."

@@ -33,6 +33,7 @@ from pydantic import BaseModel
 from strawberry.experimental.pydantic.conversion_types import StrawberryTypeFromPydantic
 from strawberry.relay import Connection
 from strawberry.schema_directives import OneOf
+from strawberry.types.base import get_object_definition
 from strawberry.types.field import StrawberryField
 from strawberry.types.field import field as strawberry_field
 
@@ -207,7 +208,7 @@ def gql_pydantic_type[PydanticModel: BaseModel](
     Use all_fields=True for scalar-only types, or declare fields explicitly
     for types with nested GQL node fields.
     """
-    return strawberry.experimental.pydantic.type(
+    decorate = strawberry.experimental.pydantic.type(
         model=model,
         name=name,
         description=_build_description(meta),
@@ -215,6 +216,23 @@ def gql_pydantic_type[PydanticModel: BaseModel](
         all_fields=all_fields,
         use_pydantic_alias=use_pydantic_alias,
     )
+
+    def wrap(cls: Any) -> type[StrawberryTypeFromPydantic[PydanticModel]]:
+        # Strawberry rebuilds every resolver-less field from the Pydantic model and takes the
+        # description off the model, so a description declared here would otherwise be dropped.
+        declared_descriptions = {
+            attr_name: attr.description
+            for attr_name, attr in vars(cls).items()
+            if isinstance(attr, StrawberryField) and attr.description is not None
+        }
+        decorated = decorate(cls)
+        for field_definition in get_object_definition(decorated, strict=True).fields:
+            description = declared_descriptions.get(field_definition.python_name)
+            if description is not None:
+                field_definition.description = description
+        return decorated
+
+    return wrap
 
 
 def gql_field(
