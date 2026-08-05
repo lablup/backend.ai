@@ -118,16 +118,18 @@ stage_needed_libs() {
 
 stage_one_root() {
 	local src="${BAI_CC_CACHE}/pkgsrc"
-	if [ ! -e "${src}/usr/bin/gocryptfs" ]; then
+	local stamp="${src}/.stage-pkgs"
+	if [ "$(cat "$stamp" 2>/dev/null)" != "${BAI_CC_STAGE_PKGS}" ]; then
 		rm -rf "$src"
 		mkdir -p "$src"
 		docker run --rm --platform "${BAI_CC_RUST_PLATFORM}" -v "${src}:/out" \
 			"${BAI_CC_PKGSRC_IMAGE}" sh -c "set -e
 				sed -i 's/^Components:.*/Components: ${BAI_CC_REPO_COMPONENTS}/' /etc/apt/sources.list.d/ubuntu.sources
 				apt-get update -qq
-				apt-get install -y --no-install-recommends ${BAI_CC_EXTRA_PKGS} >/dev/null
+				apt-get install -y --no-install-recommends ${BAI_CC_STAGE_PKGS} >/dev/null
 				dpkg-query -W | sort > /out/.packages
 				tar -C / -cf - bin sbin lib lib64 usr | tar -C /out -xf -" >/dev/null
+		printf '%s' "${BAI_CC_STAGE_PKGS}" > "$stamp"
 	fi
 	printf '%s' "$src"
 }
