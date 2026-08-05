@@ -2260,6 +2260,33 @@ class ConfidentialConfig(BaseConfigSchema):
             added_version="26.7.0",
         ),
     ]
+    attestation_lock_hold: Annotated[
+        float,
+        Field(default=60.0),
+        BackendAIConfigMeta(
+            description=(
+                "Seconds one guest may keep the node-wide attestation lock. The host's quote"
+                " generation is a serial resource, so guest starts take the lock in turn, but a"
+                " guest that stalls past this window hands it on rather than idling the node's"
+                " other accelerators for its whole start timeout."
+            ),
+            added_version="26.7.0",
+        ),
+    ]
+    host_stand_in_image: Annotated[
+        str,
+        Field(default=""),
+        BackendAIConfigMeta(
+            description=(
+                "An image reference the host creates the sandbox from in place of the session's"
+                " own. The guest pulls the image named in its own annotation and no host"
+                " filesystem is shared into it, so the session image on the host is never read;"
+                " naming a tiny stand-in here spares the node a content-store and a snapshot copy"
+                " of every model image. Empty keeps the session image on the host."
+            ),
+            added_version="26.7.0",
+        ),
+    ]
     relay_bind_addr: Annotated[
         HostPortPair,
         Field(default=HostPortPair(host="0.0.0.0", port=6021)),

@@ -3,7 +3,7 @@ from __future__ import annotations
 import shlex
 from collections.abc import Mapping
 
-from ai.backend.agent.errors.agent import InvalidArgumentError
+from ai.backend.common.exception import InvalidAPIParameters
 
 __all__ = ("LegacyInferenceEnvTranslator",)
 
@@ -41,5 +41,7 @@ class LegacyInferenceEnvTranslator:
                 try:
                     args.extend(shlex.split(value))
                 except ValueError as e:
-                    raise InvalidArgumentError(f"Malformed quoting in {env_key}: {e}") from e
+                    raise InvalidAPIParameters(
+                        extra_msg=f"Malformed quoting in {env_key}: {e}"
+                    ) from e
         return args

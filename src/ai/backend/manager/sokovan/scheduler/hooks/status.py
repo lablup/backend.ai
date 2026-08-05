@@ -66,10 +66,11 @@ class RunningTransitionHook(StatusTransitionHook):
 
     Handles:
     - BATCH: Trigger batch execution
-    - INFERENCE: no-op — the route coordinator pushes to AppProxy
-      synchronously from the health-check handler when a route first
-      transitions to HEALTHY, and the long-cycle ``AppProxySyncRouteHandler``
-      keeps state convergent as a fallback.
+    - INFERENCE: start the model services of a confidential session, which
+      the agent cannot start for it. Nothing else is needed: the route
+      coordinator pushes to AppProxy synchronously from the health-check
+      handler when a route first transitions to HEALTHY, and the long-cycle
+      ``AppProxySyncRouteHandler`` keeps state convergent as a fallback.
 
     Note: Resource allocation (occupied_slots) is handled per-kernel at
     kernel RUNNING transition time, not here at session level.
@@ -93,11 +94,33 @@ class RunningTransitionHook(StatusTransitionHook):
         match session_type:
             case SessionTypes.BATCH:
                 await self._execute_batch(session)
+            case SessionTypes.INFERENCE:
+                await self._execute_inference(session)
             case _:
                 log.debug(
                     "No specific RUNNING hook for session type {}",
                     session_type,
                 )
+
+    async def _execute_inference(self, session: SessionWithKernels) -> None:
+        """Start the model services of a confidential INFERENCE session.
+
+        On every other backend the agent starts them from create_kernel. A
+        confidential kernel answers no runner verb on the agent host, so the
+        manager speaks start-model-service over the channel it holds the key
+        for; without this the route would wait on a service nobody launched.
+        """
+        main_kernel = session.main_kernel
+        async with self._deps.db.begin_readonly_session() as db_session:
+            confidential = (
+                await db_session.get(ConfidentialChannelRow, uuid.UUID(str(main_kernel.id)))
+            ) is not None
+        if not confidential:
+            return
+        self._deps.confidential_channel.trigger_model_service(
+            main_kernel.id,
+            session.session_info.identity.id,
+        )
 
     async def _execute_batch(self, session: SessionWithKernels) -> None:
         """Trigger batch execution for BATCH sessions."""
