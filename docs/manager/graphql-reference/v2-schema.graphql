@@ -7904,9 +7904,9 @@ type ModelServiceConfig {
   command: String
 
   """
-  Added in 26.4.2. Command to start the model service. Do not set together with `command`; when both are set, `command` takes precedence and this field is ignored. Deprecated since 26.7.0. Use `command`.
+  Command to start the model service. Do not set together with `command`; when both are set, `command` takes precedence and this field is ignored.
   """
-  startCommand: [String!] @deprecated(reason: "Use `command` instead.")
+  startCommand: [String!] @deprecated(reason: "Deprecated since 26.7.0. Use `command` instead.")
 
   """
   Shell used to run the command. If set, the kernel runs `[shell, '-c', command]`; null or empty disables shell wrapping.

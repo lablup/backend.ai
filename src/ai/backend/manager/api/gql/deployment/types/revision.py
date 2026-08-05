@@ -436,18 +436,13 @@ class ModelServiceConfigGQL:
         ),
         default=None,
     )
-    start_command: list[str] | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version="26.4.2",
-            deprecated_version="26.7.0",
-            deprecation_hint="`command`",
-            description=(
-                "Command to start the model service. Do not set together with `command`; when "
-                "both are set, `command` takes precedence and this field is ignored."
-            ),
+    start_command: list[str] | None = gql_field(
+        description=(
+            "Command to start the model service. Do not set together with `command`; when "
+            "both are set, `command` takes precedence and this field is ignored."
         ),
         default=None,
-        deprecation_reason="Use `command` instead.",
+        deprecation_reason="Deprecated since 26.7.0. Use `command` instead.",
     )
     shell: str | None = gql_field(
         description=(
