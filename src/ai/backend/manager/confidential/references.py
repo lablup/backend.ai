@@ -27,6 +27,10 @@ DEFAULT_COEXISTENCE: Final = timedelta(days=14)
 REQUIRED_MEASUREMENTS: Final = ("mr_config_id", "mr_td", "rtmr_1", "rtmr_2", "xfam")
 
 
+def unpinned_measurements(measurements: dict[str, Any]) -> list[str]:
+    return [field for field in REQUIRED_MEASUREMENTS if not measurements.get(field)]
+
+
 def bundle_bytes(
     endpoint: str, image_digest: str, profile_version: str, measurements: dict[str, Any]
 ) -> bytes:
@@ -63,7 +67,7 @@ class ReferenceValueStore:
             raise ReferenceValueRejected(
                 extra_msg="registration is reachable only under the manager's attested machine identity"
             )
-        missing = [field for field in REQUIRED_MEASUREMENTS if not measurements.get(field)]
+        missing = unpinned_measurements(measurements)
         if missing:
             raise ReferenceValueRejected(
                 extra_msg=(
@@ -116,6 +120,26 @@ class ReferenceValueStore:
                 .order_by(ConfidentialReferenceValueRow.created_at)
             )
             return list(rows.all())
+
+    async def invalidate_unpinned(self) -> list[tuple[uuid.UUID, str, list[str]]]:
+        async with self._db.begin_session() as db_session:
+            rows = await db_session.scalars(
+                sa.select(ConfidentialReferenceValueRow).where(
+                    ConfidentialReferenceValueRow.state.in_((
+                        ReferenceValueState.ACTIVE,
+                        ReferenceValueState.SUPERSEDED,
+                    ))
+                )
+            )
+            invalidated = []
+            for row in rows.all():
+                missing = unpinned_measurements(row.measurements)
+                if not missing:
+                    continue
+                row.state = ReferenceValueState.INVALID
+                row.coexistence_until = datetime.now(UTC)
+                invalidated.append((row.id, row.endpoint, missing))
+            return invalidated
 
     async def close_expired_windows(self, endpoint: str) -> int:
         now = datetime.now(UTC)

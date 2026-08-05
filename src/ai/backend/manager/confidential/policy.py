@@ -156,6 +156,14 @@ class ReleasePolicyComposer:
         ConfidentialMetricObserver.instance().observe_tcb_grace(endpoint, False)
 
     async def render(self, endpoint: str) -> str:
+        for value_id, value_endpoint, missing in await self._references.invalidate_unpinned():
+            log.warning(
+                "confidential: stored reference value {} on {} leaves {} unpinned;"
+                " it is marked invalid and contributes no rule to any composed release policy",
+                value_id,
+                value_endpoint,
+                ", ".join(missing),
+            )
         await self._references.close_expired_windows(endpoint)
         grace = await self.grace(endpoint)
         hard_denied = grace is not None and grace.expires_at <= datetime.now(UTC)
