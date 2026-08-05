@@ -1,3 +1,4 @@
+import dataclasses
 import uuid
 from collections.abc import Mapping
 from typing import Any, Self, override
@@ -17,10 +18,10 @@ class UserIdentityCtx(MiddlewareParam):
     @override
     async def from_request(cls, request: web.Request) -> Self:
         return cls(
-            user_uuid=request["user"]["uuid"],
-            user_role=request["user"]["role"],
-            user_email=request["user"]["email"],
-            domain_name=request["user"]["domain_name"],
+            user_uuid=request["user"].uuid,
+            user_role=request["user"].role,
+            user_email=request["user"].email,
+            domain_name=request["user"].domain_name,
         )
 
 
@@ -32,6 +33,6 @@ class KeypairCtx(MiddlewareParam):
     @override
     async def from_request(cls, request: web.Request) -> Self:
         return cls(
-            access_key=request["keypair"]["access_key"],
-            resource_policy=request["keypair"]["resource_policy"],
+            access_key=request["keypair"].access_key,
+            resource_policy=dataclasses.asdict(request["keypair"].resource_policy),
         )

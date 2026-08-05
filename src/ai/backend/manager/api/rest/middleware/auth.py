@@ -15,7 +15,6 @@ This module contains:
 
 from __future__ import annotations
 
-import dataclasses
 import functools
 import hashlib
 import hmac
@@ -869,9 +868,8 @@ def build_auth_middleware(
                 "is_authorized": True,
                 "is_admin": context.keypair.is_admin,
                 "is_superadmin": is_superadmin,
-                # Handlers still read mappings; BA-7189 puts the dataclasses themselves here.
-                "user": dataclasses.asdict(context.user),
-                "keypair": dataclasses.asdict(context.keypair),
+                "user": context.user,
+                "keypair": context.keypair,
             })
             authenticated_user = UserData(
                 user_id=context.user.uuid,

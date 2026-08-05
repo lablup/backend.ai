@@ -9,6 +9,7 @@ returned as ``APIResponse`` objects.
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -539,9 +540,9 @@ class SessionHandler:
 
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
+                requester_access_key=request["keypair"].access_key,
+                requester_role=request["user"].role,
+                requester_domain=request["user"].domain_name,
                 owner_access_key=params.owner_access_key,
             )
         )
@@ -555,7 +556,7 @@ class SessionHandler:
             params.session_name,
         )
 
-        domain_name = params.domain or request["user"]["domain_name"]
+        domain_name = params.domain or request["user"].domain_name
 
         # Use model_fields_set to detect which fields were explicitly provided
         # (equivalent to the old Trafaret ``undefined`` sentinel).
@@ -611,11 +612,11 @@ class SessionHandler:
                     ),
                     owner_access_key=owner_access_key,
                 ),
-                user_id=request["user"]["uuid"],
-                user_role=request["user"]["role"],
+                user_id=request["user"].uuid,
+                user_role=request["user"].role,
                 requester_access_key=requester_access_key,
-                sudo_session_enabled=request["user"]["sudo_session_enabled"],
-                keypair_resource_policy=request["keypair"]["resource_policy"],
+                sudo_session_enabled=request["user"].sudo_session_enabled,
+                keypair_resource_policy=dataclasses.asdict(request["keypair"].resource_policy),
             )
         )
         return APIResponse.build(HTTPStatus.CREATED, CreateSessionResponse(dict(result.result)))
@@ -645,19 +646,19 @@ class SessionHandler:
         agent_list = cast(list[str] | None, validated_config.get("agent_list"))
         if agent_list is not None:
             if (
-                request["user"]["role"] != UserRole.SUPERADMIN
+                request["user"].role != UserRole.SUPERADMIN
                 and self._config_provider.config.manager.hide_agents
             ):
                 raise InsufficientPrivilege(
                     "You are not allowed to manually assign agents for your session."
                 )
 
-        domain_name = params.domain or request["user"]["domain_name"]
+        domain_name = params.domain or request["user"].domain_name
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
+                requester_access_key=request["keypair"].access_key,
+                requester_role=request["user"].role,
+                requester_domain=request["user"].domain_name,
                 owner_access_key=params.owner_access_key,
             )
         )
@@ -702,11 +703,11 @@ class SessionHandler:
                     ),
                     owner_access_key=owner_access_key,
                 ),
-                user_id=request["user"]["uuid"],
-                user_role=request["user"]["role"],
+                user_id=request["user"].uuid,
+                user_role=request["user"].role,
                 requester_access_key=requester_access_key,
-                sudo_session_enabled=request["user"]["sudo_session_enabled"],
-                keypair_resource_policy=request["keypair"]["resource_policy"],
+                sudo_session_enabled=request["user"].sudo_session_enabled,
+                keypair_resource_policy=dataclasses.asdict(request["keypair"].resource_policy),
             )
         )
         return APIResponse.build(HTTPStatus.CREATED, CreateSessionResponse(dict(result.result)))
@@ -723,12 +724,12 @@ class SessionHandler:
         request = ctx.request
         params = body.parsed
 
-        domain_name = params.domain or request["user"]["domain_name"]
+        domain_name = params.domain or request["user"].domain_name
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
+                requester_access_key=request["keypair"].access_key,
+                requester_role=request["user"].role,
+                requester_domain=request["user"].domain_name,
                 owner_access_key=params.owner_access_key,
             )
         )
@@ -743,8 +744,8 @@ class SessionHandler:
         result = await self._session.create_cluster.wait_for_complete(
             CreateClusterAction(
                 session_name=params.session_name,
-                user_id=request["user"]["uuid"],
-                user_role=request["user"]["role"],
+                user_id=request["user"].uuid,
+                user_role=request["user"].role,
                 domain_name=domain_name,
                 group_name=params.group,
                 requester_access_key=requester_access_key,
@@ -754,9 +755,9 @@ class SessionHandler:
                 session_type=params.session_type,
                 enqueue_only=params.enqueue_only,
                 template_id=params.template_id or UUID(int=0),
-                sudo_session_enabled=request["user"]["sudo_session_enabled"],
+                sudo_session_enabled=request["user"].sudo_session_enabled,
                 max_wait_seconds=params.max_wait_seconds,
-                keypair_resource_policy=request["keypair"]["resource_policy"],
+                keypair_resource_policy=dataclasses.asdict(request["keypair"].resource_policy),
             )
         )
         return APIResponse.build(HTTPStatus.CREATED, CreateSessionResponse(dict(result.result)))
@@ -774,9 +775,9 @@ class SessionHandler:
         params = query.parsed
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
+                requester_access_key=request["keypair"].access_key,
+                requester_role=request["user"].role,
+                requester_domain=request["user"].domain_name,
                 owner_access_key=None,
             )
         )
@@ -812,9 +813,9 @@ class SessionHandler:
         params = body.parsed
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
+                requester_access_key=request["keypair"].access_key,
+                requester_role=request["user"].role,
+                requester_domain=request["user"].domain_name,
                 owner_access_key=None,
             )
         )
@@ -860,9 +861,9 @@ class SessionHandler:
         session_name = request.match_info["session_name"]
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
+                requester_access_key=request["keypair"].access_key,
+                requester_role=request["user"].role,
+                requester_domain=request["user"].domain_name,
                 owner_access_key=None,
             )
         )
@@ -921,12 +922,12 @@ class SessionHandler:
         request = ctx.request
         params = query.parsed
         session_name = request.match_info["session_name"]
-        user_role = cast(UserRole, request["user"]["role"])
+        user_role = cast(UserRole, request["user"].role)
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
+                requester_access_key=request["keypair"].access_key,
+                requester_role=request["user"].role,
+                requester_domain=request["user"].domain_name,
                 owner_access_key=params.owner_access_key,
             )
         )
@@ -971,9 +972,9 @@ class SessionHandler:
         session_name = request.match_info["session_name"]
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
+                requester_access_key=request["keypair"].access_key,
+                requester_role=request["user"].role,
+                requester_domain=request["user"].domain_name,
                 owner_access_key=None,
             )
         )
@@ -1009,9 +1010,9 @@ class SessionHandler:
         session_name = request.match_info["session_name"]
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
+                requester_access_key=request["keypair"].access_key,
+                requester_role=request["user"].role,
+                requester_domain=request["user"].domain_name,
                 owner_access_key=None,
             )
         )
@@ -1048,9 +1049,9 @@ class SessionHandler:
         session_name = request.match_info["session_name"]
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
+                requester_access_key=request["keypair"].access_key,
+                requester_role=request["user"].role,
+                requester_domain=request["user"].domain_name,
                 owner_access_key=None,
             )
         )
@@ -1123,9 +1124,9 @@ class SessionHandler:
         session_name = request.match_info["session_name"]
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
+                requester_access_key=request["keypair"].access_key,
+                requester_role=request["user"].role,
+                requester_domain=request["user"].domain_name,
                 owner_access_key=None,
             )
         )
@@ -1159,9 +1160,9 @@ class SessionHandler:
         session_name = request.match_info["session_name"]
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
+                requester_access_key=request["keypair"].access_key,
+                requester_role=request["user"].role,
+                requester_domain=request["user"].domain_name,
                 owner_access_key=None,
             )
         )
@@ -1199,9 +1200,9 @@ class SessionHandler:
         session_name = request.match_info["session_name"]
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
+                requester_access_key=request["keypair"].access_key,
+                requester_role=request["user"].role,
+                requester_domain=request["user"].domain_name,
                 owner_access_key=None,
             )
         )
@@ -1215,7 +1216,7 @@ class SessionHandler:
         )
         result = await self._session.download_files.wait_for_complete(
             DownloadFilesAction(
-                user_id=request["user"]["uuid"],
+                user_id=request["user"].uuid,
                 owner_access_key=owner_access_key,
                 session_name=session_name,
                 files=params.files,
@@ -1237,9 +1238,9 @@ class SessionHandler:
         session_name = request.match_info["session_name"]
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
+                requester_access_key=request["keypair"].access_key,
+                requester_role=request["user"].role,
+                requester_domain=request["user"].domain_name,
                 owner_access_key=None,
             )
         )
@@ -1253,7 +1254,7 @@ class SessionHandler:
         )
         result = await self._session.download_file.wait_for_complete(
             DownloadFileAction(
-                user_id=request["user"]["uuid"],
+                user_id=request["user"].uuid,
                 session_name=session_name,
                 owner_access_key=owner_access_key,
                 file=params.file,
@@ -1275,9 +1276,9 @@ class SessionHandler:
         session_name = request.match_info["session_name"]
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
+                requester_access_key=request["keypair"].access_key,
+                requester_role=request["user"].role,
+                requester_domain=request["user"].domain_name,
                 owner_access_key=None,
             )
         )
@@ -1291,7 +1292,7 @@ class SessionHandler:
         )
         result = await self._session.list_files.wait_for_complete(
             ListFilesAction(
-                user_id=request["user"]["uuid"],
+                user_id=request["user"].uuid,
                 path=params.path,
                 session_name=session_name,
                 owner_access_key=owner_access_key,
@@ -1314,9 +1315,9 @@ class SessionHandler:
         new_name = params.session_name
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
+                requester_access_key=request["keypair"].access_key,
+                requester_role=request["user"].role,
+                requester_domain=request["user"].domain_name,
                 owner_access_key=None,
             )
         )
@@ -1351,9 +1352,9 @@ class SessionHandler:
         session_name: str = request.match_info["session_name"]
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
+                requester_access_key=request["keypair"].access_key,
+                requester_role=request["user"].role,
+                requester_domain=request["user"].domain_name,
                 owner_access_key=None,
             )
         )
@@ -1390,9 +1391,9 @@ class SessionHandler:
         session_name: str = request.match_info["session_name"]
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
+                requester_access_key=request["keypair"].access_key,
+                requester_role=request["user"].role,
+                requester_domain=request["user"].domain_name,
                 owner_access_key=None,
             )
         )
@@ -1409,11 +1410,11 @@ class SessionHandler:
                 owner_access_key=owner_access_key,
                 image_name=params.image_name,
                 image_visibility=params.image_visibility,
-                image_owner_id=request["user"]["uuid"],
-                user_email=request["user"]["email"],
-                max_customized_image_count=request["user"]["resource_policy"][
-                    "max_customized_image_count"
-                ],
+                image_owner_id=request["user"].uuid,
+                user_email=request["user"].email,
+                max_customized_image_count=request[
+                    "user"
+                ].resource_policy.max_customized_image_count,
             )
         )
         return APIResponse.build(
@@ -1434,9 +1435,9 @@ class SessionHandler:
         session_name: str = request.match_info["session_name"]
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
+                requester_access_key=request["keypair"].access_key,
+                requester_role=request["user"].role,
+                requester_domain=request["user"].domain_name,
                 owner_access_key=None,
             )
         )
@@ -1474,9 +1475,9 @@ class SessionHandler:
         session_name: str = request.match_info["session_name"]
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
+                requester_access_key=request["keypair"].access_key,
+                requester_role=request["user"].role,
+                requester_domain=request["user"].domain_name,
                 owner_access_key=None,
             )
         )
@@ -1514,9 +1515,9 @@ class SessionHandler:
         session_name: str = request.match_info["session_name"]
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
+                requester_access_key=request["keypair"].access_key,
+                requester_role=request["user"].role,
+                requester_domain=request["user"].domain_name,
                 owner_access_key=params.owner_access_key,
             )
         )
@@ -1530,7 +1531,7 @@ class SessionHandler:
         result = await self._session.get_status_history.wait_for_complete(
             GetStatusHistoryAction(
                 session_name=session_name,
-                owner_access_key=request["keypair"]["access_key"],
+                owner_access_key=request["keypair"].access_key,
             )
         )
         return APIResponse.build(
@@ -1547,9 +1548,9 @@ class SessionHandler:
         session_name = request.match_info["session_name"]
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
+                requester_access_key=request["keypair"].access_key,
+                requester_role=request["user"].role,
+                requester_domain=request["user"].domain_name,
                 owner_access_key=None,
             )
         )
@@ -1579,9 +1580,9 @@ class SessionHandler:
         session_name: str = request.match_info["session_name"]
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
+                requester_access_key=request["keypair"].access_key,
+                requester_role=request["user"].role,
+                requester_domain=request["user"].domain_name,
                 owner_access_key=params.owner_access_key,
             )
         )
@@ -1629,12 +1630,12 @@ class SessionHandler:
         params = query.parsed
         log.info(
             "GET_TASK_LOG (ak:{}, k:{})",
-            request["keypair"]["access_key"],
+            request["keypair"].access_key,
             params.kernel_id,
         )
-        domain_name = request["user"]["domain_name"]
-        user_role = request["user"]["role"]
-        user_uuid = request["user"]["uuid"]
+        domain_name = request["user"].domain_name
+        user_role = request["user"].role
+        user_uuid = request["user"].uuid
 
         result = await self._vfolder.get_task_logs.wait_for_complete(
             GetTaskLogsAction(
@@ -1642,7 +1643,7 @@ class SessionHandler:
                 domain_name=domain_name,
                 user_role=user_role,
                 kernel_id=KernelId(params.kernel_id),
-                owner_access_key=request["keypair"]["access_key"],
+                owner_access_key=request["keypair"].access_key,
                 request=request,
             )
         )
@@ -1657,9 +1658,9 @@ class SessionHandler:
         root_session_name = request.match_info["session_name"]
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
+                requester_access_key=request["keypair"].access_key,
+                requester_role=request["user"].role,
+                requester_domain=request["user"].domain_name,
                 owner_access_key=None,
             )
         )
