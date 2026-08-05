@@ -78,7 +78,7 @@ class ResourceGroupPurgerSpec(RBACEntityPurgerSpec[ScalingGroupRow]):
 
 
 @dataclass
-class ScalingGroupRoutingsPurgerSpec(BatchPurgerSpec[RoutingRow]):
+class ResourceGroupRoutingsPurgerSpec(BatchPurgerSpec[RoutingRow]):
     """PurgerSpec for deleting the routings of a scaling group's sessions."""
 
     resource_group_id: ResourceGroupID
@@ -99,7 +99,7 @@ class ScalingGroupRoutingsPurgerSpec(BatchPurgerSpec[RoutingRow]):
 
 
 @dataclass
-class ScalingGroupEndpointsPurgerSpec(BatchPurgerSpec[EndpointRow]):
+class ResourceGroupEndpointsPurgerSpec(BatchPurgerSpec[EndpointRow]):
     """PurgerSpec for deleting the endpoints of a scaling group.
 
     ``endpoints.resource_group`` stores the scaling group name, so the id is
@@ -122,7 +122,7 @@ class ScalingGroupEndpointsPurgerSpec(BatchPurgerSpec[EndpointRow]):
 
 
 @dataclass
-class ScalingGroupKernelsPurgerSpec(BatchPurgerSpec[KernelRow]):
+class ResourceGroupKernelsPurgerSpec(BatchPurgerSpec[KernelRow]):
     """PurgerSpec for deleting the kernels of a scaling group's sessions."""
 
     resource_group_id: ResourceGroupID
@@ -143,7 +143,7 @@ class ScalingGroupKernelsPurgerSpec(BatchPurgerSpec[KernelRow]):
 
 
 @dataclass
-class ScalingGroupSessionsPurgerSpec(BatchPurgerSpec[SessionRow]):
+class ResourceGroupSessionsPurgerSpec(BatchPurgerSpec[SessionRow]):
     """PurgerSpec for deleting the sessions of a scaling group."""
 
     resource_group_id: ResourceGroupID
@@ -200,7 +200,7 @@ class ScalingGroupsForDomainPurgerSpec(BatchPurgerSpec[ScalingGroupForDomainRow]
 
 
 @dataclass
-class DomainsForScalingGroupPurgerSpec(BatchPurgerSpec[ScalingGroupForDomainRow]):
+class DomainsForResourceGroupPurgerSpec(BatchPurgerSpec[ScalingGroupForDomainRow]):
     """PurgerSpec for disassociating multiple domains from a scaling group."""
 
     resource_group_id: ResourceGroupID
@@ -350,7 +350,7 @@ class ScalingGroupsForProjectPurgerSpec(BatchPurgerSpec[ScalingGroupForProjectRo
 
 
 @dataclass
-class ProjectsForScalingGroupPurgerSpec(BatchPurgerSpec[ScalingGroupForProjectRow]):
+class ProjectsForResourceGroupPurgerSpec(BatchPurgerSpec[ScalingGroupForProjectRow]):
     """PurgerSpec for disassociating multiple projects from a scaling group."""
 
     resource_group_id: ResourceGroupID

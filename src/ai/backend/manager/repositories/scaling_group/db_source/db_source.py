@@ -73,13 +73,13 @@ from ai.backend.manager.repositories.scaling_group.creators import (
     ScalingGroupForProjectCreatorSpec,
 )
 from ai.backend.manager.repositories.scaling_group.purgers import (
-    DomainsForScalingGroupPurgerSpec,
-    ProjectsForScalingGroupPurgerSpec,
+    DomainsForResourceGroupPurgerSpec,
+    ProjectsForResourceGroupPurgerSpec,
+    ResourceGroupEndpointsPurgerSpec,
+    ResourceGroupKernelsPurgerSpec,
     ResourceGroupPurgerSpec,
-    ScalingGroupEndpointsPurgerSpec,
-    ScalingGroupKernelsPurgerSpec,
-    ScalingGroupRoutingsPurgerSpec,
-    ScalingGroupSessionsPurgerSpec,
+    ResourceGroupRoutingsPurgerSpec,
+    ResourceGroupSessionsPurgerSpec,
     ScalingGroupsForDomainPurgerSpec,
     ScalingGroupsForProjectPurgerSpec,
 )
@@ -123,7 +123,7 @@ class ScalingGroupDBSource:
             scope_id=uuid.UUID(ref.element_id),
         )
 
-    def _raise_non_duplicate_errors[TRow: Base](
+    def _tolerate_only_duplicates[TRow: Base](
         self, result: BulkCreatorResultWithFailures[TRow]
     ) -> None:
         """Re-raise partial-create failures that are not duplicate-row conflicts; an already
@@ -262,20 +262,22 @@ class ScalingGroupDBSource:
 
             await w.batch_purge(
                 BatchPurger(
-                    spec=ScalingGroupRoutingsPurgerSpec(resource_group_id=resource_group_id)
+                    spec=ResourceGroupRoutingsPurgerSpec(resource_group_id=resource_group_id)
                 )
             )
             await w.batch_purge(
                 BatchPurger(
-                    spec=ScalingGroupEndpointsPurgerSpec(resource_group_id=resource_group_id)
+                    spec=ResourceGroupEndpointsPurgerSpec(resource_group_id=resource_group_id)
                 )
             )
             await w.batch_purge(
-                BatchPurger(spec=ScalingGroupKernelsPurgerSpec(resource_group_id=resource_group_id))
+                BatchPurger(
+                    spec=ResourceGroupKernelsPurgerSpec(resource_group_id=resource_group_id)
+                )
             )
             await w.batch_purge(
                 BatchPurger(
-                    spec=ScalingGroupSessionsPurgerSpec(resource_group_id=resource_group_id)
+                    spec=ResourceGroupSessionsPurgerSpec(resource_group_id=resource_group_id)
                 )
             )
 
@@ -694,7 +696,7 @@ class ScalingGroupDBSource:
                         ]
                     )
                 )
-                self._raise_non_duplicate_errors(creation_result)
+                self._tolerate_only_duplicates(creation_result)
                 for rg_id in add:
                     await self._enroll_resource_group(w, domain_scope, rg_id)
 
@@ -747,7 +749,7 @@ class ScalingGroupDBSource:
                         ]
                     )
                 )
-                self._raise_non_duplicate_errors(creation_result)
+                self._tolerate_only_duplicates(creation_result)
                 for rg_id in add:
                     await self._enroll_resource_group(w, project_scope, rg_id)
 
@@ -780,7 +782,7 @@ class ScalingGroupDBSource:
                 ]
                 await w.batch_purge(
                     BatchPurger(
-                        spec=DomainsForScalingGroupPurgerSpec(
+                        spec=DomainsForResourceGroupPurgerSpec(
                             resource_group_id=resource_group_id,
                             domain_ids=remove_ids,
                         )
@@ -811,7 +813,7 @@ class ScalingGroupDBSource:
                         ]
                     )
                 )
-                self._raise_non_duplicate_errors(creation_result)
+                self._tolerate_only_duplicates(creation_result)
                 for domain_id in add_ids:
                     await self._enroll_resource_group(
                         w,
@@ -844,7 +846,7 @@ class ScalingGroupDBSource:
             if remove:
                 await w.batch_purge(
                     BatchPurger(
-                        spec=ProjectsForScalingGroupPurgerSpec(
+                        spec=ProjectsForResourceGroupPurgerSpec(
                             resource_group_id=resource_group_id,
                             projects=list(remove),
                         )
@@ -869,7 +871,7 @@ class ScalingGroupDBSource:
                         ]
                     )
                 )
-                self._raise_non_duplicate_errors(creation_result)
+                self._tolerate_only_duplicates(creation_result)
                 for project_id in add:
                     await self._enroll_resource_group(
                         w,
