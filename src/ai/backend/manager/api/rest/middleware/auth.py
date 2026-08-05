@@ -15,6 +15,7 @@ This module contains:
 
 from __future__ import annotations
 
+import dataclasses
 import functools
 import hashlib
 import hmac
@@ -24,6 +25,7 @@ import secrets
 import uuid
 from collections.abc import Awaitable, Callable, Mapping
 from contextlib import ExitStack
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Final
 from urllib.parse import urlparse
@@ -34,18 +36,21 @@ from aiohttp import web
 from aiohttp.typedefs import Handler, Middleware
 from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
+from sqlalchemy.orm import joinedload, load_only
 
 from ai.backend.common.contexts.client_ip import with_client_ip
 from ai.backend.common.contexts.user import with_triggered_user, with_user
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import InvalidIpAddressValue
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.jwt.exceptions import JWTError
 from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED
-from ai.backend.common.types import ReadableCIDR
+from ai.backend.common.types import AccessKey, ReadableCIDR, SecretKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.utils import with_log_context_fields
 from ai.backend.manager.api.rest.types import WebRequestHandler
+from ai.backend.manager.data.auth.types import AuthenticatedKeypair, AuthenticatedUser
 from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     InsufficientPrivilege,
@@ -54,12 +59,8 @@ from ai.backend.manager.errors.auth import (
     UserNotFound,
 )
 from ai.backend.manager.errors.common import GenericForbidden, InternalServerError, RejectedByHook
-from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.resource_policy import (
-    keypair_resource_policies,
-    user_resource_policies,
-)
-from ai.backend.manager.models.user import UserRow, users
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import execute_with_retry
 
 if TYPE_CHECKING:
@@ -431,9 +432,11 @@ def extract_client_ip(request: web.Request) -> str | None:
     return None
 
 
-def validate_ip(request: web.Request, user: Mapping[str, Any]) -> None:
-    allowed_client_ip = user.get("allowed_client_ip", None)
-    if not allowed_client_ip or allowed_client_ip is None:
+def validate_ip(
+    request: web.Request,
+    allowed_client_ip: list[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]] | None,
+) -> None:
+    if not allowed_client_ip:
         return
     if not isinstance(allowed_client_ip, list):
         raise InvalidClientIPConfig("allowed_client_ip must be a list")
@@ -446,7 +449,10 @@ def validate_ip(request: web.Request, user: Mapping[str, Any]) -> None:
         )
     except InvalidIpAddressValue as e:
         raise InvalidAuthParameters(f"{raw_client_addr} is invalid IP address value") from e
-    if any(client_addr.address in allowed_ip_cand.address for allowed_ip_cand in allowed_client_ip):
+    if any(
+        allowed_ip_cand.address is not None and client_addr.address in allowed_ip_cand.address
+        for allowed_ip_cand in allowed_client_ip
+    ):
         return
     raise AuthorizationFailed(f"'{client_addr}' is not allowed IP address")
 
@@ -464,97 +470,106 @@ def _set_unauthenticated_state(request: web.Request) -> None:
     request["user"] = None
 
 
-async def _query_cred_by_access_key(
+@dataclass(frozen=True)
+class _AuthContext:
+    """What an authenticated request carries about its caller."""
+
+    user: AuthenticatedUser
+    keypair: AuthenticatedKeypair
+
+
+async def _query_auth_context_by_access_key(
     db: ExtendedAsyncSAEngine,
     access_key: str,
-) -> tuple[Any, Any]:
-    async with db.begin_readonly() as conn:
-        j = keypairs.join(
-            keypair_resource_policies,
-            keypairs.c.resource_policy == keypair_resource_policies.c.name,
-        )
-        query = (
-            sa.select(keypairs, keypair_resource_policies)
-            .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
-            .select_from(j)
+) -> _AuthContext | None:
+    """Resolve an access key into the context an authenticated request carries.
+
+    Only the columns that context carries are loaded, and the rows stay inside this session.
+    """
+    async with db.begin_readonly_session() as sess:
+        keypair_row = await sess.scalar(
+            sa.select(KeyPairRow)
+            .options(
+                load_only(
+                    KeyPairRow.access_key,
+                    KeyPairRow.secret_key,
+                    KeyPairRow.user,
+                    KeyPairRow.is_admin,
+                    KeyPairRow.rate_limit,
+                ),
+                joinedload(KeyPairRow.resource_policy_row),
+            )
             .where(
-                (keypairs.c.access_key == access_key) & (keypairs.c.is_active.is_(True)),
+                (KeyPairRow.access_key == access_key) & (KeyPairRow.is_active.is_(True)),
             )
         )
-        result = await conn.execute(query)
-        keypair_row = result.first()
-
         if keypair_row is None:
-            return None, None
+            return None
 
-        j = users.join(
-            user_resource_policies,
-            users.c.resource_policy == user_resource_policies.c.name,
-        ).join(
-            keypairs,
-            users.c.uuid == keypairs.c.user,
+        user_row = await sess.scalar(
+            sa.select(UserRow)
+            .options(
+                load_only(
+                    UserRow.uuid,
+                    UserRow.email,
+                    UserRow.role,
+                    UserRow.domain_name,
+                    UserRow.domain_id,
+                    UserRow.sudo_session_enabled,
+                    UserRow.main_access_key,
+                    UserRow.allowed_client_ip,
+                ),
+                joinedload(UserRow.resource_policy_row),
+            )
+            .where(UserRow.uuid == keypair_row.user)
         )
-        query = (
-            sa.select(users, user_resource_policies)
-            .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
-            .select_from(j)
-            .where(keypairs.c.access_key == access_key)
+        if user_row is None:
+            return None
+        if user_row.role is None or user_row.domain_name is None or user_row.domain_id is None:
+            missing_fields = [
+                name
+                for name, value in (
+                    ("role", user_row.role),
+                    ("domain_name", user_row.domain_name),
+                    ("domain_id", user_row.domain_id),
+                )
+                if value is None
+            ]
+            raise InternalServerError(
+                f"The authenticated user has no {', '.join(missing_fields)} "
+                f"(user_id={user_row.uuid})"
+            )
+
+        return _AuthContext(
+            user=AuthenticatedUser(
+                uuid=UserID(user_row.uuid),
+                email=user_row.email,
+                role=user_row.role,
+                domain_name=user_row.domain_name,
+                domain_id=DomainID(user_row.domain_id),
+                sudo_session_enabled=user_row.sudo_session_enabled,
+                main_access_key=AccessKey(user_row.main_access_key)
+                if user_row.main_access_key
+                else None,
+                allowed_client_ip=user_row.allowed_client_ip,
+                resource_policy=user_row.resource_policy_row.to_dataclass(),
+            ),
+            keypair=AuthenticatedKeypair(
+                access_key=AccessKey(keypair_row.access_key),
+                secret_key=SecretKey(keypair_row.secret_key) if keypair_row.secret_key else None,
+                is_admin=bool(keypair_row.is_admin),
+                rate_limit=keypair_row.rate_limit,
+                resource_policy=keypair_row.resource_policy_row.to_dataclass(),
+            ),
         )
-        result = await conn.execute(query)
-        user_row = result.first()
-
-        return user_row, keypair_row
-
-
-def _populate_auth_result(
-    request: web.Request,
-    user_row: Any,
-    keypair_row: Any,
-) -> None:
-    if not user_row or not keypair_row:
-        return
-
-    keypair_mapping = keypair_row._mapping
-    user_mapping = user_row._mapping
-
-    auth_result = {
-        "is_authorized": True,
-        "keypair": {
-            col.name: keypair_mapping[f"keypairs_{col.name}"]
-            for col in keypairs.c
-            if col.name != "secret_key"
-        },
-        "user": {
-            col.name: user_mapping[f"users_{col.name}"]
-            for col in users.c
-            if col.name not in ("password", "description", "created_at")
-        },
-        "is_admin": keypair_mapping["keypairs_is_admin"],
-    }
-
-    validate_ip(request, auth_result["user"])
-
-    auth_result["keypair"]["resource_policy"] = {
-        col.name: keypair_mapping[f"keypair_resource_policies_{col.name}"]
-        for col in keypair_resource_policies.c
-    }
-    auth_result["user"]["resource_policy"] = {
-        col.name: user_mapping[f"user_resource_policies_{col.name}"]
-        for col in user_resource_policies.c
-    }
-    auth_result["user"]["id"] = keypair_mapping["keypairs_user_id"]  # legacy
-    auth_result["is_superadmin"] = auth_result["user"]["role"] == "superadmin"
-
-    request.update(auth_result)
 
 
 async def _authenticate_via_jwt(
-    request: web.Request,
     db: ExtendedAsyncSAEngine,
     jwt_validator: JWTValidator,
     valkey_stat: ValkeyStatClient,
     jwt_token: str,
-) -> None:
+) -> _AuthContext | None:
     try:
         unverified_payload = pyjwt.decode(
             jwt_token,
@@ -564,20 +579,21 @@ async def _authenticate_via_jwt(
         if not access_key:
             raise AuthorizationFailed("Access key not found in JWT token")
 
-        user_row, keypair_row = await execute_with_retry(
-            functools.partial(_query_cred_by_access_key, db, access_key)
+        context = await execute_with_retry(
+            functools.partial(_query_auth_context_by_access_key, db, access_key)
         )
 
-        if keypair_row is None:
+        if context is None:
             raise AuthorizationFailed("Access key not found in database")
+        if context.keypair.secret_key is None:
+            raise InternalServerError(f"The keypair has no secret key (access_key={access_key})")
 
-        secret_key = keypair_row.keypairs_secret_key
-        jwt_validator.validate_token(jwt_token, secret_key)
+        jwt_validator.validate_token(jwt_token, context.keypair.secret_key)
 
-        _populate_auth_result(request, user_row, keypair_row)
         log.trace("JWT authentication succeeded for access_key={}", access_key)
 
         await valkey_stat.increment_keypair_query_count(access_key)
+        return context
 
     except JWTError as e:
         log.warning("JWT authentication failed: {}", e)
@@ -588,31 +604,32 @@ async def _authenticate_via_hmac(
     request: web.Request,
     db: ExtendedAsyncSAEngine,
     valkey_stat: ValkeyStatClient,
-) -> None:
+) -> _AuthContext | None:
     if not check_date(request):
         raise InvalidAuthParameters("Date/time sync error")
 
     params = _extract_auth_params(request)
     if not params:
-        return
+        return None
 
     sign_method, access_key, signature = params
 
-    user_row, keypair_row = await execute_with_retry(
-        functools.partial(_query_cred_by_access_key, db, access_key)
+    context = await execute_with_retry(
+        functools.partial(_query_auth_context_by_access_key, db, access_key)
     )
 
-    if keypair_row is None:
+    if context is None:
         raise AuthorizationFailed("Access key not found in HMAC")
+    if context.keypair.secret_key is None:
+        raise InternalServerError(f"The keypair has no secret key (access_key={access_key})")
 
-    my_signature = await sign_request(sign_method, request, keypair_row.keypairs_secret_key)
+    my_signature = await sign_request(sign_method, request, context.keypair.secret_key)
 
     if not secrets.compare_digest(my_signature, signature):
         raise AuthorizationFailed("HMAC signature mismatch")
 
-    _populate_auth_result(request, user_row, keypair_row)
-
     await valkey_stat.increment_keypair_query_count(access_key)
+    return context
 
 
 async def _authenticate_via_hook(
@@ -620,7 +637,7 @@ async def _authenticate_via_hook(
     db: ExtendedAsyncSAEngine,
     valkey_stat: ValkeyStatClient,
     hook_plugin_ctx: HookPluginContext,
-) -> None:
+) -> _AuthContext | None:
     hook_result = await hook_plugin_ctx.dispatch(
         "PRE_AUTH_MIDDLEWARE",
         (request,),
@@ -631,22 +648,21 @@ async def _authenticate_via_hook(
         raise RejectedByHook.from_hook_result(hook_result)
 
     if not hook_result.result:
-        return
+        return None
 
     access_key = hook_result.result
     if access_key is None:
-        return
+        return None
 
-    user_row, keypair_row = await execute_with_retry(
-        functools.partial(_query_cred_by_access_key, db, access_key)
+    context = await execute_with_retry(
+        functools.partial(_query_auth_context_by_access_key, db, access_key)
     )
 
-    if keypair_row is None:
+    if context is None:
         raise AuthorizationFailed("Access key not found in hook")
 
-    _populate_auth_result(request, user_row, keypair_row)
-
     await valkey_stat.increment_keypair_query_count(access_key)
+    return context
 
 
 async def _load_user_data(db: ExtendedAsyncSAEngine, user_id: UserID) -> UserData:
@@ -672,22 +688,6 @@ async def _load_user_data(db: ExtendedAsyncSAEngine, user_id: UserID) -> UserDat
         role=row.role,
         domain_name=row.domain_name,
         domain_id=row.domain_id,
-    )
-
-
-def _authenticated_user(request: web.Request) -> UserData | None:
-    """The authenticated caller's ``UserData``, built from the auth-middleware result."""
-    user = request.get("user")
-    if not user or user.get("uuid") is None:
-        return None
-    return UserData(
-        user_id=user["uuid"],
-        is_authorized=request.get("is_authorized", False),
-        is_admin=request.get("is_admin", False),
-        is_superadmin=request.get("is_superadmin", False),
-        role=UserRole(user["role"]),
-        domain_name=user["domain_name"],
-        domain_id=user["domain_id"],
     )
 
 
@@ -855,14 +855,35 @@ def build_auth_middleware(
         jwt_token = request.headers.get("X-BackendAI-Token")
         auth_header = request.headers.get("Authorization")
         if jwt_token:
-            await _authenticate_via_jwt(request, db, jwt_validator, valkey_stat, jwt_token)
+            context = await _authenticate_via_jwt(db, jwt_validator, valkey_stat, jwt_token)
         elif auth_header:
-            await _authenticate_via_hmac(request, db, valkey_stat)
+            context = await _authenticate_via_hmac(request, db, valkey_stat)
         else:
-            await _authenticate_via_hook(request, db, valkey_stat, hook_plugin_ctx)
+            context = await _authenticate_via_hook(request, db, valkey_stat, hook_plugin_ctx)
 
-        # Resolve identities (DB touched here), then push them into the context.
-        authenticated_user = _authenticated_user(request)
+        authenticated_user: UserData | None = None
+        if context is not None:
+            validate_ip(request, context.user.allowed_client_ip)
+            is_superadmin = context.user.role == UserRole.SUPERADMIN
+            request.update({
+                "is_authorized": True,
+                "is_admin": context.keypair.is_admin,
+                "is_superadmin": is_superadmin,
+                # Handlers still read mappings; BA-7189 puts the dataclasses themselves here.
+                "user": dataclasses.asdict(context.user),
+                "keypair": dataclasses.asdict(context.keypair),
+            })
+            authenticated_user = UserData(
+                user_id=context.user.uuid,
+                is_authorized=True,
+                is_admin=context.keypair.is_admin,
+                is_superadmin=is_superadmin,
+                role=context.user.role,
+                domain_name=context.user.domain_name,
+                domain_id=context.user.domain_id,
+            )
+
+        # The effective user may differ from the caller (impersonation); the DB is touched here.
         effective_user = (
             await _resolve_effective_user(request, db, authenticated_user)
             if authenticated_user is not None
