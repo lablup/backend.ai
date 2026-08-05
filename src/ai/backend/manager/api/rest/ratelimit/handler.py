@@ -37,8 +37,8 @@ def make_rlim_middleware(
     ) -> web.StreamResponse:
         """Global middleware implementing a rolling-counter rate limiter."""
         if request["is_authorized"]:
-            rate_limit = request["keypair"]["rate_limit"]
-            access_key = request["keypair"]["access_key"]
+            rate_limit = request["keypair"].rate_limit
+            access_key = request["keypair"].access_key
             rolling_count = await valkey_client.execute_rate_limit_logic(
                 access_key=access_key,
                 window=_rlim_window,

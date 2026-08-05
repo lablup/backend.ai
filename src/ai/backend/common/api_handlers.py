@@ -479,8 +479,8 @@ def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
             @classmethod
             async def from_request(cls, request: web.Request) -> Self:
                 # Extract and validate data from request
-                user_id = request["user"]["uuid"]
-                user_email = request["user"]["email"]
+                user_id = request["user"].uuid
+                user_email = request["user"].email
                 return cls(user_id=user_id)
 
         @api_handler

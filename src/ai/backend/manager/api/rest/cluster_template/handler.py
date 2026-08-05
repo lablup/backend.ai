@@ -120,7 +120,7 @@ class ClusterTemplateHandler:
             requesting_project=project_id,
             requester_uuid=ctx.user_uuid,
             requester_access_key=ctx.access_key,
-            requester_role=req.request["user"]["role"],
+            requester_role=req.request["user"].role,
             requester_domain=ctx.user_domain,
             owner_access_key=owner_access_key,
             template_data=payload,
@@ -138,7 +138,7 @@ class ClusterTemplateHandler:
         req: RequestCtx,
     ) -> APIResponse:
         params = query.parsed
-        user_role = req.request["user"]["role"]
+        user_role = req.request["user"].role
 
         log.info("CLUSTER_TEMPLATE.LIST (ak:{})", ctx.access_key)
 
