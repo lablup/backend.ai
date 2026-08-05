@@ -588,7 +588,7 @@ class TestPurgeByConfigNames:
         fragments_across_scopes: list[AppConfigFragmentData],
         scope_owners: None,
     ) -> None:
-        purged = await repository.purge_by_config_names(
+        purged = await repository.bulk_purge_by_names(
             AppConfigFragmentSearchScope(
                 scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
             ),
@@ -618,7 +618,7 @@ class TestPurgeByConfigNames:
     ) -> None:
         # `menu` exists, but only at the public scope, so the caller's user scope holds none.
         with pytest.raises(AppConfigFragmentNotFound):
-            await repository.purge_by_config_names(
+            await repository.bulk_purge_by_names(
                 AppConfigFragmentSearchScope(
                     scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
                 ),
@@ -653,7 +653,7 @@ class TestPurgeByConfigNames:
             _ScopeBinding(scope_type=ScopeType.USER, scope_id=str(_USER_ID))
         ]
 
-        purged = await repository.purge_by_config_names(
+        purged = await repository.bulk_purge_by_names(
             AppConfigFragmentSearchScope(
                 scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
             ),

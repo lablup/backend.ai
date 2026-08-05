@@ -324,7 +324,7 @@ class TestAppConfigFragmentService:
         scoped_fragment: AppConfigFragmentData,
         case: _RBACScopeCase,
     ) -> None:
-        mock_repository.purge_by_config_names = AsyncMock(return_value=[scoped_fragment])
+        mock_repository.bulk_purge_by_names = AsyncMock(return_value=[scoped_fragment])
         scope = AppConfigFragmentSearchScope(scope_type=case.scope_type, scope_id=case.scope_id)
 
         result = await service.purge_by_names(
@@ -335,7 +335,7 @@ class TestAppConfigFragmentService:
         # The result reports the RBAC scope the purge was authorized at.
         assert result.scope_type() == case.expected_scope_type
         assert result.scope_id() == case.expected_scope_id
-        mock_repository.purge_by_config_names.assert_called_once_with(scope, ["theme"])
+        mock_repository.bulk_purge_by_names.assert_called_once_with(scope, ["theme"])
 
     # --- bulk ---
 

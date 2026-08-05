@@ -156,7 +156,7 @@ class AppConfigFragmentDBSource:
             return AppConfigFragmentBulkResult(succeeded=succeeded, failed=failed)
 
     @app_config_fragment_db_source_resilience.apply()
-    async def purge_by_config_names(
+    async def bulk_purge_by_names(
         self,
         scope: AppConfigFragmentSearchScope,
         config_names: Sequence[str],
