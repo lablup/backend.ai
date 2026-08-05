@@ -806,9 +806,11 @@ class SessionLauncher:
                     )
                 )
             ).all()
-        in_use: defaultdict[AgentId, set[int]] = defaultdict(set)
+        in_use: defaultdict[str, set[int]] = defaultdict(set)
         for agent, port in taken:
-            in_use[AgentId(agent)].add(port)
+            reachable = advertised.get(AgentId(agent))
+            if reachable:
+                in_use[reachable].add(port)
         low, high = opts.tunnel_port_range
         members: list[TunnelMember] = []
         ports: dict[KernelId, int] = {}
@@ -823,12 +825,12 @@ class SessionLauncher:
                         " routable tunnel ingress host; set agent.public-host on that agent"
                     )
                 )
-            port = next((p for p in range(low, high + 1) if p not in in_use[agent_id]), None)
+            port = next((p for p in range(low, high + 1) if p not in in_use[host]), None)
             if port is None:
                 raise ConfidentialCapabilityRefused(
-                    extra_msg=f"agent {agent_id} has no free tunnel ingress port in {low}-{high}"
+                    extra_msg=f"host {host} has no free tunnel ingress port in {low}-{high}"
                 )
-            in_use[agent_id].add(port)
+            in_use[host].add(port)
             ports[kernel.kernel_id] = port
             members.append(
                 TunnelMember(
