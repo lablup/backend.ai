@@ -54,6 +54,8 @@ UNDATED_CLAIM_LEASE: Final = timedelta(minutes=5)
 _QUOTE_HEADER_LEN: Final = 48
 _MR_TD: Final = slice(136, 184)
 _MR_CONFIG_ID: Final = slice(184, 232)
+_RTMR_1: Final = slice(376, 424)
+_RTMR_2: Final = slice(424, 472)
 
 
 def _report_body(evidence: Any) -> bytes | None:
@@ -165,6 +167,8 @@ def presented_measurement(body: bytes | None) -> str | None:
     return json.dumps({
         "mr_td": body[_MR_TD].hex(),
         "mr_config_id": body[_MR_CONFIG_ID].hex(),
+        "rtmr_1": body[_RTMR_1].hex(),
+        "rtmr_2": body[_RTMR_2].hex(),
     })
 
 
