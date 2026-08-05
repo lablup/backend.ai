@@ -227,6 +227,7 @@ async def expired_password_user(
                 status=UserStatus.ACTIVE,
                 status_info="admin-requested",
                 domain_name=domain_fixture.domain_name,
+                domain_id=domain_fixture.domain_id,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.USER,
                 password_changed_at=expired_at,
