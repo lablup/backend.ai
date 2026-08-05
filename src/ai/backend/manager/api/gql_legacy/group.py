@@ -307,9 +307,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
         )
         async with graph_ctx.db.connect() as db_conn:
             user = graph_ctx.user
-            client_ctx = ClientContext(
-                graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
-            )
+            client_ctx = ClientContext(graph_ctx.db, user.domain_name, user.uuid, user.role)
             permission_ctx = await get_permission_ctx(
                 db_conn, client_ctx, permission, scope, container_registry_scope
             )

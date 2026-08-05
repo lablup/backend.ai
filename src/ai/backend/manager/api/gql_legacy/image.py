@@ -347,7 +347,7 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
         """
         Determine if the image is filtered according to the `load_filters` parameter.
         """
-        user_role = ctx.user["role"]
+        user_role = ctx.user.role
 
         # If the image filtered by any of its labels, return False early.
         # If the image is not filtered and is determiend to be valid by any of its labels, `is_valid = True`.
@@ -366,7 +366,7 @@ class Image(graphene.ObjectType):  # type: ignore[misc]
                     ):
                         return False
                     if ImageLoadFilter.CUSTOMIZED in load_filters:
-                        if label.value == f"user:{ctx.user['uuid']}":
+                        if label.value == f"user:{ctx.user.uuid}":
                             is_valid = True
                         else:
                             return False
@@ -626,9 +626,7 @@ class ImageNode(graphene.ObjectType):  # type: ignore[misc]
         _, image_id = id
         async with graph_ctx.db.connect() as db_conn:
             user = graph_ctx.user
-            client_ctx = ClientContext(
-                graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
-            )
+            client_ctx = ClientContext(graph_ctx.db, user.domain_name, user.uuid, user.role)
             permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope_id, permission)
             cond = permission_ctx.query_condition
             if cond is None:
@@ -700,9 +698,7 @@ class ImageNode(graphene.ObjectType):  # type: ignore[misc]
         )
         async with graph_ctx.db.connect() as db_conn:
             user = graph_ctx.user
-            client_ctx = ClientContext(
-                graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
-            )
+            client_ctx = ClientContext(graph_ctx.db, user.domain_name, user.uuid, user.role)
             permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope_id, permission)
             cond = permission_ctx.query_condition
             if cond is None:
