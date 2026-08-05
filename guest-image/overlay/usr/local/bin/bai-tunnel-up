@@ -9,6 +9,8 @@ import urllib.request
 STATE = pathlib.Path("/run/backend.ai")
 SHARED = STATE / "session"
 LINK = "wg0"
+IP = "/usr/sbin/ip"
+WG = "/usr/bin/wg"
 
 
 class Refused(Exception):
@@ -32,7 +34,7 @@ def run(*args, feed=None):
 
 def carrier_mtu(name):
     fields = subprocess.run(
-        ["ip", "-o", "link", "show", name], capture_output=True, check=False
+        [IP, "-o", "link", "show", name], capture_output=True, check=False
     ).stdout.split()
     if b"mtu" not in fields:
         raise Refused(f"the guest interface {name} reports no packet size to derive from")
@@ -63,13 +65,13 @@ def main():
             f"AllowedIPs = {peer['tunnel_addr']}/32\n"
             f"Endpoint = {base + peer['cluster_idx']}:{port}\nPersistentKeepalive = 25\n"
         )
-    run("ip", "link", "add", LINK, "type", "wireguard")
-    run("wg", "setconf", LINK, "/dev/stdin", feed="\n".join(config).encode())
-    run("ip", "addr", "add", f"{mine['tunnel_addr']}/32", "dev", LINK)
-    run("ip", "link", "set", LINK, "mtu", str(carrier_mtu("eth0") - 80), "up")
+    run(IP, "link", "add", LINK, "type", "wireguard")
+    run(WG, "setconf", LINK, "/dev/stdin", feed="\n".join(config).encode())
+    run(IP, "addr", "add", f"{mine['tunnel_addr']}/32", "dev", LINK)
+    run(IP, "link", "set", LINK, "mtu", str(carrier_mtu("eth0") - 80), "up")
     for peer in peers:
         if peer["cluster_idx"] != own["cluster_idx"]:
-            run("ip", "route", "add", f"{peer['tunnel_addr']}/32", "dev", LINK)
+            run(IP, "route", "add", f"{peer['tunnel_addr']}/32", "dev", LINK)
     (SHARED / "hosts").write_text(
         "".join(f"{peer['tunnel_addr']} {peer['hostname']}\n" for peer in peers)
     )
@@ -84,8 +86,8 @@ def main():
 
 try:
     main()
-except (Refused, KeyError, ValueError, OSError) as failure:
-    subprocess.run(["ip", "link", "delete", LINK], capture_output=True, check=False)
-    report({"state": "failed", "reason": str(failure)})
+except Exception as failure:
+    report({"state": "failed", "reason": f"{type(failure).__name__}: {failure}"})
+    subprocess.run([IP, "link", "delete", LINK], capture_output=True, check=False)
     print(f"backend.ai inter-kernel tunnel refused to come up: {failure}", file=sys.stderr)
     sys.exit(1)
