@@ -171,14 +171,17 @@ class ConfidentialHandler:
         affected = await self._plane.references.sessions_on(row)
         content_hash = await self._plane.policy.compose_and_upload(opts)
         endpoints = await self._plane.confidential_endpoints()
+        reason: str | None = None
         for session_id in affected:
             await self._plane.provisioner.teardown(endpoints, session_id)
+            reason = await self._plane.provisioner.disclose_drain(session_id, row.id)
         return APIResponse.build(
             HTTPStatus.OK,
             _Payload(
                 result={
                     "policy_content_hash": content_hash,
                     "drained_sessions": [str(s) for s in affected],
+                    "drained_reason": reason,
                 }
             ),
         )

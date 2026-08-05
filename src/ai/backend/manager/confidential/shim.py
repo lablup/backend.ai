@@ -286,41 +286,47 @@ class AuthorisationShim:
                 .where(ConfidentialNonceRow.nonce == nonce)
                 .with_for_update()
             )
-            if bound is not None:
-                if bound.reference_value_id is None:
-                    bound.reference_value_id = await db_session.scalar(
-                        sa.select(ConfidentialAttestedGuestRow.reference_value_id).where(
-                            (ConfidentialAttestedGuestRow.guest == claimant.guest)
-                            & (ConfidentialAttestedGuestRow.endpoint == bound.endpoint)
-                        )
-                    )
-                held = await db_session.scalar(
-                    sa.select(ConfidentialGuestClaimRow).where(
-                        (ConfidentialGuestClaimRow.nonce == nonce)
-                        & (ConfidentialGuestClaimRow.guest == claimant.guest)
+            if bound is None:
+                raise NonceQuotaExhausted(
+                    extra_msg=(
+                        "no session nonce of this name is provisioned, so the session that"
+                        " carried it has had its confidential resources destroyed"
                     )
                 )
-                if held is not None:
-                    held.expires_at = claimant.expires_at
-                    return bound.session_id, False
-                live = await db_session.scalar(
-                    sa.select(sa.func.count())
-                    .select_from(ConfidentialGuestClaimRow)
-                    .where(
-                        (ConfidentialGuestClaimRow.nonce == nonce)
-                        & (ConfidentialGuestClaimRow.expires_at > sa.func.now())
+            if bound.reference_value_id is None:
+                bound.reference_value_id = await db_session.scalar(
+                    sa.select(ConfidentialAttestedGuestRow.reference_value_id).where(
+                        (ConfidentialAttestedGuestRow.guest == claimant.guest)
+                        & (ConfidentialAttestedGuestRow.endpoint == bound.endpoint)
                     )
                 )
-                if live < bound.quota:
-                    db_session.add(
-                        ConfidentialGuestClaimRow(
-                            nonce=nonce,
-                            guest=claimant.guest,
-                            session_id=bound.session_id,
-                            expires_at=claimant.expires_at,
-                        )
+            held = await db_session.scalar(
+                sa.select(ConfidentialGuestClaimRow).where(
+                    (ConfidentialGuestClaimRow.nonce == nonce)
+                    & (ConfidentialGuestClaimRow.guest == claimant.guest)
+                )
+            )
+            if held is not None:
+                held.expires_at = claimant.expires_at
+                return bound.session_id, False
+            live = await db_session.scalar(
+                sa.select(sa.func.count())
+                .select_from(ConfidentialGuestClaimRow)
+                .where(
+                    (ConfidentialGuestClaimRow.nonce == nonce)
+                    & (ConfidentialGuestClaimRow.expires_at > sa.func.now())
+                )
+            )
+            if live < bound.quota:
+                db_session.add(
+                    ConfidentialGuestClaimRow(
+                        nonce=nonce,
+                        guest=claimant.guest,
+                        session_id=bound.session_id,
+                        expires_at=claimant.expires_at,
                     )
-                    return bound.session_id, True
+                )
+                return bound.session_id, True
             raise NonceQuotaExhausted(extra_msg="no live claim slot remains for this session nonce")
 
         async with self._db.connect() as conn:

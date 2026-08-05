@@ -33,6 +33,7 @@ from ai.backend.manager.models.confidential.types import (
     DecisionVerdict,
     SessionResourceKind,
 )
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.scaling_group.types import (
     NONCE_RESIDUAL_DISCLOSURE,
     ConfidentialScalingGroupOpts,
@@ -43,6 +44,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 RECONCILE_INTERVAL: Final = 300.0
+DRAIN_REASON: Final = "confidential-reference-value-drained"
 
 
 @dataclass(frozen=True)
@@ -218,6 +220,35 @@ class SessionResourceProvisioner:
 
         await self._settle(_release)
         return destroyed
+
+    async def disclose_drain(self, session_id: uuid.UUID, value_id: uuid.UUID) -> str:
+        reason = f"{DRAIN_REASON}:{value_id}"
+        async with self._db.begin_session() as db_session:
+            await db_session.execute(
+                sa.update(SessionRow).where(SessionRow.id == session_id).values(status_info=reason)
+            )
+            await db_session.execute(
+                sa.update(KernelRow)
+                .where(KernelRow.session_id == session_id)
+                .values(status_info=reason)
+            )
+            await self._shim.record(
+                actor=DecisionActor.MANAGER,
+                verdict=DecisionVerdict.DENIED,
+                resource_path=DRAIN_REASON,
+                failing_clause=(
+                    f"reference value {value_id} was drained, so this session's confidential"
+                    " resources were destroyed and every further guest fetch is refused"
+                ),
+                session_id=session_id,
+                db_session=db_session,
+            )
+        log.warning(
+            "confidential: session {} is stranded by the drain of reference value {}",
+            session_id,
+            value_id,
+        )
+        return reason
 
     async def reconcile(self, endpoints: Mapping[str, ConfidentialScalingGroupOpts]) -> int:
         async with self._db.begin_readonly_session() as db_session:
