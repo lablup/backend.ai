@@ -155,7 +155,7 @@ class SessionResourceProvisioner:
             )
         destroyed = 0
         for row in rows:
-            await self._broker.destroy_resource(target, row.resource_path, missing_ok=True)
+            await self._broker.destroy_resource(target, row.resource_path)
             async with self._db.begin_session() as db_session:
                 await db_session.execute(
                     sa.update(ConfidentialSessionResourceRow)
@@ -188,9 +188,7 @@ class SessionResourceProvisioner:
             if opts is None:
                 continue
             try:
-                await self._broker.destroy_resource(
-                    BrokerTarget.of(opts), row.resource_path, missing_ok=True
-                )
+                await self._broker.destroy_resource(BrokerTarget.of(opts), row.resource_path)
             except BrokerUnreachable:
                 continue
             async with self._db.begin_session() as db_session:
