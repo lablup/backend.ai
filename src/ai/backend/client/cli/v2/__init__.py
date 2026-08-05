@@ -51,6 +51,15 @@ v2.add_command(my)
 # Names are singular following the pattern: ./bai [admin] {entity} {operation}
 
 
+@v2.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.app_config_fragment:app_config_fragment",
+    name="app-config-fragment",
+)
+def app_config_fragment() -> None:
+    """App config fragment commands."""
+
+
 @v2.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.domain:domain")
 def domain() -> None:
     """Domain commands."""

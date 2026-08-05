@@ -11,7 +11,7 @@ not the recursive scope-walk.
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Awaitable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import override
@@ -33,23 +33,24 @@ from ai.backend.common.data.permission.types import (
 )
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.common.identifier.virtual_scope import VirtualScopeID
 from ai.backend.manager.actions.action.base import BaseActionTriggerMeta
-from ai.backend.manager.actions.bulk.base import BaseBulkAction
-from ai.backend.manager.actions.bulk.validator.rbac import (
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
+from ai.backend.manager.actions.v2.bulk.validator.rbac import (
     VirtualScopeBulkActionRBACValidator,
 )
-from ai.backend.manager.actions.scope.base import BaseScopeAction
-from ai.backend.manager.actions.scope.validator.rbac import (
+from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
+from ai.backend.manager.actions.v2.scope.validator.rbac import (
     VirtualScopeScopeActionRBACValidator,
 )
-from ai.backend.manager.actions.single_entity.base import BaseSingleEntityAction
-from ai.backend.manager.actions.single_entity.validator.rbac import (
+from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
+from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
     VirtualScopeSingleEntityActionRBACValidator,
 )
-from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.agent import AgentRow
@@ -119,11 +120,6 @@ class _ProjectCreateScopeAction(BaseScopeAction):
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
 
-    @classmethod
-    @override
-    def required_permission(cls) -> Permission:
-        return Permission.CREATE
-
 
 @dataclass
 class _VfolderUpdateAction(BaseSingleEntityAction):
@@ -145,10 +141,26 @@ class _VfolderUpdateAction(BaseSingleEntityAction):
     def entity_id(self) -> EntityID:
         return self.vfolder_id
 
+
+@dataclass
+class _VfolderUpsertAction(BaseSingleEntityAction):
+    """VFOLDER:UPSERT on a single vfolder — requires the ``CREATE | UPDATE`` mask."""
+
+    vfolder_id: EntityID = field(default_factory=lambda: _VFOLDER_ID)
+
     @classmethod
     @override
-    def required_permission(cls) -> Permission:
-        return Permission.UPDATE
+    def entity_type(cls) -> EntityType:
+        return EntityType("vfolder")
+
+    @classmethod
+    @override
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPSERT
+
+    @override
+    def entity_id(self) -> EntityID:
+        return self.vfolder_id
 
 
 @dataclass
@@ -171,11 +183,6 @@ class _BulkVfolderUpdateAction(BaseBulkAction):
     def entity_ids(self) -> Sequence[EntityID]:
         return self.ids
 
-    @classmethod
-    @override
-    def required_permission(cls) -> Permission:
-        return Permission.UPDATE
-
 
 def _domain_scope(scope_id: ScopeID) -> ScopeRef:
     return ScopeRef(scope_type=ScopeType("domain"), scope_id=scope_id)
@@ -189,6 +196,7 @@ def _make_user_data(user_id: uuid.UUID, *, is_superadmin: bool) -> UserData:
         is_superadmin=is_superadmin,
         role=UserRole.SUPERADMIN if is_superadmin else UserRole.USER,
         domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
     )
 
 
@@ -219,6 +227,7 @@ async def _seed_user_with_role(
         db_sess.add(
             UserRow(
                 uuid=user_id,
+                username=f"user-{suffix}",
                 email=f"user-{suffix}@test.com",
                 resource_policy=policy_name,
                 status=UserStatus.ACTIVE,
@@ -247,7 +256,14 @@ async def _grant_permission(
     scope_id: uuid.UUID,
     entity_type: PermEntityType,
     operation: OperationType,
+    permission: Permission | None = None,
 ) -> None:
+    """Grant *operation* on *entity_type* at the scope.
+
+    ``permission`` overrides the granted bitmask, which the resolution actually
+    reads; pass it to grant a multi-bit mask the single ``operation`` column
+    cannot express.
+    """
     async with db.begin_session() as db_sess:
         db_sess.add(
             PermissionRow(
@@ -256,7 +272,9 @@ async def _grant_permission(
                 scope_id=str(scope_id),
                 entity_type=entity_type,
                 operation=operation,
-                permission=Permission.from_operation(operation),
+                permission=permission
+                if permission is not None
+                else Permission.from_operation(operation),
             )
         )
         await db_sess.flush()
@@ -314,6 +332,7 @@ async def _seed_granted_user(
     perm_scope_type: PermScopeType,
     perm_entity_type: PermEntityType,
     operation: OperationType,
+    permission: Permission | None = None,
     scope_cap: Permission | None = None,
     entity_cap: Permission | None = None,
 ) -> UserData:
@@ -338,6 +357,7 @@ async def _seed_granted_user(
         scope_id=owner_scope_id,
         entity_type=perm_entity_type,
         operation=operation,
+        permission=permission,
     )
     return _make_user_data(user_id, is_superadmin=False)
 
@@ -508,6 +528,45 @@ async def user_with_read_capped_vfolder(
     )
 
 
+def _vfolder_user_with(
+    db: ExtendedAsyncSAEngine,
+    permission: Permission,
+) -> Awaitable[UserData]:
+    """A user whose effective VFOLDER permission at the project scope is *permission*."""
+    return _seed_granted_user(
+        db,
+        owner_scope_type="project",
+        owner_scope_id=_PROJECT_ID,
+        entity_type="vfolder",
+        entity_ids=[_VFOLDER_ID],
+        perm_scope_type=PermScopeType.PROJECT,
+        perm_entity_type=PermEntityType.VFOLDER,
+        operation=OperationType.CREATE,
+        permission=permission,
+    )
+
+
+@pytest.fixture
+async def user_with_vfolder_create_only(
+    db_with_rbac_tables: ExtendedAsyncSAEngine,
+) -> UserData:
+    return await _vfolder_user_with(db_with_rbac_tables, Permission.CREATE)
+
+
+@pytest.fixture
+async def user_with_vfolder_update_only(
+    db_with_rbac_tables: ExtendedAsyncSAEngine,
+) -> UserData:
+    return await _vfolder_user_with(db_with_rbac_tables, Permission.UPDATE)
+
+
+@pytest.fixture
+async def user_with_vfolder_create_and_update(
+    db_with_rbac_tables: ExtendedAsyncSAEngine,
+) -> UserData:
+    return await _vfolder_user_with(db_with_rbac_tables, Permission.CREATE | Permission.UPDATE)
+
+
 @pytest.fixture
 async def user_with_all_bulk_vfolders_granted(
     db_with_rbac_tables: ExtendedAsyncSAEngine,
@@ -659,6 +718,58 @@ class TestVirtualScopeSingleEntityActionRBACValidator:
         with with_user(user_with_read_capped_vfolder):
             with pytest.raises(NotEnoughPermission):
                 await single_entity_validator.validate(single_entity_action, trigger_meta)
+
+
+class TestUpsertRequiresBothCreateAndUpdate:
+    """An UPSERT action demands the ``CREATE | UPDATE`` mask, and the check is a
+    subset test — holding just one of the two bits must be rejected."""
+
+    @pytest.fixture
+    def upsert_action(self) -> _VfolderUpsertAction:
+        return _VfolderUpsertAction()
+
+    async def test_create_only_is_rejected(
+        self,
+        single_entity_validator: VirtualScopeSingleEntityActionRBACValidator,
+        upsert_action: _VfolderUpsertAction,
+        trigger_meta: BaseActionTriggerMeta,
+        user_with_vfolder_create_only: UserData,
+    ) -> None:
+        with with_user(user_with_vfolder_create_only):
+            with pytest.raises(NotEnoughPermission):
+                await single_entity_validator.validate(upsert_action, trigger_meta)
+
+    async def test_update_only_is_rejected(
+        self,
+        single_entity_validator: VirtualScopeSingleEntityActionRBACValidator,
+        upsert_action: _VfolderUpsertAction,
+        trigger_meta: BaseActionTriggerMeta,
+        user_with_vfolder_update_only: UserData,
+    ) -> None:
+        with with_user(user_with_vfolder_update_only):
+            with pytest.raises(NotEnoughPermission):
+                await single_entity_validator.validate(upsert_action, trigger_meta)
+
+    async def test_both_bits_pass(
+        self,
+        single_entity_validator: VirtualScopeSingleEntityActionRBACValidator,
+        upsert_action: _VfolderUpsertAction,
+        trigger_meta: BaseActionTriggerMeta,
+        user_with_vfolder_create_and_update: UserData,
+    ) -> None:
+        with with_user(user_with_vfolder_create_and_update):
+            await single_entity_validator.validate(upsert_action, trigger_meta)
+
+    async def test_single_bit_operation_still_passes_with_one_bit(
+        self,
+        single_entity_validator: VirtualScopeSingleEntityActionRBACValidator,
+        single_entity_action: _VfolderUpdateAction,
+        trigger_meta: BaseActionTriggerMeta,
+        user_with_vfolder_update_only: UserData,
+    ) -> None:
+        # Regression: the subset semantics must not tighten single-bit operations.
+        with with_user(user_with_vfolder_update_only):
+            await single_entity_validator.validate(single_entity_action, trigger_meta)
 
 
 class TestVirtualScopeBulkActionRBACValidator:

@@ -1,7 +1,8 @@
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from ai.backend.common.contexts.user import current_user, triggered_user
 from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.message_queue.types import MessageMetadata
 
@@ -14,6 +15,7 @@ def _make_user(user_id: str, is_superadmin: bool = False) -> UserData:
         is_superadmin=is_superadmin,
         role=UserRole.SUPERADMIN if is_superadmin else UserRole.USER,
         domain_name="default",
+        domain_id=DomainID(uuid4()),
     )
 
 
@@ -26,6 +28,7 @@ class TestMessageMetadata:
             is_superadmin=False,
             role=UserRole.USER,
             domain_name="default",
+            domain_id=DomainID(uuid4()),
         )
         metadata = MessageMetadata(request_id="req-123", user=user)
 
@@ -60,6 +63,7 @@ class TestMessageMetadata:
             is_superadmin=False,
             role=UserRole.ADMIN,
             domain_name="test-domain",
+            domain_id=DomainID(uuid4()),
         )
         metadata = MessageMetadata(request_id=None, user=user)
 
@@ -90,6 +94,7 @@ class TestMessageMetadata:
                 "is_superadmin": False,
                 "role": "user",
                 "domain_name": "org1",
+                "domain_id": "11111111-2222-3333-4444-555555555555",
             },
         }
         serialized = dump_json(data)
@@ -114,6 +119,7 @@ class TestMessageMetadata:
                 "is_superadmin": True,
                 "role": "superadmin",
                 "domain_name": "system",
+                "domain_id": "11111111-2222-3333-4444-555555555555",
             },
         }
         serialized_str = dump_json(data).decode("utf-8")
@@ -138,6 +144,7 @@ class TestMessageMetadata:
                 "is_superadmin": False,
                 "role": "user",
                 "domain_name": "default",
+                "domain_id": "11111111-2222-3333-4444-555555555555",
             },
         }
         serialized = dump_json(data)
@@ -182,6 +189,7 @@ class TestMessageMetadata:
             is_superadmin=False,
             role=UserRole.USER,
             domain_name="enterprise",
+            domain_id=DomainID(uuid4()),
         )
         original = MessageMetadata(request_id="roundtrip-test", user=user)
 

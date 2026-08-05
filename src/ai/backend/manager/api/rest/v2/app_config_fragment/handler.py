@@ -6,12 +6,7 @@ import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
-from ai.backend.common.api_handlers import (
-    APIResponse,
-    BaseRootResponseModel,
-    BodyParam,
-    PathParam,
-)
+from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AdminSearchAppConfigFragmentInput,
     BulkPurgeAppConfigFragmentInput,
@@ -20,7 +15,9 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     ScopedAppConfigFragmentsByNamesInput,
     ScopedUpsertAppConfigFragmentsInput,
 )
-from ai.backend.common.dto.manager.v2.app_config_fragment.response import AppConfigFragmentNode
+from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
+    AppConfigFragmentsByNamesPayload,
+)
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import AppConfigFragmentIdPathParam
@@ -31,10 +28,6 @@ if TYPE_CHECKING:
     )
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-class AppConfigFragmentsByNamesResponse(BaseRootResponseModel[list[AppConfigFragmentNode | None]]):
-    """One entry per requested config name, null where the scope holds no fragment for it."""
 
 
 class V2AppConfigFragmentHandler:
@@ -84,7 +77,7 @@ class V2AppConfigFragmentHandler:
         """Read one scope's fragments for the given config names (auth, RBAC-authorized)."""
         nodes = await self._adapter.scoped_app_config_fragments_by_names(body.parsed)
         return APIResponse.build(
-            status_code=HTTPStatus.OK, response_model=AppConfigFragmentsByNamesResponse(nodes)
+            status_code=HTTPStatus.OK, response_model=AppConfigFragmentsByNamesPayload(nodes)
         )
 
     async def my_fragments_by_names(
@@ -94,7 +87,7 @@ class V2AppConfigFragmentHandler:
         """Read the caller's own user-scope fragments for the given config names (auth)."""
         nodes = await self._adapter.my_app_config_fragments_by_names(body.parsed)
         return APIResponse.build(
-            status_code=HTTPStatus.OK, response_model=AppConfigFragmentsByNamesResponse(nodes)
+            status_code=HTTPStatus.OK, response_model=AppConfigFragmentsByNamesPayload(nodes)
         )
 
     async def scoped_bulk_upsert(

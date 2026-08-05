@@ -84,6 +84,10 @@ from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_id
     ResolveResourceGroupIDByNameAction,
     ResolveResourceGroupIDByNameActionResult,
 )
+from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_ids_by_names import (
+    ResolveResourceGroupIDsByNamesAction,
+    ResolveResourceGroupIDsByNamesActionResult,
+)
 from ai.backend.manager.services.scaling_group.actions.update_allowed_domains_for_rg import (
     UpdateAllowedDomainsForResourceGroupAction,
     UpdateAllowedDomainsForResourceGroupActionResult,
@@ -185,6 +189,10 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
         ResolveResourceGroupIDByNameAction,
         ResolveResourceGroupIDByNameActionResult,
     ]
+    resolve_resource_group_ids_by_names: ActionProcessor[
+        ResolveResourceGroupIDsByNamesAction,
+        ResolveResourceGroupIDsByNamesActionResult,
+    ]
 
     def __init__(
         self,
@@ -253,6 +261,9 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
         self.resolve_resource_group_id_by_name = ActionProcessor(
             service.resolve_resource_group_id_by_name, action_monitors
         )
+        self.resolve_resource_group_ids_by_names = ActionProcessor(
+            service.resolve_resource_group_ids_by_names, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -282,4 +293,5 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
             GetAllowedDomainsForResourceGroupAction.spec(),
             GetAllowedProjectsForResourceGroupAction.spec(),
             ResolveResourceGroupIDByNameAction.spec(),
+            ResolveResourceGroupIDsByNamesAction.spec(),
         ]

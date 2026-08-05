@@ -29,9 +29,11 @@ async def extra_scaling_group_fixture(
 ) -> AsyncIterator[str]:
     """Create a second scaling group associated with the domain AND group."""
     sgroup_name = f"extra-sgroup-{secrets.token_hex(6)}"
+    sgroup_id = uuid.uuid4()
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.insert(scaling_groups).values(
+                id=sgroup_id,
                 name=sgroup_name,
                 description=f"Extra scaling group {sgroup_name}",
                 is_active=True,
@@ -44,23 +46,23 @@ async def extra_scaling_group_fixture(
         )
         await conn.execute(
             sa.insert(sgroups_for_domains).values(
-                scaling_group=sgroup_name,
-                domain=domain_fixture.domain_name,
+                resource_group_id=sgroup_id,
+                domain_id=domain_fixture.domain_id,
             )
         )
         await conn.execute(
             sa.insert(sgroups_for_groups).values(
-                scaling_group=sgroup_name,
+                resource_group_id=sgroup_id,
                 group=group_fixture,
             )
         )
     yield sgroup_name
     async with db_engine.begin() as conn:
         await conn.execute(
-            sgroups_for_groups.delete().where(sgroups_for_groups.c.scaling_group == sgroup_name)
+            sgroups_for_groups.delete().where(sgroups_for_groups.c.resource_group_id == sgroup_id)
         )
         await conn.execute(
-            sgroups_for_domains.delete().where(sgroups_for_domains.c.scaling_group == sgroup_name)
+            sgroups_for_domains.delete().where(sgroups_for_domains.c.resource_group_id == sgroup_id)
         )
         await conn.execute(scaling_groups.delete().where(scaling_groups.c.name == sgroup_name))
 
@@ -72,9 +74,11 @@ async def private_scaling_group_fixture(
 ) -> AsyncIterator[str]:
     """Create a private (is_public=False) scaling group associated with the domain."""
     sgroup_name = f"private-sgroup-{secrets.token_hex(6)}"
+    sgroup_id = uuid.uuid4()
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.insert(scaling_groups).values(
+                id=sgroup_id,
                 name=sgroup_name,
                 description=f"Private scaling group {sgroup_name}",
                 is_active=True,
@@ -87,14 +91,14 @@ async def private_scaling_group_fixture(
         )
         await conn.execute(
             sa.insert(sgroups_for_domains).values(
-                scaling_group=sgroup_name,
-                domain=domain_fixture.domain_name,
+                resource_group_id=sgroup_id,
+                domain_id=domain_fixture.domain_id,
             )
         )
     yield sgroup_name
     async with db_engine.begin() as conn:
         await conn.execute(
-            sgroups_for_domains.delete().where(sgroups_for_domains.c.scaling_group == sgroup_name)
+            sgroups_for_domains.delete().where(sgroups_for_domains.c.resource_group_id == sgroup_id)
         )
         await conn.execute(scaling_groups.delete().where(scaling_groups.c.name == sgroup_name))
 

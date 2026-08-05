@@ -1203,10 +1203,11 @@ class PermissionDBSource:
         """Return whether the user holds *permission* on the key's entity via a virtual scope.
 
         Resolves the effective permission through the virtual-scope chain and tests
-        it bitwise (``effective & permission != NONE``).
+        that it covers *every* bit of ``permission``, which may be a mask
+        (``UPSERT`` requires ``CREATE | UPDATE``) rather than a single bit.
         """
         resolved = await self.resolve_effective_permissions_via_virtual_scope([key])
-        return bool(resolved.get(key, Permission.NONE) & permission)
+        return resolved.get(key, Permission.NONE).covers(permission)
 
     async def check_bulk_permission_via_virtual_scope(
         self,
@@ -1215,12 +1216,13 @@ class PermissionDBSource:
     ) -> Mapping[EntityPermissionCheckKey, bool]:
         """Check *permission* on each target entity through the virtual-scope chain in one go.
 
-        Returns a mapping from each input key to whether the permission is granted.
+        Returns a mapping from each input key to whether every bit of ``permission``
+        is granted.
         """
         if not keys:
             return {}
         resolved = await self.resolve_effective_permissions_via_virtual_scope(keys)
-        return {key: bool(resolved.get(key, Permission.NONE) & permission) for key in keys}
+        return {key: resolved.get(key, Permission.NONE).covers(permission) for key in keys}
 
     async def check_scope_permission_via_virtual_scope(
         self,
@@ -1229,12 +1231,13 @@ class PermissionDBSource:
     ) -> Mapping[ScopePermissionCheckKey, bool]:
         """Check *permission* on each target scope through the virtual-scope chain in one go.
 
-        Returns a mapping from each input key to whether the permission is granted.
+        Returns a mapping from each input key to whether every bit of ``permission``
+        is granted.
         """
         if not keys:
             return {}
         resolved = await self._resolve_effective_scope_permissions_via_virtual_scope(keys)
-        return {key: bool(resolved.get(key, Permission.NONE) & permission) for key in keys}
+        return {key: resolved.get(key, Permission.NONE).covers(permission) for key in keys}
 
     async def resolve_effective_permissions_via_virtual_scope(
         self,

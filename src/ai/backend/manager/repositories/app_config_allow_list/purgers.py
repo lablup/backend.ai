@@ -5,14 +5,15 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
+from ai.backend.manager.data.app_config_allow_list.types import AppConfigAllowListData
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
-from ai.backend.manager.repositories.base.purger import PurgerSpec
+from ai.backend.manager.repositories.base.purger import DataPurger
 from ai.backend.manager.repositories.base.types import ConflictCheck
 
 
 @dataclass
-class AppConfigAllowListPurgerSpec(PurgerSpec[AppConfigAllowListRow]):
-    """PurgerSpec for deleting an app config allow list entry."""
+class AppConfigAllowListPurger(DataPurger[AppConfigAllowListRow, AppConfigAllowListData]):
+    """Purger for deleting an app config allow-list entry."""
 
     allow_list_id: AppConfigAllowListID
 
@@ -27,3 +28,7 @@ class AppConfigAllowListPurgerSpec(PurgerSpec[AppConfigAllowListRow]):
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:
         return ()
+
+    @override
+    def to_data(self, row: AppConfigAllowListRow) -> AppConfigAllowListData:
+        return row.to_data()

@@ -7,6 +7,8 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
@@ -41,15 +43,15 @@ class ScalingGroupPurgerSpec(PurgerSpec[ScalingGroupRow]):
 class ScalingGroupForDomainPurgerSpec(BatchPurgerSpec[ScalingGroupForDomainRow]):
     """PurgerSpec for disassociating a scaling group from a domain."""
 
-    scaling_group: str
-    domain: str
+    resource_group_id: ResourceGroupID
+    domain_id: DomainID
 
     @override
     def build_subquery(self) -> sa.sql.Select[tuple[ScalingGroupForDomainRow]]:
         return sa.select(ScalingGroupForDomainRow).where(
             sa.and_(
-                ScalingGroupForDomainRow.scaling_group == self.scaling_group,
-                ScalingGroupForDomainRow.domain == self.domain,
+                ScalingGroupForDomainRow.resource_group_id == self.resource_group_id,
+                ScalingGroupForDomainRow.domain_id == self.domain_id,
             )
         )
 
@@ -62,15 +64,15 @@ class ScalingGroupForDomainPurgerSpec(BatchPurgerSpec[ScalingGroupForDomainRow])
 class ScalingGroupsForDomainPurgerSpec(BatchPurgerSpec[ScalingGroupForDomainRow]):
     """PurgerSpec for disassociating multiple scaling groups from a domain."""
 
-    scaling_groups: list[str]
-    domain: str
+    resource_group_ids: list[ResourceGroupID]
+    domain_id: DomainID
 
     @override
     def build_subquery(self) -> sa.sql.Select[tuple[ScalingGroupForDomainRow]]:
         return sa.select(ScalingGroupForDomainRow).where(
             sa.and_(
-                ScalingGroupForDomainRow.scaling_group.in_(self.scaling_groups),
-                ScalingGroupForDomainRow.domain == self.domain,
+                ScalingGroupForDomainRow.resource_group_id.in_(self.resource_group_ids),
+                ScalingGroupForDomainRow.domain_id == self.domain_id,
             )
         )
 
@@ -83,12 +85,12 @@ class ScalingGroupsForDomainPurgerSpec(BatchPurgerSpec[ScalingGroupForDomainRow]
 class AllScalingGroupsForDomainPurgerSpec(BatchPurgerSpec[ScalingGroupForDomainRow]):
     """PurgerSpec for disassociating all scaling groups from a domain."""
 
-    domain: str
+    domain_id: DomainID
 
     @override
     def build_subquery(self) -> sa.sql.Select[tuple[ScalingGroupForDomainRow]]:
         return sa.select(ScalingGroupForDomainRow).where(
-            ScalingGroupForDomainRow.domain == self.domain,
+            ScalingGroupForDomainRow.domain_id == self.domain_id,
         )
 
     @override
@@ -100,14 +102,14 @@ class AllScalingGroupsForDomainPurgerSpec(BatchPurgerSpec[ScalingGroupForDomainR
 class ScalingGroupForKeypairsPurgerSpec(BatchPurgerSpec[ScalingGroupForKeypairsRow]):
     """PurgerSpec for disassociating a scaling group from a keypair."""
 
-    scaling_group: str
+    resource_group_id: ResourceGroupID
     access_key: AccessKey
 
     @override
     def build_subquery(self) -> sa.sql.Select[tuple[ScalingGroupForKeypairsRow]]:
         return sa.select(ScalingGroupForKeypairsRow).where(
             sa.and_(
-                ScalingGroupForKeypairsRow.scaling_group == self.scaling_group,
+                ScalingGroupForKeypairsRow.resource_group_id == self.resource_group_id,
                 ScalingGroupForKeypairsRow.access_key == self.access_key,
             )
         )
@@ -121,14 +123,14 @@ class ScalingGroupForKeypairsPurgerSpec(BatchPurgerSpec[ScalingGroupForKeypairsR
 class ScalingGroupsForKeypairsPurgerSpec(BatchPurgerSpec[ScalingGroupForKeypairsRow]):
     """PurgerSpec for disassociating multiple scaling groups from a keypair."""
 
-    scaling_groups: list[str]
+    resource_group_ids: list[ResourceGroupID]
     access_key: AccessKey
 
     @override
     def build_subquery(self) -> sa.sql.Select[tuple[ScalingGroupForKeypairsRow]]:
         return sa.select(ScalingGroupForKeypairsRow).where(
             sa.and_(
-                ScalingGroupForKeypairsRow.scaling_group.in_(self.scaling_groups),
+                ScalingGroupForKeypairsRow.resource_group_id.in_(self.resource_group_ids),
                 ScalingGroupForKeypairsRow.access_key == self.access_key,
             )
         )
@@ -139,27 +141,27 @@ class ScalingGroupsForKeypairsPurgerSpec(BatchPurgerSpec[ScalingGroupForKeypairs
 
 
 def create_scaling_group_for_domain_purger(
-    scaling_group: str,
-    domain: str,
+    resource_group_id: ResourceGroupID,
+    domain_id: DomainID,
 ) -> BatchPurger[ScalingGroupForDomainRow]:
     """Create a BatchPurger for disassociating a scaling group from a domain."""
     return BatchPurger(
         spec=ScalingGroupForDomainPurgerSpec(
-            scaling_group=scaling_group,
-            domain=domain,
+            resource_group_id=resource_group_id,
+            domain_id=domain_id,
         ),
         batch_size=1,  # We expect only one row to be deleted
     )
 
 
 def create_scaling_group_for_keypairs_purger(
-    scaling_group: str,
+    resource_group_id: ResourceGroupID,
     access_key: AccessKey,
 ) -> BatchPurger[ScalingGroupForKeypairsRow]:
     """Create a BatchPurger for disassociating a scaling group from a keypair."""
     return BatchPurger(
         spec=ScalingGroupForKeypairsPurgerSpec(
-            scaling_group=scaling_group,
+            resource_group_id=resource_group_id,
             access_key=access_key,
         ),
         batch_size=1,  # We expect only one row to be deleted
@@ -170,14 +172,14 @@ def create_scaling_group_for_keypairs_purger(
 class ScalingGroupForProjectPurgerSpec(BatchPurgerSpec[ScalingGroupForProjectRow]):
     """PurgerSpec for disassociating a scaling group from a project (user group)."""
 
-    scaling_group: str
+    resource_group_id: ResourceGroupID
     project: UUID
 
     @override
     def build_subquery(self) -> sa.sql.Select[tuple[ScalingGroupForProjectRow]]:
         return sa.select(ScalingGroupForProjectRow).where(
             sa.and_(
-                ScalingGroupForProjectRow.scaling_group == self.scaling_group,
+                ScalingGroupForProjectRow.resource_group_id == self.resource_group_id,
                 ScalingGroupForProjectRow.group == self.project,
             )
         )
@@ -191,14 +193,14 @@ class ScalingGroupForProjectPurgerSpec(BatchPurgerSpec[ScalingGroupForProjectRow
 class ScalingGroupsForProjectPurgerSpec(BatchPurgerSpec[ScalingGroupForProjectRow]):
     """PurgerSpec for disassociating multiple scaling groups from a project (user group)."""
 
-    scaling_groups: list[str]
+    resource_group_ids: list[ResourceGroupID]
     project: UUID
 
     @override
     def build_subquery(self) -> sa.sql.Select[tuple[ScalingGroupForProjectRow]]:
         return sa.select(ScalingGroupForProjectRow).where(
             sa.and_(
-                ScalingGroupForProjectRow.scaling_group.in_(self.scaling_groups),
+                ScalingGroupForProjectRow.resource_group_id.in_(self.resource_group_ids),
                 ScalingGroupForProjectRow.group == self.project,
             )
         )
@@ -226,13 +228,13 @@ class AllScalingGroupsForProjectPurgerSpec(BatchPurgerSpec[ScalingGroupForProjec
 
 
 def create_scaling_group_for_project_purger(
-    scaling_group: str,
+    resource_group_id: ResourceGroupID,
     project: UUID,
 ) -> BatchPurger[ScalingGroupForProjectRow]:
     """Create a BatchPurger for disassociating a scaling group from a project."""
     return BatchPurger(
         spec=ScalingGroupForProjectPurgerSpec(
-            scaling_group=scaling_group,
+            resource_group_id=resource_group_id,
             project=project,
         ),
         batch_size=1,  # We expect only one row to be deleted

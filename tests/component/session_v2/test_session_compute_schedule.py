@@ -78,13 +78,13 @@ def _single_kernel_input(
 @pytest.fixture()
 async def strict_agent_selection(
     db_engine: SAEngine,
-    scaling_group_id: ResourceGroupID,
+    resource_group_id: ResourceGroupID,
 ) -> None:
     """Make the test resource group enforce designated agents strictly."""
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.update(scaling_groups)
-            .where(scaling_groups.c.id == scaling_group_id)
+            .where(scaling_groups.c.id == resource_group_id)
             .values(
                 default_session_options=DefaultSessionOptions(
                     agent_selection_policy=AgentSelectionPolicy.STRICT,
@@ -97,13 +97,15 @@ class TestComputeSchedule:
     async def test_fitting_kernel_succeeds(
         self,
         admin_v2_registry: V2ClientRegistry,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
         compute_image_fixture: ImageID,
         agent_factory: AgentFactoryFunc,
     ) -> None:
         await agent_factory({"cpu": "8", "mem": "34359738368"})
         payload = await admin_v2_registry.session.compute_schedule(
-            _single_kernel_input(scaling_group_id, compute_image_fixture, cpu="1", mem="1073741824")
+            _single_kernel_input(
+                resource_group_id, compute_image_fixture, cpu="1", mem="1073741824"
+            )
         )
         assert len(payload.results) == 1
         result = payload.results[0]
@@ -117,7 +119,7 @@ class TestComputeSchedule:
     async def test_oversized_kernel_returns_reduction_hint(
         self,
         admin_v2_registry: V2ClientRegistry,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
         compute_image_fixture: ImageID,
         agent_factory: AgentFactoryFunc,
     ) -> None:
@@ -126,7 +128,7 @@ class TestComputeSchedule:
         await agent_factory({"cpu": "8", "mem": "34359738368"})
         payload = await admin_v2_registry.session.compute_schedule(
             _single_kernel_input(
-                scaling_group_id, compute_image_fixture, cpu="10", mem="1073741824"
+                resource_group_id, compute_image_fixture, cpu="10", mem="1073741824"
             )
         )
         result = payload.results[0]
@@ -143,7 +145,7 @@ class TestComputeSchedule:
     async def test_multi_kernel_results_correlate_by_index(
         self,
         admin_v2_registry: V2ClientRegistry,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
         compute_image_fixture: ImageID,
         agent_factory: AgentFactoryFunc,
     ) -> None:
@@ -166,7 +168,7 @@ class TestComputeSchedule:
                 ),
             ],
             cluster_mode=ClusterModeEnum.MULTI_NODE,
-            resource_group_id=scaling_group_id,
+            resource_group_id=resource_group_id,
         )
         payload = await admin_v2_registry.session.compute_schedule(body)
         assert [result.success for result in payload.results] == [True, False]
@@ -174,13 +176,15 @@ class TestComputeSchedule:
     async def test_regular_user_can_compute_schedule(
         self,
         user_v2_registry: V2ClientRegistry,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
         compute_image_fixture: ImageID,
         agent_factory: AgentFactoryFunc,
     ) -> None:
         await agent_factory({"cpu": "8", "mem": "34359738368"})
         payload = await user_v2_registry.session.compute_schedule(
-            _single_kernel_input(scaling_group_id, compute_image_fixture, cpu="1", mem="1073741824")
+            _single_kernel_input(
+                resource_group_id, compute_image_fixture, cpu="1", mem="1073741824"
+            )
         )
         assert payload.results[0].success is True
 
@@ -198,13 +202,13 @@ class TestComputeSchedule:
     async def test_resource_group_without_agents_is_whole_request_error(
         self,
         admin_v2_registry: V2ClientRegistry,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
         compute_image_fixture: ImageID,
     ) -> None:
         with pytest.raises(BackendAPIError) as exc_info:
             await admin_v2_registry.session.compute_schedule(
                 _single_kernel_input(
-                    scaling_group_id, compute_image_fixture, cpu="1", mem="1073741824"
+                    resource_group_id, compute_image_fixture, cpu="1", mem="1073741824"
                 )
             )
         assert exc_info.value.status == 503
@@ -212,14 +216,16 @@ class TestComputeSchedule:
     async def test_compute_schedule_does_not_persist_session(
         self,
         admin_v2_registry: V2ClientRegistry,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
         compute_image_fixture: ImageID,
         agent_factory: AgentFactoryFunc,
         db_engine: SAEngine,
     ) -> None:
         await agent_factory({"cpu": "8", "mem": "34359738368"})
         await admin_v2_registry.session.compute_schedule(
-            _single_kernel_input(scaling_group_id, compute_image_fixture, cpu="1", mem="1073741824")
+            _single_kernel_input(
+                resource_group_id, compute_image_fixture, cpu="1", mem="1073741824"
+            )
         )
         async with db_engine.begin() as conn:
             count = await conn.scalar(
@@ -234,7 +240,7 @@ class TestComputeScheduleDesignatedAgents:
     async def test_strict_policy_limits_fitting_to_designated_agents(
         self,
         admin_v2_registry: V2ClientRegistry,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
         compute_image_fixture: ImageID,
         agent_factory: AgentFactoryFunc,
         strict_agent_selection: None,
@@ -245,7 +251,7 @@ class TestComputeScheduleDesignatedAgents:
         await agent_factory({"cpu": "8", "mem": "34359738368"})
         payload = await admin_v2_registry.session.compute_schedule(
             _single_kernel_input(
-                scaling_group_id,
+                resource_group_id,
                 compute_image_fixture,
                 cpu="4",
                 mem="1073741824",
@@ -264,7 +270,7 @@ class TestComputeScheduleDesignatedAgents:
     async def test_designated_agent_with_capacity_fits(
         self,
         admin_v2_registry: V2ClientRegistry,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
         compute_image_fixture: ImageID,
         agent_factory: AgentFactoryFunc,
         strict_agent_selection: None,
@@ -273,7 +279,7 @@ class TestComputeScheduleDesignatedAgents:
         large_agent = await agent_factory({"cpu": "8", "mem": "34359738368"})
         payload = await admin_v2_registry.session.compute_schedule(
             _single_kernel_input(
-                scaling_group_id,
+                resource_group_id,
                 compute_image_fixture,
                 cpu="4",
                 mem="1073741824",
@@ -285,7 +291,7 @@ class TestComputeScheduleDesignatedAgents:
     async def test_request_policy_overrides_resource_group_default(
         self,
         admin_v2_registry: V2ClientRegistry,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
         compute_image_fixture: ImageID,
         agent_factory: AgentFactoryFunc,
     ) -> None:
@@ -295,7 +301,7 @@ class TestComputeScheduleDesignatedAgents:
         await agent_factory({"cpu": "8", "mem": "34359738368"})
         payload = await admin_v2_registry.session.compute_schedule(
             _single_kernel_input(
-                scaling_group_id,
+                resource_group_id,
                 compute_image_fixture,
                 cpu="4",
                 mem="1073741824",
@@ -308,7 +314,7 @@ class TestComputeScheduleDesignatedAgents:
     async def test_preferred_policy_falls_back_past_designated_agents(
         self,
         admin_v2_registry: V2ClientRegistry,
-        scaling_group_id: ResourceGroupID,
+        resource_group_id: ResourceGroupID,
         compute_image_fixture: ImageID,
         agent_factory: AgentFactoryFunc,
     ) -> None:
@@ -319,7 +325,7 @@ class TestComputeScheduleDesignatedAgents:
         await agent_factory({"cpu": "8", "mem": "34359738368"})
         payload = await admin_v2_registry.session.compute_schedule(
             _single_kernel_input(
-                scaling_group_id,
+                resource_group_id,
                 compute_image_fixture,
                 cpu="4",
                 mem="1073741824",

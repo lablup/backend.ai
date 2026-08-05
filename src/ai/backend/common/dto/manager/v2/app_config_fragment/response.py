@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import Field
 
-from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.api_handlers import BaseResponseModel, BaseRootResponseModel
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
@@ -15,6 +15,7 @@ from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 __all__ = (
     "AppConfigFragmentBulkErrorInfo",
     "AppConfigFragmentNode",
+    "AppConfigFragmentsByNamesPayload",
     "BulkPurgeAppConfigFragmentPayload",
     "PurgeAppConfigFragmentPayload",
     "SearchAppConfigFragmentPayload",
@@ -34,6 +35,10 @@ class AppConfigFragmentNode(BaseResponseModel):
     config: dict[str, Any] = Field(description="The fragment's JSON config document.")
     created_at: datetime = Field(description="Creation timestamp (UTC).")
     updated_at: datetime = Field(description="Last update timestamp (UTC).")
+
+
+class AppConfigFragmentsByNamesPayload(BaseRootResponseModel[list[AppConfigFragmentNode | None]]):
+    """One entry per requested config name, null where the scope holds no fragment for it."""
 
 
 class UpsertAppConfigFragmentsPayload(BaseResponseModel):

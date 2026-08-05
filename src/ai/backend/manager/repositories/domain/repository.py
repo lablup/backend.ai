@@ -12,6 +12,7 @@ from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import BackendAIError, DomainNotFound, InvalidAPIParameters
 from ai.backend.common.identifier.domain import DomainID, DomainName
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -37,7 +38,10 @@ from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.rbac import SystemScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, get_scaling_groups
+from ai.backend.manager.models.scaling_group import (
+    ScalingGroupForDomainRow,
+    get_scaling_groups,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
 from ai.backend.manager.repositories.base.pagination import NoPagination, OffsetPagination
@@ -194,7 +198,7 @@ class DomainRepository:
 
     @domain_repository_resilience.apply()
     async def create_domain_node(
-        self, creator: Creator[DomainRow], scaling_groups: list[str] | None = None
+        self, creator: Creator[DomainRow], scaling_group_ids: list[ResourceGroupID] | None = None
     ) -> DomainData:
         """
         Creates a domain node with scaling groups.
@@ -209,14 +213,15 @@ class DomainRepository:
             creation_result = await w.create_scope(DomainScopeCreation(spec=spec))
             domain_row = creation_result.row
 
-            if scaling_groups is not None:
+            if scaling_group_ids:
                 await w.bulk_create(
                     BulkCreator(
                         specs=[
                             ScalingGroupForDomainCreatorSpec(
-                                scaling_group=sgroup_name, domain=spec.name
+                                resource_group_id=sgroup_id,
+                                domain_id=domain_row.id,
                             )
-                            for sgroup_name in scaling_groups
+                            for sgroup_id in scaling_group_ids
                         ]
                     )
                 )
@@ -227,8 +232,8 @@ class DomainRepository:
     async def modify_domain_node(
         self,
         updater: Updater[DomainRow],
-        sgroups_to_add: set[str] | None = None,
-        sgroups_to_remove: set[str] | None = None,
+        sgroup_ids_to_add: set[ResourceGroupID] | None = None,
+        sgroup_ids_to_remove: set[ResourceGroupID] | None = None,
     ) -> DomainData:
         """
         Modifies a domain node with scaling group changes.
@@ -236,20 +241,26 @@ class DomainRepository:
         """
         domain_name = str(updater.pk_value)
         async with self._db.begin_session() as session:
-            if sgroups_to_add is not None:
+            domain_id = await session.scalar(
+                sa.select(DomainRow.id).where(DomainRow.name == domain_name)
+            )
+            if domain_id is None:
+                raise DomainNotFound(f"Domain not found (id:{domain_name})")
+
+            if sgroup_ids_to_add:
                 await session.execute(
                     sa.insert(ScalingGroupForDomainRow),
                     [
-                        {"scaling_group": sgroup_name, "domain": domain_name}
-                        for sgroup_name in sgroups_to_add
+                        {"resource_group_id": sgroup_id, "domain_id": domain_id}
+                        for sgroup_id in sgroup_ids_to_add
                     ],
                 )
 
-            if sgroups_to_remove is not None:
+            if sgroup_ids_to_remove:
                 await session.execute(
                     sa.delete(ScalingGroupForDomainRow).where(
-                        (ScalingGroupForDomainRow.domain == domain_name)
-                        & (ScalingGroupForDomainRow.scaling_group.in_(sgroups_to_remove))
+                        (ScalingGroupForDomainRow.domain_id == domain_id)
+                        & (ScalingGroupForDomainRow.resource_group_id.in_(sgroup_ids_to_remove))
                     ),
                 )
 
@@ -313,7 +324,7 @@ class DomainRepository:
         self,
         creator: Creator[DomainRow],
         user_info: UserInfo,
-        scaling_groups: list[str] | None = None,
+        scaling_group_ids: list[ResourceGroupID] | None = None,
     ) -> DomainData:
         """
         Creates a domain node with scaling groups and permission checks.
@@ -321,19 +332,19 @@ class DomainRepository:
         """
 
         async with self._db.begin_session() as db_session:
-            if scaling_groups is not None:
+            if scaling_group_ids is not None:
                 await self._ensure_sgroup_permission(
-                    user_info, scaling_groups, db_session=db_session
+                    user_info, scaling_group_ids, db_session=db_session
                 )
-            return await self.create_domain_node(creator, scaling_groups)
+            return await self.create_domain_node(creator, scaling_group_ids)
 
     @domain_repository_resilience.apply()
     async def modify_domain_node_with_permissions(
         self,
         updater: Updater[DomainRow],
         user_info: UserInfo,
-        sgroups_to_add: set[str] | None = None,
-        sgroups_to_remove: set[str] | None = None,
+        sgroup_ids_to_add: set[ResourceGroupID] | None = None,
+        sgroup_ids_to_remove: set[ResourceGroupID] | None = None,
     ) -> DomainData:
         """
         Modifies a domain node with scaling group changes and permission checks.
@@ -354,23 +365,27 @@ class DomainRepository:
             if not domain_models:
                 raise DomainUpdateNotAllowed(f"Not allowed to update domain (id:{domain_name})")
 
-            if sgroups_to_add is not None:
+            if sgroup_ids_to_add is not None:
                 await self._ensure_sgroup_permission(
-                    user_info, sgroups_to_add, db_session=db_session
+                    user_info, sgroup_ids_to_add, db_session=db_session
                 )
-            if sgroups_to_remove is not None:
+            if sgroup_ids_to_remove is not None:
                 await self._ensure_sgroup_permission(
-                    user_info, sgroups_to_remove, db_session=db_session
+                    user_info, sgroup_ids_to_remove, db_session=db_session
                 )
 
             return await self.modify_domain_node(
                 updater,
-                sgroups_to_add,
-                sgroups_to_remove,
+                sgroup_ids_to_add,
+                sgroup_ids_to_remove,
             )
 
     async def _ensure_sgroup_permission(
-        self, user_info: UserInfo, sgroup_names: Iterable[str], *, db_session: SASession
+        self,
+        user_info: UserInfo,
+        sgroup_ids: Iterable[ResourceGroupID],
+        *,
+        db_session: SASession,
     ) -> None:
         """
         Private method to validate scaling group permissions.
@@ -379,11 +394,11 @@ class DomainRepository:
         sgroup_models = await get_scaling_groups(
             SystemScope(),
             ScalingGroupPermission.ASSOCIATE_WITH_SCOPES,
-            sgroup_names,
+            sgroup_ids=sgroup_ids,
             db_session=db_session,
             ctx=client_ctx,
         )
-        not_allowed_sgroups = set(sgroup_names) - {sg.name for sg in sgroup_models}
+        not_allowed_sgroups = set(sgroup_ids) - {sg.id for sg in sgroup_models}
         if not_allowed_sgroups:
             raise InvalidDomainConfiguration(
                 f"Not allowed to associate the domain with given scaling groups(s:{not_allowed_sgroups})"

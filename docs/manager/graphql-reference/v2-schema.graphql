@@ -1371,6 +1371,7 @@ enum AuditLogStatus {
   ERROR
   UNKNOWN
   RUNNING
+  DENIED
 }
 
 """Added in 24.09.0. Filter for audit log status field."""

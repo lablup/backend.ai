@@ -18,6 +18,7 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.session_group import SessionGroupID
@@ -361,6 +362,7 @@ class TestModifyEndpointModelDefinitionRefresh:
             is_superadmin=True,
             role=UserRole.SUPERADMIN,
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
         )
 
     # =========================================================================

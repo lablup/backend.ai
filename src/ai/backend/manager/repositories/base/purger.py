@@ -72,6 +72,37 @@ class PurgerSpec[TRow: Base](ABC):
         raise NotImplementedError
 
 
+class DataPurger[TRow: Base, TData](PurgerSpec[TRow], ABC):
+    """A purger spec that also says how the deleted row becomes data.
+
+    ``PurgerSpec`` is already self-contained about what to delete; this adds the
+    conversion so the ops layer returns the ``data/`` type of the row it removed
+    instead of the row itself.
+
+    Example:
+        class UserPurger(DataPurger[UserRow, UserData]):
+            def row_class(self) -> type[UserRow]:
+                return UserRow
+
+            def pk_value(self) -> UUID:
+                return self._user_id
+
+            def conflict_checks(self) -> Sequence[ConflictCheck]:
+                return ()
+
+            def to_data(self, row: UserRow) -> UserData:
+                return row.to_data()
+
+        async with ops.write_ops() as w:
+            removed = await w.purge_data(UserPurger(user_id))
+    """
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        """Convert the deleted row into its ``data/`` type."""
+        raise NotImplementedError
+
+
 @dataclass
 class Purger[TRow: Base]:
     """Bundles purger spec for single-row delete operations.
@@ -207,6 +238,34 @@ class BatchPurgerSpec[TRow: Base](ABC):
     @abstractmethod
     def conflict_checks(self) -> Sequence[ConflictCheck]:
         """Return rows that must not exist before deletion (empty if none)."""
+        raise NotImplementedError
+
+
+class DataBatchPurger[TRow: Base, TData](BatchPurgerSpec[TRow], ABC):
+    """A batch purger that also says how each deleted row becomes data.
+
+    ``BatchPurgerSpec`` is already self-contained about what to delete; this adds the
+    conversion so the operation returns the entities it removed rather than a count,
+    which is what the scope shape reports through its result.
+
+    Example:
+        class PurgeOldSessions(DataBatchPurger[SessionRow, SessionData]):
+            def build_subquery(self) -> sa.sql.Select[tuple[SessionRow]]:
+                return sa.select(SessionRow).where(SessionRow.terminated_at < self._cutoff)
+
+            def conflict_checks(self) -> Sequence[ConflictCheck]:
+                return ()
+
+            def to_data(self, row: SessionRow) -> SessionData:
+                return row.to_data()
+
+        async with ops.write_ops() as w:
+            removed = await w.batch_purge_data(PurgeOldSessions(cutoff))
+    """
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        """Convert one deleted row into its ``data/`` type."""
         raise NotImplementedError
 
 

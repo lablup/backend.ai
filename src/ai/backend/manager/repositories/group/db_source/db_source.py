@@ -562,7 +562,7 @@ class GroupDBSource:
         query = sa.select(VFolderRow).where(
             sa.and_(
                 VFolderRow.group == group_id,
-                VFolderRow.status.in_(vfolder_status_map[VFolderStatusSet.DELETABLE]),
+                VFolderRow.status.in_(vfolder_status_map[VFolderStatusSet.OWNER_PURGABLE]),
             )
         )
         result = await w.batch_query_in_global(query, BatchQuerier(pagination=NoPagination()))

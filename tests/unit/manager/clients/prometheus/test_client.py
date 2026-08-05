@@ -254,7 +254,7 @@ class TestQueryInstant:
         first_session_id = SessionId(uuid4())
         second_session_id = SessionId(uuid4())
         query_template = (
-            'min by (session_id) (backendai_container_utilization{{value_type="current",'
+            'min by ({group_by}) (backendai_container_utilization{{value_type="current",'
             'container_metric_name="cpu_used",{labels}}})'
         )
 
@@ -360,10 +360,12 @@ class TestExecutePreset:
         )
 
         result = await prometheus_client.execute_preset(
-            query_template="sum(my_metric{{{labels}}}) by ({group_by})",
-            filter_labels={"kernel_id": "kernel-1"},
-            group_labels=["kernel_id"],
-            time_window="5m",
+            MetricPreset(
+                template="sum(my_metric{{{labels}}}) by ({group_by})",
+                labels={"kernel_id": LabelMatcher.exact("kernel-1")},
+                group_by={"kernel_id"},
+                window="5m",
+            ),
             time_range=time_range,
         )
 
@@ -405,10 +407,12 @@ class TestExecutePreset:
         instant_response: AsyncMock,
     ) -> None:
         result = await prometheus_client.execute_preset(
-            query_template="sum(my_metric{{{labels}}}) by ({group_by})",
-            filter_labels={"kernel_id": "kernel-1"},
-            group_labels=["kernel_id"],
-            time_window="5m",
+            MetricPreset(
+                template="sum(my_metric{{{labels}}}) by ({group_by})",
+                labels={"kernel_id": LabelMatcher.exact("kernel-1")},
+                group_by={"kernel_id"},
+                window="5m",
+            ),
             time_range=None,
         )
 

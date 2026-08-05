@@ -9,6 +9,7 @@ from aiohttp.test_utils import make_mocked_request
 
 from ai.backend.common.contexts.user import current_user, triggered_user
 from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.api.rest.middleware import auth as auth_mw
 from ai.backend.manager.api.rest.middleware.auth import (
     _authenticated_user,
@@ -34,6 +35,7 @@ def _make_request(*, role: UserRole | None, headers: dict[str, str] | None = Non
             "uuid": uuid.uuid4(),
             "role": role.value,
             "domain_name": "default",
+            "domain_id": DomainID(uuid.uuid4()),
         }
     return request
 
@@ -48,6 +50,7 @@ def _install_target_loader(monkeypatch: pytest.MonkeyPatch, target_id: uuid.UUID
             is_superadmin=False,
             role=UserRole.USER,
             domain_name="target-domain",
+            domain_id=DomainID(uuid.uuid4()),
         )
 
     monkeypatch.setattr(auth_mw, "_load_user_data", _fake_load)
@@ -128,6 +131,7 @@ class TestSetupUserContext:
             is_superadmin=False,
             role=UserRole.USER,
             domain_name="target-domain",
+            domain_id=DomainID(uuid.uuid4()),
         )
         trigger = UserData(
             user_id=uuid.uuid4(),
@@ -136,6 +140,7 @@ class TestSetupUserContext:
             is_superadmin=True,
             role=UserRole.SUPERADMIN,
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
         )
         with _setup_user_context(request, effective, trigger):
             assert current_user() == effective

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Self
 from uuid import UUID
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import CIStrEnum
 
 
@@ -26,6 +27,7 @@ class UserData:
     is_superadmin: bool
     role: UserRole
     domain_name: str
+    domain_id: DomainID
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:

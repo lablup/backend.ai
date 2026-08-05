@@ -397,6 +397,7 @@ class AgentPermissionContextBuilder(
         ctx: ClientContext,
         scope: DomainScope,
     ) -> AgentPermissionContext:
+        from ai.backend.manager.models.domain import DomainRow
         from ai.backend.manager.models.scaling_group import (
             ScalingGroupForDomainRow,
             ScalingGroupRow,
@@ -407,7 +408,12 @@ class AgentPermissionContextBuilder(
 
         _stmt = (
             sa.select(ScalingGroupForDomainRow)
-            .where(ScalingGroupForDomainRow.domain == scope.domain_name)
+            .where(
+                ScalingGroupForDomainRow.domain_id
+                == sa.select(DomainRow.id)
+                .where(DomainRow.name == scope.domain_name)
+                .scalar_subquery()
+            )
             .options(
                 joinedload(ScalingGroupForDomainRow.sgroup_row).options(
                     selectinload(ScalingGroupRow.agents)

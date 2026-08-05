@@ -18,9 +18,11 @@ from sqlalchemy.engine import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship
+from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common import msgpack
 from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.domain.types import DomainData
@@ -138,7 +140,11 @@ class DomainRow(CreatedAtMixin, Base):  # type: ignore[misc]
         back_populates="domain",
         foreign_keys="[SessionRow.domain_name]",
     )
-    users: Mapped[list[UserRow]] = relationship("UserRow", back_populates="domain")
+    users: Mapped[list[UserRow]] = relationship(
+        "UserRow",
+        back_populates="domain",
+        foreign_keys="[UserRow.domain_name]",
+    )
     groups: Mapped[list[GroupRow]] = relationship("GroupRow", back_populates="domain")
     sgroup_for_domains_rows: Mapped[list[ScalingGroupForDomainRow]] = relationship(
         "ScalingGroupForDomainRow",
@@ -149,6 +155,14 @@ class DomainRow(CreatedAtMixin, Base):  # type: ignore[misc]
         back_populates="domain_row",
         primaryjoin=_get_network_join_condition,
     )
+
+    @classmethod
+    def scope_id_expr(cls) -> SQLColumnExpression[ScopeID]:
+        return cls.id
+
+    @classmethod
+    def scope_name_expr(cls) -> SQLColumnExpression[str]:
+        return cls.name
 
     def to_data(self) -> DomainData:
         return row_to_data(self)

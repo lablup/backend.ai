@@ -3,29 +3,47 @@ on top of the base write ops."""
 
 from __future__ import annotations
 
+import dataclasses
+import logging
+import uuid
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import AsyncIterator, Collection, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import override
+from typing import ClassVar, Protocol, override
+from uuid import UUID
 
+import jinja2
+import jinja2.sandbox
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.sql.expression import SQLColumnExpression
 
-from ai.backend.common.data.entity.types import EntityRef, ScopeRef
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_SCOPE_TYPE
+from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_SCOPE_TYPE
+from ai.backend.common.data.entity.types import EntityRef, ScopeRef, ScopeType
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE
 from ai.backend.common.data.permission.types import (
     Permission,
     RBACElementType,
     RelationType,
-    ScopeType,
 )
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import RBACTypeConversionError, UnreachableError
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.role_preset import RolePresetID
+from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.identifier.virtual_scope import VirtualScopeID
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairSecrets
 from ai.backend.manager.data.permission.id import ScopeId
+from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     EntityType,
@@ -38,7 +56,12 @@ from ai.backend.manager.data.permission.types import (
 )
 from ai.backend.manager.errors.permission import VirtualScopeNotFound
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
+from ai.backend.manager.errors.role_preset import InvalidRoleNameTemplate
 from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.group import GroupRow, ProjectType
+from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair_data
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -48,6 +71,8 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
+from ai.backend.manager.models.user import UserRow, UserStatus
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
@@ -84,6 +109,7 @@ from ai.backend.manager.repositories.base.rbac.entity_upserter import (
     RBACEntityUpserterResult,
 )
 from ai.backend.manager.repositories.base.rbac.utils import bulk_insert_on_conflict_do_nothing
+from ai.backend.manager.repositories.keypair.creators import KeyPairCreatorSpec
 from ai.backend.manager.repositories.ops.base.provider import DBOpsProvider, WriteOps
 from ai.backend.manager.repositories.permission_controller.creators import (
     PermissionCreatorSpec,
@@ -93,6 +119,11 @@ from ai.backend.manager.repositories.permission_controller.creators import (
 from ai.backend.manager.repositories.permission_controller.role_manager import (
     ScopeSystemRoleData,
 )
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+# Rendered names are stored in ``roles.name`` (sa.String(64)).
+MAX_ROLE_NAME_LENGTH = 64
 
 
 @dataclass(frozen=True)
@@ -116,6 +147,37 @@ class ScopeCreation[TRow: Base](ABC):
     @abstractmethod
     def system_roles_of(self, row: TRow) -> Collection[ScopeSystemRoleData]:
         raise NotImplementedError
+
+
+@dataclass
+class ScopeCreationResult[TRow: Base]:
+    """A created scope row and the ids of its ``auto_assign`` roles, meant to be
+    granted to the scope's enrolled user."""
+
+    row: TRow
+    auto_grant_role_ids: list[UUID]
+
+
+@dataclass
+class FullUserCreation:
+    """Everything needed to provision a user in full: the user-scope creation, the
+    scopes to enroll in, and the default keypair's policy. ``keypair_secrets`` overrides
+    the generated key material (e.g. pre-issued keys)."""
+
+    creation: ScopeCreation[UserRow]
+    domain_id: DomainID
+    project_ids: Collection[ProjectID]
+    keypair_resource_policy: str
+    keypair_rate_limit: int
+    keypair_secrets: KeyPairSecrets | None = None
+
+
+@dataclass
+class FullUserCreationResult:
+    """A fully provisioned user: the row (``main_access_key`` set) and its default keypair."""
+
+    user_row: UserRow
+    keypair_row: KeyPairRow
 
 
 class ScopeMember(ABC):
@@ -148,6 +210,21 @@ class ScopeUserMember(ScopeMember):
 
 
 @dataclass
+class ScopeEntityMember(ScopeMember):
+    """A non-user entity joining a scope; no roles are granted for it."""
+
+    ref: EntityRef
+
+    @override
+    def entity_ref(self) -> EntityRef:
+        return self.ref
+
+    @override
+    def assign_role_on(self) -> UserID | None:
+        return None
+
+
+@dataclass
 class EntityMembersAddition:
     scope: ScopeRef
     members: Collection[ScopeMember]
@@ -170,10 +247,121 @@ class ScopeBatchDeletion[TRow: Base]:
     scopes: Sequence[ScopeRef]
 
 
+class ScopeSource(Protocol):
+    """A Row queryable as an RBAC scope: its scope-id and display-name expressions."""
+
+    @classmethod
+    def scope_id_expr(cls) -> SQLColumnExpression[ScopeID]:
+        """Column whose value is used as ``ScopeRef.scope_id``."""
+        ...
+
+    @classmethod
+    def scope_name_expr(cls) -> SQLColumnExpression[str]:
+        """Expression rendering the scope's display name."""
+        ...
+
+
 class RBACWriteOps(WriteOps):
     """Base write ops plus RBAC scope-associated creation and virtual-scope writes."""
 
+    _scope_rows: ClassVar[Mapping[ScopeType, type[ScopeSource]]] = {
+        CONTAINER_REGISTRY_SCOPE_TYPE: ContainerRegistryRow,
+        DOMAIN_SCOPE_TYPE: DomainRow,
+        PROJECT_SCOPE_TYPE: GroupRow,
+        RESOURCE_GROUP_SCOPE_TYPE: ScalingGroupRow,
+        USER_SCOPE_TYPE: UserRow,
+    }
+
+    def __init__(self, sess: SASession) -> None:
+        super().__init__(sess)
+        self._template_env = jinja2.sandbox.ImmutableSandboxedEnvironment(
+            undefined=jinja2.StrictUndefined,
+        )
+
+    async def _resolve_scope_template_values(
+        self, scopes: Collection[ScopeRef]
+    ) -> dict[ScopeRef, ScopeTemplateValue | None]:
+        """Resolve the scope attributes exposed to role name templates with a
+        single UNION ALL query over the registered scope rows.
+
+        Scopes of unregistered types or whose row is gone map to None.
+        """
+        names: dict[ScopeRef, str | None] = dict.fromkeys(scopes)
+        ids_by_type: dict[ScopeType, list[ScopeID]] = defaultdict(list)
+        for s in scopes:
+            ids_by_type[s.scope_type].append(s.scope_id)
+        selects: list[sa.Select[tuple[str, ScopeID, str]]] = []
+        for scope_type, ids in ids_by_type.items():
+            row_cls = self._scope_rows.get(scope_type)
+            if row_cls is None:
+                continue
+            selects.append(
+                sa.select(
+                    sa.literal(str(scope_type)),
+                    row_cls.scope_id_expr(),
+                    row_cls.scope_name_expr(),
+                ).where(row_cls.scope_id_expr().in_(ids))
+            )
+        if selects:
+            result = await self._sess.execute(sa.union_all(*selects))
+            for scope_type_value, scope_id, scope_name in result.tuples():
+                ref = ScopeRef(
+                    scope_type=ScopeType(scope_type_value),
+                    scope_id=scope_id,
+                )
+                names[ref] = scope_name
+        return {
+            scope: (
+                ScopeTemplateValue(
+                    id=scope.scope_id,
+                    name=name,
+                    type=str(scope.scope_type),
+                )
+                if name is not None
+                else None
+            )
+            for scope, name in names.items()
+        }
+
+    def _render_role_name(self, template: str, scope: ScopeTemplateValue) -> str:
+        """Render a role name from a preset's ``role_name_template`` (e.g.
+        ``{{scope.type}}-{{scope.name}}-member``), raising :class:`InvalidRoleNameTemplate`
+        on syntax errors, undefined variables, or an unusable result."""
+        try:
+            rendered = self._template_env.from_string(template).render(
+                scope=dataclasses.asdict(scope),
+            )
+        except jinja2.TemplateError as e:
+            raise InvalidRoleNameTemplate(f"Failed to render role name template: {e}") from e
+        rendered = rendered.strip()
+        if not rendered:
+            raise InvalidRoleNameTemplate("Role name template rendered to an empty string.")
+        if len(rendered) > MAX_ROLE_NAME_LENGTH:
+            raise InvalidRoleNameTemplate(
+                f"Rendered role name exceeds {MAX_ROLE_NAME_LENGTH} characters: {rendered!r}"
+            )
+        return rendered
+
+    def validate_role_name_template(self, template: str) -> None:
+        """Validate a preset's ``role_name_template`` by rendering it against
+        representative dummy values, so syntax errors and undefined variables
+        are rejected before the preset is stored."""
+        dummy = ScopeTemplateValue(
+            id=uuid.UUID(int=0),
+            name="name",
+            type="user",
+        )
+        self._render_role_name(template, dummy)
+
     # -- Virtual-scope helpers ----------------------------------------------------
+
+    async def _find_virtual_scope_id(self, scope: ScopeRef) -> VirtualScopeID | None:
+        """Return the virtual scope id backing ``scope``, or ``None`` if it has none."""
+        stmt = sa.select(VirtualScopeRow.id).where(
+            VirtualScopeRow.scope_type == scope.scope_type,
+            VirtualScopeRow.scope_id == scope.scope_id,
+        )
+        return (await self._sess.execute(stmt)).scalar_one_or_none()
 
     async def _resolve_virtual_scope_id(self, scope: ScopeRef) -> VirtualScopeID:
         """Return the virtual scope id backing ``scope``.
@@ -181,11 +369,7 @@ class RBACWriteOps(WriteOps):
         Every owner scope is created with its virtual scope, so a missing one is an
         invariant violation: raises :class:`VirtualScopeNotFound` (500).
         """
-        stmt = sa.select(VirtualScopeRow.id).where(
-            VirtualScopeRow.scope_type == scope.scope_type,
-            VirtualScopeRow.scope_id == scope.scope_id,
-        )
-        virtual_scope_id = (await self._sess.execute(stmt)).scalar_one_or_none()
+        virtual_scope_id = await self._find_virtual_scope_id(scope)
         if virtual_scope_id is None:
             raise VirtualScopeNotFound(
                 f"No virtual scope for scope {scope.scope_type}:{scope.scope_id}"
@@ -390,21 +574,28 @@ class RBACWriteOps(WriteOps):
         self,
         creation: ScopeCreation[TRow],
         bound_scope: ScopeRef | None = None,
-    ) -> RBACEntityCreatorResult[TRow]:
+    ) -> ScopeCreationResult[TRow]:
         """Create a scope in full: the real row with its parent scope association, its
         virtual scope node, its SYSTEM roles, and the roles from matching presets.
 
         The row is inserted first, so ``creation`` sees the id the database assigned. When
         ``bound_scope`` is given, it is bound to this scope's virtual scope so it can reach
-        this scope's entities.
+        this scope's entities. The roles are only created here; granting the returned
+        ``auto_grant_role_ids`` to a user is the caller's call via
+        :meth:`assign_roles_to_user`.
         """
         result = await self.create_scoped(creation.creator())
         scope = creation.scope_of(result.row)
         await self._insert_virtual_scopes([scope])
         if bound_scope is not None:
             await self.bind_scope(bound_scope, scope, permission_cap=None)
-        await self._provision_scope_roles({scope: creation.system_roles_of(result.row)})
-        return result
+        created_roles = await self._provision_scope_roles({
+            scope: creation.system_roles_of(result.row)
+        })
+        return ScopeCreationResult(
+            row=result.row,
+            auto_grant_role_ids=[role.id for role in created_roles if role.auto_assign],
+        )
 
     async def bulk_create_scopes[TRow: Base](
         self,
@@ -447,6 +638,10 @@ class RBACWriteOps(WriteOps):
                     name=role_data.role_name(),
                     source=RoleSource.SYSTEM,
                     status=RoleStatus.ACTIVE,
+                    # A user scope's system role is auto-assigned: its only member is
+                    # the user itself, who always holds its own role. Declared roles
+                    # of container scopes (admin/member) are granted explicitly.
+                    auto_assign=scope.scope_type == USER_SCOPE_TYPE,
                 ),
                 entity_operations=role_data.entity_operations(),
             )
@@ -457,18 +652,18 @@ class RBACWriteOps(WriteOps):
     async def _provision_scope_roles(
         self,
         scope_roles: Mapping[ScopeRef, Collection[ScopeSystemRoleData]],
-    ) -> None:
+    ) -> list[RoleRow]:
         """Create every scope's declared SYSTEM roles and its preset-derived roles.
 
         Whatever the number of scopes and roles, this issues one insert for all the roles
-        and one for all their permissions.
+        and one for all their permissions. Returns the created roles.
         """
         role_specs = self._system_role_specs(scope_roles)
         preset_role_specs = await self._preset_role_specs(scope_roles.keys())
         specs = [*role_specs, *preset_role_specs]
         if not specs:
-            return
-        await self._create_roles(specs)
+            return []
+        return await self._create_roles(specs)
 
     async def _preset_role_specs(self, scopes: Collection[ScopeRef]) -> list[_RoleSpec]:
         """The roles the active presets matching ``scopes``' types call for."""
@@ -502,14 +697,19 @@ class RBACWriteOps(WriteOps):
             operations_by_preset[preset_permission.role_preset_id][
                 preset_permission.entity_type.to_element()
             ].append(preset_permission.operation)
-        presets_by_scope_type: dict[ScopeType, list[RolePresetRow]] = defaultdict(list)
+        presets_by_scope_type: dict[LegacyScopeType, list[RolePresetRow]] = defaultdict(list)
         for preset in preset_rows:
             presets_by_scope_type[preset.scope_type].append(preset)
+        scope_template_values: dict[ScopeRef, ScopeTemplateValue | None] = {}
+        if any(preset.role_name_template is not None for preset in preset_rows):
+            scope_template_values = await self._resolve_scope_template_values(scopes)
         return [
             _RoleSpec(
                 scope=scope,
                 creator=RoleCreatorSpec(
-                    name=preset.name,
+                    name=self._render_preset_role_name(
+                        preset, scope, scope_template_values.get(scope)
+                    ),
                     source=RoleSource.SYSTEM,
                     status=RoleStatus.ACTIVE,
                     auto_assign=preset.auto_assign,
@@ -520,10 +720,50 @@ class RBACWriteOps(WriteOps):
             for preset in presets_by_scope_type[self._scope_element_type(scope).to_scope_type()]
         ]
 
-    async def _create_roles(self, specs: Sequence[_RoleSpec]) -> None:
+    @staticmethod
+    def _fallback_preset_role_name(scope: ScopeRef) -> str:
+        """Deterministic per-scope role name used when a preset's template cannot
+        be rendered. Built with plain string formatting — never via the template
+        engine — so scope creation cannot fail on role naming."""
+        return f"{scope.scope_type}-{str(scope.scope_id)[:8]}-role"
+
+    def _render_preset_role_name(
+        self,
+        preset: RolePresetRow,
+        scope: ScopeRef,
+        scope_template_value: ScopeTemplateValue | None,
+    ) -> str:
+        """Render the name of a role instantiated from the preset, falling back to
+        ``{scope_type}-{scope_id[:8]}-role`` so that scope creation never fails on a
+        bad template."""
+        if preset.role_name_template is None:
+            return preset.name
+        if scope_template_value is None:
+            fallback = self._fallback_preset_role_name(scope)
+            log.warning(
+                "Cannot resolve scope attributes for role preset {} ({}); falling back to {}",
+                preset.id,
+                preset.role_name_template,
+                fallback,
+            )
+            return fallback
+        try:
+            return self._render_role_name(preset.role_name_template, scope_template_value)
+        except InvalidRoleNameTemplate as e:
+            fallback = self._fallback_preset_role_name(scope)
+            log.warning(
+                "Failed to render role name template of preset {} ({}): {}; falling back to {}",
+                preset.id,
+                preset.role_name_template,
+                e,
+                fallback,
+            )
+            return fallback
+
+    async def _create_roles(self, specs: Sequence[_RoleSpec]) -> list[RoleRow]:
         """Create ``specs`` and the permissions they grant: one insert for each."""
         if not specs:
-            return
+            return []
         roles = await self.bulk_create_scoped([
             RBACEntityCreator(
                 spec=spec.creator,
@@ -549,6 +789,7 @@ class RBACWriteOps(WriteOps):
         ]
         if permissions:
             await self.bulk_create(BulkCreator(specs=permissions))
+        return list(roles.rows)
 
     async def delete_scope[TRow: Base](
         self,
@@ -670,6 +911,106 @@ class RBACWriteOps(WriteOps):
         if specs:
             await self.bulk_create(BulkCreator(specs=specs))
 
+    async def assign_roles_to_user(
+        self,
+        user_id: UserID,
+        role_ids: Collection[UUID],
+    ) -> None:
+        """Map ``user_id`` to each of ``role_ids``; already-granted pairs are skipped."""
+        if not role_ids:
+            return
+        existing_role_ids = set(
+            (
+                await self._sess.scalars(
+                    sa.select(UserRoleRow.role_id).where(
+                        UserRoleRow.user_id == user_id,
+                        UserRoleRow.role_id.in_(role_ids),
+                    )
+                )
+            ).all()
+        )
+        specs = [
+            UserRoleCreatorSpec(user_id=user_id, role_id=role_id)
+            for role_id in role_ids
+            if role_id not in existing_role_ids
+        ]
+        if specs:
+            await self.bulk_create(BulkCreator(specs=specs))
+
+    async def create_full_user(
+        self,
+        full_creation: FullUserCreation,
+    ) -> FullUserCreationResult:
+        """Provision a user end to end in one transaction.
+
+        Creates the user scope (row, virtual scope, own-scope roles) and grants those
+        roles, creates the default keypair under the user scope and sets it as the
+        user's ``main_access_key``, then enrolls the user in its domain's and projects'
+        virtual scopes — the domain's model-store projects always included, and
+        ``project_ids`` narrowed to projects that exist in the domain.
+        """
+        creation_result = await self.create_scope(full_creation.creation)
+        user_row = creation_result.row
+        user_id = UserID(user_row.uuid)
+        await self.assign_roles_to_user(user_id, creation_result.auto_grant_role_ids)
+
+        keypair_creator = KeyPairCreator(
+            is_active=user_row.status == UserStatus.ACTIVE,
+            is_admin=user_row.role in (UserRole.SUPERADMIN, UserRole.ADMIN),
+            resource_policy=full_creation.keypair_resource_policy,
+            rate_limit=full_creation.keypair_rate_limit,
+        )
+        kp_result = await self.create_scoped(
+            RBACEntityCreator(
+                spec=KeyPairCreatorSpec(
+                    creator=keypair_creator,
+                    generated_data=full_creation.keypair_secrets or generate_keypair_data(),
+                    user_id=user_row.uuid,
+                    email=user_row.email,
+                ),
+                element_type=RBACElementType.KEYPAIR,
+                scope_ref=RBACElementRef(RBACElementType.USER, str(user_row.uuid)),
+            )
+        )
+        keypair_row = kp_result.row
+        user_row.main_access_key = keypair_row.access_key
+
+        member = ScopeUserMember(user_id=user_id)
+        domain_scope = ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=full_creation.domain_id)
+        await self.ensure_scope(domain_scope)
+        await self.add_entity_members(EntityMembersAddition(scope=domain_scope, members=[member]))
+        for project_id in await self._domain_member_project_ids(
+            full_creation.domain_id, full_creation.project_ids
+        ):
+            project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id)
+            await self.ensure_scope(project_scope)
+            await self.add_entity_members(
+                EntityMembersAddition(scope=project_scope, members=[member])
+            )
+
+        # Flushing the main_access_key update expires server-onupdate columns; reload
+        # so callers can read the row without a sync-context lazy refresh.
+        await self._sess.flush()
+        await self._sess.refresh(user_row)
+        return FullUserCreationResult(user_row=user_row, keypair_row=keypair_row)
+
+    async def _domain_member_project_ids(
+        self,
+        domain_id: DomainID,
+        project_ids: Collection[ProjectID],
+    ) -> list[ProjectID]:
+        """``project_ids`` narrowed to the domain's real projects, plus the domain's
+        model-store projects that every user joins."""
+        stmt = (
+            sa.select(GroupRow.id)
+            .join(DomainRow, DomainRow.name == GroupRow.domain_name)
+            .where(
+                DomainRow.id == domain_id,
+                sa.or_(GroupRow.id.in_(project_ids), GroupRow.type == ProjectType.MODEL_STORE),
+            )
+        )
+        return [ProjectID(row) for row in (await self._sess.scalars(stmt)).all()]
+
     async def add_entity_members(
         self,
         addition: EntityMembersAddition,
@@ -728,19 +1069,23 @@ class RBACWriteOps(WriteOps):
         entities: Collection[EntityRef],
     ) -> None:
         """Delete each entity's virtual-scope membership and scope association; role mappings
-        are left untouched."""
+        are left untouched.
+
+        A scope without a virtual scope (legacy data) only has its associations deleted.
+        """
         entity_refs = list(entities)
         if not entity_refs:
             return
-        virtual_scope_id = await self._resolve_virtual_scope_id(scope)
-        await self._sess.execute(
-            sa.delete(EntityMembershipRow).where(
-                EntityMembershipRow.virtual_scope_id == virtual_scope_id,
-                sa.tuple_(EntityMembershipRow.entity_type, EntityMembershipRow.entity_id).in_([
-                    (ref.entity_type, ref.entity_id) for ref in entity_refs
-                ]),
+        virtual_scope_id = await self._find_virtual_scope_id(scope)
+        if virtual_scope_id is not None:
+            await self._sess.execute(
+                sa.delete(EntityMembershipRow).where(
+                    EntityMembershipRow.virtual_scope_id == virtual_scope_id,
+                    sa.tuple_(EntityMembershipRow.entity_type, EntityMembershipRow.entity_id).in_([
+                        (ref.entity_type, ref.entity_id) for ref in entity_refs
+                    ]),
+                )
             )
-        )
         await self._sess.execute(
             sa.delete(AssociationScopesEntitiesRow).where(
                 AssociationScopesEntitiesRow.scope_type == LegacyScopeType(scope.scope_type),

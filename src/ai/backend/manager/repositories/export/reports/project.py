@@ -63,7 +63,7 @@ SCALING_GROUP_FOR_PROJECT_JOIN = JoinDef(
 )
 SCALING_GROUP_JOIN = JoinDef(
     table=ScalingGroupRow.__table__,
-    condition=ScalingGroupForProjectRow.scaling_group == ScalingGroupRow.name,
+    condition=ScalingGroupForProjectRow.resource_group_id == ScalingGroupRow.id,
 )
 SCALING_GROUP_JOINS = (SCALING_GROUP_FOR_PROJECT_JOIN, SCALING_GROUP_JOIN)
 

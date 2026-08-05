@@ -13,6 +13,9 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_SCOPE_TYPE
 from ai.backend.common.data.entity.types import (
     EntityRef,
     ScopeRef,
@@ -21,6 +24,7 @@ from ai.backend.common.data.entity.types import (
 from ai.backend.common.data.entity.types import (
     EntityType as VirtualScopeEntityType,
 )
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
 from ai.backend.common.data.permission.types import EntityType, RBACElementType, RelationType
 from ai.backend.common.data.permission.types import ScopeType as PermissionScopeType
 from ai.backend.common.exception import (
@@ -30,7 +34,9 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.user import UserID
+from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.repository import (
     ForeignKeyViolationError,
@@ -39,6 +45,7 @@ from ai.backend.manager.errors.repository import (
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -53,9 +60,10 @@ from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
+    ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
+from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, ScalingGroupRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
@@ -108,6 +116,7 @@ _TEST_SCOPE_TYPE = ScopeType(PermissionScopeType.PROJECT.value)
 _TEST_ENTITY_TYPE = VirtualScopeEntityType(PermissionScopeType.PROJECT.value)
 _TEST_BOUND_SCOPE_TYPE = ScopeType("test-bound-scope")
 _TEST_MEMBER_ENTITY_TYPE = VirtualScopeEntityType(RBACElementType.USER.value)
+_TEST_MEMBER_SCOPE_TYPE = ScopeType(RBACElementType.USER.value)
 
 _USER_SCOPE_ID = str(uuid.uuid4())
 _USER_SCOPE_REF = RBACElementRef(RBACElementType.USER, _USER_SCOPE_ID)
@@ -1332,3 +1341,177 @@ class TestUpsertScoped:
                         conflict_target=ConflictTarget(columns=["tenant_id", "item_id"]),
                     )
                 )
+
+
+# =============================================================================
+# _resolve_scope_template_values
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class _ScopeNameSeed:
+    """One row per registered scope table, with the display name each must resolve to."""
+
+    domain_ref: ScopeRef
+    domain_name: str
+    project_ref: ScopeRef
+    project_name: str
+    resource_group_ref: ScopeRef
+    resource_group_name: str
+    user_ref: ScopeRef
+    username: str
+
+
+@pytest.fixture
+async def scope_name_seed(
+    database_connection: ExtendedAsyncSAEngine,
+) -> AsyncGenerator[_ScopeNameSeed, None]:
+    """A domain, a project, and a user — the scope rows the resolver reads."""
+    async with with_tables(
+        database_connection,
+        [
+            # FK dependency order: parents before children
+            DomainRow,
+            ScalingGroupRow,
+            UserResourcePolicyRow,
+            ProjectResourcePolicyRow,
+            KeyPairResourcePolicyRow,
+            UserRow,
+            KeyPairRow,
+            GroupRow,
+        ],
+    ):
+        unique = uuid.uuid4().hex[:8]
+        domain_id = uuid.uuid4()
+        project_id = uuid.uuid4()
+        resource_group_id = ResourceGroupID(uuid.uuid4())
+        user_id = uuid.uuid4()
+        domain_name = f"dom-{unique}"
+        project_name = f"proj-{unique}"
+        resource_group_name = f"rg-{unique}"
+        username = f"user-{unique}"
+        async with database_connection.begin_session() as db_sess:
+            db_sess.add_all([
+                DomainRow(name=domain_name, id=domain_id),
+                ScalingGroupRow(
+                    id=resource_group_id,
+                    name=resource_group_name,
+                    driver="static",
+                    scheduler="fifo",
+                ),
+                UserResourcePolicyRow(
+                    name=f"urp-{unique}",
+                    max_vfolder_count=0,
+                    max_quota_scope_size=-1,
+                    max_session_count_per_model_session=10,
+                    max_customized_image_count=10,
+                ),
+                ProjectResourcePolicyRow(
+                    name=f"prp-{unique}",
+                    max_vfolder_count=0,
+                    max_quota_scope_size=-1,
+                    max_network_count=3,
+                ),
+            ])
+            await db_sess.flush()
+            db_sess.add_all([
+                GroupRow(
+                    id=project_id,
+                    name=project_name,
+                    domain_name=domain_name,
+                    resource_policy=f"prp-{unique}",
+                ),
+                UserRow(
+                    uuid=user_id,
+                    username=username,
+                    email=f"{username}@example.com",
+                    domain_name=domain_name,
+                    resource_policy=f"urp-{unique}",
+                ),
+            ])
+        yield _ScopeNameSeed(
+            domain_ref=ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=domain_id),
+            domain_name=domain_name,
+            project_ref=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
+            project_name=project_name,
+            resource_group_ref=ScopeRef(
+                scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=resource_group_id
+            ),
+            resource_group_name=resource_group_name,
+            user_ref=ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=user_id),
+            username=username,
+        )
+
+
+class TestResolveScopeTemplateValues:
+    """_resolve_scope_template_values maps each ScopeRef to its template values with a
+    single UNION ALL query over the registered scope rows."""
+
+    async def test_mixed_scope_types_resolve_to_their_display_names(
+        self,
+        provider: RBACOpsProvider,
+        scope_name_seed: _ScopeNameSeed,
+    ) -> None:
+        """Domain, project, and resource group resolve to their name, a user to its
+        username."""
+        seed = scope_name_seed
+        refs = [seed.domain_ref, seed.project_ref, seed.resource_group_ref, seed.user_ref]
+
+        async with provider.write_ops() as w:
+            result = await w._resolve_scope_template_values(refs)
+
+        assert result == {
+            seed.domain_ref: ScopeTemplateValue(
+                id=seed.domain_ref.scope_id, name=seed.domain_name, type="domain"
+            ),
+            seed.project_ref: ScopeTemplateValue(
+                id=seed.project_ref.scope_id, name=seed.project_name, type="project"
+            ),
+            seed.resource_group_ref: ScopeTemplateValue(
+                id=seed.resource_group_ref.scope_id,
+                name=seed.resource_group_name,
+                type="resource_group",
+            ),
+            seed.user_ref: ScopeTemplateValue(
+                id=seed.user_ref.scope_id, name=seed.username, type="user"
+            ),
+        }
+
+    async def test_unregistered_scope_type_maps_to_none(
+        self,
+        provider: RBACOpsProvider,
+        scope_name_seed: _ScopeNameSeed,
+    ) -> None:
+        """A scope type without a registered row resolves to None; others still resolve."""
+        seed = scope_name_seed
+        unregistered = ScopeRef(scope_type=ScopeType("unregistered"), scope_id=uuid.uuid4())
+
+        async with provider.write_ops() as w:
+            result = await w._resolve_scope_template_values([unregistered, seed.domain_ref])
+
+        assert result[unregistered] is None
+        assert result[seed.domain_ref] is not None
+
+    async def test_missing_row_maps_to_none(
+        self,
+        provider: RBACOpsProvider,
+        scope_name_seed: _ScopeNameSeed,
+    ) -> None:
+        """A registered scope type whose row does not exist resolves to None."""
+        missing = ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=uuid.uuid4())
+
+        async with provider.write_ops() as w:
+            result = await w._resolve_scope_template_values([missing])
+
+        assert result == {missing: None}
+
+    async def test_empty_scopes_return_empty_mapping(
+        self,
+        provider: RBACOpsProvider,
+        scope_name_seed: _ScopeNameSeed,
+    ) -> None:
+        """No scopes -> no query, empty mapping."""
+        async with provider.write_ops() as w:
+            result = await w._resolve_scope_template_values([])
+
+        assert result == {}

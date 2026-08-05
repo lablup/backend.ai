@@ -7,6 +7,8 @@ from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 
 from ai.backend.common.api_handlers import Sentinel as BackendSentinel
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_root_field
 from ai.backend.manager.api.gql.extensions import (
     GQLExceptionHandlerExtension,
     GQLLoggingExtension,
@@ -1080,35 +1082,31 @@ schema = CustomizedSchema(
 )
 
 
-async def _public_ping() -> str:
+@gql_root_field(BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Returns 'pong'"))  # type: ignore[misc]
+async def ping() -> str:
     return "pong"
 
 
-@strawberry.type
+@strawberry.type(name="Query")
 class PublicQueries:
-    """Query root served at the unauthenticated public endpoint (POST /admin/gql/strawberry/public).
+    """Query root of the ``public`` subgraph, served without authentication at
+    ``POST /admin/gql/strawberry/public``.
 
     Contains ONLY fields that are safe to expose without authentication; private fields are
-    physically absent, so they cannot be queried (no runtime gate needed). Real public fields
-    should be registered both here and on ``Query`` so authenticated clients can reach them via the
-    main endpoint too.
-
-    ``public_ping`` is a temporary placeholder so this type is non-empty (GraphQL requires >=1
-    field). It is intentionally registered only here (not on ``Query``) and will be replaced by
-    real public fields (e.g. ``publicAppConfigs``).
+    physically absent, so they cannot be queried (no runtime gate needed). A public field belongs
+    here and nowhere else: declaring it on ``Query`` as well would let the router resolve it
+    against the authenticated subgraph, which answers 401 to an anonymous caller.
     """
 
-    public_ping: str = strawberry.field(
-        resolver=_public_ping,
-        description="Placeholder public field; returns 'pong'.",
-    )
+    ping = ping
 
 
-# Plain (non-federation) schema: the public endpoint is hit directly, not through the Apollo
-# Router supergraph, so it needs no federation machinery.
-public_schema = strawberry.Schema(
+# A subgraph of the same supergraph as `schema`, kept separate only so that its routing URL
+# carries no auth middleware: anonymous queries compose against this subgraph alone.
+public_schema = Schema(
     query=PublicQueries,
     config=StrawberryConfig(auto_camel_case=True),
+    federation_version="2.7",
     extensions=[
         GQLLoggingExtension,
         GQLMetricExtension,

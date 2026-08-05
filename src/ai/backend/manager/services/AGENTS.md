@@ -7,6 +7,12 @@
 Per domain: `services/{domain}/types.py`, `service.py`, `processors.py`,
 and `actions/{base,{operation}}.py` — one file per operation under `actions/`.
 
+`services/ops/` is not a domain: it holds the generic services for the standard six.
+An operation whose service method would only forward a repository spec writes no
+`service.py` method at all — its action mixes in an `actions/v2/ops/` base and wires
+straight to the generic service. Write a domain service method the moment the operation
+grows a branch; the generic services take no hook or callback to hide one in.
+
 ## Action rules
 
 - Action and ActionResult MUST be `@dataclass(frozen=True)`.
