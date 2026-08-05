@@ -24,6 +24,7 @@ INPUT_CHAIN = "BAII"
 
 @dataclass(frozen=True)
 class NetworkConfig:
+    agent_id: str
     netns_dir: Path
     subnet_pool: ipaddress.IPv4Network
     subnet_prefix: int
@@ -55,8 +56,9 @@ def namespace_name(kernel_id: KernelId) -> str:
     return f"bai-{kernel_id.hex[:12]}"
 
 
-def bridge_name(session_id: SessionId) -> str:
-    return f"baibr{session_id.hex[:10]}"
+def bridge_name(agent_id: str, session_id: SessionId) -> str:
+    host = hashlib.sha256(agent_id.encode()).hexdigest()[:4]
+    return f"baibr{host}{session_id.hex[:6]}"
 
 
 def veth_name(kernel_id: KernelId) -> str:
@@ -120,7 +122,8 @@ class SessionNetworkManager:
 
     async def _pick_subnet(self, session_id: SessionId) -> ipaddress.IPv4Network:
         pool = list(self._config.subnet_pool.subnets(new_prefix=self._config.subnet_prefix))
-        seed = int.from_bytes(hashlib.sha256(session_id.bytes).digest()[:4], "big")
+        keyed = self._config.agent_id.encode() + session_id.bytes
+        seed = int.from_bytes(hashlib.sha256(keyed).digest()[:4], "big")
         taken = await self._in_use_subnets()
         for offset in range(len(pool)):
             candidate = pool[(seed + offset) % len(pool)]
@@ -244,7 +247,7 @@ class SessionNetworkManager:
         self, kernel_id: KernelId, session_id: SessionId, member_idx: int
     ) -> SessionNetwork:
         namespace = namespace_name(kernel_id)
-        bridge = bridge_name(session_id)
+        bridge = bridge_name(self._config.agent_id, session_id)
         veth = veth_name(kernel_id)
         async with self._lock, host_lock("netns"):
             subnet = await self._ensure_bridge(bridge, session_id)
@@ -322,7 +325,7 @@ class SessionNetworkManager:
 
     async def destroy(self, kernel_id: KernelId, session_id: SessionId) -> None:
         namespace = namespace_name(kernel_id)
-        bridge = bridge_name(session_id)
+        bridge = bridge_name(self._config.agent_id, session_id)
         async with self._lock, host_lock("netns"):
             await self._run("ip", "netns", "delete", namespace, check=False)
             await self._run("ip", "link", "delete", veth_name(kernel_id), check=False)

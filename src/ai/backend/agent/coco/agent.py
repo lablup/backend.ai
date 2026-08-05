@@ -159,6 +159,7 @@ def build_network_config(local_config: AgentUnifiedConfig) -> NetworkConfig:
     denied += [ipaddress.IPv4Network(cidr) for cidr in section.management_networks]
     denied.append(TUNNEL_SUBNET)
     return NetworkConfig(
+        agent_id=str(local_config.agent.id),
         netns_dir=Path("/etc/netns"),
         subnet_pool=ipaddress.IPv4Network(section.session_subnet_pool),
         subnet_prefix=section.session_subnet_prefix,
