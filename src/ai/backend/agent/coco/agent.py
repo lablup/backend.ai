@@ -302,11 +302,8 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
     @override
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
         confidential = self.internal_data.get("confidential") or {}
-        member_idx = confidential.get("member_idx")
         self.network = await self.network_manager.create(
-            self.kernel_id,
-            self.session_id,
-            int(member_idx) if member_idx else self.kernel_config.get("cluster_idx", 0),
+            self.kernel_id, self.session_id, int(confidential.get("member_idx", 1))
         )
         port = confidential.get("tunnel_ingress_port")
         if not port:
@@ -513,9 +510,9 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
             async with host_lock("attestation"):
                 await self.runtime.start(container_id)
                 await self.runtime.wait_running(container_id, self.settings.container_start_timeout)
-                await _wait_for_port(
-                    str(network.guest_addr), CHANNEL_PORT, self.settings.attestation_timeout
-                )
+            await _wait_for_port(
+                str(network.guest_addr), CHANNEL_PORT, self.settings.attestation_timeout
+            )
         except Exception as e:
             raise ContainerCreationError(container_id, str(e)) from e
         for service_port in kernel_obj.service_ports:

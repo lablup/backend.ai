@@ -95,7 +95,7 @@ def main():
 try:
     main()
 except Exception as failure:
-    report({"state": "failed", "reason": f"{type(failure).__name__}: {failure}"})
+    report({"state": "retrying", "reason": f"{type(failure).__name__}: {failure}"})
     subprocess.run([IP, "link", "delete", LINK], capture_output=True, check=False)
     print(f"backend.ai inter-kernel tunnel refused to come up: {failure}", file=sys.stderr)
     sys.exit(1)

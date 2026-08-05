@@ -24,16 +24,23 @@ def profile():
 
 def fetch(api, resource):
     url = f"{api}/cdh/resource/{resource}"
-    try:
-        with urllib.request.urlopen(url, timeout=60) as response:
-            payload = response.read()
-    except urllib.error.HTTPError as error:
-        raise Refusal(f"the broker refused {resource} with {error.code}")
-    except OSError as error:
-        raise Refusal(f"the broker at {api} was unreachable for {resource}: {error}")
-    if not payload:
-        raise Refusal(f"the broker released {resource} as zero bytes")
-    return payload
+    refusal = ""
+    for attempt in range(12):
+        if attempt:
+            time.sleep(2)
+        try:
+            with urllib.request.urlopen(url, timeout=60) as response:
+                payload = response.read()
+        except urllib.error.HTTPError as error:
+            refusal = f"the broker refused {resource} with {error.code}"
+            continue
+        except OSError as error:
+            refusal = f"the broker at {api} was unreachable for {resource}: {error}"
+            continue
+        if payload:
+            return payload
+        refusal = f"the broker released {resource} as zero bytes"
+    raise Refusal(refusal)
 
 
 def unpack(payload, destination, mode):
@@ -73,12 +80,12 @@ def tunnel():
     for _ in range(120):
         if state.is_file():
             report = json.loads(state.read_text())
-            if report["state"] == "up":
+            if report["state"] != "retrying":
                 break
         time.sleep(1)
-    else:
-        if report is None:
-            raise Refusal("the guest never reported on the inter-kernel tunnel")
+    if report is None:
+        raise Refusal("the guest never reported on the inter-kernel tunnel")
+    if report["state"] != "up":
         raise Refusal(f"the inter-kernel tunnel did not come up: {report['reason']}")
     with open("/etc/hosts", "a") as hosts:
         hosts.write((shared / "hosts").read_text())

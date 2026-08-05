@@ -218,14 +218,14 @@ class SessionNetworkManager:
         return subnet
 
     async def create(
-        self, kernel_id: KernelId, session_id: SessionId, cluster_idx: int
+        self, kernel_id: KernelId, session_id: SessionId, member_idx: int
     ) -> SessionNetwork:
         namespace = namespace_name(kernel_id)
         bridge = bridge_name(session_id)
         veth = veth_name(kernel_id)
         async with self._lock, host_lock("netns"):
             subnet = await self._ensure_bridge(bridge, session_id)
-            guest_addr = subnet[2 + max(cluster_idx, 0)]
+            guest_addr = subnet[1 + max(member_idx, 1)]
             network = SessionNetwork(namespace, bridge, veth, subnet, subnet[1], guest_addr)
             await self._run("ip", "netns", "delete", namespace, check=False)
             await self._run("ip", "netns", "add", namespace)

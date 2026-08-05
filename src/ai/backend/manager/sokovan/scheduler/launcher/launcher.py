@@ -660,11 +660,20 @@ class SessionLauncher:
             )
         resources: dict[str, tuple[SessionResourceKind, bytes]] = {}
         identities: dict[KernelId, ChannelIdentity] = {}
+        member_index = {
+            kernel.kernel_id: member_idx
+            for member_idx, kernel in enumerate(
+                sorted(
+                    session.kernels,
+                    key=lambda k: (k.cluster_role != "main", k.cluster_role, k.cluster_idx),
+                ),
+                start=1,
+            )
+        }
         tunnel_ports: dict[KernelId, int] = {}
-        member_indices: dict[KernelId, int] = {}
         if len(session.kernels) > 1:
-            members, tunnel_ports, member_indices = await self._allocate_tunnel_members(
-                session, opts
+            members, tunnel_ports = await self._allocate_tunnel_members(
+                session, opts, member_index
             )
             resources.update(tunnel_resources(members))
         for kernel in session.kernels:
@@ -756,7 +765,7 @@ class SessionLauncher:
                 "tunnel_resource": provisioning.path_of(f"tunnel-{kernel.kernel_id}"),
                 "peers_resource": provisioning.path_of(PEER_DIRECTORY_TAG),
                 "tunnel_ingress_port": tunnel_ports.get(kernel.kernel_id),
-                "member_idx": member_indices.get(kernel.kernel_id),
+                "member_idx": member_index[kernel.kernel_id],
             }
             for kernel in session.kernels
         }
@@ -770,11 +779,9 @@ class SessionLauncher:
         self,
         session: SessionDataForStart,
         opts: ConfidentialScalingGroupOpts,
-    ) -> tuple[list[TunnelMember], dict[KernelId, int], dict[KernelId, int]]:
-        ordered = sorted(
-            session.kernels,
-            key=lambda k: (k.cluster_role != "main", k.cluster_role, k.cluster_idx),
-        )
+        member_index: Mapping[KernelId, int],
+    ) -> tuple[list[TunnelMember], dict[KernelId, int]]:
+        ordered = sorted(session.kernels, key=lambda k: member_index[k.kernel_id])
         agent_ids = {kernel.agent_id for kernel in ordered if kernel.agent_id}
         async with self._db.begin_readonly_session() as db_session:
             advertised = {
@@ -805,8 +812,8 @@ class SessionLauncher:
         low, high = opts.tunnel_port_range
         members: list[TunnelMember] = []
         ports: dict[KernelId, int] = {}
-        indices: dict[KernelId, int] = {}
-        for member_idx, kernel in enumerate(ordered, start=1):
+        for kernel in ordered:
+            member_idx = member_index[kernel.kernel_id]
             agent_id = kernel.agent_id
             host = advertised.get(agent_id) if agent_id else None
             if agent_id is None or not host or _loopback_host(host):
@@ -823,7 +830,6 @@ class SessionLauncher:
                 )
             in_use[agent_id].add(port)
             ports[kernel.kernel_id] = port
-            indices[kernel.kernel_id] = member_idx
             members.append(
                 TunnelMember(
                     kernel.kernel_id,
@@ -832,7 +838,7 @@ class SessionLauncher:
                     f"{host}:{port}",
                 )
             )
-        return members, ports, indices
+        return members, ports
 
     async def _create_cluster_ssh_keypair(self) -> ClusterSSHKeyPair:
         """
