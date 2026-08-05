@@ -54,6 +54,15 @@ def _get_session_row_join_condition() -> sa.ColumnElement[bool]:
 
 class KeyPairRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     __tablename__ = "keypairs"
+    __table_args__ = (
+        # Partial unique index: at most one keypair per user may have is_default = true.
+        sa.Index(
+            "uq_keypairs_is_default",
+            "user",
+            unique=True,
+            postgresql_where=sa.text("is_default"),
+        ),
+    )
 
     user_id: Mapped[str | None] = mapped_column("user_id", sa.String(length=256), index=True)
     access_key: Mapped[str] = mapped_column("access_key", sa.String(length=20), primary_key=True)
@@ -61,6 +70,9 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     is_active: Mapped[bool | None] = mapped_column("is_active", sa.Boolean, index=True)
     is_admin: Mapped[bool | None] = mapped_column(
         "is_admin", sa.Boolean, index=True, default=False, server_default=false()
+    )
+    is_default: Mapped[bool] = mapped_column(
+        "is_default", sa.Boolean, nullable=False, default=False, server_default=false()
     )
     last_used: Mapped[datetime | None] = mapped_column(
         "last_used", sa.DateTime(timezone=True), nullable=True

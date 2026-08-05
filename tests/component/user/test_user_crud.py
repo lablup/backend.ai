@@ -64,6 +64,28 @@ class TestUserCreateCrud:
         assert kp is not None, "Keypair should be auto-created for new user"
         assert kp.is_active is True
 
+    async def test_s6_create_marks_the_default_keypair_as_main(
+        self,
+        user_factory: UserFactory,
+        db_engine: SAEngine,
+    ) -> None:
+        """S-6: The auto-created keypair is marked main and agrees with users.main_access_key."""
+        result = await user_factory()
+
+        async with db_engine.begin() as conn:
+            marked = (
+                await conn.execute(
+                    sa.select(keypairs.c.access_key).where(
+                        (keypairs.c.user == str(result.user.id)) & keypairs.c.is_main
+                    )
+                )
+            ).scalars()
+            main_access_key = await conn.scalar(
+                sa.select(users.c.main_access_key).where(users.c.uuid == str(result.user.id))
+            )
+        assert main_access_key is not None
+        assert marked.all() == [main_access_key]
+
     async def test_s3_create_with_group_ids(
         self,
         user_factory: UserFactory,

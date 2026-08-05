@@ -219,6 +219,7 @@ async def create_user_if_not_exists(
                 user=keypair_data["user"],
                 ssh_public_key=keypair_data["ssh_public_key"],
                 ssh_private_key=keypair_data["ssh_private_key"],
+                is_main=True,
             )
             dbsess.add(keypair)
             await dbsess.flush()
@@ -227,7 +228,6 @@ async def create_user_if_not_exists(
             await associate_user_with_group(conn, user, user_info["project"])
             await associate_user_with_group(conn, user, "model-store")
 
-            # Add `main_access_key` value to new user column.
             user.main_access_key = keypair_data["access_key"]
 
             # Create RBAC system role and map user to role

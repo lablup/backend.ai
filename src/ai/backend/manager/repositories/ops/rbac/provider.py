@@ -998,8 +998,8 @@ class RBACWriteOps(WriteOps):
         """Provision a user end to end in one transaction.
 
         Creates the user scope (row, virtual scope, own-scope roles) and grants those
-        roles, creates the default keypair under the user scope and sets it as the
-        user's ``main_access_key``, then enrolls the user in its domain's and projects'
+        roles, creates the default keypair under the user scope and marks it as the
+        user's main one, then enrolls the user in its domain's and projects'
         virtual scopes — the domain's model-store projects always included, and
         ``project_ids`` narrowed to projects that exist in the domain.
         """
@@ -1027,6 +1027,7 @@ class RBACWriteOps(WriteOps):
             )
         )
         keypair_row = kp_result.row
+        keypair_row.is_main = True
         user_row.main_access_key = keypair_row.access_key
 
         member = ScopeUserMember(user_id=user_id)
