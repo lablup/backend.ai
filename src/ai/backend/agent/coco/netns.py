@@ -15,6 +15,8 @@ from .hostlock import host_lock
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 RULE_TAG = "bai-coco"
+TUNNEL_SUBNET = ipaddress.IPv4Network("10.252.0.0/16")
+TUNNEL_PORT = 51820
 
 
 @dataclass(frozen=True)
@@ -190,8 +192,8 @@ class SessionNetworkManager:
             if ipaddress.ip_address(upstream).is_loopback:
                 await self._run("sysctl", "-q", "-w", f"net.ipv4.conf.{bridge}.route_localnet=1")
 
-    async def _remove_rules(self, bridge: str) -> None:
-        needle = f'--comment "{RULE_TAG}:{bridge}"'
+    async def _remove_rules(self, label: str) -> None:
+        needle = f'--comment "{RULE_TAG}:{label}"'
         for table in ("filter", "nat"):
             listing = await self._run("iptables", "-t", table, "-S", check=False)
             for line in listing.splitlines():
@@ -247,6 +249,30 @@ class SessionNetworkManager:
         await self.assert_shim_reachable(network)
         return network
 
+    async def expose_tunnel(self, network: SessionNetwork, advertise: str, port: int) -> None:
+        comment = f"-m comment --comment {RULE_TAG}:{network.namespace}".split()
+        async with self._lock, host_lock("netns"):
+            await self._run(
+                "iptables",
+                "-t",
+                "nat",
+                "-I",
+                *(
+                    f"PREROUTING 1 -d {advertise}/32 -p udp --dport {port}"
+                    f" -j DNAT --to-destination {network.guest_addr}:{TUNNEL_PORT}"
+                ).split(),
+                *comment,
+            )
+            await self._run(
+                "iptables",
+                "-I",
+                *(
+                    f"FORWARD 1 -o {network.bridge} -d {network.guest_addr}/32"
+                    f" -p udp --dport {TUNNEL_PORT} -j ACCEPT"
+                ).split(),
+                *comment,
+            )
+
     async def assert_shim_reachable(self, network: SessionNetwork) -> None:
         shim = f"{self._config.shim_host}:{self._config.shim_port}"
         proc = await asyncio.create_subprocess_exec(
@@ -275,6 +301,7 @@ class SessionNetworkManager:
         async with self._lock, host_lock("netns"):
             await self._run("ip", "netns", "delete", namespace, check=False)
             await self._run("ip", "link", "delete", veth_name(kernel_id), check=False)
+            await self._remove_rules(namespace)
             resolver = self._config.netns_dir / namespace
             (resolver / "resolv.conf").unlink(missing_ok=True)
             try:

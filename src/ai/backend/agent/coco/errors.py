@@ -53,11 +53,6 @@ class HostConfigReadbackRefused(_CocoRefusal):
     error_title = "Restart state comes from the manager and a fresh fetch, never from host disk."
 
 
-class MultiNodeSessionRefused(_CocoRefusal):
-    error_type = _PREFIX + "multi-node-session-refused"
-    error_title = "Multi-node sessions are refused: inter-node bytes would cross the underlay bare."
-
-
 class ImagePushRefused(_CocoRefusal):
     error_type = _PREFIX + "image-push-refused"
     error_title = "Image push from the host is unavailable under the confidential runtime."

@@ -68,12 +68,16 @@ def bdf_for(device_id: DeviceId | str) -> str:
     return str(device_id).replace("_", ":")
 
 
-def scan_vfio_devices(vendor_ids: Sequence[str]) -> list[VfioDeviceInfo]:
+def scan_vfio_devices(
+    vendor_ids: Sequence[str], pci_addresses: Sequence[str] = ()
+) -> list[VfioDeviceInfo]:
     found: list[VfioDeviceInfo] = []
     if not PCI_DEVICES.is_dir():
         return found
     for entry in sorted(PCI_DEVICES.glob("*/vfio-dev/vfio*")):
         pci_dir = entry.parent.parent
+        if pci_addresses and pci_dir.name not in pci_addresses:
+            continue
         try:
             vendor = (pci_dir / "vendor").read_text().strip().lower()
         except OSError:
@@ -202,10 +206,12 @@ class VfioGpuPlugin(AbstractComputePlugin):
         local_config: Mapping[str, Any],
         vendor_ids: Sequence[str],
         device_memory_bytes: int,
+        pci_addresses: Sequence[str] = (),
     ) -> None:
         super().__init__(plugin_config, local_config)
         self._vendor_ids = [vendor.lower() for vendor in vendor_ids]
         self._device_memory_bytes = device_memory_bytes
+        self._pci_addresses = list(pci_addresses)
 
     @override
     async def init(self, context: Any | None = None) -> None:
@@ -241,7 +247,7 @@ class VfioGpuPlugin(AbstractComputePlugin):
                 memory_size=self._device_memory_bytes,
                 processing_units=1,
             )
-            for info in scan_vfio_devices(self._vendor_ids)
+            for info in scan_vfio_devices(self._vendor_ids, self._pci_addresses)
         ]
 
     @override
@@ -351,6 +357,7 @@ async def load_resources(
             local_config,
             confidential.get("vfio-vendor-ids") or [NVIDIA_VENDOR_ID],
             int(confidential.get("gpu-memory-bytes") or 0),
+            confidential.get("vfio-pci-addresses") or [],
         )
         await gpu_plugin.init()
         compute_plugin_ctx.attach_intrinsic_device(gpu_plugin)

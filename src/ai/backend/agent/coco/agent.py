@@ -45,7 +45,6 @@ from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.types import (
     AutoPullBehavior,
     ClusterInfo,
-    ClusterMode,
     ClusterSSHPortMapping,
     ContainerId,
     ContainerStatus,
@@ -78,7 +77,6 @@ from .errors import (
     ImageDistroUnresolved,
     ImagePushRefused,
     MountPlanMissing,
-    MultiNodeSessionRefused,
     NetworkSetupFailed,
     RawCircuitRefused,
     ReleaseNotConfirmed,
@@ -87,7 +85,7 @@ from .errors import (
 )
 from .hostlock import host_lock
 from .kernel import CocoKernel
-from .netns import NetworkConfig, SessionNetwork, SessionNetworkManager
+from .netns import TUNNEL_SUBNET, NetworkConfig, SessionNetwork, SessionNetworkManager
 from .relay import ChannelRelay, Circuit
 from .resources import ALLOC_LABEL, encode_allocations, resolve_char_devices
 from .runtime import AbstractRuntimeClient, NerdctlClient, RuntimeConfig
@@ -159,6 +157,7 @@ def build_network_config(local_config: AgentUnifiedConfig) -> NetworkConfig:
     section = local_config.confidential
     denied = [ipaddress.IPv4Network(section.metadata_endpoint + "/32")]
     denied += [ipaddress.IPv4Network(cidr) for cidr in section.management_networks]
+    denied.append(TUNNEL_SUBNET)
     return NetworkConfig(
         netns_dir=Path("/etc/netns"),
         subnet_pool=ipaddress.IPv4Network(section.session_subnet_pool),
@@ -178,6 +177,13 @@ def build_network_config(local_config: AgentUnifiedConfig) -> NetworkConfig:
 
 def _optional_uuid(raw: str | None) -> UUID | None:
     return UUID(raw) if raw else None
+
+
+def _is_loopback(host: str) -> bool:
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return host == "localhost"
 
 
 async def _wait_for_port(host: str, port: int, limit_seconds: float) -> None:
@@ -295,11 +301,25 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
 
     @override
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
-        if ClusterMode(cluster_info["mode"]) is ClusterMode.MULTI_NODE:
-            raise MultiNodeSessionRefused(extra_msg=str(self.session_id))
+        confidential = self.internal_data.get("confidential") or {}
+        member_idx = confidential.get("member_idx")
         self.network = await self.network_manager.create(
-            self.kernel_id, self.session_id, self.kernel_config.get("cluster_idx", 0)
+            self.kernel_id,
+            self.session_id,
+            int(member_idx) if member_idx else self.kernel_config.get("cluster_idx", 0),
         )
+        port = confidential.get("tunnel_ingress_port")
+        if not port:
+            return
+        advertise = self.local_config.agent.public_host
+        if not advertise or _is_loopback(advertise):
+            raise NetworkSetupFailed(
+                extra_msg=(
+                    "this member accepts tunnel ingress, which needs agent.public-host set to"
+                    " this host's routable underlay address"
+                )
+            )
+        await self.network_manager.expose_tunnel(self.network, advertise, int(port))
 
     @override
     async def prepare_ssh(self, cluster_info: ClusterInfo) -> None:
@@ -453,7 +473,6 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
         if confidential.get("tunnel_resource") and confidential.get("peers_resource"):
             env["BACKENDAI_CC_TUNNEL_URI"] = confidential["tunnel_resource"]
             env["BACKENDAI_CC_PEERS_URI"] = confidential["peers_resource"]
-            env["BACKENDAI_CC_TUNNEL_BASE"] = str(network.subnet[2])
         if confidential.get("channel_resource"):
             env["BACKENDAI_CC_CHANNEL_URI"] = confidential["channel_resource"]
         plan_resource = confidential.get("mount_plan_resource")
