@@ -396,7 +396,7 @@ class ScalingGroupDBSource:
             for pair in binder.pairs:
                 accessor_scope = self._scope_ref_of(pair.scope_ref)
                 resource_group_id = ResourceGroupID(uuid.UUID(pair.entity_ref.element_id))
-                await self._enroll_resource_group(w, accessor_scope, resource_group_id)
+                await self._enroll_resource_groups(w, accessor_scope, [resource_group_id])
 
     async def _disassociate_resource_groups[TRow: Base](
         self, unbinder: RBACScopeEntityUnbinder[TRow]
@@ -419,25 +419,29 @@ class ScalingGroupDBSource:
             await w.batch_purge(BatchPurger(spec=unbinder.build_purger_spec()))
             await self._withdraw_resource_groups(w, accessor_scope, resource_group_ids)
 
-    async def _enroll_resource_group(
+    async def _enroll_resource_groups(
         self,
         w: RBACWriteOps,
         accessor_scope: ScopeRef,
-        resource_group_id: ResourceGroupID,
+        resource_group_ids: list[ResourceGroupID],
     ) -> None:
-        """Enroll a resource group into ``accessor_scope`` with existing RBAC ops:
-        membership + association row via ``add_entity_members``, and the reverse
-        ``accessor_scope`` binding to the resource group's virtual scope via
-        ``ensure_scope`` (created lazily for pre-virtual-scope rows)."""
+        """Enroll resource groups under ``accessor_scope`` via ``add_bulk_members``:
+        membership, the legacy scope association, and the scope's binding into each
+        resource group's virtual scope. The virtual scopes are ensured first, since
+        rows created before the virtual-scope rollout may not have one."""
+        if not resource_group_ids:
+            return
         await w.ensure_scope(accessor_scope)
-        await w.add_entity_members(
+        for resource_group_id in resource_group_ids:
+            await w.ensure_scope(self._resource_group_scope(resource_group_id))
+        await w.add_bulk_members(
             EntityMembersAddition(
                 scope=accessor_scope,
-                members=[ScopeEntityMember(ref=self._resource_group_entity(resource_group_id))],
+                members=[
+                    ScopeEntityMember(ref=self._resource_group_entity(resource_group_id))
+                    for resource_group_id in resource_group_ids
+                ],
             )
-        )
-        await w.ensure_scope(
-            self._resource_group_scope(resource_group_id), bound_scope=accessor_scope
         )
 
     async def _withdraw_resource_groups(
@@ -446,20 +450,15 @@ class ScalingGroupDBSource:
         accessor_scope: ScopeRef,
         resource_group_ids: list[ResourceGroupID],
     ) -> None:
-        """Withdraw resource groups from ``accessor_scope``: memberships + association
-        rows via ``remove_entity_members``, and the reverse scope bindings via
-        ``unbind_scope``. Each resource group's virtual scope is ensured first, since
-        ``unbind_scope`` requires it and pre-virtual-scope rows may not have one."""
+        """Withdraw resource groups from ``accessor_scope`` via ``remove_bulk_members``:
+        membership, the legacy scope association, and the scope's binding in each
+        resource group's virtual scope (missing virtual scopes never raise)."""
         if not resource_group_ids:
             return
-        await w.remove_entity_members(
+        await w.remove_bulk_members(
             accessor_scope,
             [self._resource_group_entity(rg_id) for rg_id in resource_group_ids],
         )
-        for rg_id in resource_group_ids:
-            resource_group_scope = self._resource_group_scope(rg_id)
-            await w.ensure_scope(resource_group_scope)
-            await w.unbind_scope(accessor_scope, resource_group_scope)
 
     async def check_scaling_group_domain_association_exists(
         self,
@@ -697,8 +696,7 @@ class ScalingGroupDBSource:
                     )
                 )
                 self._tolerate_only_duplicates(creation_result)
-                for rg_id in add:
-                    await self._enroll_resource_group(w, domain_scope, rg_id)
+                await self._enroll_resource_groups(w, domain_scope, list(add))
 
             result = await w.batch_query_in_global(
                 sa.select(ScalingGroupRow.name)
@@ -750,8 +748,7 @@ class ScalingGroupDBSource:
                     )
                 )
                 self._tolerate_only_duplicates(creation_result)
-                for rg_id in add:
-                    await self._enroll_resource_group(w, project_scope, rg_id)
+                await self._enroll_resource_groups(w, project_scope, list(add))
 
             result = await w.batch_query_in_global(
                 sa.select(ScalingGroupRow.name)
@@ -815,10 +812,10 @@ class ScalingGroupDBSource:
                 )
                 self._tolerate_only_duplicates(creation_result)
                 for domain_id in add_ids:
-                    await self._enroll_resource_group(
+                    await self._enroll_resource_groups(
                         w,
                         ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=domain_id),
-                        resource_group_id,
+                        [resource_group_id],
                     )
 
             result = await w.batch_query_in_global(
@@ -873,10 +870,10 @@ class ScalingGroupDBSource:
                 )
                 self._tolerate_only_duplicates(creation_result)
                 for project_id in add:
-                    await self._enroll_resource_group(
+                    await self._enroll_resource_groups(
                         w,
                         ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ProjectID(project_id)),
-                        resource_group_id,
+                        [resource_group_id],
                     )
 
             result = await w.batch_query_in_global(
