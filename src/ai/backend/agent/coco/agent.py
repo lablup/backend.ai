@@ -110,7 +110,7 @@ KERNELSPEC_LABEL = "ai.backend.coco.kernelspec"
 
 ACTIVITY_REPORT_INTERVAL = 30.0
 CHANNEL_PORT = 2010
-SELF_ENCRYPTING_SERVICES = frozenset({"sshd"})
+SELF_ENCRYPTING_SERVICES = frozenset({"sshd", "ssh", "sftp"})
 
 
 @dataclass(frozen=True)
