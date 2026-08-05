@@ -52,9 +52,6 @@ class ImageNode(BaseResponseModel):
     registry_id: UUID = Field(description="Registry ID")
     project: str | None = Field(default=None, description="Project (namespace) within registry")
     tag: str | None = Field(default=None, description="Image tag")
-    version: str = Field(
-        description="Base version parsed from the tag (e.g. '3.11' for '3.11-ubuntu20.04')"
-    )
     architecture: str = Field(description="Target CPU architecture")
     size_bytes: int = Field(description="Image size in bytes")
     type: ImageTypeEnum = Field(description="Image type category")
