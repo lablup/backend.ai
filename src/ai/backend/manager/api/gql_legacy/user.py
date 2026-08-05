@@ -28,6 +28,7 @@ from ai.backend.manager.data.user.types import (
 from ai.backend.manager.models.base import GUID
 from ai.backend.manager.models.group import GroupRow, groups
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.minilang import (
     ExternalTableFilterSpec,
     FieldSpecItem,
@@ -543,6 +544,18 @@ class UserGroup(graphene.ObjectType):  # type: ignore[misc]
             )
 
 
+#: The access key of the keypair marked as the user's main one. A correlated
+#: subquery rather than a join so that it can be dropped into the Core selects
+#: below, and into filter and order expressions, without reshaping their FROM.
+_MAIN_KEYPAIR_ACCESS_KEY = (
+    sa.select(KeyPairRow.access_key)
+    .where((KeyPairRow.user == users.c.uuid) & KeyPairRow.is_main)
+    .correlate(users)
+    .scalar_subquery()
+    .label("main_keypair_access_key")
+)
+
+
 class User(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
@@ -649,7 +662,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
             totp_activated=row.totp_activated,
             totp_activated_at=row.totp_activated_at,
             sudo_session_enabled=row.sudo_session_enabled,
-            main_access_key=row.main_access_key,
+            main_access_key=row.main_keypair_access_key,
             container_uid=row.container_uid,
             container_main_gid=row.container_main_gid,
             container_gids=row.container_gids,
@@ -679,12 +692,12 @@ class User(graphene.ObjectType):  # type: ignore[misc]
                 ),
             )
             query = (
-                sa.select(users)
+                sa.select(users, _MAIN_KEYPAIR_ACCESS_KEY)
                 .select_from(j)
                 .where(AssociationScopesEntitiesRow.scope_id == str(group_id))
             )
         else:
-            query = sa.select(users).select_from(users)
+            query = sa.select(users, _MAIN_KEYPAIR_ACCESS_KEY).select_from(users)
         if ctx.user["role"] != UserRole.SUPERADMIN:
             query = query.where(users.c.domain_name == ctx.user["domain_name"])
         if domain_name is not None:
@@ -718,7 +731,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", dtparse),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-        "main_access_key": ("main_access_key", None),
+        "main_access_key": (ORMFieldItem(_MAIN_KEYPAIR_ACCESS_KEY), None),
     }
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {
@@ -738,7 +751,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", None),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-        "main_access_key": ("main_access_key", None),
+        "main_access_key": (ORMFieldItem(_MAIN_KEYPAIR_ACCESS_KEY), None),
     }
 
     @classmethod
@@ -778,9 +791,8 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         if filter is not None:
             if group_id is not None:
                 qfparser = QueryFilterParser({
-                    k: ("users_" + v[0], v[1])
+                    k: ("users_" + v[0], v[1]) if isinstance(v[0], str) else v
                     for k, v in cls._queryfilter_fieldspec.items()
-                    if isinstance(v[0], str)
                 })
             else:
                 qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
@@ -813,14 +825,14 @@ class User(graphene.ObjectType):  # type: ignore[misc]
                 ),
             )
             query = (
-                sa.select(users)
+                sa.select(users, _MAIN_KEYPAIR_ACCESS_KEY)
                 .select_from(j)
                 .where(AssociationScopesEntitiesRow.scope_id == str(group_id))
                 .limit(limit)
                 .offset(offset)
             )
         else:
-            query = sa.select(users).select_from(users).limit(limit).offset(offset)
+            query = sa.select(users, _MAIN_KEYPAIR_ACCESS_KEY).select_from(users).limit(limit).offset(offset)
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if status is not None:
@@ -831,9 +843,8 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         if filter is not None:
             if group_id is not None:
                 qfparser = QueryFilterParser({
-                    k: ("users_" + v[0], v[1])
+                    k: ("users_" + v[0], v[1]) if isinstance(v[0], str) else v
                     for k, v in cls._queryfilter_fieldspec.items()
-                    if isinstance(v[0], str)
                 })
             else:
                 qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
@@ -841,9 +852,8 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         if order is not None:
             if group_id is not None:
                 qoparser = QueryOrderParser({
-                    k: ("users_" + v[0], v[1])
+                    k: ("users_" + v[0], v[1]) if isinstance(v[0], str) else v
                     for k, v in cls._queryorder_colmap.items()
-                    if isinstance(v[0], str)
                 })
             else:
                 qoparser = QueryOrderParser(cls._queryorder_colmap)
@@ -867,7 +877,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
     ) -> Sequence[User | None]:
         if not emails:
             return []
-        query = sa.select(users).select_from(users).where(users.c.email.in_(emails))
+        query = sa.select(users, _MAIN_KEYPAIR_ACCESS_KEY).select_from(users).where(users.c.email.in_(emails))
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if status is not None:
@@ -897,7 +907,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
     ) -> Sequence[User | None]:
         if not user_ids:
             return []
-        query = sa.select(users).select_from(users).where(users.c.uuid.in_(user_ids))
+        query = sa.select(users, _MAIN_KEYPAIR_ACCESS_KEY).select_from(users).where(users.c.uuid.in_(user_ids))
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if status is not None:
