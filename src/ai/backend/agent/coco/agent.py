@@ -454,7 +454,8 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
         digest = await self.runtime.resolve_image(image["canonical"], image.get("digest") or "")
         blob = self.blob_store.select(digest)
         cpu_alloc = kernel_obj.resource_spec.allocations.get(DeviceName("cpu"), {})
-        cpuset = ",".join(sorted(str(core) for core in cpu_alloc.get(SlotName("cpu"), {})))
+        cores = cpu_alloc.get(SlotName("cpu"), {})
+        cpuset = ",".join(sorted(str(core) for core in cores))
         confidential = self.internal_data.get("confidential") or {}
         if self.internal_data.get("sudo_session_enabled"):
             raise HostPrivilegeWriteRefused(
@@ -496,6 +497,7 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
                 blob.annotation_value,
                 self.image_ref.canonical,
                 self._guest_base_memory,
+                len(cores) or 1,
             ),
             devices=self._char_devices,
             block_devices=[(v.loop, v.guest_path) for v in self._block_volumes],
