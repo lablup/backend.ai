@@ -14,7 +14,7 @@ RuntimeDirectoryPreserve=yes
 WorkingDirectory=/var/lib/backendai/manager
 Environment=HOME=/var/lib/backendai/manager
 Environment=SCIE_BASE=/var/lib/backendai/manager/.scie
-ExecStart=/bin/sh -c 'timeout 120 /usr/lib/backendai/backendai-manager mgr -f ${CREDENTIALS_DIRECTORY}/manager.toml etcd get config; echo "etcdprobe: exit $?"'
+ExecStart=/bin/sh -c 'sed "/^ssl-/d" ${CREDENTIALS_DIRECTORY}/manager.toml > /run/backendai/manager/probe.toml; echo "etcdprobe: reading etcd as the manager would"; timeout 120 /usr/lib/backendai/backendai-manager mgr -f /run/backendai/manager/probe.toml etcd get config; echo "etcdprobe: exit $?"; rm -f /run/backendai/manager/probe.toml'
 TimeoutStartSec=240
 StandardOutput=journal+console
 StandardError=journal+console
