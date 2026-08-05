@@ -1021,13 +1021,13 @@ class RBACWriteOps(WriteOps):
                     generated_data=full_creation.keypair_secrets or generate_keypair_data(),
                     user_id=user_row.uuid,
                     email=user_row.email,
+                    is_main=True,
                 ),
                 element_type=RBACElementType.KEYPAIR,
                 scope_ref=RBACElementRef(RBACElementType.USER, str(user_row.uuid)),
             )
         )
         keypair_row = kp_result.row
-        keypair_row.is_main = True
         user_row.main_access_key = keypair_row.access_key
 
         member = ScopeUserMember(user_id=user_id)
