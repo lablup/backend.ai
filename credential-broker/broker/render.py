@@ -1,10 +1,11 @@
 import json
 import os
 import re
+import urllib.parse
 
 from .errors import EmptySecret, PolicyError
 
-PLACEHOLDER = re.compile(rb"@@([A-Za-z0-9_./-]+)@@")
+PLACEHOLDER = re.compile(rb"@@(?:(url):)?([A-Za-z0-9_./-]+)@@")
 
 
 def render(template_dir, template, fetch):
@@ -17,11 +18,14 @@ def render(template_dir, template, fetch):
         raise EmptySecret(f"template {template} is empty")
 
     def substitute(match):
-        resource = match.group(1).decode("ascii")
+        mode, resource = match.group(1), match.group(2).decode("ascii")
         value = fetch(resource)
         if not value:
             raise EmptySecret(resource)
-        return json.dumps(value.decode("utf-8").strip())[1:-1].encode("utf-8")
+        text = value.decode("utf-8").strip()
+        if mode == b"url":
+            return urllib.parse.quote(text, safe="").encode("utf-8")
+        return json.dumps(text)[1:-1].encode("utf-8")
 
     rendered = PLACEHOLDER.sub(substitute, body)
     if PLACEHOLDER.search(rendered):

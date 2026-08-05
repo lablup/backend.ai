@@ -24,6 +24,16 @@ name = "rpc-keypair"
 resource = "default/control-plane/rpc-keypair"
 
 [[credential]]
+unit = "backendai-manager-schema.service"
+name = "alembic.ini"
+render = "alembic.ini.in"
+
+[[credential]]
+unit = "backendai-manager-schema.service"
+name = "password"
+resource = "default/control-plane/postgres-password"
+
+[[credential]]
 unit = "backendai-manager.service"
 name = "tls.key"
 identity = "manager"
@@ -36,6 +46,17 @@ sans = [
 
 [[credential]]
 unit = "backendai-manager.service"
+name = "tls.crt"
+identity = "manager"
+part = "chain"
+subject = "/CN=manager.control.backend.ai"
+sans = [
+  "DNS:manager.control.backend.ai",
+  "URI:spiffe://backend.ai/domain/default/control-plane/manager",
+]
+
+[[credential]]
+unit = "backendai-manager-selfcheck.service"
 name = "tls.crt"
 identity = "manager"
 part = "chain"

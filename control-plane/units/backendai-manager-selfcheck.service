@@ -1,0 +1,32 @@
+[Unit]
+Description=Backend.AI manager service check over its own API
+Requires=backendai-credentials.service backendai-manager.service
+After=backendai-credentials.service backendai-manager.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=backendai
+Group=backendai
+LoadCredential=tls.crt:/run/backendai-credentials.sock
+ExecStart=/usr/lib/backendai/credential-guard tls.crt
+ExecStart=/usr/lib/backendai/manager-selfcheck
+TimeoutStartSec=300
+StandardOutput=journal+console
+StandardError=journal+console
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateMounts=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

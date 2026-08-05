@@ -53,6 +53,22 @@ etcd-sync)
             $ETCDCTL --user "root:${password}" user passwd root --interactive=true
     $ETCDCTL --user "root:${password}" auth enable 2>/dev/null || true
     ;;
+manager-schema)
+    require "${CREDENTIALS_DIRECTORY}/alembic.ini"
+    require "${CREDENTIALS_DIRECTORY}/password"
+    PGHOST=127.0.0.1
+    PGPORT=5432
+    PGUSER=postgres
+    PGDATABASE=backend
+    PGPASSWORD=$(cat "${CREDENTIALS_DIRECTORY}/password")
+    export PGHOST PGPORT PGUSER PGDATABASE PGPASSWORD
+    await "${PGBIN}/pg_isready" -q
+    "${PGBIN}/psql" -tAc \
+        "SELECT 1 FROM information_schema.tables WHERE table_name='alembic_version'" |
+        grep -q 1 ||
+        /usr/lib/backendai/backendai-manager mgr schema oneshot \
+            -f "${CREDENTIALS_DIRECTORY}/alembic.ini"
+    ;;
 *)
     echo "datastore-bootstrap: unknown action $1" >&2
     exit 64

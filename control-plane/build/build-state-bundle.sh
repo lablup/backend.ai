@@ -84,6 +84,7 @@ install -m 0755 "$MANAGER_PEX" "$ROOT/usr/lib/backendai/backendai-manager"
 install -m 0755 "$COORDINATOR_PEX" "$ROOT/usr/lib/backendai/backendai-appproxy-coordinator"
 install -m 0755 "$KBS_CLIENT" "$ROOT/usr/bin/kbs-client"
 cp -a "${REPO}/credential-broker/broker" "$ROOT/usr/lib/backendai/credential-broker/"
+find "$ROOT/usr/lib/backendai/credential-broker" -name __pycache__ -type d -prune -exec rm -rf {} +
 install -m 0644 "${REPO}"/credential-broker/templates/* "$ROOT/usr/share/backendai/credential-templates/"
 sed "s|^url = .*|url = \"${BACKENDAI_KBS_URL}\"|" \
     "${REPO}/credential-broker/policy/state-bundle.toml" > "$ROOT/etc/backendai/credential-policy.toml"
@@ -110,7 +111,8 @@ systemctl enable var-log.mount var-lib-backendai.mount \
     backendai-credentials.service backendai-postgresql.service \
     backendai-postgresql-bootstrap.service backendai-etcd.service \
     backendai-etcd-bootstrap.service backendai-valkey.service \
-    backendai-manager.service \
+    backendai-manager-schema.service backendai-manager.service \
+    backendai-manager-selfcheck.service \
     backendai-appproxy-coordinator.service backendai-state-backup.timer
 : > /etc/machine-id
 systemctl mask systemd-timesyncd.service serial-getty@ttyS0.service getty@.service \
@@ -119,6 +121,8 @@ systemctl mask systemd-timesyncd.service serial-getty@ttyS0.service getty@.servi
 apt-get -y purge openssh-server 2>/dev/null || true
 apt-get -y clean
 rm -rf /var/lib/apt/lists/* /var/cache/debconf/*-old /usr/share/doc /usr/share/man
+rm -rf /var/log/* /var/cache/ldconfig/* /var/lib/systemd/catalog/database
+rm -f /var/lib/dpkg/status-old /var/lib/dpkg/available-old /etc/passwd- /etc/group- /etc/shadow- /etc/gshadow- /etc/subuid- /etc/subgid-
 INSIDE
 unbind
 

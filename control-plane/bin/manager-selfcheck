@@ -1,0 +1,22 @@
+#!/bin/sh
+set -eu
+
+URL=${BACKENDAI_MANAGER_URL:-https://127.0.0.1:8081/}
+CA="${CREDENTIALS_DIRECTORY}/tls.crt"
+
+[ -s "$CA" ] || { echo "manager-selfcheck: no issued chain to verify against" >&2; exit 78; }
+
+for _ in $(seq 90); do
+    if body=$(curl -fsS --cacert "$CA" --max-time 5 "$URL" 2>/dev/null); then
+        echo "manager-selfcheck: ${URL} answered ${body}"
+        subject=$(openssl s_client -connect 127.0.0.1:8081 -CAfile "$CA" \
+            -verify_return_error < /dev/null 2>/dev/null |
+            sed -n 's/^subject=//p' | head -1)
+        echo "manager-selfcheck: served certificate ${subject}"
+        exit 0
+    fi
+    sleep 2
+done
+
+echo "manager-selfcheck: ${URL} never answered" >&2
+exit 75

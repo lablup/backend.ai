@@ -17,6 +17,7 @@ RuntimeDirectory=backendai/coordinator
 RuntimeDirectoryPreserve=yes
 Environment=HOME=/var/lib/backendai/coordinator
 Environment=SCIE_BASE=/var/lib/backendai/coordinator/.scie
+Environment=PYTHONFAULTHANDLER=1
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal+console
