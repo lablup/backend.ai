@@ -6,7 +6,7 @@ import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer
 from lark.lexer import Token
 
-from . import JSONFieldItem, OrderSpecItem, get_col_from_table
+from . import JSONFieldItem, ORMFieldItem, OrderSpecItem, get_col_from_table
 
 __all__ = (
     "ColumnMapType",
@@ -69,6 +69,8 @@ class QueryOrderTransformer(Transformer[Any, Any]):
                     case JSONFieldItem(_col, _key):
                         _column = get_col_from_table(self._sa_table, _col)
                         matched_col = _column.op("->>")(_key)  # type: ignore[assignment]
+                    case ORMFieldItem(_column_element):
+                        matched_col = _column_element  # type: ignore[assignment]
                     case _:
                         raise ValueError("Invalid type of field name", col_name)
                 col = func(matched_col) if func is not None else matched_col  # type: ignore[arg-type]
