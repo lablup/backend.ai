@@ -17,7 +17,7 @@ cp "${BUNDLE}/state-header-mac" "${OUT}/production-header-mac"
 head -c 32 /dev/urandom > "${OUT}/decoy-disk-key"
 chmod 0600 "${OUT}/decoy-disk-key"
 
-"${HERE}/assemble-disk.sh" "$BUNDLE" "${OUT}/harvest-disk.img" "${OUT}/decoy-disk-key" 1024
+"${HERE}/assemble-disk.sh" "$BUNDLE" "${OUT}/harvest-disk.img" "${OUT}/decoy-disk-key" "${BAI_STATE_MIB:-8192}"
 
 cp -a "${BROKER}/storage/attestation_service_policy" "${OUT}/storage/"
 cp "${OUT}/decoy-disk-key" "${OUT}/storage/repository/${REPO}\\x2Fstate-disk-key"

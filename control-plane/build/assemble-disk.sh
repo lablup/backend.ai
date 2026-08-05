@@ -29,6 +29,7 @@ HASH_MIB=$(mib "${BUNDLE}/rootfs.verity")
 rm -f "$DISK"
 truncate -s $(( (ESP_MIB + ROOT_MIB + HASH_MIB + STATE_MIB + 4) * 1048576 )) "$DISK"
 sgdisk --clear \
+    -U "$(guid "$(derive "disk:${ROOTHASH}")")" \
     -n "1:1M:+${ESP_MIB}M" -t 1:EF00 -c 1:esp \
         -u "1:$(guid "$(derive "esp:${ROOTHASH}")")" \
     -n "2:0:+${ROOT_MIB}M" -t 2:4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709 \
