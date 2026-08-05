@@ -69,14 +69,16 @@ def tunnel():
     shared = STATE / "session"
     (shared / "tunnel.json").write_text(json.dumps(request, sort_keys=True))
     state = shared / "tunnel-state.json"
+    report = None
     for _ in range(120):
         if state.is_file():
-            break
+            report = json.loads(state.read_text())
+            if report["state"] == "up":
+                break
         time.sleep(1)
     else:
-        raise Refusal("the guest never reported on the inter-kernel tunnel")
-    report = json.loads(state.read_text())
-    if report["state"] != "up":
+        if report is None:
+            raise Refusal("the guest never reported on the inter-kernel tunnel")
         raise Refusal(f"the inter-kernel tunnel did not come up: {report['reason']}")
     with open("/etc/hosts", "a") as hosts:
         hosts.write((shared / "hosts").read_text())
