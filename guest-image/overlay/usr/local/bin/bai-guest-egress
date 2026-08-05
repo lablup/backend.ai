@@ -1,0 +1,155 @@
+#!/opt/backend.ai/bin/python
+import ipaddress
+import json
+import pathlib
+import subprocess
+import sys
+import time
+import tomllib
+import urllib.parse
+
+INITDATA = pathlib.Path("/run/confidential-containers/initdata/initdata.toml")
+STATE = pathlib.Path("/run/backend.ai")
+IP = "/usr/sbin/ip"
+XTABLES = "/usr/sbin/xtables-nft-multi"
+ENVIRONMENT = {
+    "XTABLES_LIBDIR": "/usr/lib/x86_64-linux-gnu/xtables",
+    "LD_LIBRARY_PATH": "/usr/lib/x86_64-linux-gnu",
+}
+CHAIN = "BAI-EGRESS"
+DNS_PORT = "53"
+TUNNEL_PORT = "51820"
+CARRIER_ATTEMPTS = 600
+CARRIER_INTERVAL = 0.2
+IPV6_KNOBS = (
+    "/proc/sys/net/ipv6/conf/all/disable_ipv6",
+    "/proc/sys/net/ipv6/conf/default/disable_ipv6",
+)
+
+
+class Refused(Exception):
+    pass
+
+
+def attempt(*args):
+    return subprocess.run(
+        [XTABLES, "iptables", *args], capture_output=True, env=ENVIRONMENT
+    )
+
+
+def iptables(*args):
+    result = attempt(*args)
+    if result.returncode != 0:
+        detail = result.stderr.decode().strip()
+        raise Refused(f"iptables {' '.join(args)} exited {result.returncode}: {detail}")
+    return result.stdout.decode()
+
+
+def policy():
+    if not INITDATA.is_file():
+        raise Refused("no measured configuration blob in the guest to take an egress policy from")
+    data = tomllib.loads(INITDATA.read_text())["data"]
+    shim = urllib.parse.urlsplit(tomllib.loads(data["cdh.toml"])["kbc"]["url"])
+    egress = tomllib.loads(data["backendai.toml"]).get("egress", {})
+    return shim, egress.get("resolvers", []), egress.get("hosts", [])
+
+
+def publish(state):
+    STATE.mkdir(mode=0o755, exist_ok=True)
+    (STATE / "egress.json").write_text(
+        json.dumps({"state": state, "rules": iptables("-S", CHAIN).splitlines()}, sort_keys=True)
+        + "\n"
+    )
+
+
+def seal():
+    for knob in IPV6_KNOBS:
+        path = pathlib.Path(knob)
+        if path.exists():
+            path.write_text("1\n")
+    iptables("-N", CHAIN)
+    iptables("-A", CHAIN, "-o", "lo", "-j", "ACCEPT")
+    iptables("-A", CHAIN, "-o", "wg0", "-j", "ACCEPT")
+    iptables("-A", CHAIN, "-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-j", "ACCEPT")
+    iptables("-A", "OUTPUT", "-j", CHAIN)
+    iptables("-A", "OUTPUT", "-j", "DROP")
+    publish("sealed")
+
+
+def pin():
+    shim, resolvers, hosts = policy()
+    iptables(
+        "-A", CHAIN, "-d", f"{shim.hostname}/32",
+        "-p", "tcp", "--dport", str(shim.port or 80), "-j", "ACCEPT",
+    )
+    for resolver in resolvers:
+        for protocol in ("udp", "tcp"):
+            iptables(
+                "-A", CHAIN, "-d", f"{resolver}/32",
+                "-p", protocol, "--dport", DNS_PORT, "-j", "ACCEPT",
+            )
+    for host in hosts:
+        iptables("-A", CHAIN, "-d", f"{host}/32", "-j", "ACCEPT")
+    publish("pinned")
+
+
+def carrier():
+    for _ in range(CARRIER_ATTEMPTS):
+        addr = subprocess.run(
+            [IP, "-4", "-o", "addr", "show", "dev", "eth0"], capture_output=True
+        ).stdout.split()
+        route = subprocess.run(
+            [IP, "-4", "route", "show", "default"], capture_output=True
+        ).stdout.split()
+        if b"inet" in addr and b"via" in route:
+            local = ipaddress.IPv4Interface(addr[addr.index(b"inet") + 1].decode())
+            return local.network, ipaddress.IPv4Address(route[route.index(b"via") + 1].decode())
+        time.sleep(CARRIER_INTERVAL)
+    raise Refused("eth0 never carried an address and a default route to bound the session bridge by")
+
+
+def bound():
+    shim, resolvers, hosts = policy()
+    subnet, gateway = carrier()
+    for pinned in (shim.hostname, *resolvers, *hosts):
+        if ipaddress.IPv4Address(pinned) in subnet:
+            raise Refused(
+                f"the measured egress pin {pinned} sits inside the session bridge {subnet},"
+                " where nothing can tell it apart from a peer member of this session"
+            )
+    iptables("-I", CHAIN, "1", "-d", str(subnet), "!", "-o", "lo", "-j", "DROP")
+    iptables(
+        "-I", CHAIN, "1", "-d", str(subnet), "-p", "udp",
+        "--sport", TUNNEL_PORT, "--dport", TUNNEL_PORT, "-j", "ACCEPT",
+    )
+    iptables(
+        "-I", CHAIN, "1", "-d", f"{gateway}/32",
+        "-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-j", "ACCEPT",
+    )
+    publish("bounded")
+
+
+def peers(endpoints):
+    for endpoint in endpoints:
+        host, _, port = endpoint.rpartition(":")
+        if not host or not port.isdigit():
+            raise Refused(f"the signed peer directory names {endpoint!r}, not a host and a port")
+        spec = ["-d", f"{host}/32", "-p", "udp", "--dport", port, "-j", "ACCEPT"]
+        if attempt("-C", CHAIN, *spec).returncode != 0:
+            iptables("-A", CHAIN, *spec)
+    publish("peered")
+
+
+ACTIONS = {"seal": seal, "pin": pin, "bound": bound}
+
+try:
+    action, arguments = sys.argv[1], sys.argv[2:]
+    if action == "peers":
+        peers(arguments)
+    elif action in ACTIONS:
+        ACTIONS[action]()
+    else:
+        raise Refused(f"there is no guest egress action named {action!r}")
+except Exception as failure:
+    print(f"backend.ai guest egress filter refused: {failure}", file=sys.stderr)
+    sys.exit(1)

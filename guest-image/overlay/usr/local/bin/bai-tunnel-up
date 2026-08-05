@@ -11,6 +11,7 @@ SHARED = STATE / "session"
 LINK = "wg0"
 IP = "/usr/sbin/ip"
 WG = "/usr/bin/wg"
+EGRESS = "/usr/local/bin/bai-guest-egress"
 
 
 class Refused(Exception):
@@ -64,6 +65,9 @@ def main():
             f"AllowedIPs = {peer['tunnel_addr']}/32\n"
             f"Endpoint = {peer['endpoint']}\nPersistentKeepalive = 25\n"
         )
+    run(EGRESS, "peers", *(
+        peer["endpoint"] for peer in peers if peer["cluster_idx"] != own["cluster_idx"]
+    ))
     run(IP, "link", "add", LINK, "type", "wireguard")
     conf = pathlib.Path("/run/bai-tunnel.conf")
     handle = os.open(conf, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
