@@ -237,7 +237,7 @@ class EntityMembersAddition:
 
 
 @dataclass
-class EntityMemberError:
+class EntityMemberCreationError:
     """A member whose addition failed, with the exception that rolled it back."""
 
     member: ScopeMember
@@ -248,11 +248,11 @@ class EntityMemberError:
 @dataclass
 class EntityMembersResultWithFailures:
     successes: list[ScopeMember]
-    errors: list[EntityMemberError]
+    errors: list[EntityMemberCreationError]
 
 
 @dataclass
-class ScopeMemberError:
+class ScopeMemberCreationError:
     """A member scope whose attachment failed, with the exception that rolled it back."""
 
     member: ScopeRef
@@ -263,7 +263,7 @@ class ScopeMemberError:
 @dataclass
 class ScopeMembersResultWithFailures:
     successes: list[ScopeRef]
-    errors: list[ScopeMemberError]
+    errors: list[ScopeMemberCreationError]
 
 
 @dataclass
@@ -1021,7 +1021,7 @@ class RBACWriteOps(WriteOps):
         ``errors`` and leaves the rest attached.
         """
         successes: list[ScopeRef] = []
-        errors: list[ScopeMemberError] = []
+        errors: list[ScopeMemberCreationError] = []
         if not members:
             return ScopeMembersResultWithFailures(successes=successes, errors=errors)
         scope_virtual_scope_id = await self._resolve_virtual_scope_id(scope)
@@ -1029,7 +1029,7 @@ class RBACWriteOps(WriteOps):
         for index, member in enumerate(members):
             if member not in member_virtual_scope_ids:
                 errors.append(
-                    ScopeMemberError(
+                    ScopeMemberCreationError(
                         member=member,
                         exception=VirtualScopeNotFound(
                             f"No virtual scope for scope {member.scope_type}:{member.scope_id}"
@@ -1054,7 +1054,7 @@ class RBACWriteOps(WriteOps):
                     )
                 successes.append(member)
             except Exception as e:
-                errors.append(ScopeMemberError(member=member, exception=e, index=index))
+                errors.append(ScopeMemberCreationError(member=member, exception=e, index=index))
         return ScopeMembersResultWithFailures(successes=successes, errors=errors)
 
     @staticmethod
@@ -1250,7 +1250,7 @@ class RBACWriteOps(WriteOps):
         ``auto_assign`` roles are granted only to the successful members.
         """
         successes: list[ScopeMember] = []
-        errors: list[EntityMemberError] = []
+        errors: list[EntityMemberCreationError] = []
         members = list(addition.members)
         if not members:
             return EntityMembersResultWithFailures(successes=successes, errors=errors)
@@ -1263,7 +1263,7 @@ class RBACWriteOps(WriteOps):
                     await self._add_entity_member(scope, virtual_scope_id, member.entity_ref())
                 successes.append(member)
             except Exception as e:
-                errors.append(EntityMemberError(member=member, exception=e, index=index))
+                errors.append(EntityMemberCreationError(member=member, exception=e, index=index))
         await self._grant_member_auto_assign_roles(scope, successes)
         return EntityMembersResultWithFailures(successes=successes, errors=errors)
 
