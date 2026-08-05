@@ -120,6 +120,7 @@ class CocoSettings:
     dns_servers: Sequence[str]
     container_start_timeout: float
     attestation_timeout: float
+    attestation_lock_hold: float
     relay_bind_host: str
     relay_bind_port: int
     raw_circuit_allowlist: frozenset[str]
@@ -141,6 +142,7 @@ def build_settings(local_config: AgentUnifiedConfig) -> CocoSettings:
         dns_servers=list(section.dns_servers),
         container_start_timeout=section.container_start_timeout,
         attestation_timeout=section.attestation_timeout,
+        attestation_lock_hold=section.attestation_lock_hold,
         relay_bind_host=str(section.relay_bind_addr.host),
         relay_bind_port=section.relay_bind_addr.port,
         raw_circuit_allowlist=frozenset(section.raw_circuit_allowlist),
@@ -510,7 +512,7 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
         )
         container_id = await self.runtime.create(spec)
         try:
-            async with host_lock("attestation"):
+            async with host_lock("attestation", self.settings.attestation_lock_hold):
                 await self.runtime.start(container_id)
                 await self.runtime.wait_running(container_id, self.settings.container_start_timeout)
             await _wait_for_port(
