@@ -59,5 +59,5 @@ def material(kbs, directory, entry, cache):
         return key_bytes
     if name not in cache:
         request = signing_request(key_path, entry.subject, entry.sans)
-        cache[name] = kbs.certificate(name, entry.subject, entry.sans, request)
+        cache[name] = kbs.certificate(name, request)
     return cache[name]

@@ -48,10 +48,11 @@ if [ -n "${BAI_REUSE_ROOTFS:-}" ] && [ -x "$ROOT/usr/bin/dracut" ]; then
     echo "build-state-bundle: reusing the root filesystem already under ${ROOT}" >&2
 else
     rm -rf "$OUT"
-    mkdir -p "$OUT/cache" "$ROOT"
+    mkdir -p "$ROOT"
     debootstrap --variant=minbase --merged-usr --components=main,universe \
         --include="$(IFS=,; echo "${PACKAGES[*]}")" "$SUITE" "$ROOT" "$MIRROR"
 fi
+mkdir -p "$OUT/cache"
 
 unbind() {
     for point in dev/pts dev sys proc; do
@@ -107,7 +108,9 @@ install -d -m 0700 -o postgres -g postgres /var/lib/backendai/postgresql
 install -d -m 0750 -o backendai -g backendai /var/lib/backendai/manager /var/lib/backendai/coordinator
 systemctl enable var-log.mount var-lib-backendai.mount \
     backendai-credentials.service backendai-postgresql.service \
-    backendai-etcd.service backendai-valkey.service backendai-manager.service \
+    backendai-postgresql-bootstrap.service backendai-etcd.service \
+    backendai-etcd-bootstrap.service backendai-valkey.service \
+    backendai-manager.service \
     backendai-appproxy-coordinator.service backendai-state-backup.timer
 : > /etc/machine-id
 systemctl mask systemd-timesyncd.service serial-getty@ttyS0.service getty@.service \

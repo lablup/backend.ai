@@ -18,7 +18,8 @@ num-proc = 4
 service-addr = { host = "0.0.0.0", port = 8081 }
 internal-addr = { host = "127.0.0.1", port = 18080 }
 heartbeat-timeout = 40.0
-pid-file = "/run/backendai/manager.pid"
+pid-file = "/run/backendai/manager/manager.pid"
+ipc-base-path = "/run/backendai/manager/ipc"
 disabled-plugins = []
 hide-agents = true
 agent-selection-resource-priority = ["cuda", "rocm", "tpu", "cpu", "mem"]

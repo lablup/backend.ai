@@ -23,4 +23,5 @@ done
 $DOCKER run --rm --privileged \
     -v "${REPO}:${REPO}" -v "${OUT}:${OUT}" \
     -e "BACKENDAI_KBS_URL=${BACKENDAI_KBS_URL:?BACKENDAI_KBS_URL must be set}" \
+    -e "BAI_REUSE_ROOTFS=${BAI_REUSE_ROOTFS:-}" \
     "$IMAGE" "${HERE}/build-state-bundle.sh" "${OUT}/bundle" "${inputs[@]}"

@@ -1,0 +1,22 @@
+{
+  "manager": {
+    "subject": "/CN=manager.control.backend.ai",
+    "sans": [
+      "DNS:manager.control.backend.ai",
+      "DNS:localhost",
+      "IP:127.0.0.1",
+      "URI:spiffe://backend.ai/domain/default/control-plane/manager"
+    ],
+    "validity_days": 30
+  },
+  "coordinator": {
+    "subject": "/CN=coordinator.control.backend.ai",
+    "sans": [
+      "DNS:coordinator.control.backend.ai",
+      "DNS:localhost",
+      "IP:127.0.0.1",
+      "URI:spiffe://backend.ai/domain/default/control-plane/coordinator"
+    ],
+    "validity_days": 30
+  }
+}

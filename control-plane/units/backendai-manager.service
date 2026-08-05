@@ -1,7 +1,7 @@
 [Unit]
 Description=Backend.AI manager
-Requires=backendai-credentials.service backendai-postgresql.service backendai-etcd.service backendai-valkey.service
-After=backendai-credentials.service backendai-postgresql.service backendai-etcd.service backendai-valkey.service
+Requires=backendai-credentials.service backendai-postgresql-bootstrap.service backendai-etcd-bootstrap.service backendai-valkey.service
+After=backendai-credentials.service backendai-postgresql-bootstrap.service backendai-etcd-bootstrap.service backendai-valkey.service
 
 [Service]
 Type=simple
@@ -12,8 +12,12 @@ LoadCredential=rpc-keypair:/run/backendai-credentials.sock
 LoadCredential=tls.key:/run/backendai-credentials.sock
 LoadCredential=tls.crt:/run/backendai-credentials.sock
 ExecStartPre=/usr/lib/backendai/credential-guard manager.toml rpc-keypair tls.key tls.crt
-ExecStart=/usr/lib/backendai/backendai-manager start-server -f ${CREDENTIALS_DIRECTORY}/manager.toml
+ExecStart=/usr/lib/backendai/backendai-manager mgr start-server -f ${CREDENTIALS_DIRECTORY}/manager.toml
 WorkingDirectory=/var/lib/backendai/manager
+RuntimeDirectory=backendai/manager
+RuntimeDirectoryPreserve=yes
+Environment=HOME=/var/lib/backendai/manager
+Environment=SCIE_BASE=/var/lib/backendai/manager/.scie
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal+console

@@ -3,7 +3,7 @@ set -euo pipefail
 
 DISK=${1:?usage: run-state-cvm.sh <disk> [console-log]}
 LOG=${2:-/tmp/state-cvm-console.log}
-QEMU=${BAI_QEMU:-/opt/kata/bin/qemu-system-x86_64-tdx-experimental}
+QEMU=${BAI_QEMU:-/usr/bin/qemu-system-x86_64}
 FIRMWARE=${BAI_FIRMWARE:-/opt/kata/share/ovmf/OVMF.inteltdx.fd}
 MEMORY=${BAI_MEMORY:-8192}
 CPUS=${BAI_CPUS:-4}
@@ -21,7 +21,7 @@ args=(
     -bios "$FIRMWARE"
     -drive "id=state,file=${DISK},format=raw,if=none"
     -device virtio-blk-pci,drive=state,serial=state
-    -netdev user,id=net0
+    -netdev "user,id=net0,hostfwd=tcp:127.0.0.1:${BAI_MANAGER_PORT:-18081}-:8081"
     -device virtio-net-pci,netdev=net0
     -serial "file:${LOG}"
     -display none -nodefaults -no-user-config -vga none --no-reboot

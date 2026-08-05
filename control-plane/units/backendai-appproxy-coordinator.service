@@ -1,7 +1,7 @@
 [Unit]
 Description=Backend.AI app-proxy coordinator
-Requires=backendai-credentials.service backendai-postgresql.service backendai-valkey.service
-After=backendai-credentials.service backendai-postgresql.service backendai-valkey.service backendai-manager.service
+Requires=backendai-credentials.service backendai-postgresql-bootstrap.service backendai-valkey.service
+After=backendai-credentials.service backendai-postgresql-bootstrap.service backendai-valkey.service backendai-manager.service
 
 [Service]
 Type=simple
@@ -11,8 +11,12 @@ LoadCredential=proxy-coordinator.toml:/run/backendai-credentials.sock
 LoadCredential=tls.key:/run/backendai-credentials.sock
 LoadCredential=tls.crt:/run/backendai-credentials.sock
 ExecStartPre=/usr/lib/backendai/credential-guard proxy-coordinator.toml tls.key tls.crt
-ExecStart=/usr/lib/backendai/backendai-appproxy-coordinator start-server -f ${CREDENTIALS_DIRECTORY}/proxy-coordinator.toml
+ExecStart=/usr/lib/backendai/backendai-appproxy-coordinator app-proxy-coordinator start-server -f ${CREDENTIALS_DIRECTORY}/proxy-coordinator.toml
 WorkingDirectory=/var/lib/backendai/coordinator
+RuntimeDirectory=backendai/coordinator
+RuntimeDirectoryPreserve=yes
+Environment=HOME=/var/lib/backendai/coordinator
+Environment=SCIE_BASE=/var/lib/backendai/coordinator/.scie
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal+console

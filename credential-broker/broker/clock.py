@@ -25,6 +25,31 @@ def issued_at(token_claims):
     raise ClockUntrusted("attestation token carries no issued-at claim")
 
 
+MEASUREMENTS = (
+    "mr_td",
+    "mr_config_id",
+    "mr_seam",
+    "rtmr_0",
+    "rtmr_1",
+    "rtmr_2",
+    "rtmr_3",
+    "xfam",
+)
+
+
+def measurements(token_claims):
+    reported = {}
+    for submod in (token_claims.get("submods") or {}).values():
+        if not isinstance(submod, dict):
+            continue
+        evidence = submod.get("ear.veraison.annotated-evidence") or {}
+        body = ((evidence.get("tdx") or {}).get("quote") or {}).get("body") or {}
+        for field in MEASUREMENTS:
+            if body.get(field):
+                reported[field] = body[field]
+    return reported
+
+
 def platform_status(token_claims):
     reported = {}
     for name, submod in (token_claims.get("submods") or {}).items():
