@@ -6,22 +6,43 @@ import pathlib
 import socket
 import sys
 import time
+import urllib.request
 
-SHARED = pathlib.Path("/run/backend.ai/session")
+STATE = pathlib.Path("/run/backend.ai")
+SHARED = STATE / "session"
 PORT = 47820
 CHUNK = 4 << 20
 VOLUME = 512 << 20
 
 
+def fetch(api, resource):
+    with urllib.request.urlopen(f"{api}/cdh/resource/{resource}", timeout=60) as response:
+        return json.loads(response.read())
+
+
+def membership():
+    request = json.loads((SHARED / "tunnel.json").read_text())
+    api = json.loads((STATE / "profile.json").read_text())["api"]
+    own = fetch(api, request["tunnel"])
+    directory = fetch(api, request["peers"])
+    return own["cluster_idx"], directory["peers"]
+
+
+def carrier():
+    probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    with probe:
+        probe.connect(("192.0.2.1", 9))
+        return ipaddress.ip_address(probe.getsockname()[0])
+
+
 def endpoints(peer_idx):
-    base = ipaddress.ip_address(json.loads((SHARED / "tunnel.json").read_text())["base"])
-    tunnel = ipaddress.ip_address(
-        json.loads((SHARED / "tunnel-state.json").read_text())["address"]
-    )
-    own_idx = int(os.environ["BACKENDAI_CLUSTER_IDX"])
+    own_idx, peers = membership()
+    peer = next((p for p in peers if p["cluster_idx"] == peer_idx), None)
+    if peer is None:
+        raise SystemExit(f"the signed peer directory carries no member {peer_idx}")
     return {
-        "bridge": str(base + peer_idx),
-        "tunnel": str(tunnel - own_idx + peer_idx),
+        "bridge": str(carrier() - own_idx + peer_idx),
+        "tunnel": peer["tunnel_addr"],
     }
 
 
@@ -58,10 +79,11 @@ def allreduce(master, elements):
     import torch
     import torch.distributed as dist
 
+    own_idx, peers = membership()
     os.environ["MASTER_ADDR"] = master
     os.environ["MASTER_PORT"] = str(PORT + 1)
-    os.environ["RANK"] = os.environ["BACKENDAI_CLUSTER_IDX"]
-    os.environ["WORLD_SIZE"] = os.environ["BACKENDAI_CLUSTER_SIZE"]
+    os.environ["RANK"] = str(own_idx - 1)
+    os.environ["WORLD_SIZE"] = str(len(peers))
     dist.init_process_group("gloo")
     tensor = torch.ones(elements)
     dist.all_reduce(tensor)
@@ -84,7 +106,7 @@ elif sys.argv[1:2] == ["allreduce"]:
 else:
     print(
         "usage: bai-tunnel-bench serve"
-        " | throughput <peer cluster index>"
+        " | throughput <peer member index>"
         " | allreduce <master address> [elements]",
         file=sys.stderr,
     )
