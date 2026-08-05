@@ -43,6 +43,9 @@ from ai.backend.manager.services.app_config_fragment.actions.admin_search import
 from ai.backend.manager.services.app_config_fragment.actions.bulk_purge import (
     BulkPurgeAppConfigFragmentAction,
 )
+from ai.backend.manager.services.app_config_fragment.actions.bulk_purge_by_names import (
+    BulkPurgeAppConfigFragmentsByNamesAction,
+)
 from ai.backend.manager.services.app_config_fragment.actions.bulk_upsert import (
     BulkUpsertAppConfigFragmentsAction,
 )
@@ -51,9 +54,6 @@ from ai.backend.manager.services.app_config_fragment.actions.get import (
 )
 from ai.backend.manager.services.app_config_fragment.actions.purge import (
     PurgeAppConfigFragmentAction,
-)
-from ai.backend.manager.services.app_config_fragment.actions.purge_by_names import (
-    PurgeAppConfigFragmentsByNamesAction,
 )
 from ai.backend.manager.services.app_config_fragment.actions.scoped_search import (
     ScopedSearchAppConfigFragmentAction,
@@ -317,7 +317,7 @@ class TestAppConfigFragmentService:
         ],
         ids=lambda case: case.scope_type.value,
     )
-    async def test_purge_by_names_passes_the_names_through_and_reports_its_scope(
+    async def test_bulk_purge_by_names_passes_the_names_through_and_reports_its_scope(
         self,
         service: AppConfigFragmentService,
         mock_repository: MagicMock,
@@ -327,8 +327,8 @@ class TestAppConfigFragmentService:
         mock_repository.bulk_purge_by_names = AsyncMock(return_value=[scoped_fragment])
         scope = AppConfigFragmentSearchScope(scope_type=case.scope_type, scope_id=case.scope_id)
 
-        result = await service.purge_by_names(
-            PurgeAppConfigFragmentsByNamesAction(scope=scope, config_names=["theme"])
+        result = await service.bulk_purge_by_names(
+            BulkPurgeAppConfigFragmentsByNamesAction(scope=scope, config_names=["theme"])
         )
 
         assert result.fragments == [scoped_fragment]
