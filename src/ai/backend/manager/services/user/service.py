@@ -233,7 +233,8 @@ class UserService:
         target_main_access_key = action.user_info_ctx.main_access_key
         if delegate_ownership and target_main_access_key is None:
             raise UserPurgeFailure(
-                "Cannot delegate endpoint ownership to a user without a main access key.",
+                "The requesting user has no main access key to delegate endpoint ownership to "
+                f"(user_id={action.user_info_ctx.uuid}).",
             )
 
         # Handle shared vfolders migration
@@ -303,7 +304,8 @@ class UserService:
         target_main_access_key = user_info_ctx.main_access_key
         if delegate_ownership and target_main_access_key is None:
             raise UserPurgeFailure(
-                "Cannot delegate endpoint ownership to a user without a main access key.",
+                "The requesting user has no main access key to delegate endpoint ownership to "
+                f"(user_id={user_info_ctx.uuid}).",
             )
 
         # Handle shared vfolders migration

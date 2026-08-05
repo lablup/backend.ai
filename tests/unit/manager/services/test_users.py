@@ -579,6 +579,42 @@ class TestPurgeUser:
             delete_destroyed_only=True,
         )
 
+    async def test_purge_user_rejects_delegation_without_a_main_access_key(
+        self,
+        service: UserService,
+        mock_user_repository: MagicMock,
+        purge_user_data: UserData,
+        admin_user_info_ctx: UserInfoContext,
+    ) -> None:
+        """The requester's key is checked before the purge mutates anything (BA-7190)."""
+        mock_user_repository.get_by_email_validated = AsyncMock(return_value=purge_user_data)
+        mock_user_repository.check_user_vfolder_mounted_to_active_kernels = AsyncMock(
+            return_value=False
+        )
+        mock_user_repository.migrate_shared_vfolders = AsyncMock(return_value=None)
+        mock_user_repository.delegate_endpoint_ownership = AsyncMock(return_value=None)
+        mock_user_repository.delete_endpoints = AsyncMock(return_value=None)
+        mock_user_repository.purge_user = AsyncMock(return_value=None)
+
+        action = PurgeUserAction(
+            user_info_ctx=UserInfoContext(
+                uuid=admin_user_info_ctx.uuid,
+                email=admin_user_info_ctx.email,
+                main_access_key=None,
+            ),
+            email=purge_user_data.email,
+            purge_shared_vfolders=OptionalState.update(True),
+            delegate_endpoint_ownership=OptionalState.update(True),
+        )
+
+        with pytest.raises(UserPurgeFailure):
+            await service.purge_user(action)
+
+        mock_user_repository.migrate_shared_vfolders.assert_not_called()
+        mock_user_repository.delegate_endpoint_ownership.assert_not_called()
+        mock_user_repository.delete_endpoints.assert_not_called()
+        mock_user_repository.purge_user.assert_not_called()
+
     async def test_purge_user_without_endpoint_delegation_deletes_all_endpoints(
         self,
         service: UserService,
