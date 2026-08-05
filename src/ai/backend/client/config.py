@@ -28,8 +28,6 @@ class Undefined(enum.Enum):
 _config = None
 _undefined = Undefined.token
 
-# `docs/conf.py` reads this literal with `ast`; keep it a plain assignment of a
-# `(int, str)` tuple.
 API_VERSION = (9, "20250722")
 MIN_API_VERSION = (7, "20230615")
 
