@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from functools import lru_cache
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.data.app_config.types import AppConfigScope, AppConfigScopeType
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.app_config.types import AppConfigScopeType as AppConfigScopeTypeDTO
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AdminSearchAppConfigFragmentInput,
@@ -185,7 +185,9 @@ class AppConfigFragmentAdapter(BaseAdapter):
 
         RBAC-authorized at that scope, so a caller purges only a scope they may write.
         """
-        scope = AppConfigScope(scope_type=input.scope.scope_type, scope_id=input.scope.scope_id)
+        scope = AppConfigFragmentSearchScope(
+            scope_type=input.scope.scope_type, scope_id=input.scope.scope_id
+        )
         action_result = await self._processors.app_config_fragment.purge_by_names.wait_for_complete(
             PurgeAppConfigFragmentsByNamesAction(scope=scope, config_names=input.config_names)
         )
@@ -203,7 +205,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        scope = AppConfigScope(
+        scope = AppConfigFragmentSearchScope(
             scope_type=AppConfigScopeType.USER, scope_id=AppConfigScopeID(me.user_id)
         )
         action_result = await self._processors.app_config_fragment.purge_by_names.wait_for_complete(
