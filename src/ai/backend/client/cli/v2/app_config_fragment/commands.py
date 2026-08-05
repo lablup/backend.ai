@@ -137,6 +137,50 @@ def update(scope_type: str, scope_id: uuid.UUID | None, items: str) -> None:
     run_async(_run)
 
 
+@app_config_fragment.command(name="purge-by-names")
+@click.option(
+    "--scope-type",
+    required=True,
+    type=click.Choice([scope_type.value for scope_type in AppConfigScopeType]),
+    help="Scope whose fragments to purge (public | domain | user).",
+)
+@click.option(
+    "--scope-id",
+    default=None,
+    type=click.UUID,
+    help="Domain id or user id; omit for the public scope.",
+)
+@click.argument("config_names", nargs=-1, required=True)
+def purge_by_names(
+    scope_type: str, scope_id: uuid.UUID | None, config_names: tuple[str, ...]
+) -> None:
+    """Purge one scope's fragments for CONFIG_NAMES, all-or-nothing.
+
+    A name the scope holds no fragment for purges nothing, so a typo cannot quietly destroy
+    a neighbouring config. Addresses the same (scope, config_name) pair that `get` and
+    `update` do, so no fragment id has to be resolved first.
+    """
+    from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
+        ScopedPurgeAppConfigFragmentsByNamesInput,
+    )
+
+    scope = _resolve_scope(scope_type, scope_id)
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.app_config_fragment.scoped_purge_app_config_fragments_by_names(
+                ScopedPurgeAppConfigFragmentsByNamesInput(
+                    scope=scope, config_names=list(config_names)
+                )
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    run_async(_run)
+
+
 @app_config_fragment.command()
 @click.option(
     "--id",

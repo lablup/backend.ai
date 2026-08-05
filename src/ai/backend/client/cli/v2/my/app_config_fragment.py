@@ -78,3 +78,28 @@ def update(items: str) -> None:
             await registry.close()
 
     run_async(_run)
+
+
+@app_config_fragment.command()
+@click.argument("config_names", nargs=-1, required=True)
+def purge(config_names: tuple[str, ...]) -> None:
+    """Purge my user-scope fragments for CONFIG_NAMES, all-or-nothing.
+
+    A name I hold no fragment for purges nothing, so a typo cannot quietly destroy a
+    neighbouring config.
+    """
+    from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
+        MyPurgeAppConfigFragmentsByNamesInput,
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.app_config_fragment.my_purge_app_config_fragments_by_names(
+                MyPurgeAppConfigFragmentsByNamesInput(config_names=list(config_names))
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    run_async(_run)
