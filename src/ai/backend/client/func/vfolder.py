@@ -683,17 +683,26 @@ class VFolderByName(BaseFunction):
     async def list_files(self, path: str | Path = ".") -> dict[str, Any]:
         await self.update_id_by_name()
         paths = await self._cipher()
-        if paths is not None:
-            return {
-                "items": [
-                    {"name": e.name, "size": e.size, "type": "DIRECTORY" if e.is_dir else "FILE"}
-                    for e in await paths.listing(str(path))
-                ]
-            }
-        rqst = Request("GET", f"/folders/{self.request_key}/files", params={"path": str(path)})
+        remote = await self._remote(path)
+        rqst = Request(
+            "GET", f"/folders/{self.request_key}/files", params={"path": remote or "."}
+        )
         async with rqst.fetch() as resp:
             result: dict[str, Any] = await resp.json()
+        if paths is None:
             return result
+        stored = {item["name"]: item for item in result["items"]}
+        return {
+            "items": [
+                {
+                    **stored.get(e.on_disk, {}),
+                    "name": e.name,
+                    "size": e.size,
+                    "type": "DIRECTORY" if e.is_dir else "FILE",
+                }
+                for e in await paths.listing(str(path))
+            ]
+        }
 
     @api_function
     async def invite(self, perm: str, emails: Sequence[str]) -> dict[str, Any]:
