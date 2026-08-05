@@ -10,6 +10,7 @@ from ai.backend.common.types import KernelId, SessionId
 from ai.backend.logging import BraceStyleAdapter
 
 from .errors import BrokerUnreachableFromNamespace, NetworkSetupFailed
+from .hostlock import host_lock
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -220,7 +221,7 @@ class SessionNetworkManager:
         namespace = namespace_name(kernel_id)
         bridge = bridge_name(session_id)
         veth = veth_name(kernel_id)
-        async with self._lock:
+        async with self._lock, host_lock("netns"):
             subnet = await self._ensure_bridge(bridge, session_id)
             guest_addr = subnet[2 + max(cluster_idx, 0)]
             network = SessionNetwork(namespace, bridge, veth, subnet, subnet[1], guest_addr)
@@ -271,7 +272,7 @@ class SessionNetworkManager:
     async def destroy(self, kernel_id: KernelId, session_id: SessionId) -> None:
         namespace = namespace_name(kernel_id)
         bridge = bridge_name(session_id)
-        async with self._lock:
+        async with self._lock, host_lock("netns"):
             await self._run("ip", "netns", "delete", namespace, check=False)
             await self._run("ip", "link", "delete", veth_name(kernel_id), check=False)
             resolver = self._config.netns_dir / namespace

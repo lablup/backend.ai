@@ -85,6 +85,7 @@ from .errors import (
     StorageBindRefused,
     UnmanagedFolderRefused,
 )
+from .hostlock import host_lock
 from .kernel import CocoKernel
 from .netns import NetworkConfig, SessionNetwork, SessionNetworkManager
 from .relay import ChannelRelay, Circuit
@@ -490,11 +491,12 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
         )
         container_id = await self.runtime.create(spec)
         try:
-            await self.runtime.start(container_id)
-            await self.runtime.wait_running(container_id, self.settings.container_start_timeout)
-            await _wait_for_port(
-                str(network.guest_addr), CHANNEL_PORT, self.settings.attestation_timeout
-            )
+            async with host_lock("attestation"):
+                await self.runtime.start(container_id)
+                await self.runtime.wait_running(container_id, self.settings.container_start_timeout)
+                await _wait_for_port(
+                    str(network.guest_addr), CHANNEL_PORT, self.settings.attestation_timeout
+                )
         except Exception as e:
             raise ContainerCreationError(container_id, str(e)) from e
         for service_port in kernel_obj.service_ports:
