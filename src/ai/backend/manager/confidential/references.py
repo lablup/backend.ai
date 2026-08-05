@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any, Final, cast
@@ -8,6 +9,7 @@ from typing import Any, Final, cast
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
 
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.confidential.shim import AuthorisationShim
 from ai.backend.manager.errors.confidential import ReferenceValueRejected
 from ai.backend.manager.models.confidential.row import (
@@ -16,7 +18,10 @@ from ai.backend.manager.models.confidential.row import (
 )
 from ai.backend.manager.models.confidential.types import ReferenceValueState
 from ai.backend.manager.models.scaling_group.types import ConfidentialScalingGroupOpts
+from ai.backend.manager.models.session import DEAD_SESSION_STATUSES, SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+
+log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 DEFAULT_COEXISTENCE: Final = timedelta(days=14)
 REQUIRED_MEASUREMENTS: Final = ("mr_config_id", "mr_td", "rtmr_1", "rtmr_2", "xfam")
@@ -137,22 +142,35 @@ class ReferenceValueStore:
             return row
 
     async def sessions_on(self, row: ConfidentialReferenceValueRow) -> list[uuid.UUID]:
-        if any(
-            other.id != row.id
-            and other.image_digest == row.image_digest
-            and other.profile_version == row.profile_version
-            for other in await self.admissible(row.endpoint)
-        ):
-            return []
+        live = sa.select(ConfidentialNonceRow.session_id).join(
+            SessionRow, SessionRow.id == ConfidentialNonceRow.session_id
+        )
         async with self._db.begin_readonly_session() as db_session:
-            sessions = await db_session.scalars(
-                sa.select(ConfidentialNonceRow.session_id)
-                .join(SessionRow, SessionRow.id == ConfidentialNonceRow.session_id)
-                .where(
-                    (ConfidentialNonceRow.endpoint == row.endpoint)
+            carried = await db_session.scalars(
+                live.where(
+                    (ConfidentialNonceRow.reference_value_id == row.id)
+                    & SessionRow.status.not_in(DEAD_SESSION_STATUSES)
+                )
+            )
+            unattributed = await db_session.scalars(
+                live.where(
+                    ConfidentialNonceRow.reference_value_id.is_(None)
+                    & (ConfidentialNonceRow.endpoint == row.endpoint)
                     & (ConfidentialNonceRow.image_digest == row.image_digest)
                     & (ConfidentialNonceRow.profile_version == row.profile_version)
                     & SessionRow.status.not_in(DEAD_SESSION_STATUSES)
                 )
             )
-            return list(sessions.all())
+            drained = list(carried.all())
+            blind = list(unattributed.all())
+        if blind:
+            log.warning(
+                "confidential: {} live sessions on image {} at profile {} never named the"
+                " reference value that admitted them, so retiring {} cannot speak for them: {}",
+                len(blind),
+                row.image_digest,
+                row.profile_version,
+                row.id,
+                blind,
+            )
+        return drained

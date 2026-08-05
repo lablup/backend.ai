@@ -4,6 +4,7 @@ import base64
 import binascii
 import hashlib
 import json
+import logging
 import uuid
 from datetime import UTC, datetime, timedelta
 from http.cookies import SimpleCookie
@@ -15,6 +16,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.confidential.broker import BrokerClient, BrokerTarget
 from ai.backend.manager.confidential.payloads import TIME_RESOURCE
 from ai.backend.manager.confidential.storage import FOLDER_KEY_SEGMENT, folder_key_tag
@@ -31,15 +33,19 @@ from ai.backend.manager.models.confidential.row import (
     ConfidentialDecisionRow,
     ConfidentialGuestClaimRow,
     ConfidentialNonceRow,
+    ConfidentialReferenceValueRow,
     ConfidentialSessionResourceRow,
 )
 from ai.backend.manager.models.confidential.types import (
     DecisionActor,
     DecisionVerdict,
+    ReferenceValueState,
     SessionResourceKind,
 )
 from ai.backend.manager.models.scaling_group.types import ConfidentialScalingGroupOpts
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
+
+log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 RCAR_SESSION_COOKIE: Final = "kbs-session-id"
 RELAYED_REQUEST_HEADERS: Final = frozenset({
@@ -162,15 +168,28 @@ def rcar_session(headers: dict[str, str]) -> str | None:
     return morsel.value if morsel is not None else None
 
 
-def presented_measurement(body: bytes | None) -> str | None:
+def presented_registers(body: bytes | None) -> dict[str, str] | None:
     if body is None:
         return None
-    return json.dumps({
+    return {
         "mr_td": body[_MR_TD].hex(),
         "mr_config_id": body[_MR_CONFIG_ID].hex(),
         "rtmr_1": body[_RTMR_1].hex(),
         "rtmr_2": body[_RTMR_2].hex(),
-    })
+    }
+
+
+def admits(measurements: dict[str, Any], registers: dict[str, str]) -> bool:
+    pinned = 0
+    for field, presented in registers.items():
+        expected = measurements.get(field)
+        if not expected:
+            continue
+        admitted = expected if isinstance(expected, list) else [expected]
+        if presented not in admitted:
+            return False
+        pinned += 1
+    return pinned == len(registers)
 
 
 class AuthorisationShim:
@@ -267,34 +286,47 @@ class AuthorisationShim:
                 .where(ConfidentialNonceRow.nonce == nonce)
                 .with_for_update()
             )
-            if bound is not None:
-                held = await db_session.scalar(
-                    sa.select(ConfidentialGuestClaimRow).where(
-                        (ConfidentialGuestClaimRow.nonce == nonce)
-                        & (ConfidentialGuestClaimRow.guest == claimant.guest)
+            if bound is None:
+                raise NonceQuotaExhausted(
+                    extra_msg=(
+                        "no session nonce of this name is provisioned, so the session that"
+                        " carried it has had its confidential resources destroyed"
                     )
                 )
-                if held is not None:
-                    held.expires_at = claimant.expires_at
-                    return bound.session_id, False
-                live = await db_session.scalar(
-                    sa.select(sa.func.count())
-                    .select_from(ConfidentialGuestClaimRow)
-                    .where(
-                        (ConfidentialGuestClaimRow.nonce == nonce)
-                        & (ConfidentialGuestClaimRow.expires_at > sa.func.now())
+            if bound.reference_value_id is None:
+                bound.reference_value_id = await db_session.scalar(
+                    sa.select(ConfidentialAttestedGuestRow.reference_value_id).where(
+                        (ConfidentialAttestedGuestRow.guest == claimant.guest)
+                        & (ConfidentialAttestedGuestRow.endpoint == bound.endpoint)
                     )
                 )
-                if live < bound.quota:
-                    db_session.add(
-                        ConfidentialGuestClaimRow(
-                            nonce=nonce,
-                            guest=claimant.guest,
-                            session_id=bound.session_id,
-                            expires_at=claimant.expires_at,
-                        )
+            held = await db_session.scalar(
+                sa.select(ConfidentialGuestClaimRow).where(
+                    (ConfidentialGuestClaimRow.nonce == nonce)
+                    & (ConfidentialGuestClaimRow.guest == claimant.guest)
+                )
+            )
+            if held is not None:
+                held.expires_at = claimant.expires_at
+                return bound.session_id, False
+            live = await db_session.scalar(
+                sa.select(sa.func.count())
+                .select_from(ConfidentialGuestClaimRow)
+                .where(
+                    (ConfidentialGuestClaimRow.nonce == nonce)
+                    & (ConfidentialGuestClaimRow.expires_at > sa.func.now())
+                )
+            )
+            if live < bound.quota:
+                db_session.add(
+                    ConfidentialGuestClaimRow(
+                        nonce=nonce,
+                        guest=claimant.guest,
+                        session_id=bound.session_id,
+                        expires_at=claimant.expires_at,
                     )
-                    return bound.session_id, True
+                )
+                return bound.session_id, True
             raise NonceQuotaExhausted(extra_msg="no live claim slot remains for this session nonce")
 
         async with self._db.connect() as conn:
@@ -371,7 +403,8 @@ class AuthorisationShim:
             evidence = json.loads(body)
         except (ValueError, UnicodeDecodeError):
             evidence = None
-        measurement = presented_measurement(_report_body(evidence))
+        registers = presented_registers(_report_body(evidence))
+        measurement = None if registers is None else json.dumps(registers)
         try:
             status, payload, resp_headers = await self._broker.relay(
                 BrokerTarget.of(opts), "POST", "/kbs/v0/attest", body=body, headers=headers
@@ -386,7 +419,11 @@ class AuthorisationShim:
             raise
         guest = presented_guest(evidence)
         if status < 400 and guest is not None:
-            await self._witness(guest, opts.broker_endpoint)
+            await self._witness(
+                guest,
+                opts.broker_endpoint,
+                await self._admitting_value(opts.broker_endpoint, registers),
+            )
         await self.record(
             actor=DecisionActor.GUEST,
             verdict=DecisionVerdict.ALLOWED if status < 400 else DecisionVerdict.DENIED,
@@ -396,13 +433,51 @@ class AuthorisationShim:
         )
         return status, payload, resp_headers
 
-    async def _witness(self, guest: str, endpoint: str) -> None:
-        async with self._db.begin_session() as db_session:
-            await db_session.execute(
-                pg_insert(ConfidentialAttestedGuestRow)
-                .values(guest=guest, endpoint=endpoint)
-                .on_conflict_do_nothing()
+    async def _admitting_value(
+        self, endpoint: str, registers: dict[str, str] | None
+    ) -> uuid.UUID | None:
+        if registers is None:
+            return None
+        now = datetime.now(UTC)
+        async with self._db.begin_readonly_session() as db_session:
+            rows = await db_session.scalars(
+                sa.select(ConfidentialReferenceValueRow).where(
+                    (ConfidentialReferenceValueRow.endpoint == endpoint)
+                    & (
+                        (ConfidentialReferenceValueRow.state == ReferenceValueState.ACTIVE)
+                        | (
+                            (ConfidentialReferenceValueRow.state == ReferenceValueState.SUPERSEDED)
+                            & (ConfidentialReferenceValueRow.coexistence_until > now)
+                        )
+                    )
+                )
             )
+            admitting = [row.id for row in rows.all() if admits(row.measurements, registers)]
+        if len(admitting) == 1:
+            return admitting[0]
+        log.warning(
+            "confidential: the registers a guest presented at {} name {} admissible reference"
+            " values, so the session it goes on to claim carries no attribution: {}",
+            endpoint,
+            len(admitting),
+            registers["rtmr_2"],
+        )
+        return None
+
+    async def _witness(self, guest: str, endpoint: str, value_id: uuid.UUID | None) -> None:
+        statement = pg_insert(ConfidentialAttestedGuestRow).values(
+            guest=guest, endpoint=endpoint, reference_value_id=value_id
+        )
+        statement = (
+            statement.on_conflict_do_nothing()
+            if value_id is None
+            else statement.on_conflict_do_update(
+                index_elements=["guest", "endpoint"],
+                set_={"reference_value_id": value_id},
+            )
+        )
+        async with self._db.begin_session() as db_session:
+            await db_session.execute(statement)
 
     async def _is_witnessed(self, guest: str, endpoint: str) -> bool:
         async with self._db.begin_readonly_session() as db_session:
