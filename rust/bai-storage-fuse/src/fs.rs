@@ -19,7 +19,7 @@ use fuser::{
     WriteFlags,
 };
 
-use crate::file::{err, CryptFile, CHUNK};
+use crate::file::{err, CryptFile, CHUNK, FRAME};
 
 const TTL: Duration = Duration::from_secs(1);
 const ROOT: u64 = 1;
@@ -404,6 +404,12 @@ impl Fs {
         Ok(())
     }
 
+    fn do_sync(&self, fh: FileHandle, datasync: bool) -> io::Result<()> {
+        let state = self.state.lock().unwrap();
+        let handle = state.open.get(&fh.0).ok_or_else(|| err(libc::EBADF))?;
+        handle.sync(datasync)
+    }
+
     fn do_statfs(&self) -> io::Result<libc::statvfs> {
         let path = CString::new(self.root.as_os_str().as_bytes()).map_err(|_| err(libc::EINVAL))?;
         let mut found: libc::statvfs = unsafe { std::mem::zeroed() };
@@ -562,11 +568,14 @@ impl Filesystem for Fs {
         &self,
         _req: &Request,
         _ino: INodeNo,
-        _fh: FileHandle,
-        _datasync: bool,
+        fh: FileHandle,
+        datasync: bool,
         reply: ReplyEmpty,
     ) {
-        reply.ok();
+        match self.do_sync(fh, datasync) {
+            Ok(()) => reply.ok(),
+            Err(failure) => reply.error(failure.into()),
+        }
     }
 
     fn release(
@@ -608,16 +617,19 @@ impl Filesystem for Fs {
 
     fn statfs(&self, _req: &Request, _ino: INodeNo, reply: ReplyStatfs) {
         match self.do_statfs() {
-            Ok(found) => reply.statfs(
-                found.f_blocks,
-                found.f_bfree,
-                found.f_bavail,
-                found.f_files,
-                found.f_ffree,
-                found.f_bsize as u32,
-                255,
-                found.f_frsize as u32,
-            ),
+            Ok(found) => {
+                let frames = |count: u64| count.saturating_mul(found.f_frsize as u64) / FRAME;
+                reply.statfs(
+                    frames(found.f_blocks),
+                    frames(found.f_bfree),
+                    frames(found.f_bavail),
+                    found.f_files,
+                    found.f_ffree,
+                    CHUNK as u32,
+                    255,
+                    CHUNK as u32,
+                )
+            }
             Err(failure) => reply.error(failure.into()),
         }
     }

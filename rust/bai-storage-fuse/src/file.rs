@@ -9,6 +9,7 @@ use bai_storage_format::{
 };
 
 pub const CHUNK: u64 = CHUNK_PLAINTEXT as u64;
+pub const FRAME: u64 = CHUNK_STORED as u64;
 
 pub fn err(code: i32) -> io::Error {
     io::Error::from_raw_os_error(code)
@@ -67,6 +68,14 @@ impl CryptFile {
             .seal_chunk_random(index, last, chunk)
             .map_err(|_| err(libc::EIO))?;
         self.file.write_all_at(&frame, chunk_offset(index))
+    }
+
+    pub fn sync(&self, datasync: bool) -> io::Result<()> {
+        if datasync {
+            self.file.sync_data()
+        } else {
+            self.file.sync_all()
+        }
     }
 
     pub fn read(&self, offset: u64, size: usize) -> io::Result<Vec<u8>> {
