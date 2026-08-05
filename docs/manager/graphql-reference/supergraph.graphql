@@ -140,14 +140,10 @@ Added in 26.4.0. Active resource usage overview for a domain or project. Shows t
 type ActiveResourceOverview
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Resource slots currently occupied by active sessions. Each entry represents a resource type and the total quantity in use.
-  """
+  """Resource slots currently occupied"""
   slots: ResourceSlot!
 
-  """
-  Number of active sessions contributing to the current resource occupancy.
-  """
+  """Number of active sessions"""
   sessionCount: Int!
 }
 
@@ -526,17 +522,17 @@ type AgentResource
   @join__type(graph: STRAWBERRY)
 {
   """
-  Total hardware resource capacity available on the agent. Expressed as a JSON object containing resource slots (e.g., cpu, mem, accelerators). Each slot represents the maximum amount of that resource type the agent can provide.
+  Total hardware resource capacity available on the agent. Expressed as a JSON object containing resource slots.
   """
   capacity: JSON!
 
   """
-  Total amount of resources currently consumed by running and scheduled compute sessions. Includes both the requested resources for sessions being prepared and already allocated resources for active sessions. The sum of occupied resources across all session states that occupy agent resources (PREPARING, PULLING, RUNNING, RESTARTING, etc.). Expressed as a JSON object with the same structure as capacity.
+  Total amount of resources currently consumed by running and scheduled sessions.
   """
   used: JSON!
 
   """
-  Available resources for scheduling new compute sessions (capacity - used). This represents the maximum resources that can be allocated to new sessions without exceeding the agent's capacity. Expressed as a JSON object with the same structure as capacity.
+  Available resources for scheduling new compute sessions (capacity - used).
   """
   free: JSON!
 }
@@ -619,7 +615,9 @@ enum AgentResourceSlotOrderField
 type AgentStats
   @join__type(graph: STRAWBERRY)
 {
-  """Total resource capacity of the agent."""
+  """
+  Total hardware resource capacity, usage, and availability across all agents.
+  """
   totalResource: AgentResource!
 }
 
@@ -649,27 +647,23 @@ type AgentStatusInfo
   @join__type(graph: STRAWBERRY)
 {
   """
-  Current operational status of the agent. Indicates whether the agent is ALIVE (active and reachable), LOST (unreachable), TERMINATED (intentionally stopped), or RESTARTING (in recovery process).
+  Current operational status of the agent. One of: ALIVE, LOST, TERMINATED, RESTARTING.
   """
   status: AgentStatusEnum!
 
-  """
-  Timestamp when the agent last changed its status. Updated whenever the agent transitions between different status states (e.g., from ALIVE to LOST, or RESTARTING to ALIVE). Will be null if the agent status has never changed since initial registration.
-  """
+  """Timestamp when the agent last changed its status."""
   statusChanged: DateTime
 
-  """
-  Timestamp when the agent first registered with the manager. This value remains constant throughout the agent's lifecycle and can be used to track the agent's age or identify when it was initially deployed.
-  """
+  """Timestamp when the agent first registered with the manager."""
   firstContact: DateTime
 
   """
-  Timestamp when the agent was marked as lost or unreachable. Set when the manager detects the agent has stopped sending heartbeats. Will be null if the agent has never been lost or is currently alive.
+  Timestamp when the agent was marked as lost or unreachable. Null if the agent has never been lost or is currently alive.
   """
   lostAt: DateTime
 
   """
-  Indicates whether the agent is available for scheduling new compute sessions. An agent can be non-schedulable due to maintenance mode, resource constraints or other operational reasons by admin. When false, no new sessions will be assigned to this agent.
+  Indicates whether the agent is available for scheduling new compute sessions.
   """
   schedulable: Boolean!
 }
@@ -701,22 +695,20 @@ type AgentSystemInfo
   @join__type(graph: STRAWBERRY)
 {
   """
-  Hardware architecture of the agent's host system (e.g., "x86_64", "aarch64"). Used to match compute sessions with compatible container images and ensure proper binary execution on the agent.
+  Hardware architecture of the agent's host system (e.g., "x86_64", "aarch64"). Used to match compute sessions with compatible container images.
   """
   architecture: String!
 
   """
-  Version string of the Backend.AI agent software running on this node. Follows semantic versioning (e.g., "26.1.0") and helps identify compatibility and available features.
+  Version string of the Backend.AI agent software running on this node. Follows semantic versioning (e.g., "26.1.0").
   """
   version: String!
 
-  """
-  Legacy configuration flag, no longer actively used in the system. Retained for backward compatibility and schema consistency. Originally intended to control automatic termination of misbehaving sessions.
-  """
+  """Legacy configuration flag, no longer actively used in the system."""
   autoTerminateAbusingKernel: Boolean!
 
   """
-  List of compute plugin metadata supported by this agent. Each plugin represents a specific accelerator or resource type (e.g., CUDA). Entries contain plugin names and their associated metadata with plugin-specific configuration and capabilities.
+  List of compute plugin metadata supported by this agent. Typed as Any because this field holds a nested GQL type (ComputePluginsGQL).
   """
   computePlugins: ComputePlugins!
 }
@@ -1403,20 +1395,16 @@ enum ArtifactOrderField
 type ArtifactRegistry
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Added in 25.17.0. Internal identifier for the artifact registry metadata record in the 'artifact_registries' table. This ID is unique across all registry types and represents the metadata record itself. Example: When you need to reference a registry entry in the metadata table, use this ID.
-  """
+  """Internal identifier of the artifact registry metadata record."""
   id: ID!
 
-  """
-  Added in 25.17.0. Identifier of the actual registry implementation (e.g., HuggingFace registry, Reservoir registry). This ID corresponds to the primary key in the registry-type-specific table. Example: For a HuggingFace registry, this value matches the 'id' field in the 'huggingface_registries' table. Use this ID when you need to access type-specific registry details.
-  """
+  """Identifier of the actual registry implementation."""
   registryId: ID!
 
-  """Name of the default artifact registry."""
+  """Name of the artifact registry."""
   name: String!
 
-  """Type of the default artifact registry."""
+  """Type of the artifact registry."""
   type: ArtifactRegistryType!
 }
 
@@ -1659,7 +1647,7 @@ Added in 25.17.0. Complete verification result containing results from all confi
 type ArtifactVerificationResult
   @join__type(graph: STRAWBERRY)
 {
-  """Results from each verifier that scanned the artifact"""
+  """Results from each verifier that scanned the artifact."""
   verifiers: [ArtifactVerifierResultEntry!]!
 }
 
@@ -1669,7 +1657,7 @@ Added in 26.1.0. A collection of metadata from an artifact verifier. Contains ke
 type ArtifactVerifierMetadata
   @join__type(graph: STRAWBERRY)
 {
-  """List of metadata entries. Each entry contains a key-value pair."""
+  """List of metadata entries."""
   entries: [ArtifactVerifierMetadataEntry!]!
 }
 
@@ -1692,25 +1680,25 @@ Added in 25.17.0. Result from a single malware verifier containing scan results 
 type ArtifactVerifierResult
   @join__type(graph: STRAWBERRY)
 {
-  """Whether the verification completed successfully"""
+  """Whether the verification completed successfully."""
   success: Boolean!
 
-  """Number of infected or suspicious files detected"""
+  """Number of infected or suspicious files detected."""
   infectedCount: Int!
 
-  """Timestamp when verification started"""
+  """Timestamp when verification started."""
   scannedAt: DateTime!
 
-  """Time taken to complete verification in seconds"""
+  """Time taken to complete verification in seconds."""
   scanTime: Float!
 
-  """Total number of files scanned"""
+  """Total number of files scanned."""
   scannedCount: Int!
 
-  """Added in 26.1.0. Additional metadata from the verifier."""
+  """Additional metadata from the verifier."""
   metadata: ArtifactVerifierMetadata!
 
-  """Fatal error message if the verifier failed to complete"""
+  """Fatal error message if the verifier failed to complete."""
   error: String
 }
 
@@ -1720,10 +1708,10 @@ Added in 25.17.0. Entry for a single verifier's result in the verification resul
 type ArtifactVerifierResultEntry
   @join__type(graph: STRAWBERRY)
 {
-  """Name of the verifier (e.g., 'clamav', 'custom')"""
+  """Name of the verifier."""
   name: String!
 
-  """Scan result from this verifier"""
+  """Scan result from this verifier."""
   result: ArtifactVerifierResult!
 }
 
@@ -2255,22 +2243,22 @@ Added in 26.4.4. Failure detail for a single permission entry in bulk add
 type BulkAddRolePermissionFailureInfo
   @join__type(graph: STRAWBERRY)
 {
-  """Role ID of the failed entry."""
+  """Role ID of the failed entry"""
   roleId: UUID!
 
-  """Scope element type of the failed entry."""
+  """Scope element type of the failed entry"""
   scopeType: String!
 
-  """Scope element ID of the failed entry."""
+  """Scope element ID of the failed entry"""
   scopeId: String!
 
-  """Entity element type of the failed entry."""
+  """Entity element type of the failed entry"""
   entityType: String!
 
-  """Operation type of the failed entry."""
+  """Operation type of the failed entry"""
   operation: String!
 
-  """Error message describing the failure."""
+  """Error message describing the failure"""
   message: String!
 }
 
@@ -2329,10 +2317,10 @@ input BulkAddRolePermissionsInput
 type BulkAddRolePermissionsPayload
   @join__type(graph: STRAWBERRY)
 {
-  """Successfully inserted permission rows."""
+  """Successfully inserted permission rows"""
   items: [Permission!]!
 
-  """Permission entries that failed to insert."""
+  """Permission entries that failed to insert"""
   failed: [BulkAddRolePermissionFailureInfo!]!
 }
 
@@ -2342,10 +2330,10 @@ Added in 26.3.0. Error information for a failed user in bulk role assignment.
 type BulkAssignRoleError
   @join__type(graph: STRAWBERRY)
 {
-  """UUID of the user that failed."""
+  """UUID of the user that failed"""
   userId: UUID!
 
-  """Error message describing the failure."""
+  """Error message describing the failure"""
   message: String!
 }
 
@@ -2362,10 +2350,10 @@ input BulkAssignRoleInput
 type BulkAssignRolePayload
   @join__type(graph: STRAWBERRY)
 {
-  """List of successfully created role assignments."""
+  """Successfully created role assignments"""
   assigned: [RoleAssignment!]!
 
-  """List of errors for users that failed to be assigned."""
+  """Users that failed to be assigned"""
   failed: [BulkAssignRoleError!]!
 }
 
@@ -2585,7 +2573,7 @@ type BulkPurgeVFoldersV2Payload
   """Number of virtual folders successfully purged."""
   purgedCount: Int!
 
-  """Added in 26.4.4. List of errors for vfolders that failed to purge."""
+  """List of errors for vfolders that failed to purge."""
   failed: [BulkPurgeVFolderV2Error!]!
 }
 
@@ -2606,10 +2594,10 @@ Added in 26.4.4. Failure detail for a single permission ID in bulk remove
 type BulkRemoveRolePermissionFailureInfo
   @join__type(graph: STRAWBERRY)
 {
-  """Permission row ID that failed to delete."""
+  """Permission row ID that failed to delete"""
   permissionId: UUID!
 
-  """Error message describing the failure."""
+  """Error message describing the failure"""
   message: String!
 }
 
@@ -2649,10 +2637,10 @@ input BulkRemoveRolePermissionsInput
 type BulkRemoveRolePermissionsPayload
   @join__type(graph: STRAWBERRY)
 {
-  """Successfully deleted permission rows."""
+  """Successfully deleted permission rows"""
   items: [Permission!]!
 
-  """Permission IDs that failed to delete."""
+  """Permission IDs that failed to delete"""
   failed: [BulkRemoveRolePermissionFailureInfo!]!
 }
 
@@ -2683,10 +2671,10 @@ Added in 26.3.0. Error information for a failed user in bulk role revocation.
 type BulkRevokeRoleError
   @join__type(graph: STRAWBERRY)
 {
-  """UUID of the user that failed."""
+  """UUID of the user that failed"""
   userId: UUID!
 
-  """Error message describing the failure."""
+  """Error message describing the failure"""
   message: String!
 }
 
@@ -2702,10 +2690,10 @@ input BulkRevokeRoleInput
 type BulkRevokeRolePayload
   @join__type(graph: STRAWBERRY)
 {
-  """List of successfully revoked role assignments."""
+  """Successfully revoked role assignments"""
   revoked: [RoleAssignment!]!
 
-  """List of errors for users that failed to be revoked."""
+  """Users that failed to be revoked"""
   failed: [BulkRevokeRoleError!]!
 }
 
@@ -2715,7 +2703,7 @@ Added in 26.4.4. Failure detail for a single permission entry in a bulk operatio
 type BulkRolePermissionPresetFailureInfo
   @join__type(graph: STRAWBERRY)
 {
-  """Permission entry ID that the operation failed on."""
+  """role_permission_presets row ID that the operation failed on."""
   permissionPresetId: UUID!
 
   """Error message describing the failure."""
@@ -3044,10 +3032,10 @@ input CloneVFolderV2Input
 type CloneVFolderV2Payload
   @join__type(graph: STRAWBERRY)
 {
-  """The cloned virtual folder."""
+  """Cloned virtual folder"""
   vfolder: VFolder!
 
-  """Background task ID for the clone operation."""
+  """Background task ID for the clone operation"""
   bgtaskId: String!
 }
 
@@ -3057,10 +3045,7 @@ Added in 25.19.0. Cluster configuration for model deployment replicas. Defines t
 type ClusterConfig
   @join__type(graph: STRAWBERRY)
 {
-  """The clustering mode (e.g., SINGLE_NODE)."""
   mode: ClusterMode!
-
-  """Number of replicas in the cluster."""
   size: Int!
 }
 
@@ -3155,7 +3140,7 @@ type ComputePlugins
   @join__type(graph: STRAWBERRY)
 {
   """
-  List of compute plugins. Each entry contains a plugin name and its metadata. The list includes all accelerator and resource type plugins installed on the agent.
+  List of compute plugins. Each entry contains a plugin name and its metadata.
   """
   entries: [ComputePluginEntry!]!
 }
@@ -3712,7 +3697,7 @@ input CreateAppConfigAllowListInput
 type CreateAppConfigAllowListPayload
   @join__type(graph: STRAWBERRY)
 {
-  """The created app config allow-list entry."""
+  """Created app config allow-list entry."""
   appConfigAllowList: AppConfigAllowList!
 }
 
@@ -3728,7 +3713,7 @@ input CreateAppConfigDefinitionInput
 type CreateAppConfigDefinitionPayload
   @join__type(graph: STRAWBERRY)
 {
-  """The created app config definition."""
+  """Created app config definition."""
   appConfigDefinition: AppConfigDefinition!
 }
 
@@ -3886,7 +3871,7 @@ Added in 26.4.2. Payload for container registry create/update mutations.
 type CreateContainerRegistryPayload
   @join__type(graph: STRAWBERRY)
 {
-  """The container registry."""
+  """Created container registry."""
   registry: ContainerRegistryV2!
 }
 
@@ -4066,10 +4051,10 @@ input CreateDownloadSessionV2Input
 type CreateDownloadSessionV2Payload
   @join__type(graph: STRAWBERRY)
 {
-  """Download session token."""
+  """Download session token"""
   token: String!
 
-  """Download URL."""
+  """Download URL"""
   url: String!
 }
 
@@ -4129,7 +4114,6 @@ Added in 26.8.0. Returns the created idle checker assignment. The node contains 
 type CreateIdleCheckerAssignmentPayload
   @join__type(graph: STRAWBERRY)
 {
-  """Created idle checker assignment."""
   idleCheckerAssignment: IdleCheckerAssignment!
 }
 
@@ -4162,7 +4146,6 @@ Added in 26.8.0. Returns the created global idle checker definition. The node co
 type CreateIdleCheckerPayload
   @join__type(graph: STRAWBERRY)
 {
-  """Created idle checker."""
   idleChecker: IdleChecker!
 }
 
@@ -4268,7 +4251,7 @@ Added in 26.4.2. Payload for keypair resource policy create/update mutations.
 type CreateKeypairResourcePolicyPayload
   @join__type(graph: STRAWBERRY)
 {
-  """The keypair resource policy."""
+  """Created keypair resource policy."""
   keypairResourcePolicy: KeypairResourcePolicyV2!
 }
 
@@ -4287,7 +4270,7 @@ input CreateLoginClientTypeInput
 type CreateLoginClientTypePayload
   @join__type(graph: STRAWBERRY)
 {
-  """The created login client type."""
+  """Created login client type."""
   loginClientType: LoginClientType!
 }
 
@@ -4504,7 +4487,7 @@ Added in 26.4.2. Payload for project resource policy create/update mutations.
 type CreateProjectResourcePolicyPayload
   @join__type(graph: STRAWBERRY)
 {
-  """The project resource policy."""
+  """Created project resource policy."""
   projectResourcePolicy: ProjectResourcePolicyV2!
 }
 
@@ -4582,7 +4565,7 @@ input CreateResourceGroupInput
 type CreateResourceGroupPayload
   @join__type(graph: STRAWBERRY)
 {
-  """The created resource group."""
+  """Created resource group."""
   resourceGroup: ResourceGroup!
 }
 
@@ -4610,7 +4593,7 @@ input CreateResourcePresetInput
 type CreateResourcePresetPayload
   @join__type(graph: STRAWBERRY)
 {
-  """The created resource preset."""
+  """Created resource preset."""
   resourcePreset: ResourcePresetV2!
 }
 
@@ -4848,10 +4831,10 @@ input CreateUploadSessionV2Input
 type CreateUploadSessionV2Payload
   @join__type(graph: STRAWBERRY)
 {
-  """Upload session token."""
+  """Upload session token"""
   token: String!
 
-  """Upload URL."""
+  """Upload URL"""
   url: String!
 }
 
@@ -4930,7 +4913,7 @@ Added in 26.4.2. Payload for user resource policy create/update mutations.
 type CreateUserResourcePolicyPayload
   @join__type(graph: STRAWBERRY)
 {
-  """The user resource policy."""
+  """Created user resource policy."""
   userResourcePolicy: UserResourcePolicyV2!
 }
 
@@ -5000,7 +4983,7 @@ type CreateUserV2Payload
   user: UserV2!
 
   """
-  Added in 26.4.4. The default keypair automatically generated for the user, including its one-time secret key.
+  The default keypair automatically generated for the user, including its one-time secret key.
   """
   keypair: CreateKeypairPayload!
 }
@@ -5054,7 +5037,7 @@ input CreateVFolderV2Input
 type CreateVFolderV2Payload
   @join__type(graph: STRAWBERRY)
 {
-  """The created virtual folder."""
+  """Created virtual folder"""
   vfolder: VFolder!
 }
 
@@ -5344,11 +5327,11 @@ type DelegateImportArtifactsPayload
   @join__type(graph: STRAWBERRY)
 {
   """
-  Connection of artifact revisions that were imported from the reservoir registry's remote registry
+  List of imported artifact revisions from the reservoir registry's remote registry.
   """
   artifactRevisions: ArtifactRevisionConnection!
 
-  """List of background tasks created for importing the artifact revisions"""
+  """List of background tasks created for importing the artifact revisions."""
   tasks: [ArtifactRevisionImportTask!]!
 }
 
@@ -5380,9 +5363,7 @@ Added in 25.15.0. Response payload for delegated artifact scanning operation. Co
 type DelegateScanArtifactsPayload
   @join__type(graph: STRAWBERRY)
 {
-  """
-  List of artifacts discovered during the delegated scan from the reservoir registry's remote registry
-  """
+  """List of artifacts discovered during the delegated scan."""
   artifacts: [Artifact!]!
 }
 
@@ -5445,7 +5426,7 @@ Added in 26.3.0. Payload returned after deleting a query preset category.
 type DeleteCategoryPayload
   @join__type(graph: STRAWBERRY)
 {
-  """Deleted category ID."""
+  """Deleted category ID"""
   id: UUID!
 }
 
@@ -5474,7 +5455,7 @@ type DeleteContainerRegistryNodeV2
 type DeleteContainerRegistryPayload
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the deleted registry."""
+  """ID of the deleted container registry."""
   id: String!
 }
 
@@ -5550,7 +5531,7 @@ Added in 26.4.2. Payload returned after deleting files in a virtual folder.
 type DeleteFilesV2Payload
   @join__type(graph: STRAWBERRY)
 {
-  """Background task ID for the deletion operation."""
+  """Background task ID for the deletion operation"""
   bgtaskId: String!
 }
 
@@ -5595,7 +5576,7 @@ type DeleteKeyPairResourcePolicy
 type DeleteKeypairResourcePolicyPayload
   @join__type(graph: STRAWBERRY)
 {
-  """Name of the deleted policy."""
+  """Name of the deleted keypair resource policy."""
   name: String!
 }
 
@@ -5644,7 +5625,7 @@ input DeleteNotificationChannelInput
 type DeleteNotificationChannelPayload
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the deleted notification channel."""
+  """ID of the deleted notification channel"""
   id: UUID!
 }
 
@@ -5659,7 +5640,7 @@ input DeleteNotificationRuleInput
 type DeleteNotificationRulePayload
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the deleted notification rule."""
+  """ID of the deleted notification rule"""
   id: UUID!
 }
 
@@ -5674,7 +5655,7 @@ input DeleteObjectStorageInput
 type DeleteObjectStoragePayload
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the deleted object storage."""
+  """ID of the deleted object storage"""
   id: UUID!
 }
 
@@ -5689,7 +5670,7 @@ input DeletePermissionInput
 type DeletePermissionPayload
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the deleted permission."""
+  """ID of the deleted permission"""
   id: UUID!
 }
 
@@ -5712,7 +5693,7 @@ type DeleteProjectResourcePolicy
 type DeleteProjectResourcePolicyPayload
   @join__type(graph: STRAWBERRY)
 {
-  """Name of the deleted policy."""
+  """Name of the deleted project resource policy."""
   name: String!
 }
 
@@ -5720,7 +5701,7 @@ type DeleteProjectResourcePolicyPayload
 type DeleteQueryDefinitionPayload
   @join__type(graph: STRAWBERRY)
 {
-  """Deleted query definition ID."""
+  """Deleted query definition ID"""
   id: UUID!
 }
 
@@ -5743,9 +5724,7 @@ type DeleteReservoirRegistryPayload
 type DeleteResourceGroupPayload
   @join__type(graph: STRAWBERRY)
 {
-  """
-  UUID of the deleted resource group. Since 26.8.0, the value is the UUID instead of the name.
-  """
+  """UUID of the deleted resource group."""
   id: UUID!
 }
 
@@ -5783,7 +5762,7 @@ input DeleteRoleInput
 type DeleteRolePayload
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the deleted role."""
+  """ID of the deleted role"""
   id: UUID!
 }
 
@@ -5849,7 +5828,7 @@ type DeleteUserResourcePolicy
 type DeleteUserResourcePolicyPayload
   @join__type(graph: STRAWBERRY)
 {
-  """Name of the deleted policy."""
+  """Name of the deleted user resource policy."""
   name: String!
 }
 
@@ -5885,7 +5864,7 @@ Added in 26.4.2. Payload returned after soft-deleting a virtual folder.
 type DeleteVFolderV2Payload
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the deleted virtual folder."""
+  """ID of the deleted virtual folder"""
   id: UUID!
 }
 
@@ -6192,10 +6171,10 @@ Added in 26.4.2. A single environment variable key-value pair injected into the 
 type DeploymentRevisionPresetEnvironEntry
   @join__type(graph: STRAWBERRY)
 {
-  """The environment variable name (e.g., CUDA_VISIBLE_DEVICES, HF_HOME)."""
+  """Environment variable key."""
   key: String!
 
-  """The value assigned to the environment variable."""
+  """Environment variable value."""
   value: String!
 }
 
@@ -7550,10 +7529,7 @@ Added in 26.1.0. A single environment variable entry with name and value.
 type EnvironmentVariableEntry
   @join__type(graph: STRAWBERRY)
 {
-  """Environment variable name (e.g., CUDA_VISIBLE_DEVICES)."""
   name: String!
-
-  """Environment variable value."""
   value: String!
 }
 
@@ -7574,7 +7550,6 @@ input EnvironmentVariableEntryInput
 type EnvironmentVariables
   @join__type(graph: STRAWBERRY)
 {
-  """List of environment variable entries."""
   entries: [EnvironmentVariableEntry!]!
 }
 
@@ -7624,17 +7599,15 @@ type ExtraVFolderMountInfo
   """The vfolder of this entity."""
   vfolder: VirtualFolderNode
   vfolderId: ID!
-
-  """Mount destination path inside the container."""
   mountDestination: String
 
   """
-  Added in 26.4.4. The concrete permission snapshot fixed at revision-write time; later vfolder permission changes do not retroactively affect it.
+  The concrete permission snapshot fixed at revision-write time. ``INHERIT`` policies are resolved against the vfolder's current permission at that point, so this value is immutable and does not change when the vfolder's permission later changes. ``None`` when the caller left it unset to inherit the vfolder's stored permission at session-creation time (task #83).
   """
   mountPerm: MountPermission!
 
   """
-  Added in 26.4.4. Subpath within the vfolder. ``null`` means the vfolder root.
+  Added in 26.4.4. Subpath within the vfolder. ``None`` means the vfolder root.
   """
   subpath: String
 }
@@ -7663,34 +7636,22 @@ type FairShareCalculationSnapshot
   """
   averageDailyDecayedUsage: ResourceSlot
 
-  """
-  Computed fair share factor ranging from 0 to 1. Higher values indicate more entitlement to resources (less historical usage relative to others). Used by the scheduler to prioritize workloads - entities with higher factors get scheduled first.
-  """
+  """Computed fair share factor (0-1 range)"""
   fairShareFactor: Decimal!
 
-  """
-  Sum of exponentially decayed historical usage across the lookback period. Recent usage contributes more than older usage based on the half-life decay function. This is the raw usage data before normalization.
-  """
+  """Sum of decayed historical usage"""
   totalDecayedUsage: ResourceSlot!
 
-  """
-  Single scalar value representing weighted resource consumption. Computed by applying resource weights to the decayed usage and summing. Used to compare usage across entities with different resource consumption patterns.
-  """
+  """Single scalar representing weighted consumption"""
   normalizedUsage: Decimal!
 
-  """
-  Start date of the lookback window used in this calculation (inclusive). Usage before this date is not considered in the fair share factor computation.
-  """
+  """Start date of the lookback window"""
   lookbackStart: Date!
 
-  """
-  End date of the lookback window used in this calculation (inclusive). Typically the current date or the date of the last calculation.
-  """
+  """End date of the lookback window"""
   lookbackEnd: Date!
 
-  """
-  Timestamp when this fair share calculation was performed. Fair share factors are recalculated periodically by the scheduler.
-  """
+  """Timestamp when calculation was performed"""
   lastCalculatedAt: DateTime!
 }
 
@@ -7700,29 +7661,19 @@ Added in 26.1.0. Fair share calculation configuration for a resource group. Defi
 type FairShareScalingGroupSpec
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Half-life for exponential decay in days. Determines how quickly historical usage loses significance. Default is 7 days.
-  """
+  """Half-life for exponential decay in days"""
   halfLifeDays: Int!
 
-  """
-  Total lookback period in days for usage aggregation. Only usage within this window is considered. Default is 28 days.
-  """
+  """Total lookback period in days"""
   lookbackDays: Int!
 
-  """
-  Granularity of decay buckets in days. Usage is aggregated into buckets of this size. Default is 1 day.
-  """
+  """Granularity of decay buckets in days"""
   decayUnitDays: Int!
 
-  """
-  Default weight for entities without explicit weight in this resource group. Default is 1.0.
-  """
+  """Default weight for entities without explicit weight"""
   defaultWeight: Decimal!
 
-  """
-  Added in 26.2.0. Weights for each resource type with default indicators. All resource types from capacity are included. Shows which resources use explicit vs default weights.
-  """
+  """Weights for each resource type"""
   resourceWeights: [ResourceWeightEntry!]!
 }
 
@@ -7733,33 +7684,25 @@ type FairShareSpec
   @join__type(graph: STRAWBERRY)
 {
   """
-  Base weight multiplier for this entity. Higher weight values result in higher scheduling priority. This is the effective weight - either the explicitly set value or the resource group's default_weight.
+  Effective weight for this entity. Always the resolved value (either the explicitly set weight or the resource group's default_weight).
   """
   weight: Decimal!
 
   """
-  Added in 26.1.0. Whether this entity uses the resource group's default_weight. True means no explicit weight was set and the default is being used. False means an explicit weight value was configured for this entity.
+  Whether this entity uses the resource group's default_weight. True means no explicit weight was set.
   """
   usesDefault: Boolean!
 
-  """
-  Half-life for exponential decay in days. Determines how quickly historical usage loses significance. For example, with half_life_days=7, usage from 7 days ago contributes half as much as today's usage.
-  """
+  """Half-life for exponential decay in days"""
   halfLifeDays: Int!
 
-  """
-  Total lookback period in days for usage aggregation. Only usage within this window is considered. Typical values range from 7 to 30 days depending on scheduling policy.
-  """
+  """Total lookback period in days"""
   lookbackDays: Int!
 
-  """
-  Granularity of decay buckets in days. Usage is aggregated into buckets of this size. Smaller values provide more precision but require more storage. Typically 1 day.
-  """
+  """Granularity of decay buckets in days"""
   decayUnitDays: Int!
 
-  """
-  Added in 26.2.0. Weights for each resource type with default indicators. Shows which resources use explicit vs default weights. Allows different resources to contribute differently to the fair share calculation. For example, GPU usage might be weighted higher than CPU usage.
-  """
+  """Weights for each resource type with default indicators"""
   resourceWeights: [ResourceWeightEntry!]!
 }
 
@@ -8330,16 +8273,9 @@ Added in 26.8.0. Contains the settings used by an idle checker implementation.
 type IdleCheckerSpec
   @join__type(graph: STRAWBERRY)
 {
-  """Checker implementation type."""
   type: IdleCheckerType!
-
-  """Settings that define the maximum lifetime of a session."""
   sessionLifetime: SessionLifetimeIdleCheckerSpec
-
-  """Settings that define the maximum network inactivity period."""
   network: NetworkTimeoutIdleCheckerSpec
-
-  """Settings that define the maximum underutilized duration."""
   utilization: UtilizationIdleCheckerSpec
 }
 
@@ -8745,23 +8681,19 @@ Added in 26.2.0. Metadata information for an image. Contains tags, labels, diges
 type ImageV2MetadataInfo
   @join__type(graph: STRAWBERRY)
 {
-  """Config digest (image hash) for verification."""
+  """Config digest for verification."""
   digest: String
 
   """Image size in bytes."""
   sizeBytes: Int!
 
-  """Timestamp when the image was created/registered."""
+  """Image creation timestamp."""
   createdAt: DateTime
 
-  """
-  Added in 26.3.0. Timestamp of the most recent session created with this image. Returns null if the image has never been used.
-  """
+  """Timestamp of the most recent session created with this image."""
   lastUsedAt: DateTime
 
-  """
-  Parsed tag components from the image reference (e.g., python=3.11, cuda=12.1).
-  """
+  """Parsed tag components."""
   tags: [ImageV2TagEntry!]!
 
   """Docker labels."""
@@ -8806,7 +8738,7 @@ Added in 26.2.0. Permission information for an image. Contains the list of permi
 type ImageV2PermissionInfo
   @join__type(graph: STRAWBERRY)
 {
-  """List of permissions the user has on this image."""
+  """List of permissions the user has on this image"""
   permissions: [ImageV2Permission!]!
 }
 
@@ -8816,10 +8748,10 @@ Added in 26.2.0. Runtime requirements information for an image. Contains resourc
 type ImageV2RequirementsInfo
   @join__type(graph: STRAWBERRY)
 {
-  """List of supported accelerator types (e.g., 'cuda', 'rocm')."""
+  """List of supported accelerator types."""
   supportedAccelerators: [String!]!
 
-  """Resource slot limits (cpu, memory, accelerators, etc.)."""
+  """Resource slot limits with string min/max values."""
   resourceLimits: [ImageV2ResourceLimit!]!
 }
 
@@ -9386,18 +9318,16 @@ input KernelV2Filter
 type KernelV2LifecycleInfo
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Current status of the kernel (e.g., PENDING, RUNNING, TERMINATED). Indicates the kernel's position in its lifecycle.
-  """
+  """Current status of the kernel."""
   status: KernelV2Status!
 
-  """The result of the kernel execution (UNDEFINED, SUCCESS, FAILURE)."""
+  """The result of the kernel execution."""
   result: SessionV2Result!
 
   """Timestamp when the kernel was created."""
   createdAt: DateTime
 
-  """Timestamp when the kernel was terminated. Null if still active."""
+  """Timestamp when the kernel was terminated."""
   terminatedAt: DateTime
 
   """Scheduled start time for the kernel, if applicable."""
@@ -9408,7 +9338,9 @@ type KernelV2LifecycleInfo
 type KernelV2NetworkInfo
   @join__type(graph: STRAWBERRY)
 {
-  """Collection of service ports exposed by this kernel."""
+  """
+  Collection of service ports exposed by this kernel. Typed as Any because this field holds a nested GQL type (ServicePortsGQL).
+  """
   servicePorts: ServicePorts
 
   """List of ports that are pre-opened for this kernel."""
@@ -9447,18 +9379,22 @@ type KernelV2ResourceInfo
   """The resource group (scaling group) this kernel is assigned to."""
   resourceGroupName: String
 
-  """
-  The container ID on the agent. Null if container not yet created or hidden.
-  """
+  """The container ID on the agent."""
   containerId: String
 
-  """Resource allocation with requested and used slots."""
+  """
+  Resource allocation with requested and used slots. Typed as Any because this field holds a nested GQL type (ResourceAllocationGQL).
+  """
   allocation: ResourceAllocation!
 
-  """The fractional resource shares occupied by this kernel."""
+  """
+  The fractional resource shares occupied by this kernel. Typed as Any because this field holds a nested GQL type (ResourceSlotGQL).
+  """
   shares: ResourceSlot!
 
-  """Additional resource options and configurations for this kernel."""
+  """
+  Additional resource options and configurations. Typed as Any because this field holds a nested GQL type (ResourceOptsGQL).
+  """
   resourceOpts: ResourceOpts
 }
 
@@ -9475,7 +9411,7 @@ type KernelV2SessionInfo
   """The name of the session."""
   name: String
 
-  """The type of session (INTERACTIVE, BATCH, INFERENCE, SYSTEM)."""
+  """The type of session (interactive, batch, inference, system)."""
   sessionType: SessionTypes!
 }
 
@@ -9980,7 +9916,7 @@ Added in 26.4.2. Payload returned after listing files in a virtual folder.
 type ListFilesV2Payload
   @join__type(graph: STRAWBERRY)
 {
-  """List of file entries."""
+  """List of file entries"""
   items: [VFolderFileEntryV2!]!
 }
 
@@ -10367,7 +10303,7 @@ Added in 26.4.2. Payload returned after creating directories in a virtual folder
 type MkdirV2Payload
   @join__type(graph: STRAWBERRY)
 {
-  """List of created directory paths."""
+  """List of created directory paths"""
   results: [String!]!
 }
 
@@ -10592,42 +10528,15 @@ Added in 26.4.2. Metadata extracted from the model-definition.yaml file in the m
 type ModelCardV2Metadata
   @join__type(graph: STRAWBERRY)
 {
-  """The author or organization that created this model."""
   author: String
-
-  """Human-readable display title for the model."""
   title: String
-
-  """Version string of the model (e.g., '1.0', '2.3.1')."""
   modelVersion: String
-
-  """Brief summary of what the model does and its intended use cases."""
   description: String
-
-  """
-  The primary ML task this model performs (e.g., 'text-generation', 'image-classification').
-  """
   task: String
-
-  """High-level category for the model (e.g., 'NLP', 'Computer Vision')."""
   category: String
-
-  """Model architecture name (e.g., 'transformer', 'diffusion', 'CNN')."""
   architecture: String
-
-  """
-  List of ML frameworks required to run the model (e.g., 'PyTorch', 'TensorFlow', 'JAX').
-  """
   framework: [String!]!
-
-  """
-  Classification labels and tags for categorization and search (e.g., 'text-generation', 'vision', 'multilingual').
-  """
   label: [String!]!
-
-  """
-  License under which the model is distributed (e.g., 'Apache-2.0', 'MIT').
-  """
   license: String
 }
 
@@ -10656,10 +10565,10 @@ Added in 26.4.2. A single resource requirement entry for a model card. The quant
 type ModelCardV2ResourceSlotEntry
   @join__type(graph: STRAWBERRY)
 {
-  """Resource type identifier (e.g., 'cpu', 'mem', 'cuda.shares')."""
+  """Resource type name."""
   resourceType: String!
 
-  """Minimum required quantity for this resource as a decimal string."""
+  """Resource quantity."""
   quantity: String!
 }
 
@@ -10824,10 +10733,6 @@ type ModelDeploymentMetadata
   name: String!
   status: DeploymentStatus!
   tags: [String!]!
-
-  """
-  Added in 26.4.4. Name of the resource group (scaling group) this deployment runs in.
-  """
   resourceGroupName: String!
   createdAt: DateTime!
   updatedAt: DateTime!
@@ -10868,7 +10773,7 @@ type ModelHealthCheck
   @join__type(graph: STRAWBERRY)
 {
   """
-  Added in 26.4.4. Whether the route is health-checked. When false the route activates immediately and the remaining fields are ignored.
+  Whether the route is health-checked. When false the route activates immediately.
   """
   enable: Boolean!
 
@@ -11018,15 +10923,11 @@ type ModelMountConfig
   """The vfolder of this entity."""
   vfolder: VirtualFolderNode
   vfolderId: ID!
-
-  """Path inside the container where the model is mounted."""
   mountDestination: String!
-
-  """Path to the model definition file within the mounted folder."""
   definitionPath: String!
 
   """
-  Added in 26.4.4. Subpath within the model vfolder. ``null`` means the vfolder root.
+  Added in 26.4.4. Subpath within the model vfolder. ``None`` means the vfolder root.
   """
   subpath: String
 }
@@ -11266,19 +11167,11 @@ type ModelRuntimeConfig
   Added in 26.4.4. The runtime variant referenced by this runtime config.
   """
   runtimeVariant: RuntimeVariant
-
-  """
-  The runtime variant row id. Clients can resolve the full variant node via the ``runtime_variant`` field resolver.
-  """
   runtimeVariantId: UUID!
-
-  """Framework-specific configuration in JSON format."""
   inferenceRuntimeConfig: JSON
-
-  """Environment variables for the service, e.g. CUDA_VISIBLE_DEVICES=0."""
   environ: EnvironmentVariables
 
-  """Added in 26.4.4. Preset values materialised on this revision."""
+  """Preset values materialised on this revision."""
   runtimeVariantPresetValues: [RuntimeVariantPresetValue!]!
 }
 
@@ -11309,7 +11202,9 @@ type ModelServiceConfig
   """Added in 26.7.0. Single-string command to start the model service."""
   command: String
 
-  """Command to start the model service."""
+  """
+  Deprecated since 26.7.0. Command to start the model service. Do not set together with `command`; when both are set, `command` takes precedence and this field is ignored.
+  """
   startCommand: [String!] @deprecated(reason: "Use `command` instead.")
 
   """
@@ -11940,10 +11835,10 @@ Added in 26.4.2. Payload returned after moving a file in a virtual folder.
 type MoveFileV2Payload
   @join__type(graph: STRAWBERRY)
 {
-  """Source path that was moved."""
+  """Source path that was moved"""
   src: String!
 
-  """Destination path."""
+  """Destination path"""
   dst: String!
 }
 
@@ -13107,7 +13002,7 @@ Added in 26.4.2. Query result returning the current client's IP address.
 type MyClientIp
   @join__type(graph: STRAWBERRY)
 {
-  """The client's IP address as seen by the server."""
+  """The client's IP address as seen by the server"""
   clientIp: String!
 }
 
@@ -13182,7 +13077,6 @@ Added in 26.8.0. Configures the maximum period without active network traffic.
 type NetworkTimeoutIdleCheckerSpec
   @join__type(graph: STRAWBERRY)
 {
-  """Maximum network inactivity period in seconds."""
   maxNetworkInactivitySeconds: Int!
 }
 
@@ -13434,10 +13328,7 @@ Added in 26.3.0. Display number format configuration for a resource slot type.
 type NumberFormat
   @join__type(graph: STRAWBERRY)
 {
-  """Whether to use binary (1024-based) or decimal (1000-based) prefixes."""
   binary: Boolean!
-
-  """Number of decimal places to round to when displaying values."""
   roundLength: Int!
 }
 
@@ -13681,9 +13572,7 @@ type PredefinedAtomicPermission
 type PreemptionConfig
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Added in 26.8.0. Whether preemption is enabled for this resource group (opt-in).
-  """
+  """Whether preemption is enabled for this resource group (opt-in)."""
   enabled: Boolean!
 
   """Sessions with priority <= this value are eligible for preemption."""
@@ -13696,7 +13585,7 @@ type PreemptionConfig
   mode: PreemptionMode!
 
   """
-  Added in 26.8.0. Minimum session runtime in seconds before it becomes preemptible (0 = disabled).
+  Minimum session runtime in seconds before it becomes preemptible (0 = disabled).
   """
   preemptionMinRuntime: Float!
 }
@@ -13784,14 +13673,10 @@ Added in 26.4.2. Cluster topology settings for the deployment, defining whether 
 type PresetClusterSpec
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Deployment topology mode: 'single-node' runs on one node, 'multi-node' distributes across multiple nodes.
-  """
+  """Cluster mode."""
   clusterMode: String!
 
-  """
-  Number of worker nodes in the cluster. For single-node mode, this is typically 1.
-  """
+  """Cluster size."""
   clusterSize: Int!
 }
 
@@ -13801,15 +13686,13 @@ Added in 26.4.2. Deployment-level defaults stored on the preset. Any null field 
 type PresetDeploymentDefaults
   @join__type(graph: STRAWBERRY)
 {
-  """Default open_to_public for deployments created from this preset."""
+  """Default open_to_public for deployments from this preset."""
   openToPublic: Boolean
 
-  """Default replica count for deployments created from this preset."""
+  """Default replica count for deployments from this preset."""
   replicaCount: Int
 
-  """
-  Default revision history limit for deployments created from this preset.
-  """
+  """Default revision history limit for deployments from this preset."""
   revisionHistoryLimit: Int
 
   """Default deployment strategy type (ROLLING or BLUE_GREEN)."""
@@ -13841,18 +13724,16 @@ Added in 26.4.2. Container execution configuration for the deployment, including
 type PresetExecutionSpec
   @join__type(graph: STRAWBERRY)
 {
-  """UUID of the container image used to run the inference server."""
+  """Container image UUID."""
   imageId: UUID
 
-  """Command to start the inference server process inside the container."""
+  """Startup command."""
   startupCommand: String
 
-  """
-  Script executed before the main process starts, used for setup tasks like downloading model weights.
-  """
+  """Bootstrap script."""
   bootstrapScript: String
 
-  """Environment variables injected into the inference container."""
+  """Environment variables."""
   environ: [DeploymentRevisionPresetEnvironEntry!]!
 }
 
@@ -13998,7 +13879,7 @@ Added in 26.4.2. Compute resource allocation for the deployment, specifying CPU,
 type PresetResourceAllocation
   @join__type(graph: STRAWBERRY)
 {
-  """Additional resource options such as shared memory (shmem) size."""
+  """Additional resource options."""
   resourceOpts: [ResourceOptsEntry!]!
 }
 
@@ -14018,24 +13899,16 @@ Added in 26.4.2. Specifies how a runtime variant preset value is applied to the 
 type PresetTargetSpec
   @join__type(graph: STRAWBERRY)
 {
-  """
-  How the value is applied to the container: 'env' sets it as an environment variable, 'args' appends it as a command-line argument.
-  """
+  """Target: env or args."""
   presetTarget: PresetTarget!
 
-  """
-  Data type used for input validation (e.g., 'str', 'int', 'float', 'bool', 'flag').
-  """
+  """Value type: str, int, float, bool, flag."""
   valueType: PresetValueType!
 
-  """
-  The default value shown to users when they create a deployment using this preset.
-  """
+  """Default value."""
   defaultValue: String
 
-  """
-  For 'env' target, the environment variable name (e.g., VLLM_TENSOR_PARALLEL_SIZE); for 'args' target, the CLI flag name (e.g., --tensor-parallel).
-  """
+  """Env key or args flag."""
   key: String!
 }
 
@@ -14098,7 +13971,7 @@ type ProjectBasicInfo
   """Optional description of the project."""
   description: String
 
-  """Project type determining its purpose. See ProjectTypeV2 enum."""
+  """Project type determining its purpose. See ProjectType enum."""
   type: ProjectTypeV2!
 
   """External system integration identifier."""
@@ -14937,7 +14810,6 @@ Added in 26.8.0. Confirms that an idle checker assignment was permanently remove
 type PurgeIdleCheckerAssignmentPayload
   @join__type(graph: STRAWBERRY)
 {
-  """Purged idle checker assignment ID."""
   id: UUID!
 }
 
@@ -14955,7 +14827,6 @@ Added in 26.8.0. Confirms that an idle checker was permanently removed. The retu
 type PurgeIdleCheckerPayload
   @join__type(graph: STRAWBERRY)
 {
-  """Purged idle checker ID."""
   id: UUID!
 }
 
@@ -15031,7 +14902,7 @@ input PurgeRoleInput
 type PurgeRolePayload
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the purged role."""
+  """ID of the purged role"""
   id: UUID!
 }
 
@@ -16378,10 +16249,10 @@ input QueryDefinitionFilter
 type QueryDefinitionMetricResult
   @join__type(graph: STRAWBERRY)
 {
-  """Metric labels as key-value entries."""
+  """Label key-value pairs for this series"""
   metric: [MetricLabelEntry!]!
 
-  """Time-series values."""
+  """Data points (timestamp, value) for this series"""
   values: [QueryDefinitionMetricResultValue!]!
 }
 
@@ -16444,19 +16315,19 @@ enum QueryDefinitionOrderField
 type QueryPresetCategory
   @join__type(graph: STRAWBERRY)
 {
-  """Category UUID."""
+  """Category ID"""
   id: UUID!
 
-  """Human-readable category name."""
+  """Human-readable category name"""
   name: String!
 
-  """Optional category description."""
+  """Optional category description"""
   description: String
 
-  """Creation timestamp."""
+  """Creation timestamp"""
   createdAt: DateTime!
 
-  """Last update timestamp."""
+  """Last update timestamp"""
   updatedAt: DateTime!
 }
 
@@ -16685,22 +16556,22 @@ Added in 26.4.4. Failure detail for a single permission entry in replace
 type ReplaceRolePermissionFailureInfo
   @join__type(graph: STRAWBERRY)
 {
-  """Role ID of the failed entry."""
+  """Role ID of the failed entry"""
   roleId: UUID!
 
-  """Scope element type of the failed entry."""
+  """Scope element type of the failed entry"""
   scopeType: String!
 
-  """Scope element ID of the failed entry."""
+  """Scope element ID of the failed entry"""
   scopeId: String!
 
-  """Entity element type of the failed entry."""
+  """Entity element type of the failed entry"""
   entityType: String!
 
-  """Operation type of the failed entry."""
+  """Operation type of the failed entry"""
   operation: String!
 
-  """Error message describing the failure."""
+  """Error message describing the failure"""
   message: String!
 }
 
@@ -16720,10 +16591,10 @@ Added in 26.4.4. Payload for replacing a role's entire scoped-permission set
 type ReplaceRolePermissionsPayload
   @join__type(graph: STRAWBERRY)
 {
-  """Permission rows that make up the new set."""
+  """Permission rows that make up the new set"""
   items: [Permission!]!
 
-  """Permission entries that failed to insert."""
+  """Permission entries that failed to insert"""
   failed: [ReplaceRolePermissionFailureInfo!]!
 }
 
@@ -17021,16 +16892,18 @@ type ReservoirRegistryEdge
 type ResourceAllocation
   @join__type(graph: STRAWBERRY)
 {
-  """The resource slots originally requested for this kernel."""
+  """
+  The resource slots originally requested. Typed as Any because this field holds a nested GQL type (ResourceSlotGQL).
+  """
   requested: ResourceSlot!
 
   """
-  The resource slots currently used by this kernel. May be null if not yet allocated.
+  The resource slots currently used. Typed as Any because this field holds a nested GQL type (ResourceSlotGQL).
   """
   used: ResourceSlot
 
   """
-  Added in 26.8.0. The resource slots actually allocated, computed from the resource_allocations table. Unlike `used`, this persists after the session/kernel is freed or terminated (for statistics and billing).
+  The resource slots actually allocated, computed from the resource_allocations table. Unlike `used`, this persists after the session/kernel is freed or terminated (for statistics and billing). Typed as Any because this field holds a nested GQL type (ResourceSlotGQL).
   """
   allocated: ResourceSlot
 }
@@ -17058,8 +16931,6 @@ type ResourceConfig
   """The resource group of this entity."""
   resourceGroup: ScalingGroupNode
   resourceGroupName: String!
-
-  """Added in 26.1.0. Additional resource options such as shared memory."""
   resourceOpts: ResourceOpts
 }
 
@@ -17244,7 +17115,7 @@ type ResourceGroupSchedulerConfig
   """
   type: SchedulerType!
 
-  """Added in 26.3.0. Preemption configuration for this resource group."""
+  """Preemption configuration for this resource group."""
   preemption: PreemptionConfig!
 }
 
@@ -17305,17 +17176,13 @@ Added in 26.1.0. Resource information for a resource group. Provides aggregated 
 type ResourceInfo
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Total available resources from ALIVE, schedulable agents in this resource group.
-  """
+  """Total available resources"""
   capacity: ResourceSlot!
 
-  """
-  Currently occupied resources from active kernels (RUNNING/TERMINATING status).
-  """
+  """Currently occupied resources"""
   used: ResourceSlot!
 
-  """Available resources (capacity - used)."""
+  """Available resources (capacity - used)"""
   free: ResourceSlot!
 }
 
@@ -17355,7 +17222,7 @@ Added in 26.1.0. A collection of additional resource options for a deployment. C
 type ResourceOpts
   @join__type(graph: STRAWBERRY)
 {
-  """List of resource option entries. Each entry contains a key-value pair."""
+  """List of resource option entries."""
   entries: [ResourceOptsEntry!]!
 }
 
@@ -17365,10 +17232,10 @@ Added in 26.1.0. A single key-value entry representing a resource option. Contai
 type ResourceOptsEntry
   @join__type(graph: STRAWBERRY)
 {
-  """The name of this resource option. Example: 'shmem'."""
+  """The name of this resource option (e.g., 'shmem')."""
   name: String!
 
-  """The value for this resource option. Example: '64m'."""
+  """The value for this resource option (e.g., '64m')."""
   value: String!
 }
 
@@ -17489,9 +17356,7 @@ Added in 26.1.0. A collection of compute resource allocations. Represents the re
 type ResourceSlot
   @join__type(graph: STRAWBERRY)
 {
-  """
-  List of resource allocations. Each entry contains a resource type and quantity pair.
-  """
+  """List of resource allocations"""
   entries: [ResourceSlotEntry!]!
 }
 
@@ -17501,14 +17366,10 @@ Added in 26.1.0. A single entry representing one resource type and its allocated
 type ResourceSlotEntry
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Resource type identifier. Common types include: 'cpu' (CPU cores), 'mem' (memory in bytes), 'cuda.shares' (fractional GPU), 'cuda.device' (whole GPU devices), 'rocm.device' (AMD GPU devices). Custom accelerator plugins may define additional types.
-  """
+  """Resource type identifier (e.g., cpu, mem, cuda.shares)"""
   resourceType: String!
 
-  """
-  Quantity of the resource. For 'cpu': number of cores (e.g., 2.0, 0.5). For 'mem': bytes (e.g., 4294967296 for 4GB). For accelerators: device count or share fraction.
-  """
+  """Quantity of the resource"""
   quantity: Decimal!
 }
 
@@ -17635,19 +17496,13 @@ Added in 26.2.0. Resource weight with default indicator. Shows whether this reso
 type ResourceWeightEntry
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Resource type identifier (e.g., 'cpu', 'mem', 'cuda.device'). Matches the resource types available in the scaling group.
-  """
+  """Resource type identifier"""
   resourceType: String!
 
-  """
-  Weight multiplier for this resource type in fair share calculations. Higher weight means more contribution to normalized usage.
-  """
+  """Weight multiplier for this resource type"""
   weight: Decimal!
 
-  """
-  Whether this resource uses the resource group's default weight. True means no explicit weight was configured for this type.
-  """
+  """Whether this resource uses the resource group's default weight"""
   usesDefault: Boolean!
 }
 
@@ -17695,7 +17550,7 @@ Added in 26.4.4. Payload returned after restoring a virtual folder from trash.
 type RestoreVFolderPayload
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the restored virtual folder."""
+  """ID of the restored virtual folder"""
   id: UUID!
 }
 
@@ -19138,7 +18993,7 @@ type RuntimeVariantPresetValue
   """The runtime variant preset this value is bound to."""
   preset: RuntimeVariantPreset
 
-  """The preset this value is bound to."""
+  """Runtime variant preset ID."""
   presetId: UUID!
 
   """Value bound to the preset."""
@@ -19151,10 +19006,10 @@ Added in 26.4.4. A mapping of a runtime variant preset to a specific value, used
 type RuntimeVariantPresetValueEntry
   @join__type(graph: STRAWBERRY)
 {
-  """The runtime variant preset that this value applies to."""
+  """Runtime variant preset ID."""
   presetId: UUID!
 
-  """The concrete value to set for the referenced preset parameter."""
+  """Value for this preset."""
   value: String!
 }
 
@@ -19354,7 +19209,7 @@ type ScanProjectModelCardsV2Payload
   """Number of newly created model cards."""
   createdCount: Int!
 
-  """Number of updated model cards."""
+  """Number of updated existing model cards."""
   updatedCount: Int!
 
   """Per-vfolder error messages."""
@@ -19579,22 +19434,11 @@ type ServiceCatalog implements Node
 type ServiceCatalogEndpoint
   @join__type(graph: STRAWBERRY)
 {
-  """Role of this endpoint (e.g., 'main', 'health')."""
   role: String!
-
-  """Network scope (e.g., 'public', 'private', 'internal')."""
   scope: String!
-
-  """Hostname or IP address."""
   address: String!
-
-  """Port number."""
   port: Int!
-
-  """Protocol (e.g., 'grpc', 'http', 'https')."""
   protocol: String!
-
-  """Additional metadata."""
   metadata: JSON
 }
 
@@ -19717,19 +19561,19 @@ Added in 26.2.0. A single service port entry representing an exposed service. Co
 type ServicePortEntry
   @join__type(graph: STRAWBERRY)
 {
-  """Name of the service (e.g., 'jupyter', 'tensorboard', 'ssh')."""
+  """Name of the service"""
   name: String!
 
-  """Protocol type for this service port (http, tcp, preopen, internal)."""
+  """Protocol type (http, tcp, preopen, internal)"""
   protocol: ServicePortProtocol!
 
-  """Port numbers inside the container."""
+  """Port numbers inside the container"""
   containerPorts: [Int!]!
 
-  """Mapped port numbers on the host. May be null if not yet assigned."""
+  """Mapped port numbers on the host"""
   hostPorts: [Int]!
 
-  """Whether this port is used for inference endpoints."""
+  """Whether this port is used for inference endpoints"""
   isInference: Boolean!
 }
 
@@ -19751,7 +19595,7 @@ Added in 26.2.0. A collection of exposed service ports. Each entry defines a ser
 type ServicePorts
   @join__type(graph: STRAWBERRY)
 {
-  """List of service port entries."""
+  """List of service port entries"""
   entries: [ServicePortEntry!]!
 }
 
@@ -19804,7 +19648,6 @@ Added in 26.8.0. Configures the maximum lifetime of a running session. The check
 type SessionLifetimeIdleCheckerSpec
   @join__type(graph: STRAWBERRY)
 {
-  """Maximum session lifetime in seconds."""
   maxLifetimeSeconds: Int!
 }
 
@@ -20145,7 +19988,7 @@ type SessionV2MetadataInfo
   priority: Int!
 
   """
-  Added in 26.8.0. Preemption priority among the owner's own sessions. A pending session may reclaim another session's resources only when both belong to the same user and the other session's value is strictly lower, so equal values never preempt each other; among the eligible sessions the lowest value is reclaimed first. Independent of `priority`, which orders the pending queue and takes no part in this comparison.
+  Preemption priority among the owner's own sessions. A pending session may reclaim another session's resources only when both belong to the same user and the other session's value is strictly lower, so equal values never preempt each other; among the eligible sessions the lowest value is reclaimed first. Independent of `priority`, which orders the pending queue and takes no part in this comparison.
   """
   jobPriority: Int!
 
@@ -20195,7 +20038,9 @@ enum SessionV2OrderField
 type SessionV2ResourceInfo
   @join__type(graph: STRAWBERRY)
 {
-  """Resource allocation with requested and occupied slots."""
+  """
+  Resource allocation with requested and occupied slots. Typed as Any because this field holds a nested GQL type (ResourceAllocationGQL).
+  """
   allocation: ResourceAllocation!
 
   """The resource group (scaling group) this session is assigned to."""
@@ -20217,7 +20062,9 @@ enum SessionV2Result
 type SessionV2RuntimeInfo
   @join__type(graph: STRAWBERRY)
 {
-  """Environment variables for the session."""
+  """
+  Environment variables for the session. Typed as Any because this field holds a nested GQL type (EnvironmentVariablesGQL).
+  """
   environ: EnvironmentVariables
 
   """Bootstrap script to run before the main process."""
@@ -20345,7 +20192,7 @@ Added in 26.4.2. A single storage host together with the permissions granted to 
 type StorageHostPermission
   @join__type(graph: STRAWBERRY)
 {
-  """Storage host name (e.g., 'local:volume1')."""
+  """Storage host name."""
   host: String!
 
   """Permissions granted to the current user on this storage host."""
@@ -20857,7 +20704,7 @@ input UpdateAppConfigAllowListInput
 type UpdateAppConfigAllowListPayload
   @join__type(graph: STRAWBERRY)
 {
-  """The updated app config allow-list entry."""
+  """Updated app config allow-list entry."""
   appConfigAllowList: AppConfigAllowList!
 }
 
@@ -20950,7 +20797,7 @@ input UpdateContainerRegistryInput
 type UpdateContainerRegistryPayload
   @join__type(graph: STRAWBERRY)
 {
-  """The updated container registry."""
+  """Updated container registry."""
   registry: ContainerRegistryV2!
 }
 
@@ -21160,7 +21007,6 @@ Added in 26.8.0. Returns the idle checker assignment after an update is applied.
 type UpdateIdleCheckerAssignmentPayload
   @join__type(graph: STRAWBERRY)
 {
-  """Updated idle checker assignment."""
   idleCheckerAssignment: IdleCheckerAssignment!
 }
 
@@ -21197,7 +21043,6 @@ Added in 26.8.0. Returns the idle checker after an update is applied. The node r
 type UpdateIdleCheckerPayload
   @join__type(graph: STRAWBERRY)
 {
-  """Updated idle checker."""
   idleChecker: IdleChecker!
 }
 
@@ -21247,7 +21092,7 @@ input UpdateKeypairResourcePolicyInput
 type UpdateKeypairResourcePolicyPayload
   @join__type(graph: STRAWBERRY)
 {
-  """The updated keypair resource policy."""
+  """Updated keypair resource policy."""
   keypairResourcePolicy: KeypairResourcePolicyV2!
 }
 
@@ -21268,7 +21113,7 @@ input UpdateLoginClientTypeInput
 type UpdateLoginClientTypePayload
   @join__type(graph: STRAWBERRY)
 {
-  """The updated login client type."""
+  """Updated login client type."""
   loginClientType: LoginClientType!
 }
 
@@ -21489,7 +21334,7 @@ input UpdateProjectResourcePolicyInput
 type UpdateProjectResourcePolicyPayload
   @join__type(graph: STRAWBERRY)
 {
-  """The updated project resource policy."""
+  """Updated project resource policy."""
   projectResourcePolicy: ProjectResourcePolicyV2!
 }
 
@@ -21608,7 +21453,7 @@ type UpdateResourceGroupPayload
 type UpdateResourcePresetPayload
   @join__type(graph: STRAWBERRY)
 {
-  """The updated resource preset."""
+  """Updated resource preset."""
   resourcePreset: ResourcePresetV2!
 }
 
@@ -21809,7 +21654,7 @@ input UpdateUserResourcePolicyInput
 type UpdateUserResourcePolicyPayload
   @join__type(graph: STRAWBERRY)
 {
-  """The updated user resource policy."""
+  """Updated user resource policy."""
   userResourcePolicy: UserResourcePolicyV2!
 }
 
@@ -21916,7 +21761,7 @@ input UpsertDomainFairShareWeightInput
 type UpsertDomainFairShareWeightPayload
   @join__type(graph: STRAWBERRY)
 {
-  """The updated or created domain fair share record."""
+  """Updated domain fair share data"""
   domainFairShare: DomainFairShare!
 }
 
@@ -21947,7 +21792,7 @@ Added in 26.1.0. Payload for project fair share weight upsert mutation.
 type UpsertProjectFairShareWeightPayload
   @join__type(graph: STRAWBERRY)
 {
-  """The updated or created project fair share record."""
+  """Updated project fair share data"""
   projectFairShare: ProjectFairShare!
 }
 
@@ -21979,7 +21824,7 @@ input UpsertUserFairShareWeightInput
 type UpsertUserFairShareWeightPayload
   @join__type(graph: STRAWBERRY)
 {
-  """The updated or created user fair share record."""
+  """Updated user fair share data"""
   userFairShare: UserFairShare!
 }
 
@@ -22845,7 +22690,7 @@ type UserV2BasicInfo
   """Optional description or notes about the user."""
   description: String
 
-  """Added in 26.4.2. External system integration identifier."""
+  """External system integration identifier."""
   integrationName: String
 }
 
@@ -22983,7 +22828,7 @@ type UserV2OrganizationInfo
   """Name of the domain this user belongs to."""
   domainName: String
 
-  """User's role determining access permissions. See UserRoleV2 enum."""
+  """User's role determining access permissions. See UserRole enum."""
   role: UserRoleV2
 
   """Name of the user resource policy applied to this user."""
@@ -23000,7 +22845,7 @@ type UserV2SecurityInfo
   @join__type(graph: STRAWBERRY)
 {
   """
-  List of allowed client IP addresses or CIDR ranges. If set, login is restricted to these IP addresses.
+  List of allowed client IP addresses or CIDR ranges. If set, login is restricted to these IP addresses. Supports both IPv4 and IPv6 formats (e.g., '192.168.1.0/24', '::1').
   """
   allowedClientIp: [String!]
 
@@ -23023,7 +22868,7 @@ type UserV2StatusInfo
   @join__type(graph: STRAWBERRY)
 {
   """
-  Current account status. See UserStatusV2 enum for possible values. Replaces the deprecated is_active field.
+  Current account status. See UserStatus enum for possible values. Replaces the deprecated is_active field.
   """
   status: UserStatusV2!
 
@@ -23063,10 +22908,7 @@ Added in 26.8.0. Configures how long a session may remain underutilized.
 type UtilizationIdleCheckerSpec
   @join__type(graph: STRAWBERRY)
 {
-  """Maximum underutilized duration in seconds."""
   maxUnderutilizedDurationSeconds: Int!
-
-  """Preset-backed utilization threshold."""
   threshold: UtilizationIdleCheckerThreshold!
 }
 
@@ -23085,10 +22927,7 @@ input UtilizationIdleCheckerSpecInput
 type UtilizationIdleCheckerThreshold
   @join__type(graph: STRAWBERRY)
 {
-  """Prometheus query preset ID."""
   presetId: UUID!
-
-  """Underutilization threshold."""
   threshold: Decimal!
 
   """Added in 26.9.0. Label filters injected into the preset query."""
@@ -23164,7 +23003,7 @@ input ValidateNotificationChannelInput
 type ValidateNotificationChannelPayload
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the validated notification channel."""
+  """ID of the validated notification channel"""
   id: UUID!
 }
 
@@ -23238,14 +23077,7 @@ Added in 26.4.2. Access control information for a virtual folder. Includes the m
 type VFolderAccessControlInfo
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Mount permission level: READ_ONLY (ro), READ_WRITE (rw), or RW_DELETE (wd).
-  """
   permission: VFolderMountPermission!
-
-  """
-  Ownership type: USER (personal folder) or GROUP (project-shared folder).
-  """
   ownershipType: VFolderOwnershipType!
 }
 
@@ -23280,22 +23112,22 @@ type VFolderEdge
 type VFolderFileEntryV2
   @join__type(graph: STRAWBERRY)
 {
-  """File or directory name."""
+  """File or directory name"""
   name: String!
 
-  """Entry type (FILE, DIRECTORY, SYMLINK)."""
+  """Entry type"""
   type: String!
 
-  """File size in bytes."""
+  """File size in bytes"""
   size: Int!
 
-  """POSIX file permission mode."""
+  """POSIX file permission mode (e.g., 33188 for 0o100644)"""
   mode: Int!
 
-  """Creation timestamp."""
+  """Creation timestamp"""
   createdAt: String!
 
-  """Last modification timestamp."""
+  """Last modification timestamp"""
   updatedAt: String!
 }
 
@@ -23322,10 +23154,10 @@ Added in 26.2.0. Storage host permission configuration. Defines what operations 
 type VFolderHostPermissionEntry
   @join__type(graph: STRAWBERRY)
 {
-  """Storage host identifier (e.g., 'default', 'storage-01')."""
+  """Virtual folder host name (e.g., 'default', 'nfs-vol1')."""
   host: String!
 
-  """List of permissions granted for this host."""
+  """List of permission values (e.g., 'mount-in-session', 'upload-file')."""
   permissions: [VFolderHostPermissionV2!]!
 }
 
@@ -23362,26 +23194,11 @@ Added in 26.4.2. Descriptive metadata for a virtual folder. Includes the folder 
 type VFolderMetadataInfo
   @join__type(graph: STRAWBERRY)
 {
-  """Display name of the virtual folder."""
   name: String!
-
-  """
-  Usage mode: GENERAL (normal), MODEL (shared models), or DATA (shared datasets).
-  """
   usageMode: VFolderUsageMode!
-
-  """Quota scope identifier that governs storage limits for this folder."""
   quotaScopeId: String
-
-  """Timestamp when the virtual folder was created."""
   createdAt: DateTime!
-
-  """
-  Timestamp of the most recent access. Null if never accessed after creation.
-  """
   lastUsed: DateTime
-
-  """Whether this virtual folder can be cloned by other users."""
   cloneable: Boolean!
 }
 
@@ -23463,21 +23280,9 @@ type VFolderOwnershipInfo
 
   """The user who originally created this virtual folder."""
   creator: UserV2
-
-  """
-  UUID of the user who owns this virtual folder. Null for project-owned folders.
-  """
   userId: UUID
-
-  """
-  UUID of the project that owns this virtual folder. Null for user-owned folders.
-  """
   projectId: UUID
-
-  """UUID of the user who originally created this virtual folder."""
   creatorId: UUID
-
-  """Email of the user who originally created this virtual folder."""
   creatorEmail: String
 }
 
@@ -23499,12 +23304,7 @@ scalar VFolderPermissionValueField
 type VFolderQuotaInfo
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Capacity quota limit in bytes with human-readable display. Null if unlimited.
-  """
   maxSize: BinarySizeInfo
-
-  """File-count quota for the folder."""
   maxFiles: Int!
 }
 
@@ -23514,14 +23314,7 @@ Added in 26.4.4. Usage statistics for a virtual folder, measured live through th
 type VFolderUsageInfo
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Number of files currently stored in the folder, measured live through the storage proxy.
-  """
   numFiles: Int!
-
-  """
-  Current used capacity in bytes with human-readable display, measured live through the storage proxy.
-  """
   usedBytes: BinarySizeInfo!
 }
 
