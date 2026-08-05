@@ -23,6 +23,7 @@ from ai.backend.manager.errors.confidential import (
 )
 from ai.backend.manager.metrics.confidential import ConfidentialMetricObserver
 from ai.backend.manager.models.confidential.row import (
+    ConfidentialAttestedGuestRow,
     ConfidentialDecisionRow,
     ConfidentialGuestClaimRow,
     ConfidentialNonceRow,
@@ -86,6 +87,11 @@ def _tee_pubkey(claims: Any) -> Any:
     return None
 
 
+def _pubkey_digest(pubkey: Any) -> str:
+    rendered = json.dumps(pubkey, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(rendered).hexdigest()
+
+
 def attested_guest(headers: dict[str, str]) -> str | None:
     for key, value in headers.items():
         if key.lower() != "authorization":
@@ -104,9 +110,13 @@ def attested_guest(headers: dict[str, str]) -> str | None:
         pubkey = _tee_pubkey(claims)
         if pubkey is None:
             continue
-        rendered = json.dumps(pubkey, sort_keys=True, separators=(",", ":")).encode("utf-8")
-        return hashlib.sha256(rendered).hexdigest()
+        return _pubkey_digest(pubkey)
     return None
+
+
+def presented_guest(evidence: Any) -> str | None:
+    pubkey = _tee_pubkey(evidence)
+    return None if pubkey is None else _pubkey_digest(pubkey)
 
 
 def rcar_session(headers: dict[str, str]) -> str | None:
@@ -276,6 +286,9 @@ class AuthorisationShim:
                 measurement=measurement,
             )
             raise
+        guest = presented_guest(evidence)
+        if status < 400 and guest is not None:
+            await self._witness(guest, opts.broker_endpoint)
         await self.record(
             actor=DecisionActor.GUEST,
             verdict=DecisionVerdict.ALLOWED if status < 400 else DecisionVerdict.DENIED,
@@ -285,6 +298,24 @@ class AuthorisationShim:
         )
         return status, payload, resp_headers
 
+    async def _witness(self, guest: str, endpoint: str) -> None:
+        async with self._db.begin_session() as db_session:
+            await db_session.execute(
+                pg_insert(ConfidentialAttestedGuestRow)
+                .values(guest=guest, endpoint=endpoint)
+                .on_conflict_do_nothing()
+            )
+
+    async def _is_witnessed(self, guest: str, endpoint: str) -> bool:
+        async with self._db.begin_readonly_session() as db_session:
+            found = await db_session.scalar(
+                sa.select(ConfidentialAttestedGuestRow.guest).where(
+                    (ConfidentialAttestedGuestRow.guest == guest)
+                    & (ConfidentialAttestedGuestRow.endpoint == endpoint)
+                )
+            )
+        return found is not None
+
     async def relay_release(
         self,
         opts: ConfidentialScalingGroupOpts,
@@ -292,7 +323,17 @@ class AuthorisationShim:
         headers: dict[str, str],
     ) -> tuple[int, bytes, dict[str, str]]:
         nonce = path_nonce(resource_path)
-        guest = rcar_session(headers) or attested_guest(headers)
+        bearer = attested_guest(headers)
+        if bearer is not None and not await self._is_witnessed(bearer, opts.broker_endpoint):
+            await self.record(
+                actor=DecisionActor.GUEST,
+                verdict=DecisionVerdict.DENIED,
+                resource_path=resource_path,
+                failing_clause="the bearer token names a guest that never attested through this shim",
+                nonce=nonce,
+            )
+            raise ShimRefusal(extra_msg="this shim never witnessed the presented token attest")
+        guest = rcar_session(headers) or bearer
         session_id: uuid.UUID | None = None
         consumed = False
         if nonce is not None:

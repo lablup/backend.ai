@@ -124,6 +124,15 @@ class ConfidentialGuestClaimRow(Base):  # type: ignore[misc]
     )
 
 
+class ConfidentialAttestedGuestRow(Base):  # type: ignore[misc]
+    __tablename__ = "confidential_attested_guests"
+    guest: Mapped[str] = mapped_column("guest", sa.String(length=128), primary_key=True)
+    endpoint: Mapped[str] = mapped_column("endpoint", sa.String(length=1024), primary_key=True)
+    witnessed_at: Mapped[datetime] = mapped_column(
+        "witnessed_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+    )
+
+
 class ConfidentialDecisionRow(Base):  # type: ignore[misc]
     __tablename__ = "confidential_decisions"
     id: Mapped[uuid.UUID] = mapped_column(
