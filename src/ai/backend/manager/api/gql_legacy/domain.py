@@ -249,7 +249,7 @@ class DomainNode(graphene.ObjectType):  # type: ignore[misc]
         graph_ctx: GraphQueryContext = info.context
         _, domain_name = AsyncNode.resolve_global_id(info, id)
         user = graph_ctx.user
-        client_ctx = ClientContext(graph_ctx.db, user["domain_name"], user["uuid"], user["role"])
+        client_ctx = ClientContext(graph_ctx.db, user.domain_name, user.uuid, user.role)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             permission_ctx = await get_permission_ctx(
                 SystemScope(), permission, ctx=client_ctx, db_session=db_session
@@ -311,7 +311,7 @@ class DomainNode(graphene.ObjectType):  # type: ignore[misc]
             last=last,
         )
         user = graph_ctx.user
-        client_ctx = ClientContext(graph_ctx.db, user["domain_name"], user["uuid"], user["role"])
+        client_ctx = ClientContext(graph_ctx.db, user.domain_name, user.uuid, user.role)
         result: list[Self] = []
         async with graph_ctx.db.begin_readonly_session() as db_session:
             permission_ctx = await get_permission_ctx(
@@ -365,7 +365,7 @@ async def _ensure_sgroup_permission(
     graph_ctx: GraphQueryContext, sgroup_names: Iterable[str], *, db_session: AsyncSession
 ) -> None:
     user = graph_ctx.user
-    client_ctx = ClientContext(graph_ctx.db, user["domain_name"], user["uuid"], user["role"])
+    client_ctx = ClientContext(graph_ctx.db, user.domain_name, user.uuid, user.role)
     sgroup_models = await get_scaling_groups(
         SystemScope(),
         ScalingGroupPermission.ASSOCIATE_WITH_SCOPES,
@@ -451,9 +451,9 @@ class CreateDomainNode(graphene.Mutation):  # type: ignore[misc]
         graph_ctx: GraphQueryContext = info.context
 
         user_info: UserInfo = UserInfo(
-            id=graph_ctx.user["uuid"],
-            role=graph_ctx.user["role"],
-            domain_name=graph_ctx.user["domain_name"],
+            id=graph_ctx.user.uuid,
+            role=graph_ctx.user.role,
+            domain_name=graph_ctx.user.domain_name,
         )
 
         scaling_group_ids: list[ResourceGroupID] | None = None
@@ -555,9 +555,9 @@ class ModifyDomainNode(graphene.Mutation):  # type: ignore[misc]
         _, domain_name = cast(ResolvedGlobalID, input["id"])
         graph_ctx: GraphQueryContext = info.context
         user_info: UserInfo = UserInfo(
-            id=graph_ctx.user["uuid"],
-            role=graph_ctx.user["role"],
-            domain_name=graph_ctx.user["domain_name"],
+            id=graph_ctx.user.uuid,
+            role=graph_ctx.user.role,
+            domain_name=graph_ctx.user.domain_name,
         )
         sgroup_ids_to_add: set[ResourceGroupID] | None = None
         if input.sgroups_to_add is not Undefined and input.sgroups_to_add is not None:
@@ -774,9 +774,9 @@ class CreateDomain(graphene.Mutation):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
 
         user_info: UserInfo = UserInfo(
-            id=ctx.user["uuid"],
-            role=ctx.user["role"],
-            domain_name=ctx.user["domain_name"],
+            id=ctx.user.uuid,
+            role=ctx.user.role,
+            domain_name=ctx.user.domain_name,
         )
 
         action: CreateDomainAction = props.to_action(name, user_info)
@@ -810,9 +810,9 @@ class ModifyDomain(graphene.Mutation):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
 
         user_info: UserInfo = UserInfo(
-            id=ctx.user["uuid"],
-            role=ctx.user["role"],
-            domain_name=ctx.user["domain_name"],
+            id=ctx.user.uuid,
+            role=ctx.user.role,
+            domain_name=ctx.user.domain_name,
         )
 
         action = props.to_action(name, user_info)
@@ -842,9 +842,9 @@ class DeleteDomain(graphene.Mutation):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
 
         user_info: UserInfo = UserInfo(
-            id=ctx.user["uuid"],
-            role=ctx.user["role"],
-            domain_name=ctx.user["domain_name"],
+            id=ctx.user.uuid,
+            role=ctx.user.role,
+            domain_name=ctx.user.domain_name,
         )
 
         action = DeleteDomainAction(name, user_info)
@@ -873,9 +873,9 @@ class PurgeDomain(graphene.Mutation):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
 
         user_info: UserInfo = UserInfo(
-            id=ctx.user["uuid"],
-            role=ctx.user["role"],
-            domain_name=ctx.user["domain_name"],
+            id=ctx.user.uuid,
+            role=ctx.user.role,
+            domain_name=ctx.user.domain_name,
         )
 
         action = PurgeDomainAction(name, user_info)

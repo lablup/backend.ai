@@ -11,7 +11,11 @@ from unittest.mock import AsyncMock, MagicMock
 import graphene
 import pytest
 
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.api.gql_legacy.schema import Query
+from ai.backend.manager.data.auth.types import AuthenticatedUser
+from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.user import UserRole
 
@@ -23,12 +27,17 @@ class TestAgentSummaryHideAgents:
     def mock_info_with_hide_agents_true(self, request: pytest.FixtureRequest) -> MagicMock:
         role: UserRole = request.param
         ctx = MagicMock()
-        ctx.user = {
-            "role": role,
-            "domain_name": "default",
-            "uuid": uuid.uuid4(),
-            "email": "test@test.com",
-        }
+        ctx.user = AuthenticatedUser(
+            uuid=UserID(uuid.uuid4()),
+            email="test@test.com",
+            role=role,
+            domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
+            sudo_session_enabled=False,
+            main_access_key=None,
+            allowed_client_ip=None,
+            resource_policy=UserResourcePolicyData(name="default"),
+        )
         ctx.access_key = "TESTKEY"
         ctx.config_provider.config.manager.hide_agents = True
         info = MagicMock(spec=graphene.ResolveInfo)
@@ -39,12 +48,17 @@ class TestAgentSummaryHideAgents:
     def mock_info_with_hide_agents_false(self, request: pytest.FixtureRequest) -> MagicMock:
         role: UserRole = request.param
         ctx = MagicMock()
-        ctx.user = {
-            "role": role,
-            "domain_name": "default",
-            "uuid": uuid.uuid4(),
-            "email": "test@test.com",
-        }
+        ctx.user = AuthenticatedUser(
+            uuid=UserID(uuid.uuid4()),
+            email="test@test.com",
+            role=role,
+            domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
+            sudo_session_enabled=False,
+            main_access_key=None,
+            allowed_client_ip=None,
+            resource_policy=UserResourcePolicyData(name="default"),
+        )
         ctx.access_key = "TESTKEY"
         ctx.config_provider.config.manager.hide_agents = False
         info = MagicMock(spec=graphene.ResolveInfo)

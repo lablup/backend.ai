@@ -678,8 +678,8 @@ class User(graphene.ObjectType):  # type: ignore[misc]
             query = query.where(
                 user_scope_membership_exists(PROJECT_SCOPE_TYPE, group_id, users.c.uuid)
             )
-        if ctx.user["role"] != UserRole.SUPERADMIN:
-            query = query.where(users.c.domain_name == ctx.user["domain_name"])
+        if ctx.user.role != UserRole.SUPERADMIN:
+            query = query.where(users.c.domain_name == ctx.user.domain_name)
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if status is not None:
@@ -1238,8 +1238,8 @@ class PurgeUser(graphene.Mutation):  # type: ignore[misc]
     ) -> PurgeUser:
         graph_ctx: GraphQueryContext = info.context
         user_info_ctx = UserInfoContext(
-            uuid=graph_ctx.user["uuid"],
-            email=graph_ctx.user["email"],
+            uuid=graph_ctx.user.uuid,
+            email=graph_ctx.user.email,
         )
         action = props.to_action(email, user_info_ctx)
         user_data = await graph_ctx.user_repository.get_by_email_validated(email)

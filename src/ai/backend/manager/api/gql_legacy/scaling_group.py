@@ -442,7 +442,7 @@ class ScalingGroup(graphene.ObjectType):  # type: ignore[misc]
             .where(
                 sa.and_(
                     ResourceAllocationRow.free_at.is_(None),
-                    KernelRow.user_uuid == user["uuid"],
+                    KernelRow.user_uuid == user.uuid,
                     AgentRow.scaling_group == self.name,
                 )
             )

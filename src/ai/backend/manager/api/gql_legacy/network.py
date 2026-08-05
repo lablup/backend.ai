@@ -186,14 +186,14 @@ class NetworkNode(graphene.ObjectType):  # type: ignore[misc]
         )
         async with graph_ctx.db.begin_readonly_session() as db_session:
             additional_cond: sa.ColumnElement[bool]
-            match graph_ctx.user["role"]:
+            match graph_ctx.user.role:
                 case UserRole.SUPERADMIN:
                     additional_cond = sa.true()
                 case UserRole.ADMIN:
-                    additional_cond = NetworkRow.domain_name == graph_ctx.user["domain_name"]
+                    additional_cond = NetworkRow.domain_name == graph_ctx.user.domain_name
                 case UserRole.USER:
                     project_query = sa.select(AssocGroupUserRow).where(
-                        AssocGroupUserRow.user_id == graph_ctx.user["uuid"]
+                        AssocGroupUserRow.user_id == graph_ctx.user.uuid
                     )
                     available_projects = (await db_session.execute(project_query)).scalars().all()
                     additional_cond = NetworkRow.project.in_([
@@ -258,8 +258,8 @@ class CreateNetwork(graphene.Mutation):  # type: ignore[misc]
                 raise ObjectNotFound(object_name="project") from e
 
             if (
-                graph_ctx.user["role"] != UserRole.SUPERADMIN
-                and project.domain_name != graph_ctx.user["domain_name"]
+                graph_ctx.user.role != UserRole.SUPERADMIN
+                and project.domain_name != graph_ctx.user.domain_name
             ):
                 raise GenericForbidden
             query = sa.select(sa.func.count("*")).where(NetworkRow.project == project.id)
@@ -352,8 +352,8 @@ class ModifyNetwork(graphene.Mutation):  # type: ignore[misc]
                 raise ObjectNotFound(object_name="network") from e
 
             if (
-                graph_ctx.user["role"] != UserRole.SUPERADMIN
-                and row.project_row.domain_name != graph_ctx.user["domain_name"]
+                graph_ctx.user.role != UserRole.SUPERADMIN
+                and row.project_row.domain_name != graph_ctx.user.domain_name
             ):
                 raise GenericForbidden
 
@@ -400,8 +400,8 @@ class DeleteNetwork(graphene.Mutation):  # type: ignore[misc]
                 raise ObjectNotFound(object_name="network") from e
 
             if (
-                graph_ctx.user["role"] != UserRole.SUPERADMIN
-                and row.project_row.domain_name != graph_ctx.user["domain_name"]
+                graph_ctx.user.role != UserRole.SUPERADMIN
+                and row.project_row.domain_name != graph_ctx.user.domain_name
             ):
                 raise GenericForbidden
 

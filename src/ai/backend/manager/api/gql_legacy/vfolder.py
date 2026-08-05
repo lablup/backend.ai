@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import logging
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
@@ -296,9 +297,7 @@ class VirtualFolderNode(graphene.ObjectType):  # type: ignore[misc]
             scope_id = SystemScope()
         async with graph_ctx.db.connect() as db_conn:
             user = graph_ctx.user
-            client_ctx = ClientContext(
-                graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
-            )
+            client_ctx = ClientContext(graph_ctx.db, user.domain_name, user.uuid, user.role)
             permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope_id, permission)
             cond = permission_ctx.query_condition
             if cond is None:
@@ -418,9 +417,7 @@ class VirtualFolderNode(graphene.ObjectType):  # type: ignore[misc]
         )
         async with graph_ctx.db.connect() as db_conn:
             user = graph_ctx.user
-            client_ctx = ClientContext(
-                graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
-            )
+            client_ctx = ClientContext(graph_ctx.db, user.domain_name, user.uuid, user.role)
             permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope_id, permission)
             cond = permission_ctx.query_condition
             if cond is None:
@@ -607,8 +604,8 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
                 repr(e),
             )
             if (
-                graph_ctx.user["role"] in (UserRole.SUPERADMIN, UserRole.ADMIN)
-                or vfolder_row.creator == graph_ctx.user["email"]
+                graph_ctx.user.role in (UserRole.SUPERADMIN, UserRole.ADMIN)
+                or vfolder_row.creator == graph_ctx.user.email
             ):
                 return cls(
                     id=vfolder_row.id,
@@ -769,7 +766,7 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
                     await db_session.execute(
                         sa.select(GroupRow.id).where(
                             (GroupRow.type == ProjectType.MODEL_STORE)
-                            & (GroupRow.domain_name == graph_ctx.user["domain_name"])
+                            & (GroupRow.domain_name == graph_ctx.user.domain_name)
                         )
                     )
                 )
@@ -1459,7 +1456,9 @@ class QuotaScope(graphene.ObjectType):  # type: ignore[misc]
         except QuotaScopeNotFoundError as e:
             qsid = QuotaScopeID.parse(self.quota_scope_id)
             async with graph_ctx.db.begin_readonly_session() as sess:
-                await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)
+                await ensure_quota_scope_accessible_by_user(
+                    sess, qsid, dataclasses.asdict(graph_ctx.user)
+                )
                 if qsid.scope_type == QuotaScopeType.USER:
                     user_query = (
                         sa.select(UserRow)
@@ -1525,7 +1524,9 @@ class SetQuotaScope(graphene.Mutation):  # type: ignore[misc]
         qsid = QuotaScopeID.parse(quota_scope_id)
         graph_ctx: GraphQueryContext = info.context
         async with graph_ctx.db.begin_readonly_session() as sess:
-            await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)
+            await ensure_quota_scope_accessible_by_user(
+                sess, qsid, dataclasses.asdict(graph_ctx.user)
+            )
         if props.hard_limit_bytes is Undefined:
             # Do nothing but just return the quota scope object.
             return cls(
@@ -1574,7 +1575,9 @@ class UnsetQuotaScope(graphene.Mutation):  # type: ignore[misc]
         graph_ctx: GraphQueryContext = info.context
         proxy_name, volume_name = graph_ctx.storage_manager.get_proxy_and_volume(storage_host_name)
         async with graph_ctx.db.begin_readonly_session() as sess:
-            await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)
+            await ensure_quota_scope_accessible_by_user(
+                sess, qsid, dataclasses.asdict(graph_ctx.user)
+            )
         manager_client = graph_ctx.storage_manager.get_manager_facing_client(proxy_name)
         await manager_client.delete_quota_scope_quota(volume_name, str(qsid))
 

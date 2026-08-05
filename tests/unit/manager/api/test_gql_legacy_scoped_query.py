@@ -12,7 +12,11 @@ from unittest.mock import MagicMock
 import graphene
 import pytest
 
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.api.gql_legacy.base import scoped_query
+from ai.backend.manager.data.auth.types import AuthenticatedUser
+from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.models.user import UserRole
 
 
@@ -23,7 +27,17 @@ class TestScopedQuery:
     def mock_graphene_info(self) -> MagicMock:
         """Mock GraphQL ResolveInfo with SUPERADMIN context."""
         ctx = MagicMock()
-        ctx.user = {"role": UserRole.SUPERADMIN, "domain_name": "default", "uuid": uuid.uuid4()}
+        ctx.user = AuthenticatedUser(
+            uuid=UserID(uuid.uuid4()),
+            email="admin@example.com",
+            role=UserRole.SUPERADMIN,
+            domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
+            sudo_session_enabled=False,
+            main_access_key=None,
+            allowed_client_ip=None,
+            resource_policy=UserResourcePolicyData(name="default"),
+        )
         ctx.access_key = "test-key"
         info = MagicMock(spec=graphene.ResolveInfo)
         info.context = ctx

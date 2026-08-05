@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import logging
 import time
 import uuid
@@ -102,6 +103,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.repositories.user.repository import UserRepository
 
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.manager.data.auth.types import AuthenticatedUser
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.image.types import ImageStatus
 from ai.backend.manager.data.permission.permission_defs import (
@@ -311,7 +313,7 @@ class GraphQueryContext:
     dataloader_manager: DataLoaderManager[Any, Any, Any]
     config_provider: ManagerConfigProvider
     etcd: AsyncEtcd
-    user: Mapping[str, Any]  # TODO: express using typed dict
+    user: AuthenticatedUser
     access_key: str
     db: ExtendedAsyncSAEngine
     network_plugin_ctx: NetworkPluginContext
@@ -1331,10 +1333,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         scaling_group: str | None = None,
     ) -> AgentSummary:
         ctx: GraphQueryContext = info.context
-        if (
-            ctx.config_provider.config.manager.hide_agents
-            and ctx.user["role"] != UserRole.SUPERADMIN
-        ):
+        if ctx.config_provider.config.manager.hide_agents and ctx.user.role != UserRole.SUPERADMIN:
             raise ObjectNotFound(object_name="agent")
 
         loader = ctx.dataloader_manager.get_loader_by_func(
@@ -1363,10 +1362,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         status: str | None = None,
     ) -> AgentSummaryList:
         ctx: GraphQueryContext = info.context
-        if (
-            ctx.config_provider.config.manager.hide_agents
-            and ctx.user["role"] != UserRole.SUPERADMIN
-        ):
+        if ctx.config_provider.config.manager.hide_agents and ctx.user.role != UserRole.SUPERADMIN:
             raise ObjectNotFound(object_name="agent")
 
         total_count = await AgentSummary.load_count(
@@ -1461,9 +1457,9 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         name: str | None = None,
     ) -> Domain:
         ctx: GraphQueryContext = info.context
-        name = ctx.user["domain_name"] if name is None else name
-        if ctx.user["role"] != UserRole.SUPERADMIN:
-            if name != ctx.user["domain_name"]:
+        name = ctx.user.domain_name if name is None else name
+        if ctx.user.role != UserRole.SUPERADMIN:
+            if name != ctx.user.domain_name:
                 # prevent querying other domains if not superadmin
                 raise ObjectNotFound(object_name="domain")
         loader = ctx.dataloader_manager.get_loader(ctx, "Domain.by_name")
@@ -1577,9 +1573,9 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         if type is None:
             type = [ProjectType.GENERAL.name]
         ctx: GraphQueryContext = info.context
-        client_role = ctx.user["role"]
-        client_domain = ctx.user["domain_name"]
-        client_user_id = ctx.user["uuid"]
+        client_role = ctx.user.role
+        client_domain = ctx.user.domain_name
+        client_user_id = ctx.user.uuid
         if client_role == UserRole.SUPERADMIN:
             loader = ctx.dataloader_manager.get_loader(
                 ctx,
@@ -1629,9 +1625,9 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
     ) -> Sequence[Group]:
         ctx: GraphQueryContext = info.context
-        client_role = ctx.user["role"]
-        client_domain = ctx.user["domain_name"]
-        client_user_id = ctx.user["uuid"]
+        client_role = ctx.user.role
+        client_domain = ctx.user.domain_name
+        client_user_id = ctx.user.uuid
         if client_role == UserRole.SUPERADMIN:
             loader = ctx.dataloader_manager.get_loader(
                 ctx,
@@ -1680,9 +1676,9 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         if type is None:
             type = [ProjectType.GENERAL.name]
         ctx: GraphQueryContext = info.context
-        client_role = ctx.user["role"]
-        client_domain = ctx.user["domain_name"]
-        client_user_id = ctx.user["uuid"]
+        client_role = ctx.user.role
+        client_domain = ctx.user.domain_name
+        client_user_id = ctx.user.uuid
         if client_role == UserRole.SUPERADMIN:
             pass
         elif client_role == UserRole.ADMIN:
@@ -1716,8 +1712,8 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
     ) -> Image:
         """Loads image information by its ID or reference information. Either ID or reference/architecture pair must be provided."""
         ctx: GraphQueryContext = info.context
-        client_role = ctx.user["role"]
-        client_domain = ctx.user["domain_name"]
+        client_role = ctx.user.role
+        client_domain = ctx.user.domain_name
         if id:
             item = await Image.load_item_by_id(info.context, uuid.UUID(id), filter_by_statuses=None)
         else:
@@ -1744,8 +1740,8 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         info: graphene.ResolveInfo,
     ) -> Sequence[ImageNode]:
         ctx: GraphQueryContext = info.context
-        client_role = ctx.user["role"]
-        client_domain = ctx.user["domain_name"]
+        client_role = ctx.user.role
+        client_domain = ctx.user.domain_name
         items = await Image.load_all(
             ctx,
             types={ImageLoadFilter.CUSTOMIZED},
@@ -1782,8 +1778,8 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
         ctx: GraphQueryContext = info.context
-        client_role = ctx.user["role"]
-        client_domain = ctx.user["domain_name"]
+        client_role = ctx.user.role
+        client_domain = ctx.user.domain_name
         image_load_types: set[ImageLoadFilter] = set()
         _types = load_filters or image_filters
         if _types is not None:
@@ -1882,8 +1878,8 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         from ai.backend.common.data.user.types import UserRole
 
         ctx: GraphQueryContext = info.context
-        client_role = ctx.user["role"]
-        client_domain = ctx.user["domain_name"]
+        client_role = ctx.user.role
+        client_domain = ctx.user.domain_name
         if client_role == UserRole.SUPERADMIN:
             pass
         elif client_role == UserRole.ADMIN:
@@ -1921,8 +1917,8 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         from ai.backend.common.data.user.types import UserRole
 
         ctx: GraphQueryContext = info.context
-        client_role = ctx.user["role"]
-        client_domain = ctx.user["domain_name"]
+        client_role = ctx.user.role
+        client_domain = ctx.user.domain_name
         if client_role == UserRole.SUPERADMIN:
             pass
         elif client_role == UserRole.ADMIN:
@@ -2134,7 +2130,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         info: graphene.ResolveInfo,
     ) -> Sequence[KeyPairResourcePolicy]:
         ctx: GraphQueryContext = info.context
-        client_role = ctx.user["role"]
+        client_role = ctx.user.role
         client_access_key = ctx.access_key
         if client_role == UserRole.SUPERADMIN:
             return await KeyPairResourcePolicy.load_all(info.context)
@@ -2155,7 +2151,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         name: str | None = None,
     ) -> UserResourcePolicy:
         ctx: GraphQueryContext = info.context
-        user_uuid = ctx.user["uuid"]
+        user_uuid = ctx.user.uuid
         if name is None:
             loader = ctx.dataloader_manager.get_loader(
                 ctx,
@@ -2174,8 +2170,8 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         info: graphene.ResolveInfo,
     ) -> Sequence[UserResourcePolicy]:
         ctx: GraphQueryContext = info.context
-        client_role = ctx.user["role"]
-        user_uuid = ctx.user["uuid"]
+        client_role = ctx.user.role
+        user_uuid = ctx.user.uuid
         if client_role == UserRole.SUPERADMIN:
             return await UserResourcePolicy.load_all(info.context)
         if client_role == UserRole.ADMIN:
@@ -2207,7 +2203,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         info: graphene.ResolveInfo,
     ) -> Sequence[ProjectResourcePolicy]:
         ctx: GraphQueryContext = info.context
-        client_role = ctx.user["role"]
+        client_role = ctx.user.role
         if client_role == UserRole.SUPERADMIN:
             return await ProjectResourcePolicy.load_all(info.context)
         if client_role == UserRole.ADMIN:
@@ -2280,7 +2276,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         access_key: AccessKey,
     ) -> Sequence[ScalingGroup]:
         ctx: GraphQueryContext = info.context
-        domain_name = domain_name or ctx.user["domain_name"]
+        domain_name = domain_name or ctx.user.domain_name
         async with ctx.db.begin() as db_conn:
             sgroup_rows = await query_allowed_sgroups(
                 db_conn, domain_name, ProjectID(project_id), access_key
@@ -2466,7 +2462,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         total_count = await VirtualFolder.load_count(
             info.context,
             domain_name=domain_name,  # scope
-            user_id=info.context.user["uuid"],  # scope
+            user_id=info.context.user.uuid,  # scope
             filter=filter,
         )
         items = await VirtualFolder.load_slice(
@@ -2474,7 +2470,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             limit,
             offset,
             domain_name=domain_name,  # scopes
-            user_id=info.context.user["uuid"],  # scope
+            user_id=info.context.user.uuid,  # scope
             filter=filter,
             order=order,
         )
@@ -2496,7 +2492,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         total_count = await VirtualFolder.load_count_invited(
             info.context,
             domain_name=domain_name,  # scope
-            user_id=info.context.user["uuid"],  # scope
+            user_id=info.context.user.uuid,  # scope
             filter=filter,
         )
         items = await VirtualFolder.load_slice_invited(
@@ -2504,7 +2500,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             limit,
             offset,
             domain_name=domain_name,  # scopes
-            user_id=info.context.user["uuid"],  # scope
+            user_id=info.context.user.uuid,  # scope
             filter=filter,
             order=order,
         )
@@ -2526,7 +2522,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         total_count = await VirtualFolder.load_count_project(
             info.context,
             domain_name=domain_name,  # scope
-            user_id=info.context.user["uuid"],  # scope
+            user_id=info.context.user.uuid,  # scope
             filter=filter,
         )
         items = await VirtualFolder.load_slice_project(
@@ -2534,7 +2530,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             limit,
             offset,
             domain_name=domain_name,  # scopes
-            user_id=info.context.user["uuid"],  # scope
+            user_id=info.context.user.uuid,  # scope
             filter=filter,
             order=order,
         )
@@ -3057,7 +3053,9 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         else:
             raise ValueError(f"storage volume {storage_host_name} does not exist")
         async with graph_ctx.db.begin_readonly_session() as sess:
-            await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)
+            await ensure_quota_scope_accessible_by_user(
+                sess, qsid, dataclasses.asdict(graph_ctx.user)
+            )
             return QuotaScope(
                 quota_scope_id=quota_scope_id,
                 storage_host_name=storage_host_name,
@@ -3300,8 +3298,8 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
     ) -> UserUtilizationMetric:
         graph_ctx = cast(GraphQueryContext, info.context)
         user = graph_ctx.user
-        if user["role"] not in (UserRole.SUPERADMIN, UserRole.MONITOR):
-            if user["uuid"] != user_id:
+        if user.role not in (UserRole.SUPERADMIN, UserRole.MONITOR):
+            if user.uuid != user_id:
                 raise RuntimeError("Permission denied.")
         return await UserUtilizationMetric.get_object(
             info,
@@ -3329,7 +3327,7 @@ class GQLMutationPrivilegeCheckMiddleware:
             mutation_cls = mutation_field.type
             # default is allow nobody.
             allowed_roles = getattr(mutation_cls, "allowed_roles", [])
-            if graph_ctx.user["role"] not in allowed_roles:
+            if graph_ctx.user.role not in allowed_roles:
                 if _is_legacy_mutation(mutation_cls):
                     return mutation_cls(False, f"no permission to execute {info.path.key}")  # type: ignore
                 raise PermissionDeniedError()
