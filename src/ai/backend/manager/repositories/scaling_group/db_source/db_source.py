@@ -848,7 +848,7 @@ class ScalingGroupDBSource:
                     BatchPurger(
                         spec=ProjectsForResourceGroupPurgerSpec(
                             resource_group_id=resource_group_id,
-                            projects=list(remove),
+                            project_ids=[ProjectID(project_id) for project_id in remove],
                         )
                     )
                 )

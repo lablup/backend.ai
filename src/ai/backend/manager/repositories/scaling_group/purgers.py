@@ -9,6 +9,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.permission.types import RBACElementRef
@@ -354,14 +355,14 @@ class ProjectsForResourceGroupPurgerSpec(BatchPurgerSpec[ScalingGroupForProjectR
     """PurgerSpec for disassociating multiple projects from a scaling group."""
 
     resource_group_id: ResourceGroupID
-    projects: list[UUID]
+    project_ids: list[ProjectID]
 
     @override
     def build_subquery(self) -> sa.sql.Select[tuple[ScalingGroupForProjectRow]]:
         return sa.select(ScalingGroupForProjectRow).where(
             sa.and_(
                 ScalingGroupForProjectRow.resource_group_id == self.resource_group_id,
-                ScalingGroupForProjectRow.group.in_(self.projects),
+                ScalingGroupForProjectRow.group.in_(self.project_ids),
             )
         )
 
