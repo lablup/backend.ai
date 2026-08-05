@@ -1763,6 +1763,8 @@ class AgentRegistry:
                 if kernel_id is not None
                 else session.main_kernel
             )
+            if (channel := await self._confidential(kernel.id)) is not None:
+                return str((await channel.get_logs(kernel.id))["logs"])
             if kernel.agent is None:
                 raise InstanceNotFound(
                     "Kernel has not been assigned to an agent.", extra_data={"kernel_id": kernel_id}
