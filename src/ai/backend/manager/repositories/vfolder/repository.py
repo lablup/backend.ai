@@ -1214,6 +1214,7 @@ class VfolderRepository:
             group=row.group,
             cloneable=row.cloneable,
             status=row.status,
+            encryption_tier=row.encryption_tier,
         )
 
     @vfolder_repository_resilience.apply()
