@@ -585,6 +585,24 @@ class CocoAgent(AbstractAgent[CocoKernel, CocoKernelCreationContext]):
         await self.relay.start()
         self._metering_task = asyncio.create_task(self._report_activity())
         await super().__ainit__()
+        await self._reclaim_orphans()
+
+    async def _reclaim_orphans(self) -> None:
+        live: set[KernelId] = set()
+        for entry in await self.runtime.inspect(await self.runtime.list_ids({})):
+            raw = ((entry.get("Config") or {}).get("Labels") or {}).get(LabelName.KERNEL_ID)
+            if raw:
+                live.add(KernelId(UUID(raw)))
+        dropped = [
+            *await self.network_manager.reclaim(live),
+            *await self.volumes.reclaim(live),
+        ]
+        if dropped:
+            log.warning(
+                "reclaimed {} confidential resources whose kernels left no container: {}",
+                len(dropped),
+                dropped,
+            )
 
     async def _resolve_circuit(self, kernel_id: str, port: int) -> Circuit:
         kernel_obj = self.kernel_registry.get(KernelId(UUID(kernel_id)))
@@ -840,7 +858,7 @@ class CocoAgent(AbstractAgent[CocoKernel, CocoKernelCreationContext]):
             await self.runtime.delete(str(container_id), force=True)
         await self.volumes.release(kernel_id)
         self.relay.forget(str(kernel_id))
-        if restarting or session_id is None:
+        if restarting:
             return
         await self.network_manager.destroy(kernel_id, session_id)
 

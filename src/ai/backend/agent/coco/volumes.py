@@ -1,5 +1,7 @@
 import asyncio
 import os
+import time
+from collections.abc import Collection
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -27,12 +29,12 @@ def _allocate(backing: Path, size: int) -> None:
     backing.chmod(0o600)
 
 
-async def _run(*argv: str) -> str:
+async def _run(*argv: str, check: bool = True) -> str:
     process = await asyncio.create_subprocess_exec(
         *argv, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
     )
     out, err = await process.communicate()
-    if process.returncode != 0:
+    if check and process.returncode != 0:
         raise BlockVolumeUnavailable(extra_msg=f"{argv[0]}: {err.decode().strip()}")
     return out.decode().strip()
 
@@ -60,14 +62,36 @@ class BlockVolumeManager:
             volumes.append(BlockVolume(backing, Path(loop), guest_path))
         return volumes
 
+    async def _release_backing(self, backing: Path) -> bool:
+        if not backing.exists():
+            return False
+        attached = await _run(
+            "losetup",
+            "--noheadings",
+            "--output",
+            "NAME",
+            "--associated",
+            str(backing),
+            check=False,
+        )
+        for loop in attached.split():
+            await _run("losetup", "--detach", loop, check=False)
+        backing.unlink(missing_ok=True)
+        return True
+
     async def release(self, kernel_id: KernelId) -> None:
         for guest_path in self._sizes:
-            backing = self._backing(kernel_id, guest_path)
-            if not backing.exists():
+            await self._release_backing(self._backing(kernel_id, guest_path))
+
+    async def reclaim(self, live: Collection[KernelId], grace: float = 900.0) -> list[str]:
+        if not self._root.is_dir():
+            return []
+        owned = tuple(str(kernel_id) for kernel_id in live)
+        cutoff = time.time() - grace
+        dropped: list[str] = []
+        for backing in sorted(self._root.glob("*.img")):
+            if backing.name.startswith(owned) or backing.stat().st_mtime > cutoff:
                 continue
-            attached = await _run(
-                "losetup", "--noheadings", "--output", "NAME", "--associated", str(backing)
-            )
-            for loop in attached.split():
-                await _run("losetup", "--detach", loop)
-            backing.unlink(missing_ok=True)
+            if await self._release_backing(backing):
+                dropped.append(backing.name)
+        return dropped

@@ -2,7 +2,8 @@ import asyncio
 import hashlib
 import ipaddress
 import logging
-from collections.abc import Sequence
+import time
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -323,24 +324,77 @@ class SessionNetworkManager:
                 extra_msg=f"connecting to {shim} from namespace {network.namespace}: {reason}"
             )
 
-    async def destroy(self, kernel_id: KernelId, session_id: SessionId) -> None:
+    async def _master_of(self, veth: str) -> str | None:
+        out = await self._run("ip", "-o", "link", "show", "dev", veth, check=False)
+        fields = out.split()
+        if "master" in fields:
+            return fields[fields.index("master") + 1]
+        return None
+
+    def _drop_resolver(self, namespace: str) -> None:
+        resolver = self._config.netns_dir / namespace
+        (resolver / "resolv.conf").unlink(missing_ok=True)
+        try:
+            resolver.rmdir()
+        except OSError:
+            pass
+
+    async def _drop_bridge(self, bridge: str) -> bool:
+        members = await self._run("ip", "-o", "link", "show", "master", bridge, check=False)
+        if members.strip():
+            return False
+        await self._remove_rules(bridge)
+        await self._run("ip", "link", "delete", bridge, check=False)
+        return True
+
+    async def _link_names(self) -> list[str]:
+        listing = await self._run("ip", "-o", "link", "show", check=False)
+        return [
+            line.split(":")[1].strip().split("@")[0]
+            for line in listing.splitlines()
+            if line.count(":") >= 2
+        ]
+
+    async def destroy(self, kernel_id: KernelId, session_id: SessionId | None) -> None:
         namespace = namespace_name(kernel_id)
-        bridge = bridge_name(self._config.agent_id, session_id)
+        veth = veth_name(kernel_id)
         async with self._lock, host_lock("netns"):
+            bridge = await self._master_of(veth)
+            if bridge is None and session_id is not None:
+                bridge = bridge_name(self._config.agent_id, session_id)
             await self._run("ip", "netns", "delete", namespace, check=False)
-            await self._run("ip", "link", "delete", veth_name(kernel_id), check=False)
+            await self._run("ip", "link", "delete", veth, check=False)
             await self._remove_rules(namespace)
-            resolver = self._config.netns_dir / namespace
-            (resolver / "resolv.conf").unlink(missing_ok=True)
-            try:
-                resolver.rmdir()
-            except OSError:
-                pass
-            members = await self._run("ip", "-o", "link", "show", "master", bridge, check=False)
-            if members.strip():
-                return
-            await self._remove_rules(bridge)
-            await self._run("ip", "link", "delete", bridge, check=False)
+            self._drop_resolver(namespace)
+            if bridge is not None:
+                await self._drop_bridge(bridge)
+
+    async def reclaim(self, live: Collection[KernelId], grace: float = 900.0) -> list[str]:
+        veths = {veth_name(kernel_id) for kernel_id in live}
+        namespaces = {namespace_name(kernel_id) for kernel_id in live}
+        cutoff = time.time() - grace
+        dropped: list[str] = []
+        async with self._lock, host_lock("netns"):
+            wired = set(Path("/var/run/netns").glob("bai-*"))
+            for name in await self._link_names():
+                if not name.startswith("baiv") or name in veths:
+                    continue
+                if any(f"baiv{entry.name[4:15]}" == name for entry in wired):
+                    continue
+                await self._run("ip", "link", "delete", name, check=False)
+                dropped.append(name)
+            for entry in sorted(wired):
+                if entry.name in namespaces or entry.stat().st_mtime > cutoff:
+                    continue
+                await self._run("ip", "link", "delete", f"baiv{entry.name[4:15]}", check=False)
+                await self._run("ip", "netns", "delete", entry.name, check=False)
+                await self._remove_rules(entry.name)
+                self._drop_resolver(entry.name)
+                dropped.append(entry.name)
+            for name in await self._link_names():
+                if name.startswith("baibr") and await self._drop_bridge(name):
+                    dropped.append(name)
+        return dropped
 
 
 def _unquote(spec: Sequence[str]) -> list[str]:
