@@ -635,6 +635,7 @@ async def query_accessible_vfolders(
         vfolders.c.cloneable,
         vfolders.c.status,
         vfolders.c.cur_size,
+        vfolders.c.encryption_tier,
         # vfolders.c.permission,
         # users.c.email,
     ]

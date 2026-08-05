@@ -1630,6 +1630,7 @@ class VfolderRepository:
             group=uuid.UUID(vfolder_dict["group"]) if vfolder_dict["group"] else None,
             cloneable=vfolder_dict["cloneable"],
             status=vfolder_dict["status"],
+            encryption_tier=vfolder_dict.get("encryption_tier"),
         )
 
     @vfolder_repository_resilience.apply()
