@@ -11,7 +11,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self, cast, override
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
 
 import strawberry
 from strawberry import Info
@@ -67,6 +67,9 @@ from ai.backend.manager.api.gql.pydantic_compat import (
 )
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.models.image.conditions import ImageAliasConditions
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.container_registry.types import ContainerRegistryGQL
 
 # =============================================================================
 # Enums
@@ -187,12 +190,6 @@ class ImageV2IdentityInfoGQL:
     canonical_name: strawberry.auto
     namespace: strawberry.auto
     architecture: strawberry.auto
-    registry: str = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
-            description="Registry hostname, including the port when the registry declares one (e.g. 'cr.backend.ai', 'localhost:5000').",
-        ),
-    )
     tag: str | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
@@ -294,10 +291,28 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
         description="Permission info for the current user. May be null.", default=None
     )
 
-    # Registry (ContainerRegistryNode connection to be added later)
     registry_id: uuid.UUID = gql_field(
         description="UUID of the container registry where this image is stored."
     )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Container registry this image is served from. Returns null if the registry has been removed.",
+        )
+    )  # type: ignore[misc]
+    async def registry(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            ContainerRegistryGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.container_registry.types"),
+        ]
+        | None
+    ):
+        """Get the container registry this image belongs to."""
+        return await info.context.data_loaders.container_registry_loader.load(self.registry_id)
 
     @gql_added_field(
         BackendAIGQLMeta(
