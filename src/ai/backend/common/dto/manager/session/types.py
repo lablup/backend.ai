@@ -10,7 +10,14 @@ from __future__ import annotations
 from typing import Annotated, Any
 from uuid import UUID
 
-from pydantic import AliasChoices, ConfigDict, Field, GetCoreSchemaHandler, GetJsonSchemaHandler
+from pydantic import (
+    AliasChoices,
+    ConfigDict,
+    Field,
+    GetCoreSchemaHandler,
+    GetJsonSchemaHandler,
+    model_validator,
+)
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import core_schema
 
@@ -142,6 +149,21 @@ class ResourceOpts(BaseFieldModel):
     shmem: BinarySizeField | None = None
     allow_fractional_resource_fragmentation: bool | None = None
     model_config = ConfigDict(extra="allow")
+
+    @model_validator(mode="after")
+    def refuse_metadata_egress(self) -> "ResourceOpts":
+        named = sorted(
+            key
+            for key in (self.model_extra or {})
+            if key.replace("-", "_") == "metadata_egress_allowlist"
+        )
+        if named:
+            raise ValueError(
+                f"{', '.join(named)} names an egress control that no launch option carries;"
+                " metadata egress is fixed by the agent configuration and the measured guest"
+                " image, so accepting this would be accepting an option nothing honours"
+            )
+        return self
 
 
 class MountOption(BaseFieldModel):
