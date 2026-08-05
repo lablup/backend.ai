@@ -137,7 +137,7 @@ def update(scope_type: str, scope_id: uuid.UUID | None, items: str) -> None:
     run_async(_run)
 
 
-@app_config_fragment.command(name="bulk-purge-by-names")
+@app_config_fragment.command(name="purge-by-names")
 @click.option(
     "--scope-type",
     required=True,
@@ -151,7 +151,7 @@ def update(scope_type: str, scope_id: uuid.UUID | None, items: str) -> None:
     help="Domain id or user id; omit for the public scope.",
 )
 @click.argument("config_names", nargs=-1, required=True)
-def bulk_purge_by_names(
+def purge_by_names(
     scope_type: str, scope_id: uuid.UUID | None, config_names: tuple[str, ...]
 ) -> None:
     """Purge one scope's fragments for CONFIG_NAMES, all-or-nothing.
