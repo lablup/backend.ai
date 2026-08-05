@@ -17,7 +17,7 @@ from ai.backend.common.exception import (
     FailedToGetMetric,
     PrometheusConnectionError,
 )
-from ai.backend.common.types import KernelId, SessionId
+from ai.backend.common.types import KernelId
 from ai.backend.manager.clients.prometheus.fixed_query_builder import (
     ContainerLiveStatQueryBuilder,
     ContainerMetricQueryBuilder,
@@ -29,7 +29,7 @@ from ai.backend.manager.clients.prometheus.metric_types import (
     KernelLiveStatBatchResult,
     MetricResultValue,
 )
-from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset, regex_union
+from ai.backend.manager.clients.prometheus.preset import MetricPreset
 
 DEFAULT_TIMEOUT_SECONDS: float = 30.0
 
@@ -121,25 +121,6 @@ class PrometheusClient:
             preset=preset,
             time_range=time_range,
         )
-
-    async def fetch_session_utilization(
-        self,
-        *,
-        query_template: str,
-        time_window: str,
-        session_ids: Sequence[SessionId],
-        evaluation_time: str,
-    ) -> PrometheusResponse:
-        session_id_pattern = regex_union([
-            str(session_id) for session_id in dict.fromkeys(session_ids)
-        ])
-        preset = MetricPreset(
-            template=query_template,
-            labels={"session_id": LabelMatcher.regex(session_id_pattern)},
-            group_by={"session_id"},
-            window=time_window,
-        )
-        return await self._query_instant(preset, time=evaluation_time)
 
     async def preview_query_template(
         self,

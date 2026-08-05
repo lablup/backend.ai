@@ -15,5 +15,6 @@ class MetricRepositories:
             repository=MetricRepository(
                 db=args.db,
                 prometheus_client=args.prometheus_client,
+                default_timewindow=args.config_provider.config.metric.timewindow,
             ),
         )

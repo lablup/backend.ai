@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
+    MetricLabel,
     SessionLifetimeSpec,
     UtilizationSpec,
     UtilizationThresholdEntry,
@@ -20,7 +21,7 @@ from ai.backend.common.data.idle_checker.types import (
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.types import SessionId, SessionTypes
-from ai.backend.manager.data.idle_checker.types import IdleCheckSession
+from ai.backend.manager.data.idle_checker.types import IdleCheckSession, SessionUtilizationQuery
 from ai.backend.manager.repositories.idle_checker.types import IdleCheckerDefinitionData
 from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
@@ -42,7 +43,19 @@ class AssignmentFactory(Protocol):
         threshold: Decimal,
         sessions: Sequence[IdleCheckSession],
         duration_seconds: int = _DURATION_SECONDS,
+        filter_labels: dict[str, str] | None = None,
     ) -> CheckerAssignment: ...
+
+
+def _query(
+    preset_id: PrometheusQueryPresetID,
+    filter_labels: dict[str, str] | None = None,
+) -> SessionUtilizationQuery:
+    return SessionUtilizationQuery(
+        preset_id=preset_id,
+        filter_labels=tuple(sorted((filter_labels or {}).items())),
+        group_labels=("session_id",),
+    )
 
 
 def _session(
@@ -68,6 +81,34 @@ class TestUtilizationSpec:
                 ),
             )
 
+    def test_rejects_duplicate_filter_label_keys(self) -> None:
+        with pytest.raises(ValidationError):
+            UtilizationThresholdEntry(
+                preset_id=PrometheusQueryPresetID(uuid4()),
+                threshold=Decimal("10"),
+                filter_labels=[
+                    MetricLabel(key="container_metric_name", value="cpu_util"),
+                    MetricLabel(key="container_metric_name", value="mem"),
+                ],
+            )
+
+    def test_query_key_canonicalizes_label_order(self) -> None:
+        preset_id = PrometheusQueryPresetID(uuid4())
+
+        def entry(filter_order: list[tuple[str, str]], group: list[str]) -> SessionUtilizationQuery:
+            return SessionUtilizationQuery.from_threshold(
+                UtilizationThresholdEntry(
+                    preset_id=preset_id,
+                    threshold=Decimal("10"),
+                    filter_labels=[MetricLabel(key=k, value=v) for k, v in filter_order],
+                    group_labels=group,
+                )
+            )
+
+        assert entry([("a", "1"), ("b", "2")], ["session_id", "device"]) == entry(
+            [("b", "2"), ("a", "1")], ["device", "session_id", "device"]
+        )
+
 
 class TestUtilizationChecker:
     @pytest.fixture()
@@ -88,6 +129,7 @@ class TestUtilizationChecker:
             threshold: Decimal,
             sessions: Sequence[IdleCheckSession],
             duration_seconds: int = _DURATION_SECONDS,
+            filter_labels: dict[str, str] | None = None,
         ) -> CheckerAssignment:
             return CheckerAssignment(
                 definition=IdleCheckerDefinitionData(
@@ -101,6 +143,10 @@ class TestUtilizationChecker:
                             threshold=UtilizationThresholdEntry(
                                 preset_id=preset_id,
                                 threshold=threshold,
+                                filter_labels=[
+                                    MetricLabel(key=key, value=value)
+                                    for key, value in (filter_labels or {}).items()
+                                ],
                             ),
                         ),
                     ),
@@ -121,8 +167,8 @@ class TestUtilizationChecker:
         first_session = _session()
         second_session = _session()
         metric_repository.query_session_utilization_metrics.return_value = {
-            first_preset_id: {first_session.session_id: Decimal("5")},
-            second_preset_id: {second_session.session_id: Decimal("15")},
+            _query(first_preset_id): {first_session.session_id: Decimal("5")},
+            _query(second_preset_id): {second_session.session_id: Decimal("15")},
         }
 
         decisions = await checker.judge(
@@ -144,8 +190,8 @@ class TestUtilizationChecker:
         assert all(not decision.is_active for decision in decisions)
         metric_repository.query_session_utilization_metrics.assert_awaited_once_with(
             {
-                first_preset_id: [first_session.session_id],
-                second_preset_id: [second_session.session_id],
+                _query(first_preset_id): [first_session.session_id],
+                _query(second_preset_id): [second_session.session_id],
             },
             evaluation_time=_NOW,
         )
@@ -160,7 +206,7 @@ class TestUtilizationChecker:
         first_session = _session()
         second_session = _session()
         metric_repository.query_session_utilization_metrics.return_value = {
-            preset_id: {
+            _query(preset_id): {
                 first_session.session_id: Decimal("5"),
                 second_session.session_id: Decimal("15"),
             },
@@ -185,7 +231,50 @@ class TestUtilizationChecker:
         assert [decision.is_active for decision in decisions] == [False, True]
         metric_repository.query_session_utilization_metrics.assert_awaited_once_with(
             {
-                preset_id: [first_session.session_id, second_session.session_id],
+                _query(preset_id): [first_session.session_id, second_session.session_id],
+            },
+            evaluation_time=_NOW,
+        )
+
+    async def test_same_preset_with_different_labels_batches_separately(
+        self,
+        checker: UtilizationChecker,
+        metric_repository: MagicMock,
+        assignment_factory: AssignmentFactory,
+    ) -> None:
+        preset_id = PrometheusQueryPresetID(uuid4())
+        cpu_labels = {"container_metric_name": "cpu_util"}
+        mem_labels = {"container_metric_name": "mem"}
+        first_session = _session()
+        second_session = _session()
+        metric_repository.query_session_utilization_metrics.return_value = {
+            _query(preset_id, cpu_labels): {first_session.session_id: Decimal("5")},
+            _query(preset_id, mem_labels): {second_session.session_id: Decimal("15")},
+        }
+
+        decisions = await checker.judge(
+            [
+                assignment_factory(
+                    preset_id=preset_id,
+                    threshold=Decimal("10"),
+                    sessions=[first_session],
+                    filter_labels=cpu_labels,
+                ),
+                assignment_factory(
+                    preset_id=preset_id,
+                    threshold=Decimal("10"),
+                    sessions=[second_session],
+                    filter_labels=mem_labels,
+                ),
+            ],
+            context=IdleCheckerContext(current_time=_NOW),
+        )
+
+        assert [decision.is_active for decision in decisions] == [False, True]
+        metric_repository.query_session_utilization_metrics.assert_awaited_once_with(
+            {
+                _query(preset_id, cpu_labels): [first_session.session_id],
+                _query(preset_id, mem_labels): [second_session.session_id],
             },
             evaluation_time=_NOW,
         )
@@ -199,7 +288,7 @@ class TestUtilizationChecker:
         preset_id = PrometheusQueryPresetID(uuid4())
         session = _session()
         metric_repository.query_session_utilization_metrics.return_value = {
-            preset_id: {session.session_id: Decimal("9.9")},
+            _query(preset_id): {session.session_id: Decimal("9.9")},
         }
 
         decisions = await checker.judge(
@@ -227,7 +316,7 @@ class TestUtilizationChecker:
         preset_id = PrometheusQueryPresetID(uuid4())
         session = _session(expire_at=None)
         metric_repository.query_session_utilization_metrics.return_value = {
-            preset_id: {session.session_id: Decimal("9.9")},
+            _query(preset_id): {session.session_id: Decimal("9.9")},
         }
 
         decisions = await checker.judge(
@@ -256,7 +345,7 @@ class TestUtilizationChecker:
         preset_id = PrometheusQueryPresetID(uuid4())
         session = _session(expire_at=expire_at)
         metric_repository.query_session_utilization_metrics.return_value = {
-            preset_id: {session.session_id: Decimal("5")},
+            _query(preset_id): {session.session_id: Decimal("5")},
         }
 
         decisions = await checker.judge(
@@ -285,7 +374,7 @@ class TestUtilizationChecker:
         preset_id = PrometheusQueryPresetID(uuid4())
         session = _session()
         metric_repository.query_session_utilization_metrics.return_value = {
-            preset_id: {session.session_id: value},
+            _query(preset_id): {session.session_id: value},
         }
 
         decisions = await checker.judge(

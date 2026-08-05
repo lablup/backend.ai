@@ -22929,6 +22929,12 @@ type UtilizationIdleCheckerThreshold
 {
   presetId: UUID!
   threshold: Decimal!
+
+  """Added in 26.9.0. Label filters injected into the preset query."""
+  filterLabels: [MetricLabelEntry!]!
+
+  """Added in 26.9.0. Group-by labels injected into the preset query."""
+  groupLabels: [String!]!
 }
 
 """Added in 26.8.0. Supplies a preset-backed utilization threshold."""
@@ -22940,6 +22946,14 @@ input UtilizationIdleCheckerThresholdInput
 
   """Underutilization threshold."""
   threshold: Decimal!
+
+  """Added in 26.9.0. Label filters injected into the preset query."""
+  filterLabels: [MetricLabelEntryInput!]! = []
+
+  """
+  Added in 26.9.0. Group-by labels injected into the preset query. Per-session mapping requires 'session_id'; when included, the query is also scoped to the sessions under evaluation.
+  """
+  groupLabels: [String!]! = ["session_id"]
 }
 
 """

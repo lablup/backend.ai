@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import enum
 from decimal import Decimal
-from typing import Self
+from typing import Final, Self
 
 from pydantic import Field, model_validator
 
 from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.types import BackendAISchema
+
+# Metric label carrying the session UUID; grouping by it enables per-session mapping.
+SESSION_ID_LABEL: Final = "session_id"
 
 
 class CheckerType(enum.StrEnum):
@@ -26,6 +29,13 @@ class IdleCheckPhase(enum.StrEnum):
     IDLE_EXPIRED = "idle_expired"
 
 
+class MetricLabel(BackendAISchema):
+    """Single metric label key-value pair."""
+
+    key: str = Field(description="Label key.")
+    value: str = Field(description="Label value.")
+
+
 class UtilizationThresholdEntry(BackendAISchema):
     """One preset-backed session utilization threshold."""
 
@@ -35,6 +45,27 @@ class UtilizationThresholdEntry(BackendAISchema):
     threshold: Decimal = Field(
         description="Underutilization threshold compared against the preset's query result.",
     )
+    filter_labels: list[MetricLabel] = Field(
+        default_factory=list,
+        description="Label filters injected into the preset's {labels} placeholder.",
+    )
+    group_labels: list[str] = Field(
+        default_factory=lambda: [SESSION_ID_LABEL],
+        description=(
+            "Labels injected into the preset's {group_by} placeholder. "
+            "Must include 'session_id' for per-session values to be mapped. "
+            "When 'session_id' is grouped, the checker adds a session_id filter that "
+            "limits the query to the sessions being evaluated; a user-provided "
+            "'session_id' entry in filter_labels takes precedence over it."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _validate_unique_filter_label_keys(self) -> Self:
+        keys = [label.key for label in self.filter_labels]
+        if len(keys) != len(set(keys)):
+            raise ValueError("filter_labels must not contain duplicate keys.")
+        return self
 
 
 class SessionLifetimeSpec(BackendAISchema):

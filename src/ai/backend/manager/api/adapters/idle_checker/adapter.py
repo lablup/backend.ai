@@ -10,6 +10,7 @@ from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
+    MetricLabel,
     NetworkTimeoutSpec,
     SessionLifetimeSpec,
     UtilizationSpec,
@@ -42,6 +43,7 @@ from ai.backend.common.dto.manager.v2.idle_checker.types import (
     IdleCheckerOrderField,
     IdleCheckerTypeDTO,
 )
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import MetricLabelEntryInfo
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -231,6 +233,11 @@ class IdleCheckerAdapter(BaseAdapter):
                         threshold=UtilizationThresholdInfo(
                             preset_id=utilization.threshold.preset_id,
                             threshold=utilization.threshold.threshold,
+                            filter_labels=[
+                                MetricLabelEntryInfo(key=label.key, value=label.value)
+                                for label in utilization.threshold.filter_labels
+                            ],
+                            group_labels=utilization.threshold.group_labels,
                         ),
                     ),
                 )
@@ -261,6 +268,11 @@ class IdleCheckerAdapter(BaseAdapter):
                 threshold=UtilizationThresholdEntry(
                     preset_id=utilization.threshold.preset_id,
                     threshold=utilization.threshold.threshold,
+                    filter_labels=[
+                        MetricLabel(key=entry.key, value=entry.value)
+                        for entry in utilization.threshold.filter_labels
+                    ],
+                    group_labels=utilization.threshold.group_labels,
                 ),
             ),
         )

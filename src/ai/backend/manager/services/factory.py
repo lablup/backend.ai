@@ -232,7 +232,10 @@ def create_services(args: ServiceArgs) -> Services:
             repositories.user.repository,
             args.scheduling_controller,
         ),
-        idle_checker=IdleCheckerService(repositories.idle_checker.repository),
+        idle_checker=IdleCheckerService(
+            repositories.idle_checker.repository,
+            repositories.prometheus_query_preset.repository,
+        ),
         image=ImageService(
             args.agent_registry, repositories.image.repository, args.config_provider
         ),
