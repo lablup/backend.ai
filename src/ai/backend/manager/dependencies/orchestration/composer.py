@@ -16,6 +16,7 @@ from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.confidential.channel import ConfidentialChannel
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -77,6 +78,7 @@ class OrchestrationInput:
     # Runtime variant lookup (used by deployment executor for id→name
     # resolution at the AppProxy wire boundary)
     runtime_variant_repository: RuntimeVariantRepository
+    confidential_channel: ConfidentialChannel
 
 
 @dataclass
@@ -158,6 +160,7 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
             prometheus_client=setup_input.prometheus_client,
             prometheus_query_preset_repository=setup_input.prometheus_query_preset_repository,
             runtime_variant_repository=setup_input.runtime_variant_repository,
+            confidential_channel=setup_input.confidential_channel,
         )
         sokovan_orchestrator = await stack.enter_dependency(
             sokovan_dep,

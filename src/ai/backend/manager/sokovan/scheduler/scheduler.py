@@ -4,6 +4,8 @@ from dataclasses import dataclass
 
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.confidential.channel import ConfidentialChannel
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 
@@ -38,6 +40,8 @@ def create_scheduler_components(
     config_provider: ManagerConfigProvider,
     agent_client_pool: AgentClientPool,
     network_plugin_ctx: NetworkPluginContext,
+    confidential_channel: ConfidentialChannel,
+    db: ExtendedAsyncSAEngine,
 ) -> SchedulerComponents:
     """Create SchedulerComponents with all required dependencies."""
     hook_registry = HookRegistry(
@@ -45,6 +49,8 @@ def create_scheduler_components(
             agent_client_pool=agent_client_pool,
             network_plugin_ctx=network_plugin_ctx,
             config_provider=config_provider,
+            confidential_channel=confidential_channel,
+            db=db,
         )
     )
     return SchedulerComponents(

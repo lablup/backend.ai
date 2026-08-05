@@ -11,7 +11,9 @@ from dataclasses import dataclass
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.confidential.channel import ConfidentialChannel
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
 
 from .status import (
@@ -32,6 +34,8 @@ class HookRegistryArgs:
     agent_client_pool: AgentClientPool
     network_plugin_ctx: NetworkPluginContext
     config_provider: ManagerConfigProvider
+    confidential_channel: ConfidentialChannel
+    db: ExtendedAsyncSAEngine
 
 
 class HookRegistry:
@@ -52,6 +56,8 @@ class HookRegistry:
         # RUNNING transition hook
         running_deps = RunningHookDependencies(
             agent_client_pool=args.agent_client_pool,
+            confidential_channel=args.confidential_channel,
+            db=args.db,
         )
         self._status_hooks[SessionStatus.RUNNING] = RunningTransitionHook(running_deps)
 

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.confidential.channel import ConfidentialChannel
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.fair_share import FairShareRepository
@@ -113,6 +114,7 @@ def create_default_scheduler_components(
     agent_client_pool: AgentClientPool,
     network_plugin_ctx: NetworkPluginContext,
     valkey_schedule: ValkeyScheduleClient,
+    confidential_channel: ConfidentialChannel,
 ) -> SchedulerComponents:
     """
     Create scheduler components with default configuration.
@@ -189,6 +191,8 @@ def create_default_scheduler_components(
         config_provider=config_provider,
         agent_client_pool=agent_client_pool,
         network_plugin_ctx=network_plugin_ctx,
+        confidential_channel=confidential_channel,
+        db=db,
     )
 
 
