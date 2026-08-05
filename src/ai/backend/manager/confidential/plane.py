@@ -116,7 +116,10 @@ class ConfidentialPlane:
                     if not acquired.scalar():
                         continue
                     try:
-                        await self.provisioner.reconcile(await self.confidential_endpoints())
+                        endpoints = await self.confidential_endpoints()
+                        await self.provisioner.reconcile(endpoints)
+                        for opts in endpoints.values():
+                            await self.policy.enforce_grace_expiry(opts)
                     finally:
                         await conn.exec_driver_sql(
                             f"SELECT pg_advisory_unlock({RECONCILER_LOCK_KEY:d});"

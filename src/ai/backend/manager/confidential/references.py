@@ -19,6 +19,7 @@ from ai.backend.manager.models.scaling_group.types import ConfidentialScalingGro
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 DEFAULT_COEXISTENCE: Final = timedelta(days=14)
+REQUIRED_MEASUREMENTS: Final = ("mr_config_id", "mr_td", "rtmr_1", "rtmr_2", "xfam")
 
 
 def bundle_bytes(
@@ -56,6 +57,14 @@ class ReferenceValueStore:
         if not opts.attested_identity or attested_identity != opts.attested_identity:
             raise ReferenceValueRejected(
                 extra_msg="registration is reachable only under the manager's attested machine identity"
+            )
+        missing = [field for field in REQUIRED_MEASUREMENTS if not measurements.get(field)]
+        if missing:
+            raise ReferenceValueRejected(
+                extra_msg=(
+                    f"measurements leave {', '.join(missing)} unpinned,"
+                    " so the composed release policy would not gate on them"
+                )
             )
         bundle = bundle_bytes(opts.broker_endpoint, image_digest, profile_version, measurements)
         await self._shim.authorise_bundle(opts, "reference-value", bundle, pipeline_signature)
