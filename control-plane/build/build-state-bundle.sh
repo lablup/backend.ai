@@ -157,8 +157,19 @@ else
     grep -q '^aiomonitor-enabled = false' \
         "$ROOT/usr/share/backendai/credential-templates/manager.toml.in" ||
         fail "the measured manager configuration does not disable the introspection console"
-    grep -qa 'aiomonitor-enabled' "$ROOT/usr/lib/backendai/backendai-manager" ||
+    if ! python3 - "$ROOT/usr/lib/backendai/backendai-manager" <<'CHECK'
+import sys, zipfile
+try:
+    archive = zipfile.ZipFile(sys.argv[1])
+    named = [n for n in archive.namelist() if n.endswith("manager/config/unified.py")]
+    carries = bool(named) and b"aiomonitor-enabled" in archive.read(named[0])
+except Exception:
+    carries = False
+sys.exit(0 if carries else 1)
+CHECK
+    then
         fail "the manager artifact predates the introspection-console switch, so setting it in the configuration would be silently ignored; rebuild the manager from a tree that carries manager.aiomonitor-enabled"
+    fi
     echo "build-state-bundle: the introspection console survives inside an interpreter binary; the measured configuration switches it off and the artifact honours that switch" >&2
 fi
 if [ -e "$ROOT/usr/sbin/sshd" ] || [ -e "$ROOT/usr/bin/sshd" ]; then
