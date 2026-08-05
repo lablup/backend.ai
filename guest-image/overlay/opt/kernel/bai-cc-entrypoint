@@ -12,4 +12,6 @@ done < /home/config/environ.txt
 
 /opt/backend.ai/bin/python -s /opt/kernel/bai-guest-storage
 
+cd /home/work
+
 exec /opt/kernel/entrypoint.sh "$@"
