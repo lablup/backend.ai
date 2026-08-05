@@ -23,6 +23,7 @@ LIBRARY_PATH = ":".join([
     f"{GUEST}/lib",
 ])
 MAPPER = "bai-scratch"
+TASK_LOG_DIR = ".logs"
 BLOCK = 4096
 HELPERS = {"nfs": "mount.nfs", "nfs4": "mount.nfs4", "ceph": "mount.ceph", "cifs": "mount.cifs"}
 GOCRYPTFS_FLAGS = ("-raw64", "-hkdf", "-longnames", "-noprealloc", "-allow_other")
@@ -195,8 +196,12 @@ def open_scratch(api, scope, scratch):
     target.mkdir(mode=0o755, parents=True, exist_ok=True)
     kmount(f"/dev/mapper/{MAPPER}", target, "ext4", 0)
     os.chmod(target, 0o755)
-    os.chown(target, int(os.environ.get("LOCAL_USER_ID") or 9001),
-             int(os.environ.get("LOCAL_GROUP_ID") or 9001))
+    uid = int(os.environ.get("LOCAL_USER_ID") or 9001)
+    gid = int(os.environ.get("LOCAL_GROUP_ID") or 9001)
+    os.chown(target, uid, gid)
+    logs = target / TASK_LOG_DIR
+    logs.mkdir(mode=0o755, exist_ok=True)
+    os.chown(logs, uid, gid)
 
 
 def starve(reason):
