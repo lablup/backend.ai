@@ -15,8 +15,11 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ai.backend.manager.confidential.broker import BrokerClient, BrokerTarget
+from ai.backend.manager.confidential.payloads import TIME_RESOURCE
+from ai.backend.manager.confidential.storage import FOLDER_KEY_SEGMENT, folder_key_tag
 from ai.backend.manager.errors.confidential import (
     BrokerUnreachable,
+    FolderKeyNotEntitled,
     NonceQuotaExhausted,
     ReferenceValueRejected,
     ShimRefusal,
@@ -27,8 +30,13 @@ from ai.backend.manager.models.confidential.row import (
     ConfidentialDecisionRow,
     ConfidentialGuestClaimRow,
     ConfidentialNonceRow,
+    ConfidentialSessionResourceRow,
 )
-from ai.backend.manager.models.confidential.types import DecisionActor, DecisionVerdict
+from ai.backend.manager.models.confidential.types import (
+    DecisionActor,
+    DecisionVerdict,
+    SessionResourceKind,
+)
 from ai.backend.manager.models.scaling_group.types import ConfidentialScalingGroupOpts
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -72,6 +80,16 @@ def path_nonce(resource_path: str) -> str | None:
     if len(segments) != 3:
         return None
     return segments[1].partition(".")[2] or None
+
+
+def folder_key_subject(resource_path: str) -> tuple[str, uuid.UUID] | None:
+    segments = resource_path.split("/")
+    if len(segments) != 3 or segments[1] != FOLDER_KEY_SEGMENT:
+        return None
+    try:
+        return segments[0], uuid.UUID(segments[2])
+    except ValueError:
+        return None
 
 
 def _tee_pubkey(claims: Any) -> Any:
@@ -268,6 +286,67 @@ class AuthorisationShim:
                     return bound.session_id, True
         raise NonceQuotaExhausted(extra_msg="no live claim slot remains for this session nonce")
 
+    async def _entitling_session(
+        self, guest: str, domain_name: str, folder_id: uuid.UUID
+    ) -> uuid.UUID | None:
+        async with self._db.begin_readonly_session() as db_session:
+            return await db_session.scalar(
+                sa.select(ConfidentialSessionResourceRow.session_id)
+                .join(
+                    ConfidentialGuestClaimRow,
+                    ConfidentialGuestClaimRow.session_id
+                    == ConfidentialSessionResourceRow.session_id,
+                )
+                .where(
+                    (ConfidentialGuestClaimRow.guest == guest)
+                    & (ConfidentialGuestClaimRow.expires_at > sa.func.now())
+                    & (ConfidentialSessionResourceRow.kind == SessionResourceKind.FOLDER_KEY)
+                    & ConfidentialSessionResourceRow.deleted_at.is_(None)
+                    & ConfidentialSessionResourceRow.resource_path.startswith(f"{domain_name}/")
+                    & ConfidentialSessionResourceRow.resource_path.endswith(
+                        f"/{folder_key_tag(folder_id)}"
+                    )
+                )
+            )
+
+    async def _authorise_unscoped(
+        self, resource_path: str, claimant: Claimant | None
+    ) -> uuid.UUID | None:
+        if resource_path == TIME_RESOURCE:
+            return None
+        subject = folder_key_subject(resource_path)
+        if subject is None:
+            refusal = (
+                "no session nonce scopes this path, and only the shared attested-time"
+                " anchor is released outside a session scope"
+            )
+            await self.record(
+                actor=DecisionActor.GUEST,
+                verdict=DecisionVerdict.OUT_OF_SCOPE,
+                resource_path=resource_path,
+                failing_clause=refusal,
+            )
+            raise ShimRefusal(extra_msg=refusal)
+        domain_name, folder_id = subject
+        entitled = (
+            None
+            if claimant is None
+            else await self._entitling_session(claimant.guest, domain_name, folder_id)
+        )
+        if entitled is None:
+            refusal = (
+                f"no live claim of this guest names a session that mounts folder {folder_id}"
+                f" in domain {domain_name}"
+            )
+            await self.record(
+                actor=DecisionActor.GUEST,
+                verdict=DecisionVerdict.DENIED,
+                resource_path=resource_path,
+                failing_clause=refusal,
+            )
+            raise FolderKeyNotEntitled(extra_msg=refusal)
+        return entitled
+
     async def relay_attest(
         self,
         opts: ConfidentialScalingGroupOpts,
@@ -344,7 +423,9 @@ class AuthorisationShim:
         )
         session_id: uuid.UUID | None = None
         consumed = False
-        if nonce is not None:
+        if nonce is None:
+            session_id = await self._authorise_unscoped(resource_path, claimant)
+        else:
             if claimant is None:
                 await self.record(
                     actor=DecisionActor.GUEST,

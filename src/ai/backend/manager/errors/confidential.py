@@ -194,6 +194,23 @@ class CrossDomainFolderKeyRefused(BackendAIError, web.HTTPForbidden):
         )
 
 
+class FolderKeyNotEntitled(BackendAIError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/confidential-folder-key-not-entitled"
+    error_title = (
+        "A guest may fetch a folder key only for a folder its own session mounts:"
+        " folder identifiers are not secret, so an unentitled fetch would hand every"
+        " attested guest on the deployment every folder key in its domain."
+    )
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.GRANT,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
 class ImmutableEncryptionTier(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/confidential-immutable-encryption-tier"
     error_title = "A folder's encryption tier is fixed at creation and cannot be changed."

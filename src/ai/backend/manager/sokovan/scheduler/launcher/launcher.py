@@ -698,7 +698,7 @@ class SessionLauncher:
                     raise FolderEncryptionMissing(
                         extra_msg=f"folder {mount.name} of session {session.session_id}"
                     )
-                resources[folder_key_tag(mount.vfid)] = (
+                resources[folder_key_tag(mount.vfid.folder_id)] = (
                     SessionResourceKind.FOLDER_KEY,
                     plane.custodian.release(opts, domain_name, mount.vfid.folder_id),
                 )
