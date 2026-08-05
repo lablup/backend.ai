@@ -34,14 +34,15 @@ DEFAULT_TIER: Final = "file"
 DEFAULT_FORMAT: Final = FORMAT_ID
 MOUNT_PLAN_VERSION: Final = 1
 SCRATCH_DEVICE: Final = "/dev/bai_scratch"
+FOLDER_KEY_SEGMENT: Final = "vfolder"
 
 
 def folder_key_path(domain_name: str, folder_id: uuid.UUID) -> str:
-    return f"{domain_name}/vfolder/{folder_id.hex}"
+    return f"{domain_name}/{FOLDER_KEY_SEGMENT}/{folder_id.hex}"
 
 
-def folder_key_tag(vfid: VFolderID) -> str:
-    return f"folder-key-{vfid.folder_id.hex}"
+def folder_key_tag(folder_id: uuid.UUID) -> str:
+    return f"folder-key-{folder_id.hex}"
 
 
 async def custodian_of_domain(
@@ -168,12 +169,29 @@ class FolderKeyCustodian:
         await self._broker.put_resource(BrokerTarget.of(opts), resource_path, key)
         return resource_path
 
+    async def inherit(
+        self,
+        opts: ConfidentialScalingGroupOpts,
+        domain_name: str,
+        source_id: uuid.UUID,
+        folder_id: uuid.UUID,
+    ) -> str:
+        key = self.release(opts, domain_name, source_id)
+        resource_path = folder_key_path(domain_name, folder_id)
+        self.escrow(opts).append(resource_path, key)
+        await self._broker.put_resource(BrokerTarget.of(opts), resource_path, key)
+        return resource_path
+
     async def revoke(
         self, opts: ConfidentialScalingGroupOpts, domain_name: str, folder_id: uuid.UUID
-    ) -> None:
+    ) -> bool:
         resource_path = folder_key_path(domain_name, folder_id)
-        self.escrow(opts).append(resource_path, b"")
+        escrow = self.escrow(opts)
+        if escrow.held(resource_path) is None:
+            return False
         await self._broker.destroy_resource(BrokerTarget.of(opts), resource_path)
+        escrow.append(resource_path, b"")
+        return True
 
     def release(
         self, opts: ConfidentialScalingGroupOpts, domain_name: str, folder_id: uuid.UUID
@@ -224,7 +242,7 @@ def mount_plan(mounts: list[VFolderMount], scratch_tag: str | None) -> bytes:
             "encryption": {
                 "tier": descriptor.tier,
                 "format": descriptor.format,
-                "key_tag": folder_key_tag(mount.vfid),
+                "key_tag": folder_key_tag(mount.vfid.folder_id),
             },
         })
     plan: dict[str, object] = {"version": MOUNT_PLAN_VERSION, "mounts": entries}

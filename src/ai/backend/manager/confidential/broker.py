@@ -55,15 +55,20 @@ class BrokerClient:
         target: BrokerTarget,
         path: str,
         *,
-        body: bytes,
-        content_type: str,
+        body: bytes | None = None,
+        content_type: str | None = None,
+        method: str = "POST",
     ) -> bytes:
         url = target.base / path.lstrip("/")
+        headers = dict(target.admin_headers)
+        if content_type is not None:
+            headers["Content-Type"] = content_type
         try:
-            async with self._session.post(
+            async with self._session.request(
+                method,
                 url,
                 data=body,
-                headers={**target.admin_headers, "Content-Type": content_type},
+                headers=headers,
                 timeout=REQUEST_TIMEOUT,
             ) as resp:
                 payload = await resp.read()
@@ -92,7 +97,7 @@ class BrokerClient:
         )
 
     async def destroy_resource(self, target: BrokerTarget, resource_path: str) -> None:
-        await self.put_resource(target, resource_path, b"")
+        await self._admin(target, f"/kbs/v0/resource/{resource_path}", method="DELETE")
 
     async def upload_release_policy(self, target: BrokerTarget, document: str) -> None:
         await self._admin(

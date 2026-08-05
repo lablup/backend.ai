@@ -16,9 +16,14 @@ from ai.backend.manager.confidential.admission import check_admission_belt
 from ai.backend.manager.confidential.broker import BrokerClient, BrokerTarget
 from ai.backend.manager.confidential.payloads import TIME_RESOURCE, attested_time
 from ai.backend.manager.confidential.shim import AuthorisationShim
-from ai.backend.manager.errors.confidential import BrokerUnreachable
+from ai.backend.manager.errors.confidential import (
+    BrokerRejected,
+    BrokerUnreachable,
+    ReleaseDenied,
+)
 from ai.backend.manager.metrics.confidential import ConfidentialMetricObserver
 from ai.backend.manager.models.confidential.row import (
+    ConfidentialGuestClaimRow,
     ConfidentialNonceRow,
     ConfidentialSessionResourceRow,
 )
@@ -129,7 +134,6 @@ class SessionResourceProvisioner:
                     image_digest=image_digest,
                     profile_version=profile_version,
                     quota=member_count,
-                    claims_used=0,
                 )
             )
         return SessionProvisioning(
@@ -140,8 +144,40 @@ class SessionResourceProvisioner:
             resource_paths=written,
         )
 
-    async def teardown(self, opts: ConfidentialScalingGroupOpts, session_id: uuid.UUID) -> int:
-        target = BrokerTarget.of(opts)
+    async def _destroy(
+        self,
+        endpoints: Mapping[str, ConfidentialScalingGroupOpts],
+        row: ConfidentialSessionResourceRow,
+    ) -> bool:
+        opts = endpoints.get(row.endpoint)
+        if opts is None:
+            log.warning(
+                "confidential: no configured broker at {} still holds {}, which survives",
+                row.endpoint,
+                row.resource_path,
+            )
+            return False
+        try:
+            await self._broker.destroy_resource(BrokerTarget.of(opts), row.resource_path)
+        except (BrokerUnreachable, BrokerRejected, ReleaseDenied) as e:
+            log.warning(
+                "confidential: {} kept {}, which survives for the reconciler: {}",
+                row.endpoint,
+                row.resource_path,
+                e,
+            )
+            return False
+        async with self._db.begin_session() as db_session:
+            await db_session.execute(
+                sa.update(ConfidentialSessionResourceRow)
+                .where(ConfidentialSessionResourceRow.id == row.id)
+                .values(deleted_at=datetime.now(UTC))
+            )
+        return True
+
+    async def teardown(
+        self, endpoints: Mapping[str, ConfidentialScalingGroupOpts], session_id: uuid.UUID
+    ) -> int:
         async with self._db.begin_readonly_session() as db_session:
             rows = list(
                 (
@@ -155,17 +191,16 @@ class SessionResourceProvisioner:
             )
         destroyed = 0
         for row in rows:
-            await self._broker.destroy_resource(target, row.resource_path)
-            async with self._db.begin_session() as db_session:
-                await db_session.execute(
-                    sa.update(ConfidentialSessionResourceRow)
-                    .where(ConfidentialSessionResourceRow.id == row.id)
-                    .values(deleted_at=datetime.now(UTC))
-                )
-            destroyed += 1
+            if await self._destroy(endpoints, row):
+                destroyed += 1
         async with self._db.begin_session() as db_session:
             await db_session.execute(
                 sa.delete(ConfidentialNonceRow).where(ConfidentialNonceRow.session_id == session_id)
+            )
+            await db_session.execute(
+                sa.delete(ConfidentialGuestClaimRow).where(
+                    ConfidentialGuestClaimRow.session_id == session_id
+                )
             )
         return destroyed
 
@@ -184,19 +219,9 @@ class SessionResourceProvisioner:
             )
         swept = 0
         for row in orphans:
-            opts = endpoints.get(row.endpoint)
-            if opts is None:
-                continue
-            try:
-                await self._broker.destroy_resource(BrokerTarget.of(opts), row.resource_path)
-            except BrokerUnreachable:
+            if not await self._destroy(endpoints, row):
                 continue
             async with self._db.begin_session() as db_session:
-                await db_session.execute(
-                    sa.update(ConfidentialSessionResourceRow)
-                    .where(ConfidentialSessionResourceRow.id == row.id)
-                    .values(deleted_at=datetime.now(UTC))
-                )
                 await db_session.execute(
                     sa.delete(ConfidentialNonceRow).where(
                         ConfidentialNonceRow.session_id == row.session_id
