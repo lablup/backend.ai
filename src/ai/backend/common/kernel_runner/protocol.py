@@ -640,7 +640,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                 "options": None,
             }
             type(self).aggregate_console(result, records, api_ver)
-            self.next_output_queue()
+            self.resume_output_queue()
             return result
         except BuildFinished as e:
             result = {
@@ -650,7 +650,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                 "options": None,
             }
             type(self).aggregate_console(result, records, api_ver)
-            self.next_output_queue()
+            self.resume_output_queue()
             return result
         except RunFinished as e:
             result = {
@@ -729,9 +729,10 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         We don't change self.output_queue here so that we can continue to read
         outputs while the client sends the continuation request.
         """
-        if self.current_run_id is None:
+        run_id = self.current_run_id
+        if run_id is None or run_id not in self.pending_queues:
             return
-        self.pending_queues.move_to_end(self.current_run_id, last=False)
+        self.pending_queues.move_to_end(run_id, last=False)
 
     def next_output_queue(self) -> None:
         """
