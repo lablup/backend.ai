@@ -22,6 +22,7 @@ from ai.backend.manager.models.scaling_group.types import NONCE_RESIDUAL_DISCLOS
 TUNNEL_SUBNET: Final = ipaddress.IPv4Network("10.252.0.0/16")
 TUNNEL_PORT: Final = 51820
 PEER_DIRECTORY_TAG: Final = "tunnel-peers"
+CONFIDENTIAL_NETWORK_PREFIX: Final = "bai-confidential-"
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,7 @@ class TunnelMember:
     kernel_id: uuid.UUID
     cluster_idx: int
     hostname: str
+    endpoint: str
 
     @property
     def tag(self) -> str:
@@ -60,6 +62,7 @@ def tunnel_resources(
                 "cluster_idx": member.cluster_idx,
                 "hostname": member.hostname,
                 "tunnel_addr": member.tunnel_addr,
+                "endpoint": member.endpoint,
                 "public_key": _encode(
                     keys[member.kernel_id].public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
                 ),

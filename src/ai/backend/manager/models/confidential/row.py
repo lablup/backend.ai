@@ -228,6 +228,7 @@ class ConfidentialChannelRow(Base):  # type: ignore[misc]
     )
     relay_addr: Mapped[str] = mapped_column("relay_addr", sa.String(length=256), nullable=False)
     channel_port: Mapped[int] = mapped_column("channel_port", sa.Integer, nullable=False)
+    tunnel_port: Mapped[int | None] = mapped_column("tunnel_port", sa.Integer, nullable=True)
     fingerprint: Mapped[str] = mapped_column("fingerprint", sa.String(length=128), nullable=False)
     token: Mapped[str] = mapped_column("token", sa.String(length=256), nullable=False)
     epoch: Mapped[int] = mapped_column("epoch", sa.Integer, nullable=False, default=0)
