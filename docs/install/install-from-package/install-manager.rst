@@ -260,7 +260,7 @@ can be configured from ``manager.toml``:
 .. parsed-literal::
 
    $ curl bai-m1:8081
-   {"version": "|_latest_api_version_placeholder|", "manager": "|release|"}
+   {"version": "|latest_api_version|", "manager": "|release|"}
 
 Press ``Ctrl-C`` to stop the service.
 
