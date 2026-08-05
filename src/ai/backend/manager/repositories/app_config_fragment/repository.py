@@ -22,6 +22,9 @@ from ai.backend.manager.repositories.app_config_fragment.db_source import (
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
     AppConfigFragmentPurgerSpec,
 )
+from ai.backend.manager.repositories.app_config_fragment.types import (
+    AppConfigFragmentSearchScope,
+)
 from ai.backend.manager.repositories.app_config_fragment.upserters import (
     AppConfigFragmentUpserterSpec,
 )
@@ -76,7 +79,7 @@ class AppConfigFragmentRepository:
 
     @app_config_fragment_repository_resilience.apply()
     async def purge_by_config_names(
-        self, scope: SearchScope, config_names: Sequence[str]
+        self, scope: AppConfigFragmentSearchScope, config_names: Sequence[str]
     ) -> list[AppConfigFragmentData]:
         return await self._db_source.purge_by_config_names(scope, config_names)
 

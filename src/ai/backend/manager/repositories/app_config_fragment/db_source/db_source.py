@@ -32,6 +32,9 @@ from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
     AppConfigFragmentPurgerSpec,
 )
+from ai.backend.manager.repositories.app_config_fragment.types import (
+    AppConfigFragmentSearchScope,
+)
 from ai.backend.manager.repositories.app_config_fragment.upserters import (
     AppConfigFragmentUpserterSpec,
 )
@@ -155,7 +158,7 @@ class AppConfigFragmentDBSource:
     @app_config_fragment_db_source_resilience.apply()
     async def purge_by_config_names(
         self,
-        scope: SearchScope,
+        scope: AppConfigFragmentSearchScope,
         config_names: Sequence[str],
     ) -> list[AppConfigFragmentData]:
         """Purge one scope's fragments for ``config_names``, all-or-nothing.
