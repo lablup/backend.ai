@@ -16,10 +16,34 @@ from ai.backend.manager.models.confidential.row import (
 )
 from ai.backend.manager.models.confidential.types import ReferenceValueState
 from ai.backend.manager.models.scaling_group.types import ConfidentialScalingGroupOpts
+from ai.backend.manager.models.session import DEAD_SESSION_STATUSES, SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 DEFAULT_COEXISTENCE: Final = timedelta(days=14)
 REQUIRED_MEASUREMENTS: Final = ("mr_config_id", "mr_td", "rtmr_1", "rtmr_2", "xfam")
+
+
+def carrying_live_session(endpoint: str) -> sa.ColumnElement[bool]:
+    return sa.exists(
+        sa.select(sa.literal(1))
+        .select_from(
+            sa.join(
+                ConfidentialNonceRow,
+                SessionRow,
+                SessionRow.id == ConfidentialNonceRow.session_id,
+            )
+        )
+        .where(
+            (ConfidentialNonceRow.endpoint == endpoint)
+            & (ConfidentialNonceRow.image_digest == ConfidentialReferenceValueRow.image_digest)
+            & (
+                ConfidentialNonceRow.profile_version
+                == ConfidentialReferenceValueRow.profile_version
+            )
+            & SessionRow.status.not_in(DEAD_SESSION_STATUSES)
+        )
+        .correlate(ConfidentialReferenceValueRow)
+    )
 
 
 def bundle_bytes(
@@ -104,7 +128,10 @@ class ReferenceValueStore:
                         (ConfidentialReferenceValueRow.state == ReferenceValueState.ACTIVE)
                         | (
                             (ConfidentialReferenceValueRow.state == ReferenceValueState.SUPERSEDED)
-                            & (ConfidentialReferenceValueRow.coexistence_until > now)
+                            & (
+                                (ConfidentialReferenceValueRow.coexistence_until > now)
+                                | carrying_live_session(endpoint)
+                            )
                         )
                     )
                 )
@@ -121,6 +148,7 @@ class ReferenceValueStore:
                     (ConfidentialReferenceValueRow.endpoint == endpoint)
                     & (ConfidentialReferenceValueRow.state == ReferenceValueState.SUPERSEDED)
                     & (ConfidentialReferenceValueRow.coexistence_until <= now)
+                    & ~carrying_live_session(endpoint)
                 )
                 .values(state=ReferenceValueState.RETIRED)
             )
@@ -137,12 +165,22 @@ class ReferenceValueStore:
             return row
 
     async def sessions_on(self, row: ConfidentialReferenceValueRow) -> list[uuid.UUID]:
+        if any(
+            other.id != row.id
+            and other.image_digest == row.image_digest
+            and other.profile_version == row.profile_version
+            for other in await self.admissible(row.endpoint)
+        ):
+            return []
         async with self._db.begin_readonly_session() as db_session:
             sessions = await db_session.scalars(
-                sa.select(ConfidentialNonceRow.session_id).where(
+                sa.select(ConfidentialNonceRow.session_id)
+                .join(SessionRow, SessionRow.id == ConfidentialNonceRow.session_id)
+                .where(
                     (ConfidentialNonceRow.endpoint == row.endpoint)
                     & (ConfidentialNonceRow.image_digest == row.image_digest)
                     & (ConfidentialNonceRow.profile_version == row.profile_version)
+                    & SessionRow.status.not_in(DEAD_SESSION_STATUSES)
                 )
             )
             return list(sessions.all())
