@@ -393,10 +393,9 @@ class ContainerRegistryRepository:
     ) -> None:
         """Enroll the registry in the project's virtual scope and let the project
         scope reach the registry's own entities."""
-        registry_scope = ScopeRef(scope_type=CONTAINER_REGISTRY_SCOPE_TYPE, scope_id=registry_id)
         project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id)
         await ops.ensure_scope(project_scope)
-        await ops.add_entity_members(
+        await ops.add_bulk_members(
             EntityMembersAddition(
                 scope=project_scope,
                 members=[
@@ -409,7 +408,6 @@ class ContainerRegistryRepository:
                 ],
             )
         )
-        await ops.bind_scope(project_scope, registry_scope, permission_cap=None)
 
     async def _withdraw_registry_from_project(
         self,
@@ -421,7 +419,6 @@ class ContainerRegistryRepository:
 
         Returns the number of deleted mapping rows.
         """
-        registry_scope = ScopeRef(scope_type=CONTAINER_REGISTRY_SCOPE_TYPE, scope_id=registry_id)
         project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id)
         purge_result = await ops.batch_purge(
             BatchPurger(
@@ -431,11 +428,10 @@ class ContainerRegistryRepository:
                 )
             )
         )
-        await ops.remove_entity_members(
+        await ops.remove_bulk_members(
             project_scope,
             [EntityRef(entity_type=CONTAINER_REGISTRY_ENTITY_TYPE, entity_id=registry_id)],
         )
-        await ops.unbind_scope(project_scope, registry_scope)
         return purge_result.deleted_count
 
     async def _get_by_registry_and_project(
