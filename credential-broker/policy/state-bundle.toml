@@ -39,6 +39,16 @@ name = "password"
 resource = "default/control-plane/postgres-password"
 
 [[credential]]
+unit = "backendai-appproxy-schema.service"
+name = "alembic-appproxy.ini"
+render = "alembic-appproxy.ini.in"
+
+[[credential]]
+unit = "backendai-appproxy-schema.service"
+name = "password"
+resource = "default/control-plane/postgres-password"
+
+[[credential]]
 unit = "backendai-manager.service"
 name = "tls.key"
 identity = "manager"
