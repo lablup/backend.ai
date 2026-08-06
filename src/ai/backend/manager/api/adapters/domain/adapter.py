@@ -265,6 +265,14 @@ class DomainAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
 
+        if filter.row_id is not None:
+            condition = filter.row_id.build_query_condition(
+                equals_factory=DomainConditions.by_id_equals,
+                in_factory=DomainConditions.by_id_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
         if filter.description is not None:
             condition = self._convert_description_filter(filter.description)
             if condition is not None:

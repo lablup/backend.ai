@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 
 import click
 
@@ -34,6 +35,12 @@ def domain() -> None:
     help="Filter by active status.",
 )
 @click.option(
+    "--row-id",
+    default=None,
+    type=click.UUID,
+    help="Filter by domain uuid.",
+)
+@click.option(
     "--order-by",
     multiple=True,
     help="Order by field:direction (e.g., name:asc, created_at:desc).",
@@ -43,6 +50,7 @@ def search(
     offset: int,
     name_contains: str | None,
     is_active: bool | None,
+    row_id: uuid.UUID | None,
     order_by: tuple[str, ...],
 ) -> None:
     """Search domains (superadmin only)."""
@@ -55,11 +63,12 @@ def search(
 
     # Build filter only if any filter option is provided
     filter_dto: DomainFilter | None = None
-    if name_contains is not None or is_active is not None:
-        from ai.backend.common.dto.manager.query import StringFilter
+    if name_contains is not None or is_active is not None or row_id is not None:
+        from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 
         filter_dto = DomainFilter(
             name=StringFilter(contains=name_contains) if name_contains is not None else None,
+            row_id=UUIDFilter(equals=row_id) if row_id is not None else None,
             is_active=is_active,
         )
 

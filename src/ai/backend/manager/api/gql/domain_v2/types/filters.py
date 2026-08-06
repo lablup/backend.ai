@@ -10,13 +10,16 @@ from ai.backend.common.dto.manager.v2.domain.types import (
     DomainProjectFilter,
     DomainUserFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
     StringFilter,
+    UUIDFilter,
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_enum,
     gql_pydantic_input,
 )
@@ -63,6 +66,13 @@ class DomainV2Filter(PydanticInputMixin[DomainFilter]):
     """Filter for domain queries."""
 
     name: StringFilter | None = None
+    row_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by domain uuid.",
+        ),
+        default=None,
+    )
     description: StringFilter | None = None
     is_active: bool | None = None
     created_at: DateTimeFilter | None = None
