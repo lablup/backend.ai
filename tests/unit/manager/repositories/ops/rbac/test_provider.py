@@ -1829,14 +1829,18 @@ class _ExpectedBindingRow:
 
 @dataclass(frozen=True)
 class _ScopedPartialUpsertCase:
-    """One batch for the partial bulk op: its items, and which land, fail, and bind."""
+    """One batch for the partial bulk op: its items, and which land, fail, and bind.
+
+    The expected fields carry no defaults on purpose: every case spells out its full
+    outcome, an empty one included.
+    """
 
     name: str
     description: str
     items: tuple[_PartialUpsertItem, ...]
-    expected_succeeded_names: list[str] = field(default_factory=list)
-    expected_failed_indexes: list[int] = field(default_factory=list)
-    expected_bindings: list[_ExpectedBindingRow] = field(default_factory=list)
+    expected_succeeded_names: list[str]
+    expected_failed_indexes: list[int]
+    expected_bindings: list[_ExpectedBindingRow]
 
 
 class TestBulkUpsertScopedPartial:
@@ -1851,6 +1855,7 @@ class TestBulkUpsertScopedPartial:
                     _PartialUpsertItem(row_name="second"),
                 ),
                 expected_succeeded_names=["first", "second"],
+                expected_failed_indexes=[],
                 expected_bindings=[
                     _ExpectedBindingRow(row_name="first", scope_id=_USER_SCOPE_ID),
                     _ExpectedBindingRow(row_name="second", scope_id=_USER_SCOPE_ID),
@@ -1861,6 +1866,8 @@ class TestBulkUpsertScopedPartial:
                 description="a scope-less (GLOBAL) item lands but binds to nothing",
                 items=(_PartialUpsertItem(row_name="solo", scope_ref=None),),
                 expected_succeeded_names=["solo"],
+                expected_failed_indexes=[],
+                expected_bindings=[],
             ),
             _ScopedPartialUpsertCase(
                 name="rejected-item-fails-alone",
@@ -1883,7 +1890,9 @@ class TestBulkUpsertScopedPartial:
                     _PartialUpsertItem(row_name="doomed-a", parent_id=_ABSENT_PARENT_ID),
                     _PartialUpsertItem(row_name="doomed-b", parent_id=_ABSENT_PARENT_ID),
                 ),
+                expected_succeeded_names=[],
                 expected_failed_indexes=[0, 1],
+                expected_bindings=[],
             ),
         ],
         ids=lambda case: case.name,
