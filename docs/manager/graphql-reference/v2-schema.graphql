@@ -16489,8 +16489,10 @@ type UserV2OrganizationInfo {
   """Name of the user resource policy applied to this user."""
   resourcePolicy: String!
 
-  """Primary API access key for this user."""
-  mainAccessKey: String
+  """
+  Primary API access key for this user. Deprecated since 26.9.0. The default keypair is recorded on the keypair itself.
+  """
+  mainAccessKey: String @deprecated(reason: "Deprecated since 26.9.0. The default keypair is recorded on the keypair itself.")
 }
 
 """

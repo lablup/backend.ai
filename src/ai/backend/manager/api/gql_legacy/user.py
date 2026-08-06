@@ -568,10 +568,11 @@ class User(graphene.ObjectType):  # type: ignore[misc]
     sudo_session_enabled = graphene.Boolean()
     main_access_key = graphene.String(
         description=(
-            "Added in 24.03.0. Used as the default authentication credential for password-based"
+            "Added in 24.03.0. Deprecated since 26.9.0. The default keypair is recorded on the keypair itself. Used as the default authentication credential for password-based"
             " logins and sets the user's total resource usage limit. User's main_access_key cannot"
             " be deleted, and only super-admin can replace main_access_key."
-        )
+        ),
+        deprecation_reason="Deprecated since 26.9.0. The default keypair is recorded on the keypair itself.",
     )
     container_uid = graphene.Int(
         description="Added in 25.2.0. The user ID (UID) assigned to processes running inside the container."

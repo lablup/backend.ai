@@ -106,7 +106,10 @@ class UserOrganizationInfoGQL:
     resource_policy: str = gql_field(
         description="Name of the user resource policy applied to this user."
     )
-    main_access_key: str | None = gql_field(description="Primary API access key for this user.")
+    main_access_key: str | None = gql_field(
+        description="Primary API access key for this user.",
+        deprecation_reason="Deprecated since 26.9.0. The default keypair is recorded on the keypair itself.",
+    )
 
 
 @gql_pydantic_type(
