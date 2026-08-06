@@ -1,0 +1,17 @@
+[Unit]
+Description=Backend.AI control-plane benchmarks
+After=backendai-credentials.service backendai-postgresql.service backendai-etcd.service backendai-manager.service
+
+[Service]
+Type=oneshot
+Environment="BAI_BENCH_ARGS=--label state-bundle"
+EnvironmentFile=-/var/lib/backendai/benchmarks.env
+LoadCredential=password:/run/backendai-credentials.sock
+LoadCredential=etcd-root-password:/run/backendai-credentials.sock
+ExecStartPre=/usr/lib/backendai/credential-guard password etcd-root-password
+ExecStart=/usr/lib/backendai/run-benchmarks $BAI_BENCH_ARGS
+TimeoutStartSec=3600
+StandardOutput=journal+console
+StandardError=journal+console
+UMask=0077
+NoNewPrivileges=yes

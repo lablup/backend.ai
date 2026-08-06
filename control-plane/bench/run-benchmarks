@@ -2,6 +2,7 @@
 import argparse
 import http.client
 import json
+import os
 import statistics
 import subprocess
 import sys
@@ -23,8 +24,19 @@ def percentiles(samples):
     }
 
 
-def shell(args, timeout=120):
-    return subprocess.run(args, capture_output=True, text=True, timeout=timeout, check=False)
+def shell(args, timeout=120, env=None):
+    return subprocess.run(args, capture_output=True, text=True, timeout=timeout, check=False, env=env)
+
+
+def credential(name):
+    directory = os.environ.get("CREDENTIALS_DIRECTORY")
+    if not directory:
+        raise SystemExit("run-benchmarks: no credentials directory; start it through its unit")
+    with open(os.path.join(directory, name), encoding="utf-8") as f:
+        value = f.read().strip()
+    if not value:
+        raise SystemExit(f"run-benchmarks: {name} is zero length; release was denied")
+    return value
 
 
 def control_plane_burst(args):
@@ -68,14 +80,19 @@ def control_plane_burst(args):
 
 
 def etcd_commit(args):
-    base = ["etcdctl", "--endpoints", args.etcd_endpoint]
+    base = ["etcdctl", "--endpoints", args.etcd_endpoint,
+            "--user", "root:" + credential("etcd-root-password")]
     samples = []
+    refused = ""
     for index in range(args.iterations):
         start = time.perf_counter()
         done = shell(base + ["put", f"/bench/commit/{index}", "x" * 256])
         if done.returncode == 0:
             samples.append(time.perf_counter() - start)
+        elif not refused:
+            refused = done.stderr.strip()
     report = percentiles(samples)
+    report["first_error"] = refused
     terms, leaders = [], []
     deadline = time.time() + args.election_window_s
     while time.time() < deadline:
@@ -97,17 +114,28 @@ def etcd_commit(args):
 
 def postgres_commit(args):
     samples = []
+    refused = ""
+    env = dict(
+        os.environ,
+        PATH=os.environ["PATH"] + ":/usr/lib/postgresql/16/bin",
+        PGHOST=args.pghost,
+        PGUSER=args.pguser,
+        PGPASSWORD=credential("password"),
+    )
     shell(["psql", "-q", "-d", args.database, "-c",
-           "CREATE TABLE IF NOT EXISTS bench_commit (id serial primary key, payload text)"])
+           "CREATE TABLE IF NOT EXISTS bench_commit (id serial primary key, payload text)"], env=env)
     for _ in range(args.iterations):
         start = time.perf_counter()
         done = shell(["psql", "-q", "-v", "ON_ERROR_STOP=1", "-d", args.database, "-c",
-                      "INSERT INTO bench_commit (payload) VALUES (repeat('x', 256))"])
+                      "INSERT INTO bench_commit (payload) VALUES (repeat('x', 256))"], env=env)
         if done.returncode == 0:
             samples.append(time.perf_counter() - start)
+        elif not refused:
+            refused = done.stderr.strip()
     report = percentiles(samples)
+    report["first_error"] = refused
     for setting in ("huge_pages", "synchronous_commit", "wal_sync_method", "shared_buffers"):
-        value = shell(["psql", "-tA", "-d", args.database, "-c", f"SHOW {setting}"])
+        value = shell(["psql", "-tA", "-d", args.database, "-c", f"SHOW {setting}"], env=env)
         report[setting] = value.stdout.strip() if value.returncode == 0 else "unread"
     try:
         with open("/proc/meminfo", encoding="utf-8") as f:
@@ -116,7 +144,7 @@ def postgres_commit(args):
             ]
     except OSError:
         report["meminfo_hugepages"] = []
-    shell(["psql", "-q", "-d", args.database, "-c", "DROP TABLE bench_commit"])
+    shell(["psql", "-q", "-d", args.database, "-c", "DROP TABLE bench_commit"], env=env)
     return report
 
 
@@ -164,6 +192,8 @@ def main(argv=None):
     parser.add_argument("--manager-url", default="https://127.0.0.1:8081/")
     parser.add_argument("--etcd-endpoint", default="http://127.0.0.1:2379")
     parser.add_argument("--database", default="backend")
+    parser.add_argument("--pghost", default="/run/backendai")
+    parser.add_argument("--pguser", default="postgres")
     parser.add_argument("--consumer-units", default="backendai-manager.service")
     parser.add_argument("--requests", type=int, default=2000)
     parser.add_argument("--concurrency", type=int, default=50)

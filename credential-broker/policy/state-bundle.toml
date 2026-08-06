@@ -4,7 +4,8 @@ client = "/usr/bin/kbs-client"
 socket = "/run/backendai-credentials.sock"
 template_dir = "/usr/share/backendai/credential-templates"
 identity_dir = "/run/backendai-credentials"
-decision_log = "/var/log/backendai-credentials.jsonl"
+decision_log = "/var/lib/backendai/log/backendai-credentials.jsonl"
+durable_root = "/var/lib/backendai"
 certificate_plugin = "external/pkix"
 timeout_seconds = 30
 boot_attempts = 5
@@ -147,3 +148,23 @@ resource = "default/control-plane/etcd-root-password"
 unit = "backendai-state-backup.service"
 name = "password"
 resource = "default/control-plane/postgres-password"
+
+[[credential]]
+unit = "backendai-state-restore.service"
+name = "backup.key"
+resource = "default/control-plane/state-backup-key"
+
+[[credential]]
+unit = "backendai-state-restore.service"
+name = "password"
+resource = "default/control-plane/postgres-password"
+
+[[credential]]
+unit = "backendai-benchmarks.service"
+name = "password"
+resource = "default/control-plane/postgres-password"
+
+[[credential]]
+unit = "backendai-benchmarks.service"
+name = "etcd-root-password"
+resource = "default/control-plane/etcd-root-password"
