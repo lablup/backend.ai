@@ -556,8 +556,10 @@ class PresetModelServiceConfigInputGQL(PydanticInputMixin[PresetModelServiceConf
         ),
         default=DEFAULT_SHELL,
     )
-    port: int = gql_field(
-        description="Port number for the model service. Must be greater than 1.",
+    port: int | None = gql_field(
+        default=None,
+        description="Port number for the model service. Must be greater than 1. Omit to "
+        "inherit the runtime variant baseline's port.",
     )
     health_check: PresetModelHealthCheckInputGQL | None = gql_field(
         description="Health check configuration for the model service.", default=None

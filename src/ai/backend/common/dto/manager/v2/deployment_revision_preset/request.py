@@ -82,8 +82,11 @@ class PresetModelServiceConfigInput(BaseRequestModel):
             "`[shell, '-c', command]`; null or empty disables shell wrapping."
         ),
     )
-    port: int = Field(
-        gt=1, description="Port number for the model service. Must be greater than 1."
+    port: int | None = Field(
+        default=None,
+        gt=1,
+        description="Port number for the model service. Must be greater than 1. Optional; "
+        "defaults to the runtime variant baseline's port at revision resolution.",
     )
     health_check: PresetModelHealthCheckInput | None = Field(
         default=None, description="Health check configuration for the model service."
