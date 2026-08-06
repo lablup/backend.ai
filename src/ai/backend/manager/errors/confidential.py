@@ -194,6 +194,24 @@ class CrossDomainFolderKeyRefused(BackendAIError, web.HTTPForbidden):
         )
 
 
+class ImageKeyNotEntitled(BackendAIError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/confidential-image-key-not-entitled"
+    error_title = (
+        "A guest may fetch a layer key encryption key only while this manager is launching"
+        " a session on the image that key belongs to: the key reference is frozen into the"
+        " image manifest and carries no session term, so an unnarrowed fetch would hand the"
+        " key to any attested guest at any time, forever."
+    )
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.IMAGE,
+            operation=ErrorOperation.GRANT,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
 class FolderKeyNotEntitled(BackendAIError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/confidential-folder-key-not-entitled"
     error_title = (
