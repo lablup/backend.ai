@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from yarl import URL
 
-from ai.backend.client.v2.auth import NoAuth
 from ai.backend.client.v2.base_client import BackendAIAnonymousClient, BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains_v2.app_config import V2AppConfigClient
@@ -61,13 +60,10 @@ def client(mock_session: MagicMock) -> V2AppConfigClient:
 
 
 @pytest.fixture
-def pre_login_registry(mock_session: MagicMock) -> V2ClientRegistry:
-    """A registry as a caller holds it before it has any credentials.
-
-    ``NoAuth`` is what the authenticated half carries until a keypair is configured.
-    """
+def registry(mock_session: MagicMock) -> V2ClientRegistry:
+    """A registry that does hold credentials, so a signed call is told apart from an unsigned one."""
     return V2ClientRegistry(
-        BackendAIAuthClient(_DEFAULT_CONFIG, NoAuth(), mock_session),
+        BackendAIAuthClient(_DEFAULT_CONFIG, MockAuth(), mock_session),
         BackendAIAnonymousClient(_DEFAULT_CONFIG, mock_session),
     )
 
@@ -133,16 +129,19 @@ class TestPublicMergedRead:
         assert (uncontributed.config_name, uncontributed.config) == ("menu", {})
 
 
-class TestPreLoginCaller:
-    async def test_a_caller_holding_no_credentials_can_make_the_public_read(
+class TestRegistryWiring:
+    async def test_hands_the_public_read_the_anonymous_client(
         self,
-        pre_login_registry: V2ClientRegistry,
+        registry: V2ClientRegistry,
         mock_session: MagicMock,
     ) -> None:
-        """Reaching the public read through the registry is the contract it exists for."""
-        result = await pre_login_registry.app_config.public_get_app_configs(
-            PublicGetAppConfigsInput(config_names=["theme", "menu"])
+        """A caller holding credentials still reaches the public read without sending them.
+
+        The registry keeps both halves, so wiring this domain to the authenticated one would
+        sign the pre-login read.
+        """
+        await registry.app_config.public_get_app_configs(
+            PublicGetAppConfigsInput(config_names=["theme"])
         )
 
         assert "Authorization" not in mock_session.request.call_args[1]["headers"]
-        assert [node.config_name for node in result.app_configs] == ["theme", "menu"]
