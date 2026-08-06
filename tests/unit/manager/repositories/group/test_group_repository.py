@@ -416,6 +416,7 @@ class TestGroupRepository:
                     resource_policy=default_user_resource_policy,
                 )
                 session.add(user)
+                session.add(VirtualScopeRow(scope_type=ScopeType.USER.value, scope_id=user_uuid))
                 user_uuids.append(user_uuid)
             await session.commit()
 
