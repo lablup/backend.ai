@@ -6959,6 +6959,11 @@ type DomainV2 implements Node
   lifecycle: DomainLifecycleInfo!
 
   """
+  Added in 26.9.0. Domain uuid as a plain scalar, without the Relay global-id encoding.
+  """
+  entityId: UUID!
+
+  """
   Fair share record for this domain in the specified resource group. Returns the scheduling priority configuration for this domain. Always returns an object, even if no explicit configuration exists (in which case default values are used).
   """
   fairShare(scope: DomainFairShareScope!): DomainFairShare
@@ -7014,6 +7019,9 @@ input DomainV2Filter
   @join__type(graph: STRAWBERRY)
 {
   name: StringFilter = null
+
+  """Added in 26.9.0. Filter by domain uuid."""
+  id: UUIDFilter = null
   description: StringFilter = null
   isActive: Boolean = null
   createdAt: DateTimeFilter = null

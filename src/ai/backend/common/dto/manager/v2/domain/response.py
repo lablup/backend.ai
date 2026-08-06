@@ -11,6 +11,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import BackendAISchema
 
 __all__ = (
@@ -73,8 +74,8 @@ class DomainLifecycleInfo(BackendAISchema):
 class DomainNode(BaseResponseModel):
     """Domain entity with structured field groups."""
 
-    id: str = Field(
-        description="Domain name (primary key).",
+    id: DomainID = Field(
+        description="Domain uuid. The name lives at basic_info.name.",
     )
     basic_info: DomainBasicInfo = Field(
         description="Basic domain information including name and description.",
