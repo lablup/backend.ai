@@ -183,7 +183,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult[Self]:
+    ) -> ConnectionResolverResult[UserNode]:
         from ai.backend.manager.models.user import UserRow
 
         graph_ctx: GraphQueryContext = info.context
@@ -235,7 +235,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
             cnt_query = cnt_query.where(cond)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             user_rows = (await db_session.scalars(user_query)).all()
-            result = [type(self).from_row(graph_ctx, row) for row in user_rows]
+            result = [UserNode.from_row(graph_ctx, row) for row in user_rows]
             total_cnt = await db_session.scalar(cnt_query) or 0
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
