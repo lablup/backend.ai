@@ -132,7 +132,7 @@ def _get_keypairs_join_condition() -> Any:
 def _get_main_keypair_join_condition() -> Any:
     from ai.backend.manager.models.keypair import KeyPairRow
 
-    return (foreign(KeyPairRow.user) == UserRow.uuid) & KeyPairRow.is_main
+    return (foreign(KeyPairRow.user) == UserRow.uuid) & KeyPairRow.is_default
 
 
 class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
@@ -378,7 +378,7 @@ class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
                     keypair_candidate = row
                     break
             if keypair_candidate is not None:
-                keypair_candidate.is_main = True
+                keypair_candidate.is_default = True
                 self.main_access_key = keypair_candidate.access_key
         else:
             keypair_candidate = main_keypair_row

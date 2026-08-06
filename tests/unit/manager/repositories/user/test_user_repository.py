@@ -93,7 +93,7 @@ class UserWithGroup:
 
 @dataclass(frozen=True)
 class UserWithMarkedKeypair:
-    """A user whose main keypair is known only by the ``keypairs.is_main`` marker.
+    """A user whose main keypair is known only by the ``keypairs.is_default`` marker.
 
     ``users.main_access_key`` is deliberately left unset — the state the old
     ``ON DELETE SET NULL`` foreign key produced whenever any keypair was deleted.
@@ -448,7 +448,7 @@ class TestUserRepository:
                     user=data.user_uuid,
                     is_active=True,
                     is_admin=False,
-                    is_main=True,
+                    is_default=True,
                     resource_policy=main_policy,
                     rate_limit=1000,
                 )

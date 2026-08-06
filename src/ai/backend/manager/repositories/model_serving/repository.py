@@ -849,7 +849,7 @@ class ModelServingRepository:
                     raise InvalidAPIParameters("Session owner not found for endpoint")
                 main_access_key = await db_session.scalar(
                     sa.select(KeyPairRow.access_key).where(
-                        (KeyPairRow.user == session_owner.uuid) & KeyPairRow.is_main
+                        (KeyPairRow.user == session_owner.uuid) & KeyPairRow.is_default
                     )
                 )
                 if main_access_key is None:

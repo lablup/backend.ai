@@ -175,7 +175,7 @@ async def test_user(
                 is_admin=True,
                 user=user_id,
                 resource_policy="default",
-                is_main=True,
+                is_default=True,
             )
         )
         await sess.flush()

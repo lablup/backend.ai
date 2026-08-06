@@ -2,7 +2,7 @@
 Tests for ``IdleCheckerHost.do_idle_check()`` against a real database.
 
 The idle policy is resolved through the user's main keypair — the one marked
-``keypairs.is_main`` — instead of the kernel's own ``access_key``, which a
+``keypairs.is_default`` — instead of the kernel's own ``access_key``, which a
 keypair deletion can leave orphaned. A kernel whose policy cannot be resolved,
 or whose checker raises, must not stop the remaining kernels of the same cycle
 from being checked.
@@ -320,7 +320,7 @@ class TestDoIdleCheck:
         if main_keypair_idle_timeout is None:
             return user_uuid, None
         access_key = await self._create_keypair(
-            db, user_uuid=user_uuid, idle_timeout=main_keypair_idle_timeout, is_main=True
+            db, user_uuid=user_uuid, idle_timeout=main_keypair_idle_timeout, is_default=True
         )
         return user_uuid, access_key
 
@@ -330,7 +330,7 @@ class TestDoIdleCheck:
         *,
         user_uuid: uuid.UUID,
         idle_timeout: int,
-        is_main: bool = False,
+        is_default: bool = False,
     ) -> AccessKey:
         policy_name = await self._create_keypair_policy(db, idle_timeout)
         access_key = AccessKey(f"AKTEST{uuid.uuid4().hex[:14]}")
@@ -343,7 +343,7 @@ class TestDoIdleCheck:
                     user_id=str(user_uuid),
                     is_active=True,
                     is_admin=False,
-                    is_main=is_main,
+                    is_default=is_default,
                     resource_policy=policy_name,
                 )
             )

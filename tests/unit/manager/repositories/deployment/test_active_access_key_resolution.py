@@ -31,7 +31,7 @@ class KeypairSpec:
     access_key: str
     is_active: bool
     created_at: datetime
-    is_main: bool = False
+    is_default: bool = False
 
 
 @dataclass
@@ -48,7 +48,7 @@ class TestResolveUserAndActiveAccessKey:
     replicas were persisting non-deterministic and potentially inactive
     access keys into sessions.access_key. The contract under test is:
 
-    1. The keypair marked ``is_main`` wins when active.
+    1. The keypair marked ``is_default`` wins when active.
     2. Missing user vs no-active-keypair raise different exceptions.
     """
 
@@ -129,7 +129,7 @@ class TestResolveUserAndActiveAccessKey:
                         is_active=kp.is_active,
                         resource_policy=kp_policy,
                         created_at=kp.created_at,
-                        is_main=kp.is_main,
+                        is_default=kp.is_default,
                     )
                 )
             await sess.commit()
@@ -161,7 +161,7 @@ class TestResolveUserAndActiveAccessKey:
                         main_key,
                         is_active=True,
                         created_at=now - timedelta(days=10),
-                        is_main=True,
+                        is_default=True,
                     ),
                     KeypairSpec(other_active, is_active=True, created_at=now),
                 ],

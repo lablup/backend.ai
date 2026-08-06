@@ -147,7 +147,7 @@ class TestLoginSessionForce:
                 user_id=email,
                 user=user_uuid,
                 is_active=True,
-                is_main=True,
+                is_default=True,
                 resource_policy="test-keypair-policy",
             )
             db_sess.add(keypair)

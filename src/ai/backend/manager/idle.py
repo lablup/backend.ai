@@ -262,7 +262,7 @@ class IdleCheckerHost:
         async with self._db.begin_readonly() as conn:
             j = sa.join(kernels, users, kernels.c.user_uuid == users.c.uuid).outerjoin(
                 keypairs,
-                (keypairs.c.user == users.c.uuid) & keypairs.c.is_main,
+                (keypairs.c.user == users.c.uuid) & keypairs.c.is_default,
             )
             query = (
                 sa.select(
