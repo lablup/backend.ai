@@ -28,6 +28,24 @@ def register_v2_resource_slot_routes(
     )
     registry.add(
         "POST",
+        "/slot-types",
+        handler.admin_create_slot_type,
+        middlewares=[superadmin_required],
+    )
+    registry.add(
+        "PATCH",
+        "/slot-types/{slot_name}",
+        handler.admin_update_slot_type,
+        middlewares=[superadmin_required],
+    )
+    registry.add(
+        "DELETE",
+        "/slot-types/{slot_name}",
+        handler.admin_purge_slot_type,
+        middlewares=[superadmin_required],
+    )
+    registry.add(
+        "POST",
         "/agent-resources/search",
         handler.search_agent_resources,
         middlewares=[superadmin_required],

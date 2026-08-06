@@ -15,10 +15,13 @@ from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AdminSearchResourceSlotTypesInput,
     AgentResourceFilter,
     AgentResourceOrder,
+    CreateResourceSlotTypeInput,
+    PurgeResourceSlotTypeInput,
     ResourceAllocationFilter,
     ResourceAllocationOrder,
     ResourceSlotTypeFilter,
     ResourceSlotTypeOrder,
+    UpdateResourceSlotTypeInput,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.response import (
     ActiveResourceOverviewInfoDTO,
@@ -26,10 +29,16 @@ from ai.backend.common.dto.manager.v2.resource_slot.response import (
     AdminSearchResourceAllocationsPayload,
     AdminSearchResourceSlotTypesPayload,
     AgentResourceNode,
+    CreateResourceSlotTypePayload,
+    PurgeResourceSlotTypePayload,
     ResourceAllocationNode,
     ResourceSlotTypeNode,
+    UpdateResourceSlotTypePayload,
 )
-from ai.backend.common.dto.manager.v2.resource_slot.types import NumberFormatInfo
+from ai.backend.common.dto.manager.v2.resource_slot.types import (
+    NumberFormatInfo,
+    NumberFormatInput,
+)
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.resource_slot.types import (
     AgentResourceData,
@@ -53,7 +62,12 @@ from ai.backend.manager.models.resource_slot.orders import (
     resolve_resource_allocation_order,
     resolve_slot_type_order,
 )
+from ai.backend.manager.models.resource_slot.types import NumberFormat
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.resource_slot.creators import ResourceSlotTypeCreator
+from ai.backend.manager.repositories.resource_slot.purgers import ResourceSlotTypePurger
+from ai.backend.manager.repositories.resource_slot.updaters import ResourceSlotTypeUpdater
+from ai.backend.manager.services.resource_slot.actions.create import CreateResourceSlotTypeAction
 from ai.backend.manager.services.resource_slot.actions.get_agent_resource_by_slot import (
     GetAgentResourceBySlotAction,
 )
@@ -69,6 +83,7 @@ from ai.backend.manager.services.resource_slot.actions.get_project_resource_over
 from ai.backend.manager.services.resource_slot.actions.get_resource_slot_type import (
     GetResourceSlotTypeAction,
 )
+from ai.backend.manager.services.resource_slot.actions.purge import PurgeResourceSlotTypeAction
 from ai.backend.manager.services.resource_slot.actions.search_agent_resources import (
     SearchAgentResourcesAction,
 )
@@ -78,6 +93,8 @@ from ai.backend.manager.services.resource_slot.actions.search_resource_allocatio
 from ai.backend.manager.services.resource_slot.actions.search_resource_slot_types import (
     SearchResourceSlotTypesAction,
 )
+from ai.backend.manager.services.resource_slot.actions.update import UpdateResourceSlotTypeAction
+from ai.backend.manager.types import OptionalState
 
 DEFAULT_PAGINATION_LIMIT = 10
 
@@ -159,13 +176,84 @@ class ResourceSlotAdapter(BaseAdapter):
             offset=input.offset if input.offset is not None else 0,
         )
 
+    # -------------------------------------------------------------------------
+    # ResourceSlotType write (superadmin only)
+    # -------------------------------------------------------------------------
+
+    async def admin_create_slot_type(
+        self, input: CreateResourceSlotTypeInput
+    ) -> CreateResourceSlotTypePayload:
+        """Register a new resource slot type."""
+        creator = ResourceSlotTypeCreator(
+            slot_name=input.slot_name,
+            slot_type=input.slot_type,
+            required=input.required,
+            enabled=input.enabled,
+            display_name=input.display_name,
+            description=input.description,
+            display_unit=input.display_unit,
+            display_icon=input.display_icon,
+            number_format=self._to_number_format(input.number_format),
+            rank=input.rank,
+        )
+        action_result = await self._processors.resource_slot.create_resource_slot_type.run(
+            CreateResourceSlotTypeAction(creator=creator)
+        )
+        return CreateResourceSlotTypePayload(
+            resource_slot_type=self._slot_type_data_to_node(action_result.data),
+        )
+
+    async def admin_update_slot_type(
+        self, input: UpdateResourceSlotTypeInput
+    ) -> UpdateResourceSlotTypePayload:
+        """Update the display and scheduling flags of a resource slot type."""
+        updater = ResourceSlotTypeUpdater(
+            slot_name=input.slot_name,
+            required=OptionalState.from_nullable(input.required),
+            enabled=OptionalState.from_nullable(input.enabled),
+            display_name=OptionalState.from_nullable(input.display_name),
+            description=OptionalState.from_nullable(input.description),
+            display_unit=OptionalState.from_nullable(input.display_unit),
+            display_icon=OptionalState.from_nullable(input.display_icon),
+            number_format=(
+                OptionalState.update(self._to_number_format(input.number_format))
+                if input.number_format is not None
+                else OptionalState.nop()
+            ),
+            rank=OptionalState.from_nullable(input.rank),
+        )
+        action_result = await self._processors.resource_slot.update_resource_slot_type.run(
+            UpdateResourceSlotTypeAction(updater=updater)
+        )
+        return UpdateResourceSlotTypePayload(
+            resource_slot_type=self._slot_type_data_to_node(action_result.data),
+        )
+
+    async def admin_purge_slot_type(
+        self, input: PurgeResourceSlotTypeInput
+    ) -> PurgeResourceSlotTypePayload:
+        """Remove a resource slot type, refusing while anything still references it."""
+        action_result = await self._processors.resource_slot.purge_resource_slot_type.run(
+            PurgeResourceSlotTypeAction(purger=ResourceSlotTypePurger(slot_name=input.slot_name))
+        )
+        return PurgeResourceSlotTypePayload(slot_name=action_result.data.slot_name)
+
+    @staticmethod
+    def _to_number_format(input: NumberFormatInput | None) -> NumberFormat:
+        if input is None:
+            return NumberFormat()
+        return NumberFormat(binary=input.binary, round_length=input.round_length)
+
     @staticmethod
     def _slot_type_data_to_node(data: ResourceSlotTypeData) -> ResourceSlotTypeNode:
         """Convert ResourceSlotTypeData to Pydantic DTO node."""
         return ResourceSlotTypeNode(
             id=data.slot_name,
+            uuid=data.uuid,
             slot_name=data.slot_name,
             slot_type=data.slot_type,
+            required=data.required,
+            enabled=data.enabled,
             display_name=data.display_name,
             description=data.description,
             display_unit=data.display_unit,

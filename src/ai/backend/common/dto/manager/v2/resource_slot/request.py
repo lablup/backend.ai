@@ -6,10 +6,12 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.types import SlotTypes
 
 from .types import (
     AgentResourceOrderField,
     AllocatedResourceSlotOrderField,
+    NumberFormatInput,
     OrderDirection,
     ResourceAllocationOrderField,
     ResourceSlotTypeOrderField,
@@ -23,11 +25,14 @@ __all__ = (
     "AgentResourceOrder",
     "AllocatedResourceSlotFilter",
     "AllocatedResourceSlotOrder",
+    "CreateResourceSlotTypeInput",
+    "PurgeResourceSlotTypeInput",
     "ResourceAllocationFilter",
     "ResourceAllocationOrder",
     "ResourceSlotTypeFilter",
     "ResourceSlotTypeOrder",
     "SearchAllocatedResourceSlotsInput",
+    "UpdateResourceSlotTypeInput",
 )
 
 
@@ -81,6 +86,76 @@ class AdminSearchResourceSlotTypesInput(BaseRequestModel):
     # Offset-based pagination
     limit: int | None = Field(default=None, ge=1, description="Maximum number of items to return.")
     offset: int | None = Field(default=None, ge=0, description="Number of items to skip.")
+
+
+class CreateResourceSlotTypeInput(BaseRequestModel):
+    """Input for registering a new resource slot type."""
+
+    slot_name: str = Field(
+        min_length=1,
+        max_length=64,
+        description="Unique slot name to register (e.g., 'cpu', 'mem', 'cuda.device').",
+    )
+    slot_type: SlotTypes = Field(
+        description=(
+            "Category of the slot type. The scheduler reads this back as a "
+            "`SlotTypes` member for every enabled slot, so a value outside the "
+            "enum is rejected here rather than breaking the catalog."
+        ),
+    )
+    required: bool = Field(
+        default=False,
+        description="Whether a session request must name this slot.",
+    )
+    enabled: bool = Field(
+        default=True,
+        description="Whether the scheduler considers this slot when placing sessions.",
+    )
+    display_name: str = Field(default="", max_length=128, description="Human-readable name.")
+    description: str = Field(default="", max_length=256, description="Longer description.")
+    display_unit: str = Field(default="", max_length=32, description="Unit label (e.g., 'GiB').")
+    display_icon: str = Field(default="", max_length=64, description="Icon identifier for UIs.")
+    number_format: NumberFormatInput | None = Field(
+        default=None, description="Number formatting rules. Defaults to decimal, no rounding."
+    )
+    rank: int = Field(default=0, description="Display ordering rank. Lower values appear first.")
+
+
+class UpdateResourceSlotTypeInput(BaseRequestModel):
+    """Input for updating a resource slot type.
+
+    ``slot_name`` names the target and is not itself updatable; neither is
+    ``slot_type``. Every other field left unset stays unchanged.
+    """
+
+    slot_name: str = Field(description="Slot name identifying the slot type to update.")
+    required: bool | None = Field(
+        default=None, description="Whether a session request must name this slot."
+    )
+    enabled: bool | None = Field(
+        default=None,
+        description="Whether the scheduler considers this slot when placing sessions.",
+    )
+    display_name: str | None = Field(
+        default=None, max_length=128, description="Human-readable name."
+    )
+    description: str | None = Field(default=None, max_length=256, description="Longer description.")
+    display_unit: str | None = Field(
+        default=None, max_length=32, description="Unit label (e.g., 'GiB')."
+    )
+    display_icon: str | None = Field(
+        default=None, max_length=64, description="Icon identifier for UIs."
+    )
+    number_format: NumberFormatInput | None = Field(
+        default=None, description="Number formatting rules."
+    )
+    rank: int | None = Field(default=None, description="Display ordering rank.")
+
+
+class PurgeResourceSlotTypeInput(BaseRequestModel):
+    """Input for removing a resource slot type."""
+
+    slot_name: str = Field(description="Slot name identifying the slot type to remove.")
 
 
 # ========== AgentResource ==========
