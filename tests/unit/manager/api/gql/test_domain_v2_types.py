@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 
 from ai.backend.common.dto.manager.v2.domain.response import (
@@ -10,6 +11,7 @@ from ai.backend.common.dto.manager.v2.domain.response import (
     DomainNode,
     DomainRegistryInfo,
 )
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.api.gql.domain_v2.types import (
     DomainV2GQL,
 )
@@ -28,6 +30,7 @@ def _make_domain_node(
     now = datetime.now(tz=UTC)
     return DomainNode(
         id=name,
+        row_id=DomainID(uuid.uuid4()),
         basic_info=DomainBasicInfo(
             name=name,
             description=description,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 from datetime import UTC, datetime
 
 from ai.backend.common.dto.manager.pagination import PaginationInfo
@@ -16,6 +17,7 @@ from ai.backend.common.dto.manager.v2.domain.response import (
     PurgeDomainPayload,
     SearchDomainsPayload,
 )
+from ai.backend.common.identifier.domain import DomainID
 
 
 def make_domain_node(name: str = "test-domain") -> DomainNode:
@@ -23,6 +25,7 @@ def make_domain_node(name: str = "test-domain") -> DomainNode:
     now = datetime.now(tz=UTC)
     return DomainNode(
         id=name,
+        row_id=DomainID(uuid.uuid4()),
         basic_info=DomainBasicInfo(
             name=name,
             description="Test domain",

@@ -11,6 +11,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import BackendAISchema
 
 __all__ = (
@@ -75,6 +76,12 @@ class DomainNode(BaseResponseModel):
 
     id: str = Field(
         description="Domain name (primary key).",
+    )
+    row_id: DomainID = Field(
+        description=(
+            "Domain uuid — the identifier domain-scoped APIs "
+            "(e.g. app config fragments) address a domain by."
+        ),
     )
     basic_info: DomainBasicInfo = Field(
         description="Basic domain information including name and description.",

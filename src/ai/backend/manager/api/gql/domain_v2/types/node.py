@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Annotated, Any, override
 
@@ -15,6 +16,7 @@ from ai.backend.common.dto.manager.v2.domain.types import (
     DomainUsageScopeDTO,
 )
 from ai.backend.common.identifier.domain import DomainName
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -88,6 +90,15 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
     """Domain entity with structured field groups."""
 
     id: NodeID[str] = gql_field(description="Domain name (primary key).")
+    row_id: uuid.UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Domain uuid — the identifier domain-scoped APIs "
+                "(e.g. app config fragments) address a domain by."
+            ),
+        )
+    )
     basic_info: DomainBasicInfoGQL = gql_field(
         description="Basic domain information including name and description."
     )
