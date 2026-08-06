@@ -5,8 +5,10 @@ from __future__ import annotations
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.types import AgentId, DeviceId, DeviceName, KernelId
+from ai.backend.common.identifier.agent import AgentUUID
+from ai.backend.common.types import DeviceId, DeviceName, KernelId
 from ai.backend.manager.models.base import (
+    GUID,
     Base,
     DeviceCapacityEntry,
     KernelIDColumnType,
@@ -25,7 +27,7 @@ class DeviceRow(CreatedAtMixin, Base):  # type: ignore[misc]
 
     __tablename__ = "devices"
 
-    agent_id: Mapped[AgentId] = mapped_column("agent_id", sa.String(length=64), primary_key=True)
+    agent_uuid: Mapped[AgentUUID] = mapped_column("agent_uuid", GUID(AgentUUID), primary_key=True)
     device_name: Mapped[DeviceName] = mapped_column(
         "device_name", sa.String(length=64), primary_key=True
     )
@@ -36,9 +38,9 @@ class DeviceRow(CreatedAtMixin, Base):  # type: ignore[misc]
 
     __table_args__ = (
         sa.ForeignKeyConstraint(
-            ["agent_id"],
-            ["agents.id"],
-            name="fk_devices_agent_id_agents",
+            ["agent_uuid"],
+            ["agents.uuid"],
+            name="fk_devices_agent_uuid_agents",
             ondelete="CASCADE",
         ),
     )
@@ -51,7 +53,7 @@ class KernelDeviceRow(CreatedAtMixin, Base):  # type: ignore[misc]
     __tablename__ = "kernel_devices"
 
     kernel_id: Mapped[KernelId] = mapped_column("kernel_id", KernelIDColumnType, primary_key=True)
-    agent_id: Mapped[AgentId] = mapped_column("agent_id", sa.String(length=64), primary_key=True)
+    agent_uuid: Mapped[AgentUUID] = mapped_column("agent_uuid", GUID(AgentUUID), primary_key=True)
     device_name: Mapped[DeviceName] = mapped_column(
         "device_name", sa.String(length=64), primary_key=True
     )
@@ -73,11 +75,11 @@ class KernelDeviceRow(CreatedAtMixin, Base):  # type: ignore[misc]
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
-            ["agent_id", "device_name", "device_id"],
-            ["devices.agent_id", "devices.device_name", "devices.device_id"],
+            ["agent_uuid", "device_name", "device_id"],
+            ["devices.agent_uuid", "devices.device_name", "devices.device_id"],
             name="fk_kernel_devices_device_devices",
             ondelete="CASCADE",
         ),
         # for the devices-side FK cascade
-        sa.Index("ix_kernel_devices_device", "agent_id", "device_name", "device_id"),
+        sa.Index("ix_kernel_devices_device", "agent_uuid", "device_name", "device_id"),
     )

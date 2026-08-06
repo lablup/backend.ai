@@ -1,7 +1,7 @@
 """add devices and kernel_devices tables
 
 Revision ID: 77f8e743eefd
-Revises: c1a7d3f05e28
+Revises: 13f4b8bc37f2
 Create Date: 2026-08-05 13:57:55.984027
 
 """
@@ -14,7 +14,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "77f8e743eefd"
-down_revision = "c1a7d3f05e28"
+down_revision = "13f4b8bc37f2"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
@@ -23,7 +23,7 @@ depends_on = None
 def upgrade() -> None:
     op.create_table(
         "devices",
-        sa.Column("agent_id", sa.String(length=64), nullable=False),
+        sa.Column("agent_uuid", GUID(), nullable=False),
         sa.Column("device_name", sa.String(length=64), nullable=False),
         sa.Column("device_id", sa.String(length=128), nullable=False),
         sa.Column("model_name", sa.String(length=255), nullable=False),
@@ -33,18 +33,18 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
-        sa.PrimaryKeyConstraint("agent_id", "device_name", "device_id", name=op.f("pk_devices")),
+        sa.PrimaryKeyConstraint("agent_uuid", "device_name", "device_id", name=op.f("pk_devices")),
         sa.ForeignKeyConstraint(
-            ["agent_id"],
-            ["agents.id"],
-            name=op.f("fk_devices_agent_id_agents"),
+            ["agent_uuid"],
+            ["agents.uuid"],
+            name=op.f("fk_devices_agent_uuid_agents"),
             ondelete="CASCADE",
         ),
     )
     op.create_table(
         "kernel_devices",
         sa.Column("kernel_id", GUID(), nullable=False),
-        sa.Column("agent_id", sa.String(length=64), nullable=False),
+        sa.Column("agent_uuid", GUID(), nullable=False),
         sa.Column("device_name", sa.String(length=64), nullable=False),
         sa.Column("device_id", sa.String(length=128), nullable=False),
         sa.Column(
@@ -60,7 +60,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.PrimaryKeyConstraint(
-            "kernel_id", "agent_id", "device_name", "device_id", name=op.f("pk_kernel_devices")
+            "kernel_id", "agent_uuid", "device_name", "device_id", name=op.f("pk_kernel_devices")
         ),
         sa.ForeignKeyConstraint(
             ["kernel_id"],
@@ -69,8 +69,8 @@ def upgrade() -> None:
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
-            ["agent_id", "device_name", "device_id"],
-            ["devices.agent_id", "devices.device_name", "devices.device_id"],
+            ["agent_uuid", "device_name", "device_id"],
+            ["devices.agent_uuid", "devices.device_name", "devices.device_id"],
             name=op.f("fk_kernel_devices_device_devices"),
             ondelete="CASCADE",
         ),
@@ -78,7 +78,7 @@ def upgrade() -> None:
     op.create_index(
         op.f("ix_kernel_devices_device"),
         "kernel_devices",
-        ["agent_id", "device_name", "device_id"],
+        ["agent_uuid", "device_name", "device_id"],
         unique=False,
     )
 
