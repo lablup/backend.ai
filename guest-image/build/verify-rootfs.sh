@@ -16,6 +16,10 @@ for path in \
 	opt/kernel/su-exec opt/kernel/dropbearmulti usr/local/bin/bai-guest-boot \
 	opt/kernel/bai-guest-storage usr/local/bin/bai-storage-fuse \
 	usr/bin/wg usr/sbin/ip usr/local/bin/bai-tunnel-up opt/kernel/bai-tunnel-bench \
+	usr/sbin/xtables-nft-multi usr/local/bin/bai-guest-egress \
+	usr/lib/x86_64-linux-gnu/xtables/libxt_standard.so \
+	usr/lib/x86_64-linux-gnu/xtables/libxt_udp.so \
+	usr/lib/x86_64-linux-gnu/xtables/libxt_conntrack.so \
 	etc/kata-opa/default-policy.rego
 do
 	if [ -e "${stage}/${path}" ] || [ -e "${stage}/usr/${path}" ]; then
@@ -36,9 +40,15 @@ setuid="$(find "$stage" -type f -perm /6000 -printf '%P ' 2>/dev/null)"
 [ -z "$setuid" ] && report ok "no setuid or setgid files" \
 	|| report DROP "setuid or setgid present: $setuid"
 
-magic="$(dd if="${stage}/usr/bin/kata-agent.real" bs=1 count=4 2>/dev/null | od -An -tx1 | tr -d ' \n')"
-[ "$magic" = "7f454c46" ] && report ok "kata-agent.real is an ELF binary" \
-	|| report MISS "kata-agent.real is not an ELF binary"
+for binary in usr/bin/kata-agent.real usr/sbin/ip usr/bin/wg usr/sbin/xtables-nft-multi \
+	usr/local/bin/bai-storage-fuse usr/local/bin/all-smi usr/local/bin/bssh \
+	opt/kernel/su-exec opt/kernel/dropbearmulti opt/kernel/sftp-server \
+	opt/kernel/tmux opt/kernel/ttyd
+do
+	magic="$(dd if="${stage}/${binary}" bs=1 count=4 2>/dev/null | od -An -tx1 | tr -d ' \n')"
+	[ "$magic" = "7f454c46" ] && report ok "${binary} is an ELF binary" \
+		|| report MISS "${binary} is not an ELF binary; a git-lfs pointer stages as a 132-byte text file"
+done
 
 config="$(find "${BAI_CC_KATA_SRC}/tools/packaging/kata-deploy/local-build/build/kernel-${BAI_CC_KERNEL_FLAVOUR}" \
 	-name '.config' -print -quit 2>/dev/null || true)"

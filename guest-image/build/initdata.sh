@@ -14,8 +14,18 @@ mkdir -p "$blobs"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
+toml_array() {
+	local item out=""
+	for item in $1; do
+		out="${out:+${out}, }\"${item}\""
+	done
+	printf '%s' "$out"
+}
+
 render() {
 	sed -e "s|@KBS_URL@|${kbs_url}|g" \
+		-e "s|@EGRESS_RESOLVERS@|$(toml_array "${BAI_CC_EGRESS_RESOLVERS}")|g" \
+		-e "s|@EGRESS_HOSTS@|$(toml_array "${BAI_CC_EGRESS_HOSTS}")|g" \
 		-e "s|@TIME_RESOURCE@|${BAI_CC_TIME_RESOURCE}|g" \
 		-e "s|@TIME_SKEW_BOUND@|${BAI_CC_TIME_SKEW_BOUND}|g" \
 		-e "s|@TIME_REANCHOR_INTERVAL@|${BAI_CC_TIME_REANCHOR_INTERVAL}|g" \
