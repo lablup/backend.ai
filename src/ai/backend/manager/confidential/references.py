@@ -31,6 +31,29 @@ def unpinned_measurements(measurements: dict[str, Any]) -> list[str]:
     return [field for field in REQUIRED_MEASUREMENTS if not measurements.get(field)]
 
 
+def carrying_live_session(endpoint: str) -> sa.ColumnElement[bool]:
+    return sa.exists(
+        sa.select(sa.literal(1))
+        .select_from(
+            sa.join(
+                ConfidentialNonceRow,
+                SessionRow,
+                SessionRow.id == ConfidentialNonceRow.session_id,
+            )
+        )
+        .where(
+            (ConfidentialNonceRow.endpoint == endpoint)
+            & (ConfidentialNonceRow.image_digest == ConfidentialReferenceValueRow.image_digest)
+            & (
+                ConfidentialNonceRow.profile_version
+                == ConfidentialReferenceValueRow.profile_version
+            )
+            & SessionRow.status.not_in(DEAD_SESSION_STATUSES)
+        )
+        .correlate(ConfidentialReferenceValueRow)
+    )
+
+
 def bundle_bytes(
     endpoint: str, image_digest: str, profile_version: str, measurements: dict[str, Any]
 ) -> bytes:
@@ -113,7 +136,10 @@ class ReferenceValueStore:
                         (ConfidentialReferenceValueRow.state == ReferenceValueState.ACTIVE)
                         | (
                             (ConfidentialReferenceValueRow.state == ReferenceValueState.SUPERSEDED)
-                            & (ConfidentialReferenceValueRow.coexistence_until > now)
+                            & (
+                                (ConfidentialReferenceValueRow.coexistence_until > now)
+                                | carrying_live_session(endpoint)
+                            )
                         )
                     )
                 )
@@ -150,6 +176,7 @@ class ReferenceValueStore:
                     (ConfidentialReferenceValueRow.endpoint == endpoint)
                     & (ConfidentialReferenceValueRow.state == ReferenceValueState.SUPERSEDED)
                     & (ConfidentialReferenceValueRow.coexistence_until <= now)
+                    & ~carrying_live_session(endpoint)
                 )
                 .values(state=ReferenceValueState.RETIRED)
             )

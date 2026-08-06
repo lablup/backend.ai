@@ -64,7 +64,7 @@ class VFolderCipherStore:
         async with rqst.fetch() as resp:
             items = (await resp.json())["items"]
         return [
-            (item["name"], int(item.get("size") or 0), bool(item.get("mode", "").startswith("d")))
+            (item["name"], int(item.get("size") or 0), item.get("type") == "DIRECTORY")
             for item in items
         ]
 
