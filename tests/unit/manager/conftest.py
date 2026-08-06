@@ -18,6 +18,10 @@ from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+
+# Register all models so SQLAlchemy's global configure_mappers() can resolve every
+# row's string relationships regardless of which models a test shard happens to import.
+from ai.backend.manager.models.base import ensure_all_tables_registered
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.bootstrap import (  # noqa: F401
@@ -26,6 +30,8 @@ from ai.backend.testutils.bootstrap import (  # noqa: F401
     redis_container,
 )
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
+
+ensure_all_tables_registered()
 
 
 def create_test_password_info(password: str = "test_password") -> PasswordInfo:
