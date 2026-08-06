@@ -277,6 +277,7 @@ class TestKernelTermination:
                 user_id=str(test_user_uuid),
                 is_active=True,
                 is_admin=False,
+                rate_limit=30000,
                 resource_policy=test_keypair_resource_policy_name,
             )
             db_sess.add(keypair)

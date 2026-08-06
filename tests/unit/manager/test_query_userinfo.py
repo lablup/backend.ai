@@ -198,10 +198,12 @@ class TestQueryUserinfo:
             await sess.flush()
             sess.add(
                 KeyPairRow(
+                    user_id=f"test-{user_uuid.hex[:8]}@test.io",
                     access_key=access_key,
                     secret_key="secret",
                     user=user_uuid,
                     is_active=True,
+                    rate_limit=30000,
                     resource_policy=kp_policy,
                 )
             )
@@ -319,10 +321,12 @@ class TestQueryUserinfo:
             await sess.flush()
             sess.add(
                 KeyPairRow(
+                    user_id=f"inactive-{user_uuid.hex[:8]}@test.io",
                     access_key=ak,
                     secret_key="secret",
                     user=user_uuid,
                     is_active=True,
+                    rate_limit=30000,
                     resource_policy=seed.kp_policy_name,
                 )
             )
@@ -350,10 +354,12 @@ class TestQueryUserinfo:
             await sess.flush()
             sess.add(
                 KeyPairRow(
+                    user_id=f"admin-{admin_uuid.hex[:8]}@test.io",
                     access_key=admin_ak,
                     secret_key="secret",
                     user=admin_uuid,
                     is_active=True,
+                    rate_limit=30000,
                     resource_policy=seed.kp_policy_name,
                 )
             )
@@ -586,10 +592,12 @@ class TestQueryUserinfoFromSession:
             await sess.flush()
             sess.add(
                 KeyPairRow(
+                    user_id=f"test-{user_uuid.hex[:8]}@test.io",
                     access_key=access_key,
                     secret_key="secret",
                     user=user_uuid,
                     is_active=True,
+                    rate_limit=30000,
                     resource_policy=kp_policy,
                 )
             )
