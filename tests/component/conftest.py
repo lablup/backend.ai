@@ -59,6 +59,7 @@ from ai.backend.common.defs import (
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.message_queue.redis_queue.queue import RedisMQArgs, RedisQueue
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
@@ -181,7 +182,7 @@ class KeypairFixtureData:
 
 @dataclass
 class UserFixtureData:
-    user_uuid: uuid.UUID
+    user_uuid: UserID
     keypair: KeypairFixtureData
     email: str = ""
 
@@ -810,7 +811,7 @@ async def group_fixture(
         await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
 
 
-async def _insert_user_virtual_scope(conn: AsyncConnection, user_uuid: uuid.UUID) -> None:
+async def _insert_user_virtual_scope(conn: AsyncConnection, user_uuid: UserID) -> None:
     """Give a directly-inserted user the RBAC rows ``create_full_user`` would have made.
 
     Without them the member-binding paths cannot resolve the user's virtual scope.
@@ -852,7 +853,7 @@ async def admin_user_fixture(
     unique_id = secrets.token_hex(4)
     email = f"admin-{unique_id}@test.local"
     data = UserFixtureData(
-        user_uuid=uuid.uuid4(),
+        user_uuid=UserID(uuid.uuid4()),
         keypair=KeypairFixtureData(
             access_key=f"AKTEST{secrets.token_hex(7).upper()}",
             secret_key=secrets.token_hex(20),
@@ -960,7 +961,7 @@ async def regular_user_fixture(
     unique_id = secrets.token_hex(4)
     email = f"user-{unique_id}@test.local"
     data = UserFixtureData(
-        user_uuid=uuid.uuid4(),
+        user_uuid=UserID(uuid.uuid4()),
         keypair=KeypairFixtureData(
             access_key=f"AKTEST{secrets.token_hex(7).upper()}",
             secret_key=secrets.token_hex(20),
