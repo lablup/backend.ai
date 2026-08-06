@@ -1,15 +1,12 @@
 """add is_default to keypairs
 
-Which keypair is a user's main one is recorded on ``users.main_access_key``,
-whose foreign key is ``ON DELETE SET NULL`` — deleting any keypair silently
-clears it. The fact describes a keypair, so it moves onto ``keypairs``, where
-deleting the row takes the fact with it.
+``users.main_access_key`` is ``ON DELETE SET NULL``, so deleting any keypair
+clears it. The fact describes a keypair, so it moves onto ``keypairs``.
 
-Backfills only keypairs that their own user points at; a ``main_access_key``
-naming another user's keypair is dropped rather than carried over. Users left
-with keypairs but no marker — the state ``ON DELETE SET NULL`` produced — get
-their oldest active keypair promoted, the same rule the original
-``d3f8c74bf148`` migration used to populate ``main_access_key``.
+The first backfill ignores a ``main_access_key`` naming another user's keypair:
+the foreign key enforced existence, not ownership. The second promotes the
+oldest active keypair of the users the first leaves unmarked, so that no user
+with keypairs ends up without a default.
 
 Revision ID: a2f6b90c41d7
 Revises: 2dccb3069031
