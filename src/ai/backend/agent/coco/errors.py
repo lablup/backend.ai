@@ -81,6 +81,15 @@ class ImageDistroUnresolved(_CocoFailure, web.HTTPBadRequest):
     _detail = ErrorDetail.INVALID_DATA_FORMAT
 
 
+class ImageProcessConfigMissing(_CocoFailure, web.HTTPBadRequest):
+    error_type = _PREFIX + "image-process-config-missing"
+    error_title = (
+        "The image's process configuration is absent from the manager's metadata, and a stand-in"
+        " image would drop the session's environment without a word."
+    )
+    _detail = ErrorDetail.INVALID_DATA_FORMAT
+
+
 class ImageDigestUnresolved(_CocoFailure, web.HTTPBadRequest):
     error_type = _PREFIX + "image-digest-unresolved"
     error_title = "No image manifest digest was supplied; the measured blob is keyed by it."

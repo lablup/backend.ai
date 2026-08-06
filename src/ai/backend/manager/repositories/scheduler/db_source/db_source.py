@@ -2957,6 +2957,7 @@ class ScheduleDBSource:
                     is_local=image_row.is_local,
                     digest=image_row.trimmed_digest,
                     labels=dict(image_row.labels),
+                    process_config=dict(image_row.process_config),
                     registry_name=img_ref.registry,
                     registry_url=registry_row.url,
                     registry_username=registry_row.username,

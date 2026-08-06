@@ -19,6 +19,7 @@ from .base import (
     BaseContainerRegistry,
     concurrency_sema,
     progress_reporter,
+    read_process_config,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -108,6 +109,7 @@ class LocalRegistry(BaseContainerRegistry):
                     "size": data["Size"],
                     "labels": labels,
                     "digest": config_digest,
+                    "process_config": read_process_config(data),
                 },
             }, None
 

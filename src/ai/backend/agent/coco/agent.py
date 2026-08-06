@@ -76,6 +76,7 @@ from .errors import (
     HostPrivilegeWriteRefused,
     LaunchOptionRefused,
     ImageDistroUnresolved,
+    ImageProcessConfigMissing,
     ImagePushRefused,
     MountPlanMissing,
     NetworkSetupFailed,
@@ -477,7 +478,15 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
                     " applies to itself, and the host writes nothing into the container"
                 )
             )
-        env = dict(kernel_obj.environ)
+        process_config = image.get("process_config") or {}
+        if self.settings.host_stand_in_image and not process_config:
+            raise ImageProcessConfigMissing(extra_msg=self.image_ref.canonical)
+        env: dict[str, str] = {}
+        for entry in process_config.get("env") or []:
+            name, sep, value = str(entry).partition("=")
+            if sep:
+                env[name] = value
+        env.update(kernel_obj.environ)
         if confidential.get("config_resource"):
             env["BACKENDAI_CC_CONFIG_URI"] = confidential["config_resource"]
         if confidential.get("secrets_resource"):
@@ -502,6 +511,8 @@ class CocoKernelCreationContext(AbstractKernelCreationContext[CocoKernel]):
             cpuset=cpuset,
             dns_servers=self.settings.dns_servers,
             entrypoint=GUEST_ENTRYPOINT,
+            workdir=str(process_config.get("workdir") or ""),
+            user=str(process_config.get("user") or ""),
             env=env,
             labels=self._labels(kernel_obj, network),
             annotations=build_annotations(

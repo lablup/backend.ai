@@ -26,6 +26,7 @@ from .base import (
     BaseContainerRegistry,
     concurrency_sema,
     progress_reporter,
+    read_process_config,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -139,6 +140,7 @@ class HarborRegistry_v1(BaseContainerRegistry):
                             "size": size_bytes,
                             "labels": labels,
                             "digest": config_digest,
+                            "process_config": read_process_config(data),
                         },
                     }
         await self._read_manifest(image, tag, manifest)
@@ -484,6 +486,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 "size": size_bytes,
                 "labels": labels,
                 "digest": config_digest,
+                "process_config": read_process_config(config_data),
             }
         }
         await self._read_manifest(image, tag, manifests)
@@ -604,6 +607,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 "size": size_bytes,
                 "labels": labels,
                 "digest": config_digest,
+                "process_config": read_process_config(data),
             }
             await self._read_manifest(image, tag, manifests)
 
@@ -656,5 +660,6 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 "size": size_bytes,
                 "labels": labels,
                 "digest": config_digest,
+                "process_config": read_process_config(data),
             }
             await self._read_manifest(image, tag, manifests)

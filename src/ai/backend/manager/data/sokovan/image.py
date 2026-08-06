@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 from uuid import UUID
 
 from ai.backend.common.types import AutoPullBehavior, ImageConfig
@@ -27,6 +28,7 @@ class ImageConfigData:
     is_local: bool
     digest: str
     labels: dict[str, str]
+    process_config: dict[str, Any]
     registry_name: str
     registry_url: str
     registry_username: str | None
@@ -46,6 +48,7 @@ class ImageConfigData:
             is_local=self.is_local,
             digest=self.digest,
             labels=self.labels,
+            process_config=self.process_config,
             repo_digest=None,
             registry={
                 "name": self.registry_name,
