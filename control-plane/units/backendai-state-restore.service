@@ -1,0 +1,16 @@
+[Unit]
+Description=Backend.AI state bundle restore from a backup segment
+Requires=backendai-credentials.service backendai-postgresql.service
+After=backendai-credentials.service backendai-postgresql.service backendai-etcd.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/var/lib/backendai/restore.env
+LoadCredential=backup.key:/run/backendai-credentials.sock
+LoadCredential=password:/run/backendai-credentials.sock
+ExecStartPre=/usr/lib/backendai/credential-guard backup.key password
+ExecStart=/usr/lib/backendai/state-restore ${BACKENDAI_RESTORE_SEGMENT}
+StandardOutput=journal+console
+StandardError=journal+console
+UMask=0077
+NoNewPrivileges=yes
