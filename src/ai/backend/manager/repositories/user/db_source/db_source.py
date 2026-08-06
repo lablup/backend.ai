@@ -349,7 +349,7 @@ class UserDBSource:
                 updated_user,
                 await session.scalar(
                     sa.select(KeyPairRow.access_key).where(
-                        (KeyPairRow.user == updated_user.uuid) & KeyPairRow.is_main
+                        (KeyPairRow.user == updated_user.uuid) & KeyPairRow.is_default
                     )
                 ),
             )
@@ -466,7 +466,7 @@ class UserDBSource:
             updated_user,
             await session.scalar(
                 sa.select(KeyPairRow.access_key).where(
-                    (KeyPairRow.user == updated_user.uuid) & KeyPairRow.is_main
+                    (KeyPairRow.user == updated_user.uuid) & KeyPairRow.is_default
                 )
             ),
         )

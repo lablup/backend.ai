@@ -248,7 +248,7 @@ class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
 
         return column_property(
             sa.select(KeyPairRow.access_key)
-            .where((KeyPairRow.user == cls.uuid) & KeyPairRow.is_main)
+            .where((KeyPairRow.user == cls.uuid) & KeyPairRow.is_default)
             .correlate_except(KeyPairRow)
             .scalar_subquery()
         )
