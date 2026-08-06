@@ -330,7 +330,9 @@ class ContainerdSessionNetwork:
         await coordinator.resume(meta, self._self_member(meta))
         self._coordinators[session_id] = coordinator
         self._orchestrators[session_id] = orchestrator
-        await self._start_cluster_dns(session_id, coordinator)
+        # The devices (and so the LOCAL gateway) already exist on a resume, so the resolver can come
+        # up right away — unlike a fresh session, whose block is not allocated until the first attach.
+        await self.ensure_cluster_dns(session_id)
 
     async def _recover_attachment(
         self, container_id: str, session_id: str, meta: SessionNetMeta
@@ -581,7 +583,12 @@ class ContainerdSessionNetwork:
             # then skip on retry — a retry must re-run the full setup cleanly.
             self._coordinators[session_id] = coordinator
             self._orchestrators[session_id] = orchestrator
-            await self._start_cluster_dns(session_id, coordinator)
+            # NB: the resolver is NOT started here. A fresh session has no LOCAL block yet (privnet
+            # allocates it at the first attach), so its gateway is unknown until then — the DNS
+            # server comes up post-attach via ensure_cluster_dns. Adopted survivors already have
+            # devices, so cover them now.
+            if survivors:
+                await self.ensure_cluster_dns(session_id)
             await self._adopt_containers(survivors, session_id, meta)
             return meta
 
@@ -679,20 +686,23 @@ class ContainerdSessionNetwork:
         except (ipaddress.AddressValueError, ipaddress.NetmaskValueError, StopIteration):
             return None
 
-    async def _start_cluster_dns(
-        self, session_id: str, coordinator: SessionNetworkCoordinator
-    ) -> None:
-        """Bring up the session's cluster DNS server on its LOCAL gateway. Best-effort: a failure to
-        determine the gateway or bind the socket is logged and skipped, never fatal — the container
-        still resolves peers via ``/etc/hosts`` and non-cluster names via the upstream nameservers
-        its ``/etc/resolv.conf`` also lists. (This is why the rollout keeps ``/etc/hosts`` populated
-        until the resolver is proven; see cluster-name-resolution.md, phase 5.)"""
+    async def ensure_cluster_dns(self, session_id: str) -> None:
+        """Bring up the session's cluster DNS server on its LOCAL gateway, if not already up.
+
+        Idempotent and best-effort, and deliberately called **after a container attaches** rather
+        than at session setup: in privnet mode the session's LOCAL block (and thus its gateway) is
+        not allocated until the first attach, so the gateway is simply unknown at ``ensure_session``
+        time. A missing gateway or a failed bind is logged at debug and skipped, never fatal — the
+        container still resolves peers via ``/etc/hosts`` and non-cluster names via the upstream
+        nameservers its ``/etc/resolv.conf`` also lists (see cluster-name-resolution.md, phase 5)."""
+        if session_id in self._dns_servers:
+            return
+        coordinator = self._coordinators.get(session_id)
+        if coordinator is None:
+            return
         gateway = await self.local_gateway_of(session_id)
         if gateway is None:
-            log.warning(
-                "no LOCAL gateway for session {}; cluster DNS not started (peers via /etc/hosts)",
-                session_id,
-            )
+            log.debug("no LOCAL gateway yet for session {}; cluster DNS deferred", session_id)
             return
         upstreams = resolve_container_dns(self._configured_dns).nameservers
         resolver = ClusterResolver(
@@ -704,7 +714,13 @@ class ContainerdSessionNetwork:
         except OSError as e:
             log.warning("could not start cluster DNS for {} on {}: {}", session_id, gateway, e)
             return
+        # Another kernel of this session may have started the server across the awaits above; if so,
+        # keep the first and drop this one so its socket does not leak.
+        if session_id in self._dns_servers:
+            await server.stop()
+            return
         self._dns_servers[session_id] = server
+        log.info("cluster DNS for session {} started on {}", session_id, gateway)
 
     async def _stop_cluster_dns(self, session_id: str) -> None:
         server = self._dns_servers.pop(session_id, None)
@@ -794,6 +810,9 @@ class ContainerdSessionNetwork:
         )
         self._tracker.track(session_id, container_id)
         self._attachments[container_id] = (session_id, result.plan, result.handle.pid)
+        # The attach just allocated the session's LOCAL block, so its gateway now exists — bring the
+        # resolver up (idempotent: only the first attach on this node actually starts it).
+        await self.ensure_cluster_dns(session_id)
         return result
 
     async def create_container(
@@ -825,6 +844,9 @@ class ContainerdSessionNetwork:
             container_id, meta=meta, kernel_config=kernel_config, cluster_info=cluster_info
         )
         self._attachments[container_id] = (session_id, result.plan, result.handle.pid)
+        # The attach just allocated the session's LOCAL block, so its gateway now exists — bring the
+        # resolver up (idempotent: only the first attach on this node actually starts it).
+        await self.ensure_cluster_dns(session_id)
         return result
 
     async def terminate_container(

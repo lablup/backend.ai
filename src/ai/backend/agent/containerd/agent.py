@@ -841,28 +841,47 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         _atomic_write_text(hosts_file, "\n".join(lines) + "\n")
         return Mount(MountTypes.BIND, hosts_file, Path("/etc/hosts"), MountPermission.READ_ONLY)
 
-    async def _prepare_resolv_conf(self) -> Mount | None:
+    def _resolv_conf_path(self) -> Path | None:
+        return None if self._scratch_dir is None else self._scratch_dir / "config" / "resolv.conf"
+
+    def _prepare_resolv_conf(self) -> Mount | None:
         """Write this kernel's /etc/resolv.conf and return a bind mount for it.
 
         Unconditional, unlike /etc/hosts: every container needs a resolver, not just clustered
         ones. Without this the image's own (usually absent) resolv.conf is all the container gets
         and no name resolves. See containerd/dns.py for how the nameservers are chosen.
 
-        The session's LOCAL gateway (where its cluster DNS server listens) goes first, so cluster
-        peer names resolve through it, and the upstream nameservers follow as a fallback — if the
-        resolver is down the container still reaches them directly, and cluster names still resolve
-        via /etc/hosts (BEP-1062, cluster-name-resolution.md).
+        Only the upstream nameservers go in here — the cluster resolver is prepended later by
+        ``_point_resolv_conf_at_resolver``, once the container has attached and its session's LOCAL
+        gateway (where the resolver listens) exists.
         """
-        if self._scratch_dir is None:
+        resolv_file = self._resolv_conf_path()
+        if resolv_file is None:
             return None
         resolv = resolve_container_dns(self.local_config.container.dns or ())
-        if (gateway := await self._session_network.local_gateway_of(self._session_id)) is not None:
-            resolv.nameservers = [gateway, *resolv.nameservers]
-        resolv_file = self._scratch_dir / "config" / "resolv.conf"
         resolv_file.write_text(resolv.render())
         return Mount(
             MountTypes.BIND, resolv_file, Path("/etc/resolv.conf"), MountPermission.READ_ONLY
         )
+
+    async def _point_resolv_conf_at_resolver(self) -> None:
+        """Prepend the session's cluster resolver to this container's /etc/resolv.conf, after attach.
+
+        Deferred to here (not ``_prepare_resolv_conf``) because the LOCAL gateway the resolver binds
+        does not exist until the container attaches (privnet allocates the session's LOCAL block
+        then). The file is bind-mounted, so an in-place rewrite is picked up by the container's next
+        lookup (glibc re-reads resolv.conf). Best-effort: no gateway → leave the upstream-only file,
+        under which cluster names still resolve via /etc/hosts.
+        """
+        resolv_file = self._resolv_conf_path()
+        if resolv_file is None:
+            return
+        gateway = await self._session_network.local_gateway_of(self._session_id)
+        if gateway is None:
+            return
+        resolv = resolve_container_dns(self.local_config.container.dns or ())
+        resolv.nameservers = [gateway, *resolv.nameservers]
+        resolv_file.write_text(resolv.render())
 
     @override
     async def prepare_ssh(self, cluster_info: ClusterInfo) -> None:
@@ -1244,7 +1263,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         if (hosts_mount := self._write_etc_hosts(peers, environ)) is not None:
             self._oci_mounts.append(hosts_mount)
         # containerd/runc provides no resolver either (dockerd synthesizes one per container).
-        if (resolv_mount := await self._prepare_resolv_conf()) is not None:
+        if (resolv_mount := self._prepare_resolv_conf()) is not None:
             self._oci_mounts.append(resolv_mount)
         # Build (but do NOT create) the container spec + kernel object. mount_krunner
         # (inherited) has populated resource_spec.mounts with the krunner bind mounts;
@@ -1453,6 +1472,9 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 kernel_config=self.kernel_config,
                 cluster_info=cluster_info,
             )
+            # Now that the LOCAL gateway exists (the attach allocated the session's block), point
+            # this container's resolv.conf at the session cluster resolver listening there.
+            await self._point_resolv_conf_at_resolver()
             task_pid = result.handle.pid
             container_ip = result.local_ip
             if container_ip is None:

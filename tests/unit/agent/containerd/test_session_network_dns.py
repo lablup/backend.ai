@@ -70,24 +70,46 @@ class TestLocalGateway:
         assert await net.local_gateway_of("s1") is None
 
 
+def _with_coordinator(net: ContainerdSessionNetwork, session_id: str) -> None:
+    """ensure_cluster_dns only starts once the session's coordinator is registered (post-setup)."""
+    net._coordinators[session_id] = cast(Any, Mock())
+
+
 class TestClusterDNSLifecycle:
     async def test_start_binds_the_session_gateway(self) -> None:
         net = _network("10.128.5.0/26")
-        await net._start_cluster_dns("s1", cast(Any, Mock()))
+        _with_coordinator(net, "s1")
+        await net.ensure_cluster_dns("s1")
         assert len(_FakeDNSServer.instances) == 1
         server = _FakeDNSServer.instances[0]
         assert server.bind_host == "10.128.5.1"
         assert server.started
 
-    async def test_start_is_skipped_without_a_gateway(self) -> None:
-        # Best-effort: no gateway -> no server, no raise (container still has /etc/hosts + upstream).
+    async def test_is_idempotent_across_repeated_attaches(self) -> None:
+        # Every container's attach calls ensure_cluster_dns; only the first actually binds.
+        net = _network("10.128.5.0/26")
+        _with_coordinator(net, "s1")
+        await net.ensure_cluster_dns("s1")
+        await net.ensure_cluster_dns("s1")
+        assert len(_FakeDNSServer.instances) == 1
+
+    async def test_skipped_without_a_coordinator(self) -> None:
+        # No session set up here -> nothing to source names from, so no server.
+        net = _network("10.128.5.0/26")
+        await net.ensure_cluster_dns("s1")
+        assert _FakeDNSServer.instances == []
+
+    async def test_deferred_without_a_gateway(self) -> None:
+        # Best-effort: gateway not allocated yet -> no server, no raise (a later attach retries).
         net = _network(None)
-        await net._start_cluster_dns("s1", cast(Any, Mock()))
+        _with_coordinator(net, "s1")
+        await net.ensure_cluster_dns("s1")
         assert _FakeDNSServer.instances == []
 
     async def test_stop_stops_and_forgets_the_server(self) -> None:
         net = _network("10.128.5.0/26")
-        await net._start_cluster_dns("s1", cast(Any, Mock()))
+        _with_coordinator(net, "s1")
+        await net.ensure_cluster_dns("s1")
         server = _FakeDNSServer.instances[0]
         await net._stop_cluster_dns("s1")
         assert server.stopped
@@ -96,9 +118,10 @@ class TestClusterDNSLifecycle:
 
     async def test_a_failed_bind_is_swallowed(self, monkeypatch: pytest.MonkeyPatch) -> None:
         net = _network("10.128.5.0/26")
+        _with_coordinator(net, "s1")
         failing = Mock()
         failing.start = AsyncMock(side_effect=OSError("address in use"))
         monkeypatch.setattr(session_network_mod, "ClusterDNSServer", lambda *a, **k: failing)
-        await net._start_cluster_dns("s1", cast(Any, Mock()))  # must not raise
+        await net.ensure_cluster_dns("s1")  # must not raise
         # The half-started server is not registered, so teardown won't try to stop it.
         await net._stop_cluster_dns("s1")
