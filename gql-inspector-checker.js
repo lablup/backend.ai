@@ -1,5 +1,14 @@
 module.exports = (props) => {
   const { changes, newSchema, oldSchema } = props;
+  const oldTypes = oldSchema.getTypeMap();
+
+  // An element that arrived with its owner needs no version note: the owner's dates it.
+  // graphql-inspector reports one such change per field and per argument regardless.
+  const typeIsNew = (typeName) => oldTypes[typeName] === undefined;
+  const fieldIsNew = (typeName, fieldName) =>
+    typeIsNew(typeName) ||
+    oldTypes[typeName].getFields()[fieldName] === undefined;
+
   return changes.map((change) => {
     // Allowed version notations: 'XX.XX.X', 'XX.X.X'
     const deprecateNotationRegex = /Deprecated since (\d{2}\.\d{1,2}\.\d{1})/;
@@ -26,6 +35,9 @@ module.exports = (props) => {
       change.criticality.level !== "BREAKING"
     ) {
       const [typeName, fieldName] = change.path.split(".");
+      if (typeIsNew(typeName)) {
+        return change;
+      }
       const description = newSchema.getTypeMap()[typeName].getFields()[
         fieldName
       ].astNode.description?.value;
@@ -58,6 +70,9 @@ module.exports = (props) => {
       )
     ) {
       const [type, fieldName, argumentName] = change.path.split(".");
+      if (fieldIsNew(type, fieldName)) {
+        return change;
+      }
       const field = newSchema.getTypeMap()[type].getFields()[fieldName];
       const description = field.args.find(
         (arg) => arg.name === argumentName
