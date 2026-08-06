@@ -549,7 +549,7 @@ class UserGroup(graphene.ObjectType):  # type: ignore[misc]
 #: below, and into filter and order expressions, without reshaping their FROM.
 _MAIN_KEYPAIR_ACCESS_KEY = (
     sa.select(KeyPairRow.access_key)
-    .where((KeyPairRow.user == users.c.uuid) & KeyPairRow.is_main)
+    .where((KeyPairRow.user == users.c.uuid) & KeyPairRow.is_default)
     .correlate(users)
     .scalar_subquery()
     .label("main_keypair_access_key")
