@@ -7,7 +7,12 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.config import DEFAULT_SHELL, ModelConfig, ModelDefinition, ModelServiceConfig
+from ai.backend.common.config import (
+    DEFAULT_SHELL,
+    PresetModelConfig,
+    PresetModelDefinition,
+    PresetModelServiceConfig,
+)
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.deployment.types import (
@@ -110,12 +115,12 @@ class TestModelDefinitionToDTO:
     """Tests for the adapter helper ``_model_definition_to_dto``."""
 
     def test_converts_config_to_info_dto(self) -> None:
-        config_model_def = ModelDefinition(
+        config_model_def = PresetModelDefinition(
             models=[
-                ModelConfig(
+                PresetModelConfig(
                     name="llama",
                     model_path="/models/llama",
-                    service=ModelServiceConfig(start_command="python serve.py", port=8080),
+                    service=PresetModelServiceConfig(start_command="python serve.py", port=8080),
                 )
             ],
         )

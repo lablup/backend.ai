@@ -6,7 +6,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.config import DEFAULT_SHELL, ModelDefinition, PreStartAction
+from ai.backend.common.config import DEFAULT_SHELL, PresetModelDefinition, PreStartAction
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import (
     EnvironmentVariableEntryInput,
@@ -91,8 +91,18 @@ class PresetModelServiceConfigInput(BaseRequestModel):
 
 
 class PresetModelConfigInput(BaseRequestModel):
-    name: str = Field(min_length=1, description="Name of the model.")
-    model_path: str = Field(min_length=1, description="Path to the model file.")
+    name: str | None = Field(
+        default=None,
+        min_length=1,
+        description="Name of the model. Optional; defaults to the runtime variant baseline's "
+        "model name at revision resolution.",
+    )
+    model_path: str | None = Field(
+        default=None,
+        min_length=1,
+        description="Path to the model file. Optional; defaults to the model mount destination "
+        "at revision resolution.",
+    )
     service: PresetModelServiceConfigInput = Field(
         description="Configuration for the model service."
     )
@@ -108,6 +118,10 @@ class PresetModelDefinitionInput(BaseRequestModel):
         description="List of models in the model definition. Exactly one model is supported.",
     )
 
+    def to_model_definition(self) -> PresetModelDefinition:
+        # exclude_unset keeps unset fields from clobbering lower-priority merge layers.
+        return PresetModelDefinition.model_validate(self.model_dump(exclude_unset=True))
+
 
 class CreateDeploymentRevisionPresetInput(BaseRequestModel):
     runtime_variant_id: RuntimeVariantID = Field(
@@ -118,8 +132,8 @@ class CreateDeploymentRevisionPresetInput(BaseRequestModel):
     image_id: ImageID = Field(description="Container image UUID.")
     model_definition: PresetModelDefinitionInput | None = Field(
         default=None,
-        description="Model definition configuration. Optional, but when provided it must be "
-        "fully populated (non-empty models, each with name/model_path/service).",
+        description="Model definition configuration. Optional; each model requires a service "
+        "block, while name/model_path may be omitted to inherit merge-chain defaults.",
     )
     resource_slots: list[ResourceSlotEntryInput] | None = Field(
         default=None, description="Resource slot allocations."
@@ -163,7 +177,7 @@ class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
     description: str | Sentinel | None = Field(default=SENTINEL)
     rank: int | None = Field(default=None, ge=0)
     image_id: ImageID | Sentinel | None = Field(default=SENTINEL)
-    model_definition: ModelDefinition | Sentinel | None = Field(default=SENTINEL)
+    model_definition: PresetModelDefinitionInput | Sentinel | None = Field(default=SENTINEL)
     resource_slots: list[ResourceSlotEntryInput] | None = Field(default=None)
     resource_opts: list[ResourceOptsEntryDTO] | None = Field(default=None)
     cluster_mode: str | None = Field(default=None, max_length=16)

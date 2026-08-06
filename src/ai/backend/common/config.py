@@ -785,6 +785,41 @@ class DefaultModelDefinition(BaseConfigModel):
         return ModelDefinitionDraft.model_validate(self.model_dump(exclude_unset=True))
 
 
+class PresetModelServiceConfig(BaseConfigModel):
+    """Preset-stored model service config; ``port`` stays required."""
+
+    pre_start_actions: list[PreStartAction] | None = None
+    start_command: str | None = None
+    shell: str | None = None
+    port: int
+    health_check: ModelHealthCheckDraft | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _resolve_start_command(cls, data: Any) -> Any:
+        return resolve_model_service_start_command(data)
+
+
+class PresetModelConfig(BaseConfigModel):
+    """Preset-stored model config. ``name``/``model_path`` may be omitted to
+    inherit merge-chain defaults; the ``service`` block is always present."""
+
+    name: str | None = None
+    model_path: str | None = None
+    service: PresetModelServiceConfig
+    metadata: ModelMetadata | None = None
+
+
+class PresetModelDefinition(BaseConfigModel):
+    """Stored shape of ``deployment_revision_presets.model_definition``."""
+
+    models: list[PresetModelConfig]
+
+    def to_draft(self) -> ModelDefinitionDraft:
+        # exclude_unset keeps unset fields from clobbering lower-priority merge layers.
+        return ModelDefinitionDraft.model_validate(self.model_dump(exclude_unset=True))
+
+
 def find_config_file(daemon_name: str) -> Path:
     toml_path_from_env = os.environ.get("BACKEND_CONFIG_FILE", None)
     if not toml_path_from_env:

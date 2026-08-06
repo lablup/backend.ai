@@ -124,11 +124,6 @@ class RevisionDraftReader:
         resource_slots = {entry.resource_type: entry.quantity for entry in slot_entries}
         resource_opts = {o.name: o.value for o in preset.resource_opts}
         environ = {e.key: e.value for e in preset.environ}
-        model_definition: ModelDefinitionDraft | None = (
-            ModelDefinitionDraft.model_validate(preset.model_definition)
-            if preset.model_definition
-            else None
-        )
         return RevisionDraft(
             image_id=preset.image_id,
             resource_slots=resource_slots or None,
@@ -138,7 +133,9 @@ class RevisionDraftReader:
             startup_command=preset.startup_command,
             bootstrap_script=preset.bootstrap_script,
             environ=environ or None,
-            model_definition=model_definition,
+            model_definition=(
+                preset.model_definition.to_draft() if preset.model_definition else None
+            ),
             runtime_variant_preset_values=preset.runtime_variant_preset_values,
         )
 
