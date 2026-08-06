@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable, Container, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -342,7 +342,7 @@ class ScalingGroupRow(CreatedAtMixin, Base):  # type: ignore[misc]
             ),
             metadata=ScalingGroupMetadata(
                 description=self.description or "",
-                created_at=self.created_at or datetime.now(UTC),
+                created_at=self.created_at,
             ),
             network=ScalingGroupNetworkConfig(
                 wsproxy_addr=self.wsproxy_addr or "",
@@ -432,7 +432,7 @@ class ScalingGroupModel(RBACModel[ScalingGroupPermission]):
             description=row.description,
             is_active=row.is_active if row.is_active is not None else True,
             is_public=row.is_public,
-            created_at=row.created_at or datetime.now(UTC),
+            created_at=row.created_at,
             wsproxy_addr=row.wsproxy_addr,
             wsproxy_api_token=row.wsproxy_api_token,
             driver=row.driver,

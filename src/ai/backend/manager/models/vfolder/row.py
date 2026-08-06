@@ -440,7 +440,7 @@ class VFolderRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
             max_size=self.max_size,
             num_files=self.num_files or 0,
             cur_size=self.cur_size or 0,
-            created_at=self.created_at or datetime.now(UTC),
+            created_at=self.created_at,
             last_used=self.last_used,
             updated_at=self.updated_at,
             creator=self.creator,

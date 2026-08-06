@@ -18,7 +18,6 @@ from uuid import UUID
 import aiotools
 import sqlalchemy as sa
 import yarl
-from dateutil.tz import tzutc
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -784,7 +783,7 @@ class SessionRow(CreatedAtMixin, Base):  # type: ignore[misc]
             use_host_network=self.use_host_network,
             timeout=self.timeout,
             batch_timeout=self.batch_timeout,
-            created_at=self.created_at or datetime.now(tzutc()),
+            created_at=self.created_at,
             terminated_at=self.terminated_at,
             starts_at=self.starts_at,
             status=self.status,

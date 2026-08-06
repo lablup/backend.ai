@@ -404,7 +404,8 @@ class ImageRow(CreatedAtMixin, Base):  # type: ignore[misc]
             status=image_data.status,
         )
         image_row.id = image_data.id
-        image_row.created_at = image_data.created_at
+        if image_data.created_at is not None:
+            image_row.created_at = image_data.created_at
         return image_row
 
     @classmethod

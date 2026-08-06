@@ -1,7 +1,6 @@
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from typing import Any, cast
 
 import sqlalchemy as sa
@@ -986,7 +985,7 @@ class VfolderRepository:
                     inviter_username=inviter_username,
                     invitee=row.invitee,
                     permission=row.permission or VFolderMountPermission.READ_ONLY,
-                    created_at=row.created_at or datetime.now(UTC),
+                    created_at=row.created_at,
                     modified_at=row.updated_at,
                 )
                 for row, inviter_username in rows
@@ -1257,7 +1256,7 @@ class VfolderRepository:
             max_size=row.max_size,
             num_files=row.num_files or 0,
             cur_size=row.cur_size or 0,
-            created_at=row.created_at or datetime.now(UTC),
+            created_at=row.created_at,
             last_used=row.last_used,
             updated_at=row.updated_at,
             creator=row.creator,
@@ -1428,7 +1427,7 @@ class VfolderRepository:
                 inviter_username=inviter_username,
                 invitee=invitation_row.invitee,
                 permission=invitation_row.permission or VFolderMountPermission.READ_ONLY,
-                created_at=invitation_row.created_at or datetime.now(UTC),
+                created_at=invitation_row.created_at,
                 modified_at=invitation_row.updated_at,
             )
 
@@ -1525,7 +1524,7 @@ class VfolderRepository:
                     inviter_username=inviter_username,
                     invitee=inv_row.invitee,
                     permission=inv_row.permission or VFolderMountPermission.READ_ONLY,
-                    created_at=inv_row.created_at or datetime.now(UTC),
+                    created_at=inv_row.created_at,
                     modified_at=inv_row.updated_at,
                 )
                 vfolder_data = self._vfolder_row_to_data(inv_row.vfolder_row)
@@ -1569,7 +1568,7 @@ class VfolderRepository:
                     inviter_username=inviter_username,
                     invitee=inv_row.invitee,
                     permission=inv_row.permission or VFolderMountPermission.READ_ONLY,
-                    created_at=inv_row.created_at or datetime.now(UTC),
+                    created_at=inv_row.created_at,
                     modified_at=inv_row.updated_at,
                 )
                 vfolder_data = self._vfolder_row_to_data(inv_row.vfolder_row)

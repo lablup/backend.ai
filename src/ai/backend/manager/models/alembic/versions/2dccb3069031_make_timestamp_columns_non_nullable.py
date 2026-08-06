@@ -8,7 +8,7 @@ Columns that lacked an insert-time default additionally gain a ``now()``
 server default.
 
 Revision ID: 2dccb3069031
-Revises: 13f4b8bc37f2
+Revises: e3f2ff64863f
 Create Date: 2026-08-06 00:00:00.000000
 
 """
@@ -18,7 +18,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "2dccb3069031"
-down_revision = "13f4b8bc37f2"
+down_revision = "e3f2ff64863f"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
@@ -37,8 +37,6 @@ _TARGETS = (
     ("groups", "updated_at", "COALESCE(created_at, now())"),
     ("networks", "created_at", "COALESCE(updated_at, now())"),
     ("networks", "updated_at", "COALESCE(created_at, now())"),
-    ("artifact_revisions", "created_at", "COALESCE(updated_at, now())"),
-    ("artifact_revisions", "updated_at", "COALESCE(created_at, now())"),
     ("vfolders", "created_at", "COALESCE(updated_at, now())"),
     ("vfolder_invitations", "created_at", "COALESCE(updated_at, now())"),
     ("vfolder_invitations", "updated_at", "COALESCE(created_at, now())"),
@@ -61,8 +59,6 @@ _TARGETS = (
 
 # Columns that had no insert-time default at all.
 _GAIN_SERVER_DEFAULT = (
-    ("artifact_revisions", "created_at"),
-    ("artifact_revisions", "updated_at"),
     ("vfolder_invitations", "updated_at"),
     ("model_cards", "updated_at"),
     ("role_invitations", "updated_at"),
