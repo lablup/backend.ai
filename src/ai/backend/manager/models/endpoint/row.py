@@ -296,13 +296,11 @@ class EndpointRow(Base):  # type: ignore[misc]
     )
     created_user_row: Mapped[UserRow | None] = relationship(
         "UserRow",
-        back_populates="created_endpoints",
         foreign_keys=[created_user],
         primaryjoin=_get_created_user_row_join_condition,
     )
     session_owner_row: Mapped[UserRow | None] = relationship(
         "UserRow",
-        back_populates="owned_endpoints",
         foreign_keys=[session_owner],
         primaryjoin=_get_session_owner_row_join_condition,
     )

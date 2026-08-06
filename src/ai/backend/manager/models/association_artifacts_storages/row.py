@@ -12,19 +12,12 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.base import GUID, Base
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
     from ai.backend.manager.models.object_storage import ObjectStorageRow
     from ai.backend.manager.models.vfs_storage import VFSStorageRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__: Sequence[str] = ("AssociationArtifactsStorageRow",)
-
-
-def _get_association_artifact_join_cond() -> sa.sql.elements.ColumnElement[Any]:
-    from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
-
-    return ArtifactRevisionRow.id == foreign(AssociationArtifactsStorageRow.artifact_revision_id)
 
 
 def _get_association_object_storage_join_cond() -> sa.sql.elements.ColumnElement[Any]:
@@ -64,12 +57,6 @@ class AssociationArtifactsStorageRow(Base):  # type: ignore[misc]
         nullable=False,
     )
     storage_type: Mapped[str] = mapped_column("storage_type", sa.String, nullable=False)
-
-    artifact_revision_row: Mapped[ArtifactRevisionRow] = relationship(
-        "ArtifactRevisionRow",
-        back_populates="association_artifacts_storages_rows",
-        primaryjoin=_get_association_artifact_join_cond,
-    )
 
     # only valid when storage_type is "object_storage"
     object_storage_row: Mapped[ObjectStorageRow | None] = relationship(

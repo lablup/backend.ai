@@ -110,7 +110,6 @@ class ArtifactRevisionRow(Base):  # type: ignore[misc]
     association_artifacts_storages_rows: Mapped[list[AssociationArtifactsStorageRow]] = (
         relationship(
             "AssociationArtifactsStorageRow",
-            back_populates="artifact_revision_row",
             primaryjoin=_get_association_artifacts_storages_join_cond,
         )
     )

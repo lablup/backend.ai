@@ -100,7 +100,6 @@ class KeyPairRow(Base):  # type: ignore[misc]
         "SessionRow",
         primaryjoin=_get_session_row_join_condition,
         foreign_keys="SessionRow.access_key",
-        back_populates="access_key_row",
     )
     resource_policy_row: Mapped[KeyPairResourcePolicyRow] = relationship(
         "KeyPairResourcePolicyRow", back_populates="keypairs"
