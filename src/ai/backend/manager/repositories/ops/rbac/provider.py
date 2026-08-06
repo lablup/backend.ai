@@ -182,7 +182,7 @@ class FullUserCreation:
 
 @dataclass
 class FullUserCreationResult:
-    """A fully provisioned user: the row (``main_access_key`` set) and its default keypair."""
+    """A fully provisioned user: the row and its default keypair, marked as the default one."""
 
     user_row: UserRow
     keypair_row: KeyPairRow
@@ -1054,7 +1054,6 @@ class RBACWriteOps(WriteOps):
             )
         )
         keypair_row = kp_result.row
-        user_row.main_access_key = keypair_row.access_key
 
         member = ScopeUserMember(user_id=user_id)
         domain_scope = ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=full_creation.domain_id)
