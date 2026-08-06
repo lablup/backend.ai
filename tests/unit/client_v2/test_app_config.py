@@ -59,7 +59,7 @@ def client(mock_session: MagicMock) -> V2AppConfigClient:
 
 
 class TestMyMergedRead:
-    async def test_posts_to_its_own_path(
+    async def test_posts_the_given_names_to_the_my_route(
         self, client: V2AppConfigClient, mock_session: MagicMock
     ) -> None:
         await client.my_get_app_configs(MyGetAppConfigsInput(config_names=["theme", "menu"]))
@@ -69,12 +69,14 @@ class TestMyMergedRead:
         assert str(url).endswith("/v2/app-config/my/get")
         assert mock_session.request.call_args[1]["json"] == {"config_names": ["theme", "menu"]}
 
-    async def test_is_signed(self, client: V2AppConfigClient, mock_session: MagicMock) -> None:
+    async def test_sends_the_callers_credentials(
+        self, client: V2AppConfigClient, mock_session: MagicMock
+    ) -> None:
         await client.my_get_app_configs(MyGetAppConfigsInput(config_names=["theme"]))
 
         assert "Authorization" in mock_session.request.call_args[1]["headers"]
 
-    async def test_parses_the_merge_for_each_requested_name(
+    async def test_answers_each_name_with_its_merge_or_an_empty_one(
         self, client: V2AppConfigClient
     ) -> None:
         result = await client.my_get_app_configs(
@@ -88,7 +90,7 @@ class TestMyMergedRead:
 
 
 class TestPublicMergedRead:
-    async def test_posts_to_its_own_path(
+    async def test_posts_the_given_names_to_the_public_route(
         self, client: V2AppConfigClient, mock_session: MagicMock
     ) -> None:
         await client.public_get_app_configs(
@@ -100,7 +102,9 @@ class TestPublicMergedRead:
         assert str(url).endswith("/v2/app-config/public/get")
         assert mock_session.request.call_args[1]["json"] == {"config_names": ["theme", "menu"]}
 
-    async def test_is_not_signed(self, client: V2AppConfigClient, mock_session: MagicMock) -> None:
+    async def test_sends_no_credentials(
+        self, client: V2AppConfigClient, mock_session: MagicMock
+    ) -> None:
         """The public read must reach the server without credentials — that is its whole point."""
         await client.public_get_app_configs(PublicGetAppConfigsInput(config_names=["theme"]))
 
