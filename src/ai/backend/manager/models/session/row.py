@@ -118,7 +118,6 @@ from ai.backend.manager.models.utils import (
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.domain import DomainRow
-    from ai.backend.manager.models.keypair import KeyPairRow
     from ai.backend.manager.models.scaling_group import ScalingGroupRow
     from ai.backend.manager.models.user import UserRow
 
@@ -505,12 +504,6 @@ class SessionRow(Base):  # type: ignore[misc]
     )
 
     access_key: Mapped[str | None] = mapped_column("access_key", sa.String(length=20))
-    access_key_row: Mapped[KeyPairRow | None] = relationship(
-        "KeyPairRow",
-        primaryjoin=_get_keypair_row_join_condition,
-        back_populates="sessions",
-        foreign_keys=[access_key],
-    )
 
     # `images` stores canonical image name strings for historical audit.
     images: Mapped[list[str] | None] = mapped_column("images", sa.ARRAY(sa.String), nullable=True)
