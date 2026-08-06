@@ -37,7 +37,7 @@ class ConfidentialScalingGroupOpts(BackendAISchema):
     attested_identity: str = ""
     insecure_development: bool = False
     tcb_grace_period: timedelta = timedelta(days=7)
-    admission_limit_per_image: int = 1
+    admission_limit_per_image: int = 4
     metadata_egress_allowlist: list[str] = Field(default_factory=list)
     folder_key_escrow_path: str = ""
     folder_key_escrow_key: str = ""
