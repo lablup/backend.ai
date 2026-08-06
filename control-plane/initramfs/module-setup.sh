@@ -9,7 +9,7 @@ depends() {
 }
 
 install() {
-    inst_multiple cryptsetup openssl base64 od tr cut mktemp shred modprobe mount mountpoint ip seq sleep
+    inst_multiple cryptsetup openssl base64 od tr cut mktemp shred modprobe mount mountpoint ip seq sleep date grep sed
     instmods tdx_guest
     inst_simple /etc/ssl/certs/ca-certificates.crt
     inst_binary /usr/bin/kbs-client

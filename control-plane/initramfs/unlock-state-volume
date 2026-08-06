@@ -12,6 +12,10 @@ NAME=${BACKENDAI_STATE_NAME:-backendai-state}
 URL=${BACKENDAI_KBS_URL:?BACKENDAI_KBS_URL is not set in the measured command line}
 KEY_PATH=${BACKENDAI_KEY_PATH:-default/control-plane/state-disk-key}
 MAC_PATH=${BACKENDAI_MAC_PATH:-default/control-plane/state-header-mac}
+ATTEMPTS=${BACKENDAI_UNLOCK_ATTEMPTS:-5}
+BACKOFF=${BACKENDAI_UNLOCK_BACKOFF:-5}
+VERDICTS=${BACKENDAI_UNLOCK_VERDICTS:-/run/backendai-unlock.jsonl}
+REFUSAL='PolicyDeny|denied|deny|not allowed|unauthorized|forbidden|403|401'
 WORK=$(mktemp -d)
 trap 'shred -u "$WORK"/* 2>/dev/null || true; rm -rf "$WORK"' EXIT
 
@@ -23,15 +27,45 @@ for _ in $(seq 60); do
     sleep 1
 done
 
+verdict() {
+    printf '{"at":%s,"clause":"%s","credential":"%s","unit":"backendai-unlock-state.service","verdict":"%s"}\n' \
+        "$(date -u +%s)" "$2" "$3" "$1" >> "$VERDICTS" 2>/dev/null || true
+}
+
 fetch() {
-    if ! kbs-client --url "$URL" get-resource --path "$1" | base64 -d > "$2"; then
-        echo "unlock-state-volume: release refused for $1" >&2
-        exit 78
-    fi
-    if [ ! -s "$2" ]; then
-        echo "unlock-state-volume: $1 released zero bytes; refusing to unlock" >&2
-        exit 78
-    fi
+    attempt=1
+    while :; do
+        if kbs-client --url "$URL" get-resource --path "$1" > "$WORK/wire" 2> "$WORK/why"; then
+            if ! base64 -d < "$WORK/wire" > "$2"; then
+                echo "unlock-state-volume: $1 released material that is not base64" >&2
+                verdict refused "released material that is not base64" "$1"
+                exit 78
+            fi
+            if [ ! -s "$2" ]; then
+                echo "unlock-state-volume: $1 released zero bytes; refusing to unlock" >&2
+                verdict refused "released zero bytes" "$1"
+                exit 78
+            fi
+            [ "$attempt" -eq 1 ] || verdict recovered "reached the key broker on attempt ${attempt}" "$1"
+            return 0
+        fi
+        if grep -Eqi "$REFUSAL" "$WORK/why"; then
+            echo "unlock-state-volume: release refused for $1; the key broker answered and would not release" >&2
+            grep -a 'error_type\|^Error' "$WORK/why" | sed 's/^/unlock-state-volume: refusal: /' >&2 || true
+            verdict refused "the key broker answered and would not release" "$1"
+            exit 78
+        fi
+        echo "unlock-state-volume: key broker unreachable for $1 on attempt ${attempt} of ${ATTEMPTS}" >&2
+        grep -a '^Error' "$WORK/why" | sed 's/^/unlock-state-volume: outage: /' >&2 || true
+        verdict unreachable "attempt ${attempt} of ${ATTEMPTS}" "$1"
+        if [ "$attempt" -ge "$ATTEMPTS" ]; then
+            echo "unlock-state-volume: key broker still unreachable after ${ATTEMPTS} attempts; this is an outage, not a refusal" >&2
+            verdict outage "unreachable through all ${ATTEMPTS} attempts" "$1"
+            exit 75
+        fi
+        sleep $((BACKOFF * attempt))
+        attempt=$((attempt + 1))
+    done
 }
 
 fetch "$KEY_PATH" "$WORK/key"
@@ -46,6 +80,7 @@ expected=$(tr -d ' \n\r' < "$WORK/expected")
 if [ "$actual" != "$expected" ]; then
     echo "unlock-state-volume: the encryption header does not authenticate" >&2
     echo "unlock-state-volume: expected ${expected}, computed ${actual}" >&2
+    verdict refused "the encryption header does not authenticate" "$DEVICE"
     exit 78
 fi
 

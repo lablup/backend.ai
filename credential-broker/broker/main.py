@@ -76,6 +76,18 @@ def episode(kbs, broker, table, clock, log):
     return collect(kbs, broker, table)
 
 
+def carry(path, log):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            entries = [json.loads(line) for line in f if line.strip()]
+    except (OSError, ValueError) as exc:
+        print(f"credential-broker: no unlock verdicts to carry forward ({exc})", file=sys.stderr, flush=True)
+        return
+    for entry in entries:
+        log.record(entry["verdict"], entry["clause"], entry["unit"], entry["credential"])
+    print(f"credential-broker: carried {len(entries)} unlock verdicts into the decision log", file=sys.stderr, flush=True)
+
+
 def renew(kbs, broker, table, clock, log, server, period, jitter):
     while True:
         time.sleep(period + random.uniform(0, jitter))
@@ -95,6 +107,7 @@ def main(argv=None):
     broker, table = load(args.policy)
     os.makedirs(broker["identity_dir"], mode=0o700, exist_ok=True)
     log = DecisionLog(broker.get("decision_log", "/var/log/backendai-credentials.jsonl"))
+    carry(broker.get("unlock_verdicts", "/run/backendai-unlock.jsonl"), log)
     kbs = Kbs(
         broker["url"],
         broker["client"],
