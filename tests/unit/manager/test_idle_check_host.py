@@ -84,9 +84,6 @@ from ai.backend.testutils.db import with_tables
 
 IDLE_LOGGER_NAME = "ai.backend.manager.idle"
 
-# SessionRow reaches RoutingRow, whose ``relationship("EndpointRow")`` resolves the name from
-# the mapper registry — so the endpoint chain has to be declared here even though no test
-# touches it. Same set and order as tests/unit/manager/test_query_userinfo.py.
 _IDLE_ROWS = [
     DomainRow,
     ScalingGroupRow,
