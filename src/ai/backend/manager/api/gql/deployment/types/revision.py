@@ -444,7 +444,11 @@ class ModelServiceConfigGQL:
         ),
         default=None,
     )
-    port: int = gql_field(description="Port number for the model service.")
+    port: int | None = gql_field(
+        default=None,
+        description="Port number for the model service. Null when a preset omits it to "
+        "inherit the runtime variant baseline's port at revision resolution.",
+    )
     health_check: ModelHealthCheckGQL | None = gql_field(
         description="Health check configuration for the model service.",
         default=None,

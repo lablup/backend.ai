@@ -287,7 +287,11 @@ class ModelServiceConfigInfoDTO(BaseResponseModel):
             "`[shell, '-c', command]`; null or empty disables shell wrapping."
         ),
     )
-    port: int = Field(description="Port number for the model service.")
+    port: int | None = Field(
+        default=None,
+        description="Port number for the model service. Null when a preset omits it to "
+        "inherit the runtime variant baseline's port at revision resolution.",
+    )
     health_check: ModelHealthCheckInfoDTO | None = Field(
         default=None, description="Health check configuration for the model service."
     )

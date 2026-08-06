@@ -786,12 +786,13 @@ class DefaultModelDefinition(BaseConfigModel):
 
 
 class PresetModelServiceConfig(BaseConfigModel):
-    """Preset-stored model service config; ``port`` stays required."""
+    """Preset-stored model service config. ``port`` may be omitted to inherit
+    the runtime variant baseline's port at revision resolution."""
 
     pre_start_actions: list[PreStartAction] | None = None
     start_command: str | None = None
     shell: str | None = None
-    port: int
+    port: int | None = Field(default=None, gt=1)
     health_check: ModelHealthCheckDraft | None = None
 
     @model_validator(mode="before")

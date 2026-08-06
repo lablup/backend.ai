@@ -11241,8 +11241,10 @@ type ModelServiceConfig
   """
   shell: String
 
-  """Port number for the model service."""
-  port: Int!
+  """
+  Port number for the model service. Null when a preset omits it to inherit the runtime variant baseline's port at revision resolution.
+  """
+  port: Int
 
   """Health check configuration for the model service."""
   healthCheck: ModelHealthCheck
@@ -13897,8 +13899,10 @@ input PresetModelServiceConfigInput
   """
   shell: String = "/bin/bash"
 
-  """Port number for the model service. Must be greater than 1."""
-  port: Int!
+  """
+  Port number for the model service. Must be greater than 1. Omit to inherit the runtime variant baseline's port.
+  """
+  port: Int = null
 
   """Health check configuration for the model service."""
   healthCheck: PresetModelHealthCheckInput = null
