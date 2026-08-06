@@ -93,7 +93,7 @@ Check options with `--help`.
 - **resource-allocation**: user(project-usage, resource-group-usage) · admin(domain-usage, effective) · my(effective, keypair-usage)
 - **resource-preset**: admin(search, get, create, update, delete, check-availability)
 - **resource-policy**: admin(sub keypair / project / user — each create, get, search, update, delete) · my(keypair, user)
-- **resource-slot**: sub slot-type(search), agent-resource(search), allocation(search)
+- **resource-slot**: sub slot-type(search, create, update, delete), agent-resource(search), allocation(search)
 - **resource-usage**: sub domain(search), project(search), user(search)
 
 ### Monitoring & Audit
