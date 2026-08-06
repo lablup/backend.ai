@@ -8,7 +8,7 @@ import threading
 import time
 
 from .clock import TrustedClock, claims, measurements, platform_status
-from .errors import BrokerUnreachable, EmptySecret, PolicyError, ReleaseDenied
+from .errors import BrokerUnreachable, ClockUntrusted, EmptySecret, PolicyError, ReleaseDenied
 from .identity import material
 from .kbs import Kbs
 from .policy import load
@@ -81,6 +81,8 @@ def renew(kbs, broker, table, clock, log, server, period, jitter):
         time.sleep(period + random.uniform(0, jitter))
         try:
             server.store = episode(kbs, broker, table, clock, log)
+        except ClockUntrusted as exc:
+            log.record("clock-untrusted", str(exc), "credential-broker", "")
         except (BrokerUnreachable, ReleaseDenied, EmptySecret, PolicyError) as exc:
             log.record("renewal-failed", type(exc).__name__ + ": " + str(exc), "", "")
 

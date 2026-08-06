@@ -295,14 +295,18 @@ class CipherPaths:
         entries: list[CipherEntry] = []
         for on_disk, size, is_dir in sealed:
             sidecar = fmt.sidecar_of(on_disk)
-            encoded = (
-                (await self._store.read(_join(cipher_dir, sidecar))).decode("ascii")
-                if sidecar is not None
-                else on_disk
-            )
+            try:
+                encoded = (
+                    (await self._store.read(_join(cipher_dir, sidecar))).decode("ascii")
+                    if sidecar is not None
+                    else on_disk
+                )
+                name = self.cipher.plain_name(iv, encoded)
+            except (ValueError, UnicodeDecodeError, FileNotFoundError):
+                continue
             entries.append(
                 CipherEntry(
-                    name=self.cipher.plain_name(iv, encoded),
+                    name=name,
                     on_disk=on_disk,
                     size=size if is_dir else fmt.plaintext_len(size),
                     is_dir=is_dir,

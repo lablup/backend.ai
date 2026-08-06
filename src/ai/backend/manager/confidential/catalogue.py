@@ -10,11 +10,8 @@ from ai.backend.common.cc_storage import (
     FolderCipher,
 )
 from ai.backend.manager.confidential.broker import BrokerClient
-from ai.backend.manager.confidential.client_keys import (
-    ClientKeyRelease,
-    CustodianFolderKeyCustody,
-)
-from ai.backend.manager.confidential.storage import FolderKeyCustodian
+from ai.backend.manager.confidential.client_keys import CustodianFolderKeyCustody
+from ai.backend.manager.confidential.storage import FolderKeyCustodian, opts_for_domain
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
@@ -47,7 +44,11 @@ class _ProxyStore:
     async def listdir(self, path: str) -> list[tuple[str, int, bool]]:
         result = await self._client.list_files(self._volume, self._vfolder_id, f"./{path or ''}")
         return [
-            (item["name"], int(item.get("size") or 0), item.get("type") == "DIRECTORY")
+            (
+                item["name"],
+                int((item.get("stat") or {}).get("size") or 0),
+                item.get("type") == "DIRECTORY",
+            )
             for item in result["items"]
         ]
 
@@ -95,8 +96,7 @@ class CatalogueReader:
             return _PlainView(store)
         async with aiohttp.ClientSession() as session:
             custody = CustodianFolderKeyCustody(FolderKeyCustodian(BrokerClient(session)))
-            releases = ClientKeyRelease(self._db, custody)
-            opts = await releases.opts_for_domain(domain_name)
+            opts = await opts_for_domain(self._db, domain_name)
             material = await custody.material(opts, domain_name, folder_uuid, encryption_tier)
         cipher = FolderCipher(material)
         return _CipherView(cipher=cipher, paths=CipherPaths(cipher, store), store=store)
