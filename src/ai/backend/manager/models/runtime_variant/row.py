@@ -5,7 +5,7 @@ from datetime import datetime
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.config import ModelDefinitionDraft
+from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.models.base import GUID, Base, PydanticColumn
@@ -30,9 +30,9 @@ class RuntimeVariantRow(Base):  # type: ignore[misc]
         nullable=False,
         server_default=sa.false(),
     )
-    default_model_definition: Mapped[ModelDefinitionDraft] = mapped_column(
+    default_model_definition: Mapped[DefaultModelDefinition] = mapped_column(
         "default_model_definition",
-        PydanticColumn(ModelDefinitionDraft, exclude_unset=True),
+        PydanticColumn(DefaultModelDefinition, exclude_unset=True),
         nullable=False,
     )
 

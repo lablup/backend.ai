@@ -746,6 +746,28 @@ class ModelDefinitionDraft(BaseConfigModel):
         return cls.model_validate(data)
 
 
+class DefaultModelConfig(BaseConfigModel):
+    """Baseline model config stored on a runtime variant. ``name`` is required
+    so the always-present baseline layer guarantees every revision a model name;
+    ``model_path`` keeps its dynamic mount-destination default in the reader.
+    """
+
+    name: str
+    model_path: str | None = None
+    service: ModelServiceConfigDraft | None = None
+    metadata: ModelMetadata | None = None
+
+
+class DefaultModelDefinition(BaseConfigModel):
+    """Stored shape of ``runtime_variants.default_model_definition``."""
+
+    models: list[DefaultModelConfig] | None = None
+
+    def to_draft(self) -> ModelDefinitionDraft:
+        # exclude_unset keeps unset fields from clobbering lower-priority merge layers.
+        return ModelDefinitionDraft.model_validate(self.model_dump(exclude_unset=True))
+
+
 def find_config_file(daemon_name: str) -> Path:
     toml_path_from_env = os.environ.get("BACKEND_CONFIG_FILE", None)
     if not toml_path_from_env:

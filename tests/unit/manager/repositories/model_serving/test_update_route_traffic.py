@@ -19,7 +19,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
-from ai.backend.common.config import ModelDefinition
+from ai.backend.common.config import DefaultModelDefinition, ModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.image import ImageID
@@ -280,7 +280,7 @@ async def endpoint_with_revision_and_route(
                 id=runtime_variant_id,
                 name=f"variant-{runtime_variant_id.hex[:8]}",
                 description="test variant",
-                default_model_definition=ModelDefinition.model_validate({"models": []}),
+                default_model_definition=DefaultModelDefinition(models=[]),
             )
         )
         await sess.flush()

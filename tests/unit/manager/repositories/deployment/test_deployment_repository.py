@@ -14,7 +14,7 @@ import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 
-from ai.backend.common.config import ModelDefinitionDraft
+from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
@@ -702,7 +702,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                     id=runtime_variant_id,
                     name=f"vllm-{runtime_variant_id.hex[:8]}",
                     description="test variant",
-                    default_model_definition=ModelDefinitionDraft(),
+                    default_model_definition=DefaultModelDefinition(),
                 )
             )
             await db_sess.flush()
@@ -938,7 +938,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                     id=runtime_variant_id,
                     name=f"vllm-{runtime_variant_id.hex[:8]}",
                     description="test variant",
-                    default_model_definition=ModelDefinitionDraft(),
+                    default_model_definition=DefaultModelDefinition(),
                 )
             )
             await db_sess.flush()
@@ -1718,7 +1718,7 @@ class TestDeploymentRevisionOperations:
                     id=variant_id,
                     name=f"test-variant-{variant_id.hex[:8]}",
                     description="test",
-                    default_model_definition=ModelDefinitionDraft(),
+                    default_model_definition=DefaultModelDefinition(),
                 )
             )
             await db_sess.commit()
