@@ -74,13 +74,10 @@ class DomainLifecycleInfo(BackendAISchema):
 class DomainNode(BaseResponseModel):
     """Domain entity with structured field groups."""
 
-    id: str = Field(
-        description="Domain name (primary key).",
-    )
-    row_id: DomainID = Field(
+    id: DomainID = Field(
         description=(
             "Domain uuid — the identifier domain-scoped APIs "
-            "(e.g. app config fragments) address a domain by."
+            "(e.g. app config fragments) address a domain by. The name lives at basic_info.name."
         ),
     )
     basic_info: DomainBasicInfo = Field(

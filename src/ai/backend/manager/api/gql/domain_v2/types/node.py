@@ -15,8 +15,7 @@ from ai.backend.common.dto.manager.v2.domain.types import (
     DomainFairShareScopeDTO,
     DomainUsageScopeDTO,
 )
-from ai.backend.common.identifier.domain import DomainName
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -89,14 +88,10 @@ class DomainUsageScopeGQL(PydanticInputMixin[DomainUsageScopeDTO]):
 class DomainV2GQL(PydanticNodeMixin[DomainNode]):
     """Domain entity with structured field groups."""
 
-    id: NodeID[str] = gql_field(description="Domain name (primary key).")
-    row_id: uuid.UUID = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
-            description=(
-                "Domain uuid — the identifier domain-scoped APIs "
-                "(e.g. app config fragments) address a domain by."
-            ),
+    id: NodeID[str] = gql_field(
+        description=(
+            "Domain uuid — the identifier domain-scoped APIs "
+            "(e.g. app config fragments) address a domain by. The name lives at basicInfo.name."
         )
     )
     basic_info: DomainBasicInfoGQL = gql_field(
@@ -120,7 +115,7 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
         payload = await info.context.adapters.fair_share.get_domain(
             GetDomainFairShareInput(
                 resource_group=scope.resource_group_name,
-                domain_name=str(self.id),
+                domain_name=self.basic_info.name,
             )
         )
 
@@ -136,7 +131,9 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
         self,
         info: Info,
     ) -> ActiveResourceOverviewGQL | None:
-        dto = await info.context.adapters.resource_slot.get_domain_resource_overview(str(self.id))
+        dto = await info.context.adapters.resource_slot.get_domain_resource_overview(
+            self.basic_info.name
+        )
         return ActiveResourceOverviewGQL.from_pydantic(dto)
 
     @gql_field(
@@ -168,7 +165,7 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
 
         repository_scope = DomainUsageBucketSearchScope(
             resource_group=scope.resource_group_name,
-            domain_name=str(self.id),
+            domain_name=self.basic_info.name,
         )
 
         payload = await info.context.adapters.resource_usage.gql_search_domain_scoped(
@@ -238,7 +235,7 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
         )
 
         payload = await info.context.adapters.project.search_by_domain_name(
-            domain_name=DomainName(str(self.id)),
+            domain_name=DomainName(self.basic_info.name),
             input=AdminSearchProjectsInput(
                 filter=filter.to_pydantic() if filter else None,
                 order=[o.to_pydantic() for o in order_by] if order_by else None,
@@ -302,7 +299,7 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
         )
         from ai.backend.manager.repositories.user.types import DomainUserSearchScope
 
-        scope = DomainUserSearchScope(domain_name=str(self.id))
+        scope = DomainUserSearchScope(domain_name=self.basic_info.name)
         payload = await info.context.adapters.user.gql_search_by_domain(
             scope=scope,
             input=AdminSearchUsersInput(
@@ -338,7 +335,9 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[DomainV2GQL | None]:
-        return await info.context.data_loaders.domain_loader.load_many(node_ids)
+        return await info.context.data_loaders.domain_by_id_loader.load_many([
+            DomainID(uuid.UUID(nid)) for nid in node_ids
+        ])
 
 
 DomainV2Edge = Edge[DomainV2GQL]

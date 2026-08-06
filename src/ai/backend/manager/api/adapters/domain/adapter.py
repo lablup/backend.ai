@@ -265,8 +265,8 @@ class DomainAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
 
-        if filter.row_id is not None:
-            condition = filter.row_id.build_query_condition(
+        if filter.id is not None:
+            condition = filter.id.build_query_condition(
                 equals_factory=DomainConditions.by_id_equals,
                 in_factory=DomainConditions.by_id_in,
             )
@@ -385,8 +385,7 @@ class DomainAdapter(BaseAdapter):
     def _domain_data_to_node(data: DomainData) -> DomainNode:
         """Convert data layer type to Pydantic DTO."""
         return DomainNode(
-            id=data.name,
-            row_id=data.id,
+            id=data.id,
             basic_info=DomainBasicInfo(
                 name=data.name,
                 description=data.description,

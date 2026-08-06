@@ -29,8 +29,7 @@ def _make_domain_node(
 ) -> DomainNode:
     now = datetime.now(tz=UTC)
     return DomainNode(
-        id=name,
-        row_id=DomainID(uuid.uuid4()),
+        id=DomainID(uuid.uuid4()),
         basic_info=DomainBasicInfo(
             name=name,
             description=description,
@@ -79,14 +78,14 @@ class TestDomainV2GQL:
         assert domain_gql.lifecycle.created_at == created
         assert domain_gql.lifecycle.modified_at == modified
 
-    def test_from_pydantic_primary_key_is_name(self) -> None:
-        """Test that id field contains domain name, not UUID."""
+    def test_from_pydantic_id_is_the_domain_uuid(self) -> None:
+        """Test that the id field carries the domain uuid, not the name."""
         dto = _make_domain_node(name="my-domain")
 
         domain_gql = DomainV2GQL.from_pydantic(dto)
 
-        # ID should be the domain name
-        assert str(domain_gql.id) == "my-domain"
+        assert str(domain_gql.id) == str(dto.id)
+        assert domain_gql.basic_info.name == "my-domain"
 
     def test_from_pydantic_empty_registries(self) -> None:
         """Test with empty allowed_docker_registries."""

@@ -4795,11 +4795,6 @@ type DomainV2 implements Node @key(fields: "id") {
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """
-  Added in 26.9.0. Domain uuid — the identifier domain-scoped APIs (e.g. app config fragments) address a domain by.
-  """
-  rowId: UUID!
-
   """Basic domain information including name and description."""
   basicInfo: DomainBasicInfo!
 
@@ -4861,7 +4856,7 @@ input DomainV2Filter {
   name: StringFilter = null
 
   """Added in 26.9.0. Filter by domain uuid."""
-  rowId: UUIDFilter = null
+  id: UUIDFilter = null
   description: StringFilter = null
   isActive: Boolean = null
   createdAt: DateTimeFilter = null

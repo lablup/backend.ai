@@ -66,7 +66,7 @@ class DomainV2Filter(PydanticInputMixin[DomainFilter]):
     """Filter for domain queries."""
 
     name: StringFilter | None = None
-    row_id: UUIDFilter | None = gql_added_field(
+    id: UUIDFilter | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Filter by domain uuid.",

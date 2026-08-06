@@ -96,7 +96,7 @@ class DomainFilter(BaseRequestModel):
     """Filter criteria for searching domains."""
 
     name: StringFilter | None = Field(default=None, description="Filter by domain name.")
-    row_id: UUIDFilter | None = Field(default=None, description="Filter by domain uuid.")
+    id: UUIDFilter | None = Field(default=None, description="Filter by domain uuid.")
     description: StringFilter | None = Field(default=None, description="Filter by description.")
     is_active: bool | None = Field(default=None, description="Filter by active status.")
     created_at: DateTimeFilter | None = Field(default=None, description="Filter by creation time.")

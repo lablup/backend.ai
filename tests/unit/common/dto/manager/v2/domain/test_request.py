@@ -209,12 +209,12 @@ class TestDomainFilter:
         restored = DomainFilter.model_validate_json(json_data)
         assert restored.is_active is True
 
-    def test_row_id_round_trip(self) -> None:
-        row_id = uuid.uuid4()
-        f = DomainFilter(row_id=UUIDFilter(equals=row_id))
+    def test_id_round_trip(self) -> None:
+        domain_id = uuid.uuid4()
+        f = DomainFilter(id=UUIDFilter(equals=domain_id))
         restored = DomainFilter.model_validate_json(f.model_dump_json())
-        assert restored.row_id is not None
-        assert restored.row_id.equals == row_id
+        assert restored.id is not None
+        assert restored.id.equals == domain_id
 
 
 class TestDomainOrder:
