@@ -4,6 +4,8 @@ set -eu
 TARGET=${BACKENDAI_BACKUP_TARGET:-/var/lib/backendai/backup}
 KEYFILE=${CREDENTIALS_DIRECTORY:?no credentials directory}/backup.key
 PGBIN=/usr/lib/postgresql/16/bin
+PGHOST=${PGHOST:-/run/backendai}
+export PGHOST
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
