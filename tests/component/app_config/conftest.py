@@ -135,7 +135,9 @@ def server_module_registries(
     return [v2_registry]
 
 
-type SeedFragments = Callable[[Mapping[AppConfigScopeType, dict[str, Any] | None]], Awaitable[str]]
+type SeedFragments = Callable[
+    [str, Mapping[AppConfigScopeType, dict[str, Any] | None]], Awaitable[None]
+]
 
 
 @pytest.fixture()
@@ -144,20 +146,22 @@ async def seed_colliding_fragments(
     regular_user_fixture: UserFixtureData,
     domain_fixture: DomainFixtureData,
 ) -> AsyncIterator[SeedFragments]:
-    """Writes one config name from a per-scope config, and returns the name to read back.
+    """Registers ``config_name`` at every scope and writes the fragments the caller supplies.
 
     ``None`` for a scope writes no fragment there at all, which is not the same as writing one
-    whose value for a key is ``null``. Registered at every scope, so any of the three may hold
-    a fragment.
+    whose value for a key is ``null``.
     """
-    config_name = "colliding"
+    seeded: list[str] = []
     scope_ids: dict[AppConfigScopeType, AppConfigScopeID | None] = {
         AppConfigScopeType.PUBLIC: None,
         AppConfigScopeType.DOMAIN: AppConfigScopeID(domain_fixture.domain_id),
         AppConfigScopeType.USER: AppConfigScopeID(regular_user_fixture.user_uuid),
     }
 
-    async def seed(configs: Mapping[AppConfigScopeType, dict[str, Any] | None]) -> str:
+    async def seed(
+        config_name: str, configs: Mapping[AppConfigScopeType, dict[str, Any] | None]
+    ) -> None:
+        seeded.append(config_name)
         async with database_engine.begin_session() as sess:
             sess.add(AppConfigDefinitionRow(config_name=config_name))
             await sess.flush()
@@ -180,14 +184,11 @@ async def seed_colliding_fragments(
                 for scope_type, config in configs.items()
                 if config is not None
             ])
-        return config_name
 
     yield seed
     async with database_engine.begin_session() as sess:
         await sess.execute(
-            sa.delete(AppConfigDefinitionRow).where(
-                AppConfigDefinitionRow.config_name == config_name
-            )
+            sa.delete(AppConfigDefinitionRow).where(AppConfigDefinitionRow.config_name.in_(seeded))
         )
 
 

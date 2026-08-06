@@ -25,18 +25,18 @@ from .conftest import SeedFragments
 
 @dataclass(frozen=True)
 class _MergeCase:
-    """The fragment each scope holds, and what ``key`` merges to in the caller's read.
+    """The fragment each scope holds for one config name, and the config the caller reads.
 
     ``None`` for a scope writes no fragment there; ``{}`` writes one carrying no key. Neither
-    is the same as a fragment whose value for the key *is* ``null``, which is its own rule.
+    is the same as a fragment whose value for a key *is* ``null``, which is its own rule.
     """
 
     description: str
-    key: str
+    config_name: str
     public: dict[str, Any] | None
     domain: dict[str, Any] | None
     user: dict[str, Any] | None
-    expected: Any
+    expected: dict[str, Any]
 
 
 class TestMergedRead:
@@ -56,43 +56,43 @@ class TestMergedRead:
         [
             _MergeCase(
                 description="nested objects merge recursively",
-                key="theme",
-                public={"theme": {"mode": "light"}},
-                domain={"theme": {"accent": "teal"}},
-                user={"theme": {"font": "mono"}},
-                expected={"mode": "light", "accent": "teal", "font": "mono"},
+                config_name="theme",
+                public={"palette": {"mode": "light"}},
+                domain={"palette": {"accent": "teal"}},
+                user={"palette": {"font": "mono"}},
+                expected={"palette": {"mode": "light", "accent": "teal", "font": "mono"}},
             ),
             _MergeCase(
                 description="a scalar is replaced by the highest rank that carries it",
-                key="mode",
+                config_name="theme",
                 public={"mode": "light"},
                 domain={"mode": "solarized"},
                 user={"mode": "dark"},
-                expected="dark",
+                expected={"mode": "dark"},
             ),
             _MergeCase(
                 description="a list is replaced whole, neither blended nor appended to",
-                key="pinned",
+                config_name="menu",
                 public={"pinned": ["home", "docs", "support"]},
                 domain={"pinned": ["home", "wiki"]},
                 user={"pinned": ["home"]},
-                expected=["home"],
+                expected={"pinned": ["home"]},
             ),
             _MergeCase(
                 description="an explicit null erases what was inherited",
-                key="banner",
-                public={"banner": "Welcome"},
-                domain={"banner": "Compliance notice"},
-                user={"banner": None},
-                expected=None,
+                config_name="banner",
+                public={"text": "Welcome"},
+                domain={"text": "Compliance notice"},
+                user={"text": None},
+                expected={"text": None},
             ),
             _MergeCase(
                 description="a key the higher scopes omit keeps the inherited value",
-                key="lang",
+                config_name="locale",
                 public={"lang": "en"},
                 domain={},
                 user={},
-                expected="en",
+                expected={"lang": "en"},
             ),
         ],
         ids=lambda case: case.description,
@@ -103,19 +103,22 @@ class TestMergedRead:
         user_v2_registry: V2ClientRegistry,
         case: _MergeCase,
     ) -> None:
-        """Subscripting rather than ``.get`` on purpose: a key the merge dropped is a failure,
-        which is what separates the null case from the omitted one."""
-        config_name = await seed_colliding_fragments({
-            AppConfigScopeType.PUBLIC: case.public,
-            AppConfigScopeType.DOMAIN: case.domain,
-            AppConfigScopeType.USER: case.user,
-        })
-
-        result = await user_v2_registry.app_config.my_get_app_configs(
-            MyGetAppConfigsInput(config_names=[config_name])
+        """Whole-config equality on purpose: the null case's key must come back as ``null``
+        rather than disappear, which is what separates it from the omitted one."""
+        await seed_colliding_fragments(
+            case.config_name,
+            {
+                AppConfigScopeType.PUBLIC: case.public,
+                AppConfigScopeType.DOMAIN: case.domain,
+                AppConfigScopeType.USER: case.user,
+            },
         )
 
-        assert result.app_configs[0].config[case.key] == case.expected
+        result = await user_v2_registry.app_config.my_get_app_configs(
+            MyGetAppConfigsInput(config_names=[case.config_name])
+        )
+
+        assert result.app_configs[0].config == case.expected
 
     async def test_the_public_read_draws_from_the_public_scope_alone(
         self,
@@ -123,14 +126,17 @@ class TestMergedRead:
         anonymous_v2_registry: V2ClientRegistry,
     ) -> None:
         """Over rows the caller would merge all three of, the public read answers with one."""
-        config_name = await seed_colliding_fragments({
-            AppConfigScopeType.PUBLIC: {"mode": "light"},
-            AppConfigScopeType.DOMAIN: {"mode": "solarized"},
-            AppConfigScopeType.USER: {"mode": "dark"},
-        })
-
-        result = await anonymous_v2_registry.app_config.public_get_app_configs(
-            PublicGetAppConfigsInput(config_names=[config_name])
+        await seed_colliding_fragments(
+            "theme",
+            {
+                AppConfigScopeType.PUBLIC: {"mode": "light"},
+                AppConfigScopeType.DOMAIN: {"mode": "solarized"},
+                AppConfigScopeType.USER: {"mode": "dark"},
+            },
         )
 
-        assert result.app_configs[0].config["mode"] == "light"
+        result = await anonymous_v2_registry.app_config.public_get_app_configs(
+            PublicGetAppConfigsInput(config_names=["theme"])
+        )
+
+        assert result.app_configs[0].config == {"mode": "light"}
