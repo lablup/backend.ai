@@ -1917,13 +1917,13 @@ class TestBulkUpsertScopedPartial:
                 )
                 for item in case.items
             ])
-            assert [row.name for row in result.successes] == case.expected_succeeded_names
+            assert [row.name for row in result.items] == case.expected_succeeded_names
             assert [e.index for e in result.errors] == case.expected_failed_indexes
             # Every rejection these batches provoke is the FK gate, mapped by the spec.
             assert all(
                 isinstance(e.exception, _TestUpsertParentMissingError) for e in result.errors
             )
-            row_ids = {row.name: str(row.id) for row in result.successes}
+            row_ids = {row.name: str(row.id) for row in result.items}
 
         async with database_connection.begin_readonly_session() as db_sess:
             names = (await db_sess.scalars(sa.select(RBACOpsUpsertGatedRow.name))).all()

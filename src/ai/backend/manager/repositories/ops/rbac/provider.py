@@ -605,19 +605,19 @@ class RBACWriteOps(WriteOps):
         association share one savepoint, so a rejected row rolls back both and leaves the
         rest upserted.
         """
-        successes: list[TRow] = []
+        items: list[TRow] = []
         errors: list[BulkUpserterError[TRow]] = []
         for index, upserter in enumerate(upserters):
             # The handler stays outside the savepoint — see bulk_create_scoped_partial.
             try:
                 async with self.savepoint():
                     result = await self.upsert_scoped(upserter)
-                successes.append(result.row)
+                items.append(result.row)
             except Exception as e:
                 # upsert_scoped maps the integrity errors its spec declares onto domain
                 # errors; whatever arrives here fails just this row.
                 errors.append(BulkUpserterError(spec=upserter.spec, exception=e, index=index))
-        return RBACBulkEntityUpserterResultWithFailures(successes=successes, errors=errors)
+        return RBACBulkEntityUpserterResultWithFailures(items=items, errors=errors)
 
     async def bulk_create_scoped[TRow: Base](
         self,
