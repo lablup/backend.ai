@@ -142,3 +142,8 @@ resource = "default/control-plane/state-backup-key"
 unit = "backendai-state-backup.service"
 name = "etcd-root-password"
 resource = "default/control-plane/etcd-root-password"
+
+[[credential]]
+unit = "backendai-state-backup.service"
+name = "password"
+resource = "default/control-plane/postgres-password"

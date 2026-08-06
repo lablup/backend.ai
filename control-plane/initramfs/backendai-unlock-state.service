@@ -9,6 +9,7 @@ Conflicts=shutdown.target initrd-switch-root.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
+TimeoutStartSec=600
 ExecStart=/usr/bin/unlock-state-volume
 StandardOutput=journal+console
 StandardError=journal+console

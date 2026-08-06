@@ -5,12 +5,15 @@ TARGET=${BACKENDAI_BACKUP_TARGET:-/var/lib/backendai/backup}
 KEYFILE=${CREDENTIALS_DIRECTORY:?no credentials directory}/backup.key
 PGBIN=/usr/lib/postgresql/16/bin
 PGHOST=${PGHOST:-/run/backendai}
-export PGHOST
+PGUSER=${PGUSER:-postgres}
+PGPASSWORD=$(cat "${CREDENTIALS_DIRECTORY}/password")
+export PGHOST PGUSER PGPASSWORD
 SEGMENT=${1:?usage: state-restore <segment>}
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
 [ -s "$KEYFILE" ] || { echo "state-restore: backup key is empty" >&2; exit 78; }
+[ -n "$PGPASSWORD" ] || { echo "state-restore: datastore password is empty" >&2; exit 78; }
 
 key=$(od -An -v -tx1 < "$KEYFILE" | tr -d ' \n')
 mackey=$(printf 'backendai-state-backup-v1' | openssl dgst -sha256 -mac HMAC -macopt "hexkey:${key}" -r | cut -d' ' -f1)

@@ -1,0 +1,15 @@
+[Unit]
+Description=Backend.AI state bundle power button
+After=basic.target
+
+[Service]
+ExecStart=/usr/lib/backendai/power-button
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal+console
+StandardError=journal+console
+NoNewPrivileges=yes
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target
