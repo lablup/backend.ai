@@ -320,9 +320,9 @@ async def admin_bulk_update_users_v2(
                 else OptionalState.nop()
             ),
             main_access_key=(
-                TriState.nop()
+                OptionalState.nop()
                 if isinstance(dto.main_access_key, Sentinel)
-                else TriState.from_graphql(dto.main_access_key)
+                else OptionalState.from_graphql(dto.main_access_key)
             ),
             container_uid=(
                 TriState.nop()

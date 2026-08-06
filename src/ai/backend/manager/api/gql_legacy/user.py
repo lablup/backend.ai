@@ -1078,7 +1078,7 @@ class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
             sudo_session_enabled=OptionalState[bool].from_graphql(
                 self.sudo_session_enabled,
             ),
-            main_access_key=TriState[str].from_graphql(
+            main_access_key=OptionalState[str].from_graphql(
                 self.main_access_key,
             ),
             container_uid=TriState[int].from_graphql(

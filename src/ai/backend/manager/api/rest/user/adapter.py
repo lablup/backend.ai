@@ -82,7 +82,7 @@ class UserAdapter(BaseFilterAdapter):
         totp_activated = OptionalState[bool].nop()
         resource_policy = OptionalState[str].nop()
         sudo_session_enabled = OptionalState[bool].nop()
-        main_access_key = TriState[str].nop()
+        main_access_key = OptionalState[str].nop()
         container_uid = TriState[int].nop()
         container_main_gid = TriState[int].nop()
         container_gids = TriState[list[int]].nop()
@@ -113,7 +113,7 @@ class UserAdapter(BaseFilterAdapter):
         if request.sudo_session_enabled is not None:
             sudo_session_enabled = OptionalState.update(request.sudo_session_enabled)
         if request.main_access_key is not None:
-            main_access_key = TriState.update(request.main_access_key)
+            main_access_key = OptionalState.update(request.main_access_key)
         if request.container_uid is not None:
             container_uid = TriState.update(request.container_uid)
         if request.container_main_gid is not None:

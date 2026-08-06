@@ -515,9 +515,9 @@ class UserAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
             main_access_key=(
-                TriState.nop()
+                OptionalState.nop()
                 if isinstance(input.main_access_key, Sentinel)
-                else TriState.from_graphql(input.main_access_key)
+                else OptionalState.from_graphql(input.main_access_key)
             ),
             container_uid=(
                 TriState.nop()
