@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -61,6 +61,8 @@ from ai.backend.manager.services.app_config_definition.service import AppConfigD
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
+
+    from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 @pytest.fixture()
@@ -138,13 +140,9 @@ async def merged_fragments(
     database_engine: ExtendedAsyncSAEngine,
     regular_user_fixture: UserFixtureData,
 ) -> AsyncIterator[None]:
-    """Registers two config names, each named after the role it plays in the tests.
-
-    ``contributed`` is allow-listed at every scope and holds a public fragment the caller's
-    own overrides; ``uncontributed`` is registered and allow-listed but holds no fragment
-    anywhere, standing for a requested name nothing merges into.
-    """
-    config_names = ["contributed", "uncontributed"]
+    """``contributed`` is allow-listed at every scope, with a public fragment the caller's own
+    overrides on one key and leaves alone on another."""
+    config_names = ["contributed"]
     async with database_engine.begin_session() as sess:
         sess.add_all([
             AppConfigDefinitionRow(config_name=config_name) for config_name in config_names
@@ -180,6 +178,62 @@ async def merged_fragments(
         await sess.execute(
             sa.delete(AppConfigDefinitionRow).where(
                 AppConfigDefinitionRow.config_name.in_(config_names)
+            )
+        )
+
+
+type SeedFragments = Callable[[Mapping[AppConfigScopeType, dict[str, Any] | None]], Awaitable[str]]
+
+
+@pytest.fixture()
+async def seed_colliding_fragments(
+    database_engine: ExtendedAsyncSAEngine,
+    regular_user_fixture: UserFixtureData,
+    domain_fixture: DomainFixtureData,
+) -> AsyncIterator[SeedFragments]:
+    """Writes one config name from a per-scope config, and returns the name to read back.
+
+    ``None`` for a scope writes no fragment there at all, which is not the same as writing one
+    whose value for a key is ``null``. Registered at every scope, so any of the three may hold
+    a fragment.
+    """
+    config_name = "colliding"
+    scope_ids: dict[AppConfigScopeType, AppConfigScopeID | None] = {
+        AppConfigScopeType.PUBLIC: None,
+        AppConfigScopeType.DOMAIN: AppConfigScopeID(domain_fixture.domain_id),
+        AppConfigScopeType.USER: AppConfigScopeID(regular_user_fixture.user_uuid),
+    }
+
+    async def seed(configs: Mapping[AppConfigScopeType, dict[str, Any] | None]) -> str:
+        async with database_engine.begin_session() as sess:
+            sess.add(AppConfigDefinitionRow(config_name=config_name))
+            await sess.flush()
+            sess.add_all([
+                AppConfigAllowListRow(
+                    config_name=config_name,
+                    scope_type=scope_type,
+                    rank=scope_type.default_rank(),
+                )
+                for scope_type in AppConfigScopeType
+            ])
+            await sess.flush()
+            sess.add_all([
+                AppConfigFragmentRow(
+                    config_name=config_name,
+                    scope_type=scope_type,
+                    scope_id=scope_ids[scope_type],
+                    config=config,
+                )
+                for scope_type, config in configs.items()
+                if config is not None
+            ])
+        return config_name
+
+    yield seed
+    async with database_engine.begin_session() as sess:
+        await sess.execute(
+            sa.delete(AppConfigDefinitionRow).where(
+                AppConfigDefinitionRow.config_name == config_name
             )
         )
 
