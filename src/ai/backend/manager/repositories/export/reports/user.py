@@ -65,7 +65,7 @@ PROJECT_JOINS = (ASSOC_GROUP_USER_JOIN, PROJECT_JOIN)
 # Main Keypair JOIN (N:1, no duplication)
 MAIN_KEYPAIR_JOIN = JoinDef(
     table=KeyPairRow.__table__,
-    condition=(KeyPairRow.user == UserRow.uuid) & KeyPairRow.is_main,
+    condition=(KeyPairRow.user == UserRow.uuid) & KeyPairRow.is_default,
 )
 
 # Field definitions for user export
