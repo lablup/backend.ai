@@ -22,6 +22,7 @@ class TestRuntimeVariantDataToNode:
                         "name": "vllm-model",
                         "service": {
                             "start_command": "vllm serve '{model_path}'",
+                            "port": 8000,
                         },
                     }
                 ]
