@@ -103,7 +103,8 @@ class UserOrganizationInfo(BackendAISchema):
     )
     main_access_key: str | None = Field(
         default=None,
-        description="Primary API access key for this user.",
+        description="Primary API access key for this user. Deprecated since 26.9.0. The default keypair is recorded on the keypair itself.",
+        deprecated=True,
     )
 
 
