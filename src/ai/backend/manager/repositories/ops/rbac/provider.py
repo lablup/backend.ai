@@ -606,7 +606,7 @@ class RBACWriteOps(WriteOps):
         rest upserted.
         """
         items: list[TRow] = []
-        errors: list[BulkUpserterError[TRow]] = []
+        failed: list[BulkUpserterError[TRow]] = []
         for index, upserter in enumerate(upserters):
             # The handler stays outside the savepoint — see bulk_create_scoped_partial.
             try:
@@ -616,8 +616,8 @@ class RBACWriteOps(WriteOps):
             except Exception as e:
                 # upsert_scoped maps the integrity errors its spec declares onto domain
                 # errors; whatever arrives here fails just this row.
-                errors.append(BulkUpserterError(spec=upserter.spec, exception=e, index=index))
-        return RBACBulkEntityUpserterResultWithFailures(items=items, errors=errors)
+                failed.append(BulkUpserterError(spec=upserter.spec, exception=e, index=index))
+        return RBACBulkEntityUpserterResultWithFailures(items=items, failed=failed)
 
     async def bulk_create_scoped[TRow: Base](
         self,

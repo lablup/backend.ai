@@ -1918,10 +1918,10 @@ class TestBulkUpsertScopedPartial:
                 for item in case.items
             ])
             assert [row.name for row in result.items] == case.expected_succeeded_names
-            assert [e.index for e in result.errors] == case.expected_failed_indexes
+            assert [e.index for e in result.failed] == case.expected_failed_indexes
             # Every rejection these batches provoke is the FK gate, mapped by the spec.
             assert all(
-                isinstance(e.exception, _TestUpsertParentMissingError) for e in result.errors
+                isinstance(e.exception, _TestUpsertParentMissingError) for e in result.failed
             )
             row_ids = {row.name: str(row.id) for row in result.items}
 

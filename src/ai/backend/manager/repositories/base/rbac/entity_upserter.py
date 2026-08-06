@@ -68,9 +68,9 @@ class RBACEntityUpserterResult[TRow: Base]:
 class RBACBulkEntityUpserterResultWithFailures[TRow: Base]:
     """Result of a scoped bulk upsert that isolates each entity.
 
-    ``items`` are the upserted rows; ``errors`` index into the sequence of upserters handed
-    to the executor, not into any list the caller may have derived it from.
+    ``items`` are the upserted rows; ``failed`` entries index into the sequence of upserters
+    handed to the executor, not into any list the caller may have derived it from.
     """
 
     items: list[TRow]
-    errors: list[BulkUpserterError[TRow]]
+    failed: list[BulkUpserterError[TRow]]
