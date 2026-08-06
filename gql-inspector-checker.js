@@ -5,18 +5,12 @@ module.exports = (props) => {
   // graphql-inspector reports one FIELD_ADDED per field of a brand-new type and one
   // FIELD_ARGUMENT_ADDED per argument of a brand-new field. Those elements arrived with
   // their owner, whose own notation already dates them, so only an element appearing on
-  // an owner that already shipped states a version of its own. Omit `fieldName` to ask
-  // about the type alone.
-  const ownerIsNew = (typeName, fieldName) => {
-    const oldType = oldTypes[typeName];
-    if (oldType === undefined) {
-      return true;
-    }
-    if (fieldName === undefined) {
-      return false;
-    }
-    return oldType.getFields?.()[fieldName] === undefined;
-  };
+  // an owner that already shipped states a version of its own. A field's owner is its
+  // type; an argument's owner is its field, which may itself be new on a type that is not.
+  const typeIsNew = (typeName) => oldTypes[typeName] === undefined;
+  const fieldIsNew = (typeName, fieldName) =>
+    typeIsNew(typeName) ||
+    oldTypes[typeName].getFields()[fieldName] === undefined;
 
   return changes.map((change) => {
     // Allowed version notations: 'XX.XX.X', 'XX.X.X'
@@ -44,7 +38,7 @@ module.exports = (props) => {
       change.criticality.level !== "BREAKING"
     ) {
       const [typeName, fieldName] = change.path.split(".");
-      if (!ownerIsNew(typeName)) {
+      if (!typeIsNew(typeName)) {
         const description = newSchema.getTypeMap()[typeName].getFields()[
           fieldName
         ].astNode.description?.value;
@@ -78,7 +72,7 @@ module.exports = (props) => {
       )
     ) {
       const [type, fieldName, argumentName] = change.path.split(".");
-      if (!ownerIsNew(type, fieldName)) {
+      if (!fieldIsNew(type, fieldName)) {
         const field = newSchema.getTypeMap()[type].getFields()[fieldName];
         const description = field.args.find(
           (arg) => arg.name === argumentName
