@@ -24,11 +24,13 @@ METADATA_EGRESS_DISCLOSURE = (
 )
 
 NONCE_RESIDUAL_DISCLOSURE = (
-    "The launch nonce binds a session with a claim quota equal to its member count. It preserves"
-    " cross-session isolation and does not provide member-against-member isolation within a"
-    " session; the quota binds count rather than identity, so a host that suppresses a legitimate"
-    " member can take the freed slot with a measurement-identical guest, whereupon the suppressed"
-    " member's fetch is refused and its session dies loudly."
+    "The launch nonce binds a session with a claim quota equal to its member count. A claim is a"
+    " lease that runs for the validity of the attestation token which took it, so a member that"
+    " re-attests renews its own slot instead of consuming a second one, and a lapsed lease frees"
+    " its slot. It preserves cross-session isolation and does not provide member-against-member"
+    " isolation within a session; the quota binds count rather than identity, so a host that"
+    " suppresses a legitimate member can take that member's slot once its lease lapses, whereupon"
+    " the suppressed member's fetch is refused and its session dies loudly."
 )
 
 
