@@ -34,6 +34,9 @@ def register_confidential_routes(
     reg.add("POST", "/reference-values", handler.register_reference_value, middlewares=admin)
     reg.add("POST", "/reference-values/drain", handler.drain_reference_value, middlewares=admin)
     reg.add("POST", "/measured-blobs", handler.publish_blob, middlewares=admin)
+    reg.add(
+        "POST", "/launch-credentials", handler.deposit_launch_credential, middlewares=admin
+    )
     reg.add("POST", "/folder-keys/restore", handler.restore_folder_keys, middlewares=admin)
     reg.add("POST", "/tcb-grace", handler.open_grace, middlewares=admin)
     reg.add("POST", "/decisions/search", handler.list_decisions, middlewares=admin)

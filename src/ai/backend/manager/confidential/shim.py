@@ -336,12 +336,16 @@ class AuthorisationShim:
                 )
             )
 
-    async def _launching_image_session(self, domain_name: str, tag: str) -> uuid.UUID | None:
+    async def _launching_image_sessions(self, domain_name: str, tag: str) -> dict[uuid.UUID, str]:
         async with self._db.begin_readonly_session() as db_session:
             rows = (
                 await db_session.execute(
-                    sa.select(KernelRow.session_id, KernelRow.image)
+                    sa.select(KernelRow.session_id, KernelRow.image, ConfidentialNonceRow.nonce)
                     .join(SessionRow, SessionRow.id == KernelRow.session_id)
+                    .join(
+                        ConfidentialNonceRow,
+                        ConfidentialNonceRow.session_id == KernelRow.session_id,
+                    )
                     .where(
                         (SessionRow.domain_name == domain_name)
                         & KernelRow.status.in_(IMAGE_KEY_LAUNCH_STATUSES)
@@ -349,13 +353,15 @@ class AuthorisationShim:
                     )
                 )
             ).all()
-        return next(
-            (session_id for session_id, image in rows if image_key_tag(image) == tag), None
-        )
+        return {
+            session_id: nonce
+            for session_id, image, nonce in rows
+            if image_key_tag(image) == tag
+        }
 
     async def _authorise_image_key(
         self, resource_path: str, domain_name: str, tag: str, claimant: Claimant | None
-    ) -> uuid.UUID:
+    ) -> tuple[uuid.UUID, str | None]:
         if claimant is None:
             refusal = "an unattested fetch cannot claim a layer key encryption key"
             await self.record(
@@ -365,8 +371,8 @@ class AuthorisationShim:
                 failing_clause=refusal,
             )
             raise ShimRefusal(extra_msg=refusal)
-        entitled = await self._launching_image_session(domain_name, tag)
-        if entitled is None:
+        entitled = await self._launching_image_sessions(domain_name, tag)
+        if not entitled:
             refusal = (
                 f"no live session in domain {domain_name} runs an image whose layer key"
                 f" encryption key is {tag}"
@@ -378,13 +384,30 @@ class AuthorisationShim:
                 failing_clause=refusal,
             )
             raise ImageKeyNotEntitled(extra_msg=refusal)
-        return entitled
+        for session_id, nonce in entitled.items():
+            try:
+                await self._consume(nonce, claimant)
+            except NonceQuotaExhausted:
+                continue
+            return session_id, nonce
+        refusal = (
+            f"{len(entitled)} launching session(s) in domain {domain_name} entitle the layer key"
+            f" encryption key {tag}, and every one of their launch-nonce claim quotas is already"
+            f" held by other guests"
+        )
+        await self.record(
+            actor=DecisionActor.GUEST,
+            verdict=DecisionVerdict.DENIED,
+            resource_path=resource_path,
+            failing_clause=refusal,
+        )
+        raise NonceQuotaExhausted(extra_msg=refusal)
 
     async def _authorise_unscoped(
         self, resource_path: str, claimant: Claimant | None
-    ) -> uuid.UUID | None:
+    ) -> tuple[uuid.UUID | None, str | None]:
         if resource_path == TIME_RESOURCE:
-            return None
+            return None, None
         image = image_key_subject(resource_path)
         if image is not None:
             return await self._authorise_image_key(resource_path, image[0], image[1], claimant)
@@ -419,7 +442,7 @@ class AuthorisationShim:
                 failing_clause=refusal,
             )
             raise FolderKeyNotEntitled(extra_msg=refusal)
-        return entitled
+        return entitled, None
 
     async def relay_attest(
         self,
@@ -498,7 +521,7 @@ class AuthorisationShim:
         session_id: uuid.UUID | None = None
         consumed = False
         if nonce is None:
-            session_id = await self._authorise_unscoped(resource_path, claimant)
+            session_id, nonce = await self._authorise_unscoped(resource_path, claimant)
         else:
             if claimant is None:
                 await self.record(

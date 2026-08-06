@@ -34,6 +34,7 @@ class ConfidentialScalingGroupOpts(BackendAISchema):
     shim_public_addr: str = ""
     provisioning_record: str = ""
     pipeline_public_key: str = ""
+    launch_authority_public_key: str = ""
     attested_identity: str = ""
     insecure_development: bool = False
     tcb_grace_period: timedelta = timedelta(days=7)
