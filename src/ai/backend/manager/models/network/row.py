@@ -88,7 +88,6 @@ class NetworkRow(Base):  # type: ignore[misc]
     )
     domain_row: Mapped[DomainRow] = relationship(
         "DomainRow",
-        back_populates="networks",
         primaryjoin=_get_domain_join_condition,
     )
 

@@ -467,7 +467,6 @@ class SessionRow(Base):  # type: ignore[misc]
     )
     scaling_group: Mapped[ScalingGroupRow] = relationship(
         "ScalingGroupRow",
-        back_populates="sessions",
         foreign_keys=[scaling_group_name],
     )
     target_sgroup_names: Mapped[list[str] | None] = mapped_column(
@@ -489,7 +488,6 @@ class SessionRow(Base):  # type: ignore[misc]
     )
     domain: Mapped[DomainRow] = relationship(
         "DomainRow",
-        back_populates="sessions",
         foreign_keys=[domain_name],
     )
     group_id: Mapped[UUID] = mapped_column(

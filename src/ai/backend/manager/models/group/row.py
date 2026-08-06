@@ -229,9 +229,9 @@ class GroupRow(Base):  # type: ignore[misc]
 
     # Relationships (defined with deferred join conditions to avoid circular imports)
     sessions: Mapped[list[SessionRow]] = relationship("SessionRow", back_populates="group")
-    domain: Mapped[DomainRow] = relationship("DomainRow", back_populates="groups")
+    domain: Mapped[DomainRow] = relationship("DomainRow")
     sgroup_for_groups_rows: Mapped[list[ScalingGroupForProjectRow]] = relationship(
-        "ScalingGroupForProjectRow", back_populates="project_row"
+        "ScalingGroupForProjectRow"
     )
     users: Mapped[list[AssocGroupUserRow]] = relationship(
         "AssocGroupUserRow", back_populates="group"

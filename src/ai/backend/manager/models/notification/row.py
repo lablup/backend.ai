@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
@@ -22,10 +22,6 @@ from ai.backend.manager.models.base import (
     Base,
 )
 
-if TYPE_CHECKING:
-    from ai.backend.manager.models.user import UserRow
-
-
 __all__ = (
     "NotificationChannelRow",
     "NotificationRuleRow",
@@ -33,18 +29,6 @@ __all__ = (
 
 
 # ========== ORM Models ==========
-
-
-def _get_notification_channel_rules_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.notification import NotificationRuleRow
-
-    return NotificationChannelRow.id == foreign(NotificationRuleRow.channel_id)
-
-
-def _get_notification_channel_creator_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.user import UserRow
-
-    return foreign(NotificationChannelRow.created_by) == UserRow.uuid
 
 
 class NotificationChannelRow(Base):  # type: ignore[misc]
@@ -83,20 +67,6 @@ class NotificationChannelRow(Base):  # type: ignore[misc]
         onupdate=sa.func.now(),
     )
 
-    # Relationships
-    rules: Mapped[list[NotificationRuleRow]] = relationship(
-        "NotificationRuleRow",
-        back_populates="channel",
-        primaryjoin=_get_notification_channel_rules_join_condition,
-        foreign_keys=[id],
-    )
-    creator: Mapped[UserRow] = relationship(
-        "UserRow",
-        primaryjoin=_get_notification_channel_creator_join_condition,
-        foreign_keys=[created_by],
-        uselist=False,
-    )
-
     def to_data(self) -> NotificationChannelData:
         """Convert Row to domain model data."""
         # Parse channel_type string to enum
@@ -127,12 +97,6 @@ def _get_notification_rule_channel_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.notification import NotificationChannelRow
 
     return foreign(NotificationRuleRow.channel_id) == NotificationChannelRow.id
-
-
-def _get_notification_rule_creator_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.user import UserRow
-
-    return foreign(NotificationRuleRow.created_by) == UserRow.uuid
 
 
 class NotificationRuleRow(Base):  # type: ignore[misc]
@@ -169,15 +133,8 @@ class NotificationRuleRow(Base):  # type: ignore[misc]
     # Relationships
     channel: Mapped[NotificationChannelRow] = relationship(
         "NotificationChannelRow",
-        back_populates="rules",
         primaryjoin=_get_notification_rule_channel_join_condition,
         foreign_keys=[channel_id],
-    )
-    creator: Mapped[UserRow] = relationship(
-        "UserRow",
-        primaryjoin=_get_notification_rule_creator_join_condition,
-        foreign_keys=[created_by],
-        uselist=False,
     )
 
     def to_data(self) -> NotificationRuleData:

@@ -70,7 +70,6 @@ class ResourcePresetRow(Base):  # type: ignore[misc]
     )
     scaling_group_row: Mapped[ScalingGroupRow | None] = relationship(
         "ScalingGroupRow",
-        back_populates="resource_preset_rows",
         primaryjoin=_get_scaling_group_join_condition,
     )
 

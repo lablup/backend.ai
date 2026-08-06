@@ -11,10 +11,9 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, SlotQuantity
@@ -33,12 +32,6 @@ from ai.backend.manager.models.base import (
     ResourceSlotColumn,
 )
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.domain import DomainRow
-    from ai.backend.manager.models.group import GroupRow
-    from ai.backend.manager.models.user import UserRow
-
 
 __all__ = (
     "DomainFairShareRow",
@@ -88,12 +81,6 @@ def _merge_resource_weights(
 def _resource_slot_to_slot_quantities(slot: ResourceSlot) -> list[SlotQuantity]:
     """Convert a ResourceSlot to list[SlotQuantity] (unordered)."""
     return [SlotQuantity(slot_name=k, quantity=Decimal(str(v))) for k, v in slot.items()]
-
-
-def _get_domain_fair_share_domain_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.domain import DomainRow
-
-    return DomainFairShareRow.domain_name == foreign(DomainRow.name)
 
 
 class DomainFairShareRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
@@ -226,14 +213,6 @@ class DomainFairShareRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         "Example: 1 means daily aggregation, 7 means weekly aggregation.",
     )
 
-    domain: Mapped[DomainRow | None] = relationship(
-        "DomainRow",
-        primaryjoin=_get_domain_fair_share_domain_join_condition,
-        foreign_keys=[domain_name],
-        uselist=False,
-        viewonly=True,
-    )
-
     __table_args__ = (
         sa.UniqueConstraint("resource_group_id", "domain_name", name="uq_domain_fair_share_rg_id"),
         sa.Index("ix_domain_fair_share_lookup", "resource_group", "domain_name"),
@@ -298,18 +277,6 @@ class DomainFairShareRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
                 uses_default_resources=uses_default_resources,  # New field
             ),
         )
-
-
-def _get_project_fair_share_project_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.group import GroupRow
-
-    return ProjectFairShareRow.project_id == foreign(GroupRow.id)
-
-
-def _get_project_fair_share_domain_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.domain import DomainRow
-
-    return ProjectFairShareRow.domain_name == foreign(DomainRow.name)
 
 
 class ProjectFairShareRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
@@ -427,21 +394,6 @@ class ProjectFairShareRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         comment="Aggregation period for usage buckets in days.",
     )
 
-    project: Mapped[GroupRow | None] = relationship(
-        "GroupRow",
-        primaryjoin=_get_project_fair_share_project_join_condition,
-        foreign_keys=[project_id],
-        uselist=False,
-        viewonly=True,
-    )
-    domain: Mapped[DomainRow | None] = relationship(
-        "DomainRow",
-        primaryjoin=_get_project_fair_share_domain_join_condition,
-        foreign_keys=[domain_name],
-        uselist=False,
-        viewonly=True,
-    )
-
     __table_args__ = (
         sa.UniqueConstraint("resource_group_id", "project_id", name="uq_project_fair_share_rg_id"),
         sa.Index("ix_project_fair_share_lookup", "resource_group", "project_id"),
@@ -507,24 +459,6 @@ class ProjectFairShareRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
                 uses_default_resources=uses_default_resources,  # New field
             ),
         )
-
-
-def _get_user_fair_share_user_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.user import UserRow
-
-    return UserFairShareRow.user_uuid == foreign(UserRow.uuid)
-
-
-def _get_user_fair_share_project_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.group import GroupRow
-
-    return UserFairShareRow.project_id == foreign(GroupRow.id)
-
-
-def _get_user_fair_share_domain_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.domain import DomainRow
-
-    return UserFairShareRow.domain_name == foreign(DomainRow.name)
 
 
 class UserFairShareRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
@@ -652,28 +586,6 @@ class UserFairShareRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         nullable=False,
         default=DEFAULT_DECAY_UNIT_DAYS,
         comment="Aggregation period for usage buckets in days.",
-    )
-
-    user: Mapped[UserRow | None] = relationship(
-        "UserRow",
-        primaryjoin=_get_user_fair_share_user_join_condition,
-        foreign_keys=[user_uuid],
-        uselist=False,
-        viewonly=True,
-    )
-    project: Mapped[GroupRow | None] = relationship(
-        "GroupRow",
-        primaryjoin=_get_user_fair_share_project_join_condition,
-        foreign_keys=[project_id],
-        uselist=False,
-        viewonly=True,
-    )
-    domain: Mapped[DomainRow | None] = relationship(
-        "DomainRow",
-        primaryjoin=_get_user_fair_share_domain_join_condition,
-        foreign_keys=[domain_name],
-        uselist=False,
-        viewonly=True,
     )
 
     __table_args__ = (

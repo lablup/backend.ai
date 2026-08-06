@@ -26,7 +26,7 @@ Query-related methods (`get_by_id`, `list_by_condition`, etc.) should be impleme
 ### Reference Columns
 
 - Use ID(UUID) columns without DB-level Foreign Key constraints
-- Relationships are defined via SQLAlchemy `relationship()` with `primaryjoin`
+- Related rows are fetched via explicit joins in repositories, not via `relationship()`
 
 ### Enum
 
@@ -82,8 +82,8 @@ Sets default at Python level. Applied only when creating via ORM.
 
 ## Relationship Definition
 
-- `back_populates` is required for bidirectional relationships
-- Specify `primaryjoin`, `foreign_keys` for complex join conditions
+- Do not define new `relationship()` attributes on Row classes — fetch related rows with explicit joins in repositories
+- Existing relationships are being removed; when the last reference to one disappears, delete it together with its `back_populates` pair on the other side
 - Association table naming: `association_{tableA}_{tableB}`
 
 ## Index Design
@@ -92,7 +92,7 @@ Consider indexes for the following columns:
 
 - **WHERE clause**: Frequently filtered columns like `status`, `domain_name`, `scaling_group_name`
 - **ORDER BY clause**: Columns used for sorting like `created_at`, `priority`
-- **Reference columns**: Improves relationship query performance
+- **Reference columns**: Improves join query performance
 - **Compound conditions**: Column combinations frequently used together
 
 Index types:
@@ -107,7 +107,6 @@ Implement `to_data()` method to convert ORM Row to dataclass.
 
 - Convert Enum values to appropriate types
 - Convert JSONB data to structured models using Pydantic `model_validate()`
-- Extract only necessary fields from relationship data
 
 ## Naming Conventions
 
@@ -132,6 +131,6 @@ When adding a new model:
 - [ ] Set `server_default` or `default` (only one)
 - [ ] Include `created_at` column (cursor pagination)
 - [ ] Add necessary indexes (consider WHERE, ORDER BY)
-- [ ] Set `back_populates` for bidirectional relationships
+- [ ] No `relationship()` attributes — related rows come from repository joins
 - [ ] Implement `to_data()` conversion method
 - [ ] Generate Alembic migration
