@@ -849,8 +849,6 @@ class ModelServingRepository:
                     raise InvalidAPIParameters("Session owner not found for endpoint")
                 if session_owner.main_access_key is None:
                     raise InvalidAPIParameters("Session owner has no access key")
-                if session_owner.role is None:
-                    raise InvalidAPIParameters("Session owner has no role")
 
                 conn = await db_session.connection()
                 if conn is None:
