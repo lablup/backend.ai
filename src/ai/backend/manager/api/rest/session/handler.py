@@ -1189,11 +1189,11 @@ class SessionHandler:
 
     async def download_files(
         self,
-        query: QueryParam[DownloadFilesRequest],
+        body: BodyParam[DownloadFilesRequest],
         ctx: RequestCtx,
     ) -> web.Response:
         request = ctx.request
-        params = query.parsed
+        params = body.parsed
         session_name = request.match_info["session_name"]
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
