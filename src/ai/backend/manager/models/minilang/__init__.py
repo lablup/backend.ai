@@ -15,7 +15,7 @@ class JSONFieldItem(NamedTuple):
 
 
 class ORMFieldItem(NamedTuple):
-    column: sa.ColumnElement[Any]
+    column: sa.orm.attributes.InstrumentedAttribute[Any] | sa.ColumnElement[Any]
 
 
 TEnum = TypeVar("TEnum", bound=Enum)

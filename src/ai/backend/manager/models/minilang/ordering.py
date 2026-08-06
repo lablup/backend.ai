@@ -6,7 +6,7 @@ import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer
 from lark.lexer import Token
 
-from . import JSONFieldItem, ORMFieldItem, OrderSpecItem, get_col_from_table
+from . import JSONFieldItem, OrderSpecItem, ORMFieldItem, get_col_from_table
 
 __all__ = (
     "ColumnMapType",
