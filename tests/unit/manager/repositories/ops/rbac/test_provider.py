@@ -1497,7 +1497,8 @@ class _TestUpsertParentMissingError(BackendAIError, aiohttp.web.HTTPBadRequest):
 class RBACOpsGatedUpserterSpec(UpserterSpec[RBACOpsUpsertGatedRow]):
     """Upserts a row behind a FK gate, mapping the violation to a domain error."""
 
-    parent_id: UUID
+    parent_id: UUID | None
+    name: str = _UPSERT_ENTITY_NAME
 
     @property
     @override
@@ -1516,7 +1517,7 @@ class RBACOpsGatedUpserterSpec(UpserterSpec[RBACOpsUpsertGatedRow]):
 
     @override
     def build_insert_values(self) -> dict[str, Any]:
-        return {"name": _UPSERT_ENTITY_NAME, "parent_id": self.parent_id}
+        return {"name": self.name, "parent_id": self.parent_id}
 
     @override
     def build_update_values(self) -> dict[str, Any]:
@@ -1804,6 +1805,76 @@ class TestUpsertScoped:
                         conflict_target=ConflictTarget(columns=["tenant_id", "item_id"]),
                     )
                 )
+
+
+class TestBulkUpsertScopedPartial:
+    async def test_upserts_every_item_and_binds_each(
+        self,
+        provider: RBACOpsProvider,
+        database_connection: ExtendedAsyncSAEngine,
+        upsert_tables: None,
+    ) -> None:
+        """Every item of a clean batch lands: a scoped row binds, a global one binds nothing."""
+        async with provider.write_ops() as w:
+            result = await w.bulk_upsert_scoped_partial([
+                RBACEntityUpserter(
+                    spec=RBACOpsUpserterSpec("user", _USER_SCOPE_ID, "scoped"),
+                    element_type=RBACElementType.VFOLDER,
+                    scope_ref=_USER_SCOPE_REF,
+                    conflict_target=ConflictTarget(columns=["name", "scope_type", "scope_id"]),
+                ),
+                RBACEntityUpserter(
+                    spec=RBACOpsUpserterSpec("public", None, "global"),
+                    element_type=RBACElementType.VFOLDER,
+                    scope_ref=None,
+                    conflict_target=ConflictTarget(
+                        columns=["name", "scope_type"],
+                        index_predicate=RBACOpsUpsertRow.scope_id.is_(None),
+                    ),
+                ),
+            ])
+            assert [row.value for row in result.successes] == ["scoped", "global"]
+            assert result.errors == []
+            scoped_id = str(result.successes[0].id)
+
+        async with database_connection.begin_readonly_session() as db_sess:
+            assocs = (await db_sess.scalars(sa.select(AssociationScopesEntitiesRow))).all()
+        assert [(a.entity_id, a.scope_id) for a in assocs] == [(scoped_id, _USER_SCOPE_ID)]
+
+    async def test_rejected_item_leaves_the_rest_upserted(
+        self,
+        provider: RBACOpsProvider,
+        database_connection: ExtendedAsyncSAEngine,
+        upsert_gated_tables: None,
+    ) -> None:
+        """A row and its association share one savepoint, so a rejected row rolls back both."""
+        async with provider.write_ops() as w:
+            result = await w.bulk_upsert_scoped_partial([
+                RBACEntityUpserter(  # FK gate violation (parent missing) -> rejected
+                    spec=RBACOpsGatedUpserterSpec(parent_id=uuid.uuid4(), name="doomed"),
+                    element_type=RBACElementType.VFOLDER,
+                    scope_ref=_USER_SCOPE_REF,
+                    conflict_target=ConflictTarget(columns=["name"]),
+                ),
+                RBACEntityUpserter(
+                    spec=RBACOpsGatedUpserterSpec(parent_id=None, name="fresh"),
+                    element_type=RBACElementType.VFOLDER,
+                    scope_ref=_USER_SCOPE_REF,
+                    conflict_target=ConflictTarget(columns=["name"]),
+                ),
+            ])
+            assert [row.name for row in result.successes] == ["fresh"]
+            assert [e.index for e in result.errors] == [0]
+            assert isinstance(result.errors[0].exception, _TestUpsertParentMissingError)
+            fresh_id = str(result.successes[0].id)
+
+        async with database_connection.begin_readonly_session() as db_sess:
+            names = (await db_sess.scalars(sa.select(RBACOpsUpsertGatedRow.name))).all()
+            assocs = (await db_sess.scalars(sa.select(AssociationScopesEntitiesRow))).all()
+
+        assert list(names) == ["fresh"]
+        # the surviving row kept its association, and the rejected one left none behind
+        assert [(a.entity_id, a.scope_id) for a in assocs] == [(fresh_id, _USER_SCOPE_ID)]
 
 
 # =============================================================================

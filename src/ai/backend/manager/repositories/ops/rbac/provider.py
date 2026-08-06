@@ -108,10 +108,12 @@ from ai.backend.manager.repositories.base.rbac.entity_purger import (
     execute_rbac_entity_purger,
 )
 from ai.backend.manager.repositories.base.rbac.entity_upserter import (
+    RBACBulkEntityUpserterResultWithFailures,
     RBACEntityUpserter,
     RBACEntityUpserterResult,
 )
 from ai.backend.manager.repositories.base.rbac.utils import bulk_insert_on_conflict_do_nothing
+from ai.backend.manager.repositories.base.upserter import BulkUpserterError
 from ai.backend.manager.repositories.keypair.creators import KeyPairCreatorSpec
 from ai.backend.manager.repositories.ops.base.provider import DBOpsProvider, WriteOps
 from ai.backend.manager.repositories.permission_controller.creators import (
@@ -592,6 +594,30 @@ class RBACWriteOps(WriteOps):
             ],
         )
         return RBACEntityUpserterResult(row=row)
+
+    async def bulk_upsert_scoped_partial[TRow: Base](
+        self,
+        upserters: Sequence[RBACEntityUpserter[TRow]],
+    ) -> RBACBulkEntityUpserterResultWithFailures[TRow]:
+        """Upsert rows with their scope associations, isolating each row for partial success.
+
+        The upsert counterpart of :meth:`bulk_create_scoped_partial`: a row and its
+        association share one savepoint, so a rejected row rolls back both and leaves the
+        rest upserted.
+        """
+        successes: list[TRow] = []
+        errors: list[BulkUpserterError[TRow]] = []
+        for index, upserter in enumerate(upserters):
+            # The handler stays outside the savepoint — see bulk_create_scoped_partial.
+            try:
+                async with self.savepoint():
+                    result = await self.upsert_scoped(upserter)
+                successes.append(result.row)
+            except Exception as e:
+                # upsert_scoped maps the integrity errors its spec declares onto domain
+                # errors; whatever arrives here fails just this row.
+                errors.append(BulkUpserterError(spec=upserter.spec, exception=e, index=index))
+        return RBACBulkEntityUpserterResultWithFailures(successes=successes, errors=errors)
 
     async def bulk_create_scoped[TRow: Base](
         self,
