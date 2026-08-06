@@ -30,6 +30,7 @@ render() {
 		-e "s|@TIME_SKEW_BOUND@|${BAI_CC_TIME_SKEW_BOUND}|g" \
 		-e "s|@TIME_REANCHOR_INTERVAL@|${BAI_CC_TIME_REANCHOR_INTERVAL}|g" \
 		-e "s|@ALLOW_SUDO@|${BAI_CC_ALLOW_SUDO}|g" \
+		-e "s|@TOKEN_SIGNING_KEY@|${BAI_CC_TOKEN_SIGNING_KEY}|g" \
 		-e "s|@GPU_VBIOS@|${BAI_CC_GPU_VBIOS}|g" \
 		-e "s|@GPU_DRIVER@|${BAI_CC_GPU_DRIVER}|g" "$1" \
 		| awk -v ca="$registry_ca" '{ gsub(/@REGISTRY_CA@/, ca); print }'

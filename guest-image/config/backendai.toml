@@ -3,6 +3,7 @@ time_resource = "@TIME_RESOURCE@"
 time_skew_bound = @TIME_SKEW_BOUND@
 time_reanchor_interval = @TIME_REANCHOR_INTERVAL@
 allow_sudo = @ALLOW_SUDO@
+token_signing_key = "@TOKEN_SIGNING_KEY@"
 
 [egress]
 resolvers = [@EGRESS_RESOLVERS@]

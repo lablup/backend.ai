@@ -1,6 +1,7 @@
 #!/opt/backend.ai/bin/python
 import base64
 import ctypes
+import hashlib
 import json
 import os
 import pathlib
@@ -12,6 +13,12 @@ import urllib.request
 
 INITDATA = pathlib.Path("/run/confidential-containers/initdata/initdata.toml")
 STATE = pathlib.Path("/run/backend.ai")
+P = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF
+N = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551
+G = (
+    0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296,
+    0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5,
+)
 
 
 class Starve(Exception):
@@ -33,23 +40,67 @@ def get(url, timeout=15):
         return response.read()
 
 
-def token_issued_at(api):
-    body = json.loads(get(f"{api}/aa/token?token_type=kbs"))
-    claims = body["token"].split(".")[1]
-    claims += "=" * (-len(claims) % 4)
-    return int(json.loads(base64.urlsafe_b64decode(claims))["iat"])
+def unpad(segment):
+    return base64.urlsafe_b64decode(segment + "=" * (-len(segment) % 4))
 
 
-def resource_issued_at(api, resource):
-    return int(json.loads(get(f"{api}/cdh/resource/{resource}"))["iat"])
+def point_add(a, b):
+    if a is None:
+        return b
+    if b is None:
+        return a
+    if a[0] == b[0]:
+        if (a[1] + b[1]) % P == 0:
+            return None
+        slope = (3 * a[0] * a[0] - 3) * pow(2 * a[1], -1, P) % P
+    else:
+        slope = (b[1] - a[1]) * pow(b[0] - a[0], -1, P) % P
+    x = (slope * slope - a[0] - b[0]) % P
+    return (x, (slope * (a[0] - x) - a[1]) % P)
+
+
+def point_mul(scalar, point):
+    total = None
+    while scalar:
+        if scalar & 1:
+            total = point_add(total, point)
+        point = point_add(point, point)
+        scalar >>= 1
+    return total
+
+
+def signed_by(pinned, message, signature):
+    encoded = base64.b64decode(pinned)[-65:]
+    if len(signature) != 64 or encoded[0] != 4:
+        return False
+    public = (int.from_bytes(encoded[1:33]), int.from_bytes(encoded[33:]))
+    r = int.from_bytes(signature[:32])
+    s = int.from_bytes(signature[32:])
+    if not 0 < r < N or not 0 < s < N:
+        return False
+    inverse = pow(s, -1, N)
+    digest = int.from_bytes(hashlib.sha256(message).digest())
+    check = point_add(
+        point_mul(digest * inverse % N, G), point_mul(r * inverse % N, public)
+    )
+    return check is not None and check[0] % N == r
+
+
+def token_issued_at(cfg):
+    body = json.loads(get(f"{cfg['api']}/aa/token?token_type=kbs"))
+    header, claims, signature = body["token"].split(".")
+    if json.loads(unpad(header)).get("alg") != "ES256":
+        raise Starve("the attestation token is not signed with the pinned algorithm")
+    if not signed_by(cfg["token_signing_key"], f"{header}.{claims}".encode(), unpad(signature)):
+        raise Starve(
+            "the attestation token does not carry the signature of the key broker this"
+            " measured configuration pins, so the guest is not talking to its own broker"
+        )
+    return int(json.loads(unpad(claims))["iat"])
 
 
 def attested_now(cfg):
-    api, resource = cfg["api"], cfg["time_resource"]
-    try:
-        return token_issued_at(api), "attestation-token"
-    except Exception:
-        return resource_issued_at(api, resource), "broker-resource"
+    return token_issued_at(cfg), "attestation-token"
 
 
 def set_realtime(epoch):
@@ -102,6 +153,8 @@ def main():
     STATE.mkdir(mode=0o755, exist_ok=True)
     (STATE / "session").mkdir(mode=0o755, exist_ok=True)
     cfg = settings()
+    if not cfg.get("token_signing_key"):
+        raise Starve("the measured configuration pins no key broker token signing key")
     epoch, source = attested_now(cfg)
     set_realtime(epoch)
     anchor_mono = time.clock_gettime(time.CLOCK_MONOTONIC_RAW)
