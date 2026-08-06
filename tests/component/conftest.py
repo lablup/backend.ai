@@ -21,6 +21,7 @@ import sqlalchemy as sa
 import yarl
 from aiohttp import web
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.auth import HMACAuth
@@ -809,6 +810,37 @@ async def group_fixture(
         await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
 
 
+async def _insert_user_virtual_scope(conn: AsyncConnection, user_uuid: uuid.UUID) -> None:
+    """Give a directly-inserted user the RBAC rows ``create_full_user`` would have made.
+
+    Without them the member-binding paths cannot resolve the user's virtual scope.
+    """
+    virtual_scope_id = uuid.uuid4()
+    await conn.execute(
+        sa.insert(VirtualScopeRow.__table__).values(
+            id=virtual_scope_id,
+            scope_type=ScopeType.USER,
+            scope_id=str(user_uuid),
+        )
+    )
+    await conn.execute(
+        sa.insert(EntityMembershipRow.__table__).values(
+            virtual_scope_id=virtual_scope_id,
+            entity_type=EntityType.USER,
+            entity_id=str(user_uuid),
+            permission_cap=None,
+        )
+    )
+    await conn.execute(
+        sa.insert(ScopeBindingRow.__table__).values(
+            virtual_scope_id=virtual_scope_id,
+            scope_type=ScopeType.USER,
+            scope_id=str(user_uuid),
+            permission_cap=None,
+        )
+    )
+
+
 @pytest.fixture()
 async def admin_user_fixture(
     db_engine: SAEngine,
@@ -862,6 +894,7 @@ async def admin_user_fixture(
                 user=str(data.user_uuid),
             )
         )
+        await _insert_user_virtual_scope(conn, data.user_uuid)
         await conn.execute(
             users.update()
             .where(users.c.uuid == str(data.user_uuid))
@@ -906,6 +939,12 @@ async def admin_user_fixture(
         )
         await conn.execute(
             keypairs.delete().where(keypairs.c.access_key == data.keypair.access_key)
+        )
+        await conn.execute(
+            VirtualScopeRow.__table__.delete().where(
+                VirtualScopeRow.__table__.c.scope_type == ScopeType.USER,
+                VirtualScopeRow.__table__.c.scope_id == str(data.user_uuid),
+            )
         )
         await conn.execute(users.delete().where(users.c.uuid == str(data.user_uuid)))
 
@@ -963,6 +1002,7 @@ async def regular_user_fixture(
                 user=str(data.user_uuid),
             )
         )
+        await _insert_user_virtual_scope(conn, data.user_uuid)
         await conn.execute(
             users.update()
             .where(users.c.uuid == str(data.user_uuid))
@@ -1004,6 +1044,12 @@ async def regular_user_fixture(
         )
         await conn.execute(
             keypairs.delete().where(keypairs.c.access_key == data.keypair.access_key)
+        )
+        await conn.execute(
+            VirtualScopeRow.__table__.delete().where(
+                VirtualScopeRow.__table__.c.scope_type == ScopeType.USER,
+                VirtualScopeRow.__table__.c.scope_id == str(data.user_uuid),
+            )
         )
         await conn.execute(users.delete().where(users.c.uuid == str(data.user_uuid)))
 
