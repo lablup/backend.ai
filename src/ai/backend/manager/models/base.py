@@ -1021,13 +1021,6 @@ class ResourceOptsEntry(BackendAISchema):
     value: str
 
 
-class DeviceCapacityEntry(BackendAISchema):
-    """A single device capacity entry for PydanticListColumn storage."""
-
-    name: str
-    value: int
-
-
 def IDColumn(name: str = "id") -> sa.Column[Any]:
     return sa.Column(name, GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
 
