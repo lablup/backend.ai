@@ -20,10 +20,8 @@ from ai.backend.manager.repositories.app_config_fragment.db_source import (
     AppConfigFragmentDBSource,
 )
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
+    AppConfigFragmentBatchPurgerByNamesSpec,
     AppConfigFragmentPurgerSpec,
-)
-from ai.backend.manager.repositories.app_config_fragment.types import (
-    AppConfigFragmentSearchScope,
 )
 from ai.backend.manager.repositories.app_config_fragment.upserters import (
     AppConfigFragmentUpserterSpec,
@@ -79,9 +77,9 @@ class AppConfigFragmentRepository:
 
     @app_config_fragment_repository_resilience.apply()
     async def batch_purge_by_names(
-        self, scope: AppConfigFragmentSearchScope, config_names: Sequence[str]
+        self, purger_spec: AppConfigFragmentBatchPurgerByNamesSpec
     ) -> list[AppConfigFragmentData]:
-        return await self._db_source.batch_purge_by_names(scope, config_names)
+        return await self._db_source.batch_purge_by_names(purger_spec)
 
     @app_config_fragment_repository_resilience.apply()
     async def admin_search(self, querier: BatchQuerier) -> AppConfigFragmentSearchResult:

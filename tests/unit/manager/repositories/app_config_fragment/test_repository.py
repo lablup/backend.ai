@@ -46,6 +46,7 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
+    AppConfigFragmentBatchPurgerByNamesSpec,
     AppConfigFragmentPurgerSpec,
 )
 from ai.backend.manager.repositories.app_config_fragment.repository import (
@@ -589,10 +590,12 @@ class TestPurgeByConfigNames:
         scope_owners: None,
     ) -> None:
         purged = await repository.batch_purge_by_names(
-            AppConfigFragmentSearchScope(
-                scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
-            ),
-            ["theme"],
+            AppConfigFragmentBatchPurgerByNamesSpec(
+                scope=AppConfigFragmentSearchScope(
+                    scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
+                ),
+                config_names=["theme"],
+            )
         )
 
         expected = [
@@ -619,10 +622,12 @@ class TestPurgeByConfigNames:
         # `menu` exists, but only at the public scope, so the caller's user scope holds none.
         with pytest.raises(AppConfigFragmentNotFound):
             await repository.batch_purge_by_names(
-                AppConfigFragmentSearchScope(
-                    scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
-                ),
-                ["theme", "menu"],
+                AppConfigFragmentBatchPurgerByNamesSpec(
+                    scope=AppConfigFragmentSearchScope(
+                        scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
+                    ),
+                    config_names=["theme", "menu"],
+                )
             )
 
         for fragment in fragments_across_scopes:
@@ -654,10 +659,12 @@ class TestPurgeByConfigNames:
         ]
 
         purged = await repository.batch_purge_by_names(
-            AppConfigFragmentSearchScope(
-                scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
-            ),
-            ["theme"],
+            AppConfigFragmentBatchPurgerByNamesSpec(
+                scope=AppConfigFragmentSearchScope(
+                    scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
+                ),
+                config_names=["theme"],
+            )
         )
 
         assert [f.id for f in purged] == [created.id]

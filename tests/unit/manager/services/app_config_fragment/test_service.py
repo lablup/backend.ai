@@ -22,6 +22,7 @@ from ai.backend.manager.data.app_config_fragment.types import (
 )
 from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
+    AppConfigFragmentBatchPurgerByNamesSpec,
     AppConfigFragmentPurgerSpec,
 )
 from ai.backend.manager.repositories.app_config_fragment.repository import (
@@ -325,17 +326,20 @@ class TestAppConfigFragmentService:
         case: _RBACScopeCase,
     ) -> None:
         mock_repository.batch_purge_by_names = AsyncMock(return_value=[scoped_fragment])
-        scope = AppConfigFragmentSearchScope(scope_type=case.scope_type, scope_id=case.scope_id)
+        purger_spec = AppConfigFragmentBatchPurgerByNamesSpec(
+            scope=AppConfigFragmentSearchScope(scope_type=case.scope_type, scope_id=case.scope_id),
+            config_names=["theme"],
+        )
 
         result = await service.batch_purge_by_names(
-            BatchPurgeAppConfigFragmentsByNamesAction(scope=scope, config_names=["theme"])
+            BatchPurgeAppConfigFragmentsByNamesAction(purger_spec=purger_spec)
         )
 
         assert result.fragments == [scoped_fragment]
         # The result reports the RBAC scope the purge was authorized at.
         assert result.scope_type() == case.expected_scope_type
         assert result.scope_id() == case.expected_scope_id
-        mock_repository.batch_purge_by_names.assert_called_once_with(scope, ["theme"])
+        mock_repository.batch_purge_by_names.assert_called_once_with(purger_spec)
 
     # --- bulk ---
 

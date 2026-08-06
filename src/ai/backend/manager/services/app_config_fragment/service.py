@@ -95,9 +95,9 @@ class AppConfigFragmentService:
     async def batch_purge_by_names(
         self, action: BatchPurgeAppConfigFragmentsByNamesAction
     ) -> BatchPurgeAppConfigFragmentsByNamesActionResult:
-        fragments = await self._repository.batch_purge_by_names(action.scope, action.config_names)
+        fragments = await self._repository.batch_purge_by_names(action.purger_spec)
         return BatchPurgeAppConfigFragmentsByNamesActionResult(
-            fragments=fragments, _scope=action.scope
+            fragments=fragments, _scope=action.purger_spec.scope
         )
 
     async def bulk_purge(
