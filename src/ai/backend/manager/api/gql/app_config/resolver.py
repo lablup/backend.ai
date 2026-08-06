@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Annotated
-
-import strawberry
 from strawberry import Info
 
 from ai.backend.common.dto.manager.v2.app_config.request import (
@@ -31,10 +28,7 @@ from .types import AppConfigGQL
 )  # type: ignore[misc]
 async def my_app_configs(
     info: Info[StrawberryGQLContext],
-    config_names: Annotated[
-        list[str],
-        strawberry.argument(description="Added in 26.9.0. Config names to read merges for."),
-    ],
+    config_names: list[str],
 ) -> list[AppConfigGQL]:
     payload = await info.context.adapters.app_config.my_get_app_configs(
         MyGetAppConfigsInput(config_names=config_names)
@@ -54,10 +48,7 @@ async def my_app_configs(
 )  # type: ignore[misc]
 async def public_app_configs(
     info: Info[StrawberryGQLContext],
-    config_names: Annotated[
-        list[str],
-        strawberry.argument(description="Added in 26.9.0. Config names to read merges for."),
-    ],
+    config_names: list[str],
 ) -> list[AppConfigGQL]:
     payload = await info.context.adapters.app_config.public_get_app_configs(
         PublicGetAppConfigsInput(config_names=config_names)
