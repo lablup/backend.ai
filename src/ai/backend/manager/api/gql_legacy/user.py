@@ -833,7 +833,12 @@ class User(graphene.ObjectType):  # type: ignore[misc]
                 .offset(offset)
             )
         else:
-            query = sa.select(users, _MAIN_KEYPAIR_ACCESS_KEY).select_from(users).limit(limit).offset(offset)
+            query = (
+                sa.select(users, _MAIN_KEYPAIR_ACCESS_KEY)
+                .select_from(users)
+                .limit(limit)
+                .offset(offset)
+            )
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if status is not None:
@@ -878,7 +883,11 @@ class User(graphene.ObjectType):  # type: ignore[misc]
     ) -> Sequence[User | None]:
         if not emails:
             return []
-        query = sa.select(users, _MAIN_KEYPAIR_ACCESS_KEY).select_from(users).where(users.c.email.in_(emails))
+        query = (
+            sa.select(users, _MAIN_KEYPAIR_ACCESS_KEY)
+            .select_from(users)
+            .where(users.c.email.in_(emails))
+        )
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if status is not None:
@@ -908,7 +917,11 @@ class User(graphene.ObjectType):  # type: ignore[misc]
     ) -> Sequence[User | None]:
         if not user_ids:
             return []
-        query = sa.select(users, _MAIN_KEYPAIR_ACCESS_KEY).select_from(users).where(users.c.uuid.in_(user_ids))
+        query = (
+            sa.select(users, _MAIN_KEYPAIR_ACCESS_KEY)
+            .select_from(users)
+            .where(users.c.uuid.in_(user_ids))
+        )
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if status is not None:
