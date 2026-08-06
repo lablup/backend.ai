@@ -1,7 +1,7 @@
 """backfill virtual-scope chain for user memberships
 
 Revision ID: 3ebcf2c3c959
-Revises: 01dcbd1aa1bb
+Revises: c04f8b1a6e37
 Create Date: 2026-08-06 14:06:17
 
 """
@@ -13,7 +13,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "3ebcf2c3c959"
-down_revision = "01dcbd1aa1bb"
+down_revision = "c04f8b1a6e37"
 branch_labels = None
 depends_on = None
 
