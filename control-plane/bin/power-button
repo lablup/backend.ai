@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+import glob
+import struct
+import subprocess
+
+RECORD = struct.calcsize("llHHi")
+EV_KEY = 1
+KEY_POWER = 116
+
+
+def button():
+    for name in sorted(glob.glob("/sys/class/input/event*/device/name")):
+        with open(name, encoding="utf-8") as f:
+            if "Power Button" in f.read():
+                return "/dev/input/" + name.split("/")[4]
+    return None
+
+
+def main():
+    path = button()
+    if path is None:
+        print("power-button: no power button is present on this platform", flush=True)
+        return 0
+    print(f"power-button: watching {path} for the hypervisor's shutdown request", flush=True)
+    with open(path, "rb", buffering=0) as source:
+        while True:
+            block = source.read(RECORD)
+            if len(block) < RECORD:
+                return 1
+            _, _, kind, code, value = struct.unpack("llHHi", block)
+            if kind == EV_KEY and code == KEY_POWER and value == 1:
+                print("power-button: the hypervisor asked for a clean shutdown", flush=True)
+                subprocess.run(["systemctl", "poweroff"], check=False)
+                return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

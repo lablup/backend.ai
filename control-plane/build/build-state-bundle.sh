@@ -117,7 +117,8 @@ systemctl enable tmp.mount var-log.mount var-lib-backendai.mount \
     backendai-manager-schema.service backendai-appproxy-schema.service \
     backendai-etcdprobe.service backendai-manager.service \
     backendai-manager-selfcheck.service \
-    backendai-appproxy-coordinator.service backendai-state-backup.timer
+    backendai-appproxy-coordinator.service backendai-state-backup.timer \
+    backendai-powerbutton.service
 : > /etc/machine-id
 systemctl mask systemd-timesyncd.service serial-getty@ttyS0.service getty@.service \
     debug-shell.service systemd-ask-password-console.service \
@@ -176,6 +177,8 @@ CHECK
     fi
     echo "build-state-bundle: the introspection console survives inside an interpreter binary; the measured configuration switches it off and the artifact honours that switch" >&2
 fi
+[ -L "$ROOT/etc/systemd/system/multi-user.target.wants/backendai-powerbutton.service" ] ||
+    fail "no power-button handler is enabled in the image, so the hypervisor's only clean-shutdown request would be ignored"
 [ -L "$ROOT/etc/systemd/system/local-fs.target.wants/tmp.mount" ] ||
     fail "no writable /tmp is mounted in the image; valkey-glide puts its socket there and would wait on it forever"
 if [ -e "$ROOT/usr/sbin/sshd" ] || [ -e "$ROOT/usr/bin/sshd" ]; then
