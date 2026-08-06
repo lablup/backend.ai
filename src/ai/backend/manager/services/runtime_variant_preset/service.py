@@ -1,6 +1,10 @@
 import logging
 from typing import cast
 
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
+    FLAG_REQUIRES_ARGS_MSG,
+    FLAG_REQUIRES_ARGS_TYPE,
+)
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
     PresetValueType,
@@ -63,7 +67,13 @@ class RuntimeVariantPresetService:
             effective_value_type == PresetValueType.FLAG
             and effective_preset_target != PresetTarget.ARGS
         ):
-            raise InvalidAPIParameters("value_type 'flag' is only valid with preset_target 'args'.")
+            raise InvalidAPIParameters(
+                FLAG_REQUIRES_ARGS_MSG,
+                extra_data=[
+                    {"type": FLAG_REQUIRES_ARGS_TYPE, "loc": [field], "msg": FLAG_REQUIRES_ARGS_MSG}
+                    for field in ("preset_target", "value_type")
+                ],
+            )
 
         action.updater.pk_value = action.id
         data = await self._repository.update(action.updater)

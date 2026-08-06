@@ -4,7 +4,8 @@ from collections.abc import Callable
 from typing import Self
 from uuid import UUID
 
-from pydantic import Field, model_validator
+from pydantic import Field, ValidationError, model_validator
+from pydantic_core import InitErrorDetails, PydanticCustomError
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
@@ -29,6 +30,30 @@ def _validate_flag(v: str) -> bool:
     if v.lower() not in _VALID_BOOL_VALUES:
         raise ValueError(f"expected one of {_VALID_BOOL_VALUES}, got '{v}'")
     return v.lower() in ("true", "1")
+
+
+FLAG_REQUIRES_ARGS_MSG = "value_type 'flag' is only valid with preset_target 'args'."
+FLAG_REQUIRES_ARGS_TYPE = "flag_requires_args"
+
+
+def _flag_requires_args_error(
+    title: str, preset_target: PresetTarget | None, value_type: PresetValueType | None
+) -> ValidationError:
+    """Report the flag/args rule against both fields it constrains.
+
+    A ``model_validator`` raising ``ValueError`` lands on the model with an empty ``loc``,
+    which leaves a client no way to tell which of the two inputs it has to correct.
+    """
+    line_errors: list[InitErrorDetails] = []
+    for field, value in (("preset_target", preset_target), ("value_type", value_type)):
+        line_errors.append(
+            InitErrorDetails(
+                type=PydanticCustomError(FLAG_REQUIRES_ARGS_TYPE, FLAG_REQUIRES_ARGS_MSG),
+                loc=(field,),
+                input=value,
+            )
+        )
+    return ValidationError.from_exception_data(title, line_errors)
 
 
 VALUE_TYPE_VALIDATORS: dict[PresetValueType, Callable[[str], object]] = {
@@ -67,7 +92,9 @@ class CreateRuntimeVariantPresetInput(BaseRequestModel):
     @model_validator(mode="after")
     def validate_flag_requires_args(self) -> Self:
         if self.value_type == PresetValueType.FLAG and self.preset_target != PresetTarget.ARGS:
-            raise ValueError("value_type 'flag' is only valid with preset_target 'args'.")
+            raise _flag_requires_args_error(
+                type(self).__name__, self.preset_target, self.value_type
+            )
         return self
 
     @model_validator(mode="after")
@@ -121,7 +148,9 @@ class UpdateRuntimeVariantPresetInput(BaseRequestModel):
             and self.preset_target is not None
             and self.preset_target != PresetTarget.ARGS
         ):
-            raise ValueError("value_type 'flag' is only valid with preset_target 'args'.")
+            raise _flag_requires_args_error(
+                type(self).__name__, self.preset_target, self.value_type
+            )
         return self
 
 

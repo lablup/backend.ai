@@ -15,6 +15,34 @@ from ai.backend.logging.utils import BraceStyleAdapter
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
+def to_graphql_error(e: Exception) -> GraphQLError:
+    """Render an exception as the GraphQL error a client receives."""
+    if isinstance(e, BackendAIError):
+        if e.status_code // 100 == 4:
+            log.debug("GraphQL client error: {}", e)
+        elif e.status_code // 100 == 5:
+            log.exception("GraphQL server error: {}", e)
+        extensions: dict[str, Any] = {"code": str(e.error_code())}
+        if e.extra_data is not None:
+            extensions["data"] = e.extra_data
+        # Not ``str(e)``: it appends a repr of extra_data, which travels in extensions.
+        message = f"{e.error_title} ({e.extra_msg})" if e.extra_msg else e.error_title
+    else:
+        log.exception("GraphQL unexpected error: {}", e)
+        extensions = {"code": str(ErrorCode.default())}
+        message = str(e)
+    return GraphQLError(message=message, extensions=extensions)
+
+
+async def await_and_convert_errors(coro: Awaitable[object]) -> object:
+    """Await an async resolver's result, converting whatever it raises."""
+    try:
+        result = await coro
+    except Exception as e:
+        raise to_graphql_error(e) from e
+    return result
+
+
 class GQLExceptionHandlerExtension(SchemaExtension):
     """Transforms internal exceptions into client-safe GraphQL errors with error codes."""
 
@@ -29,40 +57,8 @@ class GQLExceptionHandlerExtension(SchemaExtension):
     ) -> AwaitableOrValue[object]:
         try:
             result: object = _next(root, info, *args, **kwargs)
-        except BackendAIError as e:
-            if e.status_code // 100 == 4:
-                log.debug("GraphQL client error: {}", e)
-            elif e.status_code // 100 == 5:
-                log.exception("GraphQL server error: {}", e)
-            raise GraphQLError(
-                message=str(e),
-                extensions={"code": str(e.error_code())},
-            ) from e
         except Exception as e:
-            log.exception("GraphQL unexpected error: {}", e)
-            raise GraphQLError(
-                message=str(e),
-                extensions={"code": str(ErrorCode.default())},
-            ) from e
+            raise to_graphql_error(e) from e
         if asyncio.iscoroutine(result):
-            return self._handle_async(result)
+            return await_and_convert_errors(result)
         return result
-
-    async def _handle_async(self, coro: Awaitable[object]) -> object:
-        try:
-            return await coro
-        except BackendAIError as e:
-            if e.status_code // 100 == 4:
-                log.debug("GraphQL client error: {}", e)
-            elif e.status_code // 100 == 5:
-                log.exception("GraphQL server error: {}", e)
-            raise GraphQLError(
-                message=str(e),
-                extensions={"code": str(e.error_code())},
-            ) from e
-        except Exception as e:
-            log.exception("GraphQL unexpected error: {}", e)
-            raise GraphQLError(
-                message=str(e),
-                extensions={"code": str(ErrorCode.default())},
-            ) from e
