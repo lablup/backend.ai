@@ -16,13 +16,11 @@ from ai.backend.manager.data.resource_slot.types import (
     AgentResourceData,
     AgentResourceDrift,
     AgentResourceSearchResult,
-    NumberFormatData,
     OrphanedAllocation,
     ReconciliationResult,
     ResourceAllocationData,
     ResourceAllocationSearchResult,
     ResourceOccupancy,
-    ResourceSlotTypeData,
     ResourceSlotTypeSearchResult,
     TerminalSessionKernelReconciliation,
 )
@@ -111,22 +109,7 @@ class ResourceSlotDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = sa.select(ResourceSlotTypeRow)
             result = await execute_batch_querier(db_sess, query, querier)
-            items = [
-                ResourceSlotTypeData(
-                    slot_name=row.ResourceSlotTypeRow.slot_name,
-                    slot_type=row.ResourceSlotTypeRow.slot_type,
-                    display_name=row.ResourceSlotTypeRow.display_name,
-                    description=row.ResourceSlotTypeRow.description,
-                    display_unit=row.ResourceSlotTypeRow.display_unit,
-                    display_icon=row.ResourceSlotTypeRow.display_icon,
-                    number_format=NumberFormatData(
-                        binary=row.ResourceSlotTypeRow.number_format.binary,
-                        round_length=row.ResourceSlotTypeRow.number_format.round_length,
-                    ),
-                    rank=row.ResourceSlotTypeRow.rank,
-                )
-                for row in result.rows
-            ]
+            items = [row.ResourceSlotTypeRow.to_data() for row in result.rows]
             return ResourceSlotTypeSearchResult(
                 items=items,
                 total_count=result.total_count,
