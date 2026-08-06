@@ -264,6 +264,7 @@ class TestAuthRepository:
                 user_id=email,
                 user=user_uuid,
                 is_active=True,
+                rate_limit=30000,
                 resource_policy=keypair_resource_policy.name,
                 ssh_public_key=ssh_public_key,
                 ssh_private_key=ssh_private_key,

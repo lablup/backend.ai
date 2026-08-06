@@ -405,6 +405,7 @@ class TestCheckPresetsOccupiedSlots:
                 user_id=user_email,  # user_id is email (string)
                 user=test_user_uuid,  # user is UUID (required NOT NULL)
                 is_active=True,
+                rate_limit=30000,
                 resource_policy=test_resource_policy_name,
             )
             db_sess.add(keypair)
@@ -1506,6 +1507,7 @@ class TestCheckPresetsZeroValues:
                 user_id=user_email,
                 user=test_user_uuid,
                 is_active=True,
+                rate_limit=30000,
                 resource_policy=test_resource_policy_name,
             )
             db_sess.add(keypair)

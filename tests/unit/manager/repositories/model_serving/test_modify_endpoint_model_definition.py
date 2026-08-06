@@ -178,6 +178,7 @@ class TestModifyEndpointModelDefinitionRefresh:
                     is_active=True,
                     is_admin=True,
                     user=user_id,
+                    rate_limit=30000,
                     resource_policy="default",
                     is_default=True,
                 )
