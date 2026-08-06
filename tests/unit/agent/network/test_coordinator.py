@@ -5,7 +5,7 @@ from typing import Any, cast, override
 from unittest import mock
 
 import ai.backend.agent.network.coordinator as coordinator_mod
-from ai.backend.agent.network.coordinator import SessionNetworkCoordinator
+from ai.backend.agent.network.coordinator import SessionClusterNames, SessionNetworkCoordinator
 from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.network.keys import endpoints_prefix, member_key, members_prefix
 from ai.backend.common.network.types import Member, NetworkBackendKind, SessionNetMeta
@@ -393,6 +393,21 @@ class TestClusterNameResolution:
         coord = _coordinator(etcd, RecordingBackend())
         await coord.reconcile_endpoints("s1")
         assert coord.resolve_cluster_name("s1", "main1") is None
+
+    async def test_session_cluster_names_binds_a_session_scope(self) -> None:
+        # The resolver sees only a bare hostname; SessionClusterNames pins the session so identical
+        # names in another session are never reached through this adapter.
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_endpoint(
+            "c-remote", "10.128.5.20", "02:42:0a:80:05:14", agent_id="a2", cluster_hostname="sub1"
+        )
+        etcd.seed_member(_PEER2)
+        coord = _coordinator(etcd, RecordingBackend())
+        await coord.reconcile_endpoints("s1")
+        names = SessionClusterNames(coord, "s1")
+        assert names.resolve_name("sub1") == "10.128.5.20"
+        assert SessionClusterNames(coord, "other").resolve_name("sub1") is None
 
 
 class _CancelAfter:

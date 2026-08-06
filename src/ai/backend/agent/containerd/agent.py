@@ -841,16 +841,23 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         _atomic_write_text(hosts_file, "\n".join(lines) + "\n")
         return Mount(MountTypes.BIND, hosts_file, Path("/etc/hosts"), MountPermission.READ_ONLY)
 
-    def _prepare_resolv_conf(self) -> Mount | None:
+    async def _prepare_resolv_conf(self) -> Mount | None:
         """Write this kernel's /etc/resolv.conf and return a bind mount for it.
 
         Unconditional, unlike /etc/hosts: every container needs a resolver, not just clustered
         ones. Without this the image's own (usually absent) resolv.conf is all the container gets
         and no name resolves. See containerd/dns.py for how the nameservers are chosen.
+
+        The session's LOCAL gateway (where its cluster DNS server listens) goes first, so cluster
+        peer names resolve through it, and the upstream nameservers follow as a fallback — if the
+        resolver is down the container still reaches them directly, and cluster names still resolve
+        via /etc/hosts (BEP-1062, cluster-name-resolution.md).
         """
         if self._scratch_dir is None:
             return None
         resolv = resolve_container_dns(self.local_config.container.dns or ())
+        if (gateway := await self._session_network.local_gateway_of(self._session_id)) is not None:
+            resolv.nameservers = [gateway, *resolv.nameservers]
         resolv_file = self._scratch_dir / "config" / "resolv.conf"
         resolv_file.write_text(resolv.render())
         return Mount(
@@ -1237,7 +1244,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         if (hosts_mount := self._write_etc_hosts(peers, environ)) is not None:
             self._oci_mounts.append(hosts_mount)
         # containerd/runc provides no resolver either (dockerd synthesizes one per container).
-        if (resolv_mount := self._prepare_resolv_conf()) is not None:
+        if (resolv_mount := await self._prepare_resolv_conf()) is not None:
             self._oci_mounts.append(resolv_mount)
         # Build (but do NOT create) the container spec + kernel object. mount_krunner
         # (inherited) has populated resource_spec.mounts with the krunner bind mounts;
@@ -1590,6 +1597,7 @@ class ContainerdAgent(
             privnet_socket=self.local_config.agent.network_privnet_socket,
             local_subnet_layout=container_cfg.local_subnet_layout(),
             vtep_ip=self._vtep_ip,
+            configured_dns=tuple(container_cfg.dns or ()),
         )
         # Host-port ingress is an iptables (CAP_NET_ADMIN) op, so only the process that owns the
         # host's networking may install it: this agent when it runs privileged, the privnet when

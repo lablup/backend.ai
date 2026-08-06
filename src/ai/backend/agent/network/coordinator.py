@@ -342,3 +342,23 @@ class SessionNetworkCoordinator:
             # this task at full CPU and starve the event loop.
             await asyncio.sleep(backoff)
             backoff = min(backoff * 2, _WATCH_RETRY_BACKOFF_MAX)
+
+
+class SessionClusterNames:
+    """A per-session ``ClusterNameSource`` view over a coordinator (BEP-1062).
+
+    The cluster DNS resolver sees only bare hostnames (``sub1``), but names are unique only within
+    a session — every session names kernels ``main1``/``sub1``/…. Binding a ``session_id`` here is
+    what keeps resolution session-scoped: two sessions' identical names resolve through two of these,
+    each pinned to its own session, so they never collide.
+    """
+
+    _coordinator: SessionNetworkCoordinator
+    _session_id: str
+
+    def __init__(self, coordinator: SessionNetworkCoordinator, session_id: str) -> None:
+        self._coordinator = coordinator
+        self._session_id = session_id
+
+    def resolve_name(self, hostname: str) -> str | None:
+        return self._coordinator.resolve_cluster_name(self._session_id, hostname)

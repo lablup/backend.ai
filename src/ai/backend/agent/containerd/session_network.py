@@ -18,20 +18,27 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import ipaddress
 import json
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
+from ai.backend.agent.containerd.dns import resolve_container_dns
 from ai.backend.agent.containerd.oci import OWNER_AGENT_LABEL, SESSION_ID_LABEL
 from ai.backend.agent.containerd.orchestrator import ContainerdKernelOrchestrator, LaunchResult
 from ai.backend.agent.containerd.runtime.interface import ExecResult, OciRuntime
 from ai.backend.agent.containerd.session_tracker import SessionContainerTracker, TeardownScope
 from ai.backend.agent.errors.network import SessionNetworkGone, UnusableVtep
 from ai.backend.agent.network.cni import CniRunner
-from ai.backend.agent.network.coordinator import SessionNetworkCoordinator
+from ai.backend.agent.network.coordinator import SessionClusterNames, SessionNetworkCoordinator
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator, LocalSubnetLayout
 from ai.backend.agent.network.native_attacher import HostLocalIpam
+from ai.backend.agent.network.privnet.resolver import (
+    ClusterDNSServer,
+    ClusterResolver,
+    make_upstream_forwarder,
+)
 from ai.backend.agent.network.provisioner import ContainerNetworkProvisioner
 from ai.backend.common.network.keys import endpoint_key, session_meta_key
 from ai.backend.common.network.types import (
@@ -88,6 +95,14 @@ class ContainerdSessionNetwork:
     _make_provisioner: Callable[[AbstractNetworkAgentPluginV2[Any], str], Any]
     _coordinators: dict[str, SessionNetworkCoordinator]
     _orchestrators: dict[str, ContainerdKernelOrchestrator]
+    # Per-session cluster DNS server, bound to the session's LOCAL gateway. Answers the session's
+    # cluster hostnames from its coordinator (session-scoped, so identical main1/sub1 across sessions
+    # never collide) and forwards everything else upstream. See cluster-name-resolution.md.
+    _dns_servers: dict[str, ClusterDNSServer]
+    # Operator-configured upstream nameservers (container.dns); the resolver forwards non-cluster
+    # queries to these (falling back to the host's own resolver when empty). Same source the
+    # container's /etc/resolv.conf uses, so cluster and non-cluster names agree.
+    _configured_dns: Sequence[str]
     # Tracks container<->session so the last kernel's removal deterministically tears the
     # session network down (otherwise overlay devices + etcd members leak).
     _tracker: SessionContainerTracker
@@ -132,6 +147,7 @@ class ContainerdSessionNetwork:
         privnet_local_subnet: Callable[[str], Awaitable[str | None]] | None = None,
         ipam: HostLocalIpam | None = None,
         vtep_ip: str | None = None,
+        configured_dns: Sequence[str] = (),
     ) -> None:
         self._etcd = etcd
         self._agent_id = agent_id
@@ -145,6 +161,8 @@ class ContainerdSessionNetwork:
         )
         self._coordinators = {}
         self._orchestrators = {}
+        self._dns_servers = {}
+        self._configured_dns = tuple(configured_dns)
         self._tracker = SessionContainerTracker()
         self._attachments = {}
         self._local_subnets = local_subnets
@@ -312,6 +330,7 @@ class ContainerdSessionNetwork:
         await coordinator.resume(meta, self._self_member(meta))
         self._coordinators[session_id] = coordinator
         self._orchestrators[session_id] = orchestrator
+        await self._start_cluster_dns(session_id, coordinator)
 
     async def _recover_attachment(
         self, container_id: str, session_id: str, meta: SessionNetMeta
@@ -562,6 +581,7 @@ class ContainerdSessionNetwork:
             # then skip on retry — a retry must re-run the full setup cleanly.
             self._coordinators[session_id] = coordinator
             self._orchestrators[session_id] = orchestrator
+            await self._start_cluster_dns(session_id, coordinator)
             await self._adopt_containers(survivors, session_id, meta)
             return meta
 
@@ -646,12 +666,61 @@ class ContainerdSessionNetwork:
             return await self._privnet_local_subnet(session_id)
         return None
 
+    async def local_gateway_of(self, session_id: str) -> str | None:
+        """This session's LOCAL bridge gateway — the first usable host of its LOCAL subnet (the
+        ``isGateway`` address, mirroring ``cluster_host_ips``). It is where the session's cluster
+        DNS server listens and what a container's ``/etc/resolv.conf`` points at. ``None`` when the
+        subnet is unknown (no block claimed / not wired)."""
+        subnet = await self.local_subnet_of(session_id)
+        if subnet is None:
+            return None
+        try:
+            return str(next(iter(ipaddress.IPv4Network(subnet).hosts())))
+        except (ipaddress.AddressValueError, ipaddress.NetmaskValueError, StopIteration):
+            return None
+
+    async def _start_cluster_dns(
+        self, session_id: str, coordinator: SessionNetworkCoordinator
+    ) -> None:
+        """Bring up the session's cluster DNS server on its LOCAL gateway. Best-effort: a failure to
+        determine the gateway or bind the socket is logged and skipped, never fatal — the container
+        still resolves peers via ``/etc/hosts`` and non-cluster names via the upstream nameservers
+        its ``/etc/resolv.conf`` also lists. (This is why the rollout keeps ``/etc/hosts`` populated
+        until the resolver is proven; see cluster-name-resolution.md, phase 5.)"""
+        gateway = await self.local_gateway_of(session_id)
+        if gateway is None:
+            log.warning(
+                "no LOCAL gateway for session {}; cluster DNS not started (peers via /etc/hosts)",
+                session_id,
+            )
+            return
+        upstreams = resolve_container_dns(self._configured_dns).nameservers
+        resolver = ClusterResolver(
+            SessionClusterNames(coordinator, session_id), make_upstream_forwarder(upstreams)
+        )
+        server = ClusterDNSServer(resolver, gateway)
+        try:
+            await server.start()
+        except OSError as e:
+            log.warning("could not start cluster DNS for {} on {}: {}", session_id, gateway, e)
+            return
+        self._dns_servers[session_id] = server
+
+    async def _stop_cluster_dns(self, session_id: str) -> None:
+        server = self._dns_servers.pop(session_id, None)
+        if server is not None:
+            with contextlib.suppress(Exception):
+                await server.stop()
+
     async def teardown_session(self, session_id: str) -> None:
         # Under the same per-session lock as setup, so a teardown racing the last kernel's setup
         # cannot tear down devices mid-creation (or leave a coordinator the setup is still filling).
         async with self._session_locked(session_id):
             coordinator = self._coordinators.pop(session_id, None)
             self._orchestrators.pop(session_id, None)
+            # Stop our resolver whenever we stop serving the session on this node — on both the
+            # withdraw and the full-teardown exit below — so its bound gateway socket never leaks.
+            await self._stop_cluster_dns(session_id)
             if coordinator is None:
                 return
             # OUR last kernel of the session is gone — but the devices and the LOCAL block are the
@@ -881,6 +950,7 @@ def build_containerd_session_network(
     privnet_socket: str | None = None,
     local_subnet_layout: LocalSubnetLayout | None = None,
     vtep_ip: str | None = None,
+    configured_dns: Sequence[str] = (),
 ) -> ContainerdSessionNetwork:
     """Assemble a ContainerdSessionNetwork with default real collaborators.
 
@@ -961,4 +1031,5 @@ def build_containerd_session_network(
         privnet_local_subnet=privnet_local_subnet,
         ipam=owned_ipam,
         vtep_ip=vtep_ip,
+        configured_dns=configured_dns,
     )

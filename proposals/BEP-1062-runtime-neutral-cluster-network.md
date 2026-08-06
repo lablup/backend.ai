@@ -99,7 +99,7 @@ The **manager plugin stays as-is**; a new `CNINetworkPlugin` implements it and d
 | P7 | `wireguard` backend (encrypted option). |
 | P8 | Failure/GC: lease-driven peer cleanup, node-crash recovery. |
 | P9 | Central endpoint IPAM: manager assigns per-endpoint overlay IPs (variable-prefix session subnet by `cluster_size`), writes `endpoints/`; coordinator programs FDB+ARP from it; overlay CNI uses the assigned static IP. Removes host-local collision + BUM flood (Swarm parity). |
-| P10 | Cluster name resolution ([cluster-name-resolution](./BEP-1062/cluster-name-resolution.md)): static `/etc/hosts` hardening **(done)** → resolver core **(done)** → session-scoped `endpoints/`+`cluster_hostname` name source **(done)** → per-session `ClusterDNSServer` wiring + resolv.conf → remove the peer map from `/etc/hosts` (localhost+self only). Dynamic membership + backend-unified peer resolution. |
+| P10 | Cluster name resolution ([cluster-name-resolution](./BEP-1062/cluster-name-resolution.md)): static `/etc/hosts` hardening **(done)** → resolver core **(done)** → session-scoped `endpoints/`+`cluster_hostname` name source **(done)** → per-session `ClusterDNSServer` wiring + resolv.conf **(done, pending live validation)** → remove the peer map from `/etc/hosts` (localhost+self only). Dynamic membership + backend-unified peer resolution. |
 
 ## Decision Log
 
