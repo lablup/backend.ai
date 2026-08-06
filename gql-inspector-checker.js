@@ -1,5 +1,23 @@
 module.exports = (props) => {
   const { changes, newSchema, oldSchema } = props;
+  const oldTypes = oldSchema.getTypeMap();
+
+  // graphql-inspector reports one FIELD_ADDED per field of a brand-new type and one
+  // FIELD_ARGUMENT_ADDED per argument of a brand-new field. Those elements arrived with
+  // their owner, whose own notation already dates them, so only an element appearing on
+  // an owner that already shipped states a version of its own. Omit `fieldName` to ask
+  // about the type alone.
+  const ownerIsNew = (typeName, fieldName) => {
+    const oldType = oldTypes[typeName];
+    if (oldType === undefined) {
+      return true;
+    }
+    if (fieldName === undefined) {
+      return false;
+    }
+    return oldType.getFields?.()[fieldName] === undefined;
+  };
+
   return changes.map((change) => {
     // Allowed version notations: 'XX.XX.X', 'XX.X.X'
     const deprecateNotationRegex = /Deprecated since (\d{2}\.\d{1,2}\.\d{1})/;
@@ -26,16 +44,18 @@ module.exports = (props) => {
       change.criticality.level !== "BREAKING"
     ) {
       const [typeName, fieldName] = change.path.split(".");
-      const description = newSchema.getTypeMap()[typeName].getFields()[
-        fieldName
-      ].astNode.description?.value;
-      if (!description || (description && !description.match(addNotationRegex))) {
-        change.criticality.level = "BREAKING";
-        change.criticality.reason =
-          'New fields must include a description with a version number in the format "Added in XX.XX.X." or "Added in XX.X.X."';
-        change.message =
-          'New fields must include a description with a version number in the format "Added in XX.XX.X." or "Added in XX.X.X.", ' +
-          change.message;
+      if (!ownerIsNew(typeName)) {
+        const description = newSchema.getTypeMap()[typeName].getFields()[
+          fieldName
+        ].astNode.description?.value;
+        if (!description || (description && !description.match(addNotationRegex))) {
+          change.criticality.level = "BREAKING";
+          change.criticality.reason =
+            'New fields must include a description with a version number in the format "Added in XX.XX.X." or "Added in XX.X.X."';
+          change.message =
+            'New fields must include a description with a version number in the format "Added in XX.XX.X." or "Added in XX.X.X.", ' +
+            change.message;
+        }
       }
     } else if (
       change.type === "TYPE_ADDED" &&
@@ -58,20 +78,22 @@ module.exports = (props) => {
       )
     ) {
       const [type, fieldName, argumentName] = change.path.split(".");
-      const field = newSchema.getTypeMap()[type].getFields()[fieldName];
-      const description = field.args.find(
-        (arg) => arg.name === argumentName
-      )?.description;
+      if (!ownerIsNew(type, fieldName)) {
+        const field = newSchema.getTypeMap()[type].getFields()[fieldName];
+        const description = field.args.find(
+          (arg) => arg.name === argumentName
+        )?.description;
 
-      if (!description || (description && !description.match(addNotationRegex))) {
-        change.criticality.level = "BREAKING";
-        change.criticality.reason =
-          'New arguments must include a description with a version number in the format "Added in XX.XX.X." or "Added in XX.X.X."';
-        change.message =
-          'New arguments must include a description with a version number in the format "Added in XX.XX.X." or "Added in XX.X.X.", ' +
-          change.message;
-      } else {
-        change.criticality.level = "DANGEROUS";
+        if (!description || (description && !description.match(addNotationRegex))) {
+          change.criticality.level = "BREAKING";
+          change.criticality.reason =
+            'New arguments must include a description with a version number in the format "Added in XX.XX.X." or "Added in XX.X.X."';
+          change.message =
+            'New arguments must include a description with a version number in the format "Added in XX.XX.X." or "Added in XX.X.X.", ' +
+            change.message;
+        } else {
+          change.criticality.level = "DANGEROUS";
+        }
       }
     }
     return change;
