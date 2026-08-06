@@ -1808,7 +1808,7 @@ class TestUpsertScoped:
 
 
 @dataclass(frozen=True)
-class _PartialUpsertCase:
+class _ScopedPartialUpsertCase:
     """One upserter shape for the partial bulk op, and the bindings it must leave."""
 
     name: str
@@ -1823,7 +1823,7 @@ class TestBulkUpsertScopedPartial:
     @pytest.mark.parametrize(
         "case",
         [
-            _PartialUpsertCase(
+            _ScopedPartialUpsertCase(
                 name="scoped",
                 scope_type="user",
                 scope_id=_USER_SCOPE_ID,
@@ -1831,7 +1831,7 @@ class TestBulkUpsertScopedPartial:
                 conflict_target=ConflictTarget(columns=["name", "scope_type", "scope_id"]),
                 expected_scope_ids=[_USER_SCOPE_ID],
             ),
-            _PartialUpsertCase(
+            _ScopedPartialUpsertCase(
                 name="global",
                 scope_type="public",
                 scope_id=None,
@@ -1846,7 +1846,7 @@ class TestBulkUpsertScopedPartial:
     )
     async def test_row_binds_to_the_scope_its_upserter_carries(
         self,
-        case: _PartialUpsertCase,
+        case: _ScopedPartialUpsertCase,
         provider: RBACOpsProvider,
         database_connection: ExtendedAsyncSAEngine,
         upsert_tables: None,
