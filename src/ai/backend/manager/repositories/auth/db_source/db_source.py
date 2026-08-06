@@ -264,7 +264,7 @@ class AuthDBSource:
             username=row.username,
             email=row.email,
             password=row.password,
-            need_password_change=row.need_password_change or False,
+            need_password_change=row.need_password_change,
             full_name=row.full_name,
             description=row.description,
             is_active=row.status == UserStatus.ACTIVE,
@@ -274,7 +274,7 @@ class AuthDBSource:
             modified_at=row.updated_at,
             password_changed_at=row.password_changed_at,
             domain_name=row.domain_name or "",
-            role=row.role or UserRole.USER,
+            role=row.role,
             integration_name=row.integration_id,  # DB column is integration_id
             resource_policy=row.resource_policy,
             sudo_session_enabled=row.sudo_session_enabled,

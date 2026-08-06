@@ -156,8 +156,8 @@ class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         "email", sa.String(length=64), index=True, nullable=False, unique=True
     )
     password: Mapped[str | None] = mapped_column("password", PasswordColumn(), nullable=True)
-    need_password_change: Mapped[bool | None] = mapped_column(
-        "need_password_change", sa.Boolean, nullable=True
+    need_password_change: Mapped[bool] = mapped_column(
+        "need_password_change", sa.Boolean, default=False, nullable=False
     )
     password_changed_at: Mapped[datetime] = mapped_column(
         "password_changed_at",
@@ -194,15 +194,15 @@ class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         index=True,
         nullable=True,
     )
-    role: Mapped[UserRole | None] = mapped_column(
-        "role", EnumValueType(UserRole), default=UserRole.USER, nullable=True
+    role: Mapped[UserRole] = mapped_column(
+        "role", EnumValueType(UserRole), default=UserRole.USER, nullable=False
     )
     allowed_client_ip: Mapped[
         list[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]] | None
     ] = mapped_column("allowed_client_ip", pgsql.ARRAY(IPColumn), nullable=True)
     totp_key: Mapped[str | None] = mapped_column("totp_key", sa.String(length=32), nullable=True)
-    totp_activated: Mapped[bool | None] = mapped_column(
-        "totp_activated", sa.Boolean, server_default=sa.false(), default=False, nullable=True
+    totp_activated: Mapped[bool] = mapped_column(
+        "totp_activated", sa.Boolean, server_default=sa.false(), default=False, nullable=False
     )
     totp_activated_at: Mapped[datetime | None] = mapped_column(
         "totp_activated_at", sa.DateTime(timezone=True), nullable=True
