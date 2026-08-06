@@ -19,6 +19,7 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentBulkResult,
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
+    AppConfigFragmentUpsertBulkResult,
 )
 from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
@@ -145,7 +146,9 @@ class TestAppConfigFragmentService:
         scoped_fragment: AppConfigFragmentData,
         case: _RBACScopeCase,
     ) -> None:
-        mock_repository.bulk_upsert = AsyncMock(return_value=[scoped_fragment])
+        mock_repository.bulk_upsert = AsyncMock(
+            return_value=AppConfigFragmentUpsertBulkResult(succeeded=[scoped_fragment], failed=[])
+        )
         specs = [
             AppConfigFragmentUpserterSpec(
                 config_name="theme",
@@ -160,7 +163,8 @@ class TestAppConfigFragmentService:
             BulkUpsertAppConfigFragmentsAction(scope=scope, upserter_specs=specs)
         )
 
-        assert result.fragments == [scoped_fragment]
+        assert result.succeeded == [scoped_fragment]
+        assert result.failed == []
         # The result reports the RBAC scope the upsert was authorized at.
         assert result.scope_type() == case.expected_scope_type
         assert result.scope_id() == case.expected_scope_id

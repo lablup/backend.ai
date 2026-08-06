@@ -56,10 +56,10 @@ def get(config_names: tuple[str, ...]) -> None:
     ),
 )
 def update(items: str) -> None:
-    """Write the given configs' fragments at my own user scope, all-or-nothing.
+    """Write the given configs' fragments at my own user scope, reporting each item's outcome.
 
     Each item replaces my fragment for its config name, or creates it when I hold none.
-    Every item lands or none does.
+    A rejected item fails alone and the rest of the batch lands.
     """
     from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
         MyUpsertAppConfigFragmentsInput,

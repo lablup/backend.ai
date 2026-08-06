@@ -36,6 +36,7 @@ from .types import (
     AppConfigScopeRefGQL,
     MyUpsertAppConfigFragmentsInputGQL,
     ScopedUpsertAppConfigFragmentsInputGQL,
+    UpsertAppConfigFragmentsPayloadGQL,
 )
 
 
@@ -107,36 +108,37 @@ async def admin_app_config_fragments(
         added_version="26.8.0",
         description=(
             "Upsert many app config fragments at one scope (insert, or replace config on "
-            "conflict), all-or-nothing. RBAC-authorized at that scope."
+            "conflict), with per-item partial success. RBAC-authorized at that scope."
         ),
     )
 )
 async def scoped_upsert_app_config_fragments(
     info: Info[StrawberryGQLContext],
     input: ScopedUpsertAppConfigFragmentsInputGQL,
-) -> list[AppConfigFragmentGQL]:
+) -> UpsertAppConfigFragmentsPayloadGQL:
     payload = await info.context.adapters.app_config_fragment.scoped_upsert_app_config_fragments(
         input.to_pydantic()
     )
-    return [AppConfigFragmentGQL.from_pydantic(node) for node in payload.items]
+    return UpsertAppConfigFragmentsPayloadGQL.from_pydantic(payload)
 
 
 @gql_mutation(
     BackendAIGQLMeta(
         added_version="26.8.0",
         description=(
-            "Upsert many app config fragments at the current user's own user scope, all-or-nothing."
+            "Upsert many app config fragments at the current user's own user scope, with "
+            "per-item partial success."
         ),
     )
 )
 async def my_upsert_app_config_fragments(
     info: Info[StrawberryGQLContext],
     input: MyUpsertAppConfigFragmentsInputGQL,
-) -> list[AppConfigFragmentGQL]:
+) -> UpsertAppConfigFragmentsPayloadGQL:
     payload = await info.context.adapters.app_config_fragment.my_upsert_app_config_fragments(
         input.to_pydantic()
     )
-    return [AppConfigFragmentGQL.from_pydantic(node) for node in payload.items]
+    return UpsertAppConfigFragmentsPayloadGQL.from_pydantic(payload)
 
 
 @gql_root_field(

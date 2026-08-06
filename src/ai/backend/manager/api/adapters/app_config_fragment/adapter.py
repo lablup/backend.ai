@@ -24,6 +24,7 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     AppConfigFragmentBulkErrorInfo,
     AppConfigFragmentNode,
+    AppConfigFragmentUpsertErrorInfo,
     BulkPurgeAppConfigFragmentPayload,
     PurgeAppConfigFragmentPayload,
     SearchAppConfigFragmentPayload,
@@ -139,7 +140,13 @@ class AppConfigFragmentAdapter(BaseAdapter):
             BulkUpsertAppConfigFragmentsAction(scope=scope, upserter_specs=specs)
         )
         return UpsertAppConfigFragmentsPayload(
-            items=[self._fragment_to_node(fragment) for fragment in action_result.fragments],
+            items=[self._fragment_to_node(fragment) for fragment in action_result.succeeded],
+            failed=[
+                AppConfigFragmentUpsertErrorInfo(
+                    config_name=error.config_name, message=error.message
+                )
+                for error in action_result.failed
+            ],
         )
 
     async def get(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentNode:
