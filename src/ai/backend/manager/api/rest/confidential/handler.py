@@ -90,6 +90,15 @@ class BlobRequest(BaseRequestModel):
     blob_base64: str
 
 
+class LaunchCredentialRequest(BaseRequestModel):
+    scaling_group: str
+    nonce: str
+    domain_name: str
+    image_digest: str
+    quota: int
+    signature: str
+
+
 class GraceRequest(BaseRequestModel):
     scaling_group: str
     platform_status: str
@@ -142,6 +151,21 @@ class ConfidentialHandler:
         return APIResponse.build(
             HTTPStatus.OK, _Payload(result=confidential_capability_view(parsed.confidential))
         )
+
+    async def deposit_launch_credential(
+        self, body: BodyParam[LaunchCredentialRequest]
+    ) -> APIResponse:
+        parsed = body.parsed
+        opts = await self._plane.opts_of(parsed.scaling_group)
+        await self._plane.launch.deposit(
+            opts,
+            nonce=parsed.nonce,
+            domain_name=parsed.domain_name,
+            image_digest=parsed.image_digest,
+            quota=parsed.quota,
+            signature=parsed.signature,
+        )
+        return APIResponse.build(HTTPStatus.OK, _Payload(result={"nonce": parsed.nonce}))
 
     async def register_reference_value(self, body: BodyParam[ReferenceValueRequest]) -> APIResponse:
         parsed = body.parsed

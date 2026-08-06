@@ -119,6 +119,35 @@ class MeasuredBlobNotFound(BackendAIError, web.HTTPNotFound):
         )
 
 
+class LaunchCredentialRefused(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/confidential-launch-credential-refused"
+    error_title = "The deposited launch credential does not carry the tenant authority's signature."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class LaunchCredentialRequired(BackendAIError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/confidential-launch-credential-required"
+    error_title = (
+        "This scaling group mints no launch nonce of its own: a confidential session starts only"
+        " by spending a single-use credential the tenant signed, and none is left unspent."
+    )
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
 class AdmissionBeltExceeded(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/confidential-admission-belt-exceeded"
     error_title = "The interim per-image-and-profile admission limit is already met."

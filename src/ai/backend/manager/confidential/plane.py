@@ -17,6 +17,7 @@ from ai.backend.manager.confidential.client_keys import (
     ClientKeyRelease,
     CustodianFolderKeyCustody,
 )
+from ai.backend.manager.confidential.launch import LaunchAuthority
 from ai.backend.manager.confidential.policy import ReleasePolicyComposer
 from ai.backend.manager.confidential.provisioning import (
     RECONCILE_INTERVAL,
@@ -79,7 +80,8 @@ class ConfidentialPlane:
         self.shim = AuthorisationShim(db, self.broker)
         self.references = ReferenceValueStore(db, self.shim)
         self.policy = ReleasePolicyComposer(db, self.broker, self.references)
-        self.provisioner = SessionResourceProvisioner(db, self.broker, self.shim)
+        self.launch = LaunchAuthority(db)
+        self.provisioner = SessionResourceProvisioner(db, self.broker, self.shim, self.launch)
         self.blobs = MeasuredBlobStore(db)
         self.custodian = FolderKeyCustodian(self.broker)
         self.client_keys = ClientKeyRelease(db, CustodianFolderKeyCustody(self.custodian))

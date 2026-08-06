@@ -259,6 +259,8 @@ class IdleCheckerHost:
     ) -> None:
         for checker in self._checkers:
             await checker.update_app_streaming_status(session_id, status)
+        for event_dispatch_checker in self._event_dispatch_checkers:
+            await event_dispatch_checker.update_app_streaming_status(session_id, status)
 
     async def dispatch_session_status_event(
         self,
@@ -619,6 +621,13 @@ class AbstractEventDispatcherIdleChecker(ABC):
         This method is called when the session status changes.
         """
         raise NotImplementedError
+
+    async def update_app_streaming_status(
+        self,
+        session_id: SessionId,
+        status: AppStreamingStatus,
+    ) -> None:
+        pass
 
 
 NETWORK_IDLE_CHECKER_NAME = "network_timeout"

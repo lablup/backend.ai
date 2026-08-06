@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import secrets
 import uuid
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
@@ -15,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.confidential.admission import check_admission_belt
 from ai.backend.manager.confidential.broker import BrokerClient, BrokerTarget
+from ai.backend.manager.confidential.launch import LaunchAuthority
 from ai.backend.manager.confidential.payloads import TIME_RESOURCE, attested_time
 from ai.backend.manager.confidential.shim import AuthorisationShim
 from ai.backend.manager.errors.confidential import (
@@ -66,10 +66,12 @@ class SessionResourceProvisioner:
         db: ExtendedAsyncSAEngine,
         broker: BrokerClient,
         shim: AuthorisationShim,
+        launch: LaunchAuthority,
     ) -> None:
         self._db = db
         self._broker = broker
         self._shim = shim
+        self._launch = launch
 
     async def _settle(self, txn_func: Callable[[SASession], Awaitable[None]]) -> None:
         async with self._db.connect() as conn:
@@ -100,7 +102,13 @@ class SessionResourceProvisioner:
                     ConfidentialNonceRow.session_id == session_id
                 )
             )
-        nonce = held or secrets.token_urlsafe(24)
+        nonce = held or await self._launch.mint(
+            opts,
+            session_id=session_id,
+            domain_name=domain_name,
+            image_digest=image_digest,
+            quota=member_count,
+        )
         target = BrokerTarget.of(opts)
         await self._broker.put_resource(target, TIME_RESOURCE, attested_time())
         written: list[tuple[str, SessionResourceKind]] = []

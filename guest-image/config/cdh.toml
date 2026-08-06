@@ -5,4 +5,5 @@ name = "cc_kbc"
 url = "@KBS_URL@"
 
 [image]
+image_security_policy = '{"default":[{"type":"reject"}],"transports":{"docker":{"10.4.0.1:5000":[{"type":"sigstoreSigned","keyData":"-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEpkJd+Yrlnm6/OlNSiqKR2ogr8blD\n5CfYNC089mMVBQmyqq10iZUc9OcF/0HInfCS/E9DPHCu1z60RJn8n8kn4g==\n-----END PUBLIC KEY-----\n"}]}}}'
 extra_root_certificates = ["""@REGISTRY_CA@"""]

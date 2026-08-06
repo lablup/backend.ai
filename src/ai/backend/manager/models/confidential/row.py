@@ -114,6 +114,32 @@ class ConfidentialNonceRow(Base):  # type: ignore[misc]
     )
 
 
+class ConfidentialLaunchCredentialRow(Base):  # type: ignore[misc]
+    __tablename__ = "confidential_launch_credentials"
+    nonce: Mapped[str] = mapped_column("nonce", sa.String(length=128), primary_key=True)
+    endpoint: Mapped[str] = mapped_column("endpoint", sa.String(length=1024), nullable=False)
+    domain_name: Mapped[str] = mapped_column("domain_name", sa.String(length=64), nullable=False)
+    image_digest: Mapped[str] = mapped_column("image_digest", sa.String(length=256), nullable=False)
+    quota: Mapped[int] = mapped_column("quota", sa.Integer, nullable=False)
+    signature: Mapped[str] = mapped_column("signature", sa.Text, nullable=False)
+    deposited_at: Mapped[datetime] = mapped_column(
+        "deposited_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+    )
+    spent_at: Mapped[datetime | None] = mapped_column(
+        "spent_at", sa.DateTime(timezone=True), nullable=True
+    )
+    session_id: Mapped[uuid.UUID | None] = mapped_column("session_id", GUID, nullable=True)
+    __table_args__ = (
+        sa.Index(
+            "ix_conf_launch_credential_unspent",
+            "endpoint",
+            "domain_name",
+            "image_digest",
+            "quota",
+        ),
+    )
+
+
 class ConfidentialGuestClaimRow(Base):  # type: ignore[misc]
     __tablename__ = "confidential_guest_claims"
     nonce: Mapped[str] = mapped_column("nonce", sa.String(length=128), primary_key=True)
