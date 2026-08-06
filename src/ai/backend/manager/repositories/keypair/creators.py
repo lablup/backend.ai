@@ -19,7 +19,7 @@ class KeyPairCreatorSpec(CreatorSpec[KeyPairRow]):
     generated_data: KeyPairSecrets
     user_id: uuid.UUID
     email: str
-    is_main: bool = False
+    is_default: bool = False
 
     @override
     def build_row(self) -> KeyPairRow:
@@ -28,5 +28,5 @@ class KeyPairCreatorSpec(CreatorSpec[KeyPairRow]):
             self.generated_data,
             self.user_id,
             self.email,
-            self.is_main,
+            self.is_default,
         )

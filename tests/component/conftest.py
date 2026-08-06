@@ -892,7 +892,7 @@ async def admin_user_fixture(
                 rate_limit=30000,
                 num_queries=0,
                 is_admin=True,
-                is_main=True,
+                is_default=True,
                 user=str(data.user_uuid),
             )
         )
@@ -1002,7 +1002,7 @@ async def regular_user_fixture(
                 rate_limit=30000,
                 num_queries=0,
                 is_admin=False,
-                is_main=True,
+                is_default=True,
                 user=str(data.user_uuid),
             )
         )

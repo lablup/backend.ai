@@ -76,7 +76,7 @@ class TestUserCreateCrud:
             marked = (
                 await conn.execute(
                     sa.select(KeyPairRow.access_key).where(
-                        (KeyPairRow.user == str(result.user.id)) & KeyPairRow.is_main
+                        (KeyPairRow.user == str(result.user.id)) & KeyPairRow.is_default
                     )
                 )
             ).scalars()

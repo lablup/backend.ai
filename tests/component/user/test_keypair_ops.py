@@ -312,7 +312,7 @@ class TestUpdateMyKeypair:
         regular_user_fixture: Any,
         db_engine: SAEngine,
     ) -> None:
-        """S-6: switchMyMainAccessKey moves keypairs.is_main and users.main_access_key together."""
+        """S-6: switchMyMainAccessKey moves keypairs.is_default and users.main_access_key together."""
         original_access_key: str = regular_user_fixture.keypair.access_key
         user_uuid = str(regular_user_fixture.user_uuid)
         issue_payload = _assert_gql_success(
@@ -332,7 +332,7 @@ class TestUpdateMyKeypair:
                 marked = (
                     await conn.execute(
                         sa.select(KeyPairRow.access_key).where(
-                            (KeyPairRow.user == user_uuid) & KeyPairRow.is_main
+                            (KeyPairRow.user == user_uuid) & KeyPairRow.is_default
                         )
                     )
                 ).scalars()

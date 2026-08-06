@@ -1021,7 +1021,7 @@ class RBACWriteOps(WriteOps):
                     generated_data=full_creation.keypair_secrets or generate_keypair_data(),
                     user_id=user_row.uuid,
                     email=user_row.email,
-                    is_main=True,
+                    is_default=True,
                 ),
                 element_type=RBACElementType.KEYPAIR,
                 scope_ref=RBACElementRef(RBACElementType.USER, str(user_row.uuid)),

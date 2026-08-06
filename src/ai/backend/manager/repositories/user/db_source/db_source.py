@@ -780,13 +780,13 @@ class UserDBSource:
         # allows a user only one marked keypair.
         await session.execute(
             sa.update(KeyPairRow)
-            .where((KeyPairRow.user == keypair_row.user) & KeyPairRow.is_main)
-            .values(is_main=False)
+            .where((KeyPairRow.user == keypair_row.user) & KeyPairRow.is_default)
+            .values(is_default=False)
         )
         await session.execute(
             sa.update(KeyPairRow)
             .where(KeyPairRow.access_key == main_access_key)
-            .values(is_main=True)
+            .values(is_default=True)
         )
         await session.execute(
             sa.update(users).where(users.c.email == email).values(main_access_key=main_access_key)
@@ -1309,7 +1309,7 @@ class UserDBSource:
                             KeyPairRow.access_key,
                             KeyPairRow.user,
                             KeyPairRow.is_active,
-                            KeyPairRow.is_main,
+                            KeyPairRow.is_default,
                         ),
                     )
                 )
@@ -1327,13 +1327,13 @@ class UserDBSource:
             # allows a user only one marked keypair.
             await session.execute(
                 sa.update(KeyPairRow)
-                .where((KeyPairRow.user == user_uuid) & KeyPairRow.is_main)
-                .values(is_main=False)
+                .where((KeyPairRow.user == user_uuid) & KeyPairRow.is_default)
+                .values(is_default=False)
             )
             await session.execute(
                 sa.update(KeyPairRow)
                 .where(KeyPairRow.access_key == access_key)
-                .values(is_main=True)
+                .values(is_default=True)
             )
             await session.execute(
                 sa.update(users).where(users.c.uuid == user_uuid).values(main_access_key=access_key)

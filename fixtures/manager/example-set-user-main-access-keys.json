@@ -25,23 +25,23 @@
   "keypairs": [
     {
       "access_key": "AKIAIOSFODNN7EXAMPLE",
-      "is_main": true
+      "is_default": true
     },
     {
       "access_key": "AKIAHUKCHDEZGEXAMPLE",
-      "is_main": true
+      "is_default": true
     },
     {
       "access_key": "AKIANABBDUSEREXAMPLE",
-      "is_main": true
+      "is_default": true
     },
     {
       "access_key": "AKIANATWOUSEREXAMPLE",
-      "is_main": true
+      "is_default": true
     },
     {
       "access_key": "AKIANAMONITOREXAMPLE",
-      "is_main": true
+      "is_default": true
     }
   ]
 }

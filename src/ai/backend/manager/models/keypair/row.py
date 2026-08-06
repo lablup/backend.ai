@@ -143,7 +143,7 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         generated_data: KeyPairSecrets,
         user_id: uuid.UUID,
         email: str,
-        is_main: bool = False,
+        is_default: bool = False,
     ) -> Self:
         return cls(
             user_id=email,
@@ -152,7 +152,7 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
             secret_key=generated_data.secret_key,
             is_active=creator.is_active,
             is_admin=creator.is_admin,
-            is_main=is_main,
+            is_default=is_default,
             resource_policy=creator.resource_policy,
             rate_limit=creator.rate_limit,
             num_queries=0,

@@ -219,7 +219,7 @@ async def create_user_if_not_exists(
                 user=keypair_data["user"],
                 ssh_public_key=keypair_data["ssh_public_key"],
                 ssh_private_key=keypair_data["ssh_private_key"],
-                is_main=True,
+                is_default=True,
             )
             dbsess.add(keypair)
             await dbsess.flush()
