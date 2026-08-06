@@ -39727,6 +39727,7 @@
           "port": {
             "anyOf": [
               {
+                "exclusiveMinimum": 1,
                 "type": "integer"
               },
               {
