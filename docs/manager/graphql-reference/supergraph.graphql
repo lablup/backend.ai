@@ -4775,7 +4775,7 @@ input CreateRuntimeVariantPresetInput
   presetTarget: PresetTarget!
 
   """
-  Data type for validation (e.g., 'str', 'int', 'float', 'bool', 'flag').
+  Data type for validation (e.g., 'str', 'int', 'float', 'bool', 'flag'). 'flag' is only valid when preset_target is 'args'.
   """
   valueType: PresetValueType!
 
@@ -21732,7 +21732,9 @@ input UpdateRuntimeVariantPresetInput
   """New target."""
   presetTarget: PresetTarget = null
 
-  """New value type."""
+  """
+  New value type. 'flag' is only valid when the effective preset_target is 'args' (the stored target applies when preset_target is omitted).
+  """
   valueType: PresetValueType = null
 
   """New default value."""
