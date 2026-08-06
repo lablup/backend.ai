@@ -1,8 +1,7 @@
 """Component tests for the REST v2 app config allow-list routes.
 
-Every route carries ``superadmin_required``, so what shows only at this layer is who the
-middleware admits and that the scope kind and rank survive the round trip. Rank semantics —
-what the merge does with the number — belong to the repository and service unit tests.
+Rank semantics — what the merge does with the number — belong to the repository and service
+unit tests.
 """
 
 from __future__ import annotations
@@ -38,46 +37,33 @@ async def defined_config_name(
 
 
 class TestSuperadminGate:
-    async def test_a_regular_user_cannot_register_an_entry(
+    async def test_every_route_turns_a_regular_user_away(
         self,
         user_v2_registry: V2ClientRegistry,
         defined_config_name: str,
     ) -> None:
+        """Each route carries the gate of its own, so a route registered without it is a hole.
+
+        The ids are made up: the gate answers before anything is looked up.
+        """
+        client = user_v2_registry.app_config_allow_list
+        entry_id = uuid.uuid4()
         with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.app_config_allow_list.admin_create(
+            await client.admin_create(
                 CreateAppConfigAllowListInput(
                     config_name=defined_config_name,
                     scope_type=AppConfigScopeType.USER,
                     rank=300,
                 )
             )
-
-    async def test_a_regular_user_cannot_search_entries(
-        self,
-        user_v2_registry: V2ClientRegistry,
-    ) -> None:
         with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.app_config_allow_list.admin_search(
-                SearchAppConfigAllowListInput(limit=1)
-            )
-
-    async def test_a_regular_user_cannot_change_a_rank(
-        self,
-        user_v2_registry: V2ClientRegistry,
-    ) -> None:
-        """The gate answers before the id is looked up, so a made-up id still gets 403."""
-        entry_id = uuid.uuid4()
+            await client.admin_search(SearchAppConfigAllowListInput(limit=1))
         with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.app_config_allow_list.admin_update(
-                entry_id, UpdateAppConfigAllowListInput(id=entry_id, rank=1)
-            )
-
-    async def test_a_regular_user_cannot_purge_an_entry(
-        self,
-        user_v2_registry: V2ClientRegistry,
-    ) -> None:
+            await client.admin_get(entry_id)
         with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.app_config_allow_list.admin_purge(uuid.uuid4())
+            await client.admin_update(entry_id, UpdateAppConfigAllowListInput(id=entry_id, rank=1))
+        with pytest.raises(PermissionDeniedError):
+            await client.admin_purge(entry_id)
 
 
 class TestAllowListRoundTrip:
@@ -86,6 +72,7 @@ class TestAllowListRoundTrip:
         admin_v2_registry: V2ClientRegistry,
         defined_config_name: str,
     ) -> None:
+        """The scope kind and rank a create sent come back unchanged from the get route."""
         created = await admin_v2_registry.app_config_allow_list.admin_create(
             CreateAppConfigAllowListInput(
                 config_name=defined_config_name,
@@ -107,6 +94,7 @@ class TestAllowListRoundTrip:
         admin_v2_registry: V2ClientRegistry,
         defined_config_name: str,
     ) -> None:
+        """The update route writes the new rank, and a later get reads it back."""
         created = await admin_v2_registry.app_config_allow_list.admin_create(
             CreateAppConfigAllowListInput(
                 config_name=defined_config_name,
@@ -128,6 +116,7 @@ class TestAllowListRoundTrip:
         admin_v2_registry: V2ClientRegistry,
         defined_config_name: str,
     ) -> None:
+        """The purge route removes the entry, and the get route then reports it missing."""
         created = await admin_v2_registry.app_config_allow_list.admin_create(
             CreateAppConfigAllowListInput(
                 config_name=defined_config_name,

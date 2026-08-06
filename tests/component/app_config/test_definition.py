@@ -1,8 +1,6 @@
 """Component tests for the REST v2 app config definition routes.
 
-Every route carries ``superadmin_required``, so what shows only at this layer is who the
-middleware admits and that the node survives the round trip. The registry rules themselves
-are asserted in the repository and service unit tests.
+The registry rules themselves are asserted in the repository and service unit tests.
 """
 
 from __future__ import annotations
@@ -13,41 +11,35 @@ import pytest
 
 from ai.backend.client.v2.exceptions import NotFoundError, PermissionDeniedError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.app_config_definition.request import (
     AppConfigDefinitionFilter,
     CreateAppConfigDefinitionInput,
     SearchAppConfigDefinitionsInput,
 )
-from ai.backend.common.dto.manager.query import StringFilter
 
 
 class TestSuperadminGate:
-    async def test_a_regular_user_cannot_register_a_definition(
+    async def test_every_route_turns_a_regular_user_away(
         self,
         user_v2_registry: V2ClientRegistry,
         registered_config_name: str,
     ) -> None:
+        """Each route carries the gate of its own, so a route registered without it is a hole.
+
+        The ids are made up: the gate answers before anything is looked up.
+        """
+        client = user_v2_registry.app_config_definition
         with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.app_config_definition.admin_create(
+            await client.admin_create(
                 CreateAppConfigDefinitionInput(config_name=registered_config_name)
             )
-
-    async def test_a_regular_user_cannot_search_definitions(
-        self,
-        user_v2_registry: V2ClientRegistry,
-    ) -> None:
         with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.app_config_definition.admin_search(
-                SearchAppConfigDefinitionsInput(limit=1)
-            )
-
-    async def test_a_regular_user_cannot_purge_a_definition(
-        self,
-        user_v2_registry: V2ClientRegistry,
-    ) -> None:
-        """The gate answers before the id is looked up, so a made-up id still gets 403."""
+            await client.admin_search(SearchAppConfigDefinitionsInput(limit=1))
         with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.app_config_definition.admin_purge(uuid.uuid4())
+            await client.admin_get(uuid.uuid4())
+        with pytest.raises(PermissionDeniedError):
+            await client.admin_purge(uuid.uuid4())
 
 
 class TestDefinitionRoundTrip:
@@ -56,6 +48,7 @@ class TestDefinitionRoundTrip:
         admin_v2_registry: V2ClientRegistry,
         registered_config_name: str,
     ) -> None:
+        """A definition registered over REST comes back from the get route unchanged."""
         created = await admin_v2_registry.app_config_definition.admin_create(
             CreateAppConfigDefinitionInput(config_name=registered_config_name)
         )
@@ -72,6 +65,7 @@ class TestDefinitionRoundTrip:
         admin_v2_registry: V2ClientRegistry,
         registered_config_name: str,
     ) -> None:
+        """The search route reaches the same row through a config-name filter."""
         created = await admin_v2_registry.app_config_definition.admin_create(
             CreateAppConfigDefinitionInput(config_name=registered_config_name)
         )
@@ -92,6 +86,7 @@ class TestDefinitionRoundTrip:
         admin_v2_registry: V2ClientRegistry,
         registered_config_name: str,
     ) -> None:
+        """The purge route removes it, and the get route then reports it missing."""
         created = await admin_v2_registry.app_config_definition.admin_create(
             CreateAppConfigDefinitionInput(config_name=registered_config_name)
         )

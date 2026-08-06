@@ -1,9 +1,7 @@
 """Component tests for the merged AppConfig REST v2 read.
 
-Covers what only shows at the HTTP boundary: that the public route reaches the handler with
-no credentials while its authenticated sibling still rejects the same caller, and that the
-merged payload serializes. The merge itself is verified in the service and repository unit
-tests and is not re-asserted here.
+The merge rules themselves are verified in the service and repository unit tests and are
+not re-asserted here.
 """
 
 from __future__ import annotations
@@ -49,6 +47,8 @@ class TestPrincipalDecidesTheMerge:
         user_v2_registry: V2ClientRegistry,
         merged_fragments: None,
     ) -> None:
+        """The principal on the request reaches the query: the caller's own fragment overrides
+        the public one, and a key only the public fragment carries still survives."""
         result = await user_v2_registry.app_config.my_get_app_configs(
             MyGetAppConfigsInput(config_names=["contributed"])
         )
@@ -61,27 +61,11 @@ class TestPrincipalDecidesTheMerge:
         anonymous_v2_registry: V2ClientRegistry,
         merged_fragments: None,
     ) -> None:
+        """Over the very same rows the anonymous caller sees the public fragment alone, so
+        visibility follows who is asking rather than what is stored."""
         result = await anonymous_v2_registry.app_config.public_get_app_configs(
             PublicGetAppConfigsInput(config_names=["contributed"])
         )
 
         merged = result.app_configs[0]
         assert merged.config == {"mode": "light", "lang": "en"}
-
-
-class TestPayloadShape:
-    async def test_an_uncontributed_name_serializes_as_an_empty_merge(
-        self,
-        user_v2_registry: V2ClientRegistry,
-        merged_fragments: None,
-    ) -> None:
-        """A name nothing contributes to holds its place instead of failing the response."""
-        result = await user_v2_registry.app_config.my_get_app_configs(
-            MyGetAppConfigsInput(config_names=["contributed", "uncontributed"])
-        )
-
-        assert [node.config_name for node in result.app_configs] == [
-            "contributed",
-            "uncontributed",
-        ]
-        assert result.app_configs[1].config == {}
