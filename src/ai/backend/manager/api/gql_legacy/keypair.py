@@ -297,27 +297,16 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         is_active: bool | None = None,
         filter: str | None = None,
     ) -> int:
-        from ai.backend.manager.data.permission.types import EntityType, ScopeType
+        from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
         from ai.backend.manager.models.group.row import groups
-        from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-            AssociationScopesEntitiesRow,
-        )
         from ai.backend.manager.models.user.row import users
+        from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
 
+        ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
-            .outerjoin(
-                AssociationScopesEntitiesRow,
-                sa.and_(
-                    sa.cast(users.c.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                ),
-            )
-            .outerjoin(
-                groups,
-                sa.cast(groups.c.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
-            )
+            .outerjoin(ms, users.c.uuid == ms.c.user_id)
+            .outerjoin(groups, groups.c.id == ms.c.scope_id)
         )
         query = sa.select(sa.func.count()).group_by(keypairs.c.access_key).select_from(j)
         if domain_name is not None:
@@ -346,27 +335,16 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         filter: str | None = None,
         order: str | None = None,
     ) -> Sequence[KeyPair]:
-        from ai.backend.manager.data.permission.types import EntityType, ScopeType
+        from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
         from ai.backend.manager.models.group.row import groups
-        from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-            AssociationScopesEntitiesRow,
-        )
         from ai.backend.manager.models.user.row import users
+        from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
 
+        ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
-            .outerjoin(
-                AssociationScopesEntitiesRow,
-                sa.and_(
-                    sa.cast(users.c.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                ),
-            )
-            .outerjoin(
-                groups,
-                sa.cast(groups.c.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
-            )
+            .outerjoin(ms, users.c.uuid == ms.c.user_id)
+            .outerjoin(groups, groups.c.id == ms.c.scope_id)
         )
         query = (
             sa.select(
@@ -410,27 +388,16 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         is_active: bool | None = None,
     ) -> Sequence[Sequence[KeyPair | None]]:
-        from ai.backend.manager.data.permission.types import EntityType, ScopeType
+        from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
         from ai.backend.manager.models.group.row import groups
-        from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-            AssociationScopesEntitiesRow,
-        )
         from ai.backend.manager.models.user.row import users
+        from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
 
+        ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
-            .join(
-                AssociationScopesEntitiesRow,
-                sa.and_(
-                    sa.cast(users.c.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                ),
-            )
-            .join(
-                groups,
-                sa.cast(groups.c.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
-            )
+            .join(ms, users.c.uuid == ms.c.user_id)
+            .join(groups, groups.c.id == ms.c.scope_id)
         )
         query = (
             sa.select(
@@ -465,27 +432,16 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         *,
         domain_name: str | None = None,
     ) -> Sequence[KeyPair | None]:
-        from ai.backend.manager.data.permission.types import EntityType, ScopeType
+        from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
         from ai.backend.manager.models.group.row import groups
-        from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-            AssociationScopesEntitiesRow,
-        )
         from ai.backend.manager.models.user.row import users
+        from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
 
+        ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
-            .join(
-                AssociationScopesEntitiesRow,
-                sa.and_(
-                    sa.cast(users.c.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                ),
-            )
-            .join(
-                groups,
-                sa.cast(groups.c.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
-            )
+            .join(ms, users.c.uuid == ms.c.user_id)
+            .join(groups, groups.c.id == ms.c.scope_id)
         )
         query = (
             sa.select(

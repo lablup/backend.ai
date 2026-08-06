@@ -1,8 +1,9 @@
 """Tests for `VfolderRepository.share_vfolder_with_users` project-membership lookup.
 
-Only the membership filter — powered by `association_scopes_entities` after BA-5819 —
-is verified. The host-permission gate is patched out so the test focuses purely on
-which users can or cannot be returned by the membership lookup.
+Only the membership filter — powered by the virtual-scope chain
+(`entity_memberships` joined to `virtual_scopes`) — is verified. The host-permission
+gate is patched out so the test focuses purely on which users can or cannot be
+returned by the membership lookup.
 """
 
 from __future__ import annotations
@@ -54,6 +55,8 @@ from ai.backend.manager.models.vfolder import (
     VFolderPermissionRow,
     VFolderRow,
 )
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.vfolder import repository as vfolder_repo_module
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.testutils.db import with_tables
@@ -107,6 +110,8 @@ class TestShareVfolderWithUsersMembership:
                 VFolderRow,
                 VFolderPermissionRow,
                 AssociationScopesEntitiesRow,
+                VirtualScopeRow,
+                EntityMembershipRow,
             ],
         ):
             yield database_connection
@@ -190,6 +195,25 @@ class TestShareVfolderWithUsersMembership:
         yield gid
 
     @pytest.fixture
+    async def project_scope_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        project: UUID,
+    ) -> AsyncGenerator[UUID, None]:
+        """Materialize `project`'s virtual scope and yield its id."""
+        vs_id = uuid4()
+        async with db_with_cleanup.begin_session() as sess:
+            sess.add(
+                VirtualScopeRow(
+                    id=vs_id,
+                    scope_type=PermissionScopeType.PROJECT.value,
+                    scope_id=project,
+                )
+            )
+            await sess.flush()
+        yield vs_id
+
+    @pytest.fixture
     async def requester(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -252,8 +276,9 @@ class TestShareVfolderWithUsersMembership:
         domain_name: str,
         user_resource_policy: str,
         project: UUID,
+        project_scope_id: UUID,
     ) -> AsyncGenerator[str, None]:
-        """An ACTIVE user with an ASE membership row in `project`."""
+        """An ACTIVE user enrolled in `project`'s virtual scope."""
         user_uuid = uuid4()
         email = f"member-{user_uuid.hex[:8]}@example.com"
         async with db_with_cleanup.begin_session() as sess:
@@ -269,6 +294,13 @@ class TestShareVfolderWithUsersMembership:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_resource_policy,
+                )
+            )
+            sess.add(
+                EntityMembershipRow(
+                    virtual_scope_id=project_scope_id,
+                    entity_type=PermissionEntityType.USER.value,
+                    entity_id=user_uuid,
                 )
             )
             sess.add(
@@ -317,8 +349,9 @@ class TestShareVfolderWithUsersMembership:
         domain_name: str,
         user_resource_policy: str,
         project: UUID,
+        project_scope_id: UUID,
     ) -> AsyncGenerator[str, None]:
-        """An INACTIVE user that nonetheless has an ASE membership row in `project`."""
+        """An INACTIVE user that is nonetheless enrolled in `project`'s virtual scope."""
         user_uuid = uuid4()
         email = f"inactive-{user_uuid.hex[:8]}@example.com"
         async with db_with_cleanup.begin_session() as sess:
@@ -334,6 +367,13 @@ class TestShareVfolderWithUsersMembership:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_resource_policy,
+                )
+            )
+            sess.add(
+                EntityMembershipRow(
+                    virtual_scope_id=project_scope_id,
+                    entity_type=PermissionEntityType.USER.value,
+                    entity_id=user_uuid,
                 )
             )
             sess.add(
@@ -374,14 +414,34 @@ class TestShareVfolderWithUsersMembership:
         yield gid
 
     @pytest.fixture
+    async def other_project_scope_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        other_project: UUID,
+    ) -> AsyncGenerator[UUID, None]:
+        """Materialize `other_project`'s virtual scope and yield its id."""
+        vs_id = uuid4()
+        async with db_with_cleanup.begin_session() as sess:
+            sess.add(
+                VirtualScopeRow(
+                    id=vs_id,
+                    scope_type=PermissionScopeType.PROJECT.value,
+                    scope_id=other_project,
+                )
+            )
+            await sess.flush()
+        yield vs_id
+
+    @pytest.fixture
     async def other_project_member_email(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         domain_name: str,
         user_resource_policy: str,
         other_project: UUID,
+        other_project_scope_id: UUID,
     ) -> AsyncGenerator[str, None]:
-        """An ACTIVE user with an ASE membership row in `other_project` (not `project`)."""
+        """An ACTIVE user enrolled in `other_project`'s virtual scope (not `project`'s)."""
         user_uuid = uuid4()
         email = f"elsewhere-{user_uuid.hex[:8]}@example.com"
         async with db_with_cleanup.begin_session() as sess:
@@ -397,6 +457,13 @@ class TestShareVfolderWithUsersMembership:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_resource_policy,
+                )
+            )
+            sess.add(
+                EntityMembershipRow(
+                    virtual_scope_id=other_project_scope_id,
+                    entity_type=PermissionEntityType.USER.value,
+                    entity_id=user_uuid,
                 )
             )
             sess.add(
@@ -457,7 +524,7 @@ class TestShareVfolderWithUsersMembership:
         vfolder: UUID,
         non_member_user_email: str,
     ) -> None:
-        """A user without an ASE membership row triggers ObjectNotFound."""
+        """A user without a virtual-scope membership triggers ObjectNotFound."""
         repo = VfolderRepository(db_with_cleanup)
         with pytest.raises(ObjectNotFound):
             await repo.share_vfolder_with_users(

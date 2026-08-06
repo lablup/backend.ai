@@ -8,10 +8,15 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.errors.user import UserPurgeFailure
 from ai.backend.manager.models.error_logs import ErrorLogRow
 from ai.backend.manager.models.group import AssocGroupUserRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
+from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session.row import AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES
@@ -128,6 +133,30 @@ class UserSessionGroupBatchPurgerSpec(BatchPurgerSpec[SessionGroupRow]):
 
 
 @dataclass
+class UserProjectRoleBatchPurgerSpec(BatchPurgerSpec[UserRoleRow]):
+    """PurgerSpec for unmapping a user from the roles bound at a project scope."""
+
+    user_uuid: UUID
+    project_id: UUID
+
+    @override
+    def build_subquery(self) -> sa.sql.Select[tuple[UserRoleRow]]:
+        project_role_ids = sa.select(AssociationScopesEntitiesRow.entity_id).where(
+            AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+            AssociationScopesEntitiesRow.scope_id == str(self.project_id),
+            AssociationScopesEntitiesRow.entity_type == EntityType.ROLE,
+        )
+        return sa.select(UserRoleRow).where(
+            UserRoleRow.user_id == self.user_uuid,
+            sa.cast(UserRoleRow.role_id, sa.String).in_(project_role_ids),
+        )
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
+
+@dataclass
 class UserBatchPurgerSpec(RBACEntityBatchPurgerSpec[UserRow]):
     """PurgerSpec for deleting a user with RBAC scope/permission cleanup."""
 
@@ -171,6 +200,13 @@ def create_user_group_association_purger(user_uuid: UUID) -> BatchPurger[AssocGr
     """Create a BatchPurger for deleting all group associations belonging to a user."""
     return BatchPurger(
         spec=UserGroupAssociationBatchPurgerSpec(user_uuid=user_uuid),
+    )
+
+
+def create_user_project_role_purger(user_uuid: UUID, project_id: UUID) -> BatchPurger[UserRoleRow]:
+    """Create a BatchPurger unmapping a user from the roles bound at a project scope."""
+    return BatchPurger(
+        spec=UserProjectRoleBatchPurgerSpec(user_uuid=user_uuid, project_id=project_id),
     )
 
 

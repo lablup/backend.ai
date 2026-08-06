@@ -12,6 +12,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.orm import joinedload, selectinload
 
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.exception import BackendAIError, UserNotFound
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
@@ -29,7 +30,6 @@ from ai.backend.manager.data.auth.login_session_types import (
 )
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserCreationData, UserData
 from ai.backend.manager.data.common.types import SearchResult
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.errors.auth import (
     AccessKeyNotFound,
     AuthorizationFailed,
@@ -42,9 +42,6 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.models.user import (
     UserRole,
@@ -55,6 +52,7 @@ from ai.backend.manager.models.user import (
     users,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.base.pagination import NoPagination
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.ops.rbac.provider import FullUserCreation, RBACOpsProvider
@@ -109,18 +107,9 @@ class AuthDBSource:
     async def fetch_group_membership(self, group_id: UUID, user_id: UUID) -> GroupMembershipData:
         """Fetch group membership from database."""
         async with self._db.begin() as conn:
-            query = sa.select(
-                AssociationScopesEntitiesRow.scope_id,
-                AssociationScopesEntitiesRow.entity_id,
-            ).where(
-                AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                AssociationScopesEntitiesRow.scope_id == str(group_id),
-                AssociationScopesEntitiesRow.entity_id == str(user_id),
-            )
-            result = await conn.execute(query)
-            row = result.first()
-            if not row:
+            query = sa.select(user_scope_membership_exists(PROJECT_SCOPE_TYPE, group_id, user_id))
+            is_member = (await conn.execute(query)).scalar()
+            if not is_member:
                 raise GroupMembershipNotFoundError(
                     extra_msg="No such project or you are not the member of it."
                 )

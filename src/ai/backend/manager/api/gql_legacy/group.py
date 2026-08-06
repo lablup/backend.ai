@@ -17,8 +17,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.common.data.permission.types import ScopeType as RBACScopeType
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.exception import (
     GroupNotFound,
     InvalidAPIParameters,
@@ -38,10 +37,11 @@ from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.virtual_scope.queries import (
+    user_scope_membership_exists,
+    user_scope_membership_query,
+)
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
@@ -218,21 +218,10 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
             before=before,
             last=last,
         )
-        # Project membership comes from association_scopes_entities (PROJECT/USER).
-        # Cast UserRow.uuid (GUID) to String to match the non-UUID String(64)
-        # entity_id column safely.
-        j = sa.join(
-            UserRow,
-            AssociationScopesEntitiesRow,
-            sa.cast(UserRow.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
-        )
-        membership_filter = sa.and_(
-            AssociationScopesEntitiesRow.scope_type == RBACScopeType.PROJECT,
-            AssociationScopesEntitiesRow.scope_id == str(self.id),
-            AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-        )
-        user_query = query.select_from(j).where(membership_filter)
-        cnt_query = sa.select(sa.func.count()).select_from(j).where(membership_filter)
+        # Project membership comes from the virtual-scope chain (PROJECT/USER).
+        membership_filter = user_scope_membership_exists(PROJECT_SCOPE_TYPE, self.id, UserRow.uuid)
+        user_query = query.where(membership_filter)
+        cnt_query = sa.select(sa.func.count()).select_from(UserRow).where(membership_filter)
         for cond in conditions:
             cnt_query = cnt_query.where(cond)
         async with graph_ctx.db.begin_readonly_session() as db_session:
@@ -511,21 +500,12 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             _type = [ProjectType.GENERAL]
         else:
             _type = type
-        ase = AssociationScopesEntitiesRow.__table__
-        user_id_strs = [str(uid) for uid in user_ids]
-        j = sa.join(
-            groups,
-            ase,
-            sa.and_(
-                sa.cast(groups.c.id, sa.String) == ase.c.scope_id,
-                ase.c.scope_type == RBACScopeType.PROJECT,
-                ase.c.entity_type == EntityType.USER,
-            ),
-        )
+        ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
+        j = sa.join(groups, ms, groups.c.id == ms.c.scope_id)
         query = (
-            sa.select(groups, ase.c.entity_id.label("user_id_str"))
+            sa.select(groups, ms.c.user_id)
             .select_from(j)
-            .where(ase.c.entity_id.in_(user_id_strs) & (groups.c.type.in_(_type)))
+            .where(ms.c.user_id.in_(user_ids) & (groups.c.type.in_(_type)))
         )
         if is_active is not None:
             query = query.where(groups.c.is_active == is_active)
@@ -536,7 +516,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
                 query,
                 cls,
                 user_ids,
-                lambda row: uuid.UUID(row.user_id_str),
+                lambda row: row.user_id,
             )
 
     @classmethod
@@ -545,17 +525,9 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
         graph_ctx: GraphQueryContext,
         user_id: uuid.UUID,
     ) -> Sequence[Group]:
-        ase = AssociationScopesEntitiesRow.__table__
-        j = sa.join(
-            groups,
-            ase,
-            sa.and_(
-                sa.cast(groups.c.id, sa.String) == ase.c.scope_id,
-                ase.c.scope_type == RBACScopeType.PROJECT,
-                ase.c.entity_type == EntityType.USER,
-            ),
+        query = sa.select(groups).where(
+            user_scope_membership_exists(PROJECT_SCOPE_TYPE, groups.c.id, user_id)
         )
-        query = sa.select(groups).select_from(j).where(ase.c.entity_id == str(user_id))
         async with graph_ctx.db.begin_readonly() as conn:
             return [
                 obj

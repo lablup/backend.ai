@@ -25,6 +25,7 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common.config import ModelDefinition, ModelMetadata
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import ModelDefinitionValidationError, VFolderNotFound
 from ai.backend.common.types import (
@@ -36,12 +37,6 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.permission_defs import (
     VFolderPermission as VFolderRBACPermission,
-)
-from ai.backend.manager.data.permission.types import (
-    EntityType as PermissionEntityType,
-)
-from ai.backend.manager.data.permission.types import (
-    ScopeType as PermissionScopeType,
 )
 from ai.backend.manager.errors.storage import (
     ModelCardParseError,
@@ -58,9 +53,6 @@ from ai.backend.manager.models.rbac import (
     SystemScope,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.vfolder import (
     DEAD_VFOLDER_STATUSES,
@@ -74,6 +66,8 @@ from ai.backend.manager.models.vfolder import (
     vfolder_permissions,
     vfolders,
 )
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
 
 # Re-export for backward compatibility
 __all__ = (
@@ -1224,17 +1218,15 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
     ) -> int:
         from ai.backend.manager.models.group import groups
 
-        membership_query = sa.select(AssociationScopesEntitiesRow.scope_id).where(
-            AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
-            AssociationScopesEntitiesRow.entity_type == PermissionEntityType.USER,
-            AssociationScopesEntitiesRow.entity_id == str(user_id),
+        membership_query = user_scope_membership_query(PROJECT_SCOPE_TYPE).where(
+            EntityMembershipRow.entity_id == user_id
         )
 
         async with graph_ctx.db.begin_readonly() as conn:
             membership_result = await conn.execute(membership_query)
 
         grps = membership_result.fetchall()
-        group_ids = [uuid.UUID(g.scope_id) for g in grps]
+        group_ids = [g.scope_id for g in grps]
         j = sa.join(vfolders, groups, vfolders.c.group == groups.c.id)
         query = sa.select(sa.func.count()).select_from(j).where(vfolders.c.group.in_(group_ids))
 
@@ -1262,15 +1254,13 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
     ) -> list[VirtualFolder]:
         from ai.backend.manager.models.group import groups
 
-        membership_query = sa.select(AssociationScopesEntitiesRow.scope_id).where(
-            AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
-            AssociationScopesEntitiesRow.entity_type == PermissionEntityType.USER,
-            AssociationScopesEntitiesRow.entity_id == str(user_id),
+        membership_query = user_scope_membership_query(PROJECT_SCOPE_TYPE).where(
+            EntityMembershipRow.entity_id == user_id
         )
         async with graph_ctx.db.begin_readonly() as conn:
             membership_result = await conn.execute(membership_query)
         grps = membership_result.fetchall()
-        group_ids = [uuid.UUID(g.scope_id) for g in grps]
+        group_ids = [g.scope_id for g in grps]
         j = vfolders.join(groups, vfolders.c.group == groups.c.id)
         query = (
             sa.select(

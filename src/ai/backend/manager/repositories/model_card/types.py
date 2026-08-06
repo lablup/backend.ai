@@ -9,18 +9,16 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
 from ai.backend.manager.data.model_card.types import ModelCardData
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
 
 __all__ = (
     "AvailablePresetsSearchResult",
@@ -84,13 +82,8 @@ class ProjectModelCardSearchScope(SearchScope):
     @property
     def membership_check_query(self) -> sa.Select[tuple[bool]]:
         """Query to validate user is a member of this project."""
-        return sa.select(sa.literal(True)).where(
-            sa.and_(
-                AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                AssociationScopesEntitiesRow.scope_id == str(self.project_id),
-                AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                AssociationScopesEntitiesRow.entity_id == str(self.user_id),
-            )
+        return sa.select(
+            user_scope_membership_exists(PROJECT_SCOPE_TYPE, self.project_id, self.user_id)
         )
 
 

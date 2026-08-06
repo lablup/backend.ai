@@ -22,28 +22,26 @@ from authlib.common.security import generate_token  # pants: no-infer-dep
 from authlib.integrations.httpx_client import AsyncOAuth2Client  # pants: no-infer-dep
 from authlib.jose import jwt as joseJWT  # pants: no-infer-dep
 from authlib.oidc.core import CodeIDToken  # pants: no-infer-dep
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.ext.asyncio import AsyncConnection
 
 from ai.backend.common.cron import LocalCron, PeriodicTask
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.types import CORSOptions, WebMiddleware
-from ai.backend.manager.data.permission.types import EntityType, RelationType, ScopeType
-from ai.backend.manager.models.group import groups
+from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair, generate_ssh_keypair
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.webapp import WebappPlugin
-from ai.backend.manager.repositories.base.creator import Creator, execute_creator
-from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
-from ai.backend.manager.repositories.permission_controller.role_manager import (
-    RoleManager,
-    UserSystemRoleSpec,
+from ai.backend.manager.repositories.base.pagination import NoPagination
+from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.ops.rbac.provider import (
+    FullUserCreation,
+    RBACOpsProvider,
 )
+from ai.backend.manager.repositories.user.creators import UserCreatorSpec, UserScopeCreation
 
 from .config import OIDCWebAppConfig
 from .valkey_client import ValkeyOpenIDClient
@@ -125,125 +123,69 @@ def generate_user_data(
     }
 
 
-def generate_keypair_data(
-    token: Mapping[str, Any], user_uuid: uuid.UUID, resource_policy: str
-) -> Mapping[str, Any]:
-    ak, sk = generate_keypair()
-    pubkey, privkey = generate_ssh_keypair()
-    return {
-        "user_id": token["email"],
-        "access_key": ak,
-        "secret_key": sk,
-        "is_active": True,
-        "is_admin": False,
-        "resource_policy": resource_policy,
-        "rate_limit": 10000,
-        "num_queries": 0,
-        "user": user_uuid,
-        "ssh_public_key": pubkey,
-        "ssh_private_key": privkey,
-    }
-
-
-async def associate_user_with_group(
-    conn: AsyncConnection, user: sa.engine.row.Row[Any], group_name: str
-) -> None:
-    query = (
-        sa.select(groups.c.id)
-        .select_from(groups)
-        .where(groups.c.domain_name == user.domain_name)
-        .where(groups.c.name == group_name)
-    )
-    group_id = await conn.scalar(query)
-    if group_id:
-        await conn.execute(
-            pg_insert(AssociationScopesEntitiesRow.__table__)
-            .values(
-                scope_type=ScopeType.PROJECT,
-                scope_id=str(group_id),
-                entity_type=EntityType.USER,
-                entity_id=str(user.uuid),
-                relation_type=RelationType.AUTO,
-            )
-            .on_conflict_do_nothing()
-        )
-
-
 async def create_user_if_not_exists(
     openid_user_data: Mapping[str, Any],
     group_mapping: Mapping[str, Any],
     group_order: list[str],
     db: ExtendedAsyncSAEngine,
     password_info: PasswordInfo,
-) -> sa.engine.row.Row[Any]:
-    async with db.begin_session() as dbsess:
-        conn = await dbsess.connection()
-        # Check if user exists
-        user_info = generate_user_data(openid_user_data, group_mapping, group_order)
-        user_data = user_info["user"]
-        query = sa.select(UserRow).where(UserRow.email == user_data["email"])
-        result = await dbsess.execute(query)
-        user = result.scalars().one_or_none()
-
-        if not user:
-            # Create a user.
-            user = UserRow(
-                username=user_data["username"],
-                email=user_data["email"],
-                password=password_info,
-                need_password_change=user_data["need_password_change"],
-                full_name=user_data["full_name"],
-                description=user_data["description"],
-                status=user_data["status"],
-                status_info=user_data["status_info"],
-                domain_name=user_data["domain_name"],
-                role=user_data["role"],
-                resource_policy=user_data["resource_policy"],
-            )
-            dbsess.add(user)
-            await dbsess.flush()
-
-            # Create a keypair for the user.
-            keypair_data = generate_keypair_data(
-                openid_user_data, user.uuid, user_info["keypair_resource_policy"]
-            )
-            keypair = KeyPairRow(
-                user_id=keypair_data["user_id"],
-                access_key=keypair_data["access_key"],
-                secret_key=keypair_data["secret_key"],
-                is_active=keypair_data["is_active"],
-                is_admin=keypair_data["is_admin"],
-                resource_policy=keypair_data["resource_policy"],
-                rate_limit=keypair_data["rate_limit"],
-                num_queries=keypair_data["num_queries"],
-                user=keypair_data["user"],
-                ssh_public_key=keypair_data["ssh_public_key"],
-                ssh_private_key=keypair_data["ssh_private_key"],
-                is_default=True,
-            )
-            dbsess.add(keypair)
-            await dbsess.flush()
-
-            # Associate the user with the default and model-store group, if exists.
-            await associate_user_with_group(conn, user, user_info["project"])
-            await associate_user_with_group(conn, user, "model-store")
-
-            user.main_access_key = keypair_data["access_key"]
-
-            # Create RBAC system role and map user to role
-            role_manager = RoleManager()
-            role_spec = UserSystemRoleSpec(user_id=user.uuid)
-            role = await role_manager.create_system_role(dbsess, role_spec)
-            user_role_creator = Creator(
-                spec=UserRoleCreatorSpec(user_id=user.uuid, role_id=role.id)
-            )
-            await execute_creator(dbsess, user_role_creator)
-
-            log.info("OPENID.WEBAPP: new user created ({})", user.email)
-        else:
-            # There is an active Backend.AI user. Do nothing.
+) -> UserRow:
+    """Provision an OpenID user through the RBAC member ops: the user scope, its
+    default keypair, and the domain/project (model-store included) enrollments."""
+    user_info = generate_user_data(openid_user_data, group_mapping, group_order)
+    user_data = user_info["user"]
+    async with RBACOpsProvider(db).write_ops() as w:
+        existing = await w.batch_query_in_global(
+            sa.select(UserRow).where(UserRow.email == user_data["email"]),
+            BatchQuerier(pagination=NoPagination()),
+        )
+        if existing.rows:
+            user: UserRow = existing.rows[0].UserRow
             log.info("OPENID.WEBAPP: found existing user ({})", user.email)
-    return user
+            return user
+
+        domain_result = await w.batch_query_in_global(
+            sa.select(DomainRow.id).where(DomainRow.name == user_data["domain_name"]),
+            BatchQuerier(pagination=NoPagination()),
+        )
+        if not domain_result.rows:
+            raise OpenIDError(f"Domain '{user_data['domain_name']}' does not exist")
+        domain_id = DomainID(domain_result.rows[0].id)
+
+        project_result = await w.batch_query_in_global(
+            sa.select(GroupRow.id).where(
+                GroupRow.domain_name == user_data["domain_name"],
+                GroupRow.name == user_info["project"],
+            ),
+            BatchQuerier(pagination=NoPagination()),
+        )
+        project_ids = [ProjectID(row.id) for row in project_result.rows]
+
+        user_spec = UserCreatorSpec(
+            email=user_data["email"],
+            username=user_data["username"],
+            password=password_info,
+            need_password_change=user_data["need_password_change"],
+            domain_name=user_data["domain_name"],
+            full_name=user_data["full_name"],
+            description=user_data["description"],
+            status=user_data["status"],
+            status_info=user_data["status_info"],
+            role=user_data["role"],
+            resource_policy=user_data["resource_policy"],
+        )
+        user_spec.domain_id = domain_id
+        result = await w.create_full_user(
+            FullUserCreation(
+                creation=UserScopeCreation(spec=user_spec),
+                domain_id=domain_id,
+                project_ids=project_ids,
+                keypair_resource_policy=user_info["keypair_resource_policy"],
+                keypair_rate_limit=DEFAULT_KEYPAIR_RATE_LIMIT,
+            )
+        )
+        log.info("OPENID.WEBAPP: new user created ({})", result.user_row.email)
+        return result.user_row
 
 
 _JWKS_REFRESH_INTERVAL: Final[float] = 86400.0
