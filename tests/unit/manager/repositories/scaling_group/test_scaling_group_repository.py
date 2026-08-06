@@ -30,6 +30,11 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import AssociationScopesEntitiesRow, RoleRow, UserRoleRow
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
+    RolePermissionPresetRow,
+)
+from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -50,6 +55,9 @@ from ai.backend.manager.models.session import SessionId, SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
 from ai.backend.manager.repositories.base.purger import Purger
@@ -102,13 +110,19 @@ class TestScalingGroupRepositoryDB:
                 DomainRow,
                 ScalingGroupRow,
                 AssociationScopesEntitiesRow,
+                RoleRow,
+                UserRoleRow,
+                PermissionRow,
+                RolePresetRow,
+                RolePermissionPresetRow,
+                VirtualScopeRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
                 ScalingGroupForDomainRow,
                 ScalingGroupForProjectRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
-                RoleRow,
-                UserRoleRow,
                 UserRow,
                 KeyPairRow,
                 ScalingGroupForKeypairsRow,  # depends on ScalingGroupRow and KeyPairRow

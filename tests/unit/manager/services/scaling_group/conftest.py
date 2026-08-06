@@ -26,30 +26,51 @@ from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.deployment_auto_scaling_policy import (
+    DeploymentAutoScalingPolicyRow,
+)
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain.row import DomainRow
-
-# Register ImageRow in the SQLAlchemy declarative registry. KernelRow (pulled in
-# transitively via the scaling_group models) declares a string-based
-# relationship("ImageRow"), which is resolved during mapper configuration when a
-# row is instantiated. Without this import the registry lacks ImageRow and mapper
-# configuration fails when this test target runs in isolation (outside the full
-# pytest batch that would otherwise import the image models).
-from ai.backend.manager.models.image import ImageRow  # noqa: F401
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
+    RolePermissionPresetRow,
+)
+from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
+    ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
     ScalingGroupForKeypairsRow,
+    ScalingGroupForProjectRow,
     ScalingGroupRow,
 )
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.db.engine import create_async_engine
 from ai.backend.manager.repositories.scaling_group.repository import ScalingGroupRepository
 from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
@@ -109,35 +130,52 @@ async def database_fixture(
 
     Overrides the guard fixture in tests/unit/manager/services/conftest.py.
 
-    Stub tables (sessions, kernels, endpoints, routings) are pre-created with
-    minimal schemas so that purge_scaling_group can SELECT/DELETE from them
-    without chasing the full FK dependency chain into unrelated models.
+    The purge and RBAC scope paths issue whole-entity SELECTs (batch purgers,
+    virtual-scope writes), so the real rows are created instead of minimal stub
+    tables, mirroring the repository-level test fixture.
     """
-    # Pre-create stub tables needed by purge_scaling_group.  These have only
-    # the columns accessed by the purge operation (no FK constraints) so we
-    # avoid pulling in the full FK dependency chain (groups, agents, vfolders…).
     async with database_engine.begin() as conn:
         await conn.execute(text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'))
-        for stmt in [
-            "CREATE TABLE IF NOT EXISTS sessions (id UUID PRIMARY KEY, scaling_group_name VARCHAR)",
-            "CREATE TABLE IF NOT EXISTS kernels (id UUID PRIMARY KEY, session_id UUID)",
-            "CREATE TABLE IF NOT EXISTS endpoints (id UUID PRIMARY KEY, resource_group VARCHAR)",
-            "CREATE TABLE IF NOT EXISTS routings (id UUID PRIMARY KEY, session UUID)",
-        ]:
-            await conn.execute(text(stmt))
 
     async with with_tables(
         database_engine,
         [
+            # FK dependency order: parents before children
             DomainRow,
-            KeyPairResourcePolicyRow,
+            ScalingGroupRow,
+            AssociationScopesEntitiesRow,
+            RoleRow,
+            UserRoleRow,
+            PermissionRow,
+            RolePresetRow,
+            RolePermissionPresetRow,
+            VirtualScopeRow,
+            EntityMembershipRow,
+            ScopeBindingRow,
+            ScalingGroupForDomainRow,
+            ScalingGroupForProjectRow,
             UserResourcePolicyRow,
+            ProjectResourcePolicyRow,
+            KeyPairResourcePolicyRow,
             UserRow,
             KeyPairRow,
-            ScalingGroupRow,
-            ScalingGroupForDomainRow,
             ScalingGroupForKeypairsRow,
-            AssociationScopesEntitiesRow,
+            GroupRow,
+            ContainerRegistryRow,
+            ImageRow,
+            VFolderRow,
+            EndpointRow,
+            DeploymentPolicyRow,
+            DeploymentAutoScalingPolicyRow,
+            RuntimeVariantRow,
+            DeploymentRevisionPresetRow,
+            DeploymentRevisionRow,
+            SessionRow,
+            AgentRow,
+            KernelRow,
+            ReplicaGroupRow,
+            RoutingRow,
+            ResourcePresetRow,
         ],
     ):
         yield
