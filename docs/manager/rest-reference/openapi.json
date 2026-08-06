@@ -23480,6 +23480,237 @@
         "title": "AdminSearchResourceSlotTypesInput",
         "type": "object"
       },
+      "NumberFormatInput": {
+        "description": "Number format configuration supplied when writing a resource slot type.",
+        "properties": {
+          "binary": {
+            "default": false,
+            "description": "Whether to use binary (1024-based) or decimal (1000-based) prefixes.",
+            "title": "Binary",
+            "type": "boolean"
+          },
+          "round_length": {
+            "default": 0,
+            "description": "Number of decimal places to round to when displaying values.",
+            "title": "Round Length",
+            "type": "integer"
+          }
+        },
+        "title": "NumberFormatInput",
+        "type": "object"
+      },
+      "SlotTypes": {
+        "enum": [
+          "count",
+          "bytes",
+          "unique",
+          "unified"
+        ],
+        "title": "SlotTypes",
+        "type": "string"
+      },
+      "CreateResourceSlotTypeInput": {
+        "description": "Input for registering a new resource slot type.",
+        "properties": {
+          "slot_name": {
+            "description": "Unique slot name to register (e.g., 'cpu', 'mem', 'cuda.device').",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Slot Name",
+            "type": "string"
+          },
+          "slot_type": {
+            "$ref": "#/components/schemas/SlotTypes",
+            "description": "Category of the slot type. The scheduler reads this back as a `SlotTypes` member for every enabled slot, so a value outside the enum is rejected here rather than breaking the catalog."
+          },
+          "required": {
+            "default": false,
+            "description": "Whether a session request must name this slot.",
+            "title": "Required",
+            "type": "boolean"
+          },
+          "enabled": {
+            "default": true,
+            "description": "Whether the scheduler considers this slot when placing sessions.",
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "display_name": {
+            "default": "",
+            "description": "Human-readable name.",
+            "maxLength": 128,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "description": "Longer description.",
+            "maxLength": 256,
+            "title": "Description",
+            "type": "string"
+          },
+          "display_unit": {
+            "default": "",
+            "description": "Unit label (e.g., 'GiB').",
+            "maxLength": 32,
+            "title": "Display Unit",
+            "type": "string"
+          },
+          "display_icon": {
+            "default": "",
+            "description": "Icon identifier for UIs.",
+            "maxLength": 64,
+            "title": "Display Icon",
+            "type": "string"
+          },
+          "number_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NumberFormatInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Number formatting rules. Defaults to decimal, no rounding."
+          },
+          "rank": {
+            "default": 0,
+            "description": "Display ordering rank. Lower values appear first.",
+            "title": "Rank",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "slot_name",
+          "slot_type"
+        ],
+        "title": "CreateResourceSlotTypeInput",
+        "type": "object"
+      },
+      "UpdateResourceSlotTypeInput": {
+        "description": "Input for updating a resource slot type.\n\n``slot_name`` names the target and is not itself updatable; neither is\n``slot_type``. Every other field left unset stays unchanged.",
+        "properties": {
+          "slot_name": {
+            "description": "Slot name identifying the slot type to update.",
+            "title": "Slot Name",
+            "type": "string"
+          },
+          "required": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whether a session request must name this slot.",
+            "title": "Required"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whether the scheduler considers this slot when placing sessions.",
+            "title": "Enabled"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Human-readable name.",
+            "title": "Display Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Longer description.",
+            "title": "Description"
+          },
+          "display_unit": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Unit label (e.g., 'GiB').",
+            "title": "Display Unit"
+          },
+          "display_icon": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Icon identifier for UIs.",
+            "title": "Display Icon"
+          },
+          "number_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NumberFormatInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Number formatting rules."
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Display ordering rank.",
+            "title": "Rank"
+          }
+        },
+        "required": [
+          "slot_name"
+        ],
+        "title": "UpdateResourceSlotTypeInput",
+        "type": "object"
+      },
       "AgentResourceFilter": {
         "description": "Filter conditions for agent resource search.",
         "properties": {
@@ -49984,6 +50215,100 @@
         },
         "parameters": [],
         "description": "Search resource slot types with filters, orders, and pagination.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/resource-slots/slot-types": {
+      "post": {
+        "operationId": "v2/resource-slots.admin_create_slot_type",
+        "tags": [
+          "v2/resource-slots"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateResourceSlotTypeInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Register a new resource slot type (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/resource-slots/slot-types/{slot_name}": {
+      "patch": {
+        "operationId": "v2/resource-slots.admin_update_slot_type",
+        "tags": [
+          "v2/resource-slots"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateResourceSlotTypeInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "slot_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update a resource slot type by slot name (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/resource-slots.admin_purge_slot_type",
+        "tags": [
+          "v2/resource-slots"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slot_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Remove a resource slot type by slot name (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/resource-slots/agent-resources/search": {
