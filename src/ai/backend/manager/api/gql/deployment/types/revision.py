@@ -492,8 +492,16 @@ class ModelMetadataGQL:
     name="ModelConfig",
 )
 class ModelConfigGQL:
-    name: str = gql_field(description="Name of the model.")
-    model_path: str = gql_field(description="Path to the model file.")
+    name: str | None = gql_field(
+        default=None,
+        description="Name of the model. Null when a preset omits it to inherit the "
+        "runtime variant baseline's name at revision resolution.",
+    )
+    model_path: str | None = gql_field(
+        default=None,
+        description="Path to the model file. Null when a preset omits it to inherit the "
+        "model mount destination at revision resolution.",
+    )
     service: ModelServiceConfigGQL | None = gql_field(
         description="Configuration for the model service.", default=None
     )

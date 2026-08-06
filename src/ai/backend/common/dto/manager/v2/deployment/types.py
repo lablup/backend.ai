@@ -320,8 +320,16 @@ class ModelMetadataInfoDTO(BaseResponseModel):
 class ModelConfigInfoDTO(BaseResponseModel):
     """Output DTO for a single model entry in model definition."""
 
-    name: str = Field(description="Name of the model.")
-    model_path: str = Field(description="Path to the model file.")
+    name: str | None = Field(
+        default=None,
+        description="Name of the model. Null when a preset omits it to inherit the "
+        "runtime variant baseline's name at revision resolution.",
+    )
+    model_path: str | None = Field(
+        default=None,
+        description="Path to the model file. Null when a preset omits it to inherit the "
+        "model mount destination at revision resolution.",
+    )
     service: ModelServiceConfigInfoDTO | None = Field(
         default=None, description="Configuration for the model service."
     )

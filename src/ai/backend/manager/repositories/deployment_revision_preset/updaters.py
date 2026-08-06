@@ -4,7 +4,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, override
 
-from ai.backend.common.config import ModelDefinition
+from ai.backend.common.config import PresetModelDefinition
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.manager.models.base import ResourceOptsEntry
@@ -25,8 +25,8 @@ class DeploymentRevisionPresetUpdaterSpec(UpdaterSpec[DeploymentRevisionPresetRo
     description: TriState[str] = field(default_factory=TriState[str].nop)
     rank: OptionalState[int] = field(default_factory=OptionalState[int].nop)
     image_id: TriState[uuid.UUID] = field(default_factory=TriState[uuid.UUID].nop)
-    model_definition: TriState[ModelDefinition] = field(
-        default_factory=TriState[ModelDefinition].nop
+    model_definition: TriState[PresetModelDefinition] = field(
+        default_factory=TriState[PresetModelDefinition].nop
     )
     resource_opts: OptionalState[list[ResourceOptsEntry]] = field(
         default_factory=OptionalState[list[ResourceOptsEntry]].nop

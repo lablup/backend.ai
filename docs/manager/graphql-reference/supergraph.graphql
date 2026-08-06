@@ -3951,7 +3951,7 @@ input CreateDeploymentRevisionPresetInput
   description: String = null
 
   """
-  Added in 26.4.4. Parsed model definition specifying health checks, ports, and service configuration for the inference endpoint. Optional, but when provided it must be fully populated with at least one model.
+  Added in 26.4.4. Parsed model definition specifying health checks, ports, and service configuration for the inference endpoint. Optional; name/model_path may be omitted to inherit merge-chain defaults.
   """
   modelDefinition: PresetModelDefinitionInput = null
 
@@ -10603,11 +10603,15 @@ Added in 26.4.2. Configuration for a single model in the model definition.
 type ModelConfig
   @join__type(graph: STRAWBERRY)
 {
-  """Name of the model."""
-  name: String!
+  """
+  Name of the model. Null when a preset omits it to inherit the runtime variant baseline's name at revision resolution.
+  """
+  name: String
 
-  """Path to the model file."""
-  modelPath: String!
+  """
+  Path to the model file. Null when a preset omits it to inherit the model mount destination at revision resolution.
+  """
+  modelPath: String
 
   """Configuration for the model service."""
   service: ModelServiceConfig
@@ -13763,16 +13767,18 @@ type PresetExecutionSpec
 }
 
 """
-Added in 26.4.4. Strict configuration for a single model within a preset model definition.
+Added in 26.4.4. Configuration for a single model within a preset model definition.
 """
 input PresetModelConfigInput
   @join__type(graph: STRAWBERRY)
 {
-  """Name of the model."""
-  name: String!
+  """
+  Name of the model. Omit to inherit the runtime variant baseline's name.
+  """
+  name: String = null
 
-  """Path to the model file."""
-  modelPath: String!
+  """Path to the model file. Omit to inherit the model mount destination."""
+  modelPath: String = null
 
   """Configuration for the model service."""
   service: PresetModelServiceConfigInput!
@@ -13782,7 +13788,7 @@ input PresetModelConfigInput
 }
 
 """
-Added in 26.4.4. Strict model definition for a preset. When provided on create it must be fully populated with at least one model.
+Added in 26.4.4. Model definition for a preset. Each model requires a service block; name/model_path may be omitted to inherit merge-chain defaults.
 """
 input PresetModelDefinitionInput
   @join__type(graph: STRAWBERRY)
@@ -20938,7 +20944,7 @@ input UpdateDeploymentRevisionPresetInput
   imageId: UUID
 
   """Added in 26.4.4. Parsed model definition. Set to null to clear."""
-  modelDefinition: ModelDefinitionInput
+  modelDefinition: PresetModelDefinitionInput
 
   """Added in 26.4.4. Container startup command. Set to null to clear."""
   startupCommand: String

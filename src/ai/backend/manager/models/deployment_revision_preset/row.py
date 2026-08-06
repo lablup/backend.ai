@@ -6,7 +6,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ai.backend.common.config import ModelDefinition
+from ai.backend.common.config import PresetModelDefinition
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.image import ImageID
@@ -60,8 +60,8 @@ class DeploymentRevisionPresetRow(LifecycleTimestampsMixin, Base):  # type: igno
     rank: Mapped[int] = mapped_column("rank", sa.Integer, nullable=False)
 
     image_id: Mapped[ImageID] = mapped_column("image_id", GUID(ImageID), nullable=False)
-    model_definition: Mapped[ModelDefinition | None] = mapped_column(
-        "model_definition", PydanticColumn(ModelDefinition), nullable=True
+    model_definition: Mapped[PresetModelDefinition | None] = mapped_column(
+        "model_definition", PydanticColumn(PresetModelDefinition, exclude_unset=True), nullable=True
     )
     resource_opts: Mapped[list[ResourceOptsEntry]] = mapped_column(
         "resource_opts", PydanticListColumn(ResourceOptsEntry), nullable=False, server_default="[]"

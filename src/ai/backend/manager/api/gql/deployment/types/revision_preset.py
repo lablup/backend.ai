@@ -110,7 +110,6 @@ from ai.backend.manager.api.gql.deployment.types.resource_slot import (
 )
 from ai.backend.manager.api.gql.deployment.types.revision import (
     ModelDefinitionGQL,
-    ModelDefinitionInputGQL,
     PreStartActionInputGQL,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
@@ -568,13 +567,19 @@ class PresetModelServiceConfigInputGQL(PydanticInputMixin[PresetModelServiceConf
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version="26.4.4",
-        description="Strict configuration for a single model within a preset model definition.",
+        description="Configuration for a single model within a preset model definition.",
     ),
     name="PresetModelConfigInput",
 )
 class PresetModelConfigInputGQL(PydanticInputMixin[PresetModelConfigInputDTO]):
-    name: str = gql_field(description="Name of the model.")
-    model_path: str = gql_field(description="Path to the model file.")
+    name: str | None = gql_field(
+        default=None,
+        description="Name of the model. Omit to inherit the runtime variant baseline's name.",
+    )
+    model_path: str | None = gql_field(
+        default=None,
+        description="Path to the model file. Omit to inherit the model mount destination.",
+    )
     service: PresetModelServiceConfigInputGQL = gql_field(
         description="Configuration for the model service.",
     )
@@ -586,8 +591,8 @@ class PresetModelConfigInputGQL(PydanticInputMixin[PresetModelConfigInputDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version="26.4.4",
-        description="Strict model definition for a preset. When provided on create it must be "
-        "fully populated with at least one model.",
+        description="Model definition for a preset. Each model requires a service block; "
+        "name/model_path may be omitted to inherit merge-chain defaults.",
     ),
     name="PresetModelDefinitionInput",
 )
@@ -638,8 +643,8 @@ class CreateDeploymentRevisionPresetInputGQL(PydanticInputMixin[CreateInputDTO])
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="Parsed model definition specifying health checks, ports, and service "
-            "configuration for the inference endpoint. Optional, but when provided it must be "
-            "fully populated with at least one model.",
+            "configuration for the inference endpoint. Optional; name/model_path may be omitted "
+            "to inherit merge-chain defaults.",
         ),
         default=None,
     )
@@ -745,7 +750,7 @@ class UpdateDeploymentRevisionPresetInputGQL(PydanticInputMixin[UpdateInputDTO])
         ),
         default=UNSET,
     )
-    model_definition: ModelDefinitionInputGQL | None = gql_added_field(
+    model_definition: PresetModelDefinitionInputGQL | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="Parsed model definition. Set to null to clear.",
