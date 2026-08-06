@@ -48,13 +48,7 @@ def _decode_member(agent_id: str, raw: str) -> Member:
 
 
 def _decode_endpoint(container_id: str, raw: str) -> EndpointAddr:
-    data = json.loads(raw)
-    return EndpointAddr(
-        container_id=container_id,
-        ip=data["ip"],
-        mac=data["mac"],
-        agent_id=data["agent_id"],
-    )
+    return EndpointAddr.from_etcd_payload(container_id, json.loads(raw))
 
 
 class SessionNetworkCoordinator:
@@ -66,6 +60,10 @@ class SessionNetworkCoordinator:
     _watch_tasks: dict[str, asyncio.Task[None]]
     # The periodic re-converge task per session (see _reconcile_periodically).
     _sweep_tasks: dict[str, asyncio.Task[None]]
+    # session_id -> {cluster_hostname: ip} for the whole session (every node's endpoints, not the
+    # remote-only FDB view). Maintained by the same watch/reconcile that programs the data plane, so
+    # the per-session cluster name resolver reads a live map. See cluster-name-resolution.md.
+    _names: dict[str, dict[str, str]]
 
     def __init__(
         self,
@@ -80,6 +78,7 @@ class SessionNetworkCoordinator:
         self._applied_endpoints = {}
         self._watch_tasks = {}
         self._sweep_tasks = {}
+        self._names = {}
 
     async def start(self, meta: SessionNetMeta, self_member: Member) -> None:
         """Bring up this node's data plane for the session, publish membership, apply
@@ -102,6 +101,7 @@ class SessionNetworkCoordinator:
         await self._write_member(meta.session_id, self_member)
         self._applied[meta.session_id] = {}
         self._applied_endpoints[meta.session_id] = {}
+        self._names[meta.session_id] = {}
         await self.reconcile_peers(meta.session_id)
         await self.reconcile_endpoints(meta.session_id)
         self._watch_tasks[meta.session_id] = asyncio.create_task(self._watch(meta.session_id))
@@ -158,6 +158,7 @@ class SessionNetworkCoordinator:
             await self._backend.teardown_session_network(session_id)
         self._applied.pop(session_id, None)
         self._applied_endpoints.pop(session_id, None)
+        self._names.pop(session_id, None)
 
     async def reconcile_peers(self, session_id: str) -> None:
         """Diff the published members against what has been applied and drive the
@@ -213,6 +214,14 @@ class SessionNetworkCoordinator:
         endpoints = await self._read_endpoints(session_id)
         members = await self._read_members(session_id)
         applied = self._applied_endpoints.setdefault(session_id, {})
+        # Name map first, from the FULL table (own + remote): a resolver must answer every peer in
+        # the session, including a kernel co-located on this node, which the remote-only FDB loop
+        # below skips. Rebuilt each pass so a departed/renamed kernel drops out.
+        self._names[session_id] = {
+            endpoint.cluster_hostname.lower(): endpoint.ip
+            for endpoint in endpoints.values()
+            if endpoint.cluster_hostname
+        }
 
         current: dict[str, tuple[EndpointAddr, str]] = {}
         for container_id, endpoint in endpoints.items():
@@ -258,6 +267,15 @@ class SessionNetworkCoordinator:
                     ),
                 ):
                     applied.pop(container_id, None)
+
+    def resolve_cluster_name(self, session_id: str, hostname: str) -> str | None:
+        """The session-scoped ``hostname -> ip`` lookup the per-session cluster name resolver reads
+        (BEP-1062). Case-insensitive, as DNS names are. ``None`` when this session is not set up
+        here or the name is not one it owns — the resolver then forwards the query upstream.
+
+        Scoped by ``session_id``: identical cluster hostnames (every session names kernels
+        ``main1``/``sub1``/…) never collide because each session's names live under its own key."""
+        return (self._names.get(session_id) or {}).get(hostname.lower())
 
     async def _read_endpoints(self, session_id: str) -> dict[str, EndpointAddr]:
         raw = await self._etcd.get_prefix(endpoints_prefix(session_id))

@@ -53,9 +53,22 @@ nsswitch `hosts: files dns` splits these naturally. Self and localhost stay in `
 
 The per-node network daemon (the privnet/coordinator that already owns the LOCAL/overlay **gateway** address and talks to etcd) answers DNS on that gateway. The container's `resolv.conf` nameserver is that gateway — an address the network layer already programs, so no new listener address and no new component. Split-horizon: **cluster names → etcd lookup; everything else → forward to the host's upstream resolver.**
 
-### Name source: reuse the control-plane etcd table
+### Name source: reuse the per-session `endpoints/` table
 
-The resolver reads the **existing** control-plane data, not a new table where avoidable. The manager already writes per-endpoint overlay IPs to `endpoints/` (see control-plane.md, decision 2026-07-06); joined with each kernel's cluster hostname that is exactly the `hostname → IP` the resolver needs. Publication stays **decentralized and per-kernel** (each agent/coordinator owns its kernels' entries, mirroring VTEP publication), so a kernel restart updates one key and every peer's next query sees the new address — the dynamic-membership property the static file lacks.
+The resolver reads the **existing** control-plane data, not a new table. The manager already writes per-endpoint overlay IPs to `network/session/{session_id}/endpoints/{container_id}`; enriched with each endpoint's **`cluster_hostname`** (the manager knows it at IP-assignment time) that record *is* the `hostname → IP` the resolver needs. The agent's `SessionNetworkCoordinator` already watches this per-session prefix to program FDB/ARP, so it maintains a live `hostname → IP` map for free on the same watch — a kernel restart updates one key and every peer's next query sees the new address (the dynamic-membership property the static file lacks). This resolves the earlier open question "reuse `endpoints/` vs a thin `hosts/` projection" in favour of **enriching `endpoints/`**.
+
+### Names are session-scoped, never global — no collision
+
+Every multi-node session names its kernels the same way (`main1`, `sub1`, …), so cluster hostnames are unique **only within a session**. Moving them into etcd does **not** make them a global namespace, because the control plane is already session-partitioned end to end:
+
+| Layer | Scoping | Consequence |
+|---|---|---|
+| etcd keys | `network/session/{session_id}/endpoints/…` — no flat `hosts/` | session A's `main1` and session B's `main1` are different keys |
+| coordinator | per-`session_id` watch + `hostname → IP` map | each session's name map is isolated in memory |
+| privnet LOCAL subnet / gateway | `local_subnets.allocate(session_id)` — a distinct gateway per session | a container talks to *its* session's gateway only |
+| resolver instance | one per session, bound to that session's gateway, reads only that session's map | different sessions' identical names are answered by different resolvers |
+
+So resolution is **per-session, not per-node** — the resolver a container reaches only ever knows that container's own session. This is the same isolation the per-container static `/etc/hosts` had (each file was session-local); the only change is *where* the map lives (session-scoped etcd + a session-scoped resolver instead of a bind-mounted file). A `resolve_cluster_name(session_id, hostname)` lookup keys on the session, so a missing session or unknown name simply falls through to upstream forwarding.
 
 ### Backend unification
 
@@ -66,7 +79,7 @@ Both converge on dynamic DNS; the resolver brings containerd to parity **without
 
 ## Interface / API
 
-- **etcd (read):** the resolver resolves `hostname → IP` from the session's endpoint/hosts view under the control-plane prefix (reuse `endpoints/` + hostname; a thin `hosts/` projection only if a join at query time is impractical). Lease/teardown semantics match VTEP withdrawal so a dead kernel's name expires.
+- **etcd schema (settled):** the resolver resolves `hostname → IP` from `network/session/{session_id}/endpoints/{container_id}`, whose value now carries `cluster_hostname` alongside `ip`/`mac`/`agent_id`. `EndpointAddr.to_etcd_payload`/`from_etcd_payload` single-source the wire format; `cluster_hostname` is nullable so pre-existing/name-less endpoints decode unchanged. The coordinator rebuilds the per-session `hostname → IP` map from the **full** table (own + remote endpoints — a co-located peer must resolve too, unlike the remote-only FDB view) on every reconcile, so a departed kernel drops out. Delete semantics match endpoint withdrawal so a dead kernel's name expires.
 - **Resolver contract:** authoritative for the session's cluster names; forwards all other queries to the node upstream resolver; short TTL so membership changes propagate; etcd watch may back a local cache to bound query load.
 - **Container config:** `/etc/hosts` = localhost + self only; `/etc/resolv.conf` nameserver = the LOCAL/overlay gateway the network layer owns.
 
@@ -76,9 +89,9 @@ Both converge on dynamic DNS; the resolver brings containerd to parity **without
 
 1. **Hardening of the static path — done.** own-in-map validation for both cluster modes, no loopback for cluster members, refuse an unresolvable listed peer, single-source hostname derivation, atomic write. (Regression tests in `tests/unit/agent/containerd/test_context.py::TestEtcHosts`.)
 2. **Resolver core — done.** Split-horizon resolve logic + UDP server built on `dnspython` (`agent/network/privnet/resolver.py`): cluster name → `ClusterNameSource` (an injected interface) → authoritative `A`/NODATA; anything else → `make_upstream_forwarder`; SERVFAIL (not NXDOMAIN) on total upstream failure so the client can retry. Unit-tested + **live-validated in a real fatpod multi-node session**: bound on the LOCAL gateway (`172.30.0.1`) a kernel routes through, a CinC's `getent` resolved a peer name absent from `/etc/hosts` to its overlay IP, that IP reached the peer's sshd cross-node over the VXLAN overlay, and a non-cluster name forwarded to the cluster resolver. The name source (in-memory here) and daemon wiring (who starts it / writes resolv.conf) are still injected, not yet bound in privnet.
-3. **Name availability in etcd** — implement `ClusterNameSource` over the control-plane tables (reuse `endpoints/` vs a thin `hosts/` projection is the open question; per-kernel publication/withdrawal decentralized).
-4. **Daemon wiring** — the privnet starts `ClusterDNSServer` on the LOCAL/overlay gateway it owns; container `/etc/resolv.conf` nameserver points there. Runs alongside the full static `/etc/hosts` first (`files` before `dns`) so the resolver is validated risk-free. Needs live multi-node infra.
-5. **Shrink `/etc/hosts`** to localhost + self; peers resolve via the resolver. Dynamic membership is now live.
+3. **Name availability in etcd — done.** `EndpointAddr` carries `cluster_hostname`; the manager writes it (`EndpointAllocator.assign` ← launcher's `cluster_hostname_of`), and the coordinator maintains a per-session `hostname → IP` map exposed via `resolve_cluster_name(session_id, hostname)` (case-insensitive, session-scoped). Backward-compatible (nullable field). Unit-tested (`test_types.py::TestEndpointAddr`, `test_coordinator.py::TestClusterNameResolution`, `test_cni.py`).
+4. **Daemon wiring** — the privnet/agent starts one `ClusterDNSServer` per session on the LOCAL/overlay gateway it owns, with a `ClusterNameSource` bound to that session (`resolve_cluster_name(session_id, …)`); the container's `/etc/resolv.conf` nameserver points there. Runs alongside the full static `/etc/hosts` first (`files` before `dns`) so the resolver is validated risk-free. Needs live multi-node infra.
+5. **Remove the static peer map from `/etc/hosts`** — the file keeps only `localhost` + self; peers resolve via the resolver. This deletes `_peer_host_map`'s peer-map construction and the per-backend hardening it required (the divergence collapses into the one resolver path). Dynamic membership is now live.
 
 **Costs / risks:**
 - The resolver must **forward** non-cluster names (a bare `NXDOMAIN` stops the client from trying the next nameserver), i.e. a small split-horizon forwarding resolver — the one genuinely new piece.

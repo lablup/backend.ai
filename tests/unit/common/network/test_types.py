@@ -5,6 +5,7 @@ import pytest
 from ai.backend.common.network.types import (
     AgentNetworkCaps,
     AttachKind,
+    EndpointAddr,
     EndpointPlan,
     Member,
     NetworkAttachSpec,
@@ -58,6 +59,34 @@ class TestMember:
         assert payload == {"host_ip": "1.2.3.4", "vtep_ip": "1.2.3.4"}
         assert "agent_id" not in payload  # agent_id is the key, not the value
         assert Member.from_etcd_payload("a1", payload) == member
+
+
+class TestEndpointAddr:
+    def test_cluster_hostname_defaults_to_none(self) -> None:
+        endpoint = EndpointAddr(
+            container_id="c1", ip="10.128.5.1", mac="02:42:0a:80:05:01", agent_id="a1"
+        )
+        assert endpoint.cluster_hostname is None
+
+    def test_etcd_payload_roundtrip(self) -> None:
+        # single-sourced on-wire schema shared by manager (assign) and agent (decode)
+        endpoint = EndpointAddr(
+            container_id="c1",
+            ip="10.128.5.1",
+            mac="02:42:0a:80:05:01",
+            agent_id="a1",
+            cluster_hostname="main1",
+        )
+        payload = endpoint.to_etcd_payload()
+        assert payload["cluster_hostname"] == "main1"
+        assert EndpointAddr.from_etcd_payload("c1", payload) == endpoint
+
+    def test_decode_tolerates_a_missing_hostname(self) -> None:
+        # an endpoint written before cluster_hostname existed decodes with None, not a KeyError
+        legacy = {"ip": "10.128.5.1", "mac": "02:42:0a:80:05:01", "agent_id": "a1"}
+        endpoint = EndpointAddr.from_etcd_payload("c1", legacy)
+        assert endpoint.cluster_hostname is None
+        assert endpoint.ip == "10.128.5.1"
 
 
 class TestEnums:

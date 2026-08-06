@@ -157,8 +157,13 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             endpoint_ips: dict[str, str] = {}
             for endpoint in endpoints:
                 container_id = str(endpoint["container_id"])
+                hostname = endpoint.get("cluster_hostname")
                 ip, _mac = await self._endpoint_allocator.assign(
-                    session_id, container_id, subnet, agent_id=str(endpoint["agent_id"])
+                    session_id,
+                    container_id,
+                    subnet,
+                    agent_id=str(endpoint["agent_id"]),
+                    cluster_hostname=str(hostname) if hostname is not None else None,
                 )
                 endpoint_ips[container_id] = ip
             # Pre-seed the membership table so each agent's reconcile-at-start finds every

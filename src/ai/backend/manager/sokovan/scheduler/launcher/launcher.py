@@ -565,7 +565,13 @@ class SessionLauncher:
                 # (BEP-1062 central IPAM). container_id == kernel_id (the agent keys its
                 # endpoint/CNI on the kernel id).
                 endpoints = [
-                    {"container_id": str(kernel.kernel_id), "agent_id": str(kernel.agent_id)}
+                    {
+                        "container_id": str(kernel.kernel_id),
+                        "agent_id": str(kernel.agent_id),
+                        # Stored in the endpoints/ table so the per-session cluster name
+                        # resolver can answer this kernel's hostname (BEP-1062).
+                        "cluster_hostname": cluster_hostname_of(kernel),
+                    }
                     for kernel in session.kernels
                     if kernel.agent_id
                 ]

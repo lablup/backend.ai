@@ -237,9 +237,26 @@ class TestEndpointAllocator:
     async def test_endpoint_record_written(self) -> None:
         etcd = FakeEtcd()
         alloc = EndpointAllocator(cast(AsyncEtcd, etcd))
-        ip, mac = await alloc.assign("s1", "c1", "10.128.5.0/24", agent_id="a1")
+        ip, mac = await alloc.assign(
+            "s1", "c1", "10.128.5.0/24", agent_id="a1", cluster_hostname="main1"
+        )
         rec = json.loads(etcd.store["network/session/s1/endpoints/c1"])
-        assert rec == {"ip": ip, "mac": mac, "agent_id": "a1", "container_id": "c1"}
+        assert rec == {
+            "ip": ip,
+            "mac": mac,
+            "agent_id": "a1",
+            "container_id": "c1",
+            "cluster_hostname": "main1",
+        }
+
+    async def test_endpoint_record_without_hostname_is_null(self) -> None:
+        # cluster_hostname is optional on the wire: an endpoint assigned without a name records
+        # null, and EndpointAddr.from_etcd_payload decodes it back to None (backward-compatible).
+        etcd = FakeEtcd()
+        alloc = EndpointAllocator(cast(AsyncEtcd, etcd))
+        await alloc.assign("s1", "c1", "10.128.5.0/24", agent_id="a1")
+        rec = json.loads(etcd.store["network/session/s1/endpoints/c1"])
+        assert rec["cluster_hostname"] is None
 
     async def test_release_frees_ip_for_reuse(self) -> None:
         etcd = FakeEtcd()

@@ -59,12 +59,14 @@ class FakeEtcd:
         mac: str,
         agent_id: str,
         session_id: str = "s1",
+        cluster_hostname: str | None = None,
     ) -> None:
         self.store[f"{endpoints_prefix(session_id)}{container_id}"] = json.dumps({
             "ip": ip,
             "mac": mac,
             "agent_id": agent_id,
             "container_id": container_id,
+            "cluster_hostname": cluster_hostname,
         })
 
 
@@ -322,6 +324,75 @@ class TestReconcileEndpoints:
         await etcd.delete(f"{endpoints_prefix('s1')}c-remote")
         await coord.reconcile_endpoints("s1")
         assert backend.endpoints_removed == [("10.128.5.20", "10.0.0.2")]
+
+
+class TestClusterNameResolution:
+    async def test_resolves_a_remote_peer_name_to_its_ip(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_member(_PEER2)
+        etcd.seed_endpoint(
+            "c-remote", "10.128.5.20", "02:42:0a:80:05:14", agent_id="a2", cluster_hostname="sub1"
+        )
+        coord = _coordinator(etcd, RecordingBackend())
+        await coord.reconcile_endpoints("s1")
+        assert coord.resolve_cluster_name("s1", "sub1") == "10.128.5.20"
+
+    async def test_resolves_a_same_node_peer_name(self) -> None:
+        # The name map is the FULL table, not the remote-only FDB view: a co-located peer (whose
+        # FDB entry reconcile_endpoints skips) must still resolve by name.
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_endpoint(
+            "c-local", "10.128.5.10", "02:42:0a:80:05:0a", agent_id="a1", cluster_hostname="main1"
+        )
+        coord = _coordinator(etcd, RecordingBackend())
+        await coord.reconcile_endpoints("s1")
+        assert coord.resolve_cluster_name("s1", "main1") == "10.128.5.10"
+
+    async def test_lookup_is_case_insensitive(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_endpoint(
+            "c-local", "10.128.5.10", "02:42:0a:80:05:0a", agent_id="a1", cluster_hostname="Main1"
+        )
+        coord = _coordinator(etcd, RecordingBackend())
+        await coord.reconcile_endpoints("s1")
+        assert coord.resolve_cluster_name("s1", "MAIN1") == "10.128.5.10"
+
+    async def test_unknown_name_and_unknown_session_return_none(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_endpoint(
+            "c-local", "10.128.5.10", "02:42:0a:80:05:0a", agent_id="a1", cluster_hostname="main1"
+        )
+        coord = _coordinator(etcd, RecordingBackend())
+        await coord.reconcile_endpoints("s1")
+        assert coord.resolve_cluster_name("s1", "nope") is None  # forwarded upstream
+        assert coord.resolve_cluster_name("other-session", "main1") is None  # not set up here
+
+    async def test_a_departed_kernel_drops_out_of_the_name_map(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_endpoint(
+            "c-local", "10.128.5.10", "02:42:0a:80:05:0a", agent_id="a1", cluster_hostname="main1"
+        )
+        coord = _coordinator(etcd, RecordingBackend())
+        await coord.reconcile_endpoints("s1")
+        assert coord.resolve_cluster_name("s1", "main1") == "10.128.5.10"
+
+        await etcd.delete(f"{endpoints_prefix('s1')}c-local")
+        await coord.reconcile_endpoints("s1")
+        assert coord.resolve_cluster_name("s1", "main1") is None  # dynamic membership
+
+    async def test_a_nameless_endpoint_is_absent_from_the_map(self) -> None:
+        # An endpoint written before cluster_hostname existed contributes no name entry.
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_endpoint("c-local", "10.128.5.10", "02:42:0a:80:05:0a", agent_id="a1")
+        coord = _coordinator(etcd, RecordingBackend())
+        await coord.reconcile_endpoints("s1")
+        assert coord.resolve_cluster_name("s1", "main1") is None
 
 
 class _CancelAfter:

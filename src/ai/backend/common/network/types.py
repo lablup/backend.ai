@@ -116,12 +116,42 @@ class EndpointAddr:
     and consumed by overlay backends: the CNI attach uses ``ip`` (static IPAM) and the
     coordinator proactively programs FDB + neighbor (ARP) entries from ``ip``/``mac``/
     ``agent_id`` — no per-node host-local allocation, no BUM flood.
+
+    ``cluster_hostname`` (``main1``, ``sub1``, …) makes this table the session-scoped
+    ``hostname -> ip`` source the per-session cluster name resolver reads (BEP-1062,
+    cluster-name-resolution.md) — the same per-session ``endpoints/`` prefix, so names never
+    share a global namespace and cannot collide across sessions.
     """
 
     container_id: str
     ip: str
     mac: str
     agent_id: str
+    cluster_hostname: str | None = None
+    """The kernel's in-cluster hostname. ``None`` only for endpoints written before this field
+    existed (backward-compatible decode); a name-less endpoint is simply not resolvable by name."""
+
+    def to_etcd_payload(self) -> dict[str, str | None]:
+        """The endpoint's etcd value (``container_id`` is the key, but kept in the value too for
+        the coordinator's reverse lookups). Single source of the on-wire schema — used by the
+        manager (assign) and the agent (decode) so the two never drift."""
+        return {
+            "ip": self.ip,
+            "mac": self.mac,
+            "agent_id": self.agent_id,
+            "container_id": self.container_id,
+            "cluster_hostname": self.cluster_hostname,
+        }
+
+    @classmethod
+    def from_etcd_payload(cls, container_id: str, payload: Mapping[str, Any]) -> EndpointAddr:
+        return cls(
+            container_id=container_id,
+            ip=payload["ip"],
+            mac=payload["mac"],
+            agent_id=payload["agent_id"],
+            cluster_hostname=payload.get("cluster_hostname"),
+        )
 
 
 @dataclass(frozen=True)
@@ -144,6 +174,11 @@ class NetworkAttachSpec:
     """Preassigned address, when known. May be None when the interface's IPAM
     (e.g. host-local for the LOCAL interface) assigns it at attach time."""
     cni_config: Mapping[str, Any] | None = None
+    cni_capability_args: Mapping[str, Any] | None = None
+    """Standard CNI capability args (e.g. ``{"ips": ["10.0.0.5/26"], "mac": "02:.."}``). The
+    provisioner injects each one into ``runtimeConfig`` for the capability its ``cni_config``
+    declares under ``capabilities`` — the standard way to pin a specific IP / MAC, replacing the
+    non-standard ``ipam.requested_ip`` / top-level ``mac`` keys a real CNI binary would ignore."""
     docker_config: Mapping[str, Any] | None = None
     netns_ops: Mapping[str, Any] | None = None
 

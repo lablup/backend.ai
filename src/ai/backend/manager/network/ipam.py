@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import quote
 
 from ai.backend.common.network.keys import endpoint_key, session_ipam_key
-from ai.backend.common.network.types import mac_for_ip
+from ai.backend.common.network.types import EndpointAddr, mac_for_ip
 from ai.backend.manager.errors.network import (
     NetworkPoolExhausted,
     RequestedSubnetInvalid,
@@ -190,13 +190,21 @@ class EndpointAllocator:
         self._etcd = etcd
 
     async def assign(
-        self, session_id: str, container_id: str, subnet: str, *, agent_id: str
+        self,
+        session_id: str,
+        container_id: str,
+        subnet: str,
+        *,
+        agent_id: str,
+        cluster_hostname: str | None = None,
     ) -> tuple[str, str]:
         """Claim the first free host IP in ``subnet`` for ``container_id`` (placed on
         ``agent_id``) and record the endpoint. Returns ``(ip, mac)``.
 
         ``agent_id`` is stored so a peer coordinator can resolve the endpoint's VTEP and
-        skip its own local endpoints when programming FDB/ARP.
+        skip its own local endpoints when programming FDB/ARP. ``cluster_hostname`` is stored
+        so the per-session cluster name resolver can answer ``hostname -> ip`` from this same
+        table (BEP-1062, cluster-name-resolution.md).
 
         Raises:
             NetworkPoolExhausted: the session subnet has no free host address.
@@ -210,14 +218,16 @@ class EndpointAllocator:
             if not claimed:
                 continue
             mac = mac_for_ip(ip)
+            endpoint = EndpointAddr(
+                container_id=container_id,
+                ip=ip,
+                mac=mac,
+                agent_id=agent_id,
+                cluster_hostname=cluster_hostname,
+            )
             await self._etcd.put(
                 endpoint_key(session_id, container_id),
-                json.dumps({
-                    "ip": ip,
-                    "mac": mac,
-                    "agent_id": agent_id,
-                    "container_id": container_id,
-                }),
+                json.dumps(endpoint.to_etcd_payload()),
             )
             return ip, mac
         raise NetworkPoolExhausted()
