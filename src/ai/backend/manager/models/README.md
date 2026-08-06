@@ -26,7 +26,7 @@ Query-related methods (`get_by_id`, `list_by_condition`, etc.) should be impleme
 ### Reference Columns
 
 - Use ID(UUID) columns without DB-level Foreign Key constraints
-- Related rows are fetched via explicit joins in repositories, not via `relationship()`
+- Related rows are fetched by repository queries, not via `relationship()`
 
 ### Enum
 
@@ -82,7 +82,7 @@ Sets default at Python level. Applied only when creating via ORM.
 
 ## Relationship Definition
 
-- Do not define new `relationship()` attributes on Row classes — fetch related rows with explicit joins in repositories
+- Do not define new `relationship()` attributes on Row classes — fetch related rows with repository queries
 - Existing relationships are being removed; when the last reference to one disappears, delete it together with its `back_populates` pair on the other side
 - Association table naming: `association_{tableA}_{tableB}`
 
@@ -92,7 +92,7 @@ Consider indexes for the following columns:
 
 - **WHERE clause**: Frequently filtered columns like `status`, `domain_name`, `scaling_group_name`
 - **ORDER BY clause**: Columns used for sorting like `created_at`, `priority`
-- **Reference columns**: Improves join query performance
+- **Reference columns**: Improves lookup performance for queries on referenced rows
 - **Compound conditions**: Column combinations frequently used together
 
 Index types:
@@ -131,6 +131,6 @@ When adding a new model:
 - [ ] Set `server_default` or `default` (only one)
 - [ ] Include `created_at` column (cursor pagination)
 - [ ] Add necessary indexes (consider WHERE, ORDER BY)
-- [ ] No `relationship()` attributes — related rows come from repository joins
+- [ ] No `relationship()` attributes — related rows come from repository queries
 - [ ] Implement `to_data()` conversion method
 - [ ] Generate Alembic migration
