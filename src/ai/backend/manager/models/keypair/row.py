@@ -83,7 +83,9 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     # SSH Keypairs.
     ssh_public_key: Mapped[str | None] = mapped_column("ssh_public_key", sa.Text, nullable=True)
     ssh_private_key: Mapped[str | None] = mapped_column("ssh_private_key", sa.Text, nullable=True)
-    user: Mapped[UserID] = mapped_column("user", GUID, sa.ForeignKey("users.uuid"), nullable=False)
+    user: Mapped[UserID] = mapped_column(
+        "user", GUID(UserID), sa.ForeignKey("users.uuid"), nullable=False
+    )
     resource_policy: Mapped[str] = mapped_column(
         "resource_policy",
         sa.String(length=256),

@@ -315,9 +315,12 @@ class UserDBSource:
                     )
 
             # Handle main_access_key validation
-            main_access_key = updater_spec.main_access_key.optional_value()
-            if main_access_key:
-                await self._validate_and_update_main_access_key(session, email, main_access_key)
+            if updater_spec.main_access_key.is_nullify():
+                await self._clear_default_keypair(session, UserID(current_user.uuid))
+            else:
+                main_access_key = updater_spec.main_access_key.optional_value()
+                if main_access_key:
+                    await self._validate_and_update_main_access_key(session, email, main_access_key)
 
             # Update user
             if updater_spec.password.optional_value():
@@ -423,11 +426,14 @@ class UserDBSource:
                 )
 
         # Handle main_access_key validation
-        main_access_key = updater_spec.main_access_key.optional_value()
-        if main_access_key:
-            await self._validate_and_update_main_access_key(
-                session, current_user.email, main_access_key
-            )
+        if updater_spec.main_access_key.is_nullify():
+            await self._clear_default_keypair(session, UserID(user_id))
+        else:
+            main_access_key = updater_spec.main_access_key.optional_value()
+            if main_access_key:
+                await self._validate_and_update_main_access_key(
+                    session, current_user.email, main_access_key
+                )
 
         # Update user
         if updater_spec.password.optional_value():
@@ -759,6 +765,14 @@ class UserDBSource:
         gids_to_join = rows.all()
         return list(gids_to_join)
 
+    async def _clear_default_keypair(self, session: SASession, user_id: UserID) -> None:
+        """Leave the user with no default keypair."""
+        await session.execute(
+            sa.update(KeyPairRow)
+            .where((KeyPairRow.user == user_id) & KeyPairRow.is_default)
+            .values(is_default=False)
+        )
+
     async def _set_default_keypair(
         self, session: SASession, user_id: UserID, access_key: str
     ) -> None:
@@ -767,11 +781,7 @@ class UserDBSource:
         Clearing the previous marker needs its own statement: a partial unique index
         allows a user only one marked keypair.
         """
-        await session.execute(
-            sa.update(KeyPairRow)
-            .where((KeyPairRow.user == user_id) & KeyPairRow.is_default)
-            .values(is_default=False)
-        )
+        await self._clear_default_keypair(session, user_id)
         await session.execute(
             sa.update(KeyPairRow).where(KeyPairRow.access_key == access_key).values(is_default=True)
         )
