@@ -17,11 +17,11 @@ __all__ = (
 class AppConfigNode(BaseResponseModel):
     """The merged AppConfig view for one config name."""
 
-    config_name: str = Field(description="Added in 26.9.0. Config name this view is for.")
+    config_name: str = Field(description="Config name this view is for.")
     config: dict[str, Any] = Field(
-        description="Added in 26.9.0. Every fragment visible to the caller, deep-merged in "
-        "ascending allow-list rank order. Empty when nothing visible contributes, or when "
-        "everything that did was empty. Read the fragment API for the per-scope values behind it."
+        description="Every fragment visible to the caller, deep-merged in ascending allow-list "
+        "rank order. Empty when nothing visible contributes, or when everything that did was "
+        "empty. Read the fragment API for the per-scope values behind it."
     )
 
 
