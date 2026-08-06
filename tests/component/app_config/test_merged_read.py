@@ -25,13 +25,14 @@ from .conftest import SeedFragments
 
 @dataclass(frozen=True)
 class _MergeCase:
-    """The fragment each scope holds, and the value the caller's read merges out of them.
+    """The fragment each scope holds, and what ``key`` merges to in the caller's read.
 
     ``None`` for a scope writes no fragment there; ``{}`` writes one carrying no key. Neither
     is the same as a fragment whose value for the key *is* ``null``, which is its own rule.
     """
 
     description: str
+    key: str
     public: dict[str, Any] | None
     domain: dict[str, Any] | None
     user: dict[str, Any] | None
@@ -55,38 +56,43 @@ class TestMergedRead:
         [
             _MergeCase(
                 description="nested objects merge recursively",
-                public={"key": {"from_public": 1}},
-                domain={"key": {"from_domain": 2}},
-                user={"key": {"from_user": 3}},
-                expected={"from_public": 1, "from_domain": 2, "from_user": 3},
+                key="theme",
+                public={"theme": {"mode": "light"}},
+                domain={"theme": {"accent": "teal"}},
+                user={"theme": {"font": "mono"}},
+                expected={"mode": "light", "accent": "teal", "font": "mono"},
             ),
             _MergeCase(
                 description="a scalar is replaced by the highest rank that carries it",
-                public={"key": "public"},
-                domain={"key": "domain"},
-                user={"key": "user"},
-                expected="user",
+                key="mode",
+                public={"mode": "light"},
+                domain={"mode": "solarized"},
+                user={"mode": "dark"},
+                expected="dark",
             ),
             _MergeCase(
                 description="a list is replaced whole, neither blended nor appended to",
-                public={"key": ["a", "b", "c"]},
-                domain=None,
-                user={"key": ["a"]},
-                expected=["a"],
+                key="pinned",
+                public={"pinned": ["home", "docs", "support"]},
+                domain={"pinned": ["home", "wiki"]},
+                user={"pinned": ["home"]},
+                expected=["home"],
             ),
             _MergeCase(
                 description="an explicit null erases what was inherited",
-                public={"key": "public"},
-                domain=None,
-                user={"key": None},
+                key="banner",
+                public={"banner": "Welcome"},
+                domain={"banner": "Compliance notice"},
+                user={"banner": None},
                 expected=None,
             ),
             _MergeCase(
                 description="a key the higher scopes omit keeps the inherited value",
-                public={"key": "public"},
+                key="lang",
+                public={"lang": "en"},
                 domain={},
                 user={},
-                expected="public",
+                expected="en",
             ),
         ],
         ids=lambda case: case.description,
@@ -109,7 +115,7 @@ class TestMergedRead:
             MyGetAppConfigsInput(config_names=[config_name])
         )
 
-        assert result.app_configs[0].config["key"] == case.expected
+        assert result.app_configs[0].config[case.key] == case.expected
 
     async def test_the_public_read_draws_from_the_public_scope_alone(
         self,
@@ -118,13 +124,13 @@ class TestMergedRead:
     ) -> None:
         """Over rows the caller would merge all three of, the public read answers with one."""
         config_name = await seed_colliding_fragments({
-            AppConfigScopeType.PUBLIC: {"key": "public"},
-            AppConfigScopeType.DOMAIN: {"key": "domain"},
-            AppConfigScopeType.USER: {"key": "user"},
+            AppConfigScopeType.PUBLIC: {"mode": "light"},
+            AppConfigScopeType.DOMAIN: {"mode": "solarized"},
+            AppConfigScopeType.USER: {"mode": "dark"},
         })
 
         result = await anonymous_v2_registry.app_config.public_get_app_configs(
             PublicGetAppConfigsInput(config_names=[config_name])
         )
 
-        assert result.app_configs[0].config["key"] == "public"
+        assert result.app_configs[0].config["mode"] == "light"
