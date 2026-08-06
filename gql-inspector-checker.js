@@ -2,11 +2,8 @@ module.exports = (props) => {
   const { changes, newSchema, oldSchema } = props;
   const oldTypes = oldSchema.getTypeMap();
 
-  // graphql-inspector reports one FIELD_ADDED per field of a brand-new type and one
-  // FIELD_ARGUMENT_ADDED per argument of a brand-new field. Those elements arrived with
-  // their owner, whose own notation already dates them, so only an element appearing on
-  // an owner that already shipped states a version of its own. A field's owner is its
-  // type; an argument's owner is its field, which may itself be new on a type that is not.
+  // An element that arrived with its owner needs no version note: the owner's dates it.
+  // graphql-inspector reports one such change per field and per argument regardless.
   const typeIsNew = (typeName) => oldTypes[typeName] === undefined;
   const fieldIsNew = (typeName, fieldName) =>
     typeIsNew(typeName) ||
