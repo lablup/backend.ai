@@ -30,6 +30,36 @@ class ResourceSlotTypeNotFound(BackendAIError):
         )
 
 
+class ResourceSlotTypeAlreadyExists(BackendAIError):
+    """Raised when creating a resource slot type whose slot name is already registered."""
+
+    error_type = "https://api.backend.ai/probs/resource-slot-type-already-exists"
+    error_title = "Resource slot type already exists."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.RESOURCE_PRESET,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.ALREADY_EXISTS,
+        )
+
+
+class ResourceSlotTypeInUse(BackendAIError):
+    """Raised when deleting a resource slot type that is still referenced elsewhere."""
+
+    error_type = "https://api.backend.ai/probs/resource-slot-type-in-use"
+    error_title = "Resource slot type is still referenced."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.RESOURCE_PRESET,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class AgentResourceNotFound(BackendAIError):
     """Raised when an agent resource entry for a given agent+slot is not found."""
 
