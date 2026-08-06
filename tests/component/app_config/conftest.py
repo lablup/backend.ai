@@ -135,53 +135,6 @@ def server_module_registries(
     return [v2_registry]
 
 
-@pytest.fixture()
-async def merged_fragments(
-    database_engine: ExtendedAsyncSAEngine,
-    regular_user_fixture: UserFixtureData,
-) -> AsyncIterator[None]:
-    """``contributed`` is allow-listed at every scope, with a public fragment the caller's own
-    overrides on one key and leaves alone on another."""
-    config_names = ["contributed"]
-    async with database_engine.begin_session() as sess:
-        sess.add_all([
-            AppConfigDefinitionRow(config_name=config_name) for config_name in config_names
-        ])
-        await sess.flush()
-        sess.add_all([
-            AppConfigAllowListRow(
-                config_name=config_name,
-                scope_type=scope_type,
-                rank=scope_type.default_rank(),
-            )
-            for config_name in config_names
-            for scope_type in AppConfigScopeType
-        ])
-        await sess.flush()
-        sess.add_all([
-            AppConfigFragmentRow(
-                config_name="contributed",
-                scope_type=AppConfigScopeType.PUBLIC,
-                scope_id=None,
-                config={"mode": "light", "lang": "en"},
-            ),
-            AppConfigFragmentRow(
-                config_name="contributed",
-                scope_type=AppConfigScopeType.USER,
-                scope_id=AppConfigScopeID(regular_user_fixture.user_uuid),
-                config={"mode": "dark"},
-            ),
-        ])
-    yield
-    # The definition cascades to its allow-list entries and their fragments.
-    async with database_engine.begin_session() as sess:
-        await sess.execute(
-            sa.delete(AppConfigDefinitionRow).where(
-                AppConfigDefinitionRow.config_name.in_(config_names)
-            )
-        )
-
-
 type SeedFragments = Callable[[Mapping[AppConfigScopeType, dict[str, Any] | None]], Awaitable[str]]
 
 
