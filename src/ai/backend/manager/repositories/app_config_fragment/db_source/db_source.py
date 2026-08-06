@@ -118,7 +118,7 @@ class AppConfigFragmentDBSource:
                         config_name=specs[error.index].config_name,
                         message=str(error.exception),
                     )
-                    for error in result.errors
+                    for error in result.failed
                 ],
             )
 
