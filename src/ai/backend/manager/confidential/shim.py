@@ -17,9 +17,11 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from ai.backend.manager.confidential.broker import BrokerClient, BrokerTarget
 from ai.backend.manager.confidential.payloads import TIME_RESOURCE
 from ai.backend.manager.confidential.storage import FOLDER_KEY_SEGMENT, folder_key_tag
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.errors.confidential import (
     BrokerUnreachable,
     FolderKeyNotEntitled,
+    ImageKeyNotEntitled,
     NonceQuotaExhausted,
     ReferenceValueRejected,
     ShimRefusal,
@@ -37,7 +39,9 @@ from ai.backend.manager.models.confidential.types import (
     DecisionVerdict,
     SessionResourceKind,
 )
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.scaling_group.types import ConfidentialScalingGroupOpts
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 RCAR_SESSION_COOKIE: Final = "kbs-session-id"
@@ -50,6 +54,14 @@ RELAYED_REQUEST_HEADERS: Final = frozenset({
 })
 RELAYED_RESPONSE_HEADERS: Final = frozenset({"content-type", "set-cookie", "www-authenticate"})
 UNDATED_CLAIM_LEASE: Final = timedelta(minutes=5)
+IMAGE_KEY_SEGMENT: Final = "image-key"
+IMAGE_KEY_LAUNCH_STATUSES: Final = (
+    KernelStatus.PREPARING,
+    KernelStatus.PULLING,
+    KernelStatus.PREPARED,
+    KernelStatus.CREATING,
+    KernelStatus.RUNNING,
+)
 
 _QUOTE_HEADER_LEN: Final = 48
 _MR_TD: Final = slice(136, 184)
@@ -80,6 +92,21 @@ def path_nonce(resource_path: str) -> str | None:
     if len(segments) != 3:
         return None
     return segments[1].partition(".")[2] or None
+
+
+def image_key_tag(canonical: str) -> str:
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def image_key_path(domain_name: str, canonical: str) -> str:
+    return f"{domain_name}/{IMAGE_KEY_SEGMENT}/{image_key_tag(canonical)}"
+
+
+def image_key_subject(resource_path: str) -> tuple[str, str] | None:
+    segments = resource_path.split("/")
+    if len(segments) != 3 or segments[1] != IMAGE_KEY_SEGMENT:
+        return None
+    return segments[0], segments[2]
 
 
 def folder_key_subject(resource_path: str) -> tuple[str, uuid.UUID] | None:
@@ -309,11 +336,58 @@ class AuthorisationShim:
                 )
             )
 
+    async def _launching_image_session(self, domain_name: str, tag: str) -> uuid.UUID | None:
+        async with self._db.begin_readonly_session() as db_session:
+            rows = (
+                await db_session.execute(
+                    sa.select(KernelRow.session_id, KernelRow.image)
+                    .join(SessionRow, SessionRow.id == KernelRow.session_id)
+                    .where(
+                        (SessionRow.domain_name == domain_name)
+                        & KernelRow.status.in_(IMAGE_KEY_LAUNCH_STATUSES)
+                        & KernelRow.image.is_not(None)
+                    )
+                )
+            ).all()
+        return next(
+            (session_id for session_id, image in rows if image_key_tag(image) == tag), None
+        )
+
+    async def _authorise_image_key(
+        self, resource_path: str, domain_name: str, tag: str, claimant: Claimant | None
+    ) -> uuid.UUID:
+        if claimant is None:
+            refusal = "an unattested fetch cannot claim a layer key encryption key"
+            await self.record(
+                actor=DecisionActor.GUEST,
+                verdict=DecisionVerdict.OUT_OF_SCOPE,
+                resource_path=resource_path,
+                failing_clause=refusal,
+            )
+            raise ShimRefusal(extra_msg=refusal)
+        entitled = await self._launching_image_session(domain_name, tag)
+        if entitled is None:
+            refusal = (
+                f"no live session in domain {domain_name} runs an image whose layer key"
+                f" encryption key is {tag}"
+            )
+            await self.record(
+                actor=DecisionActor.GUEST,
+                verdict=DecisionVerdict.DENIED,
+                resource_path=resource_path,
+                failing_clause=refusal,
+            )
+            raise ImageKeyNotEntitled(extra_msg=refusal)
+        return entitled
+
     async def _authorise_unscoped(
         self, resource_path: str, claimant: Claimant | None
     ) -> uuid.UUID | None:
         if resource_path == TIME_RESOURCE:
             return None
+        image = image_key_subject(resource_path)
+        if image is not None:
+            return await self._authorise_image_key(resource_path, image[0], image[1], claimant)
         subject = folder_key_subject(resource_path)
         if subject is None:
             refusal = (
