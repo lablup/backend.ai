@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -27,7 +28,7 @@ _DEFAULT_CONFIG = ClientConfig(endpoint=URL("https://api.example.com"))
 class _MergedReadCase:
     """One of the two merged reads: the same batch shape over a different HTTP client."""
 
-    method_name: str
+    read: Callable[[V2AppConfigClient, Any], Awaitable[GetAppConfigsPayload]]
     path: str
     input_type: type[MyGetAppConfigsInput] | type[PublicGetAppConfigsInput]
     signed: bool
@@ -71,23 +72,35 @@ def client(mock_session: MagicMock) -> V2AppConfigClient:
     )
 
 
+@pytest.fixture
+def pre_login_registry(mock_session: MagicMock) -> V2ClientRegistry:
+    """A registry as a caller holds it before it has any credentials.
+
+    ``NoAuth`` is what the authenticated half carries until a keypair is configured.
+    """
+    return V2ClientRegistry(
+        BackendAIAuthClient(_DEFAULT_CONFIG, NoAuth(), mock_session),
+        BackendAIAnonymousClient(_DEFAULT_CONFIG, mock_session),
+    )
+
+
 @pytest.mark.parametrize(
     "case",
     [
         _MergedReadCase(
-            method_name="my_get_app_configs",
+            read=V2AppConfigClient.my_get_app_configs,
             path="/v2/app-config/my/get",
             input_type=MyGetAppConfigsInput,
             signed=True,
         ),
         _MergedReadCase(
-            method_name="public_get_app_configs",
+            read=V2AppConfigClient.public_get_app_configs,
             path="/v2/app-config/public/get",
             input_type=PublicGetAppConfigsInput,
             signed=False,
         ),
     ],
-    ids=lambda case: case.method_name,
+    ids=lambda case: case.read.__name__,
 )
 class TestMergedRead:
     async def test_posts_to_its_own_path_and_parses_the_payload(
@@ -96,9 +109,7 @@ class TestMergedRead:
         client: V2AppConfigClient,
         mock_session: MagicMock,
     ) -> None:
-        result = await getattr(client, case.method_name)(
-            case.input_type(config_names=["theme", "menu"])
-        )
+        result = await case.read(client, case.input_type(config_names=["theme", "menu"]))
 
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "POST"
@@ -112,9 +123,7 @@ class TestMergedRead:
         case: _MergedReadCase,
         client: V2AppConfigClient,
     ) -> None:
-        result = await getattr(client, case.method_name)(
-            case.input_type(config_names=["theme", "menu"])
-        )
+        result = await case.read(client, case.input_type(config_names=["theme", "menu"]))
 
         merged, uncontributed = result.app_configs
         assert merged.config == {"mode": "dark"}
@@ -127,7 +136,7 @@ class TestMergedRead:
         mock_session: MagicMock,
     ) -> None:
         """The public read must reach the server without credentials — that is its whole point."""
-        await getattr(client, case.method_name)(case.input_type(config_names=["theme"]))
+        await case.read(client, case.input_type(config_names=["theme"]))
 
         headers = mock_session.request.call_args[1]["headers"]
         assert ("Authorization" in headers) is case.signed
@@ -136,19 +145,11 @@ class TestMergedRead:
 class TestPreLoginCaller:
     async def test_a_caller_holding_no_credentials_can_make_the_public_read(
         self,
+        pre_login_registry: V2ClientRegistry,
         mock_session: MagicMock,
     ) -> None:
-        """The pre-login case end to end: build the registry with no keypair and read.
-
-        ``NoAuth`` is what a caller has before it holds any credentials, so reaching the
-        public read through the registry with it is the contract this endpoint exists for.
-        """
-        registry = V2ClientRegistry(
-            BackendAIAuthClient(_DEFAULT_CONFIG, NoAuth(), mock_session),
-            BackendAIAnonymousClient(_DEFAULT_CONFIG, mock_session),
-        )
-
-        result = await registry.app_config.public_get_app_configs(
+        """Reaching the public read through the registry is the contract it exists for."""
+        result = await pre_login_registry.app_config.public_get_app_configs(
             PublicGetAppConfigsInput(config_names=["theme", "menu"])
         )
 
