@@ -42,7 +42,7 @@ class TestSuperadminGate:
             await client.admin_purge(uuid.uuid4())
 
 
-class TestDefinitionRoundTrip:
+class TestDefinitionCRUD:
     async def test_a_registered_definition_is_readable_by_id(
         self,
         admin_v2_registry: V2ClientRegistry,

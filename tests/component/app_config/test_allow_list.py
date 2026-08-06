@@ -66,7 +66,7 @@ class TestSuperadminGate:
             await client.admin_purge(entry_id)
 
 
-class TestAllowListRoundTrip:
+class TestAllowListCRUD:
     async def test_a_registered_entry_keeps_its_scope_and_rank(
         self,
         admin_v2_registry: V2ClientRegistry,
