@@ -7803,10 +7803,18 @@
             "title": "Shell"
           },
           "port": {
-            "description": "Port number for the model service. Must be greater than 1.",
-            "exclusiveMinimum": 1,
-            "title": "Port",
-            "type": "integer"
+            "anyOf": [
+              {
+                "exclusiveMinimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Port number for the model service. Must be greater than 1. Optional; defaults to the runtime variant baseline's port at revision resolution.",
+            "title": "Port"
           },
           "health_check": {
             "anyOf": [
@@ -7821,9 +7829,6 @@
             "description": "Health check configuration for the model service."
           }
         },
-        "required": [
-          "port"
-        ],
         "title": "PresetModelServiceConfigInput",
         "type": "object"
       },
