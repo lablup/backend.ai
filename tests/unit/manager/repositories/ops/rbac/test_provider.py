@@ -1820,8 +1820,8 @@ class _PartialUpsertItem:
 
 
 @dataclass(frozen=True)
-class _ExpectedBindingRow:
-    """One scope association the batch must leave, named by the row it binds."""
+class _ExpectedAssocScopeEntity:
+    """One association_scopes_entities row the batch must leave, named by the row it binds."""
 
     row_name: str
     scope_id: str
@@ -1836,11 +1836,10 @@ class _ScopedPartialUpsertCase:
     """
 
     name: str
-    description: str
     items: tuple[_PartialUpsertItem, ...]
-    expected_succeeded_names: list[str]
+    expected_succeeded_items: list[str]
     expected_failed_indexes: list[int]
-    expected_bindings: list[_ExpectedBindingRow]
+    expected_assoc_scope_entities: list[_ExpectedAssocScopeEntity]
 
 
 class TestBulkUpsertScopedPartial:
@@ -1849,50 +1848,45 @@ class TestBulkUpsertScopedPartial:
         [
             _ScopedPartialUpsertCase(
                 name="every-item-lands",
-                description="a clean batch lands wholly, each row bound to its scope",
                 items=(
                     _PartialUpsertItem(row_name="first"),
                     _PartialUpsertItem(row_name="second"),
                 ),
-                expected_succeeded_names=["first", "second"],
+                expected_succeeded_items=["first", "second"],
                 expected_failed_indexes=[],
-                expected_bindings=[
-                    _ExpectedBindingRow(row_name="first", scope_id=_USER_SCOPE_ID),
-                    _ExpectedBindingRow(row_name="second", scope_id=_USER_SCOPE_ID),
+                expected_assoc_scope_entities=[
+                    _ExpectedAssocScopeEntity(row_name="first", scope_id=_USER_SCOPE_ID),
+                    _ExpectedAssocScopeEntity(row_name="second", scope_id=_USER_SCOPE_ID),
                 ],
             ),
             _ScopedPartialUpsertCase(
                 name="global-binds-nothing",
-                description="a scope-less (GLOBAL) item lands but binds to nothing",
                 items=(_PartialUpsertItem(row_name="solo", scope_ref=None),),
-                expected_succeeded_names=["solo"],
+                expected_succeeded_items=["solo"],
                 expected_failed_indexes=[],
-                expected_bindings=[],
+                expected_assoc_scope_entities=[],
             ),
             _ScopedPartialUpsertCase(
                 name="rejected-item-fails-alone",
-                description=(
-                    "the FK-rejected item reports its index and rolls back its row and "
-                    "binding together; the rest of the batch lands"
-                ),
                 items=(
                     _PartialUpsertItem(row_name="doomed", parent_id=_ABSENT_PARENT_ID),
                     _PartialUpsertItem(row_name="fresh"),
                 ),
-                expected_succeeded_names=["fresh"],
+                expected_succeeded_items=["fresh"],
                 expected_failed_indexes=[0],
-                expected_bindings=[_ExpectedBindingRow(row_name="fresh", scope_id=_USER_SCOPE_ID)],
+                expected_assoc_scope_entities=[
+                    _ExpectedAssocScopeEntity(row_name="fresh", scope_id=_USER_SCOPE_ID),
+                ],
             ),
             _ScopedPartialUpsertCase(
                 name="every-item-rejected",
-                description="a batch of only rejected items reports every index and writes nothing",
                 items=(
                     _PartialUpsertItem(row_name="doomed-a", parent_id=_ABSENT_PARENT_ID),
                     _PartialUpsertItem(row_name="doomed-b", parent_id=_ABSENT_PARENT_ID),
                 ),
-                expected_succeeded_names=[],
+                expected_succeeded_items=[],
                 expected_failed_indexes=[0, 1],
-                expected_bindings=[],
+                expected_assoc_scope_entities=[],
             ),
         ],
         ids=lambda case: case.name,
@@ -1917,7 +1911,7 @@ class TestBulkUpsertScopedPartial:
                 )
                 for item in case.items
             ])
-            assert [row.name for row in result.items] == case.expected_succeeded_names
+            assert [row.name for row in result.items] == case.expected_succeeded_items
             assert [e.index for e in result.failed] == case.expected_failed_indexes
             # Every rejection these batches provoke is the FK gate, mapped by the spec.
             assert all(
@@ -1929,9 +1923,10 @@ class TestBulkUpsertScopedPartial:
             names = (await db_sess.scalars(sa.select(RBACOpsUpsertGatedRow.name))).all()
             assocs = (await db_sess.scalars(sa.select(AssociationScopesEntitiesRow))).all()
 
-        assert sorted(names) == sorted(case.expected_succeeded_names)
+        assert sorted(names) == sorted(case.expected_succeeded_items)
         assert sorted((a.entity_id, a.scope_id) for a in assocs) == sorted(
-            (row_ids[binding.row_name], binding.scope_id) for binding in case.expected_bindings
+            (row_ids[assoc.row_name], assoc.scope_id)
+            for assoc in case.expected_assoc_scope_entities
         )
 
 
