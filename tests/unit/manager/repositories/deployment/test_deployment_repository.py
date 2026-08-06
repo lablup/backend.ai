@@ -1448,7 +1448,7 @@ class TestDeploymentRevisionOperations:
                 RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
-                KeyPairRow,  # UserRow.main_access_key FK target
+                KeyPairRow,  # UserRow.default_access_key FK target
                 GroupRow,
                 VFolderRow,
                 ContainerRegistryRow,

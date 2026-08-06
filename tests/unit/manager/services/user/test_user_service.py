@@ -104,7 +104,7 @@ def _make_user_data(
         totp_activated=False,
         totp_activated_at=None,
         sudo_session_enabled=False,
-        main_access_key="TESTKEY1234567890",
+        default_access_key="TESTKEY1234567890",
         container_uid=None,
         container_main_gid=None,
         container_gids=None,
@@ -790,7 +790,7 @@ class TestPurgeUser:
             user_info_ctx=UserInfoContext(
                 uuid=uuid.uuid4(),
                 email="admin@example.com",
-                main_access_key=AccessKey("ADMINKEY"),
+                default_access_key=AccessKey("ADMINKEY"),
             ),
             email=email,
             **kwargs,

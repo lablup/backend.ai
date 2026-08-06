@@ -33,7 +33,7 @@ class UserUpdaterSpec(UpdaterSpec[UserRow]):
     totp_activated: OptionalState[bool] = field(default_factory=OptionalState.nop)
     resource_policy: OptionalState[str] = field(default_factory=OptionalState.nop)
     sudo_session_enabled: OptionalState[bool] = field(default_factory=OptionalState.nop)
-    main_access_key: OptionalState[str] = field(default_factory=OptionalState.nop)
+    default_access_key: OptionalState[str] = field(default_factory=OptionalState.nop)
     container_uid: TriState[int] = field(default_factory=TriState.nop)
     container_main_gid: TriState[int] = field(default_factory=TriState.nop)
     container_gids: TriState[list[int]] = field(default_factory=TriState.nop)

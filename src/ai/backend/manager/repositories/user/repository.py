@@ -190,11 +190,11 @@ class UserRepository:
         self,
         user_uuid: UUID,
         target_user_uuid: UUID,
-        target_main_access_key: AccessKey,
+        target_default_access_key: AccessKey,
     ) -> None:
         """Delegate endpoint ownership to another user."""
         await self._db_source.delegate_endpoint_ownership(
-            user_uuid, target_user_uuid, target_main_access_key
+            user_uuid, target_user_uuid, target_default_access_key
         )
 
     @user_repository_resilience.apply()
@@ -308,9 +308,9 @@ class UserRepository:
         return await self._db_source.update_my_keypair(user_uuid, updater)
 
     @user_repository_resilience.apply()
-    async def switch_my_main_access_key(self, user_uuid: UUID, access_key: str) -> None:
+    async def switch_my_default_access_key(self, user_uuid: UUID, access_key: str) -> None:
         """Switch the main access key for the current user."""
-        await self._db_source.switch_my_main_access_key(user_uuid, access_key)
+        await self._db_source.switch_my_default_access_key(user_uuid, access_key)
 
     @user_repository_resilience.apply()
     async def search_my_keypairs(

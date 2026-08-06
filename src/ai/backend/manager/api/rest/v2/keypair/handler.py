@@ -87,7 +87,7 @@ class V2KeypairHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Switch the main access key for the current user."""
-        result = await self._adapter.switch_my_main_access_key(
+        result = await self._adapter.switch_my_default_access_key(
             ctx.user_uuid, body.parsed.access_key
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

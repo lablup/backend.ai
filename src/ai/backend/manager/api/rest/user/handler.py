@@ -253,7 +253,7 @@ class UserHandler:
         user_info_ctx = UserInfoContext(
             uuid=caller_result.user.uuid,
             email=caller_result.user.email,
-            main_access_key=AccessKey(caller_result.user.main_access_key or ""),
+            default_access_key=AccessKey(caller_result.user.default_access_key or ""),
         )
 
         purge_shared = OptionalState[bool].nop()

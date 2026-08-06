@@ -254,7 +254,7 @@ async def admin_bulk_update_users_v2(
         dto = user_item.input.to_pydantic()
         if dto.main_access_key is None:
             raise UserModificationBadRequest(
-                "main_access_key cannot be null; omit it to leave the default keypair unchanged."
+                "default_access_key cannot be null; omit it to leave the default keypair unchanged."
             )
 
         updater_spec = UserUpdaterSpec(
@@ -324,7 +324,7 @@ async def admin_bulk_update_users_v2(
                 if dto.sudo_session_enabled is not None
                 else OptionalState.nop()
             ),
-            main_access_key=(
+            default_access_key=(
                 OptionalState.nop()
                 if isinstance(dto.main_access_key, Sentinel)
                 else OptionalState.update(dto.main_access_key)

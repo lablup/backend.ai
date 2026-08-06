@@ -182,7 +182,7 @@ class UserService:
         user_info_ctx = UserInfoContext(
             uuid=admin_user.uuid,
             email=admin_user.email,
-            main_access_key=AccessKey(admin_user.main_access_key or ""),
+            default_access_key=AccessKey(admin_user.default_access_key or ""),
         )
         # Reuse the internal UUID-based purge logic shared with bulk_purge_users
         bulk_action = BulkPurgeUserAction(
@@ -239,7 +239,7 @@ class UserService:
             await self._user_repository.delegate_endpoint_ownership(
                 user_uuid=user_uuid,
                 target_user_uuid=action.user_info_ctx.uuid,
-                target_main_access_key=action.user_info_ctx.main_access_key,
+                target_default_access_key=action.user_info_ctx.default_access_key,
             )
             await self._user_repository.delete_endpoints(
                 user_uuid=user_uuid,
@@ -301,7 +301,7 @@ class UserService:
             await self._user_repository.delegate_endpoint_ownership(
                 user_uuid=user_uuid,
                 target_user_uuid=user_info_ctx.uuid,
-                target_main_access_key=user_info_ctx.main_access_key,
+                target_default_access_key=user_info_ctx.default_access_key,
             )
             await self._user_repository.delete_endpoints(
                 user_uuid=user_uuid,
@@ -338,7 +338,7 @@ class UserService:
         user_info_ctx = UserInfoContext(
             uuid=admin_user.uuid,
             email=admin_user.email,
-            main_access_key=AccessKey(admin_user.main_access_key or ""),
+            default_access_key=AccessKey(admin_user.default_access_key or ""),
         )
 
         purged_user_ids: list[UUID] = []
@@ -443,10 +443,10 @@ class UserService:
         )
         return UpdateMyKeypairActionResult(keypair=keypair_data)
 
-    async def switch_my_main_access_key(
+    async def switch_my_default_access_key(
         self, action: SwitchMyMainAccessKeyAction
     ) -> SwitchMyMainAccessKeyActionResult:
-        await self._user_repository.switch_my_main_access_key(
+        await self._user_repository.switch_my_default_access_key(
             user_uuid=action.user_uuid, access_key=action.access_key
         )
         return SwitchMyMainAccessKeyActionResult(success=True)

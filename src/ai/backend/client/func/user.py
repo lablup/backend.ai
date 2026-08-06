@@ -331,7 +331,7 @@ class User(BaseFunction):
         totp_activated: bool | Undefined = undefined,
         group_ids: Iterable[str] | Undefined = undefined,
         sudo_session_enabled: bool | Undefined = undefined,
-        main_access_key: str | Undefined = undefined,
+        default_access_key: str | Undefined = undefined,
         container_uid: int | None | Undefined = undefined,
         container_main_gid: int | None | Undefined = undefined,
         container_gids: Iterable[int] | None | Undefined = undefined,
@@ -361,7 +361,7 @@ class User(BaseFunction):
         set_if_set(inputs, "totp_activated", totp_activated)
         set_if_set(inputs, "group_ids", group_ids)
         set_if_set(inputs, "sudo_session_enabled", sudo_session_enabled)
-        set_if_set(inputs, "main_access_key", main_access_key)
+        set_if_set(inputs, "main_access_key", default_access_key)
         set_if_set(inputs, "container_uid", container_uid)
         set_if_set(inputs, "container_main_gid", container_main_gid)
         set_if_set(inputs, "container_gids", container_gids)

@@ -147,8 +147,8 @@ class TestFieldJoinAssignments:
         assert USER_RESOURCE_POLICY_JOIN in field.joins
         assert len(field.joins) == 1
 
-    def test_main_access_key_has_join(self, fields_by_key: dict[str, ExportFieldDef]) -> None:
-        """main_access_key comes from the marked keypair, so it needs the keypair join."""
+    def test_default_access_key_has_join(self, fields_by_key: dict[str, ExportFieldDef]) -> None:
+        """default_access_key comes from the marked keypair, so it needs the keypair join."""
         field = fields_by_key["main_access_key"]
         assert field.joins is not None
         assert MAIN_KEYPAIR_JOIN in field.joins

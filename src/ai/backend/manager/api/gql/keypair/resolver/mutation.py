@@ -97,7 +97,9 @@ async def switch_my_main_access_key(
     input: SwitchMyMainAccessKeyInputGQL,
 ) -> SwitchMyMainAccessKeyPayloadGQL | None:
     user_id = _get_current_user_id()
-    payload = await info.context.adapters.user.switch_my_main_access_key(user_id, input.access_key)
+    payload = await info.context.adapters.user.switch_my_default_access_key(
+        user_id, input.access_key
+    )
     return SwitchMyMainAccessKeyPayloadGQL.from_pydantic(payload)
 
 

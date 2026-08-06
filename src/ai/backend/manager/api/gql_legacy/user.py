@@ -580,11 +580,11 @@ class User(graphene.ObjectType):  # type: ignore[misc]
     totp_activated = graphene.Boolean()
     totp_activated_at = GQLDateTime()
     sudo_session_enabled = graphene.Boolean()
-    main_access_key = graphene.String(
+    default_access_key = graphene.String(
         description=(
             "Added in 24.03.0. Deprecated since 26.9.0. The default keypair is recorded on the keypair itself. Used as the default authentication credential for password-based"
-            " logins and sets the user's total resource usage limit. User's main_access_key cannot"
-            " be deleted, and only super-admin can replace main_access_key."
+            " logins and sets the user's total resource usage limit. User's default_access_key cannot"
+            " be deleted, and only super-admin can replace default_access_key."
         ),
         deprecation_reason="Deprecated since 26.9.0. The default keypair is recorded on the keypair itself.",
     )
@@ -632,7 +632,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
             totp_activated=dto.totp_activated,
             totp_activated_at=dto.totp_activated_at,
             sudo_session_enabled=dto.sudo_session_enabled,
-            main_access_key=dto.main_access_key,
+            default_access_key=dto.default_access_key,
             container_uid=dto.container_uid,
             container_main_gid=dto.container_main_gid,
             container_gids=dto.container_gids,
@@ -664,7 +664,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
             totp_activated=row.totp_activated,
             totp_activated_at=row.totp_activated_at,
             sudo_session_enabled=row.sudo_session_enabled,
-            main_access_key=row.main_keypair_access_key,
+            default_access_key=row.main_keypair_access_key,
             container_uid=row.container_uid,
             container_main_gid=row.container_main_gid,
             container_gids=row.container_gids,
@@ -1035,7 +1035,7 @@ class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
     totp_activated = graphene.Boolean(required=False, default=False)
     resource_policy = graphene.String(required=False)
     sudo_session_enabled = graphene.Boolean(required=False, default=False)
-    main_access_key = graphene.String(required=False)
+    default_access_key = graphene.String(required=False)
     container_uid = graphene.Int(
         required=False,
         description="Added in 25.2.0. The user ID (UID) assigned to processes running inside the container.",
@@ -1103,8 +1103,8 @@ class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
             sudo_session_enabled=OptionalState[bool].from_graphql(
                 self.sudo_session_enabled,
             ),
-            main_access_key=OptionalState[str].from_graphql(
-                self.main_access_key,
+            default_access_key=OptionalState[str].from_graphql(
+                self.default_access_key,
             ),
             container_uid=TriState[int].from_graphql(
                 self.container_uid,
@@ -1301,7 +1301,7 @@ class PurgeUser(graphene.Mutation):  # type: ignore[misc]
         user_info_ctx = UserInfoContext(
             uuid=requester.uuid,
             email=requester.email,
-            main_access_key=AccessKey(requester.main_access_key or ""),
+            default_access_key=AccessKey(requester.default_access_key or ""),
         )
         action = props.to_action(email, user_info_ctx)
         user_data = await graph_ctx.user_repository.get_by_email_validated(email)
