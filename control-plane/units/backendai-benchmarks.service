@@ -1,11 +1,10 @@
 [Unit]
 Description=Backend.AI control-plane benchmarks
-Requires=backendai-credentials.service
 After=backendai-credentials.service backendai-postgresql.service backendai-etcd.service backendai-manager.service
 
 [Service]
 Type=oneshot
-Environment=BAI_BENCH_ARGS=--label state-bundle
+Environment="BAI_BENCH_ARGS=--label state-bundle"
 EnvironmentFile=-/var/lib/backendai/benchmarks.env
 LoadCredential=password:/run/backendai-credentials.sock
 LoadCredential=etcd-root-password:/run/backendai-credentials.sock
