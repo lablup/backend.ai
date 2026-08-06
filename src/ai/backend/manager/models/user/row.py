@@ -377,9 +377,6 @@ class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
                 if keypair_candidate is None or not keypair_candidate.is_admin:
                     keypair_candidate = row
                     break
-            if keypair_candidate is not None:
-                keypair_candidate.is_default = True
-                self.main_access_key = keypair_candidate.access_key
         else:
             keypair_candidate = main_keypair_row
         return keypair_candidate
