@@ -54,6 +54,17 @@ from ai.backend.manager.sokovan.recorder.context import RecorderContext
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
+def cluster_hostname_of(kernel: KernelBindingData) -> str:
+    """The kernel's cluster hostname — its explicit ``cluster_hostname`` or the ``<role><idx>``
+    fallback. Single source of truth: this exact name is written to ``BACKENDAI_CLUSTER_HOST``,
+    ``BACKENDAI_CLUSTER_HOSTS`` and the ``cluster_hosts`` IP map, and the agent matches its own
+    against those to write /etc/hosts. Any drift between the derivations here silently sends a
+    clustered kernel's own name to loopback (see the agent's ``_peer_host_map``), so it must be
+    computed in exactly one place.
+    """
+    return kernel.cluster_hostname or f"{kernel.cluster_role}{kernel.cluster_idx}"
+
+
 @dataclass
 class SessionLauncherArgs:
     repository: SchedulerRepository
@@ -272,8 +283,7 @@ class SessionLauncher:
                 "BACKENDAI_CLUSTER_SIZE": str(len(session.kernels)),
                 "BACKENDAI_CLUSTER_REPLICAS": ",".join(f"{k}:{v}" for k, v in replicas.items()),
                 "BACKENDAI_CLUSTER_HOSTS": ",".join(
-                    k.cluster_hostname or f"{k.cluster_role}{k.cluster_idx}"
-                    for k in session.kernels
+                    cluster_hostname_of(k) for k in session.kernels
                 ),
                 "BACKENDAI_ACCESS_KEY": session.access_key,
                 # BACKENDAI_SERVICE_PORTS are set as per-kernel env-vars.
@@ -289,7 +299,7 @@ class SessionLauncher:
             # Only populated where the manager pre-assigns IPs (overlay sessions).
             cluster_hosts: dict[str, str] = {}
             for kernel in session.kernels:
-                hostname = kernel.cluster_hostname or f"{kernel.cluster_role}{kernel.cluster_idx}"
+                hostname = cluster_hostname_of(kernel)
                 if (ip := network_setup.endpoint_ips.get(str(kernel.kernel_id))) is not None:
                     cluster_hosts[hostname] = ip
 
@@ -341,7 +351,7 @@ class SessionLauncher:
                     cluster_role = k.cluster_role
                     cluster_idx = k.cluster_idx
                     local_rank = k.local_rank
-                    cluster_hostname = k.cluster_hostname or f"{cluster_role}{cluster_idx}"
+                    cluster_hostname = cluster_hostname_of(k)
 
                     # Build proper KernelCreationConfig matching registry.py format
                     kernel_config: KernelCreationConfig = {

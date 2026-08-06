@@ -10,7 +10,7 @@ Implemented-Version:
 <!-- context-for-ai
 type: master-bep
 scope: Replace Docker Swarm overlay for multi-node sessions with a runtime-neutral, pluggable cluster-network data plane coordinated via etcd, so containerd (and other host-native runtimes) can provide the same isolated cross-node connectivity without Kubernetes.
-detail-docs: [control-plane.md, agent-plugin-v2.md, data-plane-backends.md, migration.md, verification.md]
+detail-docs: [control-plane.md, agent-plugin-v2.md, data-plane-backends.md, cluster-name-resolution.md, migration.md, verification.md]
 key-constraints:
   - Agents run host-native; no Kubernetes.
   - Reuse existing etcd; introduce no new coordination infrastructure.
@@ -75,6 +75,7 @@ The **manager plugin stays as-is**; a new `CNINetworkPlugin` implements it and d
 | [control-plane](./BEP-1062/control-plane.md) | etcd schema, IPAM/VNI allocation, backend selection, watch/membership |
 | [agent-plugin-v2](./BEP-1062/agent-plugin-v2.md) | Runtime-neutral v2 agent plugin interface and attach spec |
 | [data-plane-backends](./BEP-1062/data-plane-backends.md) | vxlan / host-gw / wireguard backends and isolation |
+| [cluster-name-resolution](./BEP-1062/cluster-name-resolution.md) | Peer hostname resolution: static /etc/hosts today → decentralized etcd resolver |
 | [migration](./BEP-1062/migration.md) | Rollout, compatibility, config switches |
 | [verification](./BEP-1062/verification.md) | Real-infra smoke tests (vxlan / CNI / etcd CAS) |
 
@@ -98,6 +99,7 @@ The **manager plugin stays as-is**; a new `CNINetworkPlugin` implements it and d
 | P7 | `wireguard` backend (encrypted option). |
 | P8 | Failure/GC: lease-driven peer cleanup, node-crash recovery. |
 | P9 | Central endpoint IPAM: manager assigns per-endpoint overlay IPs (variable-prefix session subnet by `cluster_size`), writes `endpoints/`; coordinator programs FDB+ARP from it; overlay CNI uses the assigned static IP. Removes host-local collision + BUM flood (Swarm parity). |
+| P10 | Cluster name resolution ([cluster-name-resolution](./BEP-1062/cluster-name-resolution.md)): static `/etc/hosts` hardening **(done)** → per-node etcd resolver → shrink `/etc/hosts` to localhost+self. Dynamic membership + backend-unified peer resolution. |
 
 ## Decision Log
 
@@ -119,6 +121,7 @@ The **manager plugin stays as-is**; a new `CNINetworkPlugin` implements it and d
 | 2026-07-02 | **Runtime management and network management are two completely separate classes**; the agent is the sole composition point. `ContainerdRuntimeClient` (containerd only — no network imports) and the network subsystem (`SessionNetworkCoordinator`/`ContainerNetworkProvisioner`, containerd-agnostic) never reference each other. `ContainerdAgent` composes them and hands the task's netns/PID from the runtime to the network layer | Enforces the separation as a code-level invariant, not just a convention: either side can be tested, versioned, or replaced in isolation, and the coupling is confined to one orchestration method. |
 | 2026-07-06 | **Overlay endpoint IPs are assigned centrally by the manager (per endpoint), not agent-locally by per-node host-local IPAM**; the agent coordinator programs FDB + neighbor (ARP) entries from the etcd `endpoints/` table (proactive), instead of relying on broadcast-flood learning | Per-node host-local IPAM gives every node the same first address on the stretched overlay subnet → **duplicate-IP collision** (verified: two nodes both allocate `.2`; only a manual reservation avoided it in verification §11). A single authority — the manager, which already owns subnet/VNI allocation and knows kernel placement — guarantees disjoint IPs. Because it also knows IP→VTEP, coordinators can pre-program FDB/ARP so no BUM flood is needed. This matches Docker Swarm's centralized IPAM + gossip-programmed neighbor tables (Swarm parity, the BEP goal). Supersedes control-plane.md's earlier "container IPs assigned agent-locally" for overlay backends. |
 | 2026-07-06 | **The session subnet size scales with `cluster_size` (variable prefix), not a fixed `/24`** | A fixed `/24` caps a session at ~254 endpoints, so ≥255-endpoint clusters cannot fit — before per-node division even matters. The manager knows `cluster_size` at `create_network` time and sizes the block to cover all endpoints; the pool budget (fewer, larger blocks) is an operator-tunable tradeoff. Very large fleets (hundreds of nodes) additionally outgrow unicast head-end replication and need multicast/EVPN — a separate data-plane track, out of scope here. |
+| 2026-08-06 | **Peer name resolution evolves from static `/etc/hosts` to a per-node etcd-backed resolver, keeping `/etc/hosts` for localhost + self only (hybrid).** The resolver reuses the control-plane etcd table (no new consensus, no central DNS) and answers on the LOCAL/overlay gateway the network layer already owns | The static file cannot reflect dynamic membership (kernel restart/elastic scale) and diverges per backend (containerd writes a file; Docker uses Swarm DNS). A decentralized etcd resolver gives containerd the dynamic DNS Docker/Swarm already has, without Swarm's manager — consistent with "reuse etcd, no new coordination". Self/localhost staying in `/etc/hosts` keeps `gethostbyname(gethostname())` independent of DNS and removes the own→loopback bug class structurally. Static-path hardening (own-in-map validation both modes, no loopback for cluster members, refuse unresolvable listed peer, single-source hostname, atomic write) landed first. See [cluster-name-resolution](./BEP-1062/cluster-name-resolution.md). |
 | 2026-07-24 | **The per-session LOCAL bridge does NOT isolate by itself; cross-session isolation on it requires explicit Docker-style FORWARD rules.** Supersedes the 2026-07-03 "gives egress + isolation with no firewall rules" claim | Live two-node testing found a cross-session leak: with `ip_forward=1` (on for NAT egress) and an on-link route per session `/26`, the host **L3-routes between the per-session LOCAL bridges**, so two co-located sessions reached each other over LOCAL. The overlay was never affected — nothing routes to another VNI's subnet, so its separate-bridge isolation (§8) holds; that mechanism does **not** transfer to LOCAL, whose bridges are host-gatewayed and forwarded between. Fixed by mirroring Docker's own-network isolation (`native_attacher.py`): accept only egress→uplink + its conntrack-established return + intra-bridge (same session — single-node clusters need it), and `-o bridge -j DROP` everything else destined to the bridge; scoping egress to the uplink (not a blanket `-i bridge`) keeps it order-independent. verification §10's "LOCAL cross-session BLOCKED" did not reproduce on the real code path — it was a netns simulation lacking the agent's actual FORWARD rules. |
 
 ## Open Questions
@@ -126,7 +129,8 @@ The **manager plugin stays as-is**; a new `CNINetworkPlugin` implements it and d
 - Should `wireguard` be a standalone backend or a composable underlay flag on `vxlan`/`host-gw`?
 - Capability probe cadence: boot-only vs periodic re-probe when NIC/topology changes.
 - IPAM pool sizing policy for large clusters: default pool `/12` vs a larger/hierarchical pool once sessions request variable (larger-than-`/24`) blocks; per-scaling-group override semantics.
-- Endpoint IP lifecycle on kernel migration/restart: reuse the same IP (sticky) vs reallocate.
+- Endpoint IP lifecycle on kernel migration/restart: reuse the same IP (sticky) vs reallocate. (Interacts with cluster-name-resolution: a sticky IP keeps peer resolution stable across restart; reallocation relies on the resolver's dynamic update.)
+- Cluster name resolution: resolve directly off the `endpoints/` table at query time vs a thin `hosts/` projection; resolver TTL/cache cadence. See [cluster-name-resolution](./BEP-1062/cluster-name-resolution.md).
 
 ## References
 

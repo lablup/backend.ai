@@ -241,6 +241,19 @@ _SCMP_ARCH = {"x86_64": "SCMP_ARCH_X86_64", "aarch64": "SCMP_ARCH_AARCH64"}
 _GO_ARCH = {"x86_64": "amd64", "aarch64": "arm64"}
 
 
+def _atomic_write_text(path: Path, text: str) -> None:
+    """Write ``text`` to ``path`` atomically: write a sibling temp file, then ``os.replace``.
+
+    Prevents a crash mid-write from leaving a partial file — for /etc/hosts that matters because a
+    later agent restart adopts the running container and keeps whatever is on disk as its
+    ``/etc/hosts``. Fresh-write only: ``os.replace`` swaps the inode, so this must NOT target a path
+    already bind-mounted into a running container (the mount would keep pointing at the old inode).
+    """
+    tmp = path.with_name(f"{path.name}.tmp")
+    tmp.write_text(text)
+    tmp.replace(path)
+
+
 def _kernel_ge(min_kernel: str) -> bool:
     """True if the running host kernel is at least ``min_kernel`` (e.g. '4.8')."""
 
@@ -742,6 +755,32 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
           without coordinating.
         """
         if cluster_hosts := (cluster_info.get("cluster_hosts") or {}):
+            # Multi-node overlay: the manager assigned every peer an IP. Validate this kernel's own
+            # entry is present and that every peer the rank list names is resolvable — symmetry with
+            # the single-node branch below, which has always raised on a self-miss.
+            #
+            # Without the own-check, a kernel dropped from cluster_hosts (the manager omits any
+            # kernel whose overlay IP was not assigned yet) falls through to _write_etc_hosts, which
+            # would map its own name to 127.0.1.1 — binding its rendezvous server (torchrun/c10d,
+            # MPI OOB) to loopback, unreachable by peers. That is the exact single-node bug, still
+            # open on the multi-node path. Fail loudly instead.
+            own = environ.get("BACKENDAI_CLUSTER_HOST")
+            if own is not None and own not in cluster_hosts:
+                raise ContainerCreationError(
+                    f"a kernel of session {self._session_id} is missing from its own cluster host"
+                    f" map (BACKENDAI_CLUSTER_HOST={own!r} not in cluster_hosts"
+                    f" {sorted(cluster_hosts)}); its name would resolve to loopback and its"
+                    " rendezvous server would be unreachable by peers"
+                )
+            # A peer named by BACKENDAI_CLUSTER_HOSTS but absent from the IP map is silently
+            # unresolvable in /etc/hosts — that rank can never be reached. Surface it here rather
+            # than let the collective hang.
+            listed = [h for h in (environ.get("BACKENDAI_CLUSTER_HOSTS") or "").split(",") if h]
+            if missing := [h for h in listed if h not in cluster_hosts]:
+                raise ContainerCreationError(
+                    f"session {self._session_id} cluster host map is missing peers {missing} that"
+                    " BACKENDAI_CLUSTER_HOSTS names; they would be unresolvable in /etc/hosts"
+                )
             return dict(cluster_hosts), None
         # Only a SINGLE_NODE session may be laid out locally, and the cluster mode is the only thing
         # that says so. An empty cluster_hosts does NOT mean single-node: a MULTI_NODE session on a
@@ -788,13 +827,18 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         lines = ["127.0.0.1\tlocalhost", "::1\tlocalhost ip6-localhost ip6-loopback"]
         lines += [f"{ip}\t{hostname}" for hostname, ip in peers.items()]
         own_hostname = environ.get("BACKENDAI_CLUSTER_HOST")
-        if own_hostname and own_hostname not in peers:
-            # A lone kernel has no peer map, but its own name must still resolve or a
+        if own_hostname and not peers:
+            # A standalone kernel (no peer map) still needs its own name to resolve, or a
             # `gethostbyname(gethostname())` — a very common way for a process to find its own
-            # address — fails outright.
+            # address — fails outright. 127.0.1.1 is the Debian convention for the host's own name.
+            #
+            # NEVER do this when there IS a peer map: a cluster member's own name must resolve to its
+            # real (overlay/LOCAL) address, which _peer_host_map guarantees is in `peers` (it raises
+            # otherwise). Mapping a clustered kernel's name to loopback would bind its rendezvous
+            # server there, unreachable by peers.
             lines.append(f"127.0.1.1\t{own_hostname}")
         hosts_file = self._scratch_dir / "config" / "hosts"
-        hosts_file.write_text("\n".join(lines) + "\n")
+        _atomic_write_text(hosts_file, "\n".join(lines) + "\n")
         return Mount(MountTypes.BIND, hosts_file, Path("/etc/hosts"), MountPermission.READ_ONLY)
 
     def _prepare_resolv_conf(self) -> Mount | None:

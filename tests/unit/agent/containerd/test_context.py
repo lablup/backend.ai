@@ -1193,3 +1193,41 @@ class TestEtcHosts:
         env = {"BACKENDAI_CLUSTER_HOSTS": "main1,sub1", "BACKENDAI_CLUSTER_HOST": "sub9"}
         with pytest.raises(ContainerCreationError):
             await ctx._peer_host_map(cast(Any, _SINGLE_NODE), env)
+
+    async def test_multi_node_refuses_a_kernel_missing_from_the_managers_map(
+        self, tmp_path: Path
+    ) -> None:
+        # Symmetry with the single-node self-miss above, for the overlay path. The manager omits any
+        # kernel whose overlay IP was not assigned; verbatim use would then map this kernel's own
+        # name to 127.0.1.1 in _write_etc_hosts and bind its rendezvous server (torchrun/c10d) to
+        # loopback, unreachable by peers. Fail loudly instead of coming up broken.
+        ctx = self._ctx(tmp_path)
+        cluster_info = {"cluster_hosts": {"main1": "10.128.5.2", "sub1": "10.128.5.3"}}
+        env = {"BACKENDAI_CLUSTER_HOSTS": "main1,sub1,sub2", "BACKENDAI_CLUSTER_HOST": "sub2"}
+        with pytest.raises(ContainerCreationError):
+            await ctx._peer_host_map(cast(Any, cluster_info), env)
+
+    async def test_multi_node_refuses_when_a_listed_peer_is_unresolvable(
+        self, tmp_path: Path
+    ) -> None:
+        # A peer the rank list names but the IP map omits would be silently unresolvable in
+        # /etc/hosts — that rank could never be reached and the collective would hang. Surface it.
+        ctx = self._ctx(tmp_path)
+        cluster_info = {"cluster_hosts": {"main1": "10.128.5.2"}}  # sub1 absent
+        env = {"BACKENDAI_CLUSTER_HOSTS": "main1,sub1", "BACKENDAI_CLUSTER_HOST": "main1"}
+        with pytest.raises(ContainerCreationError):
+            await ctx._peer_host_map(cast(Any, cluster_info), env)
+
+    async def test_a_clustered_kernel_never_maps_its_own_name_to_loopback(
+        self, tmp_path: Path
+    ) -> None:
+        # With a peer map present, the standalone 127.0.1.1 fallback must not fire: the own name is
+        # already in `peers` at its real address. Guards against a clustered kernel's name resolving
+        # to loopback via /etc/hosts.
+        ctx = self._ctx(tmp_path)
+        peers = {"main1": "10.128.5.2", "sub1": "10.128.5.3"}
+        env = {"BACKENDAI_CLUSTER_HOST": "main1"}
+        ctx._write_etc_hosts(cast(Any, peers), env)
+        text = (tmp_path / "config" / "hosts").read_text()
+        assert "127.0.1.1" not in text
+        assert self._hosts(tmp_path)["main1"] == "10.128.5.2"
