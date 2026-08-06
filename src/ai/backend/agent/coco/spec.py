@@ -27,6 +27,8 @@ class ContainerSpec:
     cpuset: str
     dns_servers: Sequence[str]
     entrypoint: str = ""
+    workdir: str = ""
+    user: str = ""
     env: Mapping[str, str] = field(default_factory=dict)
     labels: Mapping[str, str] = field(default_factory=dict)
     annotations: Mapping[str, str] = field(default_factory=dict)
@@ -53,6 +55,10 @@ class ContainerSpec:
         ]
         if self.entrypoint:
             args += ["--entrypoint", self.entrypoint]
+        if self.workdir:
+            args += ["--workdir", self.workdir]
+        if self.user:
+            args += ["--user", self.user]
         if self.memory_bytes > 0:
             args += ["--memory", str(self.memory_bytes)]
         if self.cpuset:

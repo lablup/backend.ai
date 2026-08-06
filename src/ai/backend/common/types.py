@@ -1796,6 +1796,7 @@ class ImageConfig(TypedDict):
     repo_digest: str | None
     registry: ImageRegistry
     labels: Mapping[str, str]
+    process_config: Mapping[str, Any]
     is_local: bool
     auto_pull: AutoPullBehavior  # AutoPullBehavior value
 

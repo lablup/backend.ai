@@ -45,6 +45,7 @@ class ImageRowCreatorSpec(CreatorSpec[ImageRow]):
     type: ImageType | None = None
     accelerators: str | None = None
     labels: dict[str, Any] | None = None
+    process_config: dict[str, Any] | None = None
     status: ImageStatus = ImageStatus.ALIVE
 
     @override
@@ -63,5 +64,6 @@ class ImageRowCreatorSpec(CreatorSpec[ImageRow]):
             type=self.type,
             accelerators=self.accelerators,
             labels=self.labels,
+            process_config=self.process_config,
             status=self.status,
         )

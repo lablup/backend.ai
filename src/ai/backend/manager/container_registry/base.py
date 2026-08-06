@@ -56,6 +56,22 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
 from ai.backend.manager.repositories.image.creators import ImageRowCreatorSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+def read_process_config(config_data: Mapping[str, Any]) -> dict[str, Any]:
+    config = (
+        config_data.get("config")
+        or config_data.get("Config")
+        or config_data.get("container_config")
+        or {}
+    )
+    return {
+        "env": list(config.get("Env") or []),
+        "workdir": config.get("WorkingDir") or "",
+        "user": config.get("User") or "",
+    }
+
+
 concurrency_sema: ContextVar[asyncio.Semaphore] = ContextVar("concurrency_sema")
 progress_reporter: ContextVar[ProgressReporter | None] = ContextVar(
     "progress_reporter", default=None
@@ -197,6 +213,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         image_row.size_bytes = update["size_bytes"]
                         image_row.accelerators = update.get("accels")
                         image_row.labels = update["labels"]
+                        image_row.process_config = update["process_config"]
                         image_row.is_local = is_local
                         scanned_images.append(image_row.to_dataclass())
 
@@ -242,6 +259,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                                 type=ImageType.COMPUTE,
                                 accelerators=update.get("accels"),
                                 labels=update["labels"],
+                                process_config=update["process_config"],
                                 status=ImageStatus.ALIVE,
                             ),
                             scope_ref=RBACElementRef(
@@ -481,6 +499,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             "size": size_bytes,
             "labels": labels,
             "digest": config_digest,
+            "process_config": read_process_config(data),
         }
 
     async def _process_oci_index(
@@ -560,6 +579,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 "size": size_bytes,
                 "labels": labels,
                 "digest": config_digest,
+                "process_config": read_process_config(config_data),
             }
         }
         await self._read_manifest(image, tag, manifests)
@@ -703,6 +723,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     "config_digest": manifest["digest"],
                     "size_bytes": manifest["size"],
                     "labels": manifest["labels"],  # keep the original form
+                    "process_config": manifest.get("process_config") or {},
                 }
                 if "ai.backend.kernelspec" in manifest["labels"]:
                     accels = self._read_supported_accelerators_from_labels(manifest["labels"])

@@ -198,6 +198,9 @@ class ImageRow(Base):  # type: ignore[misc]
     type: Mapped[ImageType] = mapped_column("type", sa.Enum(ImageType), nullable=False)
     accelerators: Mapped[str | None] = mapped_column("accelerators", sa.String, nullable=True)
     labels: Mapped[dict[str, Any]] = mapped_column("labels", sa.JSON, nullable=False, default=dict)
+    process_config: Mapped[dict[str, Any]] = mapped_column(
+        "process_config", sa.JSON, nullable=False, default=dict
+    )
     _resources: Mapped[dict[str, Any]] = mapped_column(
         "resources",
         StructuredJSONColumn(
@@ -249,6 +252,7 @@ class ImageRow(Base):  # type: ignore[misc]
         type: ImageType | None = None,
         accelerators: str | None = None,
         labels: dict[str, Any] | None = None,
+        process_config: dict[str, Any] | None = None,
         resources: dict[str, Any] | None = None,
         status: ImageStatus = ImageStatus.ALIVE,
     ) -> None:
@@ -265,6 +269,7 @@ class ImageRow(Base):  # type: ignore[misc]
         self.type = type  # type: ignore[assignment]
         self.accelerators = accelerators
         self.labels = labels  # type: ignore[assignment]
+        self.process_config = process_config or {}
         self._resources = resources  # type: ignore[assignment]
         self.status = status
 
