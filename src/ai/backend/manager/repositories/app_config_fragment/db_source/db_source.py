@@ -112,7 +112,7 @@ class AppConfigFragmentDBSource:
         async with self._rbac_ops_provider.write_ops() as w:
             result = await w.bulk_upsert_scoped_partial(upserters)
             return AppConfigFragmentUpsertBulkResult(
-                succeeded=[row.to_data() for row in result.successes],
+                succeeded=[row.to_data() for row in result.items],
                 failed=[
                     AppConfigFragmentUpsertItemError(
                         config_name=specs[error.index].config_name,
