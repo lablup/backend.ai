@@ -133,7 +133,8 @@ case "${1:-}" in
     reload) cmd_reload ;;
     status) cmd_status ;;
     backup-policy) note "backed up to $(backup_live_policy)" ;;
+    lint) shift; lint_policy "${1:?usage: $0 lint <file.rego>}"; note "lint passed: $1" ;;
     set-policy) shift; cmd_set_policy "$@" ;;
     set-resource) shift; cmd_set_resource "$@" ;;
-    *) die "usage: $0 {up|down|reload|status|backup-policy|set-policy <file>|set-resource <repo/type/tag> <file>}" ;;
+    *) die "usage: $0 {up|down|reload|status|backup-policy|lint <file>|set-policy <file>|set-resource <repo/type/tag> <file>}" ;;
 esac
