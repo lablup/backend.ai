@@ -3,10 +3,8 @@
 ``users.main_access_key`` is ``ON DELETE SET NULL``, so deleting any keypair
 clears it. The fact describes a keypair, so it moves onto ``keypairs``.
 
-The first backfill ignores a ``main_access_key`` naming another user's keypair:
-the foreign key enforced existence, not ownership. The second promotes the
-oldest active keypair of the users the first leaves unmarked, so that no user
-with keypairs ends up without a default.
+The backfill ignores a ``main_access_key`` naming another user's keypair: the
+foreign key enforced existence, not ownership.
 
 Revision ID: a2f6b90c41d7
 Revises: 2dccb3069031
@@ -37,22 +35,6 @@ def upgrade() -> None:
             FROM users
             WHERE users.main_access_key = keypairs.access_key
               AND users.uuid = keypairs."user"
-        """)
-    )
-    op.get_bind().execute(
-        sa.text("""
-            UPDATE keypairs
-            SET is_default = true
-            WHERE keypairs.access_key IN (
-                SELECT DISTINCT ON (candidate."user") candidate.access_key
-                FROM keypairs AS candidate
-                WHERE NOT EXISTS (
-                    SELECT 1
-                    FROM keypairs AS marked
-                    WHERE marked."user" = candidate."user" AND marked.is_default
-                )
-                ORDER BY candidate."user", candidate.is_active DESC, candidate.created_at ASC
-            )
         """)
     )
     op.create_index(
