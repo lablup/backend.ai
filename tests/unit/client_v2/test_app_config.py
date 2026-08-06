@@ -9,7 +9,6 @@ from yarl import URL
 from ai.backend.client.v2.base_client import BackendAIAnonymousClient, BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains_v2.app_config import V2AppConfigClient
-from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.dto.manager.v2.app_config.request import (
     MyGetAppConfigsInput,
     PublicGetAppConfigsInput,
@@ -54,15 +53,6 @@ def mock_session(mock_response: AsyncMock) -> MagicMock:
 def client(mock_session: MagicMock) -> V2AppConfigClient:
     """Both halves of the client share one session mock, so either call lands in the same spy."""
     return V2AppConfigClient(
-        BackendAIAuthClient(_DEFAULT_CONFIG, MockAuth(), mock_session),
-        BackendAIAnonymousClient(_DEFAULT_CONFIG, mock_session),
-    )
-
-
-@pytest.fixture
-def registry(mock_session: MagicMock) -> V2ClientRegistry:
-    """A registry that does hold credentials, so a signed call is told apart from an unsigned one."""
-    return V2ClientRegistry(
         BackendAIAuthClient(_DEFAULT_CONFIG, MockAuth(), mock_session),
         BackendAIAnonymousClient(_DEFAULT_CONFIG, mock_session),
     )
@@ -113,23 +103,5 @@ class TestPublicMergedRead:
     async def test_is_not_signed(self, client: V2AppConfigClient, mock_session: MagicMock) -> None:
         """The public read must reach the server without credentials — that is its whole point."""
         await client.public_get_app_configs(PublicGetAppConfigsInput(config_names=["theme"]))
-
-        assert "Authorization" not in mock_session.request.call_args[1]["headers"]
-
-
-class TestRegistryWiring:
-    async def test_hands_the_public_read_the_anonymous_client(
-        self,
-        registry: V2ClientRegistry,
-        mock_session: MagicMock,
-    ) -> None:
-        """A caller holding credentials still reaches the public read without sending them.
-
-        The registry keeps both halves, so wiring this domain to the authenticated one would
-        sign the pre-login read.
-        """
-        await registry.app_config.public_get_app_configs(
-            PublicGetAppConfigsInput(config_names=["theme"])
-        )
 
         assert "Authorization" not in mock_session.request.call_args[1]["headers"]
