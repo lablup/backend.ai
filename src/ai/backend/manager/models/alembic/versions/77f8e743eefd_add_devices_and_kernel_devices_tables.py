@@ -1,7 +1,7 @@
 """add devices and kernel_devices tables
 
 Revision ID: 77f8e743eefd
-Revises: 13f4b8bc37f2
+Revises: 2dccb3069031
 Create Date: 2026-08-05 13:57:55.984027
 
 """
@@ -14,7 +14,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "77f8e743eefd"
-down_revision = "13f4b8bc37f2"
+down_revision = "2dccb3069031"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
