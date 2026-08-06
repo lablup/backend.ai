@@ -1812,6 +1812,7 @@ class _ScopedPartialUpsertCase:
     """One upserter shape for the partial bulk op, and the bindings it must leave."""
 
     name: str
+    description: str
     scope_type: str
     scope_id: str | None
     scope_ref: RBACElementRef | None
@@ -1824,6 +1825,7 @@ class TestBulkUpsertScopedPartial:
         [
             _ScopedPartialUpsertCase(
                 name="scoped",
+                description="a scoped upserter binds its row to the scope it carries",
                 scope_type="user",
                 scope_id=_USER_SCOPE_ID,
                 scope_ref=_USER_SCOPE_REF,
@@ -1831,6 +1833,7 @@ class TestBulkUpsertScopedPartial:
             ),
             _ScopedPartialUpsertCase(
                 name="global",
+                description="a scope-less (GLOBAL) upserter leaves its row bound to nothing",
                 scope_type="public",
                 scope_id=None,
                 scope_ref=None,
