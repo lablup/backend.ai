@@ -36,6 +36,13 @@ def endpoint_lock_key(endpoint: str) -> int:
     return int.from_bytes(hashlib.sha256(endpoint.encode("utf-8")).digest()[:8], "big") >> 1
 
 
+def _clause(field: str, value: Any) -> str:
+    if isinstance(value, list):
+        allowed = ", ".join(f'"{item}"' for item in value)
+        return f"    body.{field} in {{{allowed}}}"
+    return f'    body.{field} == "{value}"'
+
+
 def _rule(measurements: dict[str, Any], statuses: tuple[str, ...]) -> str:
     if len(statuses) == 1:
         lines = [f'    {CPU_STATUS} == "{statuses[0]}"']
@@ -46,7 +53,7 @@ def _rule(measurements: dict[str, Any], statuses: tuple[str, ...]) -> str:
     for field in CPU_MEASUREMENT_FIELDS:
         value = measurements.get(field)
         if value:
-            lines.append(f'    body.{field} == "{value}"')
+            lines.append(_clause(field, value))
     gpu = measurements.get("gpu")
     if isinstance(gpu, dict) and gpu:
         lines.append('    input.submods.gpu0["ear.status"] == "affirming"')
@@ -64,8 +71,9 @@ def reference_payload(rows: list[ConfidentialReferenceValueRow]) -> bytes:
     for row in rows:
         for field in RVPS_FIELDS:
             value = row.measurements.get(field)
-            if value and value not in values[field]:
-                values[field].append(value)
+            for item in value if isinstance(value, list) else [value]:
+                if item and item not in values[field]:
+                    values[field].append(item)
     return json.dumps(values, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
