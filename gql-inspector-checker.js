@@ -38,18 +38,19 @@ module.exports = (props) => {
       change.criticality.level !== "BREAKING"
     ) {
       const [typeName, fieldName] = change.path.split(".");
-      if (!typeIsNew(typeName)) {
-        const description = newSchema.getTypeMap()[typeName].getFields()[
-          fieldName
-        ].astNode.description?.value;
-        if (!description || (description && !description.match(addNotationRegex))) {
-          change.criticality.level = "BREAKING";
-          change.criticality.reason =
-            'New fields must include a description with a version number in the format "Added in XX.XX.X." or "Added in XX.X.X."';
-          change.message =
-            'New fields must include a description with a version number in the format "Added in XX.XX.X." or "Added in XX.X.X.", ' +
-            change.message;
-        }
+      if (typeIsNew(typeName)) {
+        return change;
+      }
+      const description = newSchema.getTypeMap()[typeName].getFields()[
+        fieldName
+      ].astNode.description?.value;
+      if (!description || (description && !description.match(addNotationRegex))) {
+        change.criticality.level = "BREAKING";
+        change.criticality.reason =
+          'New fields must include a description with a version number in the format "Added in XX.XX.X." or "Added in XX.X.X."';
+        change.message =
+          'New fields must include a description with a version number in the format "Added in XX.XX.X." or "Added in XX.X.X.", ' +
+          change.message;
       }
     } else if (
       change.type === "TYPE_ADDED" &&
@@ -72,22 +73,23 @@ module.exports = (props) => {
       )
     ) {
       const [type, fieldName, argumentName] = change.path.split(".");
-      if (!fieldIsNew(type, fieldName)) {
-        const field = newSchema.getTypeMap()[type].getFields()[fieldName];
-        const description = field.args.find(
-          (arg) => arg.name === argumentName
-        )?.description;
+      if (fieldIsNew(type, fieldName)) {
+        return change;
+      }
+      const field = newSchema.getTypeMap()[type].getFields()[fieldName];
+      const description = field.args.find(
+        (arg) => arg.name === argumentName
+      )?.description;
 
-        if (!description || (description && !description.match(addNotationRegex))) {
-          change.criticality.level = "BREAKING";
-          change.criticality.reason =
-            'New arguments must include a description with a version number in the format "Added in XX.XX.X." or "Added in XX.X.X."';
-          change.message =
-            'New arguments must include a description with a version number in the format "Added in XX.XX.X." or "Added in XX.X.X.", ' +
-            change.message;
-        } else {
-          change.criticality.level = "DANGEROUS";
-        }
+      if (!description || (description && !description.match(addNotationRegex))) {
+        change.criticality.level = "BREAKING";
+        change.criticality.reason =
+          'New arguments must include a description with a version number in the format "Added in XX.XX.X." or "Added in XX.X.X."';
+        change.message =
+          'New arguments must include a description with a version number in the format "Added in XX.XX.X." or "Added in XX.X.X.", ' +
+          change.message;
+      } else {
+        change.criticality.level = "DANGEROUS";
       }
     }
     return change;
