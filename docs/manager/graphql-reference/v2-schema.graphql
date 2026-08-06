@@ -3228,12 +3228,12 @@ input CreateRuntimeVariantPresetInput {
   description: String = null
 
   """
-  How the value is applied: 'env' for environment variable, 'args' for command-line argument.
+  How the value is applied: 'env' for environment variable, 'args' for command-line argument. Must be 'args' when valueType is 'flag'.
   """
   presetTarget: PresetTarget!
 
   """
-  Data type for validation (e.g., 'str', 'int', 'float', 'bool', 'flag').
+  Data type for validation (e.g., 'str', 'int', 'float', 'bool', 'flag'). 'flag' requires presetTarget 'args'.
   """
   valueType: PresetValueType!
 
@@ -9497,7 +9497,7 @@ type PresetResourceAllocation {
 }
 
 """
-Added in 26.4.2. Target for applying a preset value: environment variable or command-line argument.
+Added in 26.4.2. Target for applying a preset value: environment variable or command-line argument. ARGS is the only target that accepts the FLAG value type.
 """
 enum PresetTarget {
   ENV
@@ -9508,10 +9508,12 @@ enum PresetTarget {
 Added in 26.4.2. Specifies how a runtime variant preset value is applied to the inference container, either as an environment variable or a command-line argument.
 """
 type PresetTargetSpec {
-  """Target: env or args."""
+  """Target: env or args. Only args accepts the flag value type."""
   presetTarget: PresetTarget!
 
-  """Value type: str, int, float, bool, flag."""
+  """
+  Value type: str, int, float, bool, flag. flag appears only on presets targeting args.
+  """
   valueType: PresetValueType!
 
   """Default value."""
@@ -9521,7 +9523,9 @@ type PresetTargetSpec {
   key: String!
 }
 
-"""Added in 26.4.2. Data type for preset value validation."""
+"""
+Added in 26.4.2. Data type for preset value validation. FLAG is accepted only when presetTarget is ARGS; pairing it with presetTarget ENV is rejected.
+"""
 enum PresetValueType {
   STR
   INT
@@ -15512,10 +15516,14 @@ input UpdateRuntimeVariantPresetInput {
   """New rank."""
   rank: Int = null
 
-  """New target."""
+  """
+  New target. Must be 'args' when the preset ends up with valueType 'flag', whether 'flag' comes from this input or from the stored preset.
+  """
   presetTarget: PresetTarget = null
 
-  """New value type."""
+  """
+  New value type. 'flag' requires the preset to end up with presetTarget 'args', whether 'args' comes from this input or from the stored preset.
+  """
   valueType: PresetValueType = null
 
   """New default value."""
