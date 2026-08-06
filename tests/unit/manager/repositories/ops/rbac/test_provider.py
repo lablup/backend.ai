@@ -1807,16 +1807,36 @@ class TestUpsertScoped:
                 )
 
 
+_ABSENT_PARENT_ID = uuid.uuid4()  # never inserted, so naming it as a parent trips the FK gate
+
+
+@dataclass(frozen=True)
+class _PartialUpsertItem:
+    """One batch item: the row it inserts, its scope, and the parent its FK gate checks."""
+
+    row_name: str
+    scope_ref: RBACElementRef | None = _USER_SCOPE_REF
+    parent_id: UUID | None = None
+
+
+@dataclass(frozen=True)
+class _ExpectedBindingRow:
+    """One scope association the batch must leave, named by the row it binds."""
+
+    row_name: str
+    scope_id: str
+
+
 @dataclass(frozen=True)
 class _ScopedPartialUpsertCase:
-    """One upserter shape for the partial bulk op, and the bindings it must leave."""
+    """One batch for the partial bulk op: its items, and which land, fail, and bind."""
 
     name: str
     description: str
-    scope_type: str
-    scope_id: str | None
-    scope_ref: RBACElementRef | None
-    expected_scope_ids: list[str] = field(default_factory=list)
+    items: tuple[_PartialUpsertItem, ...]
+    expected_succeeded_names: list[str] = field(default_factory=list)
+    expected_failed_indexes: list[int] = field(default_factory=list)
+    expected_bindings: list[_ExpectedBindingRow] = field(default_factory=list)
 
 
 class TestBulkUpsertScopedPartial:
@@ -1824,91 +1844,86 @@ class TestBulkUpsertScopedPartial:
         "case",
         [
             _ScopedPartialUpsertCase(
-                name="scoped",
-                description="a scoped upserter binds its row to the scope it carries",
-                scope_type="user",
-                scope_id=_USER_SCOPE_ID,
-                scope_ref=_USER_SCOPE_REF,
-                expected_scope_ids=[_USER_SCOPE_ID],
+                name="every-item-lands",
+                description="a clean batch lands wholly, each row bound to its scope",
+                items=(
+                    _PartialUpsertItem(row_name="first"),
+                    _PartialUpsertItem(row_name="second"),
+                ),
+                expected_succeeded_names=["first", "second"],
+                expected_bindings=[
+                    _ExpectedBindingRow(row_name="first", scope_id=_USER_SCOPE_ID),
+                    _ExpectedBindingRow(row_name="second", scope_id=_USER_SCOPE_ID),
+                ],
             ),
             _ScopedPartialUpsertCase(
-                name="global",
-                description="a scope-less (GLOBAL) upserter leaves its row bound to nothing",
-                scope_type="global",
-                scope_id=None,
-                scope_ref=None,
+                name="global-binds-nothing",
+                description="a scope-less (GLOBAL) item lands but binds to nothing",
+                items=(_PartialUpsertItem(row_name="solo", scope_ref=None),),
+                expected_succeeded_names=["solo"],
+            ),
+            _ScopedPartialUpsertCase(
+                name="rejected-item-fails-alone",
+                description=(
+                    "the FK-rejected item reports its index and rolls back its row and "
+                    "binding together; the rest of the batch lands"
+                ),
+                items=(
+                    _PartialUpsertItem(row_name="doomed", parent_id=_ABSENT_PARENT_ID),
+                    _PartialUpsertItem(row_name="fresh"),
+                ),
+                expected_succeeded_names=["fresh"],
+                expected_failed_indexes=[0],
+                expected_bindings=[_ExpectedBindingRow(row_name="fresh", scope_id=_USER_SCOPE_ID)],
+            ),
+            _ScopedPartialUpsertCase(
+                name="every-item-rejected",
+                description="a batch of only rejected items reports every index and writes nothing",
+                items=(
+                    _PartialUpsertItem(row_name="doomed-a", parent_id=_ABSENT_PARENT_ID),
+                    _PartialUpsertItem(row_name="doomed-b", parent_id=_ABSENT_PARENT_ID),
+                ),
+                expected_failed_indexes=[0, 1],
             ),
         ],
         ids=lambda case: case.name,
     )
-    async def test_row_binds_to_the_scope_its_upserter_carries(
+    async def test_batch_lands_and_fails_exactly_as_the_case_names(
         self,
         case: _ScopedPartialUpsertCase,
         provider: RBACOpsProvider,
         database_connection: ExtendedAsyncSAEngine,
-        upsert_tables: None,
+        upsert_gated_tables: None,
     ) -> None:
-        """A scoped upserter binds its row to its scope; a scope-less one associates nothing.
-
-        Both cases insert fresh rows, so the conflict path never runs and one plain conflict
-        target serves them; which index arbitrates which scope is TestUpsertScoped's subject.
+        """Each item has its own savepoint: the named items land with their bindings, and a
+        rejected one reports its index and leaves neither its row nor its association behind.
         """
         async with provider.write_ops() as w:
             result = await w.bulk_upsert_scoped_partial([
                 RBACEntityUpserter(
-                    spec=RBACOpsUpserterSpec(case.scope_type, case.scope_id, "after"),
+                    spec=RBACOpsGatedUpserterSpec(parent_id=item.parent_id, name=item.row_name),
                     element_type=RBACElementType.VFOLDER,
-                    scope_ref=case.scope_ref,
-                    conflict_target=ConflictTarget(columns=["name", "scope_type", "scope_id"]),
+                    scope_ref=item.scope_ref,
+                    conflict_target=ConflictTarget(columns=["name"]),
                 )
+                for item in case.items
             ])
-            assert [row.value for row in result.successes] == ["after"]
-            assert result.errors == []
-            entity_id = str(result.successes[0].id)
-
-        async with database_connection.begin_readonly_session() as db_sess:
-            scope_ids = await db_sess.scalars(
-                sa.select(AssociationScopesEntitiesRow.scope_id).where(
-                    AssociationScopesEntitiesRow.entity_type == EntityType.VFOLDER,
-                    AssociationScopesEntitiesRow.entity_id == entity_id,
-                )
+            assert [row.name for row in result.successes] == case.expected_succeeded_names
+            assert [e.index for e in result.errors] == case.expected_failed_indexes
+            # Every rejection these batches provoke is the FK gate, mapped by the spec.
+            assert all(
+                isinstance(e.exception, _TestUpsertParentMissingError) for e in result.errors
             )
-            assert list(scope_ids) == case.expected_scope_ids
-
-    async def test_rejected_item_leaves_the_rest_upserted(
-        self,
-        provider: RBACOpsProvider,
-        database_connection: ExtendedAsyncSAEngine,
-        upsert_gated_tables: None,
-    ) -> None:
-        """A row and its association share one savepoint, so a rejected row rolls back both."""
-        async with provider.write_ops() as w:
-            result = await w.bulk_upsert_scoped_partial([
-                RBACEntityUpserter(  # FK gate violation (parent missing) -> rejected
-                    spec=RBACOpsGatedUpserterSpec(parent_id=uuid.uuid4(), name="doomed"),
-                    element_type=RBACElementType.VFOLDER,
-                    scope_ref=_USER_SCOPE_REF,
-                    conflict_target=ConflictTarget(columns=["name"]),
-                ),
-                RBACEntityUpserter(
-                    spec=RBACOpsGatedUpserterSpec(parent_id=None, name="fresh"),
-                    element_type=RBACElementType.VFOLDER,
-                    scope_ref=_USER_SCOPE_REF,
-                    conflict_target=ConflictTarget(columns=["name"]),
-                ),
-            ])
-            assert [row.name for row in result.successes] == ["fresh"]
-            assert [e.index for e in result.errors] == [0]
-            assert isinstance(result.errors[0].exception, _TestUpsertParentMissingError)
-            fresh_id = str(result.successes[0].id)
+            row_ids = {row.name: str(row.id) for row in result.successes}
 
         async with database_connection.begin_readonly_session() as db_sess:
             names = (await db_sess.scalars(sa.select(RBACOpsUpsertGatedRow.name))).all()
             assocs = (await db_sess.scalars(sa.select(AssociationScopesEntitiesRow))).all()
 
-        assert list(names) == ["fresh"]
-        # the surviving row kept its association, and the rejected one left none behind
-        assert [(a.entity_id, a.scope_id) for a in assocs] == [(fresh_id, _USER_SCOPE_ID)]
+        assert sorted(names) == sorted(case.expected_succeeded_names)
+        assert sorted((a.entity_id, a.scope_id) for a in assocs) == sorted(
+            (row_ids[binding.row_name], binding.scope_id) for binding in case.expected_bindings
+        )
 
 
 # =============================================================================
