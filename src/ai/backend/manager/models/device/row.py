@@ -1,5 +1,4 @@
-"""Devices discovered on agents and their attachment to kernels, replacing the
-kernels.attached_devices JSONB."""
+"""Devices discovered on agents and their attachment to kernels."""
 
 from __future__ import annotations
 
@@ -22,12 +21,7 @@ __all__ = (
 
 
 class DeviceRow(CreatedAtMixin, Base):  # type: ignore[misc]
-    """A physical device discovered on an agent.
-
-    Natural composite primary key: (agent_id, device_name, device_id) —
-    device_id is agent-local (cpu "0", mem "root"), so it is unique only
-    within an agent and a device kind.
-    """
+    """A physical device on an agent; device_id is agent-local, hence the composite PK."""
 
     __tablename__ = "devices"
 
@@ -51,13 +45,8 @@ class DeviceRow(CreatedAtMixin, Base):  # type: ignore[misc]
 
 
 class KernelDeviceRow(CreatedAtMixin, Base):  # type: ignore[misc]
-    """Junction between kernels and devices.
-
-    Rows are write-once (INSERT ON CONFLICT DO NOTHING) and removed only by
-    FK cascade. ``data`` holds the capacity allocated to this kernel, not the
-    device's physical capacity — the same device carries different values per
-    kernel (e.g. fractional GPU shares).
-    """
+    """Kernel-device junction; ``data`` is the capacity allocated to the kernel,
+    not the device's physical capacity."""
 
     __tablename__ = "kernel_devices"
 
@@ -89,7 +78,6 @@ class KernelDeviceRow(CreatedAtMixin, Base):  # type: ignore[misc]
             name="fk_kernel_devices_device_devices",
             ondelete="CASCADE",
         ),
-        # Supports the devices-side FK cascade (agent removal) without a full
-        # scan; kernel-side consumers are covered by the PK prefix.
+        # for the devices-side FK cascade
         sa.Index("ix_kernel_devices_device", "agent_id", "device_name", "device_id"),
     )
