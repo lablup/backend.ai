@@ -1498,7 +1498,7 @@ class RBACOpsGatedUpserterSpec(UpserterSpec[RBACOpsUpsertGatedRow]):
     """Upserts a row behind a FK gate, mapping the violation to a domain error."""
 
     parent_id: UUID | None
-    name: str = _UPSERT_ENTITY_NAME
+    name: str
 
     @property
     @override
@@ -1782,7 +1782,9 @@ class TestUpsertScoped:
             async with provider.write_ops() as w:
                 await w.upsert_scoped(
                     RBACEntityUpserter(
-                        spec=RBACOpsGatedUpserterSpec(parent_id=uuid.uuid4()),
+                        spec=RBACOpsGatedUpserterSpec(
+                            parent_id=uuid.uuid4(), name=_UPSERT_ENTITY_NAME
+                        ),
                         element_type=RBACElementType.VFOLDER,
                         scope_ref=_USER_SCOPE_REF,
                         conflict_target=ConflictTarget(columns=["name"]),
