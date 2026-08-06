@@ -96,6 +96,7 @@ from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.data.user.types import UserStatus as DataUserStatus
+from ai.backend.manager.errors.user import UserModificationBadRequest
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.group.conditions import GroupConditions
@@ -447,6 +448,10 @@ class UserAdapter(BaseAdapter):
 
     async def modify_user_by_id(self, user_id: UUID, input: UpdateUserInput) -> UpdateUserPayload:
         """Update a user by UUID."""
+        if input.main_access_key is None:
+            raise UserModificationBadRequest(
+                "main_access_key cannot be null; omit it to leave the default keypair unchanged."
+            )
         updater_spec = UserUpdaterSpec(
             username=(
                 OptionalState.update(input.username)
@@ -517,7 +522,7 @@ class UserAdapter(BaseAdapter):
             main_access_key=(
                 OptionalState.nop()
                 if isinstance(input.main_access_key, Sentinel)
-                else OptionalState.from_graphql(input.main_access_key)
+                else OptionalState.update(input.main_access_key)
             ),
             container_uid=(
                 TriState.nop()

@@ -161,9 +161,9 @@ class UpdateUserInput(BaseRequestModel):
         default=None,
         description="Enable or disable sudo session capability.",
     )
-    main_access_key: str | Sentinel = Field(
+    main_access_key: str | Sentinel | None = Field(
         default=SENTINEL,
-        description="Set the primary API access key.",
+        description="Set the primary API access key. Null is not accepted.",
     )
     container_uid: int | Sentinel | None = Field(
         default=SENTINEL,
