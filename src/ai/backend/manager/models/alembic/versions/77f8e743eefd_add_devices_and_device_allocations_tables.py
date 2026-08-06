@@ -25,7 +25,7 @@ def upgrade() -> None:
         sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),
         sa.Column("agent_uuid", GUID(), nullable=False),
         sa.Column("device_name", sa.String(length=64), nullable=False),
-        sa.Column("device_id", sa.String(length=128), nullable=False),
+        sa.Column("designator", sa.String(length=128), nullable=False),
         sa.Column("model_name", sa.String(length=255), nullable=False),
         sa.Column(
             "created_at",
@@ -35,7 +35,10 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_devices")),
         sa.UniqueConstraint(
-            "agent_uuid", "device_name", "device_id", name=op.f("uq_devices_agent_device")
+            "agent_uuid",
+            "device_name",
+            "designator",
+            name=op.f("uq_devices_agent_device_name_designator"),
         ),
         sa.ForeignKeyConstraint(
             ["agent_uuid"],
@@ -48,7 +51,7 @@ def upgrade() -> None:
         "device_allocations",
         sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),
         sa.Column("kernel_id", GUID(), nullable=False),
-        sa.Column("device_uuid", GUID(), nullable=False),
+        sa.Column("device_id", GUID(), nullable=False),
         sa.Column("capacity_name", sa.String(length=64), nullable=False),
         sa.Column("quantity", sa.Numeric(precision=24, scale=6), nullable=True),
         sa.Column(
@@ -60,7 +63,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id", name=op.f("pk_device_allocations")),
         sa.UniqueConstraint(
             "kernel_id",
-            "device_uuid",
+            "device_id",
             "capacity_name",
             name=op.f("uq_device_allocations_kernel_device_capacity"),
         ),
@@ -71,21 +74,21 @@ def upgrade() -> None:
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
-            ["device_uuid"],
+            ["device_id"],
             ["devices.id"],
-            name=op.f("fk_device_allocations_device_uuid_devices"),
+            name=op.f("fk_device_allocations_device_id_devices"),
             ondelete="CASCADE",
         ),
     )
     op.create_index(
-        op.f("ix_device_allocations_device_uuid"),
+        op.f("ix_device_allocations_device_id"),
         "device_allocations",
-        ["device_uuid"],
+        ["device_id"],
         unique=False,
     )
 
 
 def downgrade() -> None:
-    op.drop_index(op.f("ix_device_allocations_device_uuid"), table_name="device_allocations")
+    op.drop_index(op.f("ix_device_allocations_device_id"), table_name="device_allocations")
     op.drop_table("device_allocations")
     op.drop_table("devices")
