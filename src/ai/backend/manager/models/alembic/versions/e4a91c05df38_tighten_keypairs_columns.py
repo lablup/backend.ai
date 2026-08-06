@@ -1,11 +1,12 @@
 """tighten the always-populated keypairs columns
 
-Eight columns are nullable in the schema and never null in practice, so every
+Six columns are nullable in the schema and never null in practice, so every
 reader has to handle a ``None`` that does not occur. Backfills the stragglers
 with the value the application would have written and sets them NOT NULL.
 
 ``last_used``, ``ssh_public_key`` and ``ssh_private_key`` stay nullable — those
 are genuinely empty for a keypair that has never been used or has no SSH key.
+``created_at`` and ``updated_at`` were already tightened by ``2dccb3069031``.
 
 ``secret_key`` has no value that could be fabricated: a row without one is a
 keypair nothing can authenticate with. If any exists the ALTER stops the
@@ -34,8 +35,6 @@ _TIGHTENED = (
     "secret_key",
     "is_active",
     "is_admin",
-    "created_at",
-    "modified_at",
     "rate_limit",
     "num_queries",
 )
@@ -53,8 +52,6 @@ def upgrade() -> None:
     )
     bind.execute(sa.text("UPDATE keypairs SET is_active = true WHERE is_active IS NULL"))
     bind.execute(sa.text("UPDATE keypairs SET is_admin = false WHERE is_admin IS NULL"))
-    bind.execute(sa.text("UPDATE keypairs SET created_at = now() WHERE created_at IS NULL"))
-    bind.execute(sa.text("UPDATE keypairs SET modified_at = now() WHERE modified_at IS NULL"))
     bind.execute(
         sa.text("UPDATE keypairs SET rate_limit = :limit WHERE rate_limit IS NULL"),
         {"limit": _DEFAULT_RATE_LIMIT},

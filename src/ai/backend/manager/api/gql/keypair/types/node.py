@@ -44,8 +44,12 @@ class KeyPairGQL(PydanticNodeMixin[KeypairNode]):
     is_active: bool | None = gql_field(description="Whether the keypair is currently active.")
     is_admin: bool | None = gql_field(description="Whether the keypair has admin privileges.")
     created_at: datetime | None = gql_field(description="Timestamp when the keypair was created.")
+    updated_at: datetime | None = gql_field(
+        description="Timestamp when the keypair was last updated."
+    )
     modified_at: datetime | None = gql_field(
-        description="Timestamp when the keypair was last modified."
+        description="Timestamp when the keypair was last updated.",
+        deprecation_reason="Deprecated since 26.9.0. Use updated_at instead.",
     )
     last_used: datetime | None = gql_field(
         description="Timestamp when the keypair was last used for an API call."

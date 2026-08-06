@@ -107,9 +107,17 @@ KEYPAIR_FIELDS: list[ExportFieldDef] = [
         formatter=lambda v: v.isoformat() if v else "",
     ),
     ExportFieldDef(
+        key="updated_at",
+        name="Updated At",
+        description="Last update time",
+        field_type=ExportFieldType.DATETIME,
+        column=KeyPairRow.updated_at,
+        formatter=lambda v: v.isoformat() if v else "",
+    ),
+    ExportFieldDef(
         key="modified_at",
         name="Modified At",
-        description="Last modification time",
+        description="Last update time. Deprecated since 26.9.0; use updated_at.",
         field_type=ExportFieldType.DATETIME,
         column=KeyPairRow.updated_at,
         formatter=lambda v: v.isoformat() if v else "",
