@@ -7,9 +7,10 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityRef
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.identifier.project import ProjectID
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.resource import ProjectHasActiveKernelsError
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow
@@ -19,9 +20,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 )
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
-from ai.backend.manager.repositories.base.rbac.entity_purger import (
-    RBACEntityPurgerSpec,
-)
+from ai.backend.manager.repositories.base.rbac.entity.purger import EntityPurgerSpec
 from ai.backend.manager.repositories.base.types import ConflictCheck
 
 
@@ -96,7 +95,7 @@ class GroupEndpointBatchPurgerSpec(BatchPurgerSpec[EndpointRow]):
 
 
 @dataclass
-class ProjectPurgerSpec(RBACEntityPurgerSpec[GroupRow]):
+class ProjectPurgerSpec(EntityPurgerSpec[GroupRow]):
     """PurgerSpec for deleting a single group with RBAC scope/permission cleanup."""
 
     project_id: ProjectID
@@ -114,12 +113,8 @@ class ProjectPurgerSpec(RBACEntityPurgerSpec[GroupRow]):
         return ()
 
     @override
-    def element_type(self) -> RBACElementType:
-        return RBACElementType.PROJECT
-
-    @override
-    def entity_ref(self) -> RBACElementRef:
-        return RBACElementRef(element_type=RBACElementType.PROJECT, element_id=str(self.project_id))
+    def entity_ref(self) -> EntityRef:
+        return EntityRef(entity_type=PROJECT_ENTITY_TYPE, entity_id=self.project_id)
 
 
 @dataclass

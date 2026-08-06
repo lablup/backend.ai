@@ -33,6 +33,9 @@ class ConflictTarget:
 class RBACEntityUpserter[TRow: Base]:
     """Upserter for a single entity (INSERT ON CONFLICT UPDATE) with its scope associations.
 
+    Deprecated: keys on the legacy ``RBACElementType``/``RBACElementRef``; new code
+    uses :class:`ai.backend.manager.repositories.base.rbac.entity.upserter.EntityUpserter`.
+
     The upsert counterpart of :class:`RBACEntityCreator`: an inserted row is bound to its
     scope(s), an updated one is bound again as a no-op. ``scope_ref=None`` marks a GLOBAL
     entity that binds to no scope.

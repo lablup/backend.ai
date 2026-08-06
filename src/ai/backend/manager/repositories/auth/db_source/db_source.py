@@ -147,7 +147,7 @@ class AuthDBSource:
 
             result = await w.create_full_user(
                 FullUserCreation(
-                    creation=UserScopeCreation(spec=user_spec),
+                    creation=UserScopeCreation(creator_spec=user_spec),
                     domain_id=domain_id,
                     project_ids=project_ids,
                     keypair_resource_policy=keypair_resource_policy,

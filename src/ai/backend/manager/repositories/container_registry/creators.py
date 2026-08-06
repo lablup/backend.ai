@@ -8,24 +8,21 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
-from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_SCOPE_TYPE
-from ai.backend.common.data.entity.types import ScopeRef
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityRef
 from ai.backend.common.exception import ContainerRegistryGroupsAlreadyAssociated
 from ai.backend.common.identifier.container_registry import ContainerRegistryID
 from ai.backend.common.identifier.project import ProjectID
+from ai.backend.manager.data.permission.role import ScopeSystemRoleData
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.repositories.base.creator import CreatorSpec
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
+from ai.backend.manager.repositories.base.rbac.entity.creator import EntityCreator
+from ai.backend.manager.repositories.base.rbac.entity.types import ScopeMembership
 from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
-from ai.backend.manager.repositories.ops.rbac.provider import ScopeCreation
-from ai.backend.manager.repositories.permission_controller.role_manager import (
-    ScopeSystemRoleData,
-)
 
 
 @dataclass
@@ -65,26 +62,26 @@ class ContainerRegistryCreatorSpec(CreatorSpec[ContainerRegistryRow]):
 
 
 @dataclass
-class ContainerRegistryScopeCreation(ScopeCreation[ContainerRegistryRow]):
+class ContainerRegistryScopeCreation(EntityCreator[ContainerRegistryRow]):
     """Creates a container registry row and the owner scope the registry becomes.
 
     The registry row itself binds to no parent scope (a plain insert); project
     reachability is granted separately by binding allowed projects to the
     registry's virtual scope."""
 
-    spec: ContainerRegistryCreatorSpec
+    creator_spec: ContainerRegistryCreatorSpec
 
     @override
-    def creator(self) -> RBACEntityCreator[ContainerRegistryRow]:
-        return RBACEntityCreator(
-            spec=self.spec,
-            element_type=RBACElementType.CONTAINER_REGISTRY,
-            scope_ref=None,
-        )
+    def spec(self) -> CreatorSpec[ContainerRegistryRow]:
+        return self.creator_spec
 
     @override
-    def scope_of(self, row: ContainerRegistryRow) -> ScopeRef:
-        return ScopeRef(scope_type=CONTAINER_REGISTRY_SCOPE_TYPE, scope_id=row.id)
+    def entity_ref_of(self, row: ContainerRegistryRow) -> EntityRef:
+        return EntityRef(entity_type=CONTAINER_REGISTRY_ENTITY_TYPE, entity_id=row.id)
+
+    @override
+    def membership(self, row: ContainerRegistryRow) -> Sequence[ScopeMembership]:
+        return ()
 
     @override
     def system_roles_of(self, row: ContainerRegistryRow) -> Collection[ScopeSystemRoleData]:

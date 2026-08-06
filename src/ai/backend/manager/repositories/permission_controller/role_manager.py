@@ -3,7 +3,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
-from typing import Protocol, cast
+from typing import cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -16,6 +16,7 @@ from ai.backend.manager.data.permission.object_permission import ObjectPermissio
 from ai.backend.manager.data.permission.permission import PermissionCreator, PermissionData
 from ai.backend.manager.data.permission.role import (
     RoleData,
+    ScopeSystemRoleData,
 )
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
@@ -56,16 +57,6 @@ from ai.backend.manager.repositories.permission_controller.creators import (
 )
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
-
-
-class ScopeSystemRoleData(Protocol):
-    def scope_id(self) -> ScopeId: ...
-
-    def role_name(self) -> str: ...
-
-    def entity_operations(self) -> Mapping[RBACElementType, Iterable[OperationType]]:
-        """Returns a mapping of entity types to the set of operations that should be granted for each entity type."""
-        ...
 
 
 @dataclass(frozen=True)

@@ -7,8 +7,14 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
+from ai.backend.manager.data.permission.types import (
+    EntityType as LegacyEntityType,
+)
+from ai.backend.manager.data.permission.types import (
+    ScopeType as LegacyScopeType,
+)
 from ai.backend.manager.errors.user import UserPurgeFailure
 from ai.backend.manager.models.error_logs import ErrorLogRow
 from ai.backend.manager.models.group import AssocGroupUserRow
@@ -24,7 +30,7 @@ from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.vfolder import VFolderPermissionRow
 from ai.backend.manager.repositories.base.purger import BatchPurger, BatchPurgerSpec
-from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityBatchPurgerSpec
+from ai.backend.manager.repositories.base.rbac.entity.purger import EntityBatchPurgerSpec
 from ai.backend.manager.repositories.base.types import ConflictCheck
 
 
@@ -142,9 +148,9 @@ class UserProjectRoleBatchPurgerSpec(BatchPurgerSpec[UserRoleRow]):
     @override
     def build_subquery(self) -> sa.sql.Select[tuple[UserRoleRow]]:
         project_role_ids = sa.select(AssociationScopesEntitiesRow.entity_id).where(
-            AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+            AssociationScopesEntitiesRow.scope_type == LegacyScopeType.PROJECT,
             AssociationScopesEntitiesRow.scope_id == str(self.project_id),
-            AssociationScopesEntitiesRow.entity_type == EntityType.ROLE,
+            AssociationScopesEntitiesRow.entity_type == LegacyEntityType.ROLE,
         )
         return sa.select(UserRoleRow).where(
             UserRoleRow.user_id == self.user_uuid,
@@ -157,7 +163,7 @@ class UserProjectRoleBatchPurgerSpec(BatchPurgerSpec[UserRoleRow]):
 
 
 @dataclass
-class UserBatchPurgerSpec(RBACEntityBatchPurgerSpec[UserRow]):
+class UserBatchPurgerSpec(EntityBatchPurgerSpec[UserRow]):
     """PurgerSpec for deleting a user with RBAC scope/permission cleanup."""
 
     user_uuid: UUID
@@ -167,8 +173,8 @@ class UserBatchPurgerSpec(RBACEntityBatchPurgerSpec[UserRow]):
         return sa.select(UserRow).where(UserRow.uuid == self.user_uuid)
 
     @override
-    def element_type(self) -> RBACElementType:
-        return RBACElementType.USER
+    def entity_type(self) -> EntityType:
+        return USER_ENTITY_TYPE
 
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:

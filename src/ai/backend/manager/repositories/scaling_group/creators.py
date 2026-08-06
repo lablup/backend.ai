@@ -5,13 +5,13 @@ from dataclasses import dataclass, field
 from typing import Any, override
 from uuid import UUID
 
-from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_SCOPE_TYPE
-from ai.backend.common.data.entity.types import ScopeRef
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityRef
 from ai.backend.common.exception import ScalingGroupConflict
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey
+from ai.backend.manager.data.permission.role import ScopeSystemRoleData
 from ai.backend.manager.data.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.scaling_group import (
@@ -22,12 +22,9 @@ from ai.backend.manager.models.scaling_group import (
     ScalingGroupRow,
 )
 from ai.backend.manager.repositories.base.creator import CreatorSpec
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
+from ai.backend.manager.repositories.base.rbac.entity.creator import EntityCreator
+from ai.backend.manager.repositories.base.rbac.entity.types import ScopeMembership
 from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
-from ai.backend.manager.repositories.ops.rbac.provider import ScopeCreation
-from ai.backend.manager.repositories.permission_controller.role_manager import (
-    ScopeSystemRoleData,
-)
 
 
 @dataclass
@@ -76,26 +73,26 @@ class ScalingGroupCreatorSpec(CreatorSpec[ScalingGroupRow]):
 
 
 @dataclass
-class ResourceGroupScopeCreation(ScopeCreation[ScalingGroupRow]):
+class ResourceGroupScopeCreation(EntityCreator[ScalingGroupRow]):
     """Creates a scaling group row and the resource-group scope it becomes.
 
     A resource group declares no scope-local system roles: roles come only from
-    matching role presets, if any. Domain/project scope associations are written by
+    matching role presets, if any. Domain/project scope memberships are written by
     the allow/associate paths, not by this creator."""
 
-    spec: ScalingGroupCreatorSpec
+    creator_spec: ScalingGroupCreatorSpec
 
     @override
-    def creator(self) -> RBACEntityCreator[ScalingGroupRow]:
-        return RBACEntityCreator(
-            spec=self.spec,
-            element_type=RBACElementType.RESOURCE_GROUP,
-            scope_ref=None,
-        )
+    def spec(self) -> CreatorSpec[ScalingGroupRow]:
+        return self.creator_spec
 
     @override
-    def scope_of(self, row: ScalingGroupRow) -> ScopeRef:
-        return ScopeRef(scope_type=RESOURCE_GROUP_SCOPE_TYPE, scope_id=row.id)
+    def entity_ref_of(self, row: ScalingGroupRow) -> EntityRef:
+        return EntityRef(entity_type=RESOURCE_GROUP_ENTITY_TYPE, entity_id=row.id)
+
+    @override
+    def membership(self, row: ScalingGroupRow) -> Sequence[ScopeMembership]:
+        return ()
 
     @override
     def system_roles_of(self, row: ScalingGroupRow) -> Collection[ScopeSystemRoleData]:

@@ -41,6 +41,7 @@ from ai.backend.common.exception import (
 )
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.user import UserID
+from ai.backend.manager.data.permission.role import ScopeSystemRoleData
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.permission import VirtualScopeNotFound
@@ -76,10 +77,16 @@ from ai.backend.manager.models.virtual_scope.entity_membership import EntityMemb
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base import CreatorSpec, IntegrityErrorCheck
+from ai.backend.manager.repositories.base.rbac.entity.creator import EntityCreator
+from ai.backend.manager.repositories.base.rbac.entity.purger import (
+    EntityBatchPurger,
+    EntityBatchPurgerSpec,
+    EntityPurger,
+    EntityPurgerSpec,
+)
+from ai.backend.manager.repositories.base.rbac.entity.types import ScopeMembership
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.rbac.entity_purger import (
-    RBACEntityBatchPurger,
-    RBACEntityBatchPurgerSpec,
     RBACEntityPurger,
     RBACEntityPurgerSpec,
 )
@@ -90,16 +97,8 @@ from ai.backend.manager.repositories.base.rbac.entity_upserter import (
 from ai.backend.manager.repositories.base.types import ConflictCheck
 from ai.backend.manager.repositories.base.upserter import UpserterSpec
 from ai.backend.manager.repositories.ops.rbac.provider import (
-    EntityMembersAddition,
     RBACOpsProvider,
-    ScopeBatchDeletion,
-    ScopeCreation,
-    ScopeDeletion,
     ScopeEntityMember,
-    ScopeMember,
-)
-from ai.backend.manager.repositories.permission_controller.role_manager import (
-    ScopeSystemRoleData,
 )
 from ai.backend.testutils.db import with_tables
 
@@ -161,39 +160,49 @@ class ScopeRowCreatorSpec(CreatorSpec[OpsRBACScopeRow]):
 
 
 @dataclass
-class OpsRBACScopeCreation(ScopeCreation[OpsRBACScopeRow]):
-    spec: ScopeRowCreatorSpec
+class OpsRBACScopeCreation(EntityCreator[OpsRBACScopeRow]):
+    creator_spec: ScopeRowCreatorSpec
 
     @override
-    def creator(self) -> RBACEntityCreator[OpsRBACScopeRow]:
-        return RBACEntityCreator(
-            spec=self.spec,
-            element_type=RBACElementType.PROJECT,
-            scope_ref=None,  # GLOBAL: no parent scope association to write
-        )
+    def spec(self) -> CreatorSpec[OpsRBACScopeRow]:
+        return self.creator_spec
 
     @override
-    def scope_of(self, row: OpsRBACScopeRow) -> ScopeRef:
-        return ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=row.id)
+    def entity_ref_of(self, row: OpsRBACScopeRow) -> EntityRef:
+        return EntityRef(entity_type=_TEST_ENTITY_TYPE, entity_id=row.id)
+
+    @override
+    def membership(self, row: OpsRBACScopeRow) -> Sequence[ScopeMembership]:
+        return ()
 
     @override
     def system_roles_of(self, row: OpsRBACScopeRow) -> Collection[ScopeSystemRoleData]:
         return ()
 
 
-def make_scope_creation(scope_id: UUID, name: str) -> ScopeCreation[OpsRBACScopeRow]:
-    return OpsRBACScopeCreation(spec=ScopeRowCreatorSpec(scope_id=scope_id, name=name))
+def make_scope_creation(scope_id: UUID, name: str) -> EntityCreator[OpsRBACScopeRow]:
+    return OpsRBACScopeCreation(creator_spec=ScopeRowCreatorSpec(scope_id=scope_id, name=name))
 
 
 @dataclass
-class StubMember(ScopeMember):
+class StubMember(ScopeMembership):
+    target_scope: ScopeRef
     member_id: UUID
     role_user: UserID | None = None
     entity_type: VirtualScopeEntityType = _TEST_MEMBER_ENTITY_TYPE
+    cap: Permission | None = None
+
+    @override
+    def scope(self) -> ScopeRef:
+        return self.target_scope
 
     @override
     def entity_ref(self) -> EntityRef:
         return EntityRef(entity_type=self.entity_type, entity_id=self.member_id)
+
+    @override
+    def permission_cap(self) -> Permission | None:
+        return self.cap
 
     @override
     def assign_role_on(self) -> UserID | None:
@@ -320,13 +329,13 @@ def provider(database_connection: ExtendedAsyncSAEngine) -> RBACOpsProvider:
 @dataclass
 class SingleScopeContext:
     scope_id: UUID
-    creation: ScopeCreation[OpsRBACScopeRow]
+    creation: EntityCreator[OpsRBACScopeRow]
 
 
 @dataclass
 class BulkScopeContext:
     scope_ids: list[UUID]
-    creations: list[ScopeCreation[OpsRBACScopeRow]]
+    creations: list[EntityCreator[OpsRBACScopeRow]]
 
 
 @pytest.fixture
@@ -750,13 +759,10 @@ class TestAddBulkMembers:
             await w.ensure_scope(scope)
             for mid in member_ids:
                 await w.ensure_scope(ScopeRef(scope_type=_TEST_MEMBER_SCOPE_TYPE, scope_id=mid))
-            await w.add_bulk_members(
-                EntityMembersAddition(
-                    scope=scope,
-                    members=[StubMember(member_id=mid) for mid in member_ids],
-                ),
-                permission_cap=Permission.READ,
-            )
+            await w.add_bulk_members([
+                StubMember(target_scope=scope, member_id=mid, cap=Permission.READ)
+                for mid in member_ids
+            ])
 
         async with database_connection.begin_session_read_committed() as sess:
             vs_rows = (await sess.execute(sa.select(VirtualScopeRow))).scalars().all()
@@ -815,13 +821,15 @@ class TestAddBulkMembers:
         scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=scope_id)
         member_id = uuid.uuid4()
         member_scope = ScopeRef(scope_type=_TEST_MEMBER_SCOPE_TYPE, scope_id=member_id)
-        addition = EntityMembersAddition(scope=scope, members=[StubMember(member_id=member_id)])
-
         async with provider.write_ops() as w:
             await w.ensure_scope(scope)
             await w.ensure_scope(member_scope)
-            await w.add_bulk_members(addition, permission_cap=Permission.READ)
-            await w.add_bulk_members(addition, permission_cap=Permission.full())
+            await w.add_bulk_members([
+                StubMember(target_scope=scope, member_id=member_id, cap=Permission.READ)
+            ])
+            await w.add_bulk_members([
+                StubMember(target_scope=scope, member_id=member_id, cap=Permission.full())
+            ])
 
         async with database_connection.begin_session_read_committed() as sess:
             scope_vs = (
@@ -882,15 +890,10 @@ class TestAddBulkMembers:
 
         with pytest.raises(VirtualScopeNotFound):
             async with provider.write_ops() as w:
-                await w.add_bulk_members(
-                    EntityMembersAddition(
-                        scope=scope,
-                        members=[
-                            StubMember(member_id=present_id),
-                            StubMember(member_id=missing_id),
-                        ],
-                    )
-                )
+                await w.add_bulk_members([
+                    StubMember(target_scope=scope, member_id=present_id),
+                    StubMember(target_scope=scope, member_id=missing_id),
+                ])
 
         async with database_connection.begin_session_read_committed() as sess:
             binding_rows = (await sess.execute(sa.select(ScopeBindingRow))).scalars().all()
@@ -916,7 +919,7 @@ class TestAddBulkMembers:
 
         async with provider.write_ops() as w:
             await w.ensure_scope(scope)
-            await w.add_bulk_members(EntityMembersAddition(scope=scope, members=[]))
+            await w.add_bulk_members([])
 
         async with database_connection.begin_session_read_committed() as sess:
             binding_count = await sess.scalar(
@@ -947,12 +950,10 @@ class TestRemoveBulkMembers:
             await w.ensure_scope(scope)
             for mid in (removed_id, kept_id):
                 await w.ensure_scope(ScopeRef(scope_type=_TEST_MEMBER_SCOPE_TYPE, scope_id=mid))
-            await w.add_bulk_members(
-                EntityMembersAddition(
-                    scope=scope,
-                    members=[StubMember(member_id=removed_id), StubMember(member_id=kept_id)],
-                )
-            )
+            await w.add_bulk_members([
+                StubMember(target_scope=scope, member_id=removed_id),
+                StubMember(target_scope=scope, member_id=kept_id),
+            ])
             await w.remove_bulk_members(
                 scope,
                 [EntityRef(entity_type=_TEST_MEMBER_ENTITY_TYPE, entity_id=removed_id)],
@@ -1079,8 +1080,9 @@ class TestAddBulkMembersPartial:
         """A member whose entity type has no legacy counterpart fails alone — its
         membership is rolled back with it — while the valid member keeps all rows."""
         scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=uuid.uuid4())
-        valid = StubMember(member_id=uuid.uuid4())
+        valid = StubMember(target_scope=scope, member_id=uuid.uuid4())
         invalid = StubMember(
+            target_scope=scope,
             member_id=uuid.uuid4(),
             entity_type=VirtualScopeEntityType("unregistered-type"),
         )
@@ -1093,12 +1095,10 @@ class TestAddBulkMembersPartial:
             await w.ensure_scope(
                 ScopeRef(scope_type=ScopeType("unregistered-type"), scope_id=invalid.member_id)
             )
-            result = await w.add_bulk_members_partial(
-                EntityMembersAddition(scope=scope, members=[valid, invalid])
-            )
+            result = await w.add_bulk_members_partial([valid, invalid])
 
         assert result.successes == [valid]
-        assert [error.member for error in result.errors] == [invalid]
+        assert [error.membership for error in result.errors] == [invalid]
         assert result.errors[0].index == 1
 
         async with database_connection.begin_session_read_committed() as sess:
@@ -1143,21 +1143,18 @@ class TestAddBulkMembersPartial:
         """The member without a VS lands in errors with nothing written for it; the
         valid member gets its membership, association, and binding."""
         scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=uuid.uuid4())
-        valid = StubMember(member_id=uuid.uuid4())
-        missing = StubMember(member_id=uuid.uuid4())
+        valid = StubMember(target_scope=scope, member_id=uuid.uuid4(), cap=Permission.READ)
+        missing = StubMember(target_scope=scope, member_id=uuid.uuid4(), cap=Permission.READ)
 
         async with provider.write_ops() as w:
             await w.ensure_scope(scope)
             await w.ensure_scope(
                 ScopeRef(scope_type=_TEST_MEMBER_SCOPE_TYPE, scope_id=valid.member_id)
             )
-            result = await w.add_bulk_members_partial(
-                EntityMembersAddition(scope=scope, members=[valid, missing]),
-                permission_cap=Permission.READ,
-            )
+            result = await w.add_bulk_members_partial([valid, missing])
 
         assert result.successes == [valid]
-        assert [error.member for error in result.errors] == [missing]
+        assert [error.membership for error in result.errors] == [missing]
         assert isinstance(result.errors[0].exception, VirtualScopeNotFound)
 
         async with database_connection.begin_session_read_committed() as sess:
@@ -1194,7 +1191,7 @@ class TestAddBulkMembersPartial:
 
 
 @dataclass
-class ScopeRowPurgerSpec(RBACEntityPurgerSpec[OpsRBACScopeRow]):
+class ScopeRowPurgerSpec(EntityPurgerSpec[OpsRBACScopeRow]):
     scope_id: UUID
 
     @override
@@ -1210,16 +1207,12 @@ class ScopeRowPurgerSpec(RBACEntityPurgerSpec[OpsRBACScopeRow]):
         return ()
 
     @override
-    def element_type(self) -> RBACElementType:
-        return RBACElementType.PROJECT
-
-    @override
-    def entity_ref(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.PROJECT, str(self.scope_id))
+    def entity_ref(self) -> EntityRef:
+        return EntityRef(entity_type=_TEST_ENTITY_TYPE, entity_id=self.scope_id)
 
 
 @dataclass
-class ScopeRowBatchPurgerSpec(RBACEntityBatchPurgerSpec[OpsRBACScopeRow]):
+class ScopeRowBatchPurgerSpec(EntityBatchPurgerSpec[OpsRBACScopeRow]):
     scope_ids: Sequence[UUID]
 
     @override
@@ -1227,8 +1220,8 @@ class ScopeRowBatchPurgerSpec(RBACEntityBatchPurgerSpec[OpsRBACScopeRow]):
         return sa.select(OpsRBACScopeRow).where(OpsRBACScopeRow.id.in_(self.scope_ids))
 
     @override
-    def element_type(self) -> RBACElementType:
-        return RBACElementType.PROJECT
+    def entity_type(self) -> VirtualScopeEntityType:
+        return _TEST_ENTITY_TYPE
 
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:
@@ -1277,34 +1270,19 @@ class TestScopeDeletionVirtualScopeCleanup:
             await w.create_scope(single_scope.creation)
             await w.ensure_scope(other)
             # Two-way membership leaves scope's binding and membership in other's VS.
-            await w.add_bulk_members(
-                EntityMembersAddition(
-                    scope=scope,
-                    members=[
-                        ScopeEntityMember(
-                            ref=EntityRef(entity_type=_TEST_ENTITY_TYPE, entity_id=other.scope_id)
-                        )
-                    ],
-                )
-            )
-            await w.add_bulk_members(
-                EntityMembersAddition(
-                    scope=other,
-                    members=[
-                        ScopeEntityMember(
-                            ref=EntityRef(entity_type=_TEST_ENTITY_TYPE, entity_id=scope_id)
-                        )
-                    ],
-                )
-            )
+            await w.add_bulk_members([
+                ScopeEntityMember(
+                    target_scope=scope,
+                    ref=EntityRef(entity_type=_TEST_ENTITY_TYPE, entity_id=other.scope_id),
+                ),
+                ScopeEntityMember(
+                    target_scope=other,
+                    ref=EntityRef(entity_type=_TEST_ENTITY_TYPE, entity_id=scope_id),
+                ),
+            ])
 
         async with provider.write_ops() as w:
-            result = await w.delete_scope(
-                ScopeDeletion(
-                    purger=RBACEntityPurger(spec=ScopeRowPurgerSpec(scope_id=scope_id)),
-                    scope=scope,
-                )
-            )
+            result = await w.delete_scope(EntityPurger(spec=ScopeRowPurgerSpec(scope_id=scope_id)))
 
         assert result is not None
 
@@ -1338,37 +1316,26 @@ class TestScopeDeletionVirtualScopeCleanup:
             await w.bulk_create_scopes(bulk_scopes.creations)
             await w.ensure_scope(other)
             # Two-way membership leaves each scope's binding and membership in other's VS.
-            for scope in scopes:
-                await w.add_bulk_members(
-                    EntityMembersAddition(
-                        scope=scope,
-                        members=[
-                            ScopeEntityMember(
-                                ref=EntityRef(
-                                    entity_type=_TEST_ENTITY_TYPE, entity_id=other.scope_id
-                                )
-                            )
-                        ],
+            await w.add_bulk_members([
+                *(
+                    ScopeEntityMember(
+                        target_scope=scope,
+                        ref=EntityRef(entity_type=_TEST_ENTITY_TYPE, entity_id=other.scope_id),
                     )
-                )
-            await w.add_bulk_members(
-                EntityMembersAddition(
-                    scope=other,
-                    members=[
-                        ScopeEntityMember(
-                            ref=EntityRef(entity_type=_TEST_ENTITY_TYPE, entity_id=sid)
-                        )
-                        for sid in scope_ids
-                    ],
-                )
-            )
+                    for scope in scopes
+                ),
+                *(
+                    ScopeEntityMember(
+                        target_scope=other,
+                        ref=EntityRef(entity_type=_TEST_ENTITY_TYPE, entity_id=sid),
+                    )
+                    for sid in scope_ids
+                ),
+            ])
 
         async with provider.write_ops() as w:
             result = await w.batch_delete_scopes(
-                ScopeBatchDeletion(
-                    purger=RBACEntityBatchPurger(spec=ScopeRowBatchPurgerSpec(scope_ids=scope_ids)),
-                    scopes=scopes,
-                )
+                EntityBatchPurger(spec=ScopeRowBatchPurgerSpec(scope_ids=scope_ids))
             )
 
         assert result.deleted_count == len(scope_ids)

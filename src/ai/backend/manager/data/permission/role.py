@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Protocol
 
 from ai.backend.manager.data.common.types import SearchResult
 
@@ -20,6 +22,18 @@ from .types import (
     RoleSource,
     ScopeType,
 )
+
+
+class ScopeSystemRoleData(Protocol):
+    """Declaration of a SYSTEM role a scope is provisioned with on creation."""
+
+    def scope_id(self) -> ScopeId: ...
+
+    def role_name(self) -> str: ...
+
+    def entity_operations(self) -> Mapping[RBACElementType, Iterable[OperationType]]:
+        """Returns a mapping of entity types to the set of operations that should be granted for each entity type."""
+        ...
 
 
 @dataclass(frozen=True)

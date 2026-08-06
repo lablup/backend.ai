@@ -20,7 +20,7 @@ from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
 from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.types import EntityRef, ScopeRef
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
@@ -36,9 +36,7 @@ from ai.backend.manager.data.group.types import (
     UnassignUserFailure,
     UnassignUsersResult,
 )
-from ai.backend.manager.data.permission.types import (
-    RBACElementRef,
-)
+from ai.backend.manager.data.permission.role import ScopeSystemRoleData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import (
     ProjectHasActiveEndpointsError,
@@ -78,12 +76,9 @@ from ai.backend.manager.repositories.base.querier import (
     Querier,
     execute_batch_querier,
 )
-from ai.backend.manager.repositories.base.rbac.entity_creator import (
-    RBACEntityCreator,
-)
-from ai.backend.manager.repositories.base.rbac.entity_purger import (
-    RBACEntityPurger,
-)
+from ai.backend.manager.repositories.base.rbac.entity.creator import EntityCreator
+from ai.backend.manager.repositories.base.rbac.entity.purger import EntityPurger
+from ai.backend.manager.repositories.base.rbac.entity.types import ScopeMembership
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.group.creators import (
     GroupCreatorSpec,
@@ -102,34 +97,36 @@ from ai.backend.manager.repositories.group.types import (
     UserProjectSearchScope,
 )
 from ai.backend.manager.repositories.ops.rbac.provider import (
-    EntityMembersAddition,
     RBACOpsProvider,
     RBACWriteOps,
-    ScopeCreation,
-    ScopeDeletion,
     ScopeEntityMember,
-    ScopeMember,
 )
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
-from ai.backend.manager.repositories.permission_controller.role_manager import (
-    ScopeSystemRoleData,
-)
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass
-class ProjectUserMember(ScopeMember):
-    """A user joining or leaving a project scope; ``manage_roles`` controls whether the
-    membership change also grants/revokes the user's roles at the project scope."""
+class ProjectUserMember(ScopeMembership):
+    """A user joining a project scope; ``manage_roles`` controls whether the
+    membership change also grants the user's roles at the project scope."""
 
+    project_id: ProjectID
     user_id: UserID
     manage_roles: bool = True
 
     @override
+    def scope(self) -> ScopeRef:
+        return ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=self.project_id)
+
+    @override
     def entity_ref(self) -> EntityRef:
         return EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=self.user_id)
+
+    @override
+    def permission_cap(self) -> Permission | None:
+        return None
 
     @override
     def assign_role_on(self) -> UserID | None:
@@ -137,25 +134,28 @@ class ProjectUserMember(ScopeMember):
 
 
 @dataclass
-class ProjectScopeCreation(ScopeCreation[GroupRow]):
+class ProjectScopeCreation(EntityCreator[GroupRow]):
     """Creates a project row under its domain, and the scope the project becomes."""
 
-    spec: GroupCreatorSpec
+    creator_spec: GroupCreatorSpec
     domain_id: DomainID
 
     @override
-    def creator(self) -> RBACEntityCreator[GroupRow]:
-        return RBACEntityCreator(
-            spec=self.spec,
-            element_type=RBACElementType.PROJECT,
-            scope_ref=RBACElementRef(
-                element_type=RBACElementType.DOMAIN, element_id=str(self.domain_id)
-            ),
-        )
+    def spec(self) -> GroupCreatorSpec:
+        return self.creator_spec
 
     @override
-    def scope_of(self, row: GroupRow) -> ScopeRef:
-        return ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ProjectID(row.id))
+    def entity_ref_of(self, row: GroupRow) -> EntityRef:
+        return EntityRef(entity_type=PROJECT_ENTITY_TYPE, entity_id=ProjectID(row.id))
+
+    @override
+    def membership(self, row: GroupRow) -> Sequence[ScopeMembership]:
+        return (
+            ScopeEntityMember(
+                target_scope=ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=self.domain_id),
+                ref=self.entity_ref_of(row),
+            ),
+        )
 
     @override
     def system_roles_of(self, row: GroupRow) -> Collection[ScopeSystemRoleData]:
@@ -183,23 +183,11 @@ class GroupDBSource:
         spec = cast(GroupCreatorSpec, creator.spec)
         async with self._rbac_ops_provider.write_ops() as w:
             domain_id = await self._get_domain_id(w, spec.domain_name)
-            creation = ProjectScopeCreation(spec=spec, domain_id=domain_id)
-            domain_scope = ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=domain_id)
-            data = (await w.create_scope(creation)).row.to_data()
-            await w.ensure_scope(domain_scope)
-            await w.add_bulk_members(
-                EntityMembersAddition(
-                    scope=domain_scope,
-                    members=[
-                        ScopeEntityMember(
-                            ref=EntityRef(
-                                entity_type=PROJECT_ENTITY_TYPE, entity_id=ProjectID(data.id)
-                            )
-                        )
-                    ],
-                )
-            )
-            return data
+            # The creator declares domain membership, which create_scope enrolls;
+            # the domain's virtual scope has to exist before that.
+            await w.ensure_scope(ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=domain_id))
+            creation = ProjectScopeCreation(creator_spec=spec, domain_id=domain_id)
+            return (await w.create_scope(creation)).row.to_data()
 
     async def _get_domain_id(self, w: RBACWriteOps, domain_name: str) -> DomainID:
         result = await w.batch_query_in_global(
@@ -275,12 +263,10 @@ class GroupDBSource:
         new_user_rows = await self._users_addable_to_project(w, project_id, user_ids)
         if not new_user_rows:
             return
-        await w.add_bulk_members(
-            EntityMembersAddition(
-                scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
-                members=[ProjectUserMember(user_id=UserID(row.uuid)) for row in new_user_rows],
-            )
-        )
+        await w.add_bulk_members([
+            ProjectUserMember(project_id=project_id, user_id=UserID(row.uuid))
+            for row in new_user_rows
+        ])
 
     async def mark_inactive(self, group_id: uuid.UUID) -> None:
         """Mark a group as inactive (soft delete)."""
@@ -508,12 +494,7 @@ class GroupDBSource:
             # Finally delete the group itself as a scope: the row, its RBAC
             # entries, and its virtual scope node.
             result = await w.delete_scope(
-                ScopeDeletion(
-                    purger=RBACEntityPurger(
-                        spec=ProjectPurgerSpec(project_id=project_id),
-                    ),
-                    scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
-                )
+                EntityPurger(spec=ProjectPurgerSpec(project_id=project_id))
             )
             if result is None:
                 raise ProjectNotFound("project not found")
@@ -650,15 +631,12 @@ class GroupDBSource:
             if not new_user_rows:
                 return []
 
-            await w.add_bulk_members(
-                EntityMembersAddition(
-                    scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
-                    members=[
-                        ProjectUserMember(user_id=UserID(row.uuid), manage_roles=False)
-                        for row in new_user_rows
-                    ],
+            await w.add_bulk_members([
+                ProjectUserMember(
+                    project_id=project_id, user_id=UserID(row.uuid), manage_roles=False
                 )
-            )
+                for row in new_user_rows
+            ])
             user_role_specs = [
                 UserRoleCreatorSpec(user_id=row.uuid, role_id=role_id) for row in new_user_rows
             ]
@@ -728,12 +706,9 @@ class GroupDBSource:
         Idempotent: adding an existing member is a no-op.
         """
         async with self._rbac_ops_provider.write_ops() as w:
-            await w.add_bulk_members(
-                EntityMembersAddition(
-                    scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
-                    members=[ProjectUserMember(user_id=user_id, manage_roles=False)],
-                )
-            )
+            await w.add_bulk_members([
+                ProjectUserMember(project_id=project_id, user_id=user_id, manage_roles=False)
+            ])
 
     async def unbind_user_from_project(self, user_id: UserID, project_id: ProjectID) -> None:
         """Remove a user from a project (membership writes only)."""

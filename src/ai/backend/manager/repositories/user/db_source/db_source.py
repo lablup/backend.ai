@@ -18,7 +18,7 @@ from sqlalchemy.sql.expression import bindparam
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.types import EntityRef, ScopeRef
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
@@ -96,12 +96,12 @@ from ai.backend.manager.repositories.base.creator import (
 )
 from ai.backend.manager.repositories.base.pagination import NoPagination
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base.rbac.entity.purger import (
+    EntityBatchPurger,
+)
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
-)
-from ai.backend.manager.repositories.base.rbac.entity_purger import (
-    RBACEntityBatchPurger,
 )
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.keypair.creators import KeyPairCreatorSpec
@@ -110,11 +110,9 @@ from ai.backend.manager.repositories.keypair.types import (
     UserKeypairSearchScope,
 )
 from ai.backend.manager.repositories.ops.rbac.provider import (
-    EntityMembersAddition,
     FullUserCreation,
     RBACOpsProvider,
     RBACWriteOps,
-    ScopeBatchDeletion,
     ScopeUserMember,
 )
 from ai.backend.manager.repositories.user.creators import (
@@ -215,7 +213,7 @@ class UserDBSource:
 
         result = await w.create_full_user(
             FullUserCreation(
-                creation=UserScopeCreation(spec=creator.spec),
+                creation=UserScopeCreation(creator_spec=creator.spec),
                 domain_id=domain_id,
                 project_ids=[ProjectID(UUID(gid)) for gid in group_ids or []],
                 keypair_resource_policy=DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
@@ -522,12 +520,7 @@ class UserDBSource:
         # (association_scopes_entities and permission rows), and its virtual
         # scope node (FK CASCADE removes its bindings and memberships).
         await w.batch_delete_scopes(
-            ScopeBatchDeletion(
-                purger=RBACEntityBatchPurger(
-                    spec=UserBatchPurgerSpec(user_uuid=user_uuid), batch_size=1
-                ),
-                scopes=[ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=user_uuid)],
-            )
+            EntityBatchPurger(spec=UserBatchPurgerSpec(user_uuid=user_uuid), batch_size=1)
         )
 
     async def check_user_vfolder_mounted_to_active_kernels(self, user_uuid: UUID) -> bool:
@@ -876,12 +869,9 @@ class UserDBSource:
                     scope_type=PROJECT_SCOPE_TYPE, scope_id=ProjectID(project_id)
                 )
                 await w.ensure_scope(project_scope)
-                await w.add_bulk_members(
-                    EntityMembersAddition(
-                        scope=project_scope,
-                        members=[ScopeUserMember(user_id=UserID(user_uuid))],
-                    )
-                )
+                await w.add_bulk_members([
+                    ScopeUserMember(target_scope=project_scope, user_id=UserID(user_uuid))
+                ])
 
     async def _get_user_uuid_by_email_with_conn(self, conn: AsyncConnection, email: str) -> UUID:
         """Get user UUID by email using an existing connection."""

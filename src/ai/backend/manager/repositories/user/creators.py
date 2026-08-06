@@ -6,21 +6,20 @@ from collections.abc import Collection, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, override
 
-from ai.backend.common.data.entity.types import ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.entity.types import EntityRef
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
+from ai.backend.manager.data.permission.role import ScopeSystemRoleData
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.user import UserCreationBadRequest
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.repositories.base.creator import Creator, CreatorSpec
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
+from ai.backend.manager.repositories.base.rbac.entity.creator import EntityCreator
+from ai.backend.manager.repositories.base.rbac.entity.types import ScopeMembership
 from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
-from ai.backend.manager.repositories.ops.rbac.provider import ScopeCreation
 from ai.backend.manager.repositories.permission_controller.role_manager import (
-    ScopeSystemRoleData,
     UserSystemRoleSpec,
 )
 
@@ -29,24 +28,24 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class UserScopeCreation(ScopeCreation[UserRow]):
+class UserScopeCreation(EntityCreator[UserRow]):
     """Creates a user row and the scope the user becomes; the user is granted its own
-    scope's roles. Domain/project scope associations are written by the enrollment
+    scope's roles. Domain/project scope memberships are written by the enrollment
     step (``add_bulk_members``), not by this creator."""
 
-    spec: CreatorSpec[UserRow]
+    creator_spec: CreatorSpec[UserRow]
 
     @override
-    def creator(self) -> RBACEntityCreator[UserRow]:
-        return RBACEntityCreator(
-            spec=self.spec,
-            element_type=RBACElementType.USER,
-            scope_ref=None,
-        )
+    def spec(self) -> CreatorSpec[UserRow]:
+        return self.creator_spec
 
     @override
-    def scope_of(self, row: UserRow) -> ScopeRef:
-        return ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=UserID(row.uuid))
+    def entity_ref_of(self, row: UserRow) -> EntityRef:
+        return EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=UserID(row.uuid))
+
+    @override
+    def membership(self, row: UserRow) -> Sequence[ScopeMembership]:
+        return ()
 
     @override
     def system_roles_of(self, row: UserRow) -> Collection[ScopeSystemRoleData]:

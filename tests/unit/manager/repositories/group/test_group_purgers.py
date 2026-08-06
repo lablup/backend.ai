@@ -43,11 +43,11 @@ from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGro
 from ai.backend.manager.models.session import SessionRow, SessionStatus, SessionTypes
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder.row import VFolderRow
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
-from ai.backend.manager.repositories.base.rbac.entity_purger import (
-    RBACEntityPurger,
-    execute_rbac_entity_purger,
-)
+from ai.backend.manager.repositories.base.rbac.entity.purger import EntityPurger
 from ai.backend.manager.repositories.group.purgers import (
     GroupEndpointBatchPurgerSpec,
     GroupKernelBatchPurgerSpec,
@@ -55,6 +55,7 @@ from ai.backend.manager.repositories.group.purgers import (
     ProjectPurgerSpec,
     SessionByIdsBatchPurgerSpec,
 )
+from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 
@@ -93,6 +94,9 @@ class TestGroupPurgersIntegration:
                 RoleRow,
                 PermissionRow,
                 AssociationScopesEntitiesRow,
+                VirtualScopeRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
             ],
         ):
             yield database_connection
@@ -507,12 +511,12 @@ class TestGroupPurgersIntegration:
         """Test purging the group itself."""
         group_id = sample_group.id
 
-        # Purge group
-        async with db_with_cleanup.begin_session() as session:
-            purger = RBACEntityPurger(
-                spec=ProjectPurgerSpec(project_id=ProjectID(group_id)),
+        # Purge group as a scope: the row, its RBAC entries, and its virtual scope.
+        provider = RBACOpsProvider(db_with_cleanup)
+        async with provider.write_ops() as w:
+            result = await w.delete_scope(
+                EntityPurger(spec=ProjectPurgerSpec(project_id=ProjectID(group_id)))
             )
-            result = await execute_rbac_entity_purger(session, purger)
             assert result is not None
 
         # Verify group is deleted
