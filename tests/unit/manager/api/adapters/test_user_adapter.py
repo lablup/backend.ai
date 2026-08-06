@@ -38,7 +38,7 @@ def _create_user_data(
         totp_activated=False,
         totp_activated_at=None,
         sudo_session_enabled=False,
-        main_access_key=None,
+        default_access_key=None,
         container_uid=None,
         container_main_gid=None,
         container_gids=None,

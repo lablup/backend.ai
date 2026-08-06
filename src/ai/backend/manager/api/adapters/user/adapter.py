@@ -450,7 +450,7 @@ class UserAdapter(BaseAdapter):
         """Update a user by UUID."""
         if input.main_access_key is None:
             raise UserModificationBadRequest(
-                "main_access_key cannot be null; omit it to leave the default keypair unchanged."
+                "default_access_key cannot be null; omit it to leave the default keypair unchanged."
             )
         updater_spec = UserUpdaterSpec(
             username=(
@@ -519,7 +519,7 @@ class UserAdapter(BaseAdapter):
                 if input.sudo_session_enabled is not None
                 else OptionalState.nop()
             ),
-            main_access_key=(
+            default_access_key=(
                 OptionalState.nop()
                 if isinstance(input.main_access_key, Sentinel)
                 else OptionalState.update(input.main_access_key)
@@ -703,11 +703,11 @@ class UserAdapter(BaseAdapter):
         )
         return UpdateMyKeypairPayload(keypair=self._keypair_data_to_node(result.keypair))
 
-    async def switch_my_main_access_key(
+    async def switch_my_default_access_key(
         self, user_id: UUID, access_key: str
     ) -> SwitchMyMainAccessKeyPayload:
         """Switch the main access key for the current user."""
-        result = await self._processors.user.switch_my_main_access_key.wait_for_complete(
+        result = await self._processors.user.switch_my_default_access_key.wait_for_complete(
             SwitchMyMainAccessKeyAction(user_uuid=user_id, access_key=access_key)
         )
         return SwitchMyMainAccessKeyPayload(success=result.success)
@@ -1583,7 +1583,7 @@ class UserAdapter(BaseAdapter):
                 domain_name=data.domain_name,
                 role=UserRoleDTO(data.role.value) if data.role is not None else None,
                 resource_policy=data.resource_policy,
-                main_access_key=data.main_access_key,
+                main_access_key=data.default_access_key,
             ),
             security=UserSecurityInfo(
                 allowed_client_ip=data.allowed_client_ip,

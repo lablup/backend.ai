@@ -144,7 +144,7 @@ action = PurgeUserAction(
     user_info_ctx=UserInfoContext(
         uuid=user_uuid,
         email="user@example.com",
-        main_access_key=user_access_key,
+        default_access_key=user_access_key,
     ),
 )
 ```

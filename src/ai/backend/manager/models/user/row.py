@@ -431,7 +431,7 @@ class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
             totp_activated=self.totp_activated,
             totp_activated_at=self.totp_activated_at,
             sudo_session_enabled=self.sudo_session_enabled,
-            main_access_key=self.main_keypair_access_key,
+            default_access_key=self.main_keypair_access_key,
             container_uid=self.container_uid,
             container_main_gid=self.container_main_gid,
             container_gids=self.container_gids,

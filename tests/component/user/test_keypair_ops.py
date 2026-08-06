@@ -104,7 +104,7 @@ def _gql_error_codes(response: dict[str, Any]) -> list[str]:
 # sub-app serves the REAL strawberry schema instead of a MagicMock.
 # Only the UserProcessors (user domain) is real; the rest of the
 # Processors and GQLContextDeps fields are mocked because the
-# update_my_keypair / switch_my_main_access_key mutations only need
+# update_my_keypair / switch_my_default_access_key mutations only need
 # processors.user.
 # ---------------------------------------------------------------------------
 

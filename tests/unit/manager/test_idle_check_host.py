@@ -449,13 +449,13 @@ class TestDoIdleCheck:
         user_resource_policy_name: str,
     ) -> None:
         """A kernel created with a secondary keypair uses the main keypair's policy."""
-        user_uuid, main_access_key = await self._create_user(
+        user_uuid, default_access_key = await self._create_user(
             db,
             domain_name=domain[1],
             user_resource_policy_name=user_resource_policy_name,
             main_keypair_idle_timeout=600,
         )
-        assert main_access_key is not None
+        assert default_access_key is not None
         secondary_access_key = await self._create_keypair(db, user_uuid=user_uuid, idle_timeout=30)
         kernel_id = await self._create_running_kernel(
             db,

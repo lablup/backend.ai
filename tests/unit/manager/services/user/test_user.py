@@ -225,7 +225,7 @@ class TestUserServiceCompatibility:
             user_info_ctx=UserInfoContext(
                 uuid=UUID("00000000-0000-0000-0000-000000000000"),
                 email="user@example.com",
-                main_access_key=AccessKey("test-key"),
+                default_access_key=AccessKey("test-key"),
             ),
         )
 

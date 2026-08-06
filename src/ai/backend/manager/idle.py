@@ -292,21 +292,21 @@ class IdleCheckerHost:
                 # The idle policy is resolved through the user's main keypair
                 # instead of the kernel's own access key, which may be left
                 # orphaned by a keypair deletion.
-                main_access_key = cast(AccessKey | None, kernel.main_access_key)
-                if main_access_key not in policy_cache:
+                default_access_key = cast(AccessKey | None, kernel.default_access_key)
+                if default_access_key not in policy_cache:
                     policy = (
-                        await self._fetch_idle_policy(conn, main_access_key)
-                        if main_access_key is not None
+                        await self._fetch_idle_policy(conn, default_access_key)
+                        if default_access_key is not None
                         else None
                     )
                     if policy is None:
                         log.warning(
-                            "idle policy not found for main_access_key={}; "
+                            "idle policy not found for default_access_key={}; "
                             "skipping its kernels in this cycle",
-                            main_access_key,
+                            default_access_key,
                         )
-                    policy_cache[main_access_key] = policy
-                policy = policy_cache[main_access_key]
+                    policy_cache[default_access_key] = policy
+                policy = policy_cache[default_access_key]
                 if policy is None:
                     continue
 
