@@ -1,12 +1,14 @@
 """tighten the always-populated users columns
 
-Six columns are nullable in the schema while every write path sets them, so
+Three columns are nullable in the schema while every write path sets them, so
 readers carry a ``None`` branch that cannot be taken — ``role`` in particular,
 which the auth path had to reject a user for lacking.
 
 Left nullable on purpose: ``full_name``, ``description``, ``integration_id``,
 ``allowed_client_ip``, ``totp_key``, ``totp_activated_at`` and the container id
-columns are genuinely optional; ``status_info`` defaults to NULL in the model
+columns are genuinely optional; ``created_at``, ``updated_at`` and
+``password_changed_at`` were already tightened by ``2dccb3069031``;
+``status_info`` defaults to NULL in the model
 itself; ``password`` may legitimately be absent for accounts an auth plugin
 owns; ``domain_name`` and ``domain_id`` are mid-transition under BA-7158.
 
@@ -28,9 +30,6 @@ depends_on = None
 
 _TIGHTENED = (
     "need_password_change",
-    "password_changed_at",
-    "created_at",
-    "modified_at",
     "role",
     "totp_activated",
 )
@@ -41,11 +40,6 @@ def upgrade() -> None:
     bind.execute(
         sa.text("UPDATE users SET need_password_change = false WHERE need_password_change IS NULL")
     )
-    bind.execute(
-        sa.text("UPDATE users SET password_changed_at = now() WHERE password_changed_at IS NULL")
-    )
-    bind.execute(sa.text("UPDATE users SET created_at = now() WHERE created_at IS NULL"))
-    bind.execute(sa.text("UPDATE users SET modified_at = now() WHERE modified_at IS NULL"))
     bind.execute(sa.text("UPDATE users SET role = 'user' WHERE role IS NULL"))
     bind.execute(sa.text("UPDATE users SET totp_activated = false WHERE totp_activated IS NULL"))
 
