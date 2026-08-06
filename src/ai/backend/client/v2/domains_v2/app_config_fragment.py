@@ -57,7 +57,7 @@ class V2AppConfigFragmentClient(BaseDomainClient):
         self,
         request: ScopedUpsertAppConfigFragmentsInput,
     ) -> UpsertAppConfigFragmentsPayload:
-        """Upsert many fragments at one scope, all-or-nothing."""
+        """Upsert many fragments at one scope, reporting per-item success and failure."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/scoped/bulk-upsert",
@@ -83,7 +83,8 @@ class V2AppConfigFragmentClient(BaseDomainClient):
         self,
         request: MyUpsertAppConfigFragmentsInput,
     ) -> UpsertAppConfigFragmentsPayload:
-        """Upsert many fragments at the caller's own user scope, all-or-nothing."""
+        """Upsert many fragments at the caller's own user scope, reporting per-item success
+        and failure."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/my/bulk-upsert",

@@ -112,10 +112,10 @@ def get(scope_type: str, scope_id: uuid.UUID | None, config_names: tuple[str, ..
     ),
 )
 def update(scope_type: str, scope_id: uuid.UUID | None, items: str) -> None:
-    """Write the given configs' fragments at one scope, all-or-nothing.
+    """Write the given configs' fragments at one scope, reporting each item's outcome.
 
     Each item replaces the scope's fragment for its config name, or creates it when the
-    scope holds none. Every item lands or none does.
+    scope holds none. A rejected item fails alone and the rest of the batch lands.
     """
     from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
         ScopedUpsertAppConfigFragmentsInput,
