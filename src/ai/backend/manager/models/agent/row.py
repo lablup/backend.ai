@@ -75,7 +75,7 @@ class AgentRow(Base):  # type: ignore[misc]
         nullable=False,
         server_default=sa.text("uuid_generate_v4()"),
     )
-    id: Mapped[str] = mapped_column("id", sa.String(length=64), primary_key=True)
+    id: Mapped[AgentId] = mapped_column("id", sa.String(length=64), primary_key=True)
     status: Mapped[AgentStatus] = mapped_column(
         "status", EnumType(AgentStatus), nullable=False, index=True, default=AgentStatus.ALIVE
     )
@@ -349,7 +349,7 @@ class AgentPermissionContext(AbstractPermissionContext[AgentPermission, AgentRow
     @override
     async def calculate_final_permission(self, rbac_obj: AgentRow) -> frozenset[AgentPermission]:
         agent_row = rbac_obj
-        agent_id = cast(AgentId, agent_row.id)
+        agent_id = agent_row.id
         permissions: set[AgentPermission] = set()
 
         if (
