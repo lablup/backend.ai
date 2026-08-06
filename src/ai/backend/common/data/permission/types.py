@@ -407,6 +407,7 @@ class RBACElementType(enum.StrEnum):
     KEYPAIR = "keypair"
     NOTIFICATION_CHANNEL = "notification_channel"
     NETWORK = "network"
+    IDLE_CHECKER = "idle_checker"
     IDLE_CHECKER_ASSIGNMENT = "idle_checker_assignment"
     RESOURCE_GROUP = "resource_group"
     CONTAINER_REGISTRY = "container_registry"

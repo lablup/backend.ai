@@ -261,6 +261,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
                 | RBACElementType.VFOLDER_DATA
                 | RBACElementType.SESSION_APP_SERVICE
                 | RBACElementType.USER_EMAIL
+                | RBACElementType.IDLE_CHECKER
                 | RBACElementType.IDLE_CHECKER_ASSIGNMENT
             ):
                 return None

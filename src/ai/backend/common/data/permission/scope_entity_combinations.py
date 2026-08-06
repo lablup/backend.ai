@@ -20,6 +20,7 @@ VALID_SCOPE_ENTITY_COMBINATIONS: Mapping[RBACElementType, frozenset[RBACElementT
         RBACElementType.PROJECT,
         RBACElementType.NETWORK,
         RBACElementType.STORAGE_HOST,
+        RBACElementType.IDLE_CHECKER,
         RBACElementType.DOMAIN_ADMIN_PAGE,
     }),
     RBACElementType.PROJECT: frozenset({
@@ -31,6 +32,7 @@ VALID_SCOPE_ENTITY_COMBINATIONS: Mapping[RBACElementType, frozenset[RBACElementT
         RBACElementType.NETWORK,
         RBACElementType.USER,
         RBACElementType.STORAGE_HOST,
+        RBACElementType.IDLE_CHECKER,
         RBACElementType.PROJECT_ADMIN_PAGE,
     }),
     RBACElementType.USER: frozenset({
@@ -42,6 +44,7 @@ VALID_SCOPE_ENTITY_COMBINATIONS: Mapping[RBACElementType, frozenset[RBACElementT
     }),
     RBACElementType.RESOURCE_GROUP: frozenset({
         RBACElementType.AGENT,
+        RBACElementType.IDLE_CHECKER,
     }),
     RBACElementType.AGENT: frozenset({
         RBACElementType.KERNEL,
