@@ -30443,7 +30443,7 @@
               }
             ],
             "default": 1,
-            "description": "Set the primary API access key. Set to null to clear.",
+            "description": "Set the primary API access key. Null is not accepted.",
             "title": "Main Access Key"
           },
           "container_uid": {
