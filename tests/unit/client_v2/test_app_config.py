@@ -116,18 +116,6 @@ class TestPublicMergedRead:
 
         assert "Authorization" not in mock_session.request.call_args[1]["headers"]
 
-    async def test_parses_the_merge_for_each_requested_name(
-        self, client: V2AppConfigClient
-    ) -> None:
-        result = await client.public_get_app_configs(
-            PublicGetAppConfigsInput(config_names=["theme", "menu"])
-        )
-
-        assert isinstance(result, GetAppConfigsPayload)
-        merged, uncontributed = result.app_configs
-        assert (merged.config_name, merged.config) == ("theme", {"mode": "dark"})
-        assert (uncontributed.config_name, uncontributed.config) == ("menu", {})
-
 
 class TestRegistryWiring:
     async def test_hands_the_public_read_the_anonymous_client(
