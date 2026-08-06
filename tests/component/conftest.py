@@ -941,6 +941,7 @@ async def admin_user_fixture(
         await conn.execute(
             keypairs.delete().where(keypairs.c.access_key == data.keypair.access_key)
         )
+        # The entity-membership and scope-binding rows cascade from the virtual scope.
         await conn.execute(
             VirtualScopeRow.__table__.delete().where(
                 VirtualScopeRow.__table__.c.scope_type == ScopeType.USER,
@@ -1046,6 +1047,7 @@ async def regular_user_fixture(
         await conn.execute(
             keypairs.delete().where(keypairs.c.access_key == data.keypair.access_key)
         )
+        # The entity-membership and scope-binding rows cascade from the virtual scope.
         await conn.execute(
             VirtualScopeRow.__table__.delete().where(
                 VirtualScopeRow.__table__.c.scope_type == ScopeType.USER,
