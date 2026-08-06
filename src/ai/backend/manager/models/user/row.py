@@ -263,7 +263,7 @@ class UserRow(Base):  # type: ignore[misc]
         foreign_keys="KernelRow.user_uuid",
     )
     domain: Mapped[DomainRow | None] = relationship(
-        "DomainRow", back_populates="users", primaryjoin=_get_domain_join_condition
+        "DomainRow", primaryjoin=_get_domain_join_condition
     )
     groups: Mapped[list[AssocGroupUserRow]] = relationship(
         "AssocGroupUserRow", back_populates="user", primaryjoin=_get_groups_join_condition

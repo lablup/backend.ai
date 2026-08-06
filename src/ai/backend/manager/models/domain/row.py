@@ -17,7 +17,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship
+from sqlalchemy.orm import Mapped, load_only, mapped_column, relationship
 from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common import msgpack
@@ -50,11 +50,7 @@ from ai.backend.manager.models.rbac import (
 from ai.backend.manager.models.rbac.context import ClientContext
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.group import GroupRow
-    from ai.backend.manager.models.network import NetworkRow
     from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
-    from ai.backend.manager.models.session import SessionRow
-    from ai.backend.manager.models.user import UserRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -85,12 +81,6 @@ def row_to_data(row: DomainRow | Row[Any]) -> DomainData:
         integration_name=row.integration_id,  # DB column is integration_id
         dotfiles=row.dotfiles,
     )
-
-
-def _get_network_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.network import NetworkRow
-
-    return DomainRow.name == foreign(NetworkRow.domain_name)
 
 
 class DomainRow(CreatedAtMixin, Base):  # type: ignore[misc]
@@ -135,25 +125,8 @@ class DomainRow(CreatedAtMixin, Base):  # type: ignore[misc]
         "dotfiles", sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b"\x90"
     )
 
-    sessions: Mapped[list[SessionRow]] = relationship(
-        "SessionRow",
-        back_populates="domain",
-        foreign_keys="[SessionRow.domain_name]",
-    )
-    users: Mapped[list[UserRow]] = relationship(
-        "UserRow",
-        back_populates="domain",
-        foreign_keys="[UserRow.domain_name]",
-    )
-    groups: Mapped[list[GroupRow]] = relationship("GroupRow", back_populates="domain")
     sgroup_for_domains_rows: Mapped[list[ScalingGroupForDomainRow]] = relationship(
         "ScalingGroupForDomainRow",
-        back_populates="domain_row",
-    )
-    networks: Mapped[list[NetworkRow]] = relationship(
-        "NetworkRow",
-        back_populates="domain_row",
-        primaryjoin=_get_network_join_condition,
     )
 
     @classmethod

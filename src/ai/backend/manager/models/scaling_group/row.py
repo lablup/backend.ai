@@ -21,7 +21,6 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import (
     Mapped,
-    foreign,
     joinedload,
     load_only,
     mapped_column,
@@ -67,11 +66,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.agent import AgentRow
-    from ai.backend.manager.models.domain import DomainRow
-    from ai.backend.manager.models.group import GroupRow
-    from ai.backend.manager.models.keypair import KeyPairRow
-    from ai.backend.manager.models.resource_preset import ResourcePresetRow
-    from ai.backend.manager.models.session import SessionRow
 
 __all__: Sequence[str] = (
     # table defs
@@ -163,11 +157,6 @@ class ScalingGroupForDomainRow(Base):  # type: ignore[misc]
     )
     sgroup_row: Mapped[ScalingGroupRow] = relationship(
         "ScalingGroupRow",
-        back_populates="sgroup_for_domains_rows",
-    )
-    domain_row: Mapped[DomainRow] = relationship(
-        "DomainRow",
-        back_populates="sgroup_for_domains_rows",
     )
 
 
@@ -199,11 +188,6 @@ class ScalingGroupForProjectRow(Base):  # type: ignore[misc]
     )
     sgroup_row: Mapped[ScalingGroupRow] = relationship(
         "ScalingGroupRow",
-        back_populates="sgroup_for_groups_rows",
-    )
-    project_row: Mapped[GroupRow] = relationship(
-        "GroupRow",
-        back_populates="sgroup_for_groups_rows",
     )
 
 
@@ -234,22 +218,11 @@ class ScalingGroupForKeypairsRow(Base):  # type: ignore[misc]
     )
     sgroup_row: Mapped[ScalingGroupRow] = relationship(
         "ScalingGroupRow",
-        back_populates="sgroup_for_keypairs_rows",
-    )
-    keypair_row: Mapped[KeyPairRow] = relationship(
-        "KeyPairRow",
-        back_populates="sgroup_for_keypairs_rows",
     )
 
 
 # For compatibility
 sgroups_for_keypairs = ScalingGroupForKeypairsRow.__table__
-
-
-def _get_resource_preset_join_condition() -> Any:
-    from ai.backend.manager.models.resource_preset import ResourcePresetRow
-
-    return ScalingGroupRow.name == foreign(ResourcePresetRow.scaling_group_name)
 
 
 class ScalingGroupRow(Base):  # type: ignore[misc]
@@ -332,33 +305,10 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
         default=DefaultSessionOptions,
     )
 
-    sessions: Mapped[list[SessionRow]] = relationship(
-        "SessionRow",
-        back_populates="scaling_group",
-        foreign_keys="[SessionRow.scaling_group_name]",
-    )
     agents: Mapped[list[AgentRow]] = relationship(
         "AgentRow",
         back_populates="scaling_group_row",
         foreign_keys="[AgentRow.scaling_group]",
-    )
-
-    sgroup_for_domains_rows: Mapped[list[ScalingGroupForDomainRow]] = relationship(
-        "ScalingGroupForDomainRow",
-        back_populates="sgroup_row",
-    )
-    sgroup_for_groups_rows: Mapped[list[ScalingGroupForProjectRow]] = relationship(
-        "ScalingGroupForProjectRow",
-        back_populates="sgroup_row",
-    )
-    sgroup_for_keypairs_rows: Mapped[list[ScalingGroupForKeypairsRow]] = relationship(
-        "ScalingGroupForKeypairsRow",
-        back_populates="sgroup_row",
-    )
-    resource_preset_rows: Mapped[list[ResourcePresetRow]] = relationship(
-        "ResourcePresetRow",
-        back_populates="scaling_group_row",
-        primaryjoin=_get_resource_preset_join_condition,
     )
 
     @classmethod

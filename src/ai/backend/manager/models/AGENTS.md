@@ -12,6 +12,7 @@ The single-file shorthand (`models/{domain}.py`) is legacy — do not add new on
 
 - Inherit `Base` (defined in `manager/models/base.py`).
 - Every Row class requires a `__tablename__`.
+- Do NOT add new `relationship()` definitions — fetch related rows in `repositories/db_source/` queries. Existing relationships are being phased out; remove them (with their `back_populates` pair) once nothing references them.
 - Inter-entity relationships: keep related Row imports inside a `TYPE_CHECKING` block only.
 
 ## No logic in Row classes

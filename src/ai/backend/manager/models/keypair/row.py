@@ -107,7 +107,6 @@ class KeyPairRow(Base):  # type: ignore[misc]
     )
     sgroup_for_keypairs_rows: Mapped[list[ScalingGroupForKeypairsRow]] = relationship(
         "ScalingGroupForKeypairsRow",
-        back_populates="keypair_row",
     )
     user_row: Mapped[UserRow] = relationship(
         "UserRow", back_populates="keypairs", foreign_keys=[user]
