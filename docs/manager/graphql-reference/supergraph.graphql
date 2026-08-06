@@ -4791,6 +4791,15 @@ input CreateRuntimeVariantPresetInput
   Added in 26.4.4. Whether this preset parameter must be supplied when building a deployment revision.
   """
   required: Boolean! = false
+
+  """Added in 26.9.0. UI category group for organizing parameters."""
+  category: String
+
+  """Added in 26.9.0. Human-readable display label for the UI."""
+  displayName: String
+
+  """Added in 26.9.0. UI rendering options."""
+  uiOption: RuntimeVariantPresetUIOptionInput
 }
 
 """Added in 26.4.2. Create preset payload."""
@@ -18956,6 +18965,25 @@ type RuntimeVariantPreset implements Node
   runtimeVariant: RuntimeVariant
 }
 
+"""Added in 26.9.0. Choice item input."""
+input RuntimeVariantPresetChoiceItemInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Option value."""
+  value: String!
+
+  """Display label."""
+  label: String!
+}
+
+"""Added in 26.9.0. Select UI config input."""
+input RuntimeVariantPresetChoiceOptionInput
+  @join__type(graph: STRAWBERRY)
+{
+  """List of choices."""
+  items: [RuntimeVariantPresetChoiceItemInput!]!
+}
+
 """Added in 26.4.2. Paginated list of runtime variant presets."""
 type RuntimeVariantPresetConnection
   @join__type(graph: STRAWBERRY)
@@ -18999,6 +19027,17 @@ input RuntimeVariantPresetFilter
   NOT: [RuntimeVariantPresetFilter!] = null
 }
 
+"""Added in 26.9.0. Number input UI config input."""
+input RuntimeVariantPresetNumberOptionInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Minimum value."""
+  min: Float = null
+
+  """Maximum value."""
+  max: Float = null
+}
+
 """Added in 26.4.2. Order specification."""
 input RuntimeVariantPresetOrderBy
   @join__type(graph: STRAWBERRY)
@@ -19017,6 +19056,59 @@ enum RuntimeVariantPresetOrderField
   NAME @join__enumValue(graph: STRAWBERRY)
   RANK @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.9.0. Slider UI config input."""
+input RuntimeVariantPresetSliderOptionInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Minimum value."""
+  min: Float!
+
+  """Maximum value."""
+  max: Float!
+
+  """Increment step."""
+  step: Float! = 1
+}
+
+"""Added in 26.9.0. Text input UI config input."""
+input RuntimeVariantPresetTextOptionInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Placeholder text."""
+  placeholder: String = null
+}
+
+"""Added in 26.9.0. UI rendering options input."""
+input RuntimeVariantPresetUIOptionInput
+  @join__type(graph: STRAWBERRY)
+{
+  """UI render type."""
+  uiType: RuntimeVariantPresetUIType!
+
+  """Slider config."""
+  slider: RuntimeVariantPresetSliderOptionInput = null
+
+  """Number input config."""
+  number: RuntimeVariantPresetNumberOptionInput = null
+
+  """Select config."""
+  choices: RuntimeVariantPresetChoiceOptionInput = null
+
+  """Text input config."""
+  text: RuntimeVariantPresetTextOptionInput = null
+}
+
+"""Added in 26.9.0. UI control type for a runtime variant preset."""
+enum RuntimeVariantPresetUIType
+  @join__type(graph: STRAWBERRY)
+{
+  SLIDER @join__enumValue(graph: STRAWBERRY)
+  NUMBER_INPUT @join__enumValue(graph: STRAWBERRY)
+  SELECT @join__enumValue(graph: STRAWBERRY)
+  CHECKBOX @join__enumValue(graph: STRAWBERRY)
+  TEXT_INPUT @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -21651,6 +21743,15 @@ input UpdateRuntimeVariantPresetInput
 
   """Added in 26.4.4. New required flag."""
   required: Boolean = null
+
+  """Added in 26.9.0. New UI category group."""
+  category: String
+
+  """Added in 26.9.0. New human-readable display label."""
+  displayName: String
+
+  """Added in 26.9.0. New UI rendering options."""
+  uiOption: RuntimeVariantPresetUIOptionInput
 }
 
 """Added in 26.4.2. Update preset payload."""

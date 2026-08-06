@@ -3249,6 +3249,15 @@ input CreateRuntimeVariantPresetInput {
   Added in 26.4.4. Whether this preset parameter must be supplied when building a deployment revision.
   """
   required: Boolean! = false
+
+  """Added in 26.9.0. UI category group for organizing parameters."""
+  category: String
+
+  """Added in 26.9.0. Human-readable display label for the UI."""
+  displayName: String
+
+  """Added in 26.9.0. UI rendering options."""
+  uiOption: RuntimeVariantPresetUIOptionInput
 }
 
 """Added in 26.4.2. Create preset payload."""
@@ -13397,6 +13406,21 @@ type RuntimeVariantPreset implements Node {
   runtimeVariant: RuntimeVariant
 }
 
+"""Added in 26.9.0. Choice item input."""
+input RuntimeVariantPresetChoiceItemInput {
+  """Option value."""
+  value: String!
+
+  """Display label."""
+  label: String!
+}
+
+"""Added in 26.9.0. Select UI config input."""
+input RuntimeVariantPresetChoiceOptionInput {
+  """List of choices."""
+  items: [RuntimeVariantPresetChoiceItemInput!]!
+}
+
 """Added in 26.4.2. Paginated list of runtime variant presets."""
 type RuntimeVariantPresetConnection {
   """Pagination data for this connection"""
@@ -13434,6 +13458,15 @@ input RuntimeVariantPresetFilter {
   NOT: [RuntimeVariantPresetFilter!] = null
 }
 
+"""Added in 26.9.0. Number input UI config input."""
+input RuntimeVariantPresetNumberOptionInput {
+  """Minimum value."""
+  min: Float = null
+
+  """Maximum value."""
+  max: Float = null
+}
+
 """Added in 26.4.2. Order specification."""
 input RuntimeVariantPresetOrderBy {
   """Field to order by."""
@@ -13448,6 +13481,51 @@ enum RuntimeVariantPresetOrderField {
   NAME
   RANK
   CREATED_AT
+}
+
+"""Added in 26.9.0. Slider UI config input."""
+input RuntimeVariantPresetSliderOptionInput {
+  """Minimum value."""
+  min: Float!
+
+  """Maximum value."""
+  max: Float!
+
+  """Increment step."""
+  step: Float! = 1
+}
+
+"""Added in 26.9.0. Text input UI config input."""
+input RuntimeVariantPresetTextOptionInput {
+  """Placeholder text."""
+  placeholder: String = null
+}
+
+"""Added in 26.9.0. UI rendering options input."""
+input RuntimeVariantPresetUIOptionInput {
+  """UI render type."""
+  uiType: RuntimeVariantPresetUIType!
+
+  """Slider config."""
+  slider: RuntimeVariantPresetSliderOptionInput = null
+
+  """Number input config."""
+  number: RuntimeVariantPresetNumberOptionInput = null
+
+  """Select config."""
+  choices: RuntimeVariantPresetChoiceOptionInput = null
+
+  """Text input config."""
+  text: RuntimeVariantPresetTextOptionInput = null
+}
+
+"""Added in 26.9.0. UI control type for a runtime variant preset."""
+enum RuntimeVariantPresetUIType {
+  SLIDER
+  NUMBER_INPUT
+  SELECT
+  CHECKBOX
+  TEXT_INPUT
 }
 
 """
@@ -15526,6 +15604,15 @@ input UpdateRuntimeVariantPresetInput {
 
   """Added in 26.4.4. New required flag."""
   required: Boolean = null
+
+  """Added in 26.9.0. New UI category group."""
+  category: String
+
+  """Added in 26.9.0. New human-readable display label."""
+  displayName: String
+
+  """Added in 26.9.0. New UI rendering options."""
+  uiOption: RuntimeVariantPresetUIOptionInput
 }
 
 """Added in 26.4.2. Update preset payload."""
