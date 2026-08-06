@@ -220,9 +220,10 @@ ukify build --linux="$KERNEL" --initrd="$OUT/initrd.img" --cmdline="@${OUT}/cmdl
     --os-release="@${ROOT}/usr/lib/os-release" --output="$OUT/state-bundle.efi"
 
 python3 - "$OUT" "$ROOTHASH" "$IMAGE_UUID" "$SCRUBBED" > "$OUT/reference-values.json" <<'PY'
-import hashlib, json, pathlib, sys
+import hashlib, json, os, pathlib, sys
 out, roothash, uuid = pathlib.Path(sys.argv[1]), sys.argv[2], sys.argv[3]
 scrubbed = sys.argv[4] == "true"
+unmerged = [line for line in os.environ.get("BAI_UNMERGED_BUNDLE_COMMITS", "").splitlines() if line]
 
 
 def digest(name, algorithm):
@@ -241,6 +242,9 @@ json.dump(
         "cmdline-sha384": digest("cmdline", "sha384"),
         "rootfs-sha256": digest("rootfs.erofs", "sha256"),
         "introspection-scrubbed": scrubbed,
+        "source-branch": os.environ.get("BAI_SOURCE_BRANCH", "unknown"),
+        "source-commit": os.environ.get("BAI_SOURCE_COMMIT", "unknown"),
+        "unmerged-bundle-commits": unmerged,
         "rtmr": "capture-reference-values must fill these from a booted trust domain",
     },
     sys.stdout,
