@@ -1216,8 +1216,7 @@ class SessionService:
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
 
-        created_at = sess.created_at or datetime.now(tzutc())
-        age = datetime.now(tzutc()) - created_at
+        age = datetime.now(tzutc()) - sess.created_at
         session_info = LegacySessionInfo(
             domain_name=sess.domain_name,
             group_id=sess.group_id,
@@ -1240,7 +1239,7 @@ class SessionService:
             status_info=str(sess.status_info) if sess.status_info else None,
             status_data=sess.status_data,
             age_ms=int(age.total_seconds() * 1000),
-            creation_time=created_at,
+            creation_time=sess.created_at,
             termination_time=sess.terminated_at,
             num_queries_executed=sess.num_queries or 0,
             last_stat=sess.last_stat,

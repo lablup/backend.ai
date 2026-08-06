@@ -128,7 +128,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
         "name": ("name", None),
         "is_active": ("is_active", None),
         "created_at": ("created_at", dtparse),
-        "modified_at": ("modified_at", dtparse),
+        "modified_at": ("updated_at", dtparse),
         "domain_name": ("domain_name", None),
         "resource_policy": ("resource_policy", None),
     }
@@ -138,7 +138,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
         "name": ("name", None),
         "is_active": ("is_active", None),
         "created_at": ("created_at", None),
-        "modified_at": ("modified_at", None),
+        "modified_at": ("updated_at", None),
         "domain_name": ("domain_name", None),
         "resource_policy": ("resource_policy", None),
     }
@@ -156,7 +156,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
             description=row.description,
             is_active=row.is_active,
             created_at=row.created_at,
-            modified_at=row.modified_at,
+            modified_at=row.updated_at,
             domain_name=row.domain_name,
             total_resource_slots=row.total_resource_slots.to_json() or {},
             allowed_vfolder_hosts=row.allowed_vfolder_hosts.to_json(),
@@ -384,7 +384,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             description=row.description,
             is_active=row.is_active,
             created_at=row.created_at,
-            modified_at=row.modified_at,
+            modified_at=row.updated_at,
             domain_name=row.domain_name,
             total_resource_slots=(
                 row.total_resource_slots.to_json() if row.total_resource_slots is not None else {}

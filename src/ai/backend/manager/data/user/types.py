@@ -132,7 +132,7 @@ class UserData:
             status=row.status,
             status_info=row.status_info,
             created_at=row.created_at,
-            modified_at=row.modified_at,
+            modified_at=row.updated_at,
             domain_name=row.domain_name,
             domain_id=row.domain_id,
             role=row.role,

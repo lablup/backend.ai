@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
@@ -11,9 +10,10 @@ from ai.backend.manager.data.role_invitation.types import (
     RoleInvitationState,
 )
 from ai.backend.manager.models.base import GUID, Base, StrEnumType
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 
-class RoleInvitationRow(Base):  # type: ignore[misc]
+class RoleInvitationRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     __tablename__ = "role_invitations"
     __table_args__ = (
         sa.Index(
@@ -52,15 +52,6 @@ class RoleInvitationRow(Base):  # type: ignore[misc]
         nullable=False,
         default=RoleInvitationState.PENDING,
         server_default=RoleInvitationState.PENDING.value,
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
-    )
-    updated_at: Mapped[datetime | None] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        nullable=True,
-        onupdate=sa.func.current_timestamp(),
     )
 
     def to_data(self) -> RoleInvitationData:

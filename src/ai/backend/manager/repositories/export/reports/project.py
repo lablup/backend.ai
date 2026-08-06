@@ -145,7 +145,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         name="Modified At",
         description="Last modification time",
         field_type=ExportFieldType.DATETIME,
-        column=GroupRow.modified_at,
+        column=GroupRow.updated_at,
         formatter=lambda v: v.isoformat() if v else "",
     ),
     # =========================================================================

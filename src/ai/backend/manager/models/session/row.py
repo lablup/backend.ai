@@ -18,7 +18,6 @@ from uuid import UUID
 import aiotools
 import sqlalchemy as sa
 import yarl
-from dateutil.tz import tzutc
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -91,6 +90,7 @@ from ai.backend.manager.models.base import (
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryFilterParser
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 from ai.backend.manager.models.network import NetworkRow, NetworkType
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
@@ -365,7 +365,7 @@ def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     return UserRow.uuid == foreign(SessionRow.user_uuid)
 
 
-class SessionRow(Base):  # type: ignore[misc]
+class SessionRow(CreatedAtMixin, Base):  # type: ignore[misc]
     __tablename__ = "sessions"
     id: Mapped[SessionId] = mapped_column(
         "id", SessionIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
@@ -541,9 +541,6 @@ class SessionRow(Base):  # type: ignore[misc]
     batch_timeout: Mapped[int | None] = mapped_column(
         "batch_timeout", sa.BigInteger(), nullable=True
     )  # Used to set timeout of batch sessions
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True
-    )
     terminated_at: Mapped[datetime | None] = mapped_column(
         "terminated_at", sa.DateTime(timezone=True), nullable=True, default=sa.null(), index=True
     )
@@ -665,6 +662,7 @@ class SessionRow(Base):  # type: ignore[misc]
 
     __table_args__ = (
         # indexing
+        sa.Index("ix_sessions_created_at", "created_at"),
         sa.Index(
             "ix_sessions_updated_order",
             sa.func.greatest(
@@ -778,7 +776,7 @@ class SessionRow(Base):  # type: ignore[misc]
             use_host_network=self.use_host_network,
             timeout=self.timeout,
             batch_timeout=self.batch_timeout,
-            created_at=self.created_at or datetime.now(tzutc()),
+            created_at=self.created_at,
             terminated_at=self.terminated_at,
             starts_at=self.starts_at,
             status=self.status,

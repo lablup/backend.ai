@@ -183,7 +183,7 @@ class RetentionDBSource:
                 ),
                 RetentionPurgerSpec(
                     VFolderInvitationRow,
-                    VFolderInvitationRow.modified_at,
+                    VFolderInvitationRow.updated_at,
                     threshold,
                     conditions=(
                         VFolderInvitationRow.state.in_(VFolderInvitationState.declined_states()),

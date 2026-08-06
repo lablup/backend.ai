@@ -19,6 +19,7 @@ from ai.backend.manager.models.base import (
     DecimalType,
     StrEnumType,
 )
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.endpoint import EndpointRow
@@ -34,7 +35,7 @@ def _get_endpoint_join_condition() -> sa.ColumnElement[bool]:
     return foreign(DeploymentAutoScalingPolicyRow.endpoint) == EndpointRow.id
 
 
-class DeploymentAutoScalingPolicyRow(Base):  # type: ignore[misc]
+class DeploymentAutoScalingPolicyRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     """
     Represents an auto-scaling policy for a deployment (K8s HPA equivalent).
 
@@ -98,20 +99,6 @@ class DeploymentAutoScalingPolicyRow(Base):  # type: ignore[misc]
     )
     last_scaled_at: Mapped[datetime | None] = mapped_column(
         "last_scaled_at", sa.DateTime(timezone=True), nullable=True
-    )
-
-    # Timestamps
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        nullable=False,
-    )
-    updated_at: Mapped[datetime | None] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        onupdate=sa.func.now(),
-        nullable=True,
     )
 
     # Relationships (without FK constraints)

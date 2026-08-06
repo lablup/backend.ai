@@ -39,8 +39,8 @@ class GroupOrders:
     @staticmethod
     def modified_at(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return GroupRow.modified_at.asc()
-        return GroupRow.modified_at.desc()
+            return GroupRow.updated_at.asc()
+        return GroupRow.updated_at.desc()
 
     @staticmethod
     def domain_name(ascending: bool = True) -> QueryOrder:

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
@@ -12,6 +11,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.data.model_card.types import ModelCardData, ResourceRequirementEntry
 from ai.backend.manager.models.base import GUID, Base
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.resource_slot.row import ModelCardResourceRequirementRow
@@ -41,7 +41,7 @@ def _format_min_quantity(value: Decimal | str) -> str:
     return format(decimal_value.normalize(), "f")
 
 
-class ModelCardRow(Base):  # type: ignore[misc]
+class ModelCardRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     __tablename__ = "model_cards"
 
     __table_args__ = (
@@ -98,19 +98,6 @@ class ModelCardRow(Base):  # type: ignore[misc]
     readme: Mapped[str | None] = mapped_column("readme", sa.Text, nullable=True)
     access_level: Mapped[str] = mapped_column(
         "access_level", sa.String(length=32), nullable=False, default="internal"
-    )
-
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        nullable=False,
-    )
-    updated_at: Mapped[datetime | None] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        nullable=True,
-        onupdate=sa.func.now(),
     )
 
     resource_requirement_rows: Mapped[list[ModelCardResourceRequirementRow]] = relationship(

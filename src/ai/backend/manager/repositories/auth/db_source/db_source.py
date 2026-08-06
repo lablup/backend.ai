@@ -271,7 +271,7 @@ class AuthDBSource:
             status=row.status or UserStatus.ACTIVE,
             status_info=row.status_info,
             created_at=row.created_at,
-            modified_at=row.modified_at,
+            modified_at=row.updated_at,
             password_changed_at=row.password_changed_at,
             domain_name=row.domain_name or "",
             role=row.role or UserRole.USER,

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
@@ -26,6 +25,7 @@ from ai.backend.manager.models.base import (
     ResourceOptsEntry,
     StrEnumType,
 )
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 from ai.backend.manager.models.runtime_variant_preset.types import (
     RuntimeVariantPresetValueEntry,
 )
@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 __all__ = ("DeploymentRevisionPresetRow",)
 
 
-class DeploymentRevisionPresetRow(Base):  # type: ignore[misc]
+class DeploymentRevisionPresetRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     __tablename__ = "deployment_revision_presets"
 
     __table_args__ = (
@@ -110,19 +110,6 @@ class DeploymentRevisionPresetRow(Base):  # type: ignore[misc]
         pgsql.JSONB(),
         nullable=False,
         server_default=sa.text("'{}'::jsonb"),
-    )
-
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        nullable=False,
-    )
-    updated_at: Mapped[datetime | None] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        nullable=True,
-        onupdate=sa.func.now(),
     )
 
     resource_slot_rows: Mapped[list[PresetResourceSlotRow]] = relationship(

@@ -287,7 +287,7 @@ class TestAuthRepository:
                 status=user.status,
                 status_info=user.status_info,
                 created_at=user.created_at,
-                modified_at=user.modified_at,
+                modified_at=user.updated_at,
                 password_changed_at=user.password_changed_at,
                 domain_name=user.domain_name,
                 role=user.role,
@@ -363,7 +363,7 @@ class TestAuthRepository:
                 description=group.description,
                 is_active=group.is_active,
                 created_at=group.created_at,
-                modified_at=group.modified_at,
+                modified_at=group.updated_at,
                 integration_name=group.integration_id,  # ORM column is integration_id
                 domain_name=group.domain_name,
                 total_resource_slots=group.total_resource_slots,

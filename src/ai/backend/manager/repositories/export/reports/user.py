@@ -134,7 +134,7 @@ USER_FIELDS: list[ExportFieldDef] = [
         name="Modified At",
         description="Last modification time",
         field_type=ExportFieldType.DATETIME,
-        column=UserRow.modified_at,
+        column=UserRow.updated_at,
         formatter=lambda v: v.isoformat() if v else "",
     ),
     # =========================================================================
