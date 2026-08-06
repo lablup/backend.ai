@@ -12,7 +12,7 @@ their oldest active keypair promoted, the same rule the original
 ``d3f8c74bf148`` migration used to populate ``main_access_key``.
 
 Revision ID: a2f6b90c41d7
-Revises: c1a7d3f05e28
+Revises: f0b8a5d61c47
 Create Date: 2026-08-05 15:20:00.000000
 
 """
@@ -22,7 +22,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "a2f6b90c41d7"
-down_revision = "c1a7d3f05e28"
+down_revision = "f0b8a5d61c47"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
