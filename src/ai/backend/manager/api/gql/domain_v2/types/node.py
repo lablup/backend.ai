@@ -89,12 +89,7 @@ class DomainUsageScopeGQL(PydanticInputMixin[DomainUsageScopeDTO]):
 class DomainV2GQL(PydanticNodeMixin[DomainNode]):
     """Domain entity with structured field groups."""
 
-    id: NodeID[str] = gql_field(
-        description=(
-            "Domain uuid — the identifier domain-scoped APIs "
-            "(e.g. app config fragments) address a domain by. The name lives at basicInfo.name."
-        )
-    )
+    id: NodeID[str] = gql_field(description="Domain uuid. The name lives at basicInfo.name.")
     basic_info: DomainBasicInfoGQL = gql_field(
         description="Basic domain information including name and description."
     )
@@ -106,10 +101,7 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
-            description=(
-                "Domain uuid as a plain scalar — the same value the node id carries, "
-                "readable without decoding the Relay global id."
-            ),
+            description="Domain uuid as a plain scalar, without the Relay global-id encoding.",
         )
     )  # type: ignore[misc]
     def entity_id(self) -> uuid.UUID:

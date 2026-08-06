@@ -75,10 +75,7 @@ class DomainNode(BaseResponseModel):
     """Domain entity with structured field groups."""
 
     id: DomainID = Field(
-        description=(
-            "Domain uuid — the identifier domain-scoped APIs "
-            "(e.g. app config fragments) address a domain by. The name lives at basic_info.name."
-        ),
+        description="Domain uuid. The name lives at basic_info.name.",
     )
     basic_info: DomainBasicInfo = Field(
         description="Basic domain information including name and description.",

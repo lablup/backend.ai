@@ -4805,7 +4805,7 @@ type DomainV2 implements Node @key(fields: "id") {
   lifecycle: DomainLifecycleInfo!
 
   """
-  Added in 26.9.0. Domain uuid as a plain scalar — the same value the node id carries, readable without decoding the Relay global id.
+  Added in 26.9.0. Domain uuid as a plain scalar, without the Relay global-id encoding.
   """
   entityId: UUID!
 
