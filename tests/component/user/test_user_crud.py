@@ -23,13 +23,13 @@ from ai.backend.common.dto.manager.user import (
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.models.group import GroupRow, ProjectType
-from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.models.user import users
+from ai.backend.manager.models.user import UserRow, users
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
@@ -63,6 +63,28 @@ class TestUserCreateCrud:
             kp = row.fetchone()
         assert kp is not None, "Keypair should be auto-created for new user"
         assert kp.is_active is True
+
+    async def test_s6_create_marks_the_default_keypair_as_main(
+        self,
+        user_factory: UserFactory,
+        db_engine: SAEngine,
+    ) -> None:
+        """S-6: The auto-created keypair is marked main and agrees with users.main_access_key."""
+        result = await user_factory()
+
+        async with db_engine.begin() as conn:
+            marked = (
+                await conn.execute(
+                    sa.select(KeyPairRow.access_key).where(
+                        (KeyPairRow.user == str(result.user.id)) & KeyPairRow.is_default
+                    )
+                )
+            ).scalars()
+            main_access_key = await conn.scalar(
+                sa.select(UserRow.main_access_key).where(UserRow.uuid == str(result.user.id))
+            )
+        assert main_access_key is not None
+        assert marked.all() == [main_access_key]
 
     async def test_s3_create_with_group_ids(
         self,

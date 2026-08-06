@@ -21,6 +21,7 @@ from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -758,6 +759,23 @@ class UserDBSource:
         gids_to_join = rows.all()
         return list(gids_to_join)
 
+    async def _set_default_keypair(
+        self, session: SASession, user_id: UserID, access_key: str
+    ) -> None:
+        """Move the default marker onto ``access_key``.
+
+        Clearing the previous marker needs its own statement: a partial unique index
+        allows a user only one marked keypair.
+        """
+        await session.execute(
+            sa.update(KeyPairRow)
+            .where((KeyPairRow.user == user_id) & KeyPairRow.is_default)
+            .values(is_default=False)
+        )
+        await session.execute(
+            sa.update(KeyPairRow).where(KeyPairRow.access_key == access_key).values(is_default=True)
+        )
+
     async def _validate_and_update_main_access_key(
         self, session: SASession, email: str, main_access_key: str
     ) -> None:
@@ -776,6 +794,7 @@ class UserDBSource:
         if keypair_row.user_row.email != email:
             raise KeyPairForbidden("Cannot set another user's access key as the main access key.")
 
+        await self._set_default_keypair(session, keypair_row.user, main_access_key)
         await session.execute(
             sa.update(users).where(users.c.email == email).values(main_access_key=main_access_key)
         )
@@ -1244,6 +1263,7 @@ class UserDBSource:
                 generated_data=secrets,
                 user_id=user_uuid,
                 email=user_row.email,
+                is_default=False,
             )
             rbac_kp_creator = RBACEntityCreator(
                 spec=kp_spec,
@@ -1297,6 +1317,7 @@ class UserDBSource:
                             KeyPairRow.access_key,
                             KeyPairRow.user,
                             KeyPairRow.is_active,
+                            KeyPairRow.is_default,
                         ),
                     )
                 )
@@ -1310,6 +1331,7 @@ class UserDBSource:
             if not kp_row.is_active:
                 raise KeyPairForbidden("Cannot set an inactive keypair as the main access key.")
 
+            await self._set_default_keypair(session, UserID(user_uuid), access_key)
             await session.execute(
                 sa.update(users).where(users.c.uuid == user_uuid).values(main_access_key=access_key)
             )
@@ -1408,6 +1430,7 @@ class UserDBSource:
                 generated_data=secrets,
                 user_id=user_id,
                 email=user_row.email,
+                is_default=False,
             )
             rbac_kp_creator = RBACEntityCreator(
                 spec=kp_spec,

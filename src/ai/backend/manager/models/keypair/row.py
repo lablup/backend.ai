@@ -16,6 +16,7 @@ from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 from sqlalchemy.sql.expression import false
 
 from ai.backend.common import msgpack
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData, KeyPairSecrets
 from ai.backend.manager.defs import RESERVED_DOTFILES
@@ -54,6 +55,15 @@ def _get_session_row_join_condition() -> sa.ColumnElement[bool]:
 
 class KeyPairRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     __tablename__ = "keypairs"
+    __table_args__ = (
+        # Partial unique index: at most one keypair per user may have is_default = true.
+        sa.Index(
+            "uq_keypairs_is_default",
+            "user",
+            unique=True,
+            postgresql_where=sa.text("is_default"),
+        ),
+    )
 
     user_id: Mapped[str | None] = mapped_column("user_id", sa.String(length=256), index=True)
     access_key: Mapped[str] = mapped_column("access_key", sa.String(length=20), primary_key=True)
@@ -61,6 +71,9 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     is_active: Mapped[bool | None] = mapped_column("is_active", sa.Boolean, index=True)
     is_admin: Mapped[bool | None] = mapped_column(
         "is_admin", sa.Boolean, index=True, default=False, server_default=false()
+    )
+    is_default: Mapped[bool] = mapped_column(
+        "is_default", sa.Boolean, nullable=False, default=False, server_default=false()
     )
     last_used: Mapped[datetime | None] = mapped_column(
         "last_used", sa.DateTime(timezone=True), nullable=True
@@ -70,9 +83,7 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     # SSH Keypairs.
     ssh_public_key: Mapped[str | None] = mapped_column("ssh_public_key", sa.Text, nullable=True)
     ssh_private_key: Mapped[str | None] = mapped_column("ssh_private_key", sa.Text, nullable=True)
-    user: Mapped[uuid.UUID] = mapped_column(
-        "user", GUID, sa.ForeignKey("users.uuid"), nullable=False
-    )
+    user: Mapped[UserID] = mapped_column("user", GUID, sa.ForeignKey("users.uuid"), nullable=False)
     resource_policy: Mapped[str] = mapped_column(
         "resource_policy",
         sa.String(length=256),
@@ -131,6 +142,7 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         generated_data: KeyPairSecrets,
         user_id: uuid.UUID,
         email: str,
+        is_default: bool,
     ) -> Self:
         return cls(
             user_id=email,
@@ -139,6 +151,7 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
             secret_key=generated_data.secret_key,
             is_active=creator.is_active,
             is_admin=creator.is_admin,
+            is_default=is_default,
             resource_policy=creator.resource_policy,
             rate_limit=creator.rate_limit,
             num_queries=0,
