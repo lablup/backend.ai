@@ -16,3 +16,7 @@ class PolicyError(Exception):
 
 class ClockUntrusted(Exception):
     pass
+
+
+class DecisionLogNotDurable(Exception):
+    pass

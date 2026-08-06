@@ -3,11 +3,17 @@ import os
 import socket
 import time
 
+from .errors import DecisionLogNotDurable
 from .policy import peer_credential
 
 
 class DecisionLog:
-    def __init__(self, path):
+    def __init__(self, path, durable_root):
+        if not path.startswith(durable_root):
+            raise DecisionLogNotDurable(f"{path} is not under {durable_root}")
+        if not os.path.ismount(durable_root):
+            raise DecisionLogNotDurable(f"{durable_root} is not a mount point")
+        os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
         self.path = path
 
     def record(self, verdict, clause, unit, name):

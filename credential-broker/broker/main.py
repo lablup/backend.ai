@@ -106,7 +106,10 @@ def main(argv=None):
 
     broker, table = load(args.policy)
     os.makedirs(broker["identity_dir"], mode=0o700, exist_ok=True)
-    log = DecisionLog(broker.get("decision_log", "/var/log/backendai-credentials.jsonl"))
+    log = DecisionLog(
+        broker.get("decision_log", "/var/lib/backendai/log/backendai-credentials.jsonl"),
+        broker.get("durable_root", "/var/lib/backendai"),
+    )
     carry(broker.get("unlock_verdicts", "/run/backendai-unlock.jsonl"), log)
     kbs = Kbs(
         broker["url"],

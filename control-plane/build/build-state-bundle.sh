@@ -177,6 +177,10 @@ CHECK
     fi
     echo "build-state-bundle: the introspection console survives inside an interpreter binary; the measured configuration switches it off and the artifact honours that switch" >&2
 fi
+grep -q '^decision_log = "/var/lib/backendai/' "$ROOT/etc/backendai/credential-policy.toml" ||
+    fail "the decision log is not on the encrypted state volume, so the record that tells a refusal from an outage would not survive the machine that wrote it"
+grep -q '^Requires=var-lib-backendai.mount' "$ROOT/usr/lib/systemd/system/backendai-credentials.service" ||
+    fail "the credential broker does not require the state volume, so it could write its decision log where nothing durable is mounted"
 [ -L "$ROOT/etc/systemd/system/multi-user.target.wants/backendai-powerbutton.service" ] ||
     fail "no power-button handler is enabled in the image, so the hypervisor's only clean-shutdown request would be ignored"
 [ -L "$ROOT/etc/systemd/system/local-fs.target.wants/tmp.mount" ] ||
