@@ -51,6 +51,12 @@ def _get_current_revision_join_condition() -> sa.sql.elements.ColumnElement[Any]
     return foreign(ReplicaGroupRow.current_revision_id) == DeploymentRevisionRow.id
 
 
+def _get_target_revision_join_condition() -> sa.sql.elements.ColumnElement[Any]:
+    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+
+    return foreign(ReplicaGroupRow.target_revision_id) == DeploymentRevisionRow.id
+
+
 class ReplicaGroupRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     """
     A group of replicas (routes) within a single deployment.
@@ -162,6 +168,12 @@ class ReplicaGroupRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     current_revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
         "DeploymentRevisionRow",
         primaryjoin=_get_current_revision_join_condition,
+        viewonly=True,
+        uselist=False,
+    )
+    target_revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
+        "DeploymentRevisionRow",
+        primaryjoin=_get_target_revision_join_condition,
         viewonly=True,
         uselist=False,
     )
