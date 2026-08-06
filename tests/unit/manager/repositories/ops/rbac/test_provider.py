@@ -1834,7 +1834,7 @@ class TestBulkUpsertScopedPartial:
             _ScopedPartialUpsertCase(
                 name="global",
                 description="a scope-less (GLOBAL) upserter leaves its row bound to nothing",
-                scope_type="public",
+                scope_type="global",
                 scope_id=None,
                 scope_ref=None,
             ),
