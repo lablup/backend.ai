@@ -20,6 +20,7 @@ from sqlalchemy.engine.row import Row
 
 from ai.backend.common.exception import UserNotFound
 from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.user.types import (
     UserData,

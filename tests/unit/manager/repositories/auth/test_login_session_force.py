@@ -153,7 +153,6 @@ class TestLoginSessionForce:
             db_sess.add(keypair)
             await db_sess.flush()
 
-            user.main_access_key = access_key
             await db_sess.commit()
 
         yield SampleUserData(

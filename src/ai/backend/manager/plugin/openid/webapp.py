@@ -228,8 +228,6 @@ async def create_user_if_not_exists(
             await associate_user_with_group(conn, user, user_info["project"])
             await associate_user_with_group(conn, user, "model-store")
 
-            user.main_access_key = keypair_data["access_key"]
-
             # Create RBAC system role and map user to role
             role_manager = RoleManager()
             role_spec = UserSystemRoleSpec(user_id=user.uuid)
