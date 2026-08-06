@@ -77,7 +77,7 @@ class TestMainAccessKeySpecs:
         )
 
         compiled = str(query.compile(compile_kwargs={"literal_binds": True}))
-        assert "keypairs.is_main" in compiled
+        assert "keypairs.is_default" in compiled
         assert "AKTESTMAIN" in compiled
 
     @pytest.mark.parametrize(
@@ -117,4 +117,4 @@ class TestMainAccessKeySpecs:
 
         compiled = str(query.compile(compile_kwargs={"literal_binds": True}))
         assert "ORDER BY" in compiled
-        assert "keypairs.is_main" in compiled
+        assert "keypairs.is_default" in compiled

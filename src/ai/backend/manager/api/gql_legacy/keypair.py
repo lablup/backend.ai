@@ -626,7 +626,7 @@ class DeleteKeyPair(graphene.Mutation):  # type: ignore[misc]
             main_keypair_query = (
                 sa.select(sa.func.count())
                 .select_from(KeyPairRow)
-                .where((KeyPairRow.access_key == access_key) & KeyPairRow.is_main)
+                .where((KeyPairRow.access_key == access_key) & KeyPairRow.is_default)
             )
             if (await db_session.scalar(main_keypair_query) or 0) > 0:
                 return DeleteKeyPair(False, "the keypair is used as main access key by any user")
