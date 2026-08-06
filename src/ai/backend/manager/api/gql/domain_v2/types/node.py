@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.domain.types import (
     DomainUsageScopeDTO,
 )
 from ai.backend.common.identifier.domain import DomainID, DomainName
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -101,6 +102,18 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
     lifecycle: DomainLifecycleInfoGQL = gql_field(
         description="Lifecycle information including activation status and timestamps."
     )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Domain uuid as a plain scalar — the same value the node id carries, "
+                "readable without decoding the Relay global id."
+            ),
+        )
+    )  # type: ignore[misc]
+    def entity_id(self) -> uuid.UUID:
+        return uuid.UUID(str(self.id))
 
     @gql_field(
         description="Fair share record for this domain in the specified resource group. Returns the scheduling priority configuration for this domain. Always returns an object, even if no explicit configuration exists (in which case default values are used)."

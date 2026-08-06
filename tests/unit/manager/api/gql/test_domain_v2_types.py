@@ -85,6 +85,7 @@ class TestDomainV2GQL:
         domain_gql = DomainV2GQL.from_pydantic(dto)
 
         assert str(domain_gql.id) == str(dto.id)
+        assert domain_gql.entity_id() == dto.id
         assert domain_gql.basic_info.name == "my-domain"
 
     def test_from_pydantic_empty_registries(self) -> None:
