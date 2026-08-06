@@ -1807,39 +1807,72 @@ class TestUpsertScoped:
                 )
 
 
+@dataclass(frozen=True)
+class _PartialUpsertCase:
+    """One upserter shape for the partial bulk op, and the bindings it must leave."""
+
+    name: str
+    scope_type: str
+    scope_id: str | None
+    scope_ref: RBACElementRef | None
+    conflict_target: ConflictTarget
+    expected_scope_ids: list[str] = field(default_factory=list)
+
+
 class TestBulkUpsertScopedPartial:
-    async def test_upserts_every_item_and_binds_each(
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _PartialUpsertCase(
+                name="scoped",
+                scope_type="user",
+                scope_id=_USER_SCOPE_ID,
+                scope_ref=_USER_SCOPE_REF,
+                conflict_target=ConflictTarget(columns=["name", "scope_type", "scope_id"]),
+                expected_scope_ids=[_USER_SCOPE_ID],
+            ),
+            _PartialUpsertCase(
+                name="global",
+                scope_type="public",
+                scope_id=None,
+                scope_ref=None,
+                conflict_target=ConflictTarget(
+                    columns=["name", "scope_type"],
+                    index_predicate=RBACOpsUpsertRow.scope_id.is_(None),
+                ),
+            ),
+        ],
+        ids=lambda case: case.name,
+    )
+    async def test_row_binds_to_the_scope_its_upserter_carries(
         self,
+        case: _PartialUpsertCase,
         provider: RBACOpsProvider,
         database_connection: ExtendedAsyncSAEngine,
         upsert_tables: None,
     ) -> None:
-        """Every item of a clean batch lands: a scoped row binds, a global one binds nothing."""
+        """A scoped upserter binds its row to its scope; a scope-less one associates nothing."""
         async with provider.write_ops() as w:
             result = await w.bulk_upsert_scoped_partial([
                 RBACEntityUpserter(
-                    spec=RBACOpsUpserterSpec("user", _USER_SCOPE_ID, "scoped"),
+                    spec=RBACOpsUpserterSpec(case.scope_type, case.scope_id, "after"),
                     element_type=RBACElementType.VFOLDER,
-                    scope_ref=_USER_SCOPE_REF,
-                    conflict_target=ConflictTarget(columns=["name", "scope_type", "scope_id"]),
-                ),
-                RBACEntityUpserter(
-                    spec=RBACOpsUpserterSpec("public", None, "global"),
-                    element_type=RBACElementType.VFOLDER,
-                    scope_ref=None,
-                    conflict_target=ConflictTarget(
-                        columns=["name", "scope_type"],
-                        index_predicate=RBACOpsUpsertRow.scope_id.is_(None),
-                    ),
-                ),
+                    scope_ref=case.scope_ref,
+                    conflict_target=case.conflict_target,
+                )
             ])
-            assert [row.value for row in result.successes] == ["scoped", "global"]
+            assert [row.value for row in result.successes] == ["after"]
             assert result.errors == []
-            scoped_id = str(result.successes[0].id)
+            entity_id = str(result.successes[0].id)
 
         async with database_connection.begin_readonly_session() as db_sess:
-            assocs = (await db_sess.scalars(sa.select(AssociationScopesEntitiesRow))).all()
-        assert [(a.entity_id, a.scope_id) for a in assocs] == [(scoped_id, _USER_SCOPE_ID)]
+            scope_ids = await db_sess.scalars(
+                sa.select(AssociationScopesEntitiesRow.scope_id).where(
+                    AssociationScopesEntitiesRow.entity_type == EntityType.VFOLDER,
+                    AssociationScopesEntitiesRow.entity_id == entity_id,
+                )
+            )
+            assert list(scope_ids) == case.expected_scope_ids
 
     async def test_rejected_item_leaves_the_rest_upserted(
         self,
