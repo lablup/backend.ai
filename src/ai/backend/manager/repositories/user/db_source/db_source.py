@@ -21,6 +21,7 @@ from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -759,7 +760,7 @@ class UserDBSource:
         return list(gids_to_join)
 
     async def _set_default_keypair(
-        self, session: SASession, user_uuid: UUID, access_key: str
+        self, session: SASession, user_id: UserID, access_key: str
     ) -> None:
         """Move the default marker onto ``access_key``.
 
@@ -768,7 +769,7 @@ class UserDBSource:
         """
         await session.execute(
             sa.update(KeyPairRow)
-            .where((KeyPairRow.user == user_uuid) & KeyPairRow.is_default)
+            .where((KeyPairRow.user == user_id) & KeyPairRow.is_default)
             .values(is_default=False)
         )
         await session.execute(
@@ -1330,7 +1331,7 @@ class UserDBSource:
             if not kp_row.is_active:
                 raise KeyPairForbidden("Cannot set an inactive keypair as the main access key.")
 
-            await self._set_default_keypair(session, user_uuid, access_key)
+            await self._set_default_keypair(session, UserID(user_uuid), access_key)
             await session.execute(
                 sa.update(users).where(users.c.uuid == user_uuid).values(main_access_key=access_key)
             )

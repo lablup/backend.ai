@@ -16,6 +16,7 @@ from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 from sqlalchemy.sql.expression import false
 
 from ai.backend.common import msgpack
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData, KeyPairSecrets
 from ai.backend.manager.defs import RESERVED_DOTFILES
@@ -82,9 +83,7 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     # SSH Keypairs.
     ssh_public_key: Mapped[str | None] = mapped_column("ssh_public_key", sa.Text, nullable=True)
     ssh_private_key: Mapped[str | None] = mapped_column("ssh_private_key", sa.Text, nullable=True)
-    user: Mapped[uuid.UUID] = mapped_column(
-        "user", GUID, sa.ForeignKey("users.uuid"), nullable=False
-    )
+    user: Mapped[UserID] = mapped_column("user", GUID, sa.ForeignKey("users.uuid"), nullable=False)
     resource_policy: Mapped[str] = mapped_column(
         "resource_policy",
         sa.String(length=256),
