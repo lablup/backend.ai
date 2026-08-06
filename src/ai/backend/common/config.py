@@ -5,7 +5,7 @@ import shlex
 import sys
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
-from typing import Annotated, Any, override
+from typing import Any, override
 
 import humps
 import tomli
@@ -146,10 +146,6 @@ agent_selector_config_iv = t.Dict({}) | agent_selector_globalconfig_iv
 
 DEFAULT_SHELL = "/bin/bash"
 
-# Shared port constraint for every model-service config variant (strict,
-# draft, baseline) so the same range is enforced at every boundary.
-ModelServicePort = Annotated[int, Field(gt=1)]
-
 
 class PreStartAction(BaseConfigModel):
     action: str = Field(
@@ -260,9 +256,10 @@ class ModelServiceConfig(BaseConfigModel):
         ),
         examples=[DEFAULT_SHELL],
     )
-    port: ModelServicePort = Field(
+    port: int = Field(
         description="Port number for the model service. Must be greater than 1.",
         examples=[8080],
+        gt=1,
     )
     health_check: ModelHealthCheck | None = Field(
         default=None,
@@ -561,7 +558,7 @@ class ModelServiceConfigDraft(BaseConfigModel):
     pre_start_actions: list[PreStartAction] | None = None
     start_command: str | None = None
     shell: str | None = None
-    port: ModelServicePort | None = None
+    port: int | None = Field(default=None, gt=1)
     health_check: ModelHealthCheckDraft | None = None
 
     @model_validator(mode="before")
@@ -756,7 +753,7 @@ class DefaultModelServiceConfig(BaseConfigModel):
     pre_start_actions: list[PreStartAction] | None = None
     start_command: str | None = None
     shell: str | None = None
-    port: ModelServicePort
+    port: int = Field(gt=1)
     health_check: ModelHealthCheckDraft | None = None
 
     @model_validator(mode="before")
