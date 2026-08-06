@@ -7449,16 +7449,32 @@
       "PresetModelConfigInput": {
         "properties": {
           "name": {
-            "description": "Name of the model.",
-            "minLength": 1,
-            "title": "Name",
-            "type": "string"
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Name of the model. Optional; defaults to the runtime variant baseline's model name at revision resolution.",
+            "title": "Name"
           },
           "model_path": {
-            "description": "Path to the model file.",
-            "minLength": 1,
-            "title": "Model Path",
-            "type": "string"
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Path to the model file. Optional; defaults to the model mount destination at revision resolution.",
+            "title": "Model Path"
           },
           "service": {
             "$ref": "#/components/schemas/PresetModelServiceConfigInput",
@@ -7478,8 +7494,6 @@
           }
         },
         "required": [
-          "name",
-          "model_path",
           "service"
         ],
         "title": "PresetModelConfigInput",
@@ -7857,7 +7871,7 @@
               }
             ],
             "default": null,
-            "description": "Model definition configuration. Optional, but when provided it must be fully populated (non-empty models, each with name/model_path/service)."
+            "description": "Model definition configuration. Optional; each model requires a service block, while name/model_path may be omitted to inherit merge-chain defaults."
           },
           "resource_slots": {
             "anyOf": [
@@ -8011,393 +8025,6 @@
         "title": "CreateDeploymentRevisionPresetInput",
         "type": "object"
       },
-      "ModelConfig": {
-        "additionalProperties": true,
-        "properties": {
-          "name": {
-            "description": "Name of the model.",
-            "examples": [
-              "my_model"
-            ],
-            "title": "Name",
-            "type": "string"
-          },
-          "model-path": {
-            "description": "Path to the model file.",
-            "examples": [
-              "/models/my_model"
-            ],
-            "title": "Model-Path",
-            "type": "string"
-          },
-          "service": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ModelServiceConfig"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Configuration for the model service."
-          },
-          "metadata": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ModelMetadata"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Metadata about the model."
-          }
-        },
-        "required": [
-          "name",
-          "model-path"
-        ],
-        "title": "ModelConfig",
-        "type": "object"
-      },
-      "ModelDefinition": {
-        "additionalProperties": true,
-        "properties": {
-          "models": {
-            "description": "List of models in the model definition.",
-            "items": {
-              "$ref": "#/components/schemas/ModelConfig"
-            },
-            "title": "Models",
-            "type": "array"
-          }
-        },
-        "title": "ModelDefinition",
-        "type": "object"
-      },
-      "ModelHealthCheck": {
-        "additionalProperties": true,
-        "properties": {
-          "enable": {
-            "default": false,
-            "description": "Whether the route should be health-checked. When false the route becomes active immediately and the remaining fields are ignored.",
-            "examples": [
-              false
-            ],
-            "title": "Enable",
-            "type": "boolean"
-          },
-          "interval": {
-            "default": 10.0,
-            "description": "Interval in seconds between health checks.",
-            "examples": [
-              10.0
-            ],
-            "title": "Interval",
-            "type": "number"
-          },
-          "path": {
-            "default": "/health",
-            "description": "Path to check for health status.",
-            "examples": [
-              "/health"
-            ],
-            "title": "Path",
-            "type": "string"
-          },
-          "max-retries": {
-            "default": 10,
-            "description": "Maximum number of retries for health check.",
-            "examples": [
-              10
-            ],
-            "title": "Max-Retries",
-            "type": "integer"
-          },
-          "max-wait-time": {
-            "default": 15.0,
-            "description": "Maximum time in seconds to wait for a health check response.",
-            "examples": [
-              15.0
-            ],
-            "title": "Max-Wait-Time",
-            "type": "number"
-          },
-          "expected-status-code": {
-            "default": 200,
-            "description": "Expected HTTP status code for a healthy response.",
-            "examples": [
-              200
-            ],
-            "exclusiveMinimum": 100,
-            "title": "Expected-Status-Code",
-            "type": "integer"
-          },
-          "initial-delay": {
-            "default": 60.0,
-            "description": "Grace period in seconds for a warming-up route to pass its first health check. Probing starts immediately; the route stays WARMING_UP until a probe passes (then it activates) or this period elapses without a passing probe (then it is terminated). This does not delay the first probe.",
-            "examples": [
-              60.0
-            ],
-            "minimum": 0,
-            "title": "Initial-Delay",
-            "type": "number"
-          }
-        },
-        "title": "ModelHealthCheck",
-        "type": "object"
-      },
-      "ModelMetadata": {
-        "additionalProperties": true,
-        "properties": {
-          "author": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "examples": [
-              "John Doe"
-            ],
-            "title": "Author"
-          },
-          "title": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Title"
-          },
-          "version": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Version"
-          },
-          "created": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Created"
-          },
-          "last_modified": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Last Modified"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Description"
-          },
-          "task": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Task"
-          },
-          "category": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Category"
-          },
-          "architecture": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Architecture"
-          },
-          "framework": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Framework"
-          },
-          "label": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Label"
-          },
-          "license": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "License"
-          },
-          "min-resource": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Minimum resource requirements for the model.",
-            "title": "Min-Resource"
-          }
-        },
-        "title": "ModelMetadata",
-        "type": "object"
-      },
-      "ModelServiceConfig": {
-        "additionalProperties": true,
-        "properties": {
-          "pre-start-actions": {
-            "description": "List of pre-start actions to execute before starting the model service.",
-            "items": {
-              "$ref": "#/components/schemas/PreStartAction"
-            },
-            "title": "Pre-Start-Actions",
-            "type": "array"
-          },
-          "start-command": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Command string to start the model service. ``{model_path}`` is replaced with the resolved ``model_path`` before launch. ``None`` falls back to the image's default CMD.",
-            "examples": [
-              "python service.py",
-              "vllm serve {model_path}"
-            ],
-            "title": "Start-Command"
-          },
-          "shell": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": "/bin/bash",
-            "description": "Shell used to run the command. If set, the kernel runs `[shell, '-c', command]`; null or empty disables shell wrapping.",
-            "examples": [
-              "/bin/bash"
-            ],
-            "title": "Shell"
-          },
-          "port": {
-            "description": "Port number for the model service. Must be greater than 1.",
-            "examples": [
-              8080
-            ],
-            "exclusiveMinimum": 1,
-            "title": "Port",
-            "type": "integer"
-          },
-          "health-check": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ModelHealthCheck"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Health check configuration for the model service."
-          }
-        },
-        "required": [
-          "port"
-        ],
-        "title": "ModelServiceConfig",
-        "type": "object"
-      },
       "UpdateDeploymentRevisionPresetInput": {
         "properties": {
           "id": {
@@ -8480,7 +8107,7 @@
           "model_definition": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/ModelDefinition"
+                "$ref": "#/components/schemas/PresetModelDefinitionInput"
               },
               {
                 "$ref": "#/components/schemas/Sentinel"
@@ -39680,6 +39307,183 @@
           }
         },
         "title": "ModelHealthCheckDraft",
+        "type": "object"
+      },
+      "ModelMetadata": {
+        "additionalProperties": true,
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "examples": [
+              "John Doe"
+            ],
+            "title": "Author"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Title"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Version"
+          },
+          "created": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Created"
+          },
+          "last_modified": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last Modified"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "task": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Task"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Category"
+          },
+          "architecture": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Architecture"
+          },
+          "framework": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Framework"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Label"
+          },
+          "license": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "License"
+          },
+          "min-resource": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Minimum resource requirements for the model.",
+            "title": "Min-Resource"
+          }
+        },
+        "title": "ModelMetadata",
         "type": "object"
       },
       "ModelServiceConfigDraft": {
