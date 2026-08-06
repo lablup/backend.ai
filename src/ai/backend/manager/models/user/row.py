@@ -220,12 +220,6 @@ class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         default=False,
         nullable=False,
     )
-    main_access_key: Mapped[str | None] = mapped_column(
-        "main_access_key",
-        sa.String(length=20),
-        sa.ForeignKey("keypairs.access_key", ondelete="SET NULL"),
-        nullable=True,  # keypairs.user is non-nullable
-    )
     container_uid: Mapped[int | None] = mapped_column(
         "container_uid", sa.Integer, nullable=True, server_default=sa.null()
     )

@@ -20,6 +20,7 @@ from sqlalchemy.engine.row import Row
 
 from ai.backend.common.exception import UserNotFound
 from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.user.types import (
     UserData,
@@ -1296,10 +1297,11 @@ class PurgeUser(graphene.Mutation):  # type: ignore[misc]
         props: PurgeUserInput,
     ) -> PurgeUser:
         graph_ctx: GraphQueryContext = info.context
+        requester = await graph_ctx.user_repository.get_user_by_uuid(graph_ctx.user["uuid"])
         user_info_ctx = UserInfoContext(
-            uuid=graph_ctx.user["uuid"],
-            email=graph_ctx.user["email"],
-            main_access_key=graph_ctx.user["main_access_key"],
+            uuid=requester.uuid,
+            email=requester.email,
+            main_access_key=AccessKey(requester.main_access_key or ""),
         )
         action = props.to_action(email, user_info_ctx)
         user_data = await graph_ctx.user_repository.get_by_email_validated(email)

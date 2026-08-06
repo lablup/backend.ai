@@ -29,7 +29,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 )
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.models.user import UserRow, users
+from ai.backend.manager.models.user import users
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
@@ -69,7 +69,7 @@ class TestUserCreateCrud:
         user_factory: UserFactory,
         db_engine: SAEngine,
     ) -> None:
-        """S-6: The auto-created keypair is marked main and agrees with users.main_access_key."""
+        """S-6: Exactly the auto-created keypair is marked as the user's main one."""
         result = await user_factory()
 
         async with db_engine.begin() as conn:
@@ -80,11 +80,12 @@ class TestUserCreateCrud:
                     )
                 )
             ).scalars()
-            main_access_key = await conn.scalar(
-                sa.select(UserRow.main_access_key).where(UserRow.uuid == str(result.user.id))
-            )
-        assert main_access_key is not None
-        assert marked.all() == [main_access_key]
+            owned = (
+                await conn.execute(
+                    sa.select(KeyPairRow.access_key).where(KeyPairRow.user == str(result.user.id))
+                )
+            ).scalars()
+        assert marked.all() == owned.all()
 
     async def test_s3_create_with_group_ids(
         self,

@@ -299,7 +299,6 @@ class TestStreamRepository:
                     resource_policy=user_resource_policy.name,
                     allowed_client_ip=None,
                     totp_key=None,
-                    main_access_key=None,
                 )
             )
             db_sess.add(
@@ -318,7 +317,6 @@ class TestStreamRepository:
                     resource_policy=user_resource_policy.name,
                     allowed_client_ip=None,
                     totp_key=None,
-                    main_access_key=None,
                 )
             )
             db_sess.add(
