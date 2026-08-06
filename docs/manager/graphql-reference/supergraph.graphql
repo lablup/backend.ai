@@ -888,6 +888,22 @@ type AllowedResourceGroupsPayload
 }
 
 """
+Added in 26.9.0. The merged config for one config name: every fragment visible to the caller, deep-merged in ascending allow-list rank order.
+"""
+type AppConfig
+  @join__type(graph: PUBLIC)
+  @join__type(graph: STRAWBERRY)
+{
+  """Config name this view is for."""
+  configName: String!
+
+  """
+  Every fragment visible to the caller, deep-merged in ascending allow-list rank order. Empty when nothing visible contributes, or when everything that did was empty. Read the fragment API for the per-scope values behind it.
+  """
+  config: JSON!
+}
+
+"""
 Added in 26.7.0. Permission to write config fragments for one config name at one scope type.
 """
 type AppConfigAllowList implements Node
@@ -8942,6 +8958,7 @@ enum join__Graph {
 The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
 """
 scalar JSON
+  @join__type(graph: PUBLIC)
   @join__type(graph: STRAWBERRY)
   @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
 
@@ -15378,6 +15395,11 @@ type Query
   """Added in 26.9.0. Returns 'pong'"""
   ping: String! @join__field(graph: PUBLIC)
 
+  """
+  Added in 26.9.0. Read the merged config for each of the given names from public fragments only. Served by the `public` subgraph without authentication, for pre-login clients that need config before they have credentials.
+  """
+  publicAppConfigs(configNames: [String!]!): [AppConfig!]! @join__field(graph: PUBLIC)
+
   """Added in 25.15.0. Get aggregate agent resource statistics"""
   agentStats: AgentStats @join__field(graph: STRAWBERRY)
 
@@ -15426,6 +15448,11 @@ type Query
   Added in 26.8.0. Read the current user's own user-scope fragments for the given config names, position by position, null where the scope holds no fragment for that name.
   """
   myAppConfigFragmentsByNames(configNames: [String!]!): [AppConfigFragment]! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.9.0. Read the acting user's merged config for each of the given names — public, the caller's domain, and the caller's own fragments deep-merged by allow-list rank. One entry per requested name, in request order; a name nothing visible contributes to yields an empty merge.
+  """
+  myAppConfigs(configNames: [String!]!): [AppConfig!]! @join__field(graph: STRAWBERRY)
 
   """
   Added in 25.14.0. Retrieve a specific artifact by its ID. Returns detailed information about the artifact including its metadata, registry information, and availability status.
