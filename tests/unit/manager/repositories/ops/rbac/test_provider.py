@@ -1815,7 +1815,6 @@ class _ScopedPartialUpsertCase:
     scope_type: str
     scope_id: str | None
     scope_ref: RBACElementRef | None
-    conflict_target: ConflictTarget
     expected_scope_ids: list[str] = field(default_factory=list)
 
 
@@ -1828,7 +1827,6 @@ class TestBulkUpsertScopedPartial:
                 scope_type="user",
                 scope_id=_USER_SCOPE_ID,
                 scope_ref=_USER_SCOPE_REF,
-                conflict_target=ConflictTarget(columns=["name", "scope_type", "scope_id"]),
                 expected_scope_ids=[_USER_SCOPE_ID],
             ),
             _ScopedPartialUpsertCase(
@@ -1836,10 +1834,6 @@ class TestBulkUpsertScopedPartial:
                 scope_type="public",
                 scope_id=None,
                 scope_ref=None,
-                conflict_target=ConflictTarget(
-                    columns=["name", "scope_type"],
-                    index_predicate=RBACOpsUpsertRow.scope_id.is_(None),
-                ),
             ),
         ],
         ids=lambda case: case.name,
@@ -1851,14 +1845,18 @@ class TestBulkUpsertScopedPartial:
         database_connection: ExtendedAsyncSAEngine,
         upsert_tables: None,
     ) -> None:
-        """A scoped upserter binds its row to its scope; a scope-less one associates nothing."""
+        """A scoped upserter binds its row to its scope; a scope-less one associates nothing.
+
+        Both cases insert fresh rows, so the conflict path never runs and one plain conflict
+        target serves them; which index arbitrates which scope is TestUpsertScoped's subject.
+        """
         async with provider.write_ops() as w:
             result = await w.bulk_upsert_scoped_partial([
                 RBACEntityUpserter(
                     spec=RBACOpsUpserterSpec(case.scope_type, case.scope_id, "after"),
                     element_type=RBACElementType.VFOLDER,
                     scope_ref=case.scope_ref,
-                    conflict_target=case.conflict_target,
+                    conflict_target=ConflictTarget(columns=["name", "scope_type", "scope_id"]),
                 )
             ])
             assert [row.value for row in result.successes] == ["after"]
