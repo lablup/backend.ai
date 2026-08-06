@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -22,16 +20,6 @@ from ai.backend.common.dto.manager.v2.app_config.response import GetAppConfigsPa
 from .conftest import MockAuth
 
 _DEFAULT_CONFIG = ClientConfig(endpoint=URL("https://api.example.com"))
-
-
-@dataclass(frozen=True)
-class _MergedReadCase:
-    """One of the two merged reads: the same batch shape over a different HTTP client."""
-
-    read: Callable[[V2AppConfigClient, Any], Awaitable[GetAppConfigsPayload]]
-    path: str
-    input_type: type[MyGetAppConfigsInput] | type[PublicGetAppConfigsInput]
-    signed: bool
 
 
 @pytest.fixture
@@ -84,62 +72,65 @@ def pre_login_registry(mock_session: MagicMock) -> V2ClientRegistry:
     )
 
 
-@pytest.mark.parametrize(
-    "case",
-    [
-        _MergedReadCase(
-            read=V2AppConfigClient.my_get_app_configs,
-            path="/v2/app-config/my/get",
-            input_type=MyGetAppConfigsInput,
-            signed=True,
-        ),
-        _MergedReadCase(
-            read=V2AppConfigClient.public_get_app_configs,
-            path="/v2/app-config/public/get",
-            input_type=PublicGetAppConfigsInput,
-            signed=False,
-        ),
-    ],
-    ids=lambda case: case.read.__name__,
-)
-class TestMergedRead:
-    async def test_posts_to_its_own_path_and_parses_the_payload(
-        self,
-        case: _MergedReadCase,
-        client: V2AppConfigClient,
-        mock_session: MagicMock,
+class TestMyMergedRead:
+    async def test_posts_to_its_own_path(
+        self, client: V2AppConfigClient, mock_session: MagicMock
     ) -> None:
-        result = await case.read(client, case.input_type(config_names=["theme", "menu"]))
+        await client.my_get_app_configs(MyGetAppConfigsInput(config_names=["theme", "menu"]))
 
-        call_args = mock_session.request.call_args
-        assert call_args[0][0] == "POST"
-        assert str(call_args[0][1]).endswith(case.path)
-        assert call_args[1]["json"] == {"config_names": ["theme", "menu"]}
+        method, url = mock_session.request.call_args[0][:2]
+        assert method == "POST"
+        assert str(url).endswith("/v2/app-config/my/get")
+        assert mock_session.request.call_args[1]["json"] == {"config_names": ["theme", "menu"]}
+
+    async def test_is_signed(self, client: V2AppConfigClient, mock_session: MagicMock) -> None:
+        await client.my_get_app_configs(MyGetAppConfigsInput(config_names=["theme"]))
+
+        assert "Authorization" in mock_session.request.call_args[1]["headers"]
+
+    async def test_parses_the_merge_for_each_requested_name(
+        self, client: V2AppConfigClient
+    ) -> None:
+        result = await client.my_get_app_configs(
+            MyGetAppConfigsInput(config_names=["theme", "menu"])
+        )
+
         assert isinstance(result, GetAppConfigsPayload)
-        assert [node.config_name for node in result.app_configs] == ["theme", "menu"]
-
-    async def test_returns_the_merge_for_each_requested_name(
-        self,
-        case: _MergedReadCase,
-        client: V2AppConfigClient,
-    ) -> None:
-        result = await case.read(client, case.input_type(config_names=["theme", "menu"]))
-
         merged, uncontributed = result.app_configs
-        assert merged.config == {"mode": "dark"}
-        assert uncontributed.config == {}
+        assert (merged.config_name, merged.config) == ("theme", {"mode": "dark"})
+        assert (uncontributed.config_name, uncontributed.config) == ("menu", {})
 
-    async def test_only_the_authenticated_read_is_signed(
-        self,
-        case: _MergedReadCase,
-        client: V2AppConfigClient,
-        mock_session: MagicMock,
+
+class TestPublicMergedRead:
+    async def test_posts_to_its_own_path(
+        self, client: V2AppConfigClient, mock_session: MagicMock
     ) -> None:
-        """The public read must reach the server without credentials — that is its whole point."""
-        await case.read(client, case.input_type(config_names=["theme"]))
+        await client.public_get_app_configs(
+            PublicGetAppConfigsInput(config_names=["theme", "menu"])
+        )
 
-        headers = mock_session.request.call_args[1]["headers"]
-        assert ("Authorization" in headers) is case.signed
+        method, url = mock_session.request.call_args[0][:2]
+        assert method == "POST"
+        assert str(url).endswith("/v2/app-config/public/get")
+        assert mock_session.request.call_args[1]["json"] == {"config_names": ["theme", "menu"]}
+
+    async def test_is_not_signed(self, client: V2AppConfigClient, mock_session: MagicMock) -> None:
+        """The public read must reach the server without credentials — that is its whole point."""
+        await client.public_get_app_configs(PublicGetAppConfigsInput(config_names=["theme"]))
+
+        assert "Authorization" not in mock_session.request.call_args[1]["headers"]
+
+    async def test_parses_the_merge_for_each_requested_name(
+        self, client: V2AppConfigClient
+    ) -> None:
+        result = await client.public_get_app_configs(
+            PublicGetAppConfigsInput(config_names=["theme", "menu"])
+        )
+
+        assert isinstance(result, GetAppConfigsPayload)
+        merged, uncontributed = result.app_configs
+        assert (merged.config_name, merged.config) == ("theme", {"mode": "dark"})
+        assert (uncontributed.config_name, uncontributed.config) == ("menu", {})
 
 
 class TestPreLoginCaller:
