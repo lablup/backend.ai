@@ -40,11 +40,11 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
     AdminSearchAppConfigFragmentAction,
 )
+from ai.backend.manager.services.app_config_fragment.actions.batch_purge_by_names import (
+    BatchPurgeAppConfigFragmentsByNamesAction,
+)
 from ai.backend.manager.services.app_config_fragment.actions.bulk_purge import (
     BulkPurgeAppConfigFragmentAction,
-)
-from ai.backend.manager.services.app_config_fragment.actions.bulk_purge_by_names import (
-    BulkPurgeAppConfigFragmentsByNamesAction,
 )
 from ai.backend.manager.services.app_config_fragment.actions.bulk_upsert import (
     BulkUpsertAppConfigFragmentsAction,
@@ -317,25 +317,25 @@ class TestAppConfigFragmentService:
         ],
         ids=lambda case: case.scope_type.value,
     )
-    async def test_bulk_purge_by_names_passes_the_names_through_and_reports_its_scope(
+    async def test_batch_purge_by_names_passes_the_names_through_and_reports_its_scope(
         self,
         service: AppConfigFragmentService,
         mock_repository: MagicMock,
         scoped_fragment: AppConfigFragmentData,
         case: _RBACScopeCase,
     ) -> None:
-        mock_repository.bulk_purge_by_names = AsyncMock(return_value=[scoped_fragment])
+        mock_repository.batch_purge_by_names = AsyncMock(return_value=[scoped_fragment])
         scope = AppConfigFragmentSearchScope(scope_type=case.scope_type, scope_id=case.scope_id)
 
-        result = await service.bulk_purge_by_names(
-            BulkPurgeAppConfigFragmentsByNamesAction(scope=scope, config_names=["theme"])
+        result = await service.batch_purge_by_names(
+            BatchPurgeAppConfigFragmentsByNamesAction(scope=scope, config_names=["theme"])
         )
 
         assert result.fragments == [scoped_fragment]
         # The result reports the RBAC scope the purge was authorized at.
         assert result.scope_type() == case.expected_scope_type
         assert result.scope_id() == case.expected_scope_id
-        mock_repository.bulk_purge_by_names.assert_called_once_with(scope, ["theme"])
+        mock_repository.batch_purge_by_names.assert_called_once_with(scope, ["theme"])
 
     # --- bulk ---
 

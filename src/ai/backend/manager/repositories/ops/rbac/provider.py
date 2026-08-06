@@ -662,6 +662,13 @@ class RBACWriteOps(WriteOps):
                 errors.append(BulkPurgerError(purger=purger, exception=e, index=index))
         return BulkPurgerResultWithFailures(successes=successes, errors=errors)
 
+    async def batch_purge_scoped[TRow: Base](
+        self,
+        purger: RBACEntityBatchPurger[TRow],
+    ) -> RBACEntityBatchPurgerResult:
+        """Delete the rows the purger's subquery selects, with their RBAC entries, atomically."""
+        return await execute_rbac_entity_batch_purger(self._sess, purger)
+
     # -- Scope lifecycle: real scope entity + its virtual scope node --------------
 
     async def create_scope[TRow: Base](

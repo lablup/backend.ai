@@ -17,7 +17,7 @@ from ai.backend.manager.services.app_config_fragment.actions.base import (
 
 
 @dataclass
-class BulkPurgeAppConfigFragmentsByNamesAction(AppConfigFragmentScopeAction):
+class BatchPurgeAppConfigFragmentsByNamesAction(AppConfigFragmentScopeAction):
     """Purge the fragments one scope holds for the given config names, all-or-nothing.
 
     A fragment is addressed by ``(scope, config_name)``, so every name resolves at ``scope``
@@ -51,7 +51,7 @@ class BulkPurgeAppConfigFragmentsByNamesAction(AppConfigFragmentScopeAction):
 
 
 @dataclass
-class BulkPurgeAppConfigFragmentsByNamesActionResult(AppConfigFragmentScopeActionResult):
+class BatchPurgeAppConfigFragmentsByNamesActionResult(AppConfigFragmentScopeActionResult):
     fragments: list[AppConfigFragmentData]
     #: The scope the purge ran at, carried only to report the RBAC scope.
     _scope: AppConfigFragmentSearchScope

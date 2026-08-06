@@ -7,13 +7,13 @@ from ai.backend.manager.services.app_config_fragment.actions.admin_search import
     AdminSearchAppConfigFragmentAction,
     AdminSearchAppConfigFragmentActionResult,
 )
+from ai.backend.manager.services.app_config_fragment.actions.batch_purge_by_names import (
+    BatchPurgeAppConfigFragmentsByNamesAction,
+    BatchPurgeAppConfigFragmentsByNamesActionResult,
+)
 from ai.backend.manager.services.app_config_fragment.actions.bulk_purge import (
     BulkPurgeAppConfigFragmentAction,
     BulkPurgeAppConfigFragmentActionResult,
-)
-from ai.backend.manager.services.app_config_fragment.actions.bulk_purge_by_names import (
-    BulkPurgeAppConfigFragmentsByNamesAction,
-    BulkPurgeAppConfigFragmentsByNamesActionResult,
 )
 from ai.backend.manager.services.app_config_fragment.actions.bulk_upsert import (
     BulkUpsertAppConfigFragmentsAction,
@@ -92,11 +92,11 @@ class AppConfigFragmentService:
         data = await self._repository.purge(action.purger_spec)
         return PurgeAppConfigFragmentActionResult(fragment=data)
 
-    async def bulk_purge_by_names(
-        self, action: BulkPurgeAppConfigFragmentsByNamesAction
-    ) -> BulkPurgeAppConfigFragmentsByNamesActionResult:
-        fragments = await self._repository.bulk_purge_by_names(action.scope, action.config_names)
-        return BulkPurgeAppConfigFragmentsByNamesActionResult(
+    async def batch_purge_by_names(
+        self, action: BatchPurgeAppConfigFragmentsByNamesAction
+    ) -> BatchPurgeAppConfigFragmentsByNamesActionResult:
+        fragments = await self._repository.batch_purge_by_names(action.scope, action.config_names)
+        return BatchPurgeAppConfigFragmentsByNamesActionResult(
             fragments=fragments, _scope=action.scope
         )
 

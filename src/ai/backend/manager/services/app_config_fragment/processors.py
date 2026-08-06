@@ -13,13 +13,13 @@ from ai.backend.manager.services.app_config_fragment.actions.admin_search import
     AdminSearchAppConfigFragmentAction,
     AdminSearchAppConfigFragmentActionResult,
 )
+from ai.backend.manager.services.app_config_fragment.actions.batch_purge_by_names import (
+    BatchPurgeAppConfigFragmentsByNamesAction,
+    BatchPurgeAppConfigFragmentsByNamesActionResult,
+)
 from ai.backend.manager.services.app_config_fragment.actions.bulk_purge import (
     BulkPurgeAppConfigFragmentAction,
     BulkPurgeAppConfigFragmentActionResult,
-)
-from ai.backend.manager.services.app_config_fragment.actions.bulk_purge_by_names import (
-    BulkPurgeAppConfigFragmentsByNamesAction,
-    BulkPurgeAppConfigFragmentsByNamesActionResult,
 )
 from ai.backend.manager.services.app_config_fragment.actions.bulk_upsert import (
     BulkUpsertAppConfigFragmentsAction,
@@ -56,8 +56,8 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
     purge: SingleEntityActionProcessor[
         PurgeAppConfigFragmentAction, PurgeAppConfigFragmentActionResult
     ]
-    bulk_purge_by_names: ScopeActionProcessor[
-        BulkPurgeAppConfigFragmentsByNamesAction, BulkPurgeAppConfigFragmentsByNamesActionResult
+    batch_purge_by_names: ScopeActionProcessor[
+        BatchPurgeAppConfigFragmentsByNamesAction, BatchPurgeAppConfigFragmentsByNamesActionResult
     ]
     bulk_purge: BulkActionProcessor[
         BulkPurgeAppConfigFragmentAction, BulkPurgeAppConfigFragmentActionResult
@@ -86,8 +86,8 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
         self.purge = SingleEntityActionProcessor(
             service.purge, action_monitors, validators=[validators.rbac.single_entity]
         )
-        self.bulk_purge_by_names = ScopeActionProcessor(
-            service.bulk_purge_by_names, action_monitors, validators=[validators.rbac.scope]
+        self.batch_purge_by_names = ScopeActionProcessor(
+            service.batch_purge_by_names, action_monitors, validators=[validators.rbac.scope]
         )
         self.bulk_purge = BulkActionProcessor(
             service.bulk_purge, monitors=action_monitors, validators=[validators.rbac.bulk]
@@ -101,6 +101,6 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
             AdminSearchAppConfigFragmentAction.spec(),
             ScopedSearchAppConfigFragmentAction.spec(),
             PurgeAppConfigFragmentAction.spec(),
-            BulkPurgeAppConfigFragmentsByNamesAction.spec(),
+            BatchPurgeAppConfigFragmentsByNamesAction.spec(),
             BulkPurgeAppConfigFragmentAction.spec(),
         ]
