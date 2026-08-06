@@ -40,10 +40,12 @@ from ai.backend.manager.actions.v2.ops.base import (
     DeleteSingleEntityOpsAction,
     GetSingleEntityOpsAction,
     PurgeBulkOpsAction,
+    PurgeGlobalOpsAction,
     PurgeSingleEntityOpsAction,
     SearchGlobalOpsAction,
     SearchScopeOpsAction,
     UpdateBulkOpsAction,
+    UpdateGlobalOpsAction,
     UpdateSingleEntityOpsAction,
     UpsertSingleEntityOpsAction,
 )
@@ -340,6 +342,30 @@ class ProcessorGroup[TData: EntityData]:
     ) -> GlobalActionProcessor[CreateGlobalOpsAction[Any, TData], CreatedEntityOpsResult[TData]]:
         return GlobalActionProcessor(
             CreateService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.global_scope, *monitors),
+            validators=(*self._deps.validators.global_scope, *validators),
+        )
+
+    def global_update_ops(
+        self,
+        *,
+        validators: Sequence[GlobalActionValidator] = (),
+        monitors: Sequence[GlobalActionMonitor] = (),
+    ) -> GlobalActionProcessor[UpdateGlobalOpsAction[Any, TData], EntityOpsResult[TData]]:
+        return GlobalActionProcessor(
+            UpdateService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.global_scope, *monitors),
+            validators=(*self._deps.validators.global_scope, *validators),
+        )
+
+    def global_purge_ops(
+        self,
+        *,
+        validators: Sequence[GlobalActionValidator] = (),
+        monitors: Sequence[GlobalActionMonitor] = (),
+    ) -> GlobalActionProcessor[PurgeGlobalOpsAction[Any, TData], EntityOpsResult[TData]]:
+        return GlobalActionProcessor(
+            PurgeService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.global_scope, *monitors),
             validators=(*self._deps.validators.global_scope, *validators),
         )

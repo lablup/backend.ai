@@ -46,6 +46,8 @@ __all__ = (
     "BatchPurgeScopeOpsAction",
     "SearchScopeOpsAction",
     "CreateGlobalOpsAction",
+    "UpdateGlobalOpsAction",
+    "PurgeGlobalOpsAction",
     "SearchGlobalOpsAction",
 )
 
@@ -351,6 +353,29 @@ class CreateGlobalOpsAction[TRow: Base, TData](BaseGlobalAction, CreateOpsAction
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
+
+
+class UpdateGlobalOpsAction[TRow: Base, TData](BaseGlobalAction, UpdateOpsAction[TRow, TData], ABC):
+    """A write to one row of system-wide state, named by a key that is not an ``EntityID``.
+
+    Global rather than single-entity because the row it names belongs to no RBAC scope:
+    the SUPERADMIN gate is what answers for the write, and the catalogs this shape
+    serves are keyed by a name that the caller passes as-is.
+    """
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+
+class PurgeGlobalOpsAction[TRow: Base, TData](BaseGlobalAction, PurgeOpsAction[TRow, TData], ABC):
+    """A hard delete of one row of system-wide state."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.PURGE
 
 
 class SearchGlobalOpsAction[TRow: Base, TData](
