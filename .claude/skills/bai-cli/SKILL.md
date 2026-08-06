@@ -104,7 +104,7 @@ Check options with `--help`.
 - **notification**: sub channel(get, search, delete), rule(get, search, delete)
 - **prometheus-query-definition**: user(get, search, execute) · admin(create, update, delete, preview)
 - **prometheus-query-definition-category**: user(get, search) · admin(create, delete)
-- **app-config**: user(get-domain, get-user, get-merged, delete-domain, delete-user)
+- **app-config**: my(get) · public(get) — the merged view; `public` is an app-config-only group for the pre-login read, needing no credentials
 - **app-config-definition**: admin(create, get, search, purge)
 - **app-config-allow-list**: admin(create, get, search, update, purge)
 - **app-config-fragment**: user(get, update, purge, bulk-purge) · my(get, update) · admin(search)

@@ -18,6 +18,7 @@ from .config_cmd import config
 from .gql_cmd import gql
 from .login_cmd import login, logout
 from .my import my
+from .public import public
 
 
 @click.group()
@@ -45,6 +46,9 @@ v2.add_command(admin)
 
 # My group — contains self-service commands per entity
 v2.add_command(my)
+
+# Public group — contains anonymous commands per entity, usable without credentials
+v2.add_command(public)
 
 
 # Entity sub-groups — lazy loaded to avoid heavy imports at startup.
