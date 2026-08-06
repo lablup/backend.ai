@@ -1262,6 +1262,7 @@ class UserDBSource:
                 generated_data=secrets,
                 user_id=user_uuid,
                 email=user_row.email,
+                is_default=False,
             )
             rbac_kp_creator = RBACEntityCreator(
                 spec=kp_spec,
@@ -1428,6 +1429,7 @@ class UserDBSource:
                 generated_data=secrets,
                 user_id=user_id,
                 email=user_row.email,
+                is_default=False,
             )
             rbac_kp_creator = RBACEntityCreator(
                 spec=kp_spec,
