@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from typing import override
 
+from aiohttp import web
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -15,7 +17,7 @@ from ai.backend.common.exception import (
 )
 
 
-class ResourceSlotTypeNotFound(BackendAIError):
+class ResourceSlotTypeNotFound(BackendAIError, web.HTTPNotFound):
     """Raised when a requested resource slot type does not exist."""
 
     error_type = "https://api.backend.ai/probs/resource-slot-type-not-found"
@@ -30,7 +32,7 @@ class ResourceSlotTypeNotFound(BackendAIError):
         )
 
 
-class ResourceSlotTypeAlreadyExists(BackendAIError):
+class ResourceSlotTypeAlreadyExists(BackendAIError, web.HTTPConflict):
     """Raised when creating a resource slot type whose slot name is already registered."""
 
     error_type = "https://api.backend.ai/probs/resource-slot-type-already-exists"
@@ -45,7 +47,7 @@ class ResourceSlotTypeAlreadyExists(BackendAIError):
         )
 
 
-class ResourceSlotTypeInUse(BackendAIError):
+class ResourceSlotTypeInUse(BackendAIError, web.HTTPConflict):
     """Raised when deleting a resource slot type that is still referenced elsewhere."""
 
     error_type = "https://api.backend.ai/probs/resource-slot-type-in-use"
@@ -60,7 +62,7 @@ class ResourceSlotTypeInUse(BackendAIError):
         )
 
 
-class AgentResourceNotFound(BackendAIError):
+class AgentResourceNotFound(BackendAIError, web.HTTPNotFound):
     """Raised when an agent resource entry for a given agent+slot is not found."""
 
     error_type = "https://api.backend.ai/probs/agent-resource-not-found"
@@ -75,7 +77,7 @@ class AgentResourceNotFound(BackendAIError):
         )
 
 
-class ResourceAllocationNotFound(BackendAIError):
+class ResourceAllocationNotFound(BackendAIError, web.HTTPNotFound):
     """Raised when a resource allocation entry for a given kernel+slot is not found."""
 
     error_type = "https://api.backend.ai/probs/resource-allocation-not-found"
@@ -90,7 +92,7 @@ class ResourceAllocationNotFound(BackendAIError):
         )
 
 
-class AgentResourceCapacityExceeded(BackendAIError):
+class AgentResourceCapacityExceeded(BackendAIError, web.HTTPConflict):
     """Raised when an agent resource update would exceed the slot capacity."""
 
     error_type = "https://api.backend.ai/probs/agent-resource-capacity-exceeded"
