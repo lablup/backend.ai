@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import datetime
 from typing import TYPE_CHECKING, Self
 
 import sqlalchemy as sa
@@ -24,6 +23,7 @@ from ai.backend.manager.models.base import (
     ResourceSlotColumn,
     VFolderHostPermissionColumn,
 )
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.group import GroupRow
@@ -41,7 +41,7 @@ __all__: Sequence[str] = (
 )
 
 
-class KeyPairResourcePolicyRow(Base):  # type: ignore[misc]
+class KeyPairResourcePolicyRow(CreatedAtMixin, Base):  # type: ignore[misc]
     __tablename__ = "keypair_resource_policies"
     # A cap outside the requestable priority range is unsatisfiable: a
     # negative one would reject every session create for the keypair.
@@ -53,9 +53,6 @@ class KeyPairResourcePolicyRow(Base):  # type: ignore[misc]
     )
 
     name: Mapped[str] = mapped_column("name", sa.String(length=256), primary_key=True)
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
-    )
     default_for_unspecified: Mapped[DefaultForUnspecified] = mapped_column(
         "default_for_unspecified",
         EnumType(DefaultForUnspecified),
@@ -124,13 +121,10 @@ class KeyPairResourcePolicyRow(Base):  # type: ignore[misc]
 keypair_resource_policies = KeyPairResourcePolicyRow.__table__
 
 
-class UserResourcePolicyRow(Base):  # type: ignore[misc]
+class UserResourcePolicyRow(CreatedAtMixin, Base):  # type: ignore[misc]
     __tablename__ = "user_resource_policies"
 
     name: Mapped[str] = mapped_column("name", sa.String(length=256), primary_key=True)
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
-    )
     max_vfolder_count: Mapped[int] = mapped_column(
         "max_vfolder_count", sa.Integer(), nullable=False
     )
@@ -193,13 +187,10 @@ class UserResourcePolicyRow(Base):  # type: ignore[misc]
 user_resource_policies = UserResourcePolicyRow.__table__
 
 
-class ProjectResourcePolicyRow(Base):  # type: ignore[misc]
+class ProjectResourcePolicyRow(CreatedAtMixin, Base):  # type: ignore[misc]
     __tablename__ = "project_resource_policies"
 
     name: Mapped[str] = mapped_column("name", sa.String(length=256), primary_key=True)
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
-    )
     max_vfolder_count: Mapped[int] = mapped_column(
         "max_vfolder_count", sa.Integer(), nullable=False
     )

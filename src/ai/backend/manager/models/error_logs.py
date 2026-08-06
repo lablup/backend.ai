@@ -25,7 +25,13 @@ error_logs = sa.Table(
     "error_logs",
     mapper_registry.metadata,
     IDColumn(),
-    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True),
+    sa.Column(
+        "created_at",
+        sa.DateTime(timezone=True),
+        server_default=sa.func.now(),
+        index=True,
+        nullable=False,
+    ),
     sa.Column(
         "severity", sa.Enum("critical", "error", "warning", name="errorlog_severity"), index=True
     ),

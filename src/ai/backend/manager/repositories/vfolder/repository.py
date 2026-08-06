@@ -987,7 +987,7 @@ class VfolderRepository:
                     invitee=row.invitee,
                     permission=row.permission or VFolderMountPermission.READ_ONLY,
                     created_at=row.created_at or datetime.now(UTC),
-                    modified_at=row.modified_at,
+                    modified_at=row.updated_at,
                 )
                 for row, inviter_username in rows
             ]
@@ -1429,7 +1429,7 @@ class VfolderRepository:
                 invitee=invitation_row.invitee,
                 permission=invitation_row.permission or VFolderMountPermission.READ_ONLY,
                 created_at=invitation_row.created_at or datetime.now(UTC),
-                modified_at=invitation_row.modified_at,
+                modified_at=invitation_row.updated_at,
             )
 
     @vfolder_repository_resilience.apply()
@@ -1526,7 +1526,7 @@ class VfolderRepository:
                     invitee=inv_row.invitee,
                     permission=inv_row.permission or VFolderMountPermission.READ_ONLY,
                     created_at=inv_row.created_at or datetime.now(UTC),
-                    modified_at=inv_row.modified_at,
+                    modified_at=inv_row.updated_at,
                 )
                 vfolder_data = self._vfolder_row_to_data(inv_row.vfolder_row)
                 results.append((invitation_data, vfolder_data))
@@ -1570,7 +1570,7 @@ class VfolderRepository:
                     invitee=inv_row.invitee,
                     permission=inv_row.permission or VFolderMountPermission.READ_ONLY,
                     created_at=inv_row.created_at or datetime.now(UTC),
-                    modified_at=inv_row.modified_at,
+                    modified_at=inv_row.updated_at,
                 )
                 vfolder_data = self._vfolder_row_to_data(inv_row.vfolder_row)
                 results.append((invitation_data, vfolder_data))

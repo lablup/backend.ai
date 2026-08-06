@@ -44,8 +44,8 @@ class UserOrders:
     @staticmethod
     def modified_at(ascending: bool = True) -> QueryOrder:
         if ascending:
-            return UserRow.modified_at.asc()
-        return UserRow.modified_at.desc()
+            return UserRow.updated_at.asc()
+        return UserRow.updated_at.desc()
 
     @staticmethod
     def status(ascending: bool = True) -> QueryOrder:

@@ -51,6 +51,7 @@ from ai.backend.manager.models.base import (
     StructuredJSONColumn,
     VFolderHostPermissionColumn,
 )
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -162,7 +163,7 @@ class AssocGroupUserRow(Base):  # type: ignore[misc]
 association_groups_users = AssocGroupUserRow.__table__
 
 
-class GroupRow(Base):  # type: ignore[misc]
+class GroupRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     __tablename__ = "groups"
     __table_args__ = (
         sa.UniqueConstraint("name", "domain_name", name="uq_groups_name_domain_name"),
@@ -176,15 +177,6 @@ class GroupRow(Base):  # type: ignore[misc]
     )
     description: Mapped[str | None] = mapped_column("description", sa.String(length=512))
     is_active: Mapped[bool | None] = mapped_column("is_active", sa.Boolean, default=True)
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
-    )
-    modified_at: Mapped[datetime | None] = mapped_column(
-        "modified_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        onupdate=sa.func.current_timestamp(),
-    )
     #: Field for synchronization with external services.
     integration_id: Mapped[str | None] = mapped_column("integration_id", sa.String(length=512))
     domain_name: Mapped[str] = mapped_column(
@@ -273,7 +265,7 @@ class GroupRow(Base):  # type: ignore[misc]
             description=self.description,
             is_active=self.is_active,
             created_at=self.created_at,
-            modified_at=self.modified_at,
+            modified_at=self.updated_at,
             integration_name=self.integration_id,  # DB column is integration_id
             domain_name=self.domain_name,
             total_resource_slots=self.total_resource_slots,
@@ -443,7 +435,7 @@ class ProjectModel(RBACModel[ProjectPermission]):
             description=row.description,
             is_active=row.is_active,
             created_at=row.created_at,
-            modified_at=row.modified_at,
+            modified_at=row.updated_at,
             domain_name=row.domain_name,
             type=row.type,
             _integration_name=row.integration_id,  # DB column is integration_id

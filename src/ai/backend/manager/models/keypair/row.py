@@ -23,6 +23,7 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
 )
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
@@ -51,7 +52,7 @@ def _get_session_row_join_condition() -> sa.ColumnElement[bool]:
     return KeyPairRow.access_key == foreign(SessionRow.access_key)
 
 
-class KeyPairRow(Base):  # type: ignore[misc]
+class KeyPairRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     __tablename__ = "keypairs"
 
     user_id: Mapped[str | None] = mapped_column("user_id", sa.String(length=256), index=True)
@@ -60,15 +61,6 @@ class KeyPairRow(Base):  # type: ignore[misc]
     is_active: Mapped[bool | None] = mapped_column("is_active", sa.Boolean, index=True)
     is_admin: Mapped[bool | None] = mapped_column(
         "is_admin", sa.Boolean, index=True, default=False, server_default=false()
-    )
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
-    )
-    modified_at: Mapped[datetime | None] = mapped_column(
-        "modified_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        onupdate=sa.func.current_timestamp(),
     )
     last_used: Mapped[datetime | None] = mapped_column(
         "last_used", sa.DateTime(timezone=True), nullable=True
@@ -121,7 +113,7 @@ class KeyPairRow(Base):  # type: ignore[misc]
             "is_active": self.is_active,
             "is_admin": self.is_admin,
             "created_at": self.created_at,
-            "modified_at": self.modified_at,
+            "modified_at": self.updated_at,
             "last_used": self.last_used,
             "rate_limit": self.rate_limit,
             "num_queries": self.num_queries,
@@ -165,7 +157,7 @@ class KeyPairRow(Base):  # type: ignore[misc]
             is_active=self.is_active if self.is_active is not None else True,
             is_admin=self.is_admin if self.is_admin is not None else False,
             created_at=self.created_at,
-            modified_at=self.modified_at,
+            modified_at=self.updated_at,
             resource_policy_name=self.resource_policy,
             rate_limit=self.rate_limit if self.rate_limit is not None else 0,
             ssh_public_key=self.ssh_public_key,

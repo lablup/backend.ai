@@ -49,6 +49,7 @@ from ai.backend.manager.models.base import (
     PydanticColumn,
 )
 from ai.backend.manager.models.group import resolve_group_name_or_id, resolve_groups
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -225,7 +226,7 @@ class ScalingGroupForKeypairsRow(Base):  # type: ignore[misc]
 sgroups_for_keypairs = ScalingGroupForKeypairsRow.__table__
 
 
-class ScalingGroupRow(Base):  # type: ignore[misc]
+class ScalingGroupRow(CreatedAtMixin, Base):  # type: ignore[misc]
     __tablename__ = "scaling_groups"
     __table_args__ = (
         # Partial unique index: at most one row may have is_default = true.
@@ -257,9 +258,6 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
     # setting the new one within the same transaction.
     is_default: Mapped[bool] = mapped_column(
         "is_default", sa.Boolean, default=False, server_default=false(), nullable=False
-    )
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
     )
     wsproxy_addr: Mapped[str | None] = mapped_column(
         "wsproxy_addr", sa.String(length=1024), nullable=True

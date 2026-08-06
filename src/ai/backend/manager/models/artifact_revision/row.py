@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime
 from typing import TYPE_CHECKING, Any, override
 
 import sqlalchemy as sa
@@ -20,6 +19,7 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
 )
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.artifact import ArtifactRow
@@ -46,11 +46,13 @@ def _get_association_artifacts_storages_join_cond() -> sa.ColumnElement[bool]:
     return ArtifactRevisionRow.id == foreign(AssociationArtifactsStorageRow.artifact_revision_id)
 
 
-class ArtifactRevisionRow(Base):  # type: ignore[misc]
+class ArtifactRevisionRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     __tablename__ = "artifact_revisions"
     __table_args__ = (
         # constraint
         sa.UniqueConstraint("artifact_id", "version", name="uq_artifact_id_version"),
+        sa.Index("ix_artifact_revisions_created_at", "created_at"),
+        sa.Index("ix_artifact_revisions_updated_at", "updated_at"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -82,20 +84,6 @@ class ArtifactRevisionRow(Base):  # type: ignore[misc]
         server_default=sa.null(),
     )
 
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        nullable=True,
-        server_default=None,
-        index=True,
-    )
-    updated_at: Mapped[datetime | None] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        nullable=True,
-        server_default=None,
-        index=True,
-    )
     verification_result: Mapped[dict[str, Any] | None] = mapped_column(
         "verification_result", sa.JSON(none_as_null=True), nullable=True, default=None
     )

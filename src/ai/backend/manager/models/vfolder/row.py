@@ -72,6 +72,7 @@ from ai.backend.manager.models.base import (
     metadata,
 )
 from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -294,7 +295,7 @@ class VFolderCloneInfo(NamedTuple):
     cloneable: bool
 
 
-class VFolderRow(Base):  # type: ignore[misc]
+class VFolderRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     __tablename__ = "vfolders"
 
     id: Mapped[VFolderUUID] = mapped_column(
@@ -330,18 +331,8 @@ class VFolderRow(Base):  # type: ignore[misc]
     )  # in MBytes
     num_files: Mapped[int | None] = mapped_column("num_files", sa.Integer(), default=0)
     cur_size: Mapped[int | None] = mapped_column("cur_size", sa.Integer(), default=0)  # in KBytes
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
-    )
     last_used: Mapped[datetime | None] = mapped_column(
         "last_used", sa.DateTime(timezone=True), nullable=True
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
     )
     # creator is always set to the user who created vfolder (regardless user/project types)
     creator: Mapped[str | None] = mapped_column("creator", sa.String(length=128), nullable=True)
@@ -487,7 +478,7 @@ vfolder_attachment = sa.Table(
 )
 
 
-class VFolderInvitationRow(Base):  # type: ignore[misc]
+class VFolderInvitationRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     __tablename__ = "vfolder_invitations"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -500,15 +491,6 @@ class VFolderInvitationRow(Base):  # type: ignore[misc]
     invitee: Mapped[str] = mapped_column("invitee", sa.String(length=256), nullable=False)  # email
     state: Mapped[VFolderInvitationState | None] = mapped_column(
         "state", EnumValueType(VFolderInvitationState), default=VFolderInvitationState.PENDING
-    )
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
-    )
-    modified_at: Mapped[datetime | None] = mapped_column(
-        "modified_at",
-        sa.DateTime(timezone=True),
-        nullable=True,
-        onupdate=sa.func.current_timestamp(),
     )
     vfolder: Mapped[VFolderUUID] = mapped_column(
         "vfolder",

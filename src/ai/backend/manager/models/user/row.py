@@ -36,6 +36,7 @@ from ai.backend.manager.models.base import (
 )
 from ai.backend.manager.models.hasher import PasswordHasherFactory
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordColumn, PasswordInfo
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 from ai.backend.manager.models.types import (
     QueryCondition,
     QueryOption,
@@ -147,7 +148,7 @@ def _get_main_keypair_join_condition() -> Any:
     return KeyPairRow.access_key == foreign(UserRow.main_access_key)
 
 
-class UserRow(Base):  # type: ignore[misc]
+class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     __tablename__ = "users"
 
     uuid: Mapped[uuid_mod.UUID] = mapped_column(
@@ -163,11 +164,11 @@ class UserRow(Base):  # type: ignore[misc]
     need_password_change: Mapped[bool | None] = mapped_column(
         "need_password_change", sa.Boolean, nullable=True
     )
-    password_changed_at: Mapped[datetime | None] = mapped_column(
+    password_changed_at: Mapped[datetime] = mapped_column(
         "password_changed_at",
         sa.DateTime(timezone=True),
         server_default=sa.func.now(),
-        nullable=True,
+        nullable=False,
     )
     full_name: Mapped[str | None] = mapped_column("full_name", sa.String(length=64), nullable=True)
     description: Mapped[str | None] = mapped_column(
@@ -178,16 +179,6 @@ class UserRow(Base):  # type: ignore[misc]
     )
     status_info: Mapped[str | None] = mapped_column(
         "status_info", sa.Unicode(), nullable=True, default=sa.null()
-    )
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=True
-    )
-    modified_at: Mapped[datetime | None] = mapped_column(
-        "modified_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        onupdate=sa.func.current_timestamp(),
-        nullable=True,
     )
     #: Field for synchronization with external services.
     integration_id: Mapped[str | None] = mapped_column(
@@ -436,7 +427,7 @@ class UserRow(Base):  # type: ignore[misc]
             status=self.status.value,
             status_info=self.status_info,
             created_at=self.created_at,
-            modified_at=self.modified_at,
+            modified_at=self.updated_at,
             domain_name=self.domain_name,
             domain_id=self.domain_id,
             role=self.role,

@@ -70,6 +70,7 @@ from ai.backend.manager.models.base import (
     StructuredJSONObjectListColumn,
     URLColumn,
 )
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
@@ -137,7 +138,7 @@ def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     return UserRow.uuid == foreign(KernelRow.user_uuid)
 
 
-class KernelRow(Base):  # type: ignore[misc]
+class KernelRow(CreatedAtMixin, Base):  # type: ignore[misc]
     __tablename__ = "kernels"
 
     # The Backend.AI-side UUID for each kernel
@@ -297,13 +298,6 @@ class KernelRow(Base):  # type: ignore[misc]
         "use_host_network", sa.Boolean(), default=False, nullable=False
     )
     # Lifecycle
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        index=True,
-        nullable=True,
-    )
     terminated_at: Mapped[datetime | None] = mapped_column(
         "terminated_at", sa.DateTime(timezone=True), nullable=True, default=sa.null(), index=True
     )
@@ -409,6 +403,7 @@ class KernelRow(Base):  # type: ignore[misc]
 
     __table_args__ = (
         # indexing
+        sa.Index("ix_kernels_created_at", "created_at"),
         sa.Index("ix_kernels_sess_id_role", "session_id", "cluster_role", unique=False),
         sa.Index("ix_kernels_status_role", "status", "cluster_role"),
         sa.Index(

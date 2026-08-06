@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping
-from datetime import datetime
 from typing import TYPE_CHECKING, Any, Final
 
 import sqlalchemy as sa
@@ -17,6 +16,7 @@ from ai.backend.manager.models.base import (
     Base,
     SlugType,
 )
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.domain import DomainRow
@@ -40,7 +40,7 @@ def _get_domain_join_condition() -> sa.ColumnElement[bool]:
     return DomainRow.name == foreign(NetworkRow.domain_name)
 
 
-class NetworkRow(Base):  # type: ignore[misc]
+class NetworkRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     __tablename__ = "networks"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -66,19 +66,6 @@ class NetworkRow(Base):  # type: ignore[misc]
         "domain_name",
         SlugType(length=64, allow_unicode=True, allow_dot=True),
         nullable=False,
-    )
-
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.text("now()"),
-        nullable=True,
-    )
-    updated_at: Mapped[datetime | None] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.text("now()"),
-        nullable=True,
     )
 
     project_row: Mapped[GroupRow] = relationship(

@@ -74,6 +74,7 @@ from ai.backend.manager.models.base import (
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -152,12 +153,13 @@ def _get_container_registry_join_condition() -> sa.sql.elements.ColumnElement[An
     return ContainerRegistryRow.id == foreign(ImageRow.registry_id)
 
 
-class ImageRow(Base):  # type: ignore[misc]
+class ImageRow(CreatedAtMixin, Base):  # type: ignore[misc]
     __tablename__ = "images"
     __table_args__ = (
         sa.UniqueConstraint(
             "registry", "project", "name", "tag", "architecture", name="uq_image_identifier"
         ),
+        sa.Index("ix_images_created_at", "created_at"),
     )
 
     id: Mapped[ImageID] = mapped_column(
@@ -166,13 +168,6 @@ class ImageRow(Base):  # type: ignore[misc]
     name: Mapped[str] = mapped_column("name", sa.String, nullable=False, index=True)
     project: Mapped[str | None] = mapped_column("project", sa.String, nullable=True)
     image: Mapped[str] = mapped_column("image", sa.String, nullable=False, index=True)
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        index=True,
-        nullable=True,
-    )
     tag: Mapped[str | None] = mapped_column("tag", sa.TEXT, nullable=True)
     registry: Mapped[str] = mapped_column("registry", sa.String, nullable=False, index=True)
     registry_id: Mapped[UUID] = mapped_column(
