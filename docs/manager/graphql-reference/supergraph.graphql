@@ -21837,7 +21837,7 @@ input UpdateUserV2Input
   sudoSessionEnabled: Boolean
 
   """Set the primary API access key."""
-  mainAccessKey: String
+  mainAccessKey: String!
 
   """New container user ID."""
   containerUid: Int

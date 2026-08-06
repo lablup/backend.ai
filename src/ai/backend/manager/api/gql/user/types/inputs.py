@@ -149,9 +149,7 @@ class UpdateUserV2InputGQL(PydanticInputMixin[UpdateUserInputDTO]):
     sudo_session_enabled: bool | None = gql_field(
         description="Enable or disable sudo session capability.", default=UNSET
     )
-    main_access_key: str | None = gql_field(
-        description="Set the primary API access key.", default=UNSET
-    )
+    main_access_key: str = gql_field(description="Set the primary API access key.", default=UNSET)
     container_uid: int | None = gql_field(description="New container user ID.", default=UNSET)
     container_main_gid: int | None = gql_field(
         description="New container primary group ID.", default=UNSET
