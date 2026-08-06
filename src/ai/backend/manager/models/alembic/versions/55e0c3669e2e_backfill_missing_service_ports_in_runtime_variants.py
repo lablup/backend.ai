@@ -1,8 +1,9 @@
 """backfill missing service ports in runtime_variants
 
-``default_model_definition`` now requires ``service.port`` on every model
-entry; create the service block and/or fill the port so pre-existing rows
-keep loading. Idempotent: only touches entries whose port is absent or null.
+``default_model_definition`` now requires ``service.port`` (> 1) on every
+model entry; create the service block and/or fill the port so pre-existing
+rows keep loading. Idempotent: only touches entries whose port is absent,
+null, or not greater than 1.
 
 Revision ID: 55e0c3669e2e
 Revises: 2dccb3069031
@@ -35,7 +36,11 @@ def upgrade() -> None:
             "WHERE jsonb_typeof(default_model_definition->'models') = 'array' "
             "AND EXISTS ("
             "  SELECT 1 FROM jsonb_array_elements(default_model_definition->'models') AS m"
-            "  WHERE jsonb_typeof(m) = 'object' AND (m->'service'->>'port') IS NULL"
+            "  WHERE jsonb_typeof(m) = 'object' AND ("
+            "    (m->'service'->>'port') IS NULL"
+            "    OR (jsonb_typeof(m->'service'->'port') = 'number'"
+            "        AND (m->'service'->>'port')::numeric <= 1)"
+            "  )"
             ")"
         )
     ).fetchall()
@@ -49,7 +54,8 @@ def upgrade() -> None:
             if not isinstance(service, dict):
                 service = {}
                 model["service"] = service
-            if service.get("port") is None:
+            port = service.get("port")
+            if port is None or (isinstance(port, (int, float)) and port <= 1):
                 service["port"] = _FALLBACK_PORT
         bind.execute(
             sa.text(
