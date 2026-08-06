@@ -753,8 +753,6 @@ class DefaultModelServiceConfig(BaseConfigModel):
     pre_start_actions: list[PreStartAction] | None = None
     start_command: str | None = None
     shell: str | None = None
-    # Mirrors the resolved ModelServiceConfig.port constraint so invalid ports
-    # fail at the DB boundary instead of at to_resolved().
     port: int = Field(gt=1)
     health_check: ModelHealthCheckDraft | None = None
 
