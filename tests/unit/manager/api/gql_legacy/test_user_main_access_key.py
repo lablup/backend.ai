@@ -8,6 +8,7 @@ that both spec sets stay usable and reach ``keypairs``.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 import pytest
 import sqlalchemy as sa
@@ -29,7 +30,7 @@ class _SpecCase:
     """A spec set together with the statement the loader applies it to."""
 
     name: str
-    statement: sa.Select
+    statement: sa.Select[Any]
     filter_spec: dict[str, FieldSpecItem]
     order_spec: dict[str, OrderSpecItem]
 
