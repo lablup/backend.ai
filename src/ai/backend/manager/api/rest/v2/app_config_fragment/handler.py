@@ -94,7 +94,10 @@ class V2AppConfigFragmentHandler:
         self,
         body: BodyParam[ScopedUpsertAppConfigFragmentsInput],
     ) -> APIResponse:
-        """Upsert many fragments at one scope, all-or-nothing (auth, RBAC-authorized)."""
+        """Upsert many fragments at one scope, with per-item partial success (auth, RBAC).
+
+        (Partial success is not in effect yet: the upsert is still all-or-nothing. To be fixed.)
+        """
         result = await self._adapter.scoped_upsert_app_config_fragments(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
@@ -102,6 +105,10 @@ class V2AppConfigFragmentHandler:
         self,
         body: BodyParam[MyUpsertAppConfigFragmentsInput],
     ) -> APIResponse:
-        """Upsert many fragments at the caller's own user scope, all-or-nothing (auth)."""
+        """Upsert many fragments at the caller's own user scope, with per-item partial
+        success (auth).
+
+        (Partial success is not in effect yet: the upsert is still all-or-nothing. To be fixed.)
+        """
         result = await self._adapter.my_upsert_app_config_fragments(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

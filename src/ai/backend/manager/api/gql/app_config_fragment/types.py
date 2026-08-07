@@ -204,7 +204,7 @@ class AppConfigFragmentConnection(Connection[AppConfigFragmentGQL]):
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "One rejected item of a bulk fragment upsert, named by its config name — "
+            "One failed item of a partial bulk fragment upsert, named by its config name — "
             "the batch shares one scope, and a rejected insert never had a fragment id."
         ),
     ),
@@ -219,7 +219,10 @@ class AppConfigFragmentUpsertErrorGQL(PydanticOutputMixin[AppConfigFragmentUpser
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Payload of a bulk fragment upsert: the fragments written, and the rejected items.",
+        description=(
+            "Partial-success payload for a bulk fragment upsert (not in effect yet: still "
+            "all-or-nothing, so failed is always empty, to be fixed)."
+        ),
     ),
     model=UpsertAppConfigFragmentsPayloadDTO,
     name="UpsertAppConfigFragmentsPayload",

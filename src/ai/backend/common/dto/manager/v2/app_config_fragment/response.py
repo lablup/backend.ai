@@ -43,7 +43,7 @@ class AppConfigFragmentsByNamesPayload(BaseRootResponseModel[list[AppConfigFragm
 
 
 class AppConfigFragmentUpsertErrorInfo(BaseResponseModel):
-    """One rejected item of a bulk upsert.
+    """One failed item of a partial-success bulk upsert.
 
     A rejected insert never had a fragment id, so the item is named by its config name —
     the batch shares one scope, and a scope holds at most one fragment per name.
@@ -54,7 +54,11 @@ class AppConfigFragmentUpsertErrorInfo(BaseResponseModel):
 
 
 class UpsertAppConfigFragmentsPayload(BaseResponseModel):
-    """Payload for a scoped upsert of many fragments: the ones written, and the rejected ones."""
+    """Partial-success payload for a scoped upsert of many fragments.
+
+    (Not in effect yet: the upsert is still all-or-nothing, so ``failed`` is always empty.
+    To be fixed.)
+    """
 
     items: list[AppConfigFragmentNode] = Field(description="The upserted app config fragments.")
     failed: list[AppConfigFragmentUpsertErrorInfo] = Field(

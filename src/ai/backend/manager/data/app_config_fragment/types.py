@@ -59,7 +59,7 @@ class AppConfigFragmentBulkResult:
 
 @dataclass(frozen=True)
 class AppConfigFragmentUpsertItemError:
-    """One rejected item of a bulk upsert: the config name it targeted and a reason.
+    """One failed item of a partial bulk upsert: the config name it targeted and a reason.
 
     A rejected insert never had a fragment id, so the config name is what identifies the
     item — the batch shares one scope, and a scope holds at most one fragment per name.
@@ -71,10 +71,13 @@ class AppConfigFragmentUpsertItemError:
 
 @dataclass(frozen=True)
 class AppConfigFragmentUpsertBulkResult:
-    """Result of a bulk upsert.
+    """Partial-success result of a bulk upsert.
 
     ``succeeded`` are the fragments inserted or replaced; ``failed`` are the items whose
     write was rejected (e.g. no allow-list row), each named by its config name.
+
+    (Not in effect yet: the upsert is still all-or-nothing, so ``failed`` is always empty.
+    To be fixed.)
     """
 
     succeeded: list[AppConfigFragmentData]
