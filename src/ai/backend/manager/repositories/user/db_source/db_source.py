@@ -144,6 +144,7 @@ from ai.backend.manager.repositories.user.types import (
     DomainUserSearchScope,
     ProjectUserSearchScope,
     RoleUserSearchScope,
+    UserWithDefaultKeypair,
 )
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec, UserUpdateSpec
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
@@ -169,8 +170,8 @@ class UserDBSource:
         Admin-only operation.
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
-            user_row, default_access_key = await self._get_user_by_uuid(db_session, user_uuid)
-            return user_row.to_data(default_access_key)
+            user = await self._get_user_by_uuid(db_session, user_uuid)
+            return user.row.to_data(user.default_access_key)
 
     async def get_by_email_validated(
         self,
@@ -181,8 +182,8 @@ class UserDBSource:
         Returns None if user not found or access denied.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
-            user_row, default_access_key = await self._get_user_by_email(session, email)
-            return user_row.to_data(default_access_key)
+            user = await self._get_user_by_email(session, email)
+            return user.row.to_data(user.default_access_key)
 
     async def create_user_validated(
         self, creator: Creator[UserRow], group_ids: list[str] | None
@@ -708,9 +709,7 @@ class UserDBSource:
         result = await session.scalar(query)
         return result is not None
 
-    async def _get_user_by_email(
-        self, session: SASession, email: str
-    ) -> tuple[UserRow, AccessKey | None]:
+    async def _get_user_by_email(self, session: SASession, email: str) -> UserWithDefaultKeypair:
         """Private method to get user by email, with the access key of its marked keypair."""
         res = (
             await session.execute(
@@ -721,11 +720,11 @@ class UserDBSource:
         ).first()
         if res is None:
             raise UserNotFound(f"User with email {email} not found.")
-        return res.UserRow, res.access_key
+        return UserWithDefaultKeypair(row=res.UserRow, default_access_key=res.access_key)
 
     async def _get_user_by_uuid(
         self, session: SASession, user_uuid: UUID
-    ) -> tuple[UserRow, AccessKey | None]:
+    ) -> UserWithDefaultKeypair:
         """Private method to get user by UUID, with the access key of its marked keypair."""
         res = (
             await session.execute(
@@ -736,7 +735,7 @@ class UserDBSource:
         ).first()
         if res is None:
             raise UserNotFound(f"User with UUID {user_uuid} not found.")
-        return res.UserRow, res.access_key
+        return UserWithDefaultKeypair(row=res.UserRow, default_access_key=res.access_key)
 
     async def _get_user_by_email_with_session(self, session: SASession, email: str) -> UserRow:
         """Private method to get user by email using a session.

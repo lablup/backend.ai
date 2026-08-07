@@ -12,6 +12,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.models.clauses import QueryCondition
@@ -134,3 +135,11 @@ class RoleUserSearchScope(SearchScope):
                 error=RoleNotFound(str(self.role_id)),
             ),
         ]
+
+
+@dataclass(frozen=True)
+class UserWithDefaultKeypair:
+    """A user row together with the access key of the keypair marked ``is_default``."""
+
+    row: UserRow
+    default_access_key: AccessKey | None

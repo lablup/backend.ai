@@ -25,7 +25,7 @@ from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.user import UserID
-from ai.backend.common.types import AccessKey, SlotName, VFolderID
+from ai.backend.common.types import SlotName, VFolderID
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -121,6 +121,7 @@ from ai.backend.manager.repositories.permission_controller.creators import UserR
 from ai.backend.manager.repositories.permission_controller.role_manager import (
     ScopeSystemRoleData,
 )
+from ai.backend.manager.repositories.user.types import UserWithDefaultKeypair
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -257,7 +258,7 @@ class GroupDBSource:
         w: RBACWriteOps,
         project_id: ProjectID,
         user_ids: Sequence[UserID],
-    ) -> list[tuple[UserRow, AccessKey | None]]:
+    ) -> list[UserWithDefaultKeypair]:
         """Users among ``user_ids`` that belong to the project's domain and are not
         yet members of the project, each with the access key of its marked keypair."""
         project_domain_subq = (
@@ -282,7 +283,10 @@ class GroupDBSource:
             )
         )
         result = await w.batch_query_in_global(query, BatchQuerier(pagination=NoPagination()))
-        return [(row.UserRow, row.access_key) for row in result.rows]
+        return [
+            UserWithDefaultKeypair(row=row.UserRow, default_access_key=row.access_key)
+            for row in result.rows
+        ]
 
     async def _add_users_to_project(
         self,
@@ -298,7 +302,9 @@ class GroupDBSource:
         await w.add_bulk_members(
             EntityMembersAddition(
                 scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
-                members=[ProjectUserMember(user_id=UserID(row.uuid)) for row, _ in new_user_rows],
+                members=[
+                    ProjectUserMember(user_id=UserID(user.row.uuid)) for user in new_user_rows
+                ],
             )
         )
 
@@ -674,17 +680,17 @@ class GroupDBSource:
                 EntityMembersAddition(
                     scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
                     members=[
-                        ProjectUserMember(user_id=UserID(row.uuid), manage_roles=False)
-                        for row, _ in new_users
+                        ProjectUserMember(user_id=UserID(user.row.uuid), manage_roles=False)
+                        for user in new_users
                     ],
                 )
             )
             user_role_specs = [
-                UserRoleCreatorSpec(user_id=row.uuid, role_id=role_id) for row, _ in new_users
+                UserRoleCreatorSpec(user_id=user.row.uuid, role_id=role_id) for user in new_users
             ]
             await w.bulk_create(BulkCreator(specs=user_role_specs))
 
-            return [row.to_data(default_access_key) for row, default_access_key in new_users]
+            return [user.row.to_data(user.default_access_key) for user in new_users]
 
     async def unassign_users_from_project(
         self, unbinder: UserProjectEntityUnbinder
