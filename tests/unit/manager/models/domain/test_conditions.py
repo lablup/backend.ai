@@ -524,6 +524,8 @@ class TestDomainNestedSearchIntegration:
                     access_key=uuid.uuid4().hex[:20],
                     secret_key=uuid.uuid4().hex[:20],
                     user=user_uuid,
+                    is_active=True,
+                    rate_limit=30000,
                     resource_policy=kp_policy.name,
                 )
                 session.add(keypair)

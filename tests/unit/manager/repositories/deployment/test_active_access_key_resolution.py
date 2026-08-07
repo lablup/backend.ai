@@ -123,10 +123,12 @@ class TestResolveUserAndActiveAccessKey:
             for kp in spec.keypairs:
                 sess.add(
                     KeyPairRow(
+                        user_id=f"{spec.user_uuid.hex[:8]}@test.io",
                         access_key=kp.access_key,
                         secret_key="secret",
                         user=spec.user_uuid,
                         is_active=kp.is_active,
+                        rate_limit=30000,
                         resource_policy=kp_policy,
                         created_at=kp.created_at,
                         is_default=kp.is_default,

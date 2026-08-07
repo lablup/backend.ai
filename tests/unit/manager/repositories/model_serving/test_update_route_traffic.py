@@ -170,6 +170,7 @@ async def test_user_id(db_with_cleanup: ExtendedAsyncSAEngine, test_domain: str)
                 is_active=True,
                 is_admin=True,
                 user=user_id,
+                rate_limit=30000,
                 resource_policy="default",
                 is_default=True,
             )

@@ -363,6 +363,7 @@ class TestUserPurgersIntegration:
             for i in range(2):
                 keypair = KeyPairRow(
                     user=sample_user.uuid,
+                    user_id=sample_user.email,
                     access_key=f"AKTEST{uuid.uuid4().hex[:12].upper()}",
                     secret_key=f"SK{uuid.uuid4().hex}",
                     is_active=True,

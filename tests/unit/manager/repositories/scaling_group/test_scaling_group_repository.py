@@ -1045,6 +1045,7 @@ class TestScalingGroupRepositoryDB:
 
             keypair = KeyPairRow(
                 user=test_user_uuid,
+                user_id=f"test-{test_user_uuid.hex[:8]}@example.com",
                 access_key=access_key,
                 secret_key=f"SK{uuid.uuid4().hex}",
                 is_active=True,

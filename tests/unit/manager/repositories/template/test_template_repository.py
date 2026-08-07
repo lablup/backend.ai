@@ -211,6 +211,7 @@ class TestTemplateRepository:
                 is_active=True,
                 is_admin=False,
                 user=test_user,
+                rate_limit=30000,
                 resource_policy=default_keypair_resource_policy,
             )
             session.add(keypair)

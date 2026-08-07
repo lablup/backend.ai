@@ -43,6 +43,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT
 from ai.backend.manager.idle import (
     BaseIdleChecker,
     IdleCheckerError,
@@ -344,6 +345,7 @@ class TestDoIdleCheck:
                     is_active=True,
                     is_admin=False,
                     is_default=is_default,
+                    rate_limit=DEFAULT_KEYPAIR_RATE_LIMIT,
                     resource_policy=policy_name,
                 )
             )

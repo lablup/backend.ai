@@ -6531,8 +6531,11 @@ type KeyPairV2 implements Node {
   """Timestamp when the keypair was created."""
   createdAt: DateTime
 
-  """Timestamp when the keypair was last modified."""
-  modifiedAt: DateTime
+  """Added in 26.9.0. Timestamp when the keypair was last updated."""
+  updatedAt: DateTime
+
+  """Timestamp when the keypair was last updated."""
+  modifiedAt: DateTime @deprecated(reason: "Deprecated since 26.9.0. Use updated_at instead.")
 
   """Timestamp when the keypair was last used for an API call."""
   lastUsed: DateTime
