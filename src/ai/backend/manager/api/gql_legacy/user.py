@@ -649,7 +649,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
             totp_activated=row.totp_activated,
             totp_activated_at=row.totp_activated_at,
             sudo_session_enabled=row.sudo_session_enabled,
-            main_access_key=row.main_keypair_access_key,
+            main_access_key=row.default_keypair_access_key,
             container_uid=row.container_uid,
             container_main_gid=row.container_main_gid,
             container_gids=row.container_gids,
@@ -679,12 +679,12 @@ class User(graphene.ObjectType):  # type: ignore[misc]
                 ),
             )
             query = (
-                sa.select(users, UserRow.main_keypair_access_key)
+                sa.select(users, UserRow.default_keypair_access_key)
                 .select_from(j)
                 .where(AssociationScopesEntitiesRow.scope_id == str(group_id))
             )
         else:
-            query = sa.select(users, UserRow.main_keypair_access_key).select_from(users)
+            query = sa.select(users, UserRow.default_keypair_access_key).select_from(users)
         if ctx.user["role"] != UserRole.SUPERADMIN:
             query = query.where(users.c.domain_name == ctx.user["domain_name"])
         if domain_name is not None:
@@ -718,7 +718,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", dtparse),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-        "main_access_key": (ORMFieldItem(UserRow.main_keypair_access_key), None),
+        "main_access_key": (ORMFieldItem(UserRow.default_keypair_access_key), None),
     }
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {
@@ -811,7 +811,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
                 ),
             )
             query = (
-                sa.select(users, UserRow.main_keypair_access_key)
+                sa.select(users, UserRow.default_keypair_access_key)
                 .select_from(j)
                 .where(AssociationScopesEntitiesRow.scope_id == str(group_id))
                 .limit(limit)
@@ -819,7 +819,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
             )
         else:
             query = (
-                sa.select(users, UserRow.main_keypair_access_key)
+                sa.select(users, UserRow.default_keypair_access_key)
                 .select_from(users)
                 .limit(limit)
                 .offset(offset)
@@ -870,7 +870,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         if not emails:
             return []
         query = (
-            sa.select(users, UserRow.main_keypair_access_key)
+            sa.select(users, UserRow.default_keypair_access_key)
             .select_from(users)
             .where(users.c.email.in_(emails))
         )
@@ -904,7 +904,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         if not user_ids:
             return []
         query = (
-            sa.select(users, UserRow.main_keypair_access_key)
+            sa.select(users, UserRow.default_keypair_access_key)
             .select_from(users)
             .where(users.c.uuid.in_(user_ids))
         )
