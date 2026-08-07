@@ -16419,7 +16419,6 @@ enum RBACElementType
   KEYPAIR @join__enumValue(graph: STRAWBERRY)
   NOTIFICATION_CHANNEL @join__enumValue(graph: STRAWBERRY)
   NETWORK @join__enumValue(graph: STRAWBERRY)
-  IDLE_CHECKER @join__enumValue(graph: STRAWBERRY)
   IDLE_CHECKER_ASSIGNMENT @join__enumValue(graph: STRAWBERRY)
   RESOURCE_GROUP @join__enumValue(graph: STRAWBERRY)
   CONTAINER_REGISTRY @join__enumValue(graph: STRAWBERRY)
