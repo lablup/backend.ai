@@ -8,7 +8,7 @@ import humanize
 from tabulate import tabulate
 
 from ai.backend.cli.types import ExitCode
-from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.extensions import output_option, pass_ctx_obj
 from ai.backend.client.cli.pretty import print_error
 from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.cli.vfolder import vfolder as user_vfolder
@@ -25,6 +25,7 @@ def vfolder() -> None:
 
 def _list_cmd(docs: str | None = None) -> Callable[..., None]:
     @pass_ctx_obj
+    @output_option
     @click.option(
         "-g",
         "--group",

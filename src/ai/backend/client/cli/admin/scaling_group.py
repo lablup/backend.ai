@@ -5,7 +5,7 @@ import click
 
 from ai.backend.cli.params import BoolExprType, JSONParamType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
-from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.extensions import output_option, pass_ctx_obj
 from ai.backend.client.cli.pretty import print_done
 from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.func.scaling_group import _default_detail_fields, _default_list_fields
@@ -24,6 +24,7 @@ def scaling_group() -> None:
 
 @scaling_group.command()
 @pass_ctx_obj
+@output_option
 @click.argument("group", type=str, metavar="GROUP_NAME")
 def get_available(ctx: CLIContext, group: str) -> None:
     with Session() as session:
@@ -37,6 +38,7 @@ def get_available(ctx: CLIContext, group: str) -> None:
 
 @scaling_group.command()
 @pass_ctx_obj
+@output_option
 @click.argument("name", type=str)
 def info(ctx: CLIContext, name: str) -> None:
     """
@@ -54,6 +56,7 @@ def info(ctx: CLIContext, name: str) -> None:
 
 @scaling_group.command()
 @pass_ctx_obj
+@output_option
 def list(ctx: CLIContext) -> None:
     """
     List and manage scaling groups.
@@ -70,6 +73,7 @@ def list(ctx: CLIContext) -> None:
 
 @scaling_group.command()
 @pass_ctx_obj
+@output_option
 @click.argument("name", type=str, metavar="NAME")
 @click.option(
     "-d",
@@ -168,6 +172,7 @@ def add(
 
 @scaling_group.command()
 @pass_ctx_obj
+@output_option
 @click.argument("name", type=str, metavar="NAME")
 @click.option(
     "-d",
@@ -293,6 +298,7 @@ def update(
 
 @scaling_group.command()
 @pass_ctx_obj
+@output_option
 @click.argument("name", type=str, metavar="NAME")
 def delete(ctx: CLIContext, name: str) -> None:
     """
@@ -327,6 +333,7 @@ def delete(ctx: CLIContext, name: str) -> None:
 
 @scaling_group.command()
 @pass_ctx_obj
+@output_option
 @click.argument("scaling_group", type=str, metavar="SCALING_GROUP")
 @click.argument("domain", type=str, metavar="DOMAIN")
 def associate_scaling_group(ctx: CLIContext, scaling_group: str, domain: str) -> None:
@@ -364,6 +371,7 @@ def associate_scaling_group(ctx: CLIContext, scaling_group: str, domain: str) ->
 
 @scaling_group.command()
 @pass_ctx_obj
+@output_option
 @click.argument("scaling_group", type=str, metavar="SCALING_GROUP")
 @click.argument("domain", type=str, metavar="DOMAIN")
 def dissociate_scaling_group(ctx: CLIContext, scaling_group: str, domain: str) -> None:

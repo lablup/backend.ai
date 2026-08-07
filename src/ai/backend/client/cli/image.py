@@ -9,7 +9,7 @@ from ai.backend.client.func.image import _default_list_fields_admin
 from ai.backend.client.output.fields import image_fields
 from ai.backend.client.session import Session
 
-from .extensions import pass_ctx_obj
+from .extensions import output_option, pass_ctx_obj
 from .pretty import print_done, print_error, print_fail, print_warn
 from .types import CLIContext
 
@@ -36,6 +36,7 @@ def get_image_id(
 
 @image.command()
 @pass_ctx_obj
+@output_option
 @click.option("--customized", is_flag=True, help="Get images customized by user only")
 def list(ctx: CLIContext, customized: bool) -> None:
     """

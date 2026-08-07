@@ -5,7 +5,7 @@ import click
 from ai.backend.cli.interaction import ask_yn
 from ai.backend.cli.params import OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
-from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.extensions import output_option, pass_ctx_obj
 from ai.backend.client.cli.pretty import print_info
 from ai.backend.client.cli.types import CLIContext
 
@@ -22,6 +22,7 @@ def keypair_resource_policy() -> None:
 
 @keypair_resource_policy.command()
 @pass_ctx_obj
+@output_option
 @click.argument("name", type=str)
 def info(ctx: CLIContext, name: str) -> None:
     """
@@ -43,6 +44,7 @@ def info(ctx: CLIContext, name: str) -> None:
 
 @keypair_resource_policy.command()
 @pass_ctx_obj
+@output_option
 def list(ctx: CLIContext) -> None:
     """
     List and manage keypair resource policies.
@@ -62,6 +64,7 @@ def list(ctx: CLIContext) -> None:
 
 @keypair_resource_policy.command()
 @pass_ctx_obj
+@output_option
 @click.argument("name", type=str, default=None, metavar="NAME")
 @click.option(
     "--default-for-unspecified",
@@ -187,6 +190,7 @@ def add(
 
 @keypair_resource_policy.command()
 @pass_ctx_obj
+@output_option
 @click.argument("name", type=str, default=None, metavar="NAME")
 @click.option(
     "--default-for-unspecified",
@@ -314,6 +318,7 @@ def update(
 
 @keypair_resource_policy.command()
 @pass_ctx_obj
+@output_option
 @click.argument("name", type=str, metavar="NAME")
 def delete(ctx: CLIContext, name: str) -> None:
     """
