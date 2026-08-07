@@ -3,14 +3,16 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Self
+from typing import Self, override
 
+from ai.backend.common.data.entity.types import EntityData
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
     UtilizationThresholdEntry,
 )
 from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.identifier.entity import EntityID
 from ai.backend.common.identifier.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
 from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.types import SessionId, SessionTypes
@@ -46,7 +48,7 @@ class SessionUtilizationQuery:
 
 
 @dataclass(frozen=True)
-class IdleCheckerAssignmentData:
+class IdleCheckerAssignmentData(EntityData):
     id: IdleCheckerAssignmentID
     scope_type: ScopeType
     scope_id: uuid.UUID
@@ -55,9 +57,13 @@ class IdleCheckerAssignmentData:
     created_at: datetime
     updated_at: datetime
 
+    @override
+    def entity_id(self) -> EntityID:
+        return self.id
+
 
 @dataclass(frozen=True)
-class IdleCheckerData:
+class IdleCheckerData(EntityData):
     id: IdleCheckerID
     name: str
     description: str | None
@@ -67,3 +73,7 @@ class IdleCheckerData:
     spec: IdleCheckerSpec
     created_at: datetime
     updated_at: datetime
+
+    @override
+    def entity_id(self) -> EntityID:
+        return self.id
