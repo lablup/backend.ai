@@ -31,6 +31,7 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.sql.expression import true
 
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
@@ -62,8 +63,6 @@ from ai.backend.manager.data.image.types import (
     Resources,
 )
 from ai.backend.manager.data.permission.permission_defs import ImagePermission
-from ai.backend.manager.data.permission.types import EntityType
-from ai.backend.manager.data.permission.types import ScopeType as PermissionScopeType
 from ai.backend.manager.defs import INTRINSIC_SLOTS, INTRINSIC_SLOTS_MIN
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.models.base import (
@@ -86,10 +85,8 @@ from ai.backend.manager.models.rbac import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.exceptions import InvalidScope
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -1174,17 +1171,8 @@ class ImagePermissionContextBuilder(
         _ctx: ClientContext,
         scope: UserScope,
     ) -> list[ProjectScope]:
-        project_ids_stmt = (
-            sa.select(GroupRow.id)
-            .join(
-                AssociationScopesEntitiesRow,
-                sa.cast(GroupRow.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
-            )
-            .where(
-                AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
-                AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                AssociationScopesEntitiesRow.entity_id == str(scope.user_id),
-            )
+        project_ids_stmt = sa.select(GroupRow.id).where(
+            user_scope_membership_exists(PROJECT_SCOPE_TYPE, GroupRow.id, scope.user_id)
         )
         project_ids = await self.db_session.scalars(project_ids_stmt)
 

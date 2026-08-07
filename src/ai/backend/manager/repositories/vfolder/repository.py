@@ -11,6 +11,7 @@ from sqlalchemy.orm import contains_eager, selectinload
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -117,6 +118,7 @@ from ai.backend.manager.models.vfolder import (
     vfolders,
 )
 from ai.backend.manager.models.vfolder.conditions import VFolderConditions
+from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     IntegrityErrorCheck,
@@ -1821,22 +1823,16 @@ class VfolderRepository:
                 domain_name=domain_name,
             )
 
+            if vfolder_group is None:
+                # Sharing targets a group vfolder; a folder without an owning
+                # project cannot be shared with project members.
+                raise VFolderInvalidParameter("Only group vfolders can be shared with users.")
             users_table = UserRow.__table__
-            j = users_table.join(
-                AssociationScopesEntitiesRow,
-                sa.cast(users_table.c.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
-            )
-            db_query = (
-                sa.select(users_table.c.uuid, users_table.c.email)
-                .select_from(j)
-                .where(
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                    AssociationScopesEntitiesRow.scope_id == str(vfolder_group),
-                    users_table.c.email.in_(emails),
-                    users_table.c.email != requester_email,
-                    users_table.c.status.in_(ACTIVE_USER_STATUSES),
-                )
+            db_query = sa.select(users_table.c.uuid, users_table.c.email).where(
+                user_scope_membership_exists(PROJECT_SCOPE_TYPE, vfolder_group, users_table.c.uuid),
+                users_table.c.email.in_(emails),
+                users_table.c.email != requester_email,
+                users_table.c.status.in_(ACTIVE_USER_STATUSES),
             )
             result = await session.execute(db_query)
             user_info = result.fetchall()
