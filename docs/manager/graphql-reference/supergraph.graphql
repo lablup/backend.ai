@@ -1238,7 +1238,7 @@ type AppConfigFragmentUpsertError
 }
 
 """
-Added in 26.8.0. One (config_name, config) pair to upsert at the request's scope.
+Added in 26.9.0. One (config_name, config) pair to upsert at the request's scope.
 """
 input AppConfigFragmentUpsertItem
   @join__type(graph: STRAWBERRY)
@@ -13064,7 +13064,7 @@ type MyStorageHostPermissionsPayload
 }
 
 """
-Added in 26.8.0. Upsert many fragments at the current user's own user scope.
+Added in 26.9.0. Upsert many fragments at the current user's own user scope.
 """
 input MyUpsertAppConfigFragmentsInput
   @join__type(graph: STRAWBERRY)
@@ -19458,7 +19458,7 @@ enum SchedulingStatus
 }
 
 """
-Added in 26.8.0. Upsert many fragments at one scope; the scope is named once for all items.
+Added in 26.9.0. Upsert many fragments at one scope; the scope is named once for all items.
 """
 input ScopedUpsertAppConfigFragmentsInput
   @join__type(graph: STRAWBERRY)

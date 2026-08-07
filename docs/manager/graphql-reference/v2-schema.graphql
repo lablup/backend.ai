@@ -914,7 +914,7 @@ type AppConfigFragmentUpsertError {
 }
 
 """
-Added in 26.8.0. One (config_name, config) pair to upsert at the request's scope.
+Added in 26.9.0. One (config_name, config) pair to upsert at the request's scope.
 """
 input AppConfigFragmentUpsertItem {
   """Registered config name."""
@@ -8810,7 +8810,7 @@ type MyStorageHostPermissionsPayload {
 }
 
 """
-Added in 26.8.0. Upsert many fragments at the current user's own user scope.
+Added in 26.9.0. Upsert many fragments at the current user's own user scope.
 """
 input MyUpsertAppConfigFragmentsInput {
   """The (config_name, config) pairs to upsert."""
@@ -13817,7 +13817,7 @@ type ScopeResourceUsageV2 {
 }
 
 """
-Added in 26.8.0. Upsert many fragments at one scope; the scope is named once for all items.
+Added in 26.9.0. Upsert many fragments at one scope; the scope is named once for all items.
 """
 input ScopedUpsertAppConfigFragmentsInput {
   """Scope the fragments are written at."""
