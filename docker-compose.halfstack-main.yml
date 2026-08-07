@@ -268,6 +268,33 @@ services:
       timeout: 3s
       retries: 10
 
+  backendai-half-traefik:
+    # Dataplane for the app-proxy "traefik" frontend mode; assets are
+    # prepared by the installer before `up`.
+    image: traefik:v3.7
+    restart: unless-stopped
+    profiles: ["traefik"]
+    networks:
+      - half
+    ports:
+      # portproxy_* entrypoints (port sub-mode); 10250 is split out because it
+      # doubles as the domainproxy entrypoint in the wildcard sub-mode.
+      - "8080:8080"                # traefik API entrypoint
+      - "10205-10249:10205-10249"
+      - "10250:10250"              # portproxy_10250 / domainproxy
+      - "10251-10300:10251-10300"
+    volumes:
+      - "./traefik.halfstack.current.yml:/etc/traefik/traefik.yml:ro"
+      - "./volumes/traefik/plugins-local:/plugins-local:ro"
+      # Must match the host path (the coordinator passes the worker's marker
+      # path verbatim); the installer substitutes the placeholder.
+      - "./volumes/traefik/marker:/__APPPROXY_MARKER_DIR__"
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
 networks:
   half:
 
