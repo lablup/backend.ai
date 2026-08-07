@@ -11,7 +11,6 @@ from .data.permission.types import EntityType, ScopeType
 from .data.user.types import SessionOwnerContext
 from .errors.api import InvalidAPIParameters
 from .errors.auth import AccessKeyNotFound, UserNotFound
-from .errors.common import InternalServerError
 from .models.domain import domains
 from .models.group import groups
 from .models.keypair import keypairs
@@ -139,8 +138,6 @@ async def query_userinfo(
         row = result.first()
         if row is None:
             raise AccessKeyNotFound("Unknown owner access key")
-        if row.role is None:
-            raise InternalServerError(f"Owner user has no role assigned (owner_uuid={row.user})")
         owner_domain = row.domain_name
         owner_uuid = row.user
         actual_owner_role: UserRole = row.role
@@ -300,8 +297,6 @@ async def query_userinfo_from_session(
         row = result.first()
         if row is None:
             raise AccessKeyNotFound("Unknown owner access key")
-        if row.role is None:
-            raise InternalServerError(f"Owner user has no role assigned (owner_uuid={row.user})")
         owner_domain = row.domain_name
         owner_uuid = row.user
         actual_owner_role: UserRole = row.role
