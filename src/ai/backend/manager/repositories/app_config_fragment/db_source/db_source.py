@@ -85,8 +85,7 @@ class AppConfigFragmentDBSource:
         """Upsert each fragment at its scope in one transaction (all-or-nothing).
 
         Each item inserts-or-updates; a newly inserted row binds to its scope, an updated one
-        keeps its binding. A ``public`` fragment is GLOBAL, so it binds to no scope. One
-        transaction covers the batch, so a rejected item raises and no item is reported failed.
+        keeps its binding. A ``public`` fragment is GLOBAL, so it binds to no scope.
         """
         async with self._rbac_ops_provider.write_ops() as w:
             results: list[AppConfigFragmentData] = []

@@ -56,8 +56,7 @@ class AppConfigFragmentUpsertErrorInfo(BaseResponseModel):
 class UpsertAppConfigFragmentsPayload(BaseResponseModel):
     """Partial-success payload for a scoped upsert of many fragments.
 
-    (Not in effect yet: the upsert is still all-or-nothing, so ``failed`` is always empty.
-    To be fixed.)
+    Not in effect yet: the upsert is still all-or-nothing.
     """
 
     items: list[AppConfigFragmentNode] = Field(description="The upserted app config fragments.")

@@ -109,7 +109,7 @@ async def admin_app_config_fragments(
         description=(
             "Upsert many app config fragments at one scope (insert, or replace config on "
             "conflict), with per-item partial success (not in effect yet: still "
-            "all-or-nothing, to be fixed). RBAC-authorized at that scope."
+            "all-or-nothing). RBAC-authorized at that scope."
         ),
     )
 )
@@ -128,7 +128,7 @@ async def scoped_upsert_app_config_fragments(
         added_version="26.8.0",
         description=(
             "Upsert many app config fragments at the current user's own user scope, with "
-            "per-item partial success (not in effect yet: still all-or-nothing, to be fixed)."
+            "per-item partial success (not in effect yet: still all-or-nothing)."
         ),
     )
 )

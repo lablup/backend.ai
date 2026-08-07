@@ -220,8 +220,8 @@ class AppConfigFragmentUpsertErrorGQL(PydanticOutputMixin[AppConfigFragmentUpser
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Partial-success payload for a bulk fragment upsert (not in effect yet: still "
-            "all-or-nothing, so failed is always empty, to be fixed)."
+            "Partial-success payload for a bulk fragment upsert "
+            "(not in effect yet: still all-or-nothing)."
         ),
     ),
     model=UpsertAppConfigFragmentsPayloadDTO,

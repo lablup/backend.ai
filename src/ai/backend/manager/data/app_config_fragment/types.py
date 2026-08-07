@@ -76,8 +76,7 @@ class AppConfigFragmentUpsertBulkResult:
     ``items`` are the fragments inserted or replaced; ``failed`` are the items whose
     write was rejected (e.g. no allow-list row), each named by its config name.
 
-    (Not in effect yet: the upsert is still all-or-nothing, so ``failed`` is always empty.
-    To be fixed.)
+    Not in effect yet: the upsert is still all-or-nothing.
     """
 
     items: list[AppConfigFragmentData]
