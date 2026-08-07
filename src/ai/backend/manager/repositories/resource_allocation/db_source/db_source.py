@@ -81,15 +81,11 @@ class ResourceAllocationDBSource:
                     KeyPairResourcePolicyRow.total_resource_slots,
                     KeyPairResourcePolicyRow.default_for_unspecified,
                 )
-                .select_from(
-                    sa.join(
-                        UserRow,
-                        KeyPairRow,
-                        (KeyPairRow.user == UserRow.uuid) & KeyPairRow.is_default,
-                    ).join(
-                        KeyPairResourcePolicyRow,
-                        KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
-                    )
+                .select_from(UserRow)
+                .join(UserRow.main_keypair)
+                .join(
+                    KeyPairResourcePolicyRow,
+                    KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
                 )
                 .where(UserRow.uuid == user_id)
             )
