@@ -9808,7 +9808,7 @@ type KeyPairV2 implements Node
   """Timestamp when the keypair was created."""
   createdAt: DateTime
 
-  """Timestamp when the keypair was last updated."""
+  """Added in 26.9.0. Timestamp when the keypair was last updated."""
   updatedAt: DateTime
 
   """Timestamp when the keypair was last updated."""
