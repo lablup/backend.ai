@@ -403,7 +403,10 @@ class CreateRuntimeVariantPresetInputGQL(PydanticInputMixin[CreateInputDTO]):
         description="How the value is applied: 'env' for environment variable, 'args' for command-line argument."
     )
     value_type: PresetValueTypeGQL = gql_field(
-        description="Data type for validation (e.g., 'str', 'int', 'float', 'bool', 'flag')."
+        description=(
+            "Data type for validation (e.g., 'str', 'int', 'float', 'bool', 'flag'). "
+            "'flag' is only valid when preset_target is 'args'."
+        )
     )
     default_value: str | None = gql_field(
         default=None, description="The default value shown to users when creating a deployment."
@@ -448,7 +451,13 @@ class UpdateRuntimeVariantPresetInputGQL(PydanticInputMixin[UpdateInputDTO]):
     description: str | None = gql_field(default=None, description="New description.")
     rank: int | None = gql_field(default=None, description="New rank.")
     preset_target: PresetTargetGQL | None = gql_field(default=None, description="New target.")
-    value_type: PresetValueTypeGQL | None = gql_field(default=None, description="New value type.")
+    value_type: PresetValueTypeGQL | None = gql_field(
+        default=None,
+        description=(
+            "New value type. 'flag' is only valid when the effective preset_target is 'args' "
+            "(the stored target applies when preset_target is omitted)."
+        ),
+    )
     default_value: str | None = gql_field(default=None, description="New default value.")
     key: str | None = gql_field(default=None, description="New key.")
     required: bool | None = gql_added_field(

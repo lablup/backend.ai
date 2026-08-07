@@ -25156,7 +25156,7 @@
           },
           "value_type": {
             "$ref": "#/components/schemas/PresetValueType",
-            "description": "Value type: str, int, float, bool, flag."
+            "description": "Value type: str, int, float, bool, flag. 'flag' is only valid with preset_target 'args'."
           },
           "default_value": {
             "anyOf": [
@@ -25306,7 +25306,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "New value type. 'flag' is only valid when the effective preset_target is 'args' (the stored target applies when preset_target is omitted)."
           },
           "default_value": {
             "anyOf": [
