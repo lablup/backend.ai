@@ -1042,10 +1042,6 @@ class RBACWriteOps(WriteOps):
                 EntityMembersAddition(scope=project_scope, members=[member])
             )
 
-        # Flushing the main_access_key update expires server-onupdate columns; reload
-        # so callers can read the row without a sync-context lazy refresh.
-        await self._sess.flush()
-        await self._sess.refresh(user_row)
         return FullUserCreationResult(user_row=user_row, keypair_row=keypair_row)
 
     async def _domain_member_project_ids(
