@@ -374,3 +374,43 @@ class TestRevisionDraftReaderVFolderDrafts:
         assert merged.model_definition is not None
         assert merged.model_definition.models is not None
         assert merged.model_definition.models[0].name == "from-file"
+
+
+class TestRevisionDraftReaderModelNameDefault:
+    """``name`` is required by the strict ``ModelConfig``; the baseline supplies it.
+
+    Every runtime variant created through the API has an empty
+    ``default_model_definition`` — the write path does not expose the field —
+    so without this default no revision on such a variant could resolve.
+    """
+
+    def test_empty_variant_baseline_still_resolves(self) -> None:
+        merged = _merge_all(
+            _reader()._model_mount_path_default_draft(_mounts("/models")),
+            _reader()._variant_baseline_to_draft(_variant()),
+        )
+
+        assert merged.model_definition is not None
+        resolved = merged.model_definition.to_resolved()
+
+        assert len(resolved.models) == 1
+        assert resolved.models[0].name == "model"
+        assert resolved.models[0].model_path == "/models"
+
+    def test_higher_layer_name_wins(self) -> None:
+        merged = _merge_all(
+            _reader()._model_mount_path_default_draft(_mounts("/models")),
+            _reader()._variant_baseline_to_draft(
+                _variant(
+                    default_model_definition=ModelDefinitionDraft(
+                        models=[ModelConfigDraft(name="vllm")]
+                    )
+                )
+            ),
+        )
+
+        assert merged.model_definition is not None
+        resolved = merged.model_definition.to_resolved()
+
+        assert resolved.models[0].name == "vllm"
+        assert resolved.models[0].model_path == "/models"
