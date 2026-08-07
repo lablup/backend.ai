@@ -23,7 +23,7 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 def _to_graphql_validation_error(e: ValidationError) -> GraphQLError:
     """Map a raw pydantic ``ValidationError`` to a 400-class GraphQL error."""
     # ``input``/``ctx`` may carry non-JSON-serializable objects.
-    errors = [{k: v for k, v in err.items() if k not in ("input", "ctx")} for err in e.errors()]
+    errors = e.errors(include_input=False, include_context=False)
     summary = "; ".join(str(err.get("msg", "")) for err in errors)
     converted = BackendAISchemaValidationFailed(extra_msg=summary)
     return GraphQLError(
