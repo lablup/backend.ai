@@ -15,11 +15,6 @@ from ai.backend.common.config import (
 )
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
-from ai.backend.common.dto.manager.v2.deployment.types import (
-    ModelConfigInfoDTO,
-    ModelDefinitionInfoDTO,
-    ModelServiceConfigInfoDTO,
-)
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     CreateDeploymentRevisionPresetInput,
     PresetModelConfigInput,
@@ -33,6 +28,11 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
     PresetDeploymentDefaults,
     PresetExecutionSpec,
     PresetResourceAllocation,
+)
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
+    PresetModelConfigInfoDTO,
+    PresetModelDefinitionInfoDTO,
+    PresetModelServiceConfigInfoDTO,
 )
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
@@ -51,7 +51,7 @@ from ai.backend.manager.api.gql.deployment.types.revision_preset import (
 def _make_preset_node(
     *,
     image_id: ImageID | None = None,
-    model_definition: ModelDefinitionInfoDTO | None = None,
+    model_definition: PresetModelDefinitionInfoDTO | None = None,
 ) -> DeploymentRevisionPresetNode:
     now = datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
     return DeploymentRevisionPresetNode(
@@ -81,12 +81,12 @@ class TestDeploymentRevisionPresetGQL:
 
     def test_from_pydantic_populates_execution_and_model_definition(self) -> None:
         image_id = ImageID(uuid.uuid4())
-        model_def = ModelDefinitionInfoDTO(
+        model_def = PresetModelDefinitionInfoDTO(
             models=[
-                ModelConfigInfoDTO(
+                PresetModelConfigInfoDTO(
                     name="llama",
                     model_path="/models/llama",
-                    service=ModelServiceConfigInfoDTO(port=8080),
+                    service=PresetModelServiceConfigInfoDTO(port=8080),
                     metadata=None,
                 ),
             ],
@@ -138,6 +138,24 @@ class TestModelDefinitionToDTO:
 
     def test_returns_none_for_none(self) -> None:
         assert _model_definition_to_dto(None) is None
+
+    def test_sparse_config_maps_omitted_fields_to_null(self) -> None:
+        sparse_model_def = PresetModelDefinition(
+            models=[
+                PresetModelConfig(
+                    service=PresetModelServiceConfig(start_command="python serve.py"),
+                )
+            ],
+        )
+
+        info_dto = _model_definition_to_dto(sparse_model_def)
+
+        assert info_dto is not None
+        config = info_dto.models[0]
+        assert config.name is None
+        assert config.model_path is None
+        assert config.service is not None
+        assert config.service.port is None
 
 
 class TestPresetModelDefinitionInputGQL:
@@ -205,6 +223,22 @@ class TestPresetModelDefinitionInput:
         )
         with pytest.raises(ValidationError):
             PresetModelDefinitionInput(models=[config, config])
+
+    def test_omitted_fields_stay_unset_in_storage_dump(self) -> None:
+        dto = PresetModelDefinitionInput(
+            models=[
+                PresetModelConfigInput(
+                    service=PresetModelServiceConfigInput(command="python serve.py"),
+                ),
+            ],
+        )
+
+        stored = dto.to_model_definition()
+        dumped_model = stored.model_dump(exclude_unset=True)["models"][0]
+
+        assert "name" not in dumped_model
+        assert "model_path" not in dumped_model
+        assert "port" not in dumped_model["service"]
 
     def test_rejects_model_without_service(self) -> None:
         # ``service`` is a required field; omitting it must be rejected.

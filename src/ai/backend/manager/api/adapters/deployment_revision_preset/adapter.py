@@ -15,11 +15,8 @@ from ai.backend.common.config import (
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.deployment.types import (
-    ModelConfigInfoDTO,
-    ModelDefinitionInfoDTO,
     ModelHealthCheckInfoDTO,
     ModelMetadataInfoDTO,
-    ModelServiceConfigInfoDTO,
     PreStartActionInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
@@ -46,6 +43,9 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
+    PresetModelConfigInfoDTO,
+    PresetModelDefinitionInfoDTO,
+    PresetModelServiceConfigInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AllocatedResourceSlotFilter,
@@ -149,8 +149,10 @@ def _model_health_check_to_dto(check: ModelHealthCheck) -> ModelHealthCheckInfoD
     )
 
 
-def _model_service_config_to_dto(service: PresetModelServiceConfig) -> ModelServiceConfigInfoDTO:
-    return ModelServiceConfigInfoDTO(
+def _model_service_config_to_dto(
+    service: PresetModelServiceConfig,
+) -> PresetModelServiceConfigInfoDTO:
+    return PresetModelServiceConfigInfoDTO(
         pre_start_actions=[_pre_start_action_to_dto(a) for a in (service.pre_start_actions or [])],
         command=service.start_command,
         start_command=to_legacy_start_command(service.start_command),
@@ -183,8 +185,8 @@ def _model_metadata_to_dto(metadata: ModelMetadata) -> ModelMetadataInfoDTO:
     )
 
 
-def _model_config_to_dto(config: PresetModelConfig) -> ModelConfigInfoDTO:
-    return ModelConfigInfoDTO(
+def _model_config_to_dto(config: PresetModelConfig) -> PresetModelConfigInfoDTO:
+    return PresetModelConfigInfoDTO(
         name=config.name,
         model_path=config.model_path,
         service=(
@@ -196,10 +198,10 @@ def _model_config_to_dto(config: PresetModelConfig) -> ModelConfigInfoDTO:
 
 def _model_definition_to_dto(
     definition: PresetModelDefinition | None,
-) -> ModelDefinitionInfoDTO | None:
+) -> PresetModelDefinitionInfoDTO | None:
     if definition is None:
         return None
-    return ModelDefinitionInfoDTO(
+    return PresetModelDefinitionInfoDTO(
         models=[_model_config_to_dto(m) for m in definition.models],
     )
 

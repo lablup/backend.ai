@@ -6133,7 +6133,7 @@ type DeploymentRevisionPreset implements Node
   """
   Parsed model definition specifying health checks, ports, and service configuration for the inference endpoint.
   """
-  modelDefinition: ModelDefinition
+  modelDefinition: PresetModelDefinition
 
   """
   List of runtime variant preset values applied when using this deployment preset to auto-configure runtime parameters.
@@ -10603,15 +10603,11 @@ Added in 26.4.2. Configuration for a single model in the model definition.
 type ModelConfig
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Name of the model. Null when a preset omits it to inherit the runtime variant baseline's name at revision resolution.
-  """
-  name: String
+  """Name of the model."""
+  name: String!
 
-  """
-  Path to the model file. Null when a preset omits it to inherit the model mount destination at revision resolution.
-  """
-  modelPath: String
+  """Path to the model file."""
+  modelPath: String!
 
   """Configuration for the model service."""
   service: ModelServiceConfig
@@ -11241,10 +11237,8 @@ type ModelServiceConfig
   """
   shell: String
 
-  """
-  Port number for the model service. Null when a preset omits it to inherit the runtime variant baseline's port at revision resolution.
-  """
-  port: Int
+  """Port number for the model service."""
+  port: Int!
 
   """Health check configuration for the model service."""
   healthCheck: ModelHealthCheck
@@ -13769,6 +13763,29 @@ type PresetExecutionSpec
 }
 
 """
+Added in 26.9.0. Configuration for a single model stored in a preset model definition.
+"""
+type PresetModelConfig
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Name of the model. Null when the preset omits it to inherit the runtime variant baseline's name at revision resolution.
+  """
+  name: String
+
+  """
+  Path to the model file. Null when the preset omits it to inherit the model mount destination at revision resolution.
+  """
+  modelPath: String
+
+  """Configuration for the model service."""
+  service: PresetModelServiceConfig
+
+  """Metadata about the model."""
+  metadata: ModelMetadata
+}
+
+"""
 Added in 26.4.4. Configuration for a single model within a preset model definition.
 """
 input PresetModelConfigInput
@@ -13787,6 +13804,16 @@ input PresetModelConfigInput
 
   """Metadata about the model."""
   metadata: PresetModelMetadataInput = null
+}
+
+"""
+Added in 26.9.0. Model definition stored in a preset; sparse fields inherit merge-chain defaults at revision resolution.
+"""
+type PresetModelDefinition
+  @join__type(graph: STRAWBERRY)
+{
+  """List of models in the model definition."""
+  models: [PresetModelConfig!]!
 }
 
 """
@@ -13873,6 +13900,39 @@ input PresetModelMetadataInput
 
   """Minimum resource requirements for the model."""
   minResource: JSON = null
+}
+
+"""
+Added in 26.9.0. Service configuration for a model entry stored in a preset.
+"""
+type PresetModelServiceConfig
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  List of pre-start actions to execute before starting the model service.
+  """
+  preStartActions: [PreStartAction!]!
+
+  """Single-string command to start the model service."""
+  command: String
+
+  """
+  Deprecated. Command to start the model service. Do not set together with `command`; when both are set, `command` takes precedence and this field is ignored.
+  """
+  startCommand: [String!] @deprecated(reason: "Use `command` instead.")
+
+  """
+  Shell used to run the command. If set, the kernel runs `[shell, '-c', command]`; null or empty disables shell wrapping.
+  """
+  shell: String
+
+  """
+  Port number for the model service. Null when the preset omits it to inherit the runtime variant baseline's port at revision resolution.
+  """
+  port: Int
+
+  """Health check configuration for the model service."""
+  healthCheck: ModelHealthCheck
 }
 
 """

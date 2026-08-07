@@ -444,11 +444,7 @@ class ModelServiceConfigGQL:
         ),
         default=None,
     )
-    port: int | None = gql_field(
-        default=None,
-        description="Port number for the model service. Null when a preset omits it to "
-        "inherit the runtime variant baseline's port at revision resolution.",
-    )
+    port: int = gql_field(description="Port number for the model service.")
     health_check: ModelHealthCheckGQL | None = gql_field(
         description="Health check configuration for the model service.",
         default=None,
@@ -496,16 +492,8 @@ class ModelMetadataGQL:
     name="ModelConfig",
 )
 class ModelConfigGQL:
-    name: str | None = gql_field(
-        default=None,
-        description="Name of the model. Null when a preset omits it to inherit the "
-        "runtime variant baseline's name at revision resolution.",
-    )
-    model_path: str | None = gql_field(
-        default=None,
-        description="Path to the model file. Null when a preset omits it to inherit the "
-        "model mount destination at revision resolution.",
-    )
+    name: str = gql_field(description="Name of the model.")
+    model_path: str = gql_field(description="Path to the model file.")
     service: ModelServiceConfigGQL | None = gql_field(
         description="Configuration for the model service.", default=None
     )
