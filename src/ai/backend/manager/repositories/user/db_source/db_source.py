@@ -326,13 +326,7 @@ class UserDBSource:
             if status is not None and status != current_user.status:
                 to_update["status_info"] = "admin-requested"
             update_query = (
-                sa.update(users)
-                .where(users.c.email == email)
-                .values(to_update)
-                .returning(
-                    users,
-                    UserRow.default_keypair_access_key.label("default_keypair_access_key"),
-                )
+                sa.update(users).where(users.c.email == email).values(to_update).returning(users)
             )
             result = await session.execute(update_query)
             updated_user = result.first()
@@ -442,13 +436,7 @@ class UserDBSource:
         if status is not None and status != current_user.status:
             to_update["status_info"] = "admin-requested"
         update_query = (
-            sa.update(users)
-            .where(users.c.uuid == user_id)
-            .values(to_update)
-            .returning(
-                users,
-                UserRow.default_keypair_access_key.label("default_keypair_access_key"),
-            )
+            sa.update(users).where(users.c.uuid == user_id).values(to_update).returning(users)
         )
         result = await session.execute(update_query)
         updated_user = result.first()
