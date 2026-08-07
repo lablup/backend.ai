@@ -790,6 +790,7 @@ class UserAdapter(BaseAdapter):
             access_key=str(data.access_key),
             is_active=data.is_active,
             is_admin=data.is_admin,
+            is_default=data.is_default,
             created_at=data.created_at,
             modified_at=data.modified_at,
             last_used=data.last_used,
