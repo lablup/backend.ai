@@ -899,11 +899,6 @@ async def admin_user_fixture(
         )
         await _insert_user_virtual_scope(conn, data.user_uuid)
         await conn.execute(
-            users.update()
-            .where(users.c.uuid == str(data.user_uuid))
-            .values(main_access_key=data.keypair.access_key)
-        )
-        await conn.execute(
             sa.insert(association_groups_users).values(
                 group_id=str(group_fixture),
                 user_id=str(data.user_uuid),
@@ -936,9 +931,6 @@ async def admin_user_fixture(
             AssociationScopesEntitiesRow.__table__.delete().where(
                 AssociationScopesEntitiesRow.__table__.c.entity_id == str(data.user_uuid)
             )
-        )
-        await conn.execute(
-            users.update().where(users.c.uuid == str(data.user_uuid)).values(main_access_key=None)
         )
         await conn.execute(
             keypairs.delete().where(keypairs.c.access_key == data.keypair.access_key)
@@ -1010,11 +1002,6 @@ async def regular_user_fixture(
         )
         await _insert_user_virtual_scope(conn, data.user_uuid)
         await conn.execute(
-            users.update()
-            .where(users.c.uuid == str(data.user_uuid))
-            .values(main_access_key=data.keypair.access_key)
-        )
-        await conn.execute(
             sa.insert(association_groups_users).values(
                 group_id=str(group_fixture),
                 user_id=str(data.user_uuid),
@@ -1044,9 +1031,6 @@ async def regular_user_fixture(
             AssociationScopesEntitiesRow.__table__.delete().where(
                 AssociationScopesEntitiesRow.__table__.c.entity_id == str(data.user_uuid)
             )
-        )
-        await conn.execute(
-            users.update().where(users.c.uuid == str(data.user_uuid)).values(main_access_key=None)
         )
         await conn.execute(
             keypairs.delete().where(keypairs.c.access_key == data.keypair.access_key)

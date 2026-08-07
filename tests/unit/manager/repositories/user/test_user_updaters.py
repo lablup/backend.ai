@@ -101,13 +101,13 @@ class TestUserUpdaterSpecBuildValues:
         """Test TriState fields with nullify state sets value to None."""
         spec = UserUpdaterSpec(
             allowed_client_ip=TriState.nullify(),
-            main_access_key=TriState.nullify(),
+            container_uid=TriState.nullify(),
         )
 
         result = spec.build_values()
 
         assert result["allowed_client_ip"] is None
-        assert result["main_access_key"] is None
+        assert result["container_uid"] is None
 
     def test_build_values_with_tristate_nop(self) -> None:
         """Test TriState fields with nop state are not included."""

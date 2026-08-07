@@ -183,7 +183,6 @@ class TestSessionSearchInProject:
                     resource_policy="default",
                     allowed_client_ip=None,
                     totp_key=None,
-                    main_access_key=None,
                 )
             )
             await db_sess.flush()
