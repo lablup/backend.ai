@@ -46,6 +46,18 @@ class TestCreateRuntimeVariantPresetInputFlagValidation:
                 preset_target=PresetTarget.ENV,
             )
 
+    def test_flag_with_env_names_both_offending_fields(self, base_fields: dict[str, Any]) -> None:
+        with pytest.raises(ValidationError) as exc_info:
+            CreateRuntimeVariantPresetInput(
+                **base_fields,
+                value_type=PresetValueType.FLAG,
+                preset_target=PresetTarget.ENV,
+            )
+        assert [error["loc"] for error in exc_info.value.errors()] == [
+            ("preset_target",),
+            ("value_type",),
+        ]
+
     def test_bool_with_env_is_valid(self, base_fields: dict[str, Any]) -> None:
         result = CreateRuntimeVariantPresetInput(
             **base_fields,
@@ -70,6 +82,18 @@ class TestUpdateRuntimeVariantPresetInputFlagValidation:
                 value_type=PresetValueType.FLAG,
                 preset_target=PresetTarget.ENV,
             )
+
+    def test_flag_with_env_names_both_offending_fields(self, preset_id: UUID) -> None:
+        with pytest.raises(ValidationError) as exc_info:
+            UpdateRuntimeVariantPresetInput(
+                id=preset_id,
+                value_type=PresetValueType.FLAG,
+                preset_target=PresetTarget.ENV,
+            )
+        assert [error["loc"] for error in exc_info.value.errors()] == [
+            ("preset_target",),
+            ("value_type",),
+        ]
 
     def test_flag_without_preset_target_is_valid(self, preset_id: UUID) -> None:
         """When preset_target is not provided, DTO cannot validate (needs DB state)."""

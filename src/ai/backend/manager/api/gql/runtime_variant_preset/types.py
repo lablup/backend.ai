@@ -78,7 +78,7 @@ if TYPE_CHECKING:
 @gql_enum(
     BackendAIGQLMeta(
         added_version="26.4.2",
-        description="Target for applying a preset value: environment variable or command-line argument.",
+        description="Target for applying a preset value: environment variable or command-line argument. ARGS is the only target that accepts the FLAG value type.",
     ),
     name="PresetTarget",
 )
@@ -90,7 +90,7 @@ class PresetTargetGQL(StrEnum):
 @gql_enum(
     BackendAIGQLMeta(
         added_version="26.4.2",
-        description="Data type for preset value validation.",
+        description="Data type for preset value validation. FLAG is accepted only when presetTarget is ARGS; pairing it with presetTarget ENV is rejected.",
     ),
     name="PresetValueType",
 )
@@ -272,10 +272,10 @@ class UIOptionInputGQL(PydanticInputMixin[UIOptionDTO]):
 )
 class PresetTargetSpecGQL(PydanticOutputMixin[PresetTargetSpecDTO]):
     preset_target: PresetTargetGQL = gql_field(
-        description="How the value is applied to the container: 'env' sets it as an environment variable, 'args' appends it as a command-line argument."
+        description="How the value is applied to the container: 'env' sets it as an environment variable, 'args' appends it as a command-line argument. Only 'args' accepts the 'flag' value type."
     )
     value_type: PresetValueTypeGQL = gql_field(
-        description="Data type used for input validation (e.g., 'str', 'int', 'float', 'bool', 'flag')."
+        description="Data type used for input validation (e.g., 'str', 'int', 'float', 'bool', 'flag'). 'flag' appears only on presets whose target is 'args'."
     )
     default_value: str | None = gql_field(
         description="The default value shown to users when they create a deployment using this preset."
@@ -400,10 +400,10 @@ class CreateRuntimeVariantPresetInputGQL(PydanticInputMixin[CreateInputDTO]):
         default=None, description="Detailed explanation of what this parameter controls."
     )
     preset_target: PresetTargetGQL = gql_field(
-        description="How the value is applied: 'env' for environment variable, 'args' for command-line argument."
+        description="How the value is applied: 'env' for environment variable, 'args' for command-line argument. Must be 'args' when valueType is 'flag'."
     )
     value_type: PresetValueTypeGQL = gql_field(
-        description="Data type for validation (e.g., 'str', 'int', 'float', 'bool', 'flag')."
+        description="Data type for validation (e.g., 'str', 'int', 'float', 'bool', 'flag'). 'flag' requires presetTarget 'args'."
     )
     default_value: str | None = gql_field(
         default=None, description="The default value shown to users when creating a deployment."
@@ -447,8 +447,14 @@ class UpdateRuntimeVariantPresetInputGQL(PydanticInputMixin[UpdateInputDTO]):
     name: str | None = gql_field(default=None, description="New name.")
     description: str | None = gql_field(default=None, description="New description.")
     rank: int | None = gql_field(default=None, description="New rank.")
-    preset_target: PresetTargetGQL | None = gql_field(default=None, description="New target.")
-    value_type: PresetValueTypeGQL | None = gql_field(default=None, description="New value type.")
+    preset_target: PresetTargetGQL | None = gql_field(
+        default=None,
+        description="New target. Must be 'args' when the preset ends up with valueType 'flag', whether 'flag' comes from this input or from the stored preset.",
+    )
+    value_type: PresetValueTypeGQL | None = gql_field(
+        default=None,
+        description="New value type. 'flag' requires the preset to end up with presetTarget 'args', whether 'args' comes from this input or from the stored preset.",
+    )
     default_value: str | None = gql_field(default=None, description="New default value.")
     key: str | None = gql_field(default=None, description="New key.")
     required: bool | None = gql_added_field(

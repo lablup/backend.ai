@@ -352,6 +352,7 @@ class BackendAIError(web.HTTPError, ABC):
     error_type: str = "https://api.backend.ai/probs/general-error"
     error_title: str = "General Backend API Error."
     extra_msg: str | None
+    extra_data: Any | None
     body_dict: dict[str, Any]
 
     def __init__(

@@ -10,26 +10,34 @@ Verifies:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any, cast
+from typing import Any, Self, cast
 from unittest.mock import MagicMock
 from uuid import uuid4
 
+import pytest
 import strawberry
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from strawberry.relay import Node, NodeID
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.dto.manager.v2.container_registry.response import (
     ContainerRegistryNode,
 )
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.api.adapters.registry import Adapters
 from ai.backend.manager.api.gql.container_registry.types import (
     ContainerRegistryGQL,
     ContainerRegistryTypeGQL,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_field,
+    gql_pydantic_input,
+)
+from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 
 # ---- Test fixtures: Pydantic DTOs ----
@@ -370,3 +378,80 @@ class TestAdaptersRegistry:
             schedule_coordinator=MagicMock(),
         )
         assert isinstance(adapters.container_registry, ContainerRegistryAdapter)
+
+
+class GuardedInput(BaseModel):
+    name: str = Field(min_length=1, description="Name")
+    token: str = Field(description="Credential the client submitted")
+
+    @model_validator(mode="after")
+    def reject_reserved_name(self) -> Self:
+        if self.name == "reserved":
+            raise ValueError("name 'reserved' is not allowed")
+        return self
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(added_version="1.0.0", description="Input used by the mixin tests."),
+    name="GuardedInput",
+)
+class GuardedInputGQL(PydanticInputMixin[GuardedInput]):
+    name: str = gql_field(description="Name")
+    token: str = gql_field(description="Credential the client submitted")
+
+
+@dataclass(frozen=True)
+class _RejectedInputCase:
+    label: str
+    name: str
+    expected_details: list[dict[str, Any]]
+
+
+class TestPydanticInputMixinValidation:
+    """to_pydantic() reports DTO validation failures as client errors."""
+
+    def test_valid_input_converts(self) -> None:
+        dto = GuardedInputGQL(name="ok", token="s3cret").to_pydantic()
+
+        assert dto.name == "ok"
+        assert dto.token == "s3cret"
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _RejectedInputCase(
+                label="field-constraint",
+                name="",
+                expected_details=[
+                    {
+                        "type": "string_too_short",
+                        "loc": ["name"],
+                        "msg": "String should have at least 1 character",
+                    }
+                ],
+            ),
+            _RejectedInputCase(
+                label="model-validator",
+                name="reserved",
+                expected_details=[
+                    {
+                        "type": "value_error",
+                        "loc": [],
+                        "msg": "Value error, name 'reserved' is not allowed",
+                    }
+                ],
+            ),
+        ],
+        ids=lambda case: case.label,
+    )
+    def test_rejected_input_raises_client_error(self, case: _RejectedInputCase) -> None:
+        with pytest.raises(InvalidAPIParameters) as exc_info:
+            GuardedInputGQL(name=case.name, token="s3cret").to_pydantic()
+
+        assert exc_info.value.extra_data == case.expected_details
+
+    def test_details_never_echo_submitted_values(self) -> None:
+        with pytest.raises(InvalidAPIParameters) as exc_info:
+            GuardedInputGQL(name="reserved", token="s3cret").to_pydantic()
+
+        assert "s3cret" not in repr(exc_info.value.extra_data)

@@ -24921,11 +24921,11 @@
           },
           "preset_target": {
             "$ref": "#/components/schemas/PresetTarget",
-            "description": "Target: env or args."
+            "description": "Target: env or args. Must be args when value_type is flag."
           },
           "value_type": {
             "$ref": "#/components/schemas/PresetValueType",
-            "description": "Value type: str, int, float, bool, flag."
+            "description": "Value type: str, int, float, bool, flag. flag requires preset_target args."
           },
           "default_value": {
             "anyOf": [
@@ -25064,7 +25064,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "New target. Must be args when the preset ends up with value_type flag, whether flag comes from this input or from the stored preset."
           },
           "value_type": {
             "anyOf": [
@@ -25075,7 +25076,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "New value type. flag requires the preset to end up with preset_target args, whether args comes from this input or from the stored preset."
           },
           "default_value": {
             "anyOf": [

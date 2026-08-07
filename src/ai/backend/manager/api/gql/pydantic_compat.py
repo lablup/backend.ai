@@ -54,11 +54,41 @@ from typing import (
 )
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from strawberry import ID as StrawberryID
 from strawberry import UNSET
 from strawberry.relay import Node
 from strawberry.types.base import StrawberryObjectDefinition
+
+from ai.backend.common.exception import InvalidAPIParameters
+
+
+def _client_safe_details(error: ValidationError) -> list[dict[str, Any]]:
+    """Reduce pydantic error entries to the parts that may leave the server.
+
+    ``input`` echoes the submitted value back — for a model-level validator that is the
+    whole input object, credentials included — and ``ctx`` can hold a live exception
+    instance that no JSON encoder accepts.
+    """
+    details: list[dict[str, Any]] = []
+    for entry in error.errors():
+        details.append({
+            "type": entry["type"],
+            "loc": [str(part) for part in entry["loc"]],
+            "msg": entry["msg"],
+        })
+    return details
+
+
+def _summarize_details(details: list[dict[str, Any]]) -> str:
+    locations_by_message: dict[str, list[str]] = {}
+    for detail in details:
+        locations_by_message.setdefault(detail["msg"], []).append(".".join(detail["loc"]))
+    parts: list[str] = []
+    for message, locations in locations_by_message.items():
+        named = ", ".join(location for location in locations if location)
+        parts.append(f"{named}: {message}" if named else message)
+    return " ".join(parts)
 
 
 def _from_pydantic_kwargs(
@@ -257,10 +287,20 @@ class PydanticInputMixin[T_DTO: BaseModel]:
 
         This method is ``@final``: subclasses must NOT override it.
         The DTO type is inferred from the generic parameter ``T_DTO``.
+
+        A DTO constraint the GraphQL schema cannot express (a cross-field rule, a length
+        bound) fails here rather than during query validation, so the resulting
+        ``ValidationError`` is translated into the client error it actually is. Left
+        unconverted it reaches the schema's exception handler as an unrecognized
+        exception and is reported as an internal server error.
         """
         dto_cls = self.__class__.__dto_type__
         kwargs = _to_pydantic_kwargs(self, dto_cls)
-        return cast(T_DTO, dto_cls(**kwargs))
+        try:
+            return cast(T_DTO, dto_cls(**kwargs))
+        except ValidationError as e:
+            details = _client_safe_details(e)
+            raise InvalidAPIParameters(_summarize_details(details), extra_data=details) from e
 
 
 def _convert_value(value: Any, type_hint: Any) -> Any:

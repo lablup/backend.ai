@@ -11,8 +11,12 @@ from .types import PresetTarget, PresetValueType, UIOption
 
 
 class PresetTargetSpec(BaseResponseModel):
-    preset_target: PresetTarget = Field(description="Target: env or args.")
-    value_type: PresetValueType = Field(description="Value type: str, int, float, bool, flag.")
+    preset_target: PresetTarget = Field(
+        description="Target: env or args. Only args accepts the flag value type."
+    )
+    value_type: PresetValueType = Field(
+        description="Value type: str, int, float, bool, flag. flag appears only on presets targeting args."
+    )
     default_value: str | None = Field(default=None, description="Default value.")
     key: str = Field(description="Env key or args flag.")
 
