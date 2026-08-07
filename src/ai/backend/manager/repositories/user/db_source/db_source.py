@@ -22,7 +22,7 @@ from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.user import UserID
-from ai.backend.common.types import AccessKey, VFolderID
+from ai.backend.common.types import VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
@@ -580,17 +580,17 @@ class UserDBSource:
     ) -> None:
         """Delegate endpoint ownership to another user."""
         async with self._db.begin_session() as session:
-            target_access_key = await session.scalar(
+            default_access_key = await session.scalar(
                 sa.select(KeyPairRow.access_key).where(
                     (KeyPairRow.user == target_user_uuid) & KeyPairRow.is_default
                 )
             )
-            if target_access_key is None:
+            if default_access_key is None:
                 raise KeyPairNotFound(
-                    f"User {target_user_uuid} has no main keypair to delegate endpoints to."
+                    f"User {target_user_uuid} has no default keypair to delegate endpoints to."
                 )
             await EndpointRow.delegate_endpoint_ownership(
-                session, user_uuid, target_user_uuid, AccessKey(target_access_key)
+                session, user_uuid, target_user_uuid, default_access_key
             )
 
     async def delete_endpoints(
