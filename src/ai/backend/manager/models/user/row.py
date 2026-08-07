@@ -17,7 +17,6 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import (
     Mapped,
     column_property,
-    declared_attr,
     foreign,
     joinedload,
     mapped_column,
@@ -45,6 +44,7 @@ from ai.backend.manager.models.base import (
 )
 from ai.backend.manager.models.hasher import PasswordHasherFactory
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordColumn, PasswordInfo
+from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 from ai.backend.manager.models.types import (
     QueryCondition,
@@ -57,7 +57,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.domain import DomainRow
     from ai.backend.manager.models.group import AssocGroupUserRow
     from ai.backend.manager.models.kernel import KernelRow
-    from ai.backend.manager.models.keypair import KeyPairRow
     from ai.backend.manager.models.rbac_models import UserRoleRow
     from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
     from ai.backend.manager.models.session import SessionRow
@@ -236,22 +235,14 @@ class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         "container_gids", sa.ARRAY(sa.Integer), nullable=True, server_default=sa.null()
     )
 
-    @declared_attr
-    def default_keypair_access_key(cls) -> Mapped[str | None]:
-        """The access key of the keypair marked as this user's main one.
-
-        A scalar subquery rather than a relationship attribute so that it loads
-        with the row itself — ``to_data()`` runs on rows that were fetched
-        without any loader options.
-        """
-        from ai.backend.manager.models.keypair import KeyPairRow
-
-        return column_property(
-            sa.select(KeyPairRow.access_key)
-            .where((KeyPairRow.user == cls.uuid) & KeyPairRow.is_default)
-            .correlate_except(KeyPairRow)
-            .scalar_subquery()
-        )
+    # A scalar subquery rather than a relationship attribute so that it loads with
+    # the row itself — ``to_data()`` runs on rows fetched without loader options.
+    default_keypair_access_key: Mapped[str | None] = column_property(
+        sa.select(KeyPairRow.access_key)
+        .where((KeyPairRow.user == uuid) & KeyPairRow.is_default)
+        .correlate_except(KeyPairRow)
+        .scalar_subquery()
+    )
 
     # Relationships
     sessions: Mapped[list[SessionRow]] = relationship(
