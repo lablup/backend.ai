@@ -270,7 +270,7 @@ class ModelServiceConfigInfoDTO(BaseResponseModel):
     )
     command: str | None = Field(
         default=None,
-        description=("Added in 26.7.0. Single-string command to start the model service."),
+        description="Single-string command to start the model service.",
     )
     start_command: list[str] | None = Field(
         default=None,
@@ -392,9 +392,7 @@ class ModelMountConfigInfoDTO(BaseResponseModel):
     definition_path: str
     subpath: str | None = Field(
         default=None,
-        description=(
-            "Added in 26.4.4. Subpath within the model vfolder. ``None`` means the vfolder root."
-        ),
+        description="Subpath within the model vfolder. ``None`` means the vfolder root.",
     )
 
 
@@ -420,9 +418,7 @@ class ExtraVFolderMountGQLDTO(BaseResponseModel):
     )
     subpath: str | None = Field(
         default=None,
-        description=(
-            "Added in 26.4.4. Subpath within the vfolder. ``None`` means the vfolder root."
-        ),
+        description="Subpath within the vfolder. ``None`` means the vfolder root.",
     )
 
 

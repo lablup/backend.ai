@@ -23,6 +23,8 @@
   - `@gql_root_field` — a root query field on the Query type (always version-tagged)
   - `gql_enum` / `@gql_enum`, `@gql_mutation`, `@gql_subscription`, `@gql_federation_type`
 - Do NOT add new decorators to bypass the Pydantic DTO requirement.
+- Field descriptions in the schema come from the GQL layer, never from the DTO. Write them in
+  `gql_field` / `gql_added_field`; keep the v2 DTO descriptions free of GQL version tags.
 
 ## Version metadata
 
