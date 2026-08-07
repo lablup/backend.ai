@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any, override
 
-from ai.backend.common.config import ModelDefinition
+from ai.backend.common.config import PresetModelDefinition
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
@@ -42,7 +42,7 @@ class DeploymentRevisionPresetCreatorSpec(DependentCreatorSpec[int, DeploymentRe
     name: str
     description: str | None
     image_id: ImageID
-    model_definition: ModelDefinition | None
+    model_definition: PresetModelDefinition | None
     resource_opts: list[ResourceOptsEntry]
     cluster_mode: str
     cluster_size: int

@@ -77,7 +77,13 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (
     UpdateDeploymentRevisionPresetPayload as UpdatePayloadDTO,
 )
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
+    PresetModelConfigInfoDTO,
+    PresetModelDefinitionInfoDTO,
+    PresetModelServiceConfigInfoDTO,
+)
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
 from ai.backend.manager.api.gql.common.types import (
@@ -109,8 +115,9 @@ from ai.backend.manager.api.gql.deployment.types.resource_slot import (
     AllocatedResourceSlotOrderByGQL,
 )
 from ai.backend.manager.api.gql.deployment.types.revision import (
-    ModelDefinitionGQL,
-    ModelDefinitionInputGQL,
+    ModelHealthCheckGQL,
+    ModelMetadataGQL,
+    PreStartActionGQL,
     PreStartActionInputGQL,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
@@ -253,6 +260,87 @@ class PresetDeploymentDefaultsGQL(PydanticOutputMixin[PresetDeploymentDefaultsDT
     )
 
 
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Service configuration for a model entry stored in a preset.",
+    ),
+    model=PresetModelServiceConfigInfoDTO,
+    name="PresetModelServiceConfig",
+)
+class PresetModelServiceConfigGQL:
+    pre_start_actions: list[PreStartActionGQL] = gql_field(
+        description="List of pre-start actions to execute before starting the model service."
+    )
+    command: str | None = gql_field(
+        description="Single-string command to start the model service.",
+        default=None,
+    )
+    start_command: list[str] | None = gql_field(
+        description="Command to start the model service.",
+        default=None,
+        deprecation_reason="Use `command` instead.",
+    )
+    shell: str | None = gql_field(
+        description=(
+            "Shell used to run the command. If set, the kernel runs "
+            "`[shell, '-c', command]`; null or empty disables shell wrapping."
+        ),
+        default=None,
+    )
+    port: int | None = gql_field(
+        default=None,
+        description="Port number for the model service. Null when the preset omits it to "
+        "inherit the runtime variant baseline's port at revision resolution.",
+    )
+    health_check: ModelHealthCheckGQL | None = gql_field(
+        description="Health check configuration for the model service.",
+        default=None,
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Configuration for a single model stored in a preset model definition.",
+    ),
+    model=PresetModelConfigInfoDTO,
+    name="PresetModelConfig",
+)
+class PresetModelConfigGQL:
+    name: str | None = gql_field(
+        default=None,
+        description="Name of the model. Null when the preset omits it to inherit the "
+        "runtime variant baseline's name at revision resolution.",
+    )
+    model_path: str | None = gql_field(
+        default=None,
+        description="Path to the model file. Null when the preset omits it to inherit the "
+        "model mount destination at revision resolution.",
+    )
+    service: PresetModelServiceConfigGQL | None = gql_field(
+        description="Configuration for the model service.", default=None
+    )
+    metadata: ModelMetadataGQL | None = gql_field(
+        description="Metadata about the model.", default=None
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Model definition stored in a preset; sparse fields inherit "
+        "merge-chain defaults at revision resolution.",
+    ),
+    model=PresetModelDefinitionInfoDTO,
+    name="PresetModelDefinition",
+)
+class PresetModelDefinitionGQL:
+    models: list[PresetModelConfigGQL] = gql_field(
+        description="List of models in the model definition."
+    )
+
+
 @gql_node_type(
     BackendAIGQLMeta(
         added_version="26.4.2",
@@ -285,7 +373,7 @@ class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
         description="Deployment-level default values (open_to_public, replica_count, "
         "revision_history_limit, deployment_strategy) provided by this preset."
     )
-    model_definition: ModelDefinitionGQL | None = gql_field(
+    model_definition: PresetModelDefinitionGQL | None = gql_field(
         description="Parsed model definition specifying health checks, ports, and service configuration for the inference endpoint.",
         default=None,
     )
@@ -557,8 +645,10 @@ class PresetModelServiceConfigInputGQL(PydanticInputMixin[PresetModelServiceConf
         ),
         default=DEFAULT_SHELL,
     )
-    port: int = gql_field(
-        description="Port number for the model service. Must be greater than 1.",
+    port: int | None = gql_field(
+        default=None,
+        description="Port number for the model service. Must be greater than 1. Omit to "
+        "inherit the runtime variant baseline's port.",
     )
     health_check: PresetModelHealthCheckInputGQL | None = gql_field(
         description="Health check configuration for the model service.", default=None
@@ -568,13 +658,19 @@ class PresetModelServiceConfigInputGQL(PydanticInputMixin[PresetModelServiceConf
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version="26.4.4",
-        description="Strict configuration for a single model within a preset model definition.",
+        description="Configuration for a single model within a preset model definition.",
     ),
     name="PresetModelConfigInput",
 )
 class PresetModelConfigInputGQL(PydanticInputMixin[PresetModelConfigInputDTO]):
-    name: str = gql_field(description="Name of the model.")
-    model_path: str = gql_field(description="Path to the model file.")
+    name: str | None = gql_field(
+        default=None,
+        description="Name of the model. Omit to inherit the runtime variant baseline's name.",
+    )
+    model_path: str | None = gql_field(
+        default=None,
+        description="Path to the model file. Omit to inherit the model mount destination.",
+    )
     service: PresetModelServiceConfigInputGQL = gql_field(
         description="Configuration for the model service.",
     )
@@ -586,8 +682,8 @@ class PresetModelConfigInputGQL(PydanticInputMixin[PresetModelConfigInputDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version="26.4.4",
-        description="Strict model definition for a preset. When provided on create it must be "
-        "fully populated with at least one model.",
+        description="Model definition for a preset. Each model requires a service block; "
+        "name/model_path may be omitted to inherit merge-chain defaults.",
     ),
     name="PresetModelDefinitionInput",
 )
@@ -638,8 +734,8 @@ class CreateDeploymentRevisionPresetInputGQL(PydanticInputMixin[CreateInputDTO])
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="Parsed model definition specifying health checks, ports, and service "
-            "configuration for the inference endpoint. Optional, but when provided it must be "
-            "fully populated with at least one model.",
+            "configuration for the inference endpoint. Optional; name/model_path may be omitted "
+            "to inherit merge-chain defaults.",
         ),
         default=None,
     )
@@ -745,7 +841,7 @@ class UpdateDeploymentRevisionPresetInputGQL(PydanticInputMixin[UpdateInputDTO])
         ),
         default=UNSET,
     )
-    model_definition: ModelDefinitionInputGQL | None = gql_added_field(
+    model_definition: PresetModelDefinitionInputGQL | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
             description="Parsed model definition. Set to null to clear.",
