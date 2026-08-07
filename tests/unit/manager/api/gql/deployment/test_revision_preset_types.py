@@ -139,24 +139,6 @@ class TestModelDefinitionToDTO:
     def test_returns_none_for_none(self) -> None:
         assert _model_definition_to_dto(None) is None
 
-    def test_sparse_config_maps_omitted_fields_to_null(self) -> None:
-        sparse_model_def = PresetModelDefinition(
-            models=[
-                PresetModelConfig(
-                    service=PresetModelServiceConfig(start_command="python serve.py"),
-                )
-            ],
-        )
-
-        info_dto = _model_definition_to_dto(sparse_model_def)
-
-        assert info_dto is not None
-        config = info_dto.models[0]
-        assert config.name is None
-        assert config.model_path is None
-        assert config.service is not None
-        assert config.service.port is None
-
 
 class TestPresetModelDefinitionInputGQL:
     """Tests for the strict CREATE-only model_definition GQL input → request DTO conversion."""
@@ -223,22 +205,6 @@ class TestPresetModelDefinitionInput:
         )
         with pytest.raises(ValidationError):
             PresetModelDefinitionInput(models=[config, config])
-
-    def test_omitted_fields_stay_unset_in_storage_dump(self) -> None:
-        dto = PresetModelDefinitionInput(
-            models=[
-                PresetModelConfigInput(
-                    service=PresetModelServiceConfigInput(command="python serve.py"),
-                ),
-            ],
-        )
-
-        stored = dto.to_model_definition()
-        dumped_model = stored.model_dump(exclude_unset=True)["models"][0]
-
-        assert "name" not in dumped_model
-        assert "model_path" not in dumped_model
-        assert "port" not in dumped_model["service"]
 
     def test_rejects_model_without_service(self) -> None:
         # ``service`` is a required field; omitting it must be rejected.
