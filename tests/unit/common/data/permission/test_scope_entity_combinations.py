@@ -22,7 +22,6 @@ class TestValidScopeEntityCombinations:
             RBACElementType.PROJECT,
             RBACElementType.NETWORK,
             RBACElementType.STORAGE_HOST,
-            RBACElementType.IDLE_CHECKER,
             RBACElementType.DOMAIN_ADMIN_PAGE,
         }
 
@@ -37,7 +36,6 @@ class TestValidScopeEntityCombinations:
             RBACElementType.NETWORK,
             RBACElementType.USER,
             RBACElementType.STORAGE_HOST,
-            RBACElementType.IDLE_CHECKER,
             RBACElementType.PROJECT_ADMIN_PAGE,
         }
 
@@ -55,7 +53,6 @@ class TestValidScopeEntityCombinations:
         entities = VALID_SCOPE_ENTITY_COMBINATIONS[RBACElementType.RESOURCE_GROUP]
         assert entities == {
             RBACElementType.AGENT,
-            RBACElementType.IDLE_CHECKER,
         }
 
     def test_agent_scope_entities(self) -> None:
