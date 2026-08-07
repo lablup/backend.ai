@@ -20523,6 +20523,12 @@
             "default": null,
             "description": "Resource policy name to apply to this resource group.",
             "title": "Resource Policy"
+          },
+          "is_default": {
+            "default": false,
+            "description": "Make this the default resource group. At most one resource group may hold the flag, so this is rejected while another one holds it; clear that one first.",
+            "title": "Is Default",
+            "type": "boolean"
           }
         },
         "required": [
@@ -20576,6 +20582,19 @@
             "default": null,
             "description": "Whether the resource group is active. Leave null to keep existing value.",
             "title": "Is Active"
+          },
+          "is_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whether this is the default resource group. At most one resource group may hold the flag, so setting it to true is rejected while another one holds it; clear that one first. Leave null to keep existing value.",
+            "title": "Is Default"
           },
           "total_resource_slots": {
             "anyOf": [
@@ -20851,6 +20870,19 @@
             "default": null,
             "description": "Whether the resource group is public. Leave null to keep existing value.",
             "title": "Is Public"
+          },
+          "is_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whether this is the default resource group. At most one resource group may hold the flag, so setting it to true is rejected while another one holds it; clear that one first. Leave null to keep existing value.",
+            "title": "Is Default"
           },
           "description": {
             "anyOf": [
