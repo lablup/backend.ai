@@ -773,7 +773,9 @@ class UserDBSource:
             .values(is_default=False)
         )
         await session.execute(
-            sa.update(KeyPairRow).where(KeyPairRow.access_key == access_key).values(is_default=True)
+            sa.update(KeyPairRow)
+            .where((KeyPairRow.user == user_id) & (KeyPairRow.access_key == access_key))
+            .values(is_default=True)
         )
 
     async def _validate_and_update_main_access_key(
