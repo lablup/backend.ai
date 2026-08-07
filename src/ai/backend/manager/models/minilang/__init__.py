@@ -15,7 +15,7 @@ class JSONFieldItem(NamedTuple):
 
 
 class ORMFieldItem(NamedTuple):
-    column: sa.orm.attributes.InstrumentedAttribute[Any] | sa.ColumnElement[Any]
+    column: sa.orm.attributes.InstrumentedAttribute[Any] | sa.Column[Any]
 
 
 TEnum = TypeVar("TEnum", bound=Enum)
@@ -31,7 +31,7 @@ FieldSpecItem = tuple[
     Callable[[str], Any] | None,
 ]
 OrderSpecItem = tuple[
-    str | ArrayFieldItem | JSONFieldItem | EnumFieldItem[Any] | ORMFieldItem,
+    str | ArrayFieldItem | JSONFieldItem | EnumFieldItem[Any],
     Callable[[sa.Column[Any]], Any] | None,
 ]
 
