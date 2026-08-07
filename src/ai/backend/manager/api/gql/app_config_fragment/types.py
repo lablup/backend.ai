@@ -78,7 +78,7 @@ __all__ = (
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version="26.8.0",
+        added_version=NEXT_RELEASE_VERSION,
         description="One (config_name, config) pair to upsert at the request's scope.",
     ),
     name="AppConfigFragmentUpsertItem",
@@ -107,7 +107,7 @@ class AppConfigScopeRefGQL(PydanticInputMixin[AppConfigScopeRefDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version="26.8.0",
+        added_version=NEXT_RELEASE_VERSION,
         description="Upsert many fragments at one scope; the scope is named once for all items.",
     ),
     name="ScopedUpsertAppConfigFragmentsInput",
@@ -123,7 +123,7 @@ class ScopedUpsertAppConfigFragmentsInputGQL(
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version="26.8.0",
+        added_version=NEXT_RELEASE_VERSION,
         description="Upsert many fragments at the current user's own user scope.",
     ),
     name="MyUpsertAppConfigFragmentsInput",
