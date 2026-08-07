@@ -260,7 +260,10 @@ class IdleCheckerHost:
         policy_cache: dict[AccessKey | None, Row[Any] | None] = {}
         errors: list[BaseException] = []
         async with self._db.begin_readonly() as conn:
-            j = sa.join(kernels, users, kernels.c.user_uuid == users.c.uuid)
+            j = sa.join(kernels, users, kernels.c.user_uuid == users.c.uuid).outerjoin(
+                keypairs,
+                (keypairs.c.user == users.c.uuid) & keypairs.c.is_default,
+            )
             query = (
                 sa.select(
                     kernels.c.id,
@@ -273,7 +276,7 @@ class IdleCheckerHost:
                     kernels.c.requested_slots,
                     kernels.c.cluster_size,
                     users.c.created_at.label("user_created_at"),
-                    users.c.main_access_key,
+                    keypairs.c.access_key.label("main_access_key"),
                 )
                 .select_from(j)
                 .where(
@@ -286,9 +289,9 @@ class IdleCheckerHost:
             rows = result.fetchall()
             for kernel in rows:
                 grace_period_end = await self._grace_period_checker.get_grace_period_end(kernel)
-                # The idle policy is resolved through the user's main access key,
-                # which is a real foreign key, instead of the kernel's own access
-                # key, which may be left orphaned by a keypair deletion.
+                # The idle policy is resolved through the user's main keypair
+                # instead of the kernel's own access key, which may be left
+                # orphaned by a keypair deletion.
                 main_access_key = cast(AccessKey | None, kernel.main_access_key)
                 if main_access_key not in policy_cache:
                     policy = (

@@ -23,7 +23,7 @@ from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.user import UserID
-from ai.backend.common.types import AccessKey, VFolderID
+from ai.backend.common.types import VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
@@ -566,12 +566,20 @@ class UserDBSource:
         self,
         user_uuid: UUID,
         target_user_uuid: UUID,
-        target_main_access_key: AccessKey,
     ) -> None:
         """Delegate endpoint ownership to another user."""
         async with self._db.begin_session() as session:
+            default_access_key = await session.scalar(
+                sa.select(KeyPairRow.access_key).where(
+                    (KeyPairRow.user == target_user_uuid) & KeyPairRow.is_default
+                )
+            )
+            if default_access_key is None:
+                raise KeyPairNotFound(
+                    f"User {target_user_uuid} has no default keypair to delegate endpoints to."
+                )
             await EndpointRow.delegate_endpoint_ownership(
-                session, user_uuid, target_user_uuid, target_main_access_key
+                session, user_uuid, target_user_uuid, default_access_key
             )
 
     async def delete_endpoints(
@@ -741,7 +749,9 @@ class UserDBSource:
             .values(is_default=False)
         )
         await session.execute(
-            sa.update(KeyPairRow).where(KeyPairRow.access_key == access_key).values(is_default=True)
+            sa.update(KeyPairRow)
+            .where((KeyPairRow.user == user_id) & (KeyPairRow.access_key == access_key))
+            .values(is_default=True)
         )
 
     async def _validate_and_update_main_access_key(
@@ -1137,21 +1147,19 @@ class UserDBSource:
                 await session.scalars(
                     sa.select(UserRow)
                     .where(UserRow.uuid == user_uuid)
-                    .options(load_only(UserRow.main_access_key, UserRow.email))
+                    .options(load_only(UserRow.email))
                 )
             ).first()
             if not user_row:
                 raise UserNotFound(f"User {user_uuid} not found")
 
-            main_kp_row: KeyPairRow | None = None
-            if user_row.main_access_key:
-                main_kp_row = (
-                    await session.scalars(
-                        sa.select(KeyPairRow)
-                        .where(KeyPairRow.access_key == user_row.main_access_key)
-                        .options(noload("*"))
-                    )
-                ).first()
+            main_kp_row = (
+                await session.scalars(
+                    sa.select(KeyPairRow)
+                    .where((KeyPairRow.user == user_uuid) & KeyPairRow.is_default)
+                    .options(noload("*"))
+                )
+            ).first()
 
             if main_kp_row:
                 keypair_creator = KeyPairCreator(
@@ -1201,15 +1209,7 @@ class UserDBSource:
                 raise KeyPairNotFound(f"Keypair {access_key} not found")
             if kp_row.user != user_uuid:
                 raise KeyPairForbidden("Cannot revoke another user's keypair")
-
-            user_row = (
-                await session.scalars(
-                    sa.select(UserRow)
-                    .where(UserRow.uuid == user_uuid)
-                    .options(load_only(UserRow.main_access_key))
-                )
-            ).first()
-            if user_row and user_row.main_access_key == access_key:
+            if kp_row.is_default:
                 raise KeyPairForbidden(
                     "Cannot revoke the main access key. Switch main access key first."
                 )
@@ -1370,21 +1370,14 @@ class UserDBSource:
                 await session.scalars(
                     sa.select(KeyPairRow)
                     .where(KeyPairRow.access_key == access_key)
-                    .options(load_only(KeyPairRow.access_key, KeyPairRow.user))
+                    .options(
+                        load_only(KeyPairRow.access_key, KeyPairRow.user, KeyPairRow.is_default)
+                    )
                 )
             ).first()
             if not kp_row:
                 raise KeyPairNotFound(f"Keypair {access_key} not found")
-
-            # Prevent deleting a keypair that is set as main access key
-            user_row = (
-                await session.scalars(
-                    sa.select(UserRow)
-                    .where(UserRow.uuid == kp_row.user)
-                    .options(load_only(UserRow.main_access_key))
-                )
-            ).first()
-            if user_row and user_row.main_access_key == access_key:
+            if kp_row.is_default:
                 raise KeyPairForbidden("Cannot delete a keypair set as the user's main access key.")
 
             await session.execute(sa.delete(keypairs).where(keypairs.c.access_key == access_key))

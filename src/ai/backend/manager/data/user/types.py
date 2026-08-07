@@ -12,7 +12,6 @@ from sqlalchemy.engine import Row
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.permission.id import ScopeId
@@ -57,7 +56,6 @@ class UserStatus(enum.StrEnum):
 class UserInfoContext:
     uuid: UUID
     email: str
-    main_access_key: AccessKey
 
 
 @dataclass(frozen=True)

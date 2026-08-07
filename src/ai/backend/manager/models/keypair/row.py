@@ -66,7 +66,9 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     )
 
     user_id: Mapped[str | None] = mapped_column("user_id", sa.String(length=256), index=True)
-    access_key: Mapped[str] = mapped_column("access_key", sa.String(length=20), primary_key=True)
+    access_key: Mapped[AccessKey] = mapped_column(
+        "access_key", sa.String(length=20), primary_key=True
+    )
     secret_key: Mapped[str | None] = mapped_column("secret_key", sa.String(length=40))
     is_active: Mapped[bool | None] = mapped_column("is_active", sa.Boolean, index=True)
     is_admin: Mapped[bool | None] = mapped_column(
@@ -83,7 +85,9 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     # SSH Keypairs.
     ssh_public_key: Mapped[str | None] = mapped_column("ssh_public_key", sa.Text, nullable=True)
     ssh_private_key: Mapped[str | None] = mapped_column("ssh_private_key", sa.Text, nullable=True)
-    user: Mapped[UserID] = mapped_column("user", GUID, sa.ForeignKey("users.uuid"), nullable=False)
+    user: Mapped[UserID] = mapped_column(
+        "user", GUID(UserID), sa.ForeignKey("users.uuid"), nullable=False
+    )
     resource_policy: Mapped[str] = mapped_column(
         "resource_policy",
         sa.String(length=256),

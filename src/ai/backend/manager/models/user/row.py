@@ -14,7 +14,14 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import Mapped, foreign, joinedload, mapped_column, relationship, selectinload
+from sqlalchemy.orm import (
+    Mapped,
+    foreign,
+    joinedload,
+    mapped_column,
+    relationship,
+    selectinload,
+)
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 from sqlalchemy.sql.expression import SQLColumnExpression
 
@@ -36,6 +43,7 @@ from ai.backend.manager.models.base import (
 )
 from ai.backend.manager.models.hasher import PasswordHasherFactory
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordColumn, PasswordInfo
+from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 from ai.backend.manager.models.types import (
     QueryCondition,
@@ -48,7 +56,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.domain import DomainRow
     from ai.backend.manager.models.group import AssocGroupUserRow
     from ai.backend.manager.models.kernel import KernelRow
-    from ai.backend.manager.models.keypair import KeyPairRow
     from ai.backend.manager.models.rbac_models import UserRoleRow
     from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
     from ai.backend.manager.models.session import SessionRow
@@ -132,7 +139,7 @@ def _get_keypairs_join_condition() -> Any:
 def _get_main_keypair_join_condition() -> Any:
     from ai.backend.manager.models.keypair import KeyPairRow
 
-    return KeyPairRow.access_key == foreign(UserRow.main_access_key)
+    return (foreign(KeyPairRow.user) == UserRow.uuid) & KeyPairRow.is_default
 
 
 class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
@@ -261,7 +268,9 @@ class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     main_keypair: Mapped[KeyPairRow | None] = relationship(
         "KeyPairRow",
         primaryjoin=_get_main_keypair_join_condition,
-        foreign_keys="UserRow.main_access_key",
+        foreign_keys="KeyPairRow.user",
+        viewonly=True,
+        lazy="joined",
     )
 
     vfolder_rows: Mapped[list[VFolderRow]] = relationship(
@@ -367,8 +376,6 @@ class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         return rows[0]
 
     def get_main_keypair_row(self) -> KeyPairRow | None:
-        # `cast()` requires import of KeyPairRow
-
         keypair_candidate: KeyPairRow | None = None
         main_keypair_row = self.main_keypair
         if main_keypair_row is None:
@@ -378,8 +385,6 @@ class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
                 if keypair_candidate is None or not keypair_candidate.is_admin:
                     keypair_candidate = row
                     break
-            if keypair_candidate is not None:
-                self.main_keypair = keypair_candidate
         else:
             keypair_candidate = main_keypair_row
         return keypair_candidate
@@ -414,7 +419,7 @@ class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
             totp_activated=self.totp_activated,
             totp_activated_at=self.totp_activated_at,
             sudo_session_enabled=self.sudo_session_enabled,
-            main_access_key=self.main_access_key,
+            main_access_key=self.main_keypair.access_key if self.main_keypair else None,
             container_uid=self.container_uid,
             container_main_gid=self.container_main_gid,
             container_gids=self.container_gids,
