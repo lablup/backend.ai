@@ -331,7 +331,6 @@ class UserDBSource:
                 .values(to_update)
                 .returning(
                     users,
-                    # A Core RETURNING keys its result columns by label, unlike a select().
                     UserRow.default_keypair_access_key.label("default_keypair_access_key"),
                 )
             )
@@ -448,7 +447,6 @@ class UserDBSource:
             .values(to_update)
             .returning(
                 users,
-                # A Core RETURNING keys its result columns by label, unlike a select().
                 UserRow.default_keypair_access_key.label("default_keypair_access_key"),
             )
         )
