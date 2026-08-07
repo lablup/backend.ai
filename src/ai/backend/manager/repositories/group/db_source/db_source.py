@@ -109,12 +109,11 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 @dataclass
 class ProjectUserMember(ScopeMembership):
-    """A user joining a project scope; ``manage_roles`` controls whether the
-    membership change also grants the user's roles at the project scope."""
+    """A user joining a project scope; membership always grants the project's
+    ``auto_assign`` roles, so membership and role state cannot drift apart."""
 
     project_id: ProjectID
     user_id: UserID
-    manage_roles: bool = True
 
     @override
     def scope(self) -> ScopeRef:
@@ -129,8 +128,8 @@ class ProjectUserMember(ScopeMembership):
         return None
 
     @override
-    def assign_role_on(self) -> UserID | None:
-        return self.user_id if self.manage_roles else None
+    def assign_role_on(self) -> UserID:
+        return self.user_id
 
 
 @dataclass
@@ -632,9 +631,7 @@ class GroupDBSource:
                 return []
 
             await w.add_bulk_members([
-                ProjectUserMember(
-                    project_id=project_id, user_id=UserID(row.uuid), manage_roles=False
-                )
+                ProjectUserMember(project_id=project_id, user_id=UserID(row.uuid))
                 for row in new_user_rows
             ])
             user_role_specs = [
@@ -706,9 +703,7 @@ class GroupDBSource:
         Idempotent: adding an existing member is a no-op.
         """
         async with self._rbac_ops_provider.write_ops() as w:
-            await w.add_bulk_members([
-                ProjectUserMember(project_id=project_id, user_id=user_id, manage_roles=False)
-            ])
+            await w.add_bulk_members([ProjectUserMember(project_id=project_id, user_id=user_id)])
 
     async def unbind_user_from_project(self, user_id: UserID, project_id: ProjectID) -> None:
         """Remove a user from a project (membership writes only)."""
