@@ -81,6 +81,7 @@ from ai.backend.manager.models.rbac import (
     DomainScope,
     ProjectScope,
     ScopeType,
+    SystemScope,
     UserScope,
     get_predefined_roles_in_scope,
 )
@@ -1229,6 +1230,17 @@ class ImagePermissionContextBuilder(
             permissions = await self._verify_project_scope_and_calculate_permission(ctx, scope)
             project_id_to_permission_map[str(scope.project_id)] = permissions
 
+        global_registry_permissions: frozenset[ImagePermission] = frozenset()
+        if filter_global_registry:
+            if project_id_to_permission_map:
+                # Assumption: permissions for global registry images is same across all projects.
+                global_registry_permissions = list(project_id_to_permission_map.values())[0]
+            else:
+                # A global registry is shared by every project, so its images are not bound to
+                # one and stay visible to a caller that belongs to no project — there is just no
+                # per-project entry to read. Use what the caller holds in the system scope.
+                global_registry_permissions = await self.calculate_permission(ctx, SystemScope())
+
         image_select_stmt = (
             sa.select(ImageRow)
             .join(ImageRow.registry_row)
@@ -1256,10 +1268,7 @@ class ImagePermissionContextBuilder(
                 continue
 
             if filter_global_registry:
-                # Assumption: permissions for global registry images is same across all projects.
-                image_id_to_permission_map[img_row.id] = list(
-                    project_id_to_permission_map.values()
-                )[0]
+                image_id_to_permission_map[img_row.id] = global_registry_permissions
             else:
                 assoc_project_ids = [
                     assoc.group_id
