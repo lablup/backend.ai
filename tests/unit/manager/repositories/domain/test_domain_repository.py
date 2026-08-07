@@ -219,7 +219,7 @@ class TestDomainRepository:
                 "domain_name": "sample-domain",
                 "is_active": True,
                 "created_at": datetime.now(tz=UTC),
-                "modified_at": datetime.now(tz=UTC),
+                "updated_at": datetime.now(tz=UTC),
                 "type": ProjectType.GENERAL,
                 "total_resource_slots": ResourceSlot(),
                 "allowed_vfolder_hosts": VFolderHostPermissionMap(),
