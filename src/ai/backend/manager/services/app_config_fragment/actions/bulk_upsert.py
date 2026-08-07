@@ -5,7 +5,10 @@ from typing import override
 
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
+from ai.backend.manager.data.app_config_fragment.types import (
+    AppConfigFragmentData,
+    AppConfigFragmentUpsertItemError,
+)
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.app_config_fragment.types import (
     AppConfigFragmentSearchScope,
@@ -55,7 +58,8 @@ class BulkUpsertAppConfigFragmentsAction(AppConfigFragmentScopeAction):
 
 @dataclass
 class BulkUpsertAppConfigFragmentsActionResult(AppConfigFragmentScopeActionResult):
-    fragments: list[AppConfigFragmentData]
+    succeeded: list[AppConfigFragmentData]
+    failed: list[AppConfigFragmentUpsertItemError]
     #: The scope the upsert ran at, carried only to report the RBAC scope.
     _scope: AppConfigFragmentSearchScope
 

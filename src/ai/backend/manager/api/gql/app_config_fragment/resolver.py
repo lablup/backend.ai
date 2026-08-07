@@ -36,6 +36,7 @@ from .types import (
     AppConfigScopeRefGQL,
     MyUpsertAppConfigFragmentsInputGQL,
     ScopedUpsertAppConfigFragmentsInputGQL,
+    UpsertAppConfigFragmentsPayloadGQL,
 )
 
 
@@ -114,11 +115,11 @@ async def admin_app_config_fragments(
 async def scoped_upsert_app_config_fragments(
     info: Info[StrawberryGQLContext],
     input: ScopedUpsertAppConfigFragmentsInputGQL,
-) -> list[AppConfigFragmentGQL]:
+) -> UpsertAppConfigFragmentsPayloadGQL:
     payload = await info.context.adapters.app_config_fragment.scoped_upsert_app_config_fragments(
         input.to_pydantic()
     )
-    return [AppConfigFragmentGQL.from_pydantic(node) for node in payload.items]
+    return UpsertAppConfigFragmentsPayloadGQL.from_pydantic(payload)
 
 
 @gql_mutation(
@@ -132,11 +133,11 @@ async def scoped_upsert_app_config_fragments(
 async def my_upsert_app_config_fragments(
     info: Info[StrawberryGQLContext],
     input: MyUpsertAppConfigFragmentsInputGQL,
-) -> list[AppConfigFragmentGQL]:
+) -> UpsertAppConfigFragmentsPayloadGQL:
     payload = await info.context.adapters.app_config_fragment.my_upsert_app_config_fragments(
         input.to_pydantic()
     )
-    return [AppConfigFragmentGQL.from_pydantic(node) for node in payload.items]
+    return UpsertAppConfigFragmentsPayloadGQL.from_pydantic(payload)
 
 
 @gql_root_field(
