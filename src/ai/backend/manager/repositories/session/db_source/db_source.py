@@ -138,16 +138,14 @@ class SessionDBSource:
     async def get_session_owner(self, session_id: str | SessionId) -> UserData:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = (
-                sa.select(UserRow, KeyPairRow.access_key)
+                sa.select(UserRow)
                 .join(SessionRow, SessionRow.user_uuid == UserRow.uuid)
-                .outerjoin(UserRow.main_keypair)
                 .where(SessionRow.id == session_id)
             )
-            row = (await db_sess.execute(query)).first()
-            if row is None:
+            user = await db_sess.scalar(query)
+            if user is None:
                 raise SessionNotFound(f"Session with id {session_id} not found")
-            user_row: UserRow = row.UserRow
-            return user_row.to_data(row.access_key)
+            return UserData.from_row(user)
 
     async def get_session_validated(
         self,

@@ -227,7 +227,7 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", dtparse),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-        "main_access_key": ("main_access_key", None),
+        "main_access_key": (ORMFieldItem(UserRow.default_keypair_access_key), None),
     }
 
     # External table filter specifications
@@ -269,7 +269,6 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", None),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-        "main_access_key": ("main_access_key", None),
     }
 
     @staticmethod
@@ -568,10 +567,11 @@ class User(graphene.ObjectType):  # type: ignore[misc]
     sudo_session_enabled = graphene.Boolean()
     main_access_key = graphene.String(
         description=(
-            "Added in 24.03.0. Used as the default authentication credential for password-based"
+            "Added in 24.03.0. Deprecated since 26.9.0. The default keypair is recorded on the keypair itself. Used as the default authentication credential for password-based"
             " logins and sets the user's total resource usage limit. User's main_access_key cannot"
             " be deleted, and only super-admin can replace main_access_key."
-        )
+        ),
+        deprecation_reason="Deprecated since 26.9.0. The default keypair is recorded on the keypair itself.",
     )
     container_uid = graphene.Int(
         description="Added in 25.2.0. The user ID (UID) assigned to processes running inside the container."

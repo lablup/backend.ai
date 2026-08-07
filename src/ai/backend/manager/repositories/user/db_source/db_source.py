@@ -144,7 +144,6 @@ from ai.backend.manager.repositories.user.types import (
     DomainUserSearchScope,
     ProjectUserSearchScope,
     RoleUserSearchScope,
-    UserWithDefaultKeypair,
 )
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec, UserUpdateSpec
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
@@ -170,8 +169,8 @@ class UserDBSource:
         Admin-only operation.
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
-            user = await self._get_user_by_uuid(db_session, user_uuid)
-            return user.row.to_data(user.default_access_key)
+            user_row = await self._get_user_by_uuid(db_session, user_uuid)
+            return user_row.to_data()
 
     async def get_by_email_validated(
         self,
@@ -182,8 +181,8 @@ class UserDBSource:
         Returns None if user not found or access denied.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
-            user = await self._get_user_by_email(session, email)
-            return user.row.to_data(user.default_access_key)
+            user_row = await self._get_user_by_email(session, email)
+            return UserData.from_row(user_row)
 
     async def create_user_validated(
         self, creator: Creator[UserRow], group_ids: list[str] | None
@@ -235,7 +234,7 @@ class UserDBSource:
             )
         )
         return UserCreateResultData(
-            user=result.user_row.to_data(result.keypair_row.access_key),
+            user=result.user_row.to_data(),
             keypair=result.keypair_row.to_data(),
         )
 
@@ -327,7 +326,13 @@ class UserDBSource:
             if status is not None and status != current_user.status:
                 to_update["status_info"] = "admin-requested"
             update_query = (
-                sa.update(users).where(users.c.email == email).values(to_update).returning(users)
+                sa.update(users)
+                .where(users.c.email == email)
+                .values(to_update)
+                .returning(
+                    users,
+                    UserRow.default_keypair_access_key.label("default_keypair_access_key"),
+                )
             )
             result = await session.execute(update_query)
             updated_user = result.first()
@@ -437,7 +442,13 @@ class UserDBSource:
         if status is not None and status != current_user.status:
             to_update["status_info"] = "admin-requested"
         update_query = (
-            sa.update(users).where(users.c.uuid == user_id).values(to_update).returning(users)
+            sa.update(users)
+            .where(users.c.uuid == user_id)
+            .values(to_update)
+            .returning(
+                users,
+                UserRow.default_keypair_access_key.label("default_keypair_access_key"),
+            )
         )
         result = await session.execute(update_query)
         updated_user = result.first()
@@ -709,33 +720,19 @@ class UserDBSource:
         result = await session.scalar(query)
         return result is not None
 
-    async def _get_user_by_email(self, session: SASession, email: str) -> UserWithDefaultKeypair:
-        """Private method to get user by email, with the access key of its marked keypair."""
-        res = (
-            await session.execute(
-                sa.select(UserRow, KeyPairRow.access_key)
-                .outerjoin(UserRow.main_keypair)
-                .where(UserRow.email == email)
-            )
-        ).first()
+    async def _get_user_by_email(self, session: SASession, email: str) -> UserRow:
+        """Private method to get user by email."""
+        res = await session.scalar(sa.select(UserRow).where(UserRow.email == email))
         if res is None:
             raise UserNotFound(f"User with email {email} not found.")
-        return UserWithDefaultKeypair(row=res.UserRow, default_access_key=res.access_key)
+        return res
 
-    async def _get_user_by_uuid(
-        self, session: SASession, user_uuid: UUID
-    ) -> UserWithDefaultKeypair:
-        """Private method to get user by UUID, with the access key of its marked keypair."""
-        res = (
-            await session.execute(
-                sa.select(UserRow, KeyPairRow.access_key)
-                .outerjoin(UserRow.main_keypair)
-                .where(UserRow.uuid == user_uuid)
-            )
-        ).first()
+    async def _get_user_by_uuid(self, session: SASession, user_uuid: UUID) -> UserRow:
+        """Private method to get user by UUID."""
+        res = await session.scalar(sa.select(UserRow).where(UserRow.uuid == user_uuid))
         if res is None:
             raise UserNotFound(f"User with UUID {user_uuid} not found.")
-        return UserWithDefaultKeypair(row=res.UserRow, default_access_key=res.access_key)
+        return res
 
     async def _get_user_by_email_with_session(self, session: SASession, email: str) -> UserRow:
         """Private method to get user by email using a session.
@@ -1139,10 +1136,10 @@ class UserDBSource:
             UserSearchResult with matching users and pagination info.
         """
         async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(UserRow, KeyPairRow.access_key).outerjoin(UserRow.main_keypair)
+            query = sa.select(UserRow)
             result = await execute_batch_querier(db_session, query, querier)
 
-            items = [row.UserRow.to_data(row.access_key) for row in result.rows]
+            items = [row.UserRow.to_data() for row in result.rows]
             return UserSearchResult(
                 items=items,
                 total_count=result.total_count,
@@ -1165,10 +1162,10 @@ class UserDBSource:
             UserSearchResult with matching users and pagination info.
         """
         async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(UserRow, KeyPairRow.access_key).outerjoin(UserRow.main_keypair)
+            query = sa.select(UserRow)
             result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
 
-            items = [row.UserRow.to_data(row.access_key) for row in result.rows]
+            items = [row.UserRow.to_data() for row in result.rows]
             return UserSearchResult(
                 items=items,
                 total_count=result.total_count,
@@ -1195,9 +1192,8 @@ class UserDBSource:
         """
         async with self._db.begin_readonly_session() as db_session:
             query = (
-                sa.select(UserRow, KeyPairRow.access_key)
+                sa.select(UserRow)
                 .select_from(UserRow)
-                .outerjoin(UserRow.main_keypair)
                 .join(
                     AssociationScopesEntitiesRow,
                     sa.and_(
@@ -1209,7 +1205,7 @@ class UserDBSource:
             )
             result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
 
-            items = [row.UserRow.to_data(row.access_key) for row in result.rows]
+            items = [row.UserRow.to_data() for row in result.rows]
             return UserSearchResult(
                 items=items,
                 total_count=result.total_count,
@@ -1228,9 +1224,8 @@ class UserDBSource:
         """
         async with self._db.begin_readonly_session() as db_session:
             query = (
-                sa.select(UserRow, KeyPairRow.access_key)
+                sa.select(UserRow)
                 .select_from(UserRow)
-                .outerjoin(UserRow.main_keypair)
                 .join(
                     UserRoleRow,
                     UserRow.uuid == UserRoleRow.user_id,
@@ -1238,7 +1233,7 @@ class UserDBSource:
             )
             result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
 
-            items = [row.UserRow.to_data(row.access_key) for row in result.rows]
+            items = [row.UserRow.to_data() for row in result.rows]
             return UserSearchResult(
                 items=items,
                 total_count=result.total_count,

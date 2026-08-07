@@ -16,6 +16,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import (
     Mapped,
+    column_property,
     foreign,
     joinedload,
     mapped_column,
@@ -28,7 +29,7 @@ from sqlalchemy.sql.expression import SQLColumnExpression
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.scope import ScopeID
-from ai.backend.common.types import AccessKey, ReadableCIDR
+from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.model_serving.types import UserData as ModelServingUserData
@@ -234,6 +235,13 @@ class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         "container_gids", sa.ARRAY(sa.Integer), nullable=True, server_default=sa.null()
     )
 
+    default_keypair_access_key: Mapped[str | None] = column_property(
+        sa.select(KeyPairRow.access_key)
+        .where((KeyPairRow.user == uuid) & KeyPairRow.is_default)
+        .correlate_except(KeyPairRow)
+        .scalar_subquery()
+    )
+
     # Relationships
     sessions: Mapped[list[SessionRow]] = relationship(
         "SessionRow",
@@ -394,7 +402,7 @@ class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
             email=self.email,
         )
 
-    def to_data(self, default_access_key: AccessKey | None) -> UserData:
+    def to_data(self) -> UserData:
         return UserData(
             id=self.uuid,
             uuid=self.uuid,
@@ -418,7 +426,7 @@ class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
             totp_activated=self.totp_activated,
             totp_activated_at=self.totp_activated_at,
             sudo_session_enabled=self.sudo_session_enabled,
-            main_access_key=default_access_key,
+            main_access_key=self.default_keypair_access_key,
             container_uid=self.container_uid,
             container_main_gid=self.container_main_gid,
             container_gids=self.container_gids,
