@@ -790,7 +790,6 @@ class TestPurgeUser:
             user_info_ctx=UserInfoContext(
                 uuid=uuid.uuid4(),
                 email="admin@example.com",
-                main_access_key=AccessKey("ADMINKEY"),
             ),
             email=email,
             **kwargs,

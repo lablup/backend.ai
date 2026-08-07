@@ -455,7 +455,6 @@ class TestPurgeUser:
         return UserInfoContext(
             uuid=uuid.uuid4(),
             email="admin@example.com",
-            main_access_key=AccessKey("ADMINKEY123456789"),
         )
 
     async def test_purge_user_succeeds_without_active_vfolders(
@@ -571,7 +570,6 @@ class TestPurgeUser:
         mock_user_repository.delegate_endpoint_ownership.assert_called_once_with(
             user_uuid=purge_user_uuid,
             target_user_uuid=admin_user_info_ctx.uuid,
-            target_main_access_key=admin_user_info_ctx.main_access_key,
         )
         # When delegating, delete_endpoints should be called with delete_destroyed_only=True
         mock_user_repository.delete_endpoints.assert_called_once_with(

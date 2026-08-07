@@ -5,7 +5,6 @@ from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
-from ai.backend.common.types import AccessKey
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.user.types import (
@@ -182,7 +181,6 @@ class UserService:
         user_info_ctx = UserInfoContext(
             uuid=admin_user.uuid,
             email=admin_user.email,
-            main_access_key=AccessKey(admin_user.main_access_key or ""),
         )
         # Reuse the internal UUID-based purge logic shared with bulk_purge_users
         bulk_action = BulkPurgeUserAction(
@@ -239,7 +237,6 @@ class UserService:
             await self._user_repository.delegate_endpoint_ownership(
                 user_uuid=user_uuid,
                 target_user_uuid=action.user_info_ctx.uuid,
-                target_main_access_key=action.user_info_ctx.main_access_key,
             )
             await self._user_repository.delete_endpoints(
                 user_uuid=user_uuid,
@@ -301,7 +298,6 @@ class UserService:
             await self._user_repository.delegate_endpoint_ownership(
                 user_uuid=user_uuid,
                 target_user_uuid=user_info_ctx.uuid,
-                target_main_access_key=user_info_ctx.main_access_key,
             )
             await self._user_repository.delete_endpoints(
                 user_uuid=user_uuid,
@@ -338,7 +334,6 @@ class UserService:
         user_info_ctx = UserInfoContext(
             uuid=admin_user.uuid,
             email=admin_user.email,
-            main_access_key=AccessKey(admin_user.main_access_key or ""),
         )
 
         purged_user_ids: list[UUID] = []

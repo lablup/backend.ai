@@ -577,12 +577,20 @@ class UserDBSource:
         self,
         user_uuid: UUID,
         target_user_uuid: UUID,
-        target_main_access_key: AccessKey,
     ) -> None:
         """Delegate endpoint ownership to another user."""
         async with self._db.begin_session() as session:
+            target_access_key = await session.scalar(
+                sa.select(KeyPairRow.access_key).where(
+                    (KeyPairRow.user == target_user_uuid) & KeyPairRow.is_default
+                )
+            )
+            if target_access_key is None:
+                raise KeyPairNotFound(
+                    f"User {target_user_uuid} has no main keypair to delegate endpoints to."
+                )
             await EndpointRow.delegate_endpoint_ownership(
-                session, user_uuid, target_user_uuid, target_main_access_key
+                session, user_uuid, target_user_uuid, AccessKey(target_access_key)
             )
 
     async def delete_endpoints(

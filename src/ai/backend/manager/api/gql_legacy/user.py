@@ -1275,7 +1275,6 @@ class PurgeUser(graphene.Mutation):  # type: ignore[misc]
         user_info_ctx = UserInfoContext(
             uuid=graph_ctx.user["uuid"],
             email=graph_ctx.user["email"],
-            main_access_key=graph_ctx.user["main_access_key"],
         )
         action = props.to_action(email, user_info_ctx)
         user_data = await graph_ctx.user_repository.get_by_email_validated(email)
