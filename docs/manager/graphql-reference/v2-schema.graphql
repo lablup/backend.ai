@@ -903,6 +903,17 @@ input AppConfigFragmentScopeTypeFilter {
 }
 
 """
+Added in 26.9.0. One rejected item of a bulk fragment upsert, named by its config name — the batch shares one scope, and a rejected insert never had a fragment id.
+"""
+type AppConfigFragmentUpsertError {
+  """Config name of the item that failed."""
+  configName: String!
+
+  """Reason the item failed."""
+  message: String!
+}
+
+"""
 Added in 26.8.0. One (config_name, config) pair to upsert at the request's scope.
 """
 input AppConfigFragmentUpsertItem {
@@ -8008,12 +8019,12 @@ type Mutation {
   """
   Added in 26.8.0. Upsert many app config fragments at one scope (insert, or replace config on conflict), all-or-nothing. RBAC-authorized at that scope.
   """
-  scopedUpsertAppConfigFragments(input: ScopedUpsertAppConfigFragmentsInput!): [AppConfigFragment!]!
+  scopedUpsertAppConfigFragments(input: ScopedUpsertAppConfigFragmentsInput!): UpsertAppConfigFragmentsPayload!
 
   """
   Added in 26.8.0. Upsert many app config fragments at the current user's own user scope, all-or-nothing.
   """
-  myUpsertAppConfigFragments(input: MyUpsertAppConfigFragmentsInput!): [AppConfigFragment!]!
+  myUpsertAppConfigFragments(input: MyUpsertAppConfigFragmentsInput!): UpsertAppConfigFragmentsPayload!
 
   """
   Added in 25.14.0. Scan external registries to discover available artifacts. Searches HuggingFace or Reservoir registries for artifacts matching the specified criteria and registers them in the system with SCANNED status. The artifacts become available for import but are not downloaded until explicitly imported. This is the first step in the artifact workflow: Scan → Import → Use
@@ -15720,6 +15731,17 @@ input UpdateVFSStorageInput {
 type UpdateVFSStoragePayload {
   """Updated VFS storage"""
   vfsStorage: VFSStorage!
+}
+
+"""
+Added in 26.9.0. Payload of a bulk fragment upsert: the fragments written, and the rejected items.
+"""
+type UpsertAppConfigFragmentsPayload {
+  """The upserted app config fragments."""
+  items: [AppConfigFragment!]!
+
+  """Per-item failures, each naming the config name it targeted."""
+  failed: [AppConfigFragmentUpsertError!]!
 }
 
 """
