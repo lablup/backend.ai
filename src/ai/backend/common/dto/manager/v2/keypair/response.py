@@ -41,6 +41,10 @@ class KeypairNode(BaseResponseModel):
     is_admin: bool | None = Field(
         default=None, description="Whether the keypair has admin privileges."
     )
+    is_default: bool = Field(
+        default=False,
+        description="Whether this is the owner's default keypair. Added in 26.9.0.",
+    )
     created_at: datetime | None = Field(default=None, description="When the keypair was created.")
     modified_at: datetime | None = Field(
         default=None, description="When the keypair was last modified."

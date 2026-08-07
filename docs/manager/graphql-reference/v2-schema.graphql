@@ -6528,6 +6528,9 @@ type KeyPairV2 implements Node {
   """Whether the keypair has admin privileges."""
   isAdmin: Boolean
 
+  """Added in 26.9.0. Whether this is the owner's default keypair."""
+  isDefault: Boolean!
+
   """Timestamp when the keypair was created."""
   createdAt: DateTime
 
@@ -16489,8 +16492,10 @@ type UserV2OrganizationInfo {
   """Name of the user resource policy applied to this user."""
   resourcePolicy: String!
 
-  """Primary API access key for this user."""
-  mainAccessKey: String
+  """
+  Primary API access key for this user. Deprecated since 26.9.0. Use the keypair's is_default field.
+  """
+  mainAccessKey: String @deprecated(reason: "Deprecated since 26.9.0. Use the keypair's is_default field.")
 }
 
 """

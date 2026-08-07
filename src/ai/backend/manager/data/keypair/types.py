@@ -31,6 +31,7 @@ class KeyPairData:
 
     is_active: bool
     is_admin: bool
+    is_default: bool
     created_at: datetime | None
     modified_at: datetime | None
 

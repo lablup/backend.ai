@@ -167,6 +167,7 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
             access_key=AccessKey(self.access_key),
             secret_key=SecretKey(self.secret_key),
             is_active=self.is_active if self.is_active is not None else True,
+            is_default=self.is_default,
             is_admin=self.is_admin if self.is_admin is not None else False,
             created_at=self.created_at,
             modified_at=self.updated_at,
