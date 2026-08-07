@@ -147,7 +147,7 @@ class TestAppConfigFragmentService:
         case: _RBACScopeCase,
     ) -> None:
         mock_repository.bulk_upsert = AsyncMock(
-            return_value=AppConfigFragmentUpsertBulkResult(succeeded=[scoped_fragment], failed=[])
+            return_value=AppConfigFragmentUpsertBulkResult(items=[scoped_fragment], failed=[])
         )
         specs = [
             AppConfigFragmentUpserterSpec(
@@ -163,7 +163,7 @@ class TestAppConfigFragmentService:
             BulkUpsertAppConfigFragmentsAction(scope=scope, upserter_specs=specs)
         )
 
-        assert result.succeeded == [scoped_fragment]
+        assert result.items == [scoped_fragment]
         assert result.failed == []
         # The result reports the RBAC scope the upsert was authorized at.
         assert result.scope_type() == case.expected_scope_type

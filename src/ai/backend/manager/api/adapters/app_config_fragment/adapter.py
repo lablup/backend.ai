@@ -140,7 +140,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
             BulkUpsertAppConfigFragmentsAction(scope=scope, upserter_specs=specs)
         )
         return UpsertAppConfigFragmentsPayload(
-            items=[self._fragment_to_node(fragment) for fragment in action_result.succeeded],
+            items=[self._fragment_to_node(fragment) for fragment in action_result.items],
             failed=[
                 AppConfigFragmentUpsertErrorInfo(
                     config_name=error.config_name, message=error.message

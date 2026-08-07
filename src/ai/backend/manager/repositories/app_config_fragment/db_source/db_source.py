@@ -108,7 +108,7 @@ class AppConfigFragmentDBSource:
                     ),
                 )
                 results.append((await w.upsert_scoped(upserter)).row.to_data())
-            return AppConfigFragmentUpsertBulkResult(succeeded=results, failed=[])
+            return AppConfigFragmentUpsertBulkResult(items=results, failed=[])
 
     @app_config_fragment_db_source_resilience.apply()
     async def get_by_id(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentData:

@@ -55,7 +55,7 @@ class AppConfigFragmentService:
     ) -> BulkUpsertAppConfigFragmentsActionResult:
         result = await self._repository.bulk_upsert(action.upserter_specs)
         return BulkUpsertAppConfigFragmentsActionResult(
-            succeeded=result.succeeded, failed=result.failed, _scope=action.scope
+            items=result.items, failed=result.failed, _scope=action.scope
         )
 
     async def admin_search(

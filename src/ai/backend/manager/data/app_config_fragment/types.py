@@ -73,12 +73,12 @@ class AppConfigFragmentUpsertItemError:
 class AppConfigFragmentUpsertBulkResult:
     """Partial-success result of a bulk upsert.
 
-    ``succeeded`` are the fragments inserted or replaced; ``failed`` are the items whose
+    ``items`` are the fragments inserted or replaced; ``failed`` are the items whose
     write was rejected (e.g. no allow-list row), each named by its config name.
 
     (Not in effect yet: the upsert is still all-or-nothing, so ``failed`` is always empty.
     To be fixed.)
     """
 
-    succeeded: list[AppConfigFragmentData]
+    items: list[AppConfigFragmentData]
     failed: list[AppConfigFragmentUpsertItemError]

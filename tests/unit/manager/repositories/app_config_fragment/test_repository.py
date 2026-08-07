@@ -796,7 +796,7 @@ class TestRBACScopeAssociation:
             )
         ])
         assert (
-            await self._scope_bindings(database, str(upserted.succeeded[0].id))
+            await self._scope_bindings(database, str(upserted.items[0].id))
             == case.expected_bindings
         )
 
@@ -836,7 +836,7 @@ class TestRBACScopeAssociation:
                 config={"k": "v"},
             )
         ])
-        created = upserted.succeeded[0]
+        created = upserted.items[0]
         assert await self._scope_bindings(database, str(created.id)) == case.expected_bindings
         purged = await repository.purge(AppConfigFragmentPurgerSpec(fragment_id=created.id))
         assert purged.id == created.id
@@ -861,7 +861,7 @@ class TestRBACScopeAssociation:
                 config={"k": "v"},
             )
         ])
-        created = upserted.succeeded[0]
+        created = upserted.items[0]
         assert await self._scope_bindings(database, str(created.id)) == [
             _ScopeBinding(scope_type=ScopeType.USER, scope_id=str(_USER_ID))
         ]
@@ -916,7 +916,7 @@ class TestUpsert:
         ])
 
         assert result.failed == []
-        upserted = result.succeeded
+        upserted = result.items
         assert [(f.config_name, f.scope_type, f.scope_id) for f in upserted] == [
             ("theme", case.scope_type, case.scope_id)
         ]
@@ -978,7 +978,7 @@ class TestUpsert:
         ])
 
         assert result.failed == []
-        upserted = result.succeeded
+        upserted = result.items
         assert [f.id for f in upserted] == [existing.id]
         assert upserted[0].config == {"theme": "light"}
         async with database.begin_readonly_session() as db_sess:
@@ -1033,7 +1033,7 @@ class TestUpsert:
         ])
 
         assert result.failed == []
-        assert [(f.scope_type, f.config) for f in result.succeeded] == [
+        assert [(f.scope_type, f.config) for f in result.items] == [
             (AppConfigScopeType.PUBLIC, {"theme": "light"}),
             (AppConfigScopeType.USER, {"theme": "solarized"}),
         ]
@@ -1091,5 +1091,5 @@ class TestUpsert:
         self, repository: AppConfigFragmentRepository, theme_registered: None
     ) -> None:
         result = await repository.bulk_upsert([])
-        assert result.succeeded == []
+        assert result.items == []
         assert result.failed == []

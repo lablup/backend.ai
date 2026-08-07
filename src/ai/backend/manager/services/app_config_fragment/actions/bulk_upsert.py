@@ -58,7 +58,7 @@ class BulkUpsertAppConfigFragmentsAction(AppConfigFragmentScopeAction):
 
 @dataclass
 class BulkUpsertAppConfigFragmentsActionResult(AppConfigFragmentScopeActionResult):
-    succeeded: list[AppConfigFragmentData]
+    items: list[AppConfigFragmentData]
     failed: list[AppConfigFragmentUpsertItemError]
     #: The scope the upsert ran at, carried only to report the RBAC scope.
     _scope: AppConfigFragmentSearchScope
