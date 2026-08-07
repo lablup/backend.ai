@@ -24,6 +24,7 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     AppConfigFragmentBulkErrorInfo,
     AppConfigFragmentNode,
+    AppConfigFragmentUpsertErrorInfo,
     BulkPurgeAppConfigFragmentPayload,
     PurgeAppConfigFragmentPayload,
     SearchAppConfigFragmentPayload,
@@ -139,7 +140,13 @@ class AppConfigFragmentAdapter(BaseAdapter):
             BulkUpsertAppConfigFragmentsAction(scope=scope, upserter_specs=specs)
         )
         return UpsertAppConfigFragmentsPayload(
-            items=[self._fragment_to_node(fragment) for fragment in action_result.fragments],
+            items=[self._fragment_to_node(fragment) for fragment in action_result.items],
+            failed=[
+                AppConfigFragmentUpsertErrorInfo(
+                    config_name=error.config_name, message=error.message
+                )
+                for error in action_result.failed
+            ],
         )
 
     async def get(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentNode:
@@ -209,8 +216,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
     ) -> list[AppConfigFragmentNode | None]:
         """The fragments written at one scope for the given config names.
 
-        RBAC-authorized at that scope, so a caller reads only a scope they may read. Meant for
-        fetching the current fragment values before editing them.
+        Meant for fetching the current fragment values before editing them.
         """
         return await self._fragments_by_names(
             AppConfigFragmentSearchScope(

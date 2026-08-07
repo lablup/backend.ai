@@ -20,6 +20,7 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentBulkResult,
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
+    AppConfigFragmentUpsertBulkResult,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.app_config import (
@@ -80,7 +81,7 @@ class AppConfigFragmentDBSource:
     @app_config_fragment_db_source_resilience.apply()
     async def bulk_upsert(
         self, specs: Sequence[AppConfigFragmentUpserterSpec]
-    ) -> list[AppConfigFragmentData]:
+    ) -> AppConfigFragmentUpsertBulkResult:
         """Upsert each fragment at its scope in one transaction (all-or-nothing).
 
         Each item inserts-or-updates; a newly inserted row binds to its scope, an updated one
@@ -106,7 +107,7 @@ class AppConfigFragmentDBSource:
                     ),
                 )
                 results.append((await w.upsert_scoped(upserter)).row.to_data())
-            return results
+            return AppConfigFragmentUpsertBulkResult(items=results, failed=[])
 
     @app_config_fragment_db_source_resilience.apply()
     async def get_by_id(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentData:

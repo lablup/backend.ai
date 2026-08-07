@@ -53,8 +53,10 @@ class AppConfigFragmentService:
     async def bulk_upsert(
         self, action: BulkUpsertAppConfigFragmentsAction
     ) -> BulkUpsertAppConfigFragmentsActionResult:
-        fragments = await self._repository.bulk_upsert(action.upserter_specs)
-        return BulkUpsertAppConfigFragmentsActionResult(fragments=fragments, _scope=action.scope)
+        result = await self._repository.bulk_upsert(action.upserter_specs)
+        return BulkUpsertAppConfigFragmentsActionResult(
+            items=result.items, failed=result.failed, _scope=action.scope
+        )
 
     async def admin_search(
         self, action: AdminSearchAppConfigFragmentAction

@@ -9,6 +9,8 @@ from typing import Any, cast
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     AppConfigFragmentNode,
+    AppConfigFragmentUpsertErrorInfo,
+    UpsertAppConfigFragmentsPayload,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.types import (
     AppConfigFragmentOrderField,
@@ -21,6 +23,7 @@ from ai.backend.manager.api.gql.app_config_fragment.types import (
     AppConfigFragmentOrderByGQL,
     AppConfigFragmentOrderFieldGQL,
     AppConfigScopeTypeFilterGQL,
+    UpsertAppConfigFragmentsPayloadGQL,
 )
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 
@@ -64,6 +67,31 @@ class TestAppConfigFragmentGQL:
 
         assert gql.scope_type == AppConfigScopeType.PUBLIC
         assert gql.scope_id is None
+
+
+class TestUpsertAppConfigFragmentsPayloadGQL:
+    def test_from_pydantic_converts_items_and_failures(self) -> None:
+        node = AppConfigFragmentNode(
+            id=AppConfigFragmentID(uuid.uuid4()),
+            config_name="theme",
+            scope_type=AppConfigScopeType.USER,
+            scope_id=AppConfigScopeID(uuid.uuid4()),
+            config={"mode": "dark"},
+            created_at=datetime(2026, 1, 1, tzinfo=UTC),
+            updated_at=datetime(2026, 1, 1, tzinfo=UTC),
+        )
+        payload = UpsertAppConfigFragmentsPayload(
+            items=[node],
+            failed=[AppConfigFragmentUpsertErrorInfo(config_name="menu", message="not allowed")],
+        )
+
+        gql = UpsertAppConfigFragmentsPayloadGQL.from_pydantic(payload)
+
+        assert [item.config_name for item in gql.items] == ["theme"]
+        assert cast(dict[str, Any], gql.items[0].config) == {"mode": "dark"}
+        assert [(error.config_name, error.message) for error in gql.failed] == [
+            ("menu", "not allowed")
+        ]
 
 
 class TestAppConfigFragmentInputs:

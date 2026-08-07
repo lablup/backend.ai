@@ -1225,7 +1225,20 @@ input AppConfigFragmentScopeTypeFilter
 }
 
 """
-Added in 26.8.0. One (config_name, config) pair to upsert at the request's scope.
+Added in 26.9.0. One failed item of a partial bulk fragment upsert, named by its config name — the batch shares one scope, and a rejected insert never had a fragment id.
+"""
+type AppConfigFragmentUpsertError
+  @join__type(graph: STRAWBERRY)
+{
+  """Config name of the item that failed."""
+  configName: String!
+
+  """Reason the item failed."""
+  message: String!
+}
+
+"""
+Added in 26.9.0. One (config_name, config) pair to upsert at the request's scope.
 """
 input AppConfigFragmentUpsertItem
   @join__type(graph: STRAWBERRY)
@@ -12312,14 +12325,14 @@ type Mutation
   adminUpdateAppConfigAllowList(input: UpdateAppConfigAllowListInput!): UpdateAppConfigAllowListPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.8.0. Upsert many app config fragments at one scope (insert, or replace config on conflict), all-or-nothing. RBAC-authorized at that scope.
+  Added in 26.9.0. Upsert many app config fragments at one scope (insert, or replace config on conflict), with per-item partial success (not in effect yet: still all-or-nothing).
   """
-  scopedUpsertAppConfigFragments(input: ScopedUpsertAppConfigFragmentsInput!): [AppConfigFragment!]! @join__field(graph: STRAWBERRY)
+  scopedUpsertAppConfigFragments(input: ScopedUpsertAppConfigFragmentsInput!): UpsertAppConfigFragmentsPayload! @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.8.0. Upsert many app config fragments at the current user's own user scope, all-or-nothing.
+  Added in 26.9.0. Upsert many app config fragments at the current user's own user scope, with per-item partial success (not in effect yet: still all-or-nothing).
   """
-  myUpsertAppConfigFragments(input: MyUpsertAppConfigFragmentsInput!): [AppConfigFragment!]! @join__field(graph: STRAWBERRY)
+  myUpsertAppConfigFragments(input: MyUpsertAppConfigFragmentsInput!): UpsertAppConfigFragmentsPayload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 25.14.0. Scan external registries to discover available artifacts. Searches HuggingFace or Reservoir registries for artifacts matching the specified criteria and registers them in the system with SCANNED status. The artifacts become available for import but are not downloaded until explicitly imported. This is the first step in the artifact workflow: Scan → Import → Use
@@ -13109,7 +13122,7 @@ type MyStorageHostPermissionsPayload
 }
 
 """
-Added in 26.8.0. Upsert many fragments at the current user's own user scope.
+Added in 26.9.0. Upsert many fragments at the current user's own user scope.
 """
 input MyUpsertAppConfigFragmentsInput
   @join__type(graph: STRAWBERRY)
@@ -15544,7 +15557,7 @@ type Query
   scopedIdleCheckerAssignments(scope: IdleCheckerAssignmentScope!, filter: IdleCheckerAssignmentFilter = null, orderBy: [IdleCheckerAssignmentOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): IdleCheckerAssignmentConnection! @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.8.0. Read the fragments written at one scope for the given config names — the current values, to inspect before editing them. Answered position by position, null where the scope holds no fragment for that name. RBAC-authorized at that scope.
+  Added in 26.8.0. Read the fragments written at one scope for the given config names — the current values, to inspect before editing them. Answered position by position, null where the scope holds no fragment for that name.
   """
   scopedAppConfigFragmentsByNames(scope: AppConfigScopeRef!, configNames: [String!]!): [AppConfigFragment]! @join__field(graph: STRAWBERRY)
 
@@ -19542,7 +19555,7 @@ enum SchedulingStatus
 }
 
 """
-Added in 26.8.0. Upsert many fragments at one scope; the scope is named once for all items.
+Added in 26.9.0. Upsert many fragments at one scope; the scope is named once for all items.
 """
 input ScopedUpsertAppConfigFragmentsInput
   @join__type(graph: STRAWBERRY)
@@ -22014,6 +22027,19 @@ type UpdateVFSStoragePayload
 {
   """Updated VFS storage"""
   vfsStorage: VFSStorage!
+}
+
+"""
+Added in 26.9.0. Partial-success payload for a bulk fragment upsert (not in effect yet: still all-or-nothing).
+"""
+type UpsertAppConfigFragmentsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The upserted app config fragments."""
+  items: [AppConfigFragment!]!
+
+  """Per-item failures, each naming the config name it targeted."""
+  failed: [AppConfigFragmentUpsertError!]!
 }
 
 """

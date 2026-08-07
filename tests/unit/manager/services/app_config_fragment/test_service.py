@@ -19,6 +19,8 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentBulkResult,
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
+    AppConfigFragmentUpsertBulkResult,
+    AppConfigFragmentUpsertItemError,
 )
 from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
@@ -71,6 +73,12 @@ class _ScopedSearchCase:
 
     scope: AppConfigFragmentSearchScope
     expected_rbac_scope_id: str
+
+
+@pytest.fixture
+def rejected_upsert_item() -> AppConfigFragmentUpsertItemError:
+    """One rejected item for the repository mock to return alongside the written fragment."""
+    return AppConfigFragmentUpsertItemError(config_name="menu", message="not allow-listed")
 
 
 @pytest.fixture
@@ -143,9 +151,14 @@ class TestAppConfigFragmentService:
         service: AppConfigFragmentService,
         mock_repository: MagicMock,
         scoped_fragment: AppConfigFragmentData,
+        rejected_upsert_item: AppConfigFragmentUpsertItemError,
         case: _RBACScopeCase,
     ) -> None:
-        mock_repository.bulk_upsert = AsyncMock(return_value=[scoped_fragment])
+        mock_repository.bulk_upsert = AsyncMock(
+            return_value=AppConfigFragmentUpsertBulkResult(
+                items=[scoped_fragment], failed=[rejected_upsert_item]
+            )
+        )
         specs = [
             AppConfigFragmentUpserterSpec(
                 config_name="theme",
@@ -160,7 +173,8 @@ class TestAppConfigFragmentService:
             BulkUpsertAppConfigFragmentsAction(scope=scope, upserter_specs=specs)
         )
 
-        assert result.fragments == [scoped_fragment]
+        assert result.items == [scoped_fragment]
+        assert result.failed == [rejected_upsert_item]
         # The result reports the RBAC scope the upsert was authorized at.
         assert result.scope_type() == case.expected_scope_type
         assert result.scope_id() == case.expected_scope_id

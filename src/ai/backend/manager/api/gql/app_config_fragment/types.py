@@ -34,10 +34,17 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     AppConfigFragmentNode,
 )
+from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
+    AppConfigFragmentUpsertErrorInfo as AppConfigFragmentUpsertErrorInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
+    UpsertAppConfigFragmentsPayload as UpsertAppConfigFragmentsPayloadDTO,
+)
 from ai.backend.common.dto.manager.v2.app_config_fragment.types import (
     AppConfigScopeTypeFilter as AppConfigScopeTypeFilterDTO,
 )
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -47,8 +54,9 @@ from ai.backend.manager.api.gql.decorators import (
     gql_field,
     gql_node_type,
     gql_pydantic_input,
+    gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
@@ -58,17 +66,19 @@ __all__ = (
     "AppConfigFragmentGQL",
     "AppConfigFragmentOrderByGQL",
     "AppConfigFragmentOrderFieldGQL",
+    "AppConfigFragmentUpsertErrorGQL",
     "AppConfigFragmentUpsertItemGQL",
     "AppConfigScopeRefGQL",
     "AppConfigScopeTypeFilterGQL",
     "MyUpsertAppConfigFragmentsInputGQL",
     "ScopedUpsertAppConfigFragmentsInputGQL",
+    "UpsertAppConfigFragmentsPayloadGQL",
 )
 
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version="26.8.0",
+        added_version=NEXT_RELEASE_VERSION,
         description="One (config_name, config) pair to upsert at the request's scope.",
     ),
     name="AppConfigFragmentUpsertItem",
@@ -97,7 +107,7 @@ class AppConfigScopeRefGQL(PydanticInputMixin[AppConfigScopeRefDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version="26.8.0",
+        added_version=NEXT_RELEASE_VERSION,
         description="Upsert many fragments at one scope; the scope is named once for all items.",
     ),
     name="ScopedUpsertAppConfigFragmentsInput",
@@ -113,7 +123,7 @@ class ScopedUpsertAppConfigFragmentsInputGQL(
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version="26.8.0",
+        added_version=NEXT_RELEASE_VERSION,
         description="Upsert many fragments at the current user's own user scope.",
     ),
     name="MyUpsertAppConfigFragmentsInput",
@@ -183,6 +193,45 @@ class AppConfigFragmentConnection(Connection[AppConfigFragmentGQL]):
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
+
+
+# ---------------------------------------------------------------------------
+# Mutation payloads
+# ---------------------------------------------------------------------------
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "One failed item of a partial bulk fragment upsert, named by its config name — "
+            "the batch shares one scope, and a rejected insert never had a fragment id."
+        ),
+    ),
+    model=AppConfigFragmentUpsertErrorInfoDTO,
+    name="AppConfigFragmentUpsertError",
+)
+class AppConfigFragmentUpsertErrorGQL(PydanticOutputMixin[AppConfigFragmentUpsertErrorInfoDTO]):
+    config_name: str = gql_field(description="Config name of the item that failed.")
+    message: str = gql_field(description="Reason the item failed.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Partial-success payload for a bulk fragment upsert "
+            "(not in effect yet: still all-or-nothing)."
+        ),
+    ),
+    model=UpsertAppConfigFragmentsPayloadDTO,
+    name="UpsertAppConfigFragmentsPayload",
+)
+class UpsertAppConfigFragmentsPayloadGQL(PydanticOutputMixin[UpsertAppConfigFragmentsPayloadDTO]):
+    items: list[AppConfigFragmentGQL] = gql_field(description="The upserted app config fragments.")
+    failed: list[AppConfigFragmentUpsertErrorGQL] = gql_field(
+        description="Per-item failures, each naming the config name it targeted."
+    )
 
 
 # ---------------------------------------------------------------------------

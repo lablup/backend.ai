@@ -795,7 +795,10 @@ class TestRBACScopeAssociation:
                 config={"k": "v"},
             )
         ])
-        assert await self._scope_bindings(database, str(upserted[0].id)) == case.expected_bindings
+        assert (
+            await self._scope_bindings(database, str(upserted.items[0].id))
+            == case.expected_bindings
+        )
 
     @pytest.mark.parametrize(
         "case",
@@ -833,7 +836,7 @@ class TestRBACScopeAssociation:
                 config={"k": "v"},
             )
         ])
-        created = upserted[0]
+        created = upserted.items[0]
         assert await self._scope_bindings(database, str(created.id)) == case.expected_bindings
         purged = await repository.purge(AppConfigFragmentPurgerSpec(fragment_id=created.id))
         assert purged.id == created.id
@@ -858,7 +861,7 @@ class TestRBACScopeAssociation:
                 config={"k": "v"},
             )
         ])
-        created = upserted[0]
+        created = upserted.items[0]
         assert await self._scope_bindings(database, str(created.id)) == [
             _ScopeBinding(scope_type=ScopeType.USER, scope_id=str(_USER_ID))
         ]
@@ -903,7 +906,7 @@ class TestUpsert:
         case: _FragmentScopeCase,
     ) -> None:
         """An insert binds the new row to its RBAC scope, exactly as a create does."""
-        upserted = await repository.bulk_upsert([
+        result = await repository.bulk_upsert([
             AppConfigFragmentUpserterSpec(
                 config_name="theme",
                 scope_type=case.scope_type,
@@ -912,6 +915,8 @@ class TestUpsert:
             )
         ])
 
+        assert result.failed == []
+        upserted = result.items
         assert [(f.config_name, f.scope_type, f.scope_id) for f in upserted] == [
             ("theme", case.scope_type, case.scope_id)
         ]
@@ -963,7 +968,7 @@ class TestUpsert:
         """
         existing = fragment_at_every_scope[case.scope_type]
 
-        upserted = await repository.bulk_upsert([
+        result = await repository.bulk_upsert([
             AppConfigFragmentUpserterSpec(
                 config_name="theme",
                 scope_type=case.scope_type,
@@ -972,6 +977,8 @@ class TestUpsert:
             )
         ])
 
+        assert result.failed == []
+        upserted = result.items
         assert [f.id for f in upserted] == [existing.id]
         assert upserted[0].config == {"theme": "light"}
         async with database.begin_readonly_session() as db_sess:
@@ -1010,7 +1017,7 @@ class TestUpsert:
             )
         ])
 
-        upserted = await repository.bulk_upsert([
+        result = await repository.bulk_upsert([
             AppConfigFragmentUpserterSpec(
                 config_name="theme",
                 scope_type=AppConfigScopeType.PUBLIC,
@@ -1025,7 +1032,8 @@ class TestUpsert:
             ),
         ])
 
-        assert [(f.scope_type, f.config) for f in upserted] == [
+        assert result.failed == []
+        assert [(f.scope_type, f.config) for f in result.items] == [
             (AppConfigScopeType.PUBLIC, {"theme": "light"}),
             (AppConfigScopeType.USER, {"theme": "solarized"}),
         ]
@@ -1082,4 +1090,6 @@ class TestUpsert:
     async def test_upsert_of_no_items_writes_nothing(
         self, repository: AppConfigFragmentRepository, theme_registered: None
     ) -> None:
-        assert await repository.bulk_upsert([]) == []
+        result = await repository.bulk_upsert([])
+        assert result.items == []
+        assert result.failed == []
