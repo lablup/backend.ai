@@ -84,8 +84,13 @@ jobs:
           git config user.name "$COMMIT_AUTHOR"
           git config user.email "$COMMIT_AUTHOR_EMAIL"
           git fetch origin main "$TARGET_COMMIT"
-          # Deliberately without `-X theirs`: a conflict must surface as a
-          # failure rather than be resolved by overwriting the release branch.
+          # Generated API docs: keep the release branch's copy (update-api-schema
+          # regenerates them on the backport PR); source conflicts still fail.
+          git config merge.ours.driver true
+          printf '%s\n' \
+            "docs/manager/rest-reference/openapi.json merge=ours" \
+            "docs/manager/graphql-reference/*.graphql merge=ours" \
+            >> .git/info/attributes
           git cherry-pick "$TARGET_COMMIT"
       - name: Report the conflict
         if: failure()
