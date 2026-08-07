@@ -44,7 +44,6 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.user import UserModificationBadRequest
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base.creator import Creator
@@ -252,10 +251,6 @@ async def admin_bulk_update_users_v2(
     items: list[UserUpdateSpec] = []
     for user_item in input.users:
         dto = user_item.input.to_pydantic()
-        if dto.main_access_key is None:
-            raise UserModificationBadRequest(
-                "main_access_key cannot be null; omit it to leave the default keypair unchanged."
-            )
 
         updater_spec = UserUpdaterSpec(
             username=(
@@ -325,9 +320,9 @@ async def admin_bulk_update_users_v2(
                 else OptionalState.nop()
             ),
             main_access_key=(
-                OptionalState.nop()
+                TriState.nop()
                 if isinstance(dto.main_access_key, Sentinel)
-                else OptionalState.update(dto.main_access_key)
+                else TriState.from_graphql(dto.main_access_key)
             ),
             container_uid=(
                 TriState.nop()
