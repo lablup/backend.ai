@@ -156,6 +156,13 @@ class ImageIdentityInfoDTO(BaseResponseModel):
 
     canonical_name: str = Field(description="Full canonical name of the image.")
     namespace: str = Field(description="Image namespace/path within the registry.")
+    tag: str | None = Field(
+        default=None,
+        description="Full image tag as written in the image reference (e.g. '3.11-ubuntu20.04-cuda12.1').",
+    )
+    version: str = Field(
+        description="Base version parsed from the tag, i.e. the segment before the first platform tag (e.g. '3.11' for '3.11-ubuntu20.04')."
+    )
     architecture: str = Field(description="CPU architecture.")
 
 

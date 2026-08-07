@@ -729,7 +729,7 @@ class ImageRow(CreatedAtMixin, Base):  # type: ignore[misc]
         return result
 
     def to_dataclass(self) -> ImageData:
-        _, ptag_set = self.image_ref.tag_set
+        version, ptag_set = self.image_ref.tag_set
         return ImageData(
             id=self.id,
             name=ImageCanonical(self.name),
@@ -737,6 +737,7 @@ class ImageRow(CreatedAtMixin, Base):  # type: ignore[misc]
             image=self.image,
             created_at=self.created_at,
             tag=self.tag,
+            version=version,
             registry=self.registry,
             registry_id=self.registry_id,
             architecture=self.architecture,
