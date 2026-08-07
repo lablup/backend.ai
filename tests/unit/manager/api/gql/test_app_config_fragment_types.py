@@ -85,7 +85,7 @@ class TestUpsertAppConfigFragmentsPayloadGQL:
             failed=[AppConfigFragmentUpsertErrorInfo(config_name="menu", message="not allowed")],
         )
 
-        gql = UpsertAppConfigFragmentsPayloadGQL.from_payload(payload)
+        gql = UpsertAppConfigFragmentsPayloadGQL.from_pydantic(payload)
 
         assert [item.config_name for item in gql.items] == ["theme"]
         assert cast(dict[str, Any], gql.items[0].config) == {"mode": "dark"}
