@@ -145,7 +145,7 @@ class SessionDBSource:
             user = await db_sess.scalar(query)
             if user is None:
                 raise SessionNotFound(f"Session with id {session_id} not found")
-            return UserData.from_row(user, user.main_keypair_access_key)
+            return UserData.from_row(user)
 
     async def get_session_validated(
         self,

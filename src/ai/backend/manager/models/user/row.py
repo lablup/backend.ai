@@ -237,7 +237,7 @@ class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     )
 
     @declared_attr
-    def main_keypair_access_key(cls) -> Mapped[str | None]:
+    def default_keypair_access_key(cls) -> Mapped[str | None]:
         """The access key of the keypair marked as this user's main one.
 
         A scalar subquery rather than a relationship attribute so that it loads
@@ -437,7 +437,7 @@ class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
             totp_activated=self.totp_activated,
             totp_activated_at=self.totp_activated_at,
             sudo_session_enabled=self.sudo_session_enabled,
-            main_access_key=self.main_keypair_access_key,
+            main_access_key=self.default_keypair_access_key,
             container_uid=self.container_uid,
             container_main_gid=self.container_main_gid,
             container_gids=self.container_gids,

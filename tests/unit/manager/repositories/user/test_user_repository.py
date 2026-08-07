@@ -1384,7 +1384,7 @@ class TestUserDataConversion:
             container_gids=None,
         )
 
-        user_data = UserData.from_row(user_row, "test_access_key")
+        user_data = UserData.from_row(user_row)
 
         assert user_data.uuid == user_row.uuid
         assert user_data.username == user_row.username
@@ -1422,7 +1422,7 @@ class TestUserDataConversion:
             container_gids=None,
         )
 
-        user_data = UserData.from_row(user_row, "test_access_key")
+        user_data = UserData.from_row(user_row)
 
         assert user_data.allowed_client_ip is not None
         assert user_data.allowed_client_ip == ["192.168.1.0/24", "10.0.0.0/8"]
@@ -1454,7 +1454,7 @@ class TestUserDataConversion:
             container_gids=None,
         )
 
-        user_data = UserData.from_row(user_row, "test_access_key")
+        user_data = UserData.from_row(user_row)
 
         assert user_data.allowed_client_ip is None
 
