@@ -25,7 +25,7 @@ from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.user import UserID
-from ai.backend.common.types import SlotName, VFolderID
+from ai.backend.common.types import AccessKey, SlotName, VFolderID
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -257,7 +257,7 @@ class GroupDBSource:
         w: RBACWriteOps,
         project_id: ProjectID,
         user_ids: Sequence[UserID],
-    ) -> list[tuple[UserRow, str | None]]:
+    ) -> list[tuple[UserRow, AccessKey | None]]:
         """Users among ``user_ids`` that belong to the project's domain and are not
         yet members of the project, each with the access key of its marked keypair."""
         project_domain_subq = (
@@ -684,7 +684,7 @@ class GroupDBSource:
             ]
             await w.bulk_create(BulkCreator(specs=user_role_specs))
 
-            return [row.to_data(access_key) for row, access_key in new_users]
+            return [row.to_data(default_access_key) for row, default_access_key in new_users]
 
     async def unassign_users_from_project(
         self, unbinder: UserProjectEntityUnbinder

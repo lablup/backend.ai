@@ -169,8 +169,8 @@ class UserDBSource:
         Admin-only operation.
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
-            user_row, access_key = await self._get_user_by_uuid(db_session, user_uuid)
-            return user_row.to_data(access_key)
+            user_row, default_access_key = await self._get_user_by_uuid(db_session, user_uuid)
+            return user_row.to_data(default_access_key)
 
     async def get_by_email_validated(
         self,
@@ -181,8 +181,8 @@ class UserDBSource:
         Returns None if user not found or access denied.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
-            user_row, access_key = await self._get_user_by_email(session, email)
-            return user_row.to_data(access_key)
+            user_row, default_access_key = await self._get_user_by_email(session, email)
+            return user_row.to_data(default_access_key)
 
     async def create_user_validated(
         self, creator: Creator[UserRow], group_ids: list[str] | None
@@ -710,7 +710,7 @@ class UserDBSource:
 
     async def _get_user_by_email(
         self, session: SASession, email: str
-    ) -> tuple[UserRow, str | None]:
+    ) -> tuple[UserRow, AccessKey | None]:
         """Private method to get user by email, with the access key of its marked keypair."""
         res = (
             await session.execute(
@@ -725,7 +725,7 @@ class UserDBSource:
 
     async def _get_user_by_uuid(
         self, session: SASession, user_uuid: UUID
-    ) -> tuple[UserRow, str | None]:
+    ) -> tuple[UserRow, AccessKey | None]:
         """Private method to get user by UUID, with the access key of its marked keypair."""
         res = (
             await session.execute(
