@@ -673,6 +673,15 @@ class ContainerdSessionNetwork:
             return await self._privnet_local_subnet(session_id)
         return None
 
+    def register_cluster_names(self, session_id: str, names: Mapping[str, str]) -> None:
+        """Register locally-computed peer names (single-node ``cluster_host_ips``) with the session's
+        resolver, so it can answer them without an etcd ``endpoints/`` table — the containerd analog
+        of Docker's network ``Aliases`` feeding dockerd's embedded DNS. No-op if the session is not
+        set up here."""
+        coordinator = self._coordinators.get(session_id)
+        if coordinator is not None:
+            coordinator.register_static_names(session_id, names)
+
     async def local_gateway_of(self, session_id: str) -> str | None:
         """This session's LOCAL bridge gateway — the first usable host of its LOCAL subnet (the
         ``isGateway`` address, mirroring ``cluster_host_ips``). It is where the session's cluster

@@ -812,31 +812,28 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             )
         return mapping, mapping[own]
 
-    def _write_etc_hosts(
-        self, peers: Mapping[str, str], environ: Mapping[str, str]
-    ) -> Mount | None:
-        """Write /etc/hosts and return a bind mount for it.
+    def _write_etc_hosts(self, own_ip: str | None, environ: Mapping[str, str]) -> Mount | None:
+        """Write /etc/hosts (localhost + this kernel's own name) and return a bind mount for it.
 
-        Unconditional now, not only for cluster sessions: containerd/runc (unlike dockerd) does not
+        Unconditional, not only for cluster sessions: containerd/runc (unlike dockerd) does not
         synthesize the file at all, so without this even an ordinary kernel has no ``localhost`` and
-        no entry for its own hostname — the hostname the agent set is then unresolvable. Cluster
-        peers (`_peer_host_map`) are added on top, this kernel's own entry among them.
+        no entry for its own hostname — the hostname the agent set is then unresolvable.
+
+        Peers are deliberately NOT written here — they resolve via the per-session cluster resolver
+        (BEP-1062), matching how Docker leaves peer resolution to its embedded DNS rather than a
+        static file. Only ``localhost`` and *self* stay in the file: ``gethostbyname(gethostname())``
+        (a very common way a process finds its own address) must never depend on the resolver being
+        up, and a cluster member's own name must resolve to its real (overlay/LOCAL) address so its
+        rendezvous server (torchrun/c10d, MPI OOB) binds where peers can reach it.
         """
         if self._scratch_dir is None:
             return None
         lines = ["127.0.0.1\tlocalhost", "::1\tlocalhost ip6-localhost ip6-loopback"]
-        lines += [f"{ip}\t{hostname}" for hostname, ip in peers.items()]
         own_hostname = environ.get("BACKENDAI_CLUSTER_HOST")
-        if own_hostname and not peers:
-            # A standalone kernel (no peer map) still needs its own name to resolve, or a
-            # `gethostbyname(gethostname())` — a very common way for a process to find its own
-            # address — fails outright. 127.0.1.1 is the Debian convention for the host's own name.
-            #
-            # NEVER do this when there IS a peer map: a cluster member's own name must resolve to its
-            # real (overlay/LOCAL) address, which _peer_host_map guarantees is in `peers` (it raises
-            # otherwise). Mapping a clustered kernel's name to loopback would bind its rendezvous
-            # server there, unreachable by peers.
-            lines.append(f"127.0.1.1\t{own_hostname}")
+        if own_hostname:
+            # A clustered kernel maps its own name to its real address (own_ip); a standalone kernel
+            # has none, so use 127.0.1.1 (the Debian convention for the host's own name).
+            lines.append(f"{own_ip}\t{own_hostname}" if own_ip else f"127.0.1.1\t{own_hostname}")
         hosts_file = self._scratch_dir / "config" / "hosts"
         _atomic_write_text(hosts_file, "\n".join(lines) + "\n")
         return Mount(MountTypes.BIND, hosts_file, Path("/etc/hosts"), MountPermission.READ_ONLY)
@@ -1253,14 +1250,19 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         # User-facing provisioning from internal_data: ssh keypair, dotfiles, bootstrap script,
         # registry credentials.
         await self._provision_internal_data(resource_spec)
-        # containerd/runc (unlike Docker) neither synthesizes /etc/hosts nor provides cluster DNS,
-        # so write one (localhost + own hostname) and add peer resolution for cluster sessions.
+        # containerd/runc (unlike Docker) neither synthesizes /etc/hosts nor provides cluster DNS.
+        # Write localhost + self into /etc/hosts; peers resolve via the per-session cluster resolver.
         peers, static_ip = await self._peer_host_map(cluster_info, environ)
         if static_ip is not None:
             # Single-node cluster: pin this kernel at the address its peers expect, via the same
-            # kernel_config channel the overlay uses (the bridge backend reads it at attach).
+            # kernel_config channel the overlay uses (the bridge backend reads it at attach). And
+            # register the locally-computed peer map with the resolver — single-node sessions have no
+            # etcd endpoints/ table, so this is the resolver's only source for them (cf. Docker's
+            # network Aliases feeding its embedded DNS).
             cast(dict[str, Any], self.kernel_config)["local_static_ip"] = static_ip
-        if (hosts_mount := self._write_etc_hosts(peers, environ)) is not None:
+            self._session_network.register_cluster_names(self._session_id, peers)
+        own_ip = peers.get(environ.get("BACKENDAI_CLUSTER_HOST") or "")
+        if (hosts_mount := self._write_etc_hosts(own_ip, environ)) is not None:
             self._oci_mounts.append(hosts_mount)
         # containerd/runc provides no resolver either (dockerd synthesizes one per container).
         if (resolv_mount := self._prepare_resolv_conf()) is not None:

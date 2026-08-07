@@ -12,7 +12,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Mapping
 from contextlib import aclosing
 from typing import TYPE_CHECKING, Any
 
@@ -64,6 +64,10 @@ class SessionNetworkCoordinator:
     # remote-only FDB view). Maintained by the same watch/reconcile that programs the data plane, so
     # the per-session cluster name resolver reads a live map. See cluster-name-resolution.md.
     _names: dict[str, dict[str, str]]
+    # session_id -> {cluster_hostname: ip} supplied by the agent, not etcd. Single-node sessions
+    # have no central endpoints/ table (the agent lays peers out locally with cluster_host_ips), so
+    # their names are registered here instead. Consulted as a fallback after the etcd-backed _names.
+    _static_names: dict[str, dict[str, str]]
 
     def __init__(
         self,
@@ -79,6 +83,7 @@ class SessionNetworkCoordinator:
         self._watch_tasks = {}
         self._sweep_tasks = {}
         self._names = {}
+        self._static_names = {}
 
     async def start(self, meta: SessionNetMeta, self_member: Member) -> None:
         """Bring up this node's data plane for the session, publish membership, apply
@@ -159,6 +164,7 @@ class SessionNetworkCoordinator:
         self._applied.pop(session_id, None)
         self._applied_endpoints.pop(session_id, None)
         self._names.pop(session_id, None)
+        self._static_names.pop(session_id, None)
 
     async def reconcile_peers(self, session_id: str) -> None:
         """Diff the published members against what has been applied and drive the
@@ -274,8 +280,22 @@ class SessionNetworkCoordinator:
         here or the name is not one it owns — the resolver then forwards the query upstream.
 
         Scoped by ``session_id``: identical cluster hostnames (every session names kernels
-        ``main1``/``sub1``/…) never collide because each session's names live under its own key."""
-        return (self._names.get(session_id) or {}).get(hostname.lower())
+        ``main1``/``sub1``/…) never collide because each session's names live under its own key.
+
+        The etcd-backed dynamic map wins; agent-registered static names (single-node sessions, which
+        have no ``endpoints/`` table) are the fallback."""
+        key = hostname.lower()
+        if (ip := (self._names.get(session_id) or {}).get(key)) is not None:
+            return ip
+        return (self._static_names.get(session_id) or {}).get(key)
+
+    def register_static_names(self, session_id: str, names: Mapping[str, str]) -> None:
+        """Register agent-computed ``hostname -> ip`` names for a session (single-node
+        ``cluster_host_ips``), so the resolver can answer them even though nothing is written to
+        etcd. Merged (not replaced) and lower-cased for case-insensitive lookup."""
+        self._static_names.setdefault(session_id, {}).update({
+            hostname.lower(): ip for hostname, ip in names.items()
+        })
 
     async def _read_endpoints(self, session_id: str) -> dict[str, EndpointAddr]:
         raw = await self._etcd.get_prefix(endpoints_prefix(session_id))

@@ -394,6 +394,28 @@ class TestClusterNameResolution:
         await coord.reconcile_endpoints("s1")
         assert coord.resolve_cluster_name("s1", "main1") is None
 
+    async def test_static_names_answer_when_etcd_has_none(self) -> None:
+        # Single-node sessions have no endpoints/ table; the agent registers cluster_host_ips here.
+        etcd = FakeEtcd()
+        coord = _coordinator(etcd, RecordingBackend())
+        coord.register_static_names("s1", {"main1": "172.30.0.2", "sub1": "172.30.0.3"})
+        assert coord.resolve_cluster_name("s1", "sub1") == "172.30.0.3"
+        assert coord.resolve_cluster_name("s1", "Main1") == "172.30.0.2"  # case-insensitive
+        assert coord.resolve_cluster_name("s1", "nope") is None
+        assert coord.resolve_cluster_name("other", "sub1") is None  # session-scoped
+
+    async def test_etcd_names_win_over_static(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_member(_PEER2)
+        etcd.seed_endpoint(
+            "c-remote", "10.128.5.20", "02:42:0a:80:05:14", agent_id="a2", cluster_hostname="sub1"
+        )
+        coord = _coordinator(etcd, RecordingBackend())
+        coord.register_static_names("s1", {"sub1": "172.30.0.3"})  # stale/local copy
+        await coord.reconcile_endpoints("s1")
+        assert coord.resolve_cluster_name("s1", "sub1") == "10.128.5.20"  # dynamic etcd wins
+
     async def test_session_cluster_names_binds_a_session_scope(self) -> None:
         # The resolver sees only a bare hostname; SessionClusterNames pins the session so identical
         # names in another session are never reached through this adapter.
