@@ -7,451 +7,174 @@ Target-Version:
 Implemented-Version:
 ---
 
+<!-- context-for-ai
+type: master-bep
+scope: Add a ROUTER frontend mode to AppProxy so continuum-router serves every published model behind one OpenAI-compatible address, driven by Manager-defined model publications and model API keys.
+detail-docs: [architecture.md, coordinator.md, manager.md, migration.md]
+key-constraints: [Manager never talks to routers directly (the coordinator is the control plane), no plaintext credential at rest or on the event bus, stock WILDCARD/PORT workers and deployment access tokens unchanged, coordinator-worker protocol stays events + pull (no coordinator-to-worker dialing)]
+key-decisions: [hierarchical routing realized inside the ROUTER worker with per-replica-group router instances (2026-07-15), replica-group id/weight propagated through the existing circuit wire (2026-07-15), fail-fast on stock/ROUTER inference-worker colocation (2026-07-15), model API keys with hash-only custody (2026-06-21), publications scoped per authority (2026-06-21)]
+phases: 6
+-->
+
 # ROUTER Frontend Mode: LLM Inference Gateway Integration
 
 ## Related Issues
 
 - JIRA: TBD
-- GitHub: [lablup/continuum-router#748](https://github.com/lablup/continuum-router/pull/748)
-  (the worker-side design document this proposal pairs with:
-  `docs/en/architecture/appproxy-worker.md`)
+- GitHub: [lablup/backend.ai#12331](https://github.com/lablup/backend.ai/pull/12331) (this refinement),
+  [lablup/continuum-router#748](https://github.com/lablup/continuum-router/pull/748) (paired worker-side design:
+  `docs/en/architecture/appproxy-worker.md`),
+  [lablup/continuum-router#804](https://github.com/lablup/continuum-router/issues/804) (router-side implementation epic; rework tracker)
 
 ## Motivation
 
-Backend.AI serves models through a stack of three concepts: a **deployment
-endpoint** (`EndpointRow`) with replicas, revisions, and autoscaling; one or
-more backing **replica sessions** (`RoutingRow`), each reachable at a
-`kernel_host:kernel_port`; and an AppProxy **circuit** that binds the endpoint
-to its replicas on a proxy worker, load balancing by `traffic_ratio`.
+Backend.AI publishes each model deployment at its *own* frontend slot — a
+dedicated wildcard subdomain or port with a per-deployment JWT. That shape is
+transparent, but it leaves four gaps for LLM inference at the cluster level:
 
-Today each endpoint is published at its *own* frontend slot — a dedicated
-wildcard subdomain or port — with its own per-endpoint JWT, the *deployment
-access token* (`EndpointTokenRow`). That shape is transparent and simple,
-but it leaves a gap for LLM inference at the cluster level:
+- **No single surface.** Every deployment has a different base URL; no
+  OpenAI-compatible SDK can hold one address and pick a model by name.
+- **No model abstraction.** Users address a *deployment*, not a *model*; there
+  is no first-class way to back one model name with several deployments (A/B
+  tests, cross-resource-group balancing).
+- **No key governance.** A deployment access token grants one deployment; no
+  API-key surface scopes *which models* a consumer may see across the cluster.
+- **No LLM-aware data plane.** The stock worker forwards bytes; protocol
+  translation, fallback chains, and prefix/KV-cache-aware routing need an L7
+  router that understands inference traffic.
 
-- **No single surface.** Every deployment has a different base URL. Clients
-  cannot hold one address and pick a model by name, the way every
-  OpenAI-compatible SDK expects.
-- **No model abstraction.** Users address a *deployment*, not a *model*.
-  There is no first-class way to publish one model name backed by several
-  deployment endpoints — for A/B testing two revisions, or for balancing one
-  model across resource groups.
-- **No key governance.** A deployment access token grants access to one
-  deployment; there is no API-key surface that scopes *which models* a
-  consumer may see and use across the cluster.
-- **No LLM-aware data plane.** The stock worker forwards bytes. Protocol
-  translation (OpenAI ↔ Anthropic ↔ Gemini), fallback chains, response
-  caching, and prefix/KV-cache-aware routing all need an L7 router that
-  understands inference traffic.
+[Continuum Router](https://github.com/lablup/continuum-router) is that data
+plane. This proposal integrates it as a new kind of AppProxy worker — a
+**ROUTER frontend mode** — and gives the Manager a management surface for what
+the router publishes. The design intent, in one sentence each:
 
-[Continuum Router](https://github.com/lablup/continuum-router) provides
-exactly that data plane. This proposal adds the Backend.AI-side support to
-run it as a new kind of AppProxy worker: a **ROUTER frontend mode** in which
-the worker holds a **single binding address** for its sole endpoint, all slot
-management is skipped, and the request's `model` name (gated by an API key)
-becomes the addressing key. The AppProxy coordinator remains the control
-plane; the Backend.AI Manager gains a management surface for
-**key–model–service mappings** that define what the router publishes.
+- **The router owns one address; the request's `model` name is the addressing
+  key.** No slots, no per-deployment URLs; the Manager hands users the triple
+  *(base URL, model name, model API key)*.
+- **Users configure names and keys deliberately; the system keeps traffic
+  correct continuously.** Publications and keys are explicit Manager actions;
+  replica scaling, health, and rollout ramps flow through existing machinery
+  with no user action.
+- **The routing hierarchy mirrors the platform's own hierarchy.** Model →
+  deployment endpoints → replica groups → replicas, each level normalized and
+  owned by the layer that already owns that concept (see the architecture
+  document).
+- **Reuse the existing control-plane idioms.** Full-state-per-entity events +
+  pull-reconcile snapshots, first-ack proactive deploy, shared
+  `X-BackendAI-Token` auth — the same shapes the circuit protocol already uses.
 
-## Current Design
+## Architecture at a glance
 
-### Frontend modes and slots
+```mermaid
+flowchart LR
+    subgraph mgmt["Control plane"]
+        MGR["Backend.AI Manager<br/>(source of truth:<br/>publications, model API keys)"]
+        COORD["AppProxy Coordinator<br/>(persists desired state,<br/>schedules circuits,<br/>broadcasts events)"]
+    end
+    subgraph router["ROUTER worker (continuum-router, one authority, N HA nodes)"]
+        GATE["API-key gate<br/>(hash lookup, model visibility)"]
+        ROOT["Model router<br/>(endpoint pick by ratio)"]
+        RG1["Replica-group instance A<br/>(KV/prefix-aware replica pick)"]
+        RG2["Replica-group instance B"]
+    end
+    CLIENT(["OpenAI-compatible client<br/>POST /v1/chat/completions<br/>Bearer sk-… + model name"])
+    R1(["replica sessions<br/>(kernels)"])
+    R2(["replica sessions<br/>(kernels)"])
 
-`FrontendMode` (`src/ai/backend/appproxy/common/types.py`) has two values:
-
-```python
-class FrontendMode(enum.StrEnum):
-    WILDCARD_DOMAIN = "wildcard"
-    PORT = "port"
+    MGR -- "PUT /v2/routers/*" --> COORD
+    COORD -- "events (Redis Pub/Sub)<br/>+ snapshot pull (REST)" --> router
+    CLIENT --> GATE --> ROOT
+    ROOT --> RG1 --> R1
+    ROOT --> RG2 --> R2
 ```
 
-A worker advertises a slot space at registration (`wildcard_domain` or
-`port_range`); the coordinator allocates one slot (a generated subdomain or a
-port) per circuit in `add_circuit()`, and `Circuit.get_endpoint_url()` builds
-a per-deployment URL from that slot. `Worker._calculate_available_slots()`
-returns `-1` for wildcard and the range size for port mode.
-
-### Deployment access tokens
-
-The Manager mints per-endpoint JWTs via the coordinator
-(`POST /v2/endpoints/{endpoint_id}/token` →
-`Circuit.generate_jwt()`, HS256 with the cluster-wide `jwt_secret`), stores
-them in `EndpointTokenRow`, and the stock worker verifies the bearer per
-circuit. This is the deployment API's *access token*
-(`create_access_token` in `services/deployment/service.py`); it grants
-access to exactly one deployment.
-
-### Coordinator → worker propagation
-
-Two mechanisms exist (`src/ai/backend/appproxy/coordinator/types.py:CircuitManager`):
-
-- **Legacy (aiohttp worker) mode.** Circuit changes are broadcast as Redis
-  Pub/Sub events carrying the **full per-entity state**
-  (`AppProxyCircuitCreatedEvent` / `…RouteUpdatedEvent` / `…RemovedEvent`).
-  Circuit creation blocks up to 15 s for the **first** worker ack
-  (`initialize_legacy_circuit`, raising `E10001` on timeout); route updates
-  and removals are fire-and-forget. The worker pulls the circuit snapshot
-  exactly once, at startup (`src/ai/backend/appproxy/worker/server.py:worker_registration_ctx`).
-- **Traefik mode.** The coordinator writes each circuit's full desired state
-  into etcd (`atomic_replace_prefixes`) and a leader-elected
-  `reconcile_traefik_routes` task re-publishes every circuit and drops
-  orphans every 30 s — explicitly "a safety net against missed propagation
-  events (e.g. on coordinator restart or transient Redis issues)".
-
-Note the asymmetry this proposal will reuse: the protocol has **no
-coordinator→worker dialing** (events + pull only), achieves idempotency via
-**full-state-per-entity** payloads rather than version chains, and the newer
-Traefik path compensates for lossy events with **periodic set-diff
-reconciliation** against the desired state.
-
-## Proposed Design
-
-### Terminology
-
-This proposal introduces a second inference credential next to an existing,
-customer-visible one. To avoid confusion, the two are named as follows and
-used consistently throughout:
-
-- **Deployment access token** — the *existing* credential: a per-deployment
-  JWT minted via the coordinator and stored in `EndpointTokenRow` (the
-  deployment API's "access token"). **It is neither renamed nor changed by
-  this proposal** and keeps working for WILDCARD/PORT frontends exactly as
-  today.
-- **Model API key** — the *new* credential: an opaque `sk-…`-style key
-  generated by the Manager, carrying an RBAC-derived allowed-model set, and
-  presented to the ROUTER-mode worker the way any OpenAI-compatible SDK
-  expects an API key.
-
-Naming rationale: "access key" is deliberately avoided because it already
-means the AK half of the platform keypair (`access_key`/`secret_key`);
-"router … key" is avoided because it leaks a data-plane component name and
-collides with the existing route/routing terminology of model serving
-(`RoutingRow`, `route_info`). "Model API key" names the scope (models) and
-matches what users already call the `sk-…` string they paste into an SDK.
-Internal identifiers (the `router_api_keys` table, `/v2/routers/*` paths,
-event names) may still reference the ROUTER frontend mode; only user-facing
-surfaces (GraphQL/CLI/WebUI/docs) use the term *model API key*.
-
-### Overview
-
-```text
-   Backend.AI Manager ──(key–model–service mappings)──► AppProxy Coordinator
-        │  user creates deployments,                        │ persists desired state
-        │  defines models & API keys                        │ (PostgreSQL); schedules
-        ▼                                                   │ circuits; broadcasts
-   deployment endpoints (replica sessions)                  │ events (Redis Pub/Sub)
-                                                            ▼
-   client ── POST /v1/chat/completions ──► continuum-router worker
-             Authorization: Bearer <key>     (frontend_mode = router,
-             {"model": "llama-4-chat", …}     one address, no slots)
-                                                │
-                                                ▼  weighted selection
-                                       replica sessions (kernels)
-```
-
-Two-level hierarchical routing on the worker: an API key scopes the visible
-**models**; a model maps to one or more **deployment endpoints** (each
-mapping carrying a split `ratio`); each endpoint resolves to its replica
-sessions via the circuit's `route_info`, weighted by
-`ratio × traffic_ratio`. The Manager hands users the triple **(base URL,
-model name, API key)** instead of a per-deployment URL.
-
-### Request path and responsibility split
-
-An LLM inference request resolves through three mapping layers, each owned
-by a different part of the stack:
-
-```text
-API key ──(1: visibility)──► model ──(2: publication)──► endpoint(s) ──(3: replicas)──► replica session
-        enforced by the router      defined in the Manager,           maintained by the core
-        at request time             delivered via the coordinator     (autoscaling, health checks)
-```
-
-1. **key → models** (router). The router authenticates the key and restricts
-   model listing and use to the key's allowed-model set. The router only
-   *enforces* a materialized list; it never evaluates permissions itself.
-2. **model → endpoints** (AppProxy). The publication mapping — which
-   deployment endpoints serve a model, with what split ratios — is stored on
-   the coordinator and pushed to the router as described below.
-3. **endpoint → replica sessions** (core). Each endpoint's replica set is
-   the circuit's `route_info`, fed from the Manager's `RoutingRow` state and
-   flowing to the router through the existing circuit route-update events.
-
-The layers split cleanly between what a **user configures deliberately** and
-what the **system maintains continuously**:
+A request resolves through three mapping layers, each owned by a different
+part of the stack; the split between deliberate user configuration and
+continuous system maintenance is the design's backbone:
 
 | Mapping layer | Owner | How |
 |---|---|---|
-| Key generation / issuance | **User** | An explicit action via WebUI / API / CLI; the Manager mints the model API key and persists it with its owner. |
-| Model → endpoint mapping | **User** | Explicit publication management via WebUI / API / CLI: choose the model name, the backing endpoints, and the split ratios (A/B tests, resource-group balancing). |
-| Key → model visibility | **System** | Derived from RBAC: the Manager computes the key's allowed-model set from the owner's scope (domain/project permissions over published models), optionally narrowed further at issuance, and recomputes and re-propagates it whenever RBAC grants or publications change — no manual list maintenance. |
-| Endpoint → replica sessions | **System** | Continuously updated by deployment scaling and health checks: `RoutingRow` changes flow to circuit `route_info` and on to the router as route-update events, with no user action. |
+| API key → visible models | **User at issuance** (system shrinks) | Explicit allow-list, validated to be a subset of the owner's RBAC-visible published names; never auto-expands |
+| Model → endpoints (+ split `ratio`) | **User** | Explicit *publication* management via WebUI / API / CLI |
+| Endpoint → replica groups → replicas | **System** | Existing deployment scaling, rollout, and health machinery; propagated over the existing circuit wire |
 
-In other words, users decide *what is published and who gets a key*; the
-system keeps *what a key can see* and *what actually serves the traffic*
-correct over time. The `allowed_models` value pushed to the coordinator and
-the router (§3, §4) is therefore a **materialized view** computed by the
-Manager from RBAC state: when a user's permissions change, the Manager
-re-issues `PUT /v2/routers/{authority}/api-keys/{key_id}` with the
-recomputed set, and the normal propagation path applies it.
+## Document index
 
-### 1. Common: `FrontendMode.ROUTER`
-
-```python
-class FrontendMode(enum.StrEnum):
-    WILDCARD_DOMAIN = "wildcard"
-    PORT = "port"
-    ROUTER = "router"  # new
-```
-
-`WorkerRequestModel` gains one optional field:
-
-```python
-traffic_port: int | None  # ROUTER mode: advertised data-plane port
-                          # (an LB may front the worker); defaults to api_port
-```
-
-Registration validation per mode: ROUTER requires neither `port_range` nor
-`wildcard_domain` (both must be null) and accepts `traffic_port`;
-the existing modes are unchanged.
-
-### 2. Coordinator: slot-free circuits
-
-- `Worker._calculate_available_slots()` returns unbounded (`-1`) for ROUTER
-  workers; `occupied_slots` accounting is skipped.
-- `add_circuit()` skips subdomain/port allocation: ROUTER circuits are
-  created with `port = None` **and** `subdomain = None`.
-- `Circuit.get_endpoint_url()` gains a ROUTER branch returning the worker's
-  single advertised base URL (`hostname` + `traffic_port`, scheme from
-  `tls_advertised`) — the same URL for every circuit on that worker.
-- `open_to_public` is ignored for ROUTER circuits (API keys gate access);
-  `allowed_client_ips` is still honoured by the worker.
-- HA: multiple router nodes register under one `authority` (the existing
-  `nodes`-counter semantics), typically behind an external L4 LB whose
-  address is the advertised `hostname`. The coordinator delivers the same
-  circuits and mappings to every node of the authority.
-
-### 3. Coordinator: desired-state persistence
-
-Two new tables, scoped per worker authority, with a per-authority monotonic
-`revision` bumped in the same transaction as any mutation:
-
-```text
-router_models:
-    id UUID PK
-    worker_authority str  (indexed)
-    model_name str
-    mappings JSONB        # [{"endpoint_id": UUID, "ratio": float}]
-    created_at / updated_at
-    UNIQUE (worker_authority, model_name)
-
-router_api_keys:
-    id UUID PK
-    worker_authority str  (indexed)
-    key_id str            # manager-side identifier
-    token str             # opaque key material (see Security)
-    allowed_models JSONB  # ["model-a", "model-b"]
-    expires_at datetime | None
-    rate_limit int | None
-    created_at / updated_at
-    UNIQUE (worker_authority, key_id)
-```
-
-Persistence on the coordinator is required, not optional: the router
-worker's runtime state is in-memory by design, so the coordinator must be
-able to replay the full mapping/key set whenever a router node
-(re-)registers.
-
-### 4. Coordinator: manager-scope REST API (new)
-
-Authenticated with the shared `X-BackendAI-Token`, like the existing
-`/v2/endpoints` family:
-
-| Method & path | Purpose |
+| Document | Description |
 |---|---|
-| `GET /v2/routers/{authority}/models` | list model mappings |
-| `PUT /v2/routers/{authority}/models/{model}` | upsert: `{mappings: [{endpoint_id, ratio}]}` |
-| `DELETE /v2/routers/{authority}/models/{model}` | unpublish a model |
-| `GET /v2/routers/{authority}/api-keys` | list keys (masked) |
-| `PUT /v2/routers/{authority}/api-keys/{key_id}` | upsert: `{token, allowed_models, expires_at, rate_limit}` |
-| `DELETE /v2/routers/{authority}/api-keys/{key_id}` | revoke a key |
-
-**Proactive-deploy semantics.** Each mutating call (1) persists to
-PostgreSQL and bumps the authority's `revision`, (2) broadcasts the
-corresponding event (below), (3) waits up to 15 s for the **first** worker
-ack — the same pattern `initialize_legacy_circuit` uses — and returns. It
-never waits for every node, and replica-session health never gates it. On
-ack timeout the call still **succeeds** (the persisted state is
-authoritative; pull reconciliation guarantees convergence) with the response
-flagging propagation as deferred.
-
-### 5. Coordinator: worker-scope snapshot endpoint (new)
-
-```text
-GET /api/worker/{worker_id}/router-config
-→ {revision, models: [...], api_keys: [...]}
-```
-
-The router worker pulls this at registration (full in-memory state restore)
-and on its reconcile timer, reconciling by **set-diff** — the same idiom as
-`reconcile_traefik_etcd_state`, moved worker-side. The opaque `revision`
-makes an unchanged poll a cheap no-op.
-
-### 6. Coordinator: new Pub/Sub events
-
-Five new events on the existing `events_all-appproxy` bus, following the
-existing envelope and conventions (each inbound event carries the **full new
-state of exactly one entity**, or its deletion — idempotent,
-last-writer-wins, no version chain):
-
-| Event | Direction | args |
-|---|---|---|
-| `appproxy_router_model_updated_event` | → worker | `(authority, model_json)` — full mapping state |
-| `appproxy_router_model_removed_event` | → worker | `(authority, model_name)` |
-| `appproxy_router_key_updated_event` | → worker | `(authority, key_id)` — **notification only, no token** |
-| `appproxy_router_key_removed_event` | → worker | `(authority, key_id)` — applied immediately |
-| `appproxy_worker_router_config_applied_event` | ← worker (ack) | `(authority, kind, id)` |
-
-**Key material never rides the event bus.** Mapping events carry full
-payloads (a mapping contains no secrets), but key events are id-only
-notifications: the worker fetches key material via the authenticated
-`router-config` snapshot. Circuit events already transit this shared bus but
-carry kernel addresses, never credentials; this design preserves that
-property.
-
-The coordinator emits these events for ROUTER workers in **both**
-coordinator modes — the Traefik/etcd path applies to stock circuits only and
-never signals a ROUTER worker.
-
-### 7. Manager: key–model–service mapping management
-
-The Manager is the **source of truth and the single user-facing surface**:
-
-- **Model publications.** A new entity mapping a published model name to one
-  or more deployment endpoints with split ratios, targeted at a router
-  authority. Exposed via GraphQL mutations/queries, CLI, and WebUI. Endpoint
-  lifecycle integration: destroying an endpoint removes it from any
-  publication (re-publishing the mapping minus that endpoint).
-- **Model API keys.** Issuance is a user-initiated action (WebUI / API /
-  CLI); the Manager mints the key material (an opaque `sk-…`-style token)
-  and persists it with the owning user/project and expiry — the deployment
-  access token pattern (`EndpointTokenRow`) lifted from endpoint scope to
-  model scope. Issuing, listing, rotating, and revoking are Manager
-  operations.
-- **RBAC-derived model visibility.** The key's `allowed_models` set is *not*
-  a free-form list: the Manager computes it from the key owner's RBAC scope
-  (domain/project permissions over published models), optionally narrowed
-  further at issuance, and treats the pushed value as a materialized view —
-  recomputed and re-propagated through `/v2/routers/*` whenever the owner's
-  grants or the publication set change (see "Request path and responsibility
-  split").
-- **Propagation.** The Manager never talks to a router directly; it calls
-  the coordinator's `/v2/routers/*` API
-  (`manager/clients/appproxy/client.py` gains the corresponding methods),
-  which persists and broadcasts as described above.
-- **Access info contract.** For deployments attached to a ROUTER
-  publication, the user-visible access information becomes
-  (gateway base URL, model name, model API key) instead of a per-deployment
-  URL + deployment access token.
-
-### 8. Failure model
-
-| Failure | Outcome |
-|---|---|
-| Redis down | Events lost; manager call succeeds with ack timeout flagged; workers converge via periodic snapshot pull (`reconcile_interval`) |
-| Worker node down during a change | Full replay via snapshot pull on re-registration |
-| Coordinator cannot dial a worker (NAT/k8s) | Non-issue — the protocol never dials workers |
-| Both signals lost | Periodic set-diff pull heals within `reconcile_interval` |
-| Coordinator restart mid-fan-out | Desired state is in PostgreSQL; pull reconciliation converges |
-
-Bounded revocation: a node that misses a key-removal notification converges
-at its next pull, so the worst-case revocation window on that node is the
-worker's `reconcile_interval` (default 15 s on the Continuum Router side).
-
-### 9. Security
-
-- All control-plane REST (manager→coordinator, worker→coordinator) keeps the
-  shared `X-BackendAI-Token` authentication.
-- Key material is at rest in the Manager and the coordinator, in memory in
-  the router, and never transits Redis. Both HTTP hops must run over TLS or
-  a trusted network; key values must never be logged; listings are masked.
-- Deployment access tokens (`Circuit.generate_jwt` / `EndpointTokenRow`) are
-  **not used** for ROUTER circuits; model API keys replace them as the
-  data-plane credential. Existing deployment access tokens continue to work
-  for WILDCARD/PORT circuits unchanged.
-
-## Migration / Compatibility
-
-### Backward compatibility
-
-- All changes are additive: a new enum value, a new optional registration
-  field, new tables, new API routes, and new event types. Stock
-  WILDCARD/PORT workers, existing circuits, deployment access tokens, and
-  the Traefik path are untouched.
-- A ROUTER worker cannot register against a coordinator that predates this
-  proposal (registration validation rejects the unknown `frontend_mode`);
-  this is the intended version gate.
-- `SerializableCircuit` consumers must tolerate `frontend_mode == "router"`
-  with both `port` and `subdomain` null; existing workers already filter
-  events by `target_worker_authority`, so they never see ROUTER circuits.
-
-### Breaking changes
-
-None for existing deployments. The WebUI/CLI flows that display endpoint
-URLs need a new presentation path for ROUTER-published deployments
-(base URL + model name + key), which is additive.
+| [architecture](./BEP-1053/architecture.md) | Hierarchical routing model, weight normalization, KV-cache tier scoping, per-replica-group instance lifecycle (and the in-memory vs subprocess trade-off), HA |
+| [coordinator](./BEP-1053/coordinator.md) | `FrontendMode.ROUTER`, registration + colocation fail-fast, per-node liveness, desired-state tables, `/v2/routers/*` API, snapshot + events, failure model, key custody |
+| [manager](./BEP-1053/manager.md) | Publication / model API key entities, Manager-side data model, RBAC visibility + shrink reconciler, rotation/revocation, authority discovery, BEP-1049 interplay |
+| [migration](./BEP-1053/migration.md) | Adding a ROUTER surface to an existing AppProxy deployment, compatibility, version gates, rollback |
 
 ## Implementation Plan
 
-1. **Phase 1 — common + coordinator core**: `FrontendMode.ROUTER`,
-   `traffic_port`, registration validation, slot-skipping `add_circuit()`,
-   `get_endpoint_url()` ROUTER branch.
-2. **Phase 2 — desired state + APIs**: `router_models` / `router_api_keys`
-   tables (+ alembic migration for the appproxy DB), per-authority
-   `revision`, `/v2/routers/*` manager-scope API,
-   `/api/worker/{id}/router-config` worker-scope snapshot.
-3. **Phase 3 — propagation**: the five events, first-ack proactive-deploy
-   wiring in the mutation handlers, replay-on-registration.
-4. **Phase 4 — manager surface**: model publication + model API key
-   entities, GraphQL/CLI, appproxy client methods, endpoint lifecycle hooks,
-   WebUI access-info presentation.
-5. **Phase 5 — end-to-end validation**: integration tests against a
-   Continuum Router worker built with its `appproxy` feature (worker-side
-   tracking: lablup/continuum-router#748 and its implementation epic).
+| Phase | Scope | Detail doc |
+|---|---|---|
+| 1 | `FrontendMode.ROUTER`, `traffic_port` / `node_id` registration fields, colocation fail-fast validation, slot-free circuits, ROUTER branch in `pick_worker()` / `get_endpoint_url()` | coordinator |
+| 1a | Per-node liveness: valkey liveness set, derived `nodes` (mixed-mode-safe), per-node metadata + REST/metrics exposure | coordinator |
+| 2 | Desired-state tables (`router_models`, `router_api_keys`), per-authority `revision`, `/v2/routers/*` manager API, `router-config` snapshot with conditional polling | coordinator |
+| 3 | The five router-config events, `node_id`-tagged acks, first-ack proactive deploy, opt-in strict revocation | coordinator |
+| 4 | Replica-group wire propagation: `replica_groups` on the circuit payload + `replica_group_id` per route, Manager pushing group `traffic_weight` (folds in the BA-6233 follow-up) | architecture, coordinator |
+| 5 | Manager surface: publication + model API key entities and tables, RBAC-validated visibility + shrink reconciler, GraphQL/CLI, authority discovery + fleet view, endpoint lifecycle hooks, access-info presentation | manager |
+| 6 | End-to-end validation with the reworked continuum-router worker (`appproxy-router` feature), including hierarchy overhead measurement for streaming | — |
+
+Cross-repo dependency: continuum-router's shipped ROUTER worker (epic #804)
+implements the *flattened* selection this proposal supersedes; its reconcile
+must be reworked to the hierarchical model before Phase 6 (tracked on #804).
+
+## Decision Log
+
+| Date | Decision | Rationale |
+|---|---|---|
+| 2026-06-21 | Publications are scoped to **one authority**; multi-region is caller-side fan-out | Keeps the entity simple; "one surface for many scaling groups" is met by routing scaling groups to one coordinator |
+| 2026-06-21 | Model API keys use **hash-only custody** (plain SHA-256, plaintext shown once) | A leaked hash is not bearer-equivalent; high key entropy makes unsalted SHA-256 safe and keeps hash-keyed lookup |
+| 2026-06-21 | Key→model visibility is **explicit at issuance, RBAC-validated, shrink-only** | The router only enforces a materialized list; no privilege escalation, no surprise auto-expansion |
+| 2026-06-21 | **Two-tier revocation** accepted; opt-in `strict` all-live-nodes revoke | Explicit revoke is fast; RBAC-driven revoke is bounded by reconcile intervals; instant offboarding uses explicit DELETE |
+| 2026-06-21 | **Aliases** are a first-class publication feature, gated per name per key | One deployment exposed under several names without duplicate publications |
+| 2026-06-21 | `ratio` is a non-negative **relative weight**; `0` drains an endpoint | No sum-to-1 bookkeeping; drain without unmapping |
+| 2026-06-21 | Per-authority single `revision` + conditional snapshot polling; per-node liveness via ephemeral `node_id` | Cheap no-change polls; crash-safe `nodes` accounting without graceful deregistration |
+| 2026-06-21 | Per-node best-effort `rate_limit` (cluster ceiling ≈ limit × nodes) | Preserves stateless nodes; global quota deferred until demanded |
+| 2026-07-15 | **Hierarchical (chained) routing adopted; the flattened one-level pool is superseded** | The shipped flatten-then-multiply weight composition cannot reproduce configured endpoint splits under uneven replica counts; hierarchy normalizes each level independently |
+| 2026-07-15 | Hierarchy is realized **inside the ROUTER worker** as per-replica-group router instances — not by forwarding to stock backing circuits | Forwarding to stock circuits would forfeit continuum-router's replica-level KV machinery (prefix-aware routing, KV index, disaggregated serving); internal realization keeps it and minimizes rework of the shipped worker |
+| 2026-07-15 | **Replica-group id + `traffic_weight` propagate over the existing circuit wire** (`replica_groups` on the circuit, `replica_group_id` per route) | The router needs group membership to build instances; this folds the BA-6233 "weight never reaches AppProxy" follow-up into this proposal |
+| 2026-07-15 | **Fail-fast**: coordinator rejects registrations that would colocate stock and ROUTER inference workers on one coordinator | `pick_worker()` has no key to separate them; explicit error beats silent misrouting (review request on #12331) |
+| 2026-07-15 | Coordinator schema treated as **freely evolvable**; JSONB mirror columns stay | BEP-1005 (coordinator/Manager consolidation) has no work plan; coordinator storage mirrors wire payloads 1:1 and can be normalized later without wire impact |
+| 2026-07-15 | Manager-side data model specified (normalized names/mappings tables, CASCADE backstops + service-layer hooks) | The Manager is the validator: per-authority name uniqueness and reverse lookups become DB constraints and indexed queries |
+| 2026-07-15 | Mixed `node_id` adoption handled deterministically: `nodes` = liveness-set count **+** legacy counter | "First registration decides the mode" breaks during rolling upgrades of stock workers adopting `node_id` |
 
 ## Open Questions
 
-- **Authority scoping granularity.** Mappings and keys are scoped per router
-  authority. Should a publication be able to target multiple authorities
-  (e.g. one per region) in a single Manager operation, or is that a
-  composition concern left to the caller?
-- **Key custody hardening.** The coordinator stores key material in
-  plaintext to support replay. Should both Manager and coordinator store
-  only an HMAC/hash with the plaintext shown once at issuance — at the cost
-  of the router having to match hashes instead of values, or of re-issuing
-  on every replay?
-- **Strict revocation option.** Is the `reconcile_interval`-bounded
-  revocation window acceptable for all tenants, or do we need an optional
-  all-ALIVE-nodes confirmation mode for key deletion?
-- **Autoscaling interplay.** Mapping ratios are static; should the
-  deployment-strategy handler (BEP-1049) be able to adjust ratios
-  dynamically (e.g. canary promotion) through the same `/v2/routers/*` API?
+- **Per-replica-group instance substrate: in-memory scopes vs a subprocess
+  pool.** The lifecycle is self-managed by continuum-router either way; the
+  open question is whether each replica-group instance runs as an in-process
+  scoped selection context or as a supervised child process. Trade-off
+  discussion and the current recommendation (in-memory first, behind a
+  substrate-agnostic seam) live in
+  [architecture.md](./BEP-1053/architecture.md#instance-substrate-in-memory-vs-subprocess).
+- **Conditional snapshot polling: `?known_revision=` query param vs
+  `ETag`/`If-None-Match`.** Functionally equivalent for the single purpose-built
+  client; see the trade-off note in
+  [coordinator.md](./BEP-1053/coordinator.md#snapshot-endpoint). The shipped
+  router client uses the query param; switching is a small, acceptable change.
 
 ## References
 
-- [Continuum Router: AppProxy Worker Mode design](https://github.com/lablup/continuum-router/pull/748)
-  (`docs/en/architecture/appproxy-worker.md`) — the worker-side half of this
-  design: two-level routing realization, weight composition, key
-  enforcement, and the worker's reconcile loop.
+- [continuum-router PR #748](https://github.com/lablup/continuum-router/pull/748)
+  (`docs/en/architecture/appproxy-worker.md`) — the paired worker-side design;
+  to be re-synced to the hierarchical model decided here.
+- [continuum-router#804](https://github.com/lablup/continuum-router/issues/804)
+  — router-side implementation epic (shipped with the superseded flattened
+  selection) and rework tracker.
 - [BEP-1005: Unified AppProxy](BEP-1005-unified-appproxy.md) — longer-term
-  consolidation direction; this proposal stays within the current
-  coordinator/worker split and remains compatible with it.
+  consolidation direction; no work plan, recorded as an evolvability
+  assumption in the Decision Log.
 - [BEP-1006: Service Deployment Strategy](BEP-1006-service-deployment-strategy.md),
   [BEP-1049: Deployment Strategy Handler](BEP-1049-deployment-strategy-handler.md)
-  — deployment/replica lifecycle this proposal builds on.
-- [BEP-1008: RBAC](BEP-1008-RBAC.md),
-  [BEP-1012: RBAC](BEP-1012-RBAC.md),
-  [BEP-1048: RBAC Entity-Relationship Model](BEP-1048-RBAC-entity-relationship-model.md)
-  — the scope/permission model from which key→model visibility is derived.
+  — deployment / replica-group lifecycle this proposal builds on (replica
+  groups introduced in PR #11871, BA-6233).
+- [BEP-1008](BEP-1008-RBAC.md), [BEP-1012](BEP-1012-RBAC.md),
+  [BEP-1048](BEP-1048-RBAC-entity-relationship-model.md) — the RBAC model from
+  which key→model visibility derives.
 - `src/ai/backend/appproxy/coordinator/types.py` (`CircuitManager`) — the
   existing propagation mechanisms whose idioms this proposal reuses.
