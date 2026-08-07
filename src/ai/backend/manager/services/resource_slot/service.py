@@ -2,12 +2,9 @@ from __future__ import annotations
 
 from ai.backend.manager.data.resource_slot.types import (
     AgentResourceData,
-    NumberFormatData,
     ResourceAllocationData,
     ResourceOccupancy,
-    ResourceSlotTypeData,
 )
-from ai.backend.manager.models.resource_slot import ResourceSlotTypeRow
 from ai.backend.manager.repositories.resource_slot.repository import ResourceSlotRepository
 
 from .actions.get_agent_resource_by_slot import (
@@ -38,22 +35,6 @@ from .actions.search_resource_slot_types import (
     SearchResourceSlotTypesAction,
     SearchResourceSlotTypesResult,
 )
-
-
-def _row_to_slot_type_data(row: ResourceSlotTypeRow) -> ResourceSlotTypeData:
-    return ResourceSlotTypeData(
-        slot_name=row.slot_name,
-        slot_type=row.slot_type,
-        display_name=row.display_name,
-        description=row.description,
-        display_unit=row.display_unit,
-        display_icon=row.display_icon,
-        number_format=NumberFormatData(
-            binary=row.number_format.binary,
-            round_length=row.number_format.round_length,
-        ),
-        rank=row.rank,
-    )
 
 
 class ResourceSlotService:
@@ -146,7 +127,7 @@ class ResourceSlotService:
         self, action: GetResourceSlotTypeAction
     ) -> GetResourceSlotTypeResult:
         row = await self._repository.get_slot_type(action.slot_name)
-        return GetResourceSlotTypeResult(item=_row_to_slot_type_data(row))
+        return GetResourceSlotTypeResult(item=row.to_data())
 
     async def search_resource_slot_types(
         self, action: SearchResourceSlotTypesAction

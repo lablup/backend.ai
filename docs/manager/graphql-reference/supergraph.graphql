@@ -4630,6 +4630,51 @@ input CreateResourcePresetV2Input
   resourceGroupName: String = null
 }
 
+"""Added in 26.9.0. Input for registering a new resource slot type."""
+input CreateResourceSlotTypeInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Unique slot name to register."""
+  slotName: String!
+
+  """
+  Category of the slot type: one of 'count', 'bytes', 'unique', 'unified'.
+  """
+  slotType: String!
+
+  """Whether a session request must name this slot."""
+  required: Boolean! = false
+
+  """Whether the scheduler considers this slot when placing sessions."""
+  enabled: Boolean! = true
+
+  """Human-readable name."""
+  displayName: String! = ""
+
+  """Longer description."""
+  description: String! = ""
+
+  """Unit label (e.g., 'GiB')."""
+  displayUnit: String! = ""
+
+  """Icon identifier for UIs."""
+  displayIcon: String! = ""
+
+  """Number formatting rules. Defaults to decimal with no rounding."""
+  numberFormat: NumberFormatInput = null
+
+  """Display ordering rank. Lower values appear first."""
+  rank: Int! = 0
+}
+
+"""Added in 26.9.0. Payload for resource slot type registration."""
+type CreateResourceSlotTypePayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The registered resource slot type."""
+  resourceSlotType: ResourceSlotType!
+}
+
 """Added in 26.8.0. Create retention policy input."""
 input CreateRetentionPolicyInput
   @join__type(graph: STRAWBERRY)
@@ -12238,6 +12283,19 @@ type Mutation
   """
   purgeIdleCheckerAssignment(input: PurgeIdleCheckerAssignmentInput!): PurgeIdleCheckerAssignmentPayload! @join__field(graph: STRAWBERRY)
 
+  """Added in 26.9.0. Register a new resource slot type (super admin only)."""
+  adminCreateResourceSlotType(input: CreateResourceSlotTypeInput!): CreateResourceSlotTypePayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.9.0. Update a resource slot type by slot name (super admin only).
+  """
+  adminUpdateResourceSlotType(input: UpdateResourceSlotTypeInput!): UpdateResourceSlotTypePayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.9.0. Remove a resource slot type by slot name (super admin only).
+  """
+  adminPurgeResourceSlotType(input: PurgeResourceSlotTypeInput!): PurgeResourceSlotTypePayload @join__field(graph: STRAWBERRY)
+
   """
   Added in 26.7.0. Register a new app config allow-list entry (super admin only).
   """
@@ -13364,6 +13422,19 @@ type NumberFormat
 {
   binary: Boolean!
   roundLength: Int!
+}
+
+"""
+Added in 26.9.0. Number format configuration written with a resource slot type.
+"""
+input NumberFormatInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Whether to use binary (1024-based) or decimal (1000-based) prefixes."""
+  binary: Boolean! = false
+
+  """Number of decimal places to round to when displaying values."""
+  roundLength: Int! = 0
 }
 
 """Added in 26.4.2. Number input UI config."""
@@ -14915,6 +14986,22 @@ type PurgeProjectPayload
 {
   """Whether the purge was successful."""
   purged: Boolean!
+}
+
+"""Added in 26.9.0. Input for removing a resource slot type."""
+input PurgeResourceSlotTypeInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Slot name identifying the slot type to remove."""
+  slotName: String!
+}
+
+"""Added in 26.9.0. Payload for resource slot type removal."""
+type PurgeResourceSlotTypePayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Slot name of the removed resource slot type."""
+  slotName: String!
 }
 
 """Added in 26.8.0. Purge retention policy payload."""
@@ -17456,8 +17543,18 @@ type ResourceSlotType implements Node
   """
   slotName: String!
 
-  """Category of the slot type (e.g., 'count', 'bytes', 'unique-count')."""
+  """
+  Category of the slot type: one of 'count', 'bytes', 'unique', 'unified'.
+  """
   slotType: String!
+
+  """Added in 26.9.0. Whether a session request must name this slot."""
+  required: Boolean!
+
+  """
+  Added in 26.9.0. Whether the scheduler considers this slot when placing sessions. A disabled slot is ignored by the image slot-type rule.
+  """
+  enabled: Boolean!
 
   """Human-readable name for display in UIs."""
   displayName: String!
@@ -21604,6 +21701,48 @@ input UpdateResourcePresetV2Input
 
   """Updated resource group name. Use null to make global."""
   resourceGroupName: String = null
+}
+
+"""
+Added in 26.9.0. Input for updating a resource slot type. The slot name and slot type are immutable; omitted fields stay unchanged.
+"""
+input UpdateResourceSlotTypeInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Slot name identifying the slot type to update."""
+  slotName: String!
+
+  """Whether a session request must name this slot."""
+  required: Boolean = null
+
+  """Whether the scheduler considers this slot when placing sessions."""
+  enabled: Boolean = null
+
+  """Human-readable name."""
+  displayName: String = null
+
+  """Longer description."""
+  description: String = null
+
+  """Unit label (e.g., 'GiB')."""
+  displayUnit: String = null
+
+  """Icon identifier for UIs."""
+  displayIcon: String = null
+
+  """Number formatting rules."""
+  numberFormat: NumberFormatInput = null
+
+  """Display ordering rank."""
+  rank: Int = null
+}
+
+"""Added in 26.9.0. Payload for resource slot type update."""
+type UpdateResourceSlotTypePayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The updated resource slot type."""
+  resourceSlotType: ResourceSlotType!
 }
 
 """Added in 26.8.0. Update retention policy input."""

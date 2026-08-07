@@ -1,11 +1,23 @@
 from __future__ import annotations
 
-from typing import override
+from typing import Any, override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.registry import ProcessorGroup
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.ops.base import (
+    CreateGlobalOpsAction,
+    PurgeGlobalOpsAction,
+    UpdateGlobalOpsAction,
+)
+from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult, EntityOpsResult
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
+from ai.backend.manager.services.resource_slot.actions.create import CreateResourceSlotTypeAction
+from ai.backend.manager.services.resource_slot.actions.purge import PurgeResourceSlotTypeAction
+from ai.backend.manager.services.resource_slot.actions.update import UpdateResourceSlotTypeAction
 
 from .actions import (
     GetAgentResourceBySlotAction,
@@ -55,12 +67,25 @@ class ResourceSlotProcessors(AbstractProcessorPackage):
     get_project_resource_overview: ActionProcessor[
         GetProjectResourceOverviewAction, GetProjectResourceOverviewResult
     ]
+    create_resource_slot_type: GlobalActionProcessor[
+        CreateGlobalOpsAction[Any, ResourceSlotTypeData],
+        CreatedEntityOpsResult[ResourceSlotTypeData],
+    ]
+    update_resource_slot_type: GlobalActionProcessor[
+        UpdateGlobalOpsAction[Any, ResourceSlotTypeData],
+        EntityOpsResult[ResourceSlotTypeData],
+    ]
+    purge_resource_slot_type: GlobalActionProcessor[
+        PurgeGlobalOpsAction[Any, ResourceSlotTypeData],
+        EntityOpsResult[ResourceSlotTypeData],
+    ]
 
     def __init__(
         self,
         service: ResourceSlotService,
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
+        group: ProcessorGroup[ResourceSlotTypeData],
     ) -> None:
         self.get_agent_resource_by_slot = ActionProcessor(
             service.get_agent_resource_by_slot, action_monitors
@@ -90,6 +115,9 @@ class ResourceSlotProcessors(AbstractProcessorPackage):
         self.get_project_resource_overview = ActionProcessor(
             service.get_project_resource_overview, action_monitors
         )
+        self.create_resource_slot_type = group.global_create_ops()
+        self.update_resource_slot_type = group.global_update_ops()
+        self.purge_resource_slot_type = group.global_purge_ops()
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -104,4 +132,7 @@ class ResourceSlotProcessors(AbstractProcessorPackage):
             SearchResourceSlotTypesAction.spec(),
             GetDomainResourceOverviewAction.spec(),
             GetProjectResourceOverviewAction.spec(),
+            CreateResourceSlotTypeAction.spec(),
+            UpdateResourceSlotTypeAction.spec(),
+            PurgeResourceSlotTypeAction.spec(),
         ]

@@ -3,7 +3,11 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import override
 
+from ai.backend.common.data.entity.types import EntityData
+from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.identifier.resource_slot import ResourceSlotTypeUUID
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 
 
@@ -30,15 +34,28 @@ class NumberFormatData:
 
 
 @dataclass(frozen=True)
-class ResourceSlotTypeData:
+class ResourceSlotTypeData(EntityData):
+    """One registered resource slot type.
+
+    ``slot_name`` is the primary key and the five referencing tables' FK target;
+    ``uuid`` is the unique alternate key that gives the entity its ``EntityID``.
+    """
+
+    uuid: ResourceSlotTypeUUID
     slot_name: str
     slot_type: str
+    required: bool
+    enabled: bool
     display_name: str
     description: str
     display_unit: str
     display_icon: str
     number_format: NumberFormatData
     rank: int
+
+    @override
+    def entity_id(self) -> EntityID:
+        return self.uuid
 
 
 @dataclass(frozen=True)

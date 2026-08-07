@@ -529,7 +529,18 @@ def create_processors(
         resource_preset=ResourcePresetProcessors(
             services.resource_preset, action_monitors, validators
         ),
-        resource_slot=ResourceSlotProcessors(services.resource_slot, action_monitors, validators),
+        resource_slot=ResourceSlotProcessors(
+            services.resource_slot,
+            action_monitors,
+            validators,
+            ProcessorRegistry(
+                ProcessorDependencies(
+                    monitors=monitors,
+                    validators=args.validators,
+                    repository=OpsRepository(repositories.ops_provider),
+                )
+            ).group(),
+        ),
         retention_policy=RetentionPolicyProcessors(services.retention_policy, action_monitors),
         role_preset=RolePresetProcessors(services.role_preset, action_monitors, validators),
         runtime_variant=RuntimeVariantProcessors(
