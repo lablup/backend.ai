@@ -119,6 +119,7 @@ class TestCreateUserIfNotExists:
 
         assert user.email == "newuser@example.com"
         assert user.full_name == "New User"
+        assert user.main_access_key is not None
 
         # Verify keypair was created
         async with seed_data.begin_readonly_session() as sess:
@@ -127,6 +128,7 @@ class TestCreateUserIfNotExists:
                 await conn.execute(sa.select(keypairs).where(keypairs.c.user == user.uuid))
             ).fetchone()
             assert row is not None
+            assert row.access_key == user.main_access_key
             assert row.is_default is True
 
     async def test_returns_existing_user_without_duplicate(

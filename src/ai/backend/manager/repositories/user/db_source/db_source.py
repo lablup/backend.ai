@@ -797,6 +797,9 @@ class UserDBSource:
             raise KeyPairForbidden("Cannot set another user's access key as the main access key.")
 
         await self._set_default_keypair(session, keypair_row.user, main_access_key)
+        await session.execute(
+            sa.update(users).where(users.c.email == email).values(main_access_key=main_access_key)
+        )
 
     async def _sync_keypair_roles(
         self, session: SASession, user_uuid: UUID, new_role: UserRole
@@ -1321,6 +1324,9 @@ class UserDBSource:
                 raise KeyPairForbidden("Cannot set an inactive keypair as the main access key.")
 
             await self._set_default_keypair(session, UserID(user_uuid), access_key)
+            await session.execute(
+                sa.update(users).where(users.c.uuid == user_uuid).values(main_access_key=access_key)
+            )
 
     async def update_my_keypair(self, user_uuid: UUID, updater: Updater[KeyPairRow]) -> KeyPairData:
         """Update a keypair owned by the current user."""

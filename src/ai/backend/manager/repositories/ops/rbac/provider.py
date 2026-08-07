@@ -180,7 +180,7 @@ class FullUserCreation:
 
 @dataclass
 class FullUserCreationResult:
-    """A fully provisioned user: the row and its default keypair, marked as the default one."""
+    """A fully provisioned user: the row (``main_access_key`` set) and its default keypair."""
 
     user_row: UserRow
     keypair_row: KeyPairRow
@@ -1028,6 +1028,7 @@ class RBACWriteOps(WriteOps):
             )
         )
         keypair_row = kp_result.row
+        user_row.main_access_key = keypair_row.access_key
 
         member = ScopeUserMember(user_id=user_id)
         domain_scope = ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=full_creation.domain_id)
@@ -1042,6 +1043,10 @@ class RBACWriteOps(WriteOps):
                 EntityMembersAddition(scope=project_scope, members=[member])
             )
 
+        # Flushing the main_access_key update expires server-onupdate columns; reload
+        # so callers can read the row without a sync-context lazy refresh.
+        await self._sess.flush()
+        await self._sess.refresh(user_row)
         return FullUserCreationResult(user_row=user_row, keypair_row=keypair_row)
 
     async def _domain_member_project_ids(
