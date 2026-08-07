@@ -42,6 +42,7 @@ from ai.backend.manager.clients.appproxy.client import AppProxyClient, AppProxyC
 from ai.backend.manager.data.deployment.access_token import ModelDeploymentAccessTokenCreator
 from ai.backend.manager.data.deployment.creator import (
     ModelRevisionCreator,
+    NewDeploymentCreator,
     VFolderMountsCreator,
 )
 from ai.backend.manager.data.deployment.types import (
@@ -72,6 +73,9 @@ from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import EndpointTokenCreatorSpec
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
+)
+from ai.backend.manager.services.deployment.actions.create_deployment import (
+    CreateDeploymentAction,
 )
 from ai.backend.manager.services.deployment.actions.deployment_policy import (
     SearchDeploymentPoliciesAction,
@@ -775,3 +779,126 @@ class TestConvertDeploymentInfoToData:
         legacy_data = _convert_deployment_info_to_legacy_data(deployment_info)
         assert legacy_data.revision is not None
         assert legacy_data.revision.id == current_data.id
+
+
+class TestCreateDeploymentTeardown(ModelRevisionFixtures):
+    """The endpoint and its first revision are created in two separate commits.
+
+    Nothing advances an endpoint that is still ``PENDING`` with no revision —
+    no lifecycle handler targets ``PENDING`` — so a revision failure must not
+    leave one behind.
+    """
+
+    @pytest.fixture
+    def created_deployment_info(self, deployment_id: uuid.UUID) -> DeploymentInfo:
+        """A freshly created endpoint: PENDING, no revision on either pointer."""
+        return DeploymentInfo(
+            id=DeploymentID(deployment_id),
+            metadata=DeploymentMetadata(
+                name="teardown-test",
+                domain="default",
+                project=uuid.uuid4(),
+                resource_group="default",
+                created_user=uuid.uuid4(),
+                session_owner=uuid.uuid4(),
+                created_at=datetime(2024, 1, 1, tzinfo=UTC),
+                revision_history_limit=10,
+            ),
+            state=DeploymentState(
+                lifecycle=EndpointLifecycle.PENDING,
+                scaling_state=ScalingState.STABLE,
+                retry_count=0,
+            ),
+            replica=ReplicaData(replica_count=1, desired_replica_count=None),
+            network=DeploymentNetworkData(
+                open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
+            ),
+            options=DeploymentOptions(),
+            current_revision_id=None,
+            deploying_revision_id=None,
+            current_revision=None,
+            deploying_revision=None,
+        )
+
+    @pytest.fixture
+    def creator(
+        self, created_deployment_info: DeploymentInfo, revision_creator: ModelRevisionCreator
+    ) -> NewDeploymentCreator:
+        return NewDeploymentCreator(
+            metadata=created_deployment_info.metadata,
+            model_revision=revision_creator,
+        )
+
+    async def test_endpoint_is_destroyed_when_revision_creation_fails(
+        self,
+        deployment_service: DeploymentService,
+        mock_deployment_controller: MagicMock,
+        created_deployment_info: DeploymentInfo,
+        creator: NewDeploymentCreator,
+        deployment_id: uuid.UUID,
+    ) -> None:
+        """A revision failure tears the endpoint down and re-raises the cause."""
+        revision_error = ValueError("image_id is required to add a revision")
+        mock_deployment_controller.create_deployment = AsyncMock(
+            return_value=created_deployment_info
+        )
+        mock_deployment_controller.add_deployment_revision = AsyncMock(side_effect=revision_error)
+        mock_deployment_controller.destroy_deployment = AsyncMock(return_value=True)
+
+        with pytest.raises(ValueError) as exc_info:
+            await deployment_service.create_deployment(
+                CreateDeploymentAction(creator=creator, auto_activate=True)
+            )
+
+        assert exc_info.value is revision_error
+        mock_deployment_controller.destroy_deployment.assert_awaited_once_with(
+            DeploymentID(deployment_id)
+        )
+
+    async def test_teardown_failure_does_not_mask_the_original_error(
+        self,
+        deployment_service: DeploymentService,
+        mock_deployment_controller: MagicMock,
+        created_deployment_info: DeploymentInfo,
+        creator: NewDeploymentCreator,
+    ) -> None:
+        """The caller sees why the revision failed, not why the cleanup failed."""
+        revision_error = ValueError("image_id is required to add a revision")
+        mock_deployment_controller.create_deployment = AsyncMock(
+            return_value=created_deployment_info
+        )
+        mock_deployment_controller.add_deployment_revision = AsyncMock(side_effect=revision_error)
+        mock_deployment_controller.destroy_deployment = AsyncMock(
+            side_effect=RuntimeError("endpoint row vanished")
+        )
+
+        with pytest.raises(ValueError) as exc_info:
+            await deployment_service.create_deployment(
+                CreateDeploymentAction(creator=creator, auto_activate=True)
+            )
+
+        assert exc_info.value is revision_error
+
+    async def test_successful_create_does_not_destroy_the_endpoint(
+        self,
+        deployment_service: DeploymentService,
+        mock_deployment_controller: MagicMock,
+        mock_deployment_repository: MagicMock,
+        created_deployment_info: DeploymentInfo,
+        creator: NewDeploymentCreator,
+        revision_data: ModelRevisionData,
+    ) -> None:
+        mock_deployment_controller.create_deployment = AsyncMock(
+            return_value=created_deployment_info
+        )
+        mock_deployment_controller.add_deployment_revision = AsyncMock(return_value=revision_data)
+        mock_deployment_controller.destroy_deployment = AsyncMock()
+        mock_deployment_repository.get_endpoint_info = AsyncMock(
+            return_value=created_deployment_info
+        )
+
+        await deployment_service.create_deployment(
+            CreateDeploymentAction(creator=creator, auto_activate=True)
+        )
+
+        mock_deployment_controller.destroy_deployment.assert_not_awaited()

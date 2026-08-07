@@ -26,9 +26,11 @@ from .base import DeploymentHandler
 
 
 class DeployingInitializingHandler(DeploymentHandler):
-    """DEPLOYING / INITIALIZING: register the appproxy endpoint for deployments that entered
-    DEPLOYING via ActivateRevision (and so skipped check_pending), then hand off to
-    PROVISIONING which sets up the target replica group."""
+    """DEPLOYING / INITIALIZING: register the appproxy endpoint, then hand off to
+    PROVISIONING which sets up the target replica group.
+
+    ``ActivateRevision`` is the only way into this stage: it is what moves an
+    endpoint out of ``PENDING``, which no handler targets."""
 
     def __init__(
         self,
