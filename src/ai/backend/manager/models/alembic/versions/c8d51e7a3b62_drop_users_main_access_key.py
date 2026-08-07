@@ -7,7 +7,7 @@ so deleting any keypair silently cleared it — the reason for the move.
 The downgrade restores the column and refills it from the marker.
 
 Revision ID: c8d51e7a3b62
-Revises: a2f6b90c41d7
+Revises: c04f8b1a6e37
 Create Date: 2026-08-06 12:30:00.000000
 
 """
@@ -17,7 +17,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "c8d51e7a3b62"
-down_revision = "a2f6b90c41d7"
+down_revision = "c04f8b1a6e37"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
