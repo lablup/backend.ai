@@ -42006,7 +42006,7 @@
           }
         },
         "parameters": [],
-        "description": "Upsert many fragments at one scope, all-or-nothing (auth, RBAC-authorized).\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Upsert many fragments at one scope, with per-item partial success (auth, RBAC).\n\n(Partial success is not in effect yet: the upsert is still all-or-nothing. To be fixed.)\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/app-config-fragments/my/by-names": {
@@ -42064,7 +42064,7 @@
           }
         },
         "parameters": [],
-        "description": "Upsert many fragments at the caller's own user scope, all-or-nothing (auth).\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Upsert many fragments at the caller's own user scope, with per-item partial\nsuccess (auth).\n\n(Partial success is not in effect yet: the upsert is still all-or-nothing. To be fixed.)\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/app-config-fragments/{fragment_id}": {

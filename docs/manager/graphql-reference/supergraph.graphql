@@ -1225,7 +1225,7 @@ input AppConfigFragmentScopeTypeFilter
 }
 
 """
-Added in 26.9.0. One rejected item of a bulk fragment upsert, named by its config name — the batch shares one scope, and a rejected insert never had a fragment id.
+Added in 26.9.0. One failed item of a partial bulk fragment upsert, named by its config name — the batch shares one scope, and a rejected insert never had a fragment id.
 """
 type AppConfigFragmentUpsertError
   @join__type(graph: STRAWBERRY)
@@ -12267,12 +12267,12 @@ type Mutation
   adminUpdateAppConfigAllowList(input: UpdateAppConfigAllowListInput!): UpdateAppConfigAllowListPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.8.0. Upsert many app config fragments at one scope (insert, or replace config on conflict), all-or-nothing. RBAC-authorized at that scope.
+  Added in 26.8.0. Upsert many app config fragments at one scope (insert, or replace config on conflict), with per-item partial success (not in effect yet: still all-or-nothing, to be fixed). RBAC-authorized at that scope.
   """
   scopedUpsertAppConfigFragments(input: ScopedUpsertAppConfigFragmentsInput!): UpsertAppConfigFragmentsPayload! @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.8.0. Upsert many app config fragments at the current user's own user scope, all-or-nothing.
+  Added in 26.8.0. Upsert many app config fragments at the current user's own user scope, with per-item partial success (not in effect yet: still all-or-nothing, to be fixed).
   """
   myUpsertAppConfigFragments(input: MyUpsertAppConfigFragmentsInput!): UpsertAppConfigFragmentsPayload! @join__field(graph: STRAWBERRY)
 
@@ -21889,7 +21889,7 @@ type UpdateVFSStoragePayload
 }
 
 """
-Added in 26.9.0. Payload of a bulk fragment upsert: the fragments written, and the rejected items.
+Added in 26.9.0. Partial-success payload for a bulk fragment upsert (not in effect yet: still all-or-nothing, so failed is always empty, to be fixed).
 """
 type UpsertAppConfigFragmentsPayload
   @join__type(graph: STRAWBERRY)
