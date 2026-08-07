@@ -696,11 +696,20 @@ class VFolderService:
         if opts is not None:
             await plane.custodian.mint(opts, domain_name, vfid.folder_id)
 
-    async def _destroy_folder_key(self, domain_name: str, vfid: VFolderID) -> None:
+    async def _inherit_folder_key(self, source: VFolderData, folder_id: uuid.UUID) -> None:
+        if source.encryption_tier is None:
+            return
+        plane = await self._plane()
+        opts = await custodian_of_domain(self._db, source.domain_name)
+        if opts is not None:
+            await plane.custodian.inherit(opts, source.domain_name, source.id, folder_id)
+
+    async def _destroy_folder_key(self, vfolder_data: VFolderData) -> None:
+        domain_name = vfolder_data.domain_name
         plane = await self._plane()
         opts = await custodian_of_domain(self._db, domain_name)
         if opts is not None:
-            await plane.custodian.revoke(opts, domain_name, vfid.folder_id)
+            await plane.custodian.revoke(opts, domain_name, vfolder_data.id)
 
     async def _remove_vfolder_from_storage(self, vfolder_data: VFolderData) -> None:
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
@@ -736,15 +745,14 @@ class VFolderService:
         )
         if result.failures:
             raise result.failures[0].exception
-        await self._destroy_folder_key(
-            user.domain_name, VFolderID(vfolder_data.quota_scope_id, vfolder_data.id)
-        )
+        await self._destroy_folder_key(vfolder_data)
         await self._remove_vfolder_from_storage(vfolder_data)
         return DeleteForeverVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def purge(self, action: PurgeVFolderAction) -> PurgeVFolderActionResult:
         """Purge a DELETE_COMPLETE vfolder from DB (admin only)."""
         data = await self._vfolder_repository.purge_vfolder(action.purger)
+        await self._destroy_folder_key(data)
         return PurgeVFolderActionResult(vfolder_uuid=data.id)
 
     async def force_delete(
@@ -761,6 +769,7 @@ class VFolderService:
         result = await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
         if result.failures:
             raise result.failures[0].exception
+        await self._destroy_folder_key(vfolder_data)
         await self._remove_vfolder_from_storage(vfolder_data)
         return ForceDeleteVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
@@ -904,6 +913,7 @@ class VFolderService:
             email=requester_email,
             user_id=action.requester_user_uuid,
             cloneable=action.cloneable,
+            encryption_tier=source_vfolder_data.encryption_tier,
         )
 
         # Initiate the actual vfolder cloning process using repository
@@ -912,6 +922,7 @@ class VFolderService:
             self._storage_manager,
             self._background_task_manager,
         )
+        await self._inherit_folder_key(source_vfolder_data, target_folder_id)
 
         # Return the information about the destination vfolder
         return CloneVFolderActionResult(
@@ -1910,6 +1921,7 @@ class VFolderService:
         )
         if result.failures:
             raise result.failures[0].exception
+        await self._destroy_folder_key(vfolder_data)
         await self._remove_vfolder_from_storage(vfolder_data)
         return PurgeVFolderV2ActionResult(vfolder_id=action.vfolder_id)
 
@@ -2029,6 +2041,7 @@ class VFolderService:
             email=requester_email,
             user_id=action.user_id,
             cloneable=action.cloneable,
+            encryption_tier=source_vfolder_data.encryption_tier,
         )
 
         # Initiate the actual vfolder cloning process using repository
@@ -2037,6 +2050,7 @@ class VFolderService:
             self._storage_manager,
             self._background_task_manager,
         )
+        await self._inherit_folder_key(source_vfolder_data, target_folder_id)
 
         return CloneVFolderV2ActionResult(
             new_vfolder_id=target_folder_id,

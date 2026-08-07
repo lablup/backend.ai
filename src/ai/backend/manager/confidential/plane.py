@@ -84,7 +84,9 @@ class ConfidentialPlane:
         self.provisioner = SessionResourceProvisioner(db, self.broker, self.shim, self.launch)
         self.blobs = MeasuredBlobStore(db)
         self.custodian = FolderKeyCustodian(self.broker)
-        self.client_keys = ClientKeyRelease(db, CustodianFolderKeyCustody(self.custodian))
+        self.client_keys = ClientKeyRelease(
+            db, CustodianFolderKeyCustody(self.custodian), self.shim
+        )
         self._reconciler: asyncio.Task[None] | None = None
 
     async def opts_of(self, scaling_group: str) -> ConfidentialScalingGroupOpts:

@@ -1214,6 +1214,7 @@ class VfolderRepository:
             group=row.group,
             cloneable=row.cloneable,
             status=row.status,
+            encryption_tier=row.encryption_tier,
         )
 
     @vfolder_repository_resilience.apply()
@@ -1629,6 +1630,7 @@ class VfolderRepository:
             group=uuid.UUID(vfolder_dict["group"]) if vfolder_dict["group"] else None,
             cloneable=vfolder_dict["cloneable"],
             status=vfolder_dict["status"],
+            encryption_tier=vfolder_dict.get("encryption_tier"),
         )
 
     @vfolder_repository_resilience.apply()
@@ -1701,6 +1703,7 @@ class VfolderRepository:
                     "unmanaged_path": None,
                     "cloneable": vfolder_info.cloneable,
                     "quota_scope_id": vfolder_info.target_quota_scope_id,
+                    "encryption_tier": vfolder_info.encryption_tier,
                 }
                 query = sa.insert(vfolders).values(**insert_values)
                 await db_session.execute(query)
