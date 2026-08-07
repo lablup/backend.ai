@@ -54,15 +54,13 @@ from ai.backend.manager.repositories.base.purger import (
     Purger,
     execute_batch_purger,
 )
-from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
+from ai.backend.manager.repositories.base.rbac.entity.purger import EntityPurger
 from ai.backend.manager.repositories.base.rbac.scope_binder import RBACScopeBinder
 from ai.backend.manager.repositories.base.rbac.scope_unbinder import RBACScopeEntityUnbinder
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.ops.rbac.provider import (
-    EntityMembersAddition,
     RBACOpsProvider,
     RBACWriteOps,
-    ScopeDeletion,
     ScopeEntityMember,
 )
 from ai.backend.manager.repositories.resource_slot.types import subtract_quantities
@@ -177,7 +175,7 @@ class ScalingGroupDBSource:
         """
         spec = cast(ScalingGroupCreatorSpec, creator.spec)
         async with self._rbac_ops_provider.write_ops() as w:
-            result = await w.create_scope(ResourceGroupScopeCreation(spec=spec))
+            result = await w.create_scope(ResourceGroupScopeCreation(creator_spec=spec))
             return result.row.to_dataclass()
 
     async def search_scaling_groups(
@@ -282,14 +280,11 @@ class ScalingGroupDBSource:
             )
 
             result = await w.delete_scope(
-                ScopeDeletion(
-                    purger=RBACEntityPurger(
-                        spec=ResourceGroupPurgerSpec(
-                            name=scaling_group_name,
-                            resource_group_id=resource_group_id,
-                        )
-                    ),
-                    scope=self._resource_group_scope(resource_group_id),
+                EntityPurger(
+                    spec=ResourceGroupPurgerSpec(
+                        name=scaling_group_name,
+                        resource_group_id=resource_group_id,
+                    )
                 )
             )
             if result is None:
@@ -434,15 +429,12 @@ class ScalingGroupDBSource:
         await w.ensure_scope(accessor_scope)
         for resource_group_id in resource_group_ids:
             await w.ensure_scope(self._resource_group_scope(resource_group_id))
-        await w.add_bulk_members(
-            EntityMembersAddition(
-                scope=accessor_scope,
-                members=[
-                    ScopeEntityMember(ref=self._resource_group_entity(resource_group_id))
-                    for resource_group_id in resource_group_ids
-                ],
+        await w.add_bulk_members([
+            ScopeEntityMember(
+                target_scope=accessor_scope, ref=self._resource_group_entity(resource_group_id)
             )
-        )
+            for resource_group_id in resource_group_ids
+        ])
 
     async def _withdraw_resource_groups(
         self,

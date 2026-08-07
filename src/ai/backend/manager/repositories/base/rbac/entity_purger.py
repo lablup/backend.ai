@@ -35,7 +35,11 @@ from ai.backend.manager.repositories.base.purger import (
 
 
 class RBACEntityPurgerSpec[TRow: Base](PurgerSpec[TRow], ABC):
-    """PurgerSpec that additionally provides RBAC entity info for cleanup."""
+    """PurgerSpec that additionally provides RBAC entity info for cleanup.
+
+    Deprecated: keys on the legacy ``RBACElementType``/``RBACElementRef``; new code
+    uses :class:`ai.backend.manager.repositories.base.rbac.entity.purger.EntityPurgerSpec`.
+    """
 
     @abstractmethod
     def element_type(self) -> RBACElementType:
@@ -50,6 +54,9 @@ class RBACEntityPurgerSpec[TRow: Base](PurgerSpec[TRow], ABC):
 
 class RBACEntityBatchPurgerSpec(BatchPurgerSpec[TRow], ABC):
     """Spec for RBAC entity batch purge operations.
+
+    Deprecated: keys on the legacy ``RBACElementType``; new code uses
+    :class:`ai.backend.manager.repositories.base.rbac.entity.purger.EntityBatchPurgerSpec`.
 
     Inherits build_subquery() from BatchPurgerSpec.
     Implementations must provide:

@@ -7,12 +7,12 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityRef
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.routing import RoutingRow
@@ -24,7 +24,7 @@ from ai.backend.manager.models.scaling_group import (
 )
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.repositories.base.purger import BatchPurger, BatchPurgerSpec, PurgerSpec
-from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurgerSpec
+from ai.backend.manager.repositories.base.rbac.entity.purger import EntityPurgerSpec
 from ai.backend.manager.repositories.base.types import ConflictCheck
 
 
@@ -48,7 +48,7 @@ class ScalingGroupPurgerSpec(PurgerSpec[ScalingGroupRow]):
 
 
 @dataclass
-class ResourceGroupPurgerSpec(RBACEntityPurgerSpec[ScalingGroupRow]):
+class ResourceGroupPurgerSpec(EntityPurgerSpec[ScalingGroupRow]):
     """PurgerSpec for purging a scaling group together with its RBAC entries."""
 
     name: str
@@ -63,14 +63,10 @@ class ResourceGroupPurgerSpec(RBACEntityPurgerSpec[ScalingGroupRow]):
         return self.name
 
     @override
-    def element_type(self) -> RBACElementType:
-        return RBACElementType.RESOURCE_GROUP
-
-    @override
-    def entity_ref(self) -> RBACElementRef:
-        return RBACElementRef(
-            element_type=RBACElementType.RESOURCE_GROUP,
-            element_id=str(self.resource_group_id),
+    def entity_ref(self) -> EntityRef:
+        return EntityRef(
+            entity_type=RESOURCE_GROUP_ENTITY_TYPE,
+            entity_id=self.resource_group_id,
         )
 
     @override

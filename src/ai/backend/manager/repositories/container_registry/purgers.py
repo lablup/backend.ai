@@ -9,16 +9,16 @@ from typing import override
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityRef
 from ai.backend.common.identifier.container_registry import ContainerRegistryID
 from ai.backend.common.identifier.project import ProjectID
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
-from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurgerSpec
+from ai.backend.manager.repositories.base.rbac.entity.purger import EntityPurgerSpec
 from ai.backend.manager.repositories.base.types import ConflictCheck
 
 
@@ -46,7 +46,7 @@ class ContainerRegistryGroupPurgerSpec(
 
 
 @dataclass
-class ContainerRegistryPurgerSpec(RBACEntityPurgerSpec[ContainerRegistryRow]):
+class ContainerRegistryPurgerSpec(EntityPurgerSpec[ContainerRegistryRow]):
     """PurgerSpec for deleting a container registry with its RBAC entries."""
 
     registry_id: ContainerRegistryID
@@ -60,14 +60,10 @@ class ContainerRegistryPurgerSpec(RBACEntityPurgerSpec[ContainerRegistryRow]):
         return self.registry_id
 
     @override
-    def element_type(self) -> RBACElementType:
-        return RBACElementType.CONTAINER_REGISTRY
-
-    @override
-    def entity_ref(self) -> RBACElementRef:
-        return RBACElementRef(
-            element_type=RBACElementType.CONTAINER_REGISTRY,
-            element_id=str(self.registry_id),
+    def entity_ref(self) -> EntityRef:
+        return EntityRef(
+            entity_type=CONTAINER_REGISTRY_ENTITY_TYPE,
+            entity_id=self.registry_id,
         )
 
     @override

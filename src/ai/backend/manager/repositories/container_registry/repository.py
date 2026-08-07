@@ -47,7 +47,7 @@ from ai.backend.manager.repositories.base.querier import (
     Querier,
     execute_batch_querier,
 )
-from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
+from ai.backend.manager.repositories.base.rbac.entity.purger import EntityPurger
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.container_registry.creators import (
     ContainerRegistryCreatorSpec,
@@ -62,10 +62,8 @@ from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
 )
 from ai.backend.manager.repositories.ops.rbac.provider import (
-    EntityMembersAddition,
     RBACOpsProvider,
     RBACWriteOps,
-    ScopeDeletion,
     ScopeEntityMember,
 )
 
@@ -108,7 +106,9 @@ class ContainerRegistryRepository:
         """
         spec = cast(ContainerRegistryCreatorSpec, creator.spec)
         async with self._rbac_ops_provider.write_ops() as w:
-            creation_result = await w.create_scope(ContainerRegistryScopeCreation(spec=spec))
+            creation_result = await w.create_scope(
+                ContainerRegistryScopeCreation(creator_spec=spec)
+            )
             container_registry_row = creation_result.row
 
             if spec.has_allowed_groups:
@@ -166,14 +166,7 @@ class ContainerRegistryRepository:
         spec = cast(ContainerRegistryPurgerSpec, purger.spec)
         async with self._rbac_ops_provider.write_ops() as w:
             await self._clear_all_allowed_groups(w, spec.registry_id)
-            result = await w.delete_scope(
-                ScopeDeletion(
-                    purger=RBACEntityPurger(spec=spec),
-                    scope=ScopeRef(
-                        scope_type=CONTAINER_REGISTRY_SCOPE_TYPE, scope_id=spec.registry_id
-                    ),
-                )
-            )
+            result = await w.delete_scope(EntityPurger(spec=spec))
             if result is None:
                 raise ContainerRegistryNotFound(
                     f"Container registry not found (id:{purger.spec.pk_value()})"
@@ -395,19 +388,15 @@ class ContainerRegistryRepository:
         scope reach the registry's own entities."""
         project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id)
         await ops.ensure_scope(project_scope)
-        await ops.add_bulk_members(
-            EntityMembersAddition(
-                scope=project_scope,
-                members=[
-                    ScopeEntityMember(
-                        ref=EntityRef(
-                            entity_type=CONTAINER_REGISTRY_ENTITY_TYPE,
-                            entity_id=registry_id,
-                        )
-                    )
-                ],
+        await ops.add_bulk_members([
+            ScopeEntityMember(
+                target_scope=project_scope,
+                ref=EntityRef(
+                    entity_type=CONTAINER_REGISTRY_ENTITY_TYPE,
+                    entity_id=registry_id,
+                ),
             )
-        )
+        ])
 
     async def _withdraw_registry_from_project(
         self,

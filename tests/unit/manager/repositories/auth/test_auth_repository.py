@@ -13,6 +13,8 @@ from uuid import UUID
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.data.permission.types import RelationType
 from ai.backend.common.exception import UserNotFound
 from ai.backend.common.identifier.domain import DomainID
@@ -344,7 +346,23 @@ class TestAuthRepository:
             db_sess.add(group)
             await db_sess.flush()
 
-            # Add user to group via RBAC scope-entity association
+            # Add the user to the group as the runtime does: the membership in the
+            # project's virtual scope (the read model) and the legacy association.
+            project_vs_id = (
+                await db_sess.execute(
+                    sa.insert(VirtualScopeRow)
+                    .values(scope_type=PROJECT_SCOPE_TYPE, scope_id=group_id)
+                    .returning(VirtualScopeRow.id)
+                )
+            ).scalar_one()
+            await db_sess.execute(
+                sa.insert(EntityMembershipRow).values(
+                    virtual_scope_id=project_vs_id,
+                    entity_type=USER_ENTITY_TYPE,
+                    entity_id=sample_user_data.uuid,
+                    permission_cap=None,
+                )
+            )
             await db_sess.execute(
                 sa.insert(AssociationScopesEntitiesRow).values(
                     scope_type=ScopeType.PROJECT,

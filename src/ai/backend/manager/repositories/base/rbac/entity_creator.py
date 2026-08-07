@@ -36,6 +36,9 @@ TRow = TypeVar("TRow", bound=Base)
 class RBACEntityCreator[TRow: Base]:
     """Creator for a single entity with scope associations for RBAC.
 
+    Deprecated: keys on the legacy ``RBACElementType``/``RBACElementRef``; new code
+    uses :class:`ai.backend.manager.repositories.base.rbac.entity.creator.EntityCreator`.
+
     Creates an entity row and associates it with the permission scopes it belongs to.
     A ``scope_ref`` of ``None`` marks the entity as GLOBAL — outside the RBAC scope
     hierarchy — so it binds to no scope at all and its create is a plain insert.
@@ -154,6 +157,9 @@ class RBACBulkEntityCreatorResultWithFailures[TRow: Base]:
 @dataclass
 class RBACBulkEntityCreator[TRow: Base]:
     """Bulk creator for multiple entities with a single shared scope.
+
+    Deprecated: keys on the legacy ``RBACElementType``/``RBACElementRef``; new code
+    uses :class:`ai.backend.manager.repositories.base.rbac.entity.creator.EntityCreator`.
 
     Attributes:
         specs: Sequence of CreatorSpec implementations.

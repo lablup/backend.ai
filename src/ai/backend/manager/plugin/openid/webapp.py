@@ -177,7 +177,7 @@ async def create_user_if_not_exists(
         user_spec.domain_id = domain_id
         result = await w.create_full_user(
             FullUserCreation(
-                creation=UserScopeCreation(spec=user_spec),
+                creation=UserScopeCreation(creator_spec=user_spec),
                 domain_id=domain_id,
                 project_ids=project_ids,
                 keypair_resource_policy=user_info["keypair_resource_policy"],
