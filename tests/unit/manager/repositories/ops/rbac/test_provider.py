@@ -1497,7 +1497,8 @@ class _TestUpsertParentMissingError(BackendAIError, aiohttp.web.HTTPBadRequest):
 class RBACOpsGatedUpserterSpec(UpserterSpec[RBACOpsUpsertGatedRow]):
     """Upserts a row behind a FK gate, mapping the violation to a domain error."""
 
-    parent_id: UUID
+    parent_id: UUID | None
+    name: str
 
     @property
     @override
@@ -1516,7 +1517,7 @@ class RBACOpsGatedUpserterSpec(UpserterSpec[RBACOpsUpsertGatedRow]):
 
     @override
     def build_insert_values(self) -> dict[str, Any]:
-        return {"name": _UPSERT_ENTITY_NAME, "parent_id": self.parent_id}
+        return {"name": self.name, "parent_id": self.parent_id}
 
     @override
     def build_update_values(self) -> dict[str, Any]:
@@ -1781,7 +1782,9 @@ class TestUpsertScoped:
             async with provider.write_ops() as w:
                 await w.upsert_scoped(
                     RBACEntityUpserter(
-                        spec=RBACOpsGatedUpserterSpec(parent_id=uuid.uuid4()),
+                        spec=RBACOpsGatedUpserterSpec(
+                            parent_id=uuid.uuid4(), name=_UPSERT_ENTITY_NAME
+                        ),
                         element_type=RBACElementType.VFOLDER,
                         scope_ref=_USER_SCOPE_REF,
                         conflict_target=ConflictTarget(columns=["name"]),
@@ -1804,6 +1807,129 @@ class TestUpsertScoped:
                         conflict_target=ConflictTarget(columns=["tenant_id", "item_id"]),
                     )
                 )
+
+
+_ABSENT_PARENT_ID = uuid.uuid4()  # never inserted, so naming it as a parent trips the FK gate
+
+
+@dataclass(frozen=True)
+class _PartialUpsertItem:
+    """One batch item: the row it inserts, its scope, and the parent its FK gate checks."""
+
+    row_name: str
+    scope_ref: RBACElementRef | None = _USER_SCOPE_REF
+    parent_id: UUID | None = None
+
+
+@dataclass(frozen=True)
+class _ExpectedAssocScopeEntity:
+    """One association_scopes_entities row the batch must leave, named by the row it binds."""
+
+    row_name: str
+    scope_id: str
+
+
+@dataclass(frozen=True)
+class _ScopedPartialUpsertCase:
+    """One batch for the partial bulk op: its items, and which land, fail, and bind.
+
+    The expected fields carry no defaults on purpose: every case spells out its full
+    outcome, an empty one included.
+    """
+
+    name: str
+    items: tuple[_PartialUpsertItem, ...]
+    expected_succeeded_items: list[str]
+    expected_failed_indexes: list[int]
+    expected_assoc_scope_entities: list[_ExpectedAssocScopeEntity]
+
+
+class TestBulkUpsertScopedPartial:
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _ScopedPartialUpsertCase(
+                name="every-item-lands",
+                items=(
+                    _PartialUpsertItem(row_name="first"),
+                    _PartialUpsertItem(row_name="second"),
+                ),
+                expected_succeeded_items=["first", "second"],
+                expected_failed_indexes=[],
+                expected_assoc_scope_entities=[
+                    _ExpectedAssocScopeEntity(row_name="first", scope_id=_USER_SCOPE_ID),
+                    _ExpectedAssocScopeEntity(row_name="second", scope_id=_USER_SCOPE_ID),
+                ],
+            ),
+            _ScopedPartialUpsertCase(
+                name="global-binds-nothing",
+                items=(_PartialUpsertItem(row_name="solo", scope_ref=None),),
+                expected_succeeded_items=["solo"],
+                expected_failed_indexes=[],
+                expected_assoc_scope_entities=[],
+            ),
+            _ScopedPartialUpsertCase(
+                name="rejected-item-fails-alone",
+                items=(
+                    _PartialUpsertItem(row_name="doomed", parent_id=_ABSENT_PARENT_ID),
+                    _PartialUpsertItem(row_name="fresh"),
+                ),
+                expected_succeeded_items=["fresh"],
+                expected_failed_indexes=[0],
+                expected_assoc_scope_entities=[
+                    _ExpectedAssocScopeEntity(row_name="fresh", scope_id=_USER_SCOPE_ID),
+                ],
+            ),
+            _ScopedPartialUpsertCase(
+                name="every-item-rejected",
+                items=(
+                    _PartialUpsertItem(row_name="doomed-a", parent_id=_ABSENT_PARENT_ID),
+                    _PartialUpsertItem(row_name="doomed-b", parent_id=_ABSENT_PARENT_ID),
+                ),
+                expected_succeeded_items=[],
+                expected_failed_indexes=[0, 1],
+                expected_assoc_scope_entities=[],
+            ),
+        ],
+        ids=lambda case: case.name,
+    )
+    async def test_batch_lands_and_fails_exactly_as_the_case_names(
+        self,
+        case: _ScopedPartialUpsertCase,
+        provider: RBACOpsProvider,
+        database_connection: ExtendedAsyncSAEngine,
+        upsert_gated_tables: None,
+    ) -> None:
+        """Each item has its own savepoint: the named items land with their bindings, and a
+        rejected one reports its index and leaves neither its row nor its association behind.
+        """
+        async with provider.write_ops() as w:
+            result = await w.bulk_upsert_scoped_partial([
+                RBACEntityUpserter(
+                    spec=RBACOpsGatedUpserterSpec(parent_id=item.parent_id, name=item.row_name),
+                    element_type=RBACElementType.VFOLDER,
+                    scope_ref=item.scope_ref,
+                    conflict_target=ConflictTarget(columns=["name"]),
+                )
+                for item in case.items
+            ])
+            assert [row.name for row in result.items] == case.expected_succeeded_items
+            assert [e.index for e in result.failed] == case.expected_failed_indexes
+            # Every rejection these batches provoke is the FK gate, mapped by the spec.
+            assert all(
+                isinstance(e.exception, _TestUpsertParentMissingError) for e in result.failed
+            )
+            row_ids = {row.name: str(row.id) for row in result.items}
+
+        async with database_connection.begin_readonly_session() as db_sess:
+            names = (await db_sess.scalars(sa.select(RBACOpsUpsertGatedRow.name))).all()
+            assocs = (await db_sess.scalars(sa.select(AssociationScopesEntitiesRow))).all()
+
+        assert sorted(names) == sorted(case.expected_succeeded_items)
+        assert sorted((a.entity_id, a.scope_id) for a in assocs) == sorted(
+            (row_ids[assoc.row_name], assoc.scope_id)
+            for assoc in case.expected_assoc_scope_entities
+        )
 
 
 # =============================================================================

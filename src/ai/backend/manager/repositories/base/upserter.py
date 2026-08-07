@@ -184,6 +184,21 @@ async def execute_upserter[TRow: Base](
 
 
 @dataclass
+class BulkUpserterError[TRow: Base]:
+    """Error information for a failed item of a partial bulk upsert.
+
+    Attributes:
+        spec: The UpserterSpec that failed
+        exception: The exception that occurred
+        index: Original position in the specs list for traceability
+    """
+
+    spec: UpserterSpec[TRow]
+    exception: Exception
+    index: int
+
+
+@dataclass
 class BulkUpserter[TRow: Base]:
     """Bundles multiple upserter specs for bulk upsert operations.
 

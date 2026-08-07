@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.permission.types import RBACElementType, RelationType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.repositories.base.upserter import UpserterSpec
+from ai.backend.manager.repositories.base.upserter import BulkUpserterError, UpserterSpec
 
 
 @dataclass(frozen=True)
@@ -62,3 +62,15 @@ class RBACEntityUpserterResult[TRow: Base]:
     """Result of executing a single entity upsert."""
 
     row: TRow
+
+
+@dataclass
+class RBACBulkEntityUpserterResultWithFailures[TRow: Base]:
+    """Result of a scoped bulk upsert that isolates each entity.
+
+    ``items`` are the upserted rows; ``failed`` entries index into the sequence of upserters
+    handed to the executor, not into any list the caller may have derived it from.
+    """
+
+    items: list[TRow]
+    failed: list[BulkUpserterError[TRow]]
