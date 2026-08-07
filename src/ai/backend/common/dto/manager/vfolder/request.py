@@ -10,7 +10,7 @@ from typing import Any
 from pydantic import AliasChoices, Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.cc_storage import CONCURRENT_TIER
+from ai.backend.common.cc_storage import CONCURRENT_TIER, TIERS
 from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.typed_validators import VFolderName
 from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
@@ -84,6 +84,15 @@ class VFolderCreateReq(BaseRequestModel):
     )
     cloneable: bool = Field(default=False)
     encryption_tier: str | None = Field(default=CONCURRENT_TIER, alias="encryptionTier")
+
+    @field_validator("encryption_tier")
+    @classmethod
+    def _known_tier(cls, value: str | None) -> str | None:
+        if value is not None and value not in TIERS:
+            raise ValueError(
+                f"unknown encryption tier {value!r}; this deployment offers {', '.join(TIERS)}"
+            )
+        return value
 
 
 class RenameVFolderReq(BaseRequestModel):

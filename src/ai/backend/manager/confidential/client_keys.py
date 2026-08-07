@@ -7,6 +7,7 @@ from typing import Any, Final, Protocol
 
 from ai.backend.common.cc_storage import (
     CAPABILITY_HEADER,
+    CONCURRENT_TIER,
     FORMAT_ID,
     TAMPER_EVIDENT,
     TIER_DISCLOSURE,
@@ -77,7 +78,7 @@ class ClientRelease:
     expires_at: datetime
 
     def to_json(self) -> dict[str, Any]:
-        tier = self.material.tier
+        tier = self.material.tier if self.material.tier in TAMPER_EVIDENT else CONCURRENT_TIER
         return {
             "format": FORMAT_ID,
             **self.material.to_json(),
