@@ -3,48 +3,11 @@ from __future__ import annotations
 import ctypes
 import platform
 from abc import ABCMeta, abstractmethod
-from collections.abc import MutableMapping, Sequence
-from itertools import groupby
-from operator import itemgetter
-from typing import Any, NamedTuple, cast
+from collections.abc import MutableMapping
+from typing import Any, NamedTuple
 
-# ref: https://developer.nvidia.com/cuda-toolkit-archive
-TARGET_CUDA_VERSIONS = (
-    (13, 0),
-    (12, 9),
-    (12, 8),
-    (12, 7),
-    (12, 6),
-    (12, 5),
-    (12, 4),
-    (12, 3),
-    (12, 2),
-    (12, 1),
-    (12, 0),
-    (11, 8),
-    (11, 7),
-    (11, 6),
-    (11, 5),
-    (11, 4),
-    (11, 3),
-    (11, 2),
-    (11, 1),
-    (11, 0),
-    (10, 2),
-    (10, 1),
-    (10, 0),
-    (9, 2),
-    (9, 1),
-    (9, 0),
-    (8, 0),
-    (7, 5),
-    (7, 0),
-    (6, 5),
-    (6, 0),
-    (5, 5),
-    (5, 0),
-    # older versions are not supported
-)
+# ref: https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__DEVICE.html
+CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT = 16
 
 
 class LibraryError(RuntimeError):
@@ -64,460 +27,6 @@ class LibraryError(RuntimeError):
     def __repr__(self) -> str:
         args = ", ".join(map(repr, self.args))
         return f"LibraryError({args})"
-
-
-class cudaDeviceProp_v13(ctypes.Structure):
-    _fields_ = [
-        ("name", ctypes.c_char * 256),
-        ("uuid", ctypes.c_byte * 16),  # cudaUUID_t
-        ("luid", ctypes.c_byte * 8),
-        ("luidDeviceNodeMask", ctypes.c_uint),
-        ("totalGlobalMem", ctypes.c_size_t),
-        ("sharedMemPerBlock", ctypes.c_size_t),
-        ("regsPerBlock", ctypes.c_int),
-        ("warpSize", ctypes.c_int),
-        ("memPitch", ctypes.c_size_t),
-        ("maxThreadsPerBlock", ctypes.c_int),
-        ("maxThreadsDim", ctypes.c_int * 3),
-        ("maxGridSize", ctypes.c_int * 3),
-        ("totalConstMem", ctypes.c_size_t),
-        ("major", ctypes.c_int),
-        ("minor", ctypes.c_int),
-        ("textureAlignment", ctypes.c_size_t),
-        ("texturePitchAlignment", ctypes.c_size_t),
-        ("multiProcessorCount", ctypes.c_int),
-        ("integrated", ctypes.c_int),
-        ("canMapHostMemory", ctypes.c_int),
-        ("maxTexture1D", ctypes.c_int),
-        ("maxTexture1DMipmap", ctypes.c_int),
-        ("maxTexture2D", ctypes.c_int * 2),
-        ("maxTexture2DMipmap", ctypes.c_int * 2),
-        ("maxTexture2DLinear", ctypes.c_int * 3),
-        ("maxTexture2DGather", ctypes.c_int * 2),
-        ("maxTexture3D", ctypes.c_int * 3),
-        ("maxTexture3DAlt", ctypes.c_int * 3),
-        ("maxTextureCubemap", ctypes.c_int),
-        ("maxTexture1DLayered", ctypes.c_int * 2),
-        ("maxTexture2DLayered", ctypes.c_int * 3),
-        ("maxTextureCubemapLayered", ctypes.c_int * 2),
-        ("maxSurface1D", ctypes.c_int),
-        ("maxSurface2D", ctypes.c_int * 2),
-        ("maxSurface3D", ctypes.c_int * 3),
-        ("maxSurface1DLayered", ctypes.c_int * 2),
-        ("maxSurface2DLayered", ctypes.c_int * 3),
-        ("maxSurfaceCubemap", ctypes.c_int),
-        ("maxSurfaceCubemapLayered", ctypes.c_int * 2),
-        ("surfaceAlignment", ctypes.c_size_t),
-        ("concurrentKernels", ctypes.c_int),
-        ("ECCEnabled", ctypes.c_int),
-        ("pciBusID", ctypes.c_int),
-        ("pciDeviceID", ctypes.c_int),
-        ("pciDomainID", ctypes.c_int),
-        ("tccDriver", ctypes.c_int),
-        ("asyncEngineCount", ctypes.c_int),
-        ("unifiedAddressing", ctypes.c_int),
-        ("memoryBusWidth", ctypes.c_int),
-        ("l2CacheSize", ctypes.c_int),
-        ("persistingL2CacheMaxSize", ctypes.c_int),
-        ("maxThreadsPerMultiProcessor", ctypes.c_int),
-        ("streamPrioritiesSupported", ctypes.c_int),
-        ("globalL1CacheSupported", ctypes.c_int),
-        ("localL1CacheSupported", ctypes.c_int),
-        ("sharedMemPerMultiprocessor", ctypes.c_size_t),
-        ("regsPerMultiprocessor", ctypes.c_int),
-        ("managedMemory", ctypes.c_int),
-        ("isMultiGpuBoard", ctypes.c_int),
-        ("multiGpuBoardGroupID", ctypes.c_int),
-        ("hostNativeAtomicSupported", ctypes.c_int),
-        ("pageableMemoryAccess", ctypes.c_int),
-        ("concurrentManagedAccess", ctypes.c_int),
-        ("computePreemptionSupported", ctypes.c_int),
-        ("canUseHostPointerForRegisteredMem", ctypes.c_int),
-        ("cooperativeLaunch", ctypes.c_int),
-        ("sharedMemPerBlockOptin", ctypes.c_size_t),
-        ("pageableMemoryAccessUsesHostPageTables", ctypes.c_int),
-        ("directManagedMemAccessFromHost", ctypes.c_int),
-        ("maxBlocksPerMultiProcessor", ctypes.c_int),
-        ("accessPolicyMaxWindowSize", ctypes.c_int),
-        ("reservedSharedMemPerBlock", ctypes.c_size_t),
-        ("hostRegisterSupported", ctypes.c_int),
-        ("sparseCudaArraySupported", ctypes.c_int),
-        ("hostRegisterReadOnlySupported", ctypes.c_int),
-        ("timelineSemaphoreInteropSupported", ctypes.c_int),
-        ("memoryPoolsSupported", ctypes.c_int),
-        ("gpuDirectRDMASupported", ctypes.c_int),
-        ("gpuDirectRDMAFlushWritesOptions", ctypes.c_uint),
-        ("gpuDirectRDMAWritesOrdering", ctypes.c_int),
-        ("memoryPoolSupportedHandleTypes", ctypes.c_uint),
-        ("deferredMappingCudaArraySupported", ctypes.c_int),
-        ("ipcEventSupported", ctypes.c_int),
-        ("clusterLaunch", ctypes.c_int),
-        ("unifiedFunctionPointers", ctypes.c_int),
-        ("deviceNumaConfig", ctypes.c_int),
-        ("deviceNumaId", ctypes.c_int),
-        ("mpsEnabled", ctypes.c_int),
-        ("hostNumaId", ctypes.c_int),
-        ("gpuPciDeviceID", ctypes.c_uint),
-        ("gpuPciSubsystemID", ctypes.c_uint),
-        ("hostNumaMultinodeIpcSupported", ctypes.c_int),
-        ("reserved", ctypes.c_int * 56),
-    ]
-
-
-class cudaDeviceProp_v12(ctypes.Structure):
-    _fields_ = [
-        ("name", ctypes.c_char * 256),
-        ("uuid", ctypes.c_byte * 16),  # cudaUUID_t
-        ("luid", ctypes.c_byte * 8),
-        ("luidDeviceNodeMask", ctypes.c_uint),
-        ("totalGlobalMem", ctypes.c_size_t),
-        ("sharedMemPerBlock", ctypes.c_size_t),
-        ("regsPerBlock", ctypes.c_int),
-        ("warpSize", ctypes.c_int),
-        ("memPitch", ctypes.c_size_t),
-        ("maxThreadsPerBlock", ctypes.c_int),
-        ("maxThreadsDim", ctypes.c_int * 3),
-        ("maxGridSize", ctypes.c_int * 3),
-        ("clockRate", ctypes.c_int),
-        ("totalConstMem", ctypes.c_size_t),
-        ("major", ctypes.c_int),
-        ("minor", ctypes.c_int),
-        ("textureAlignment", ctypes.c_size_t),
-        ("texturePitchAlignment", ctypes.c_size_t),
-        ("deviceOverlap", ctypes.c_int),
-        ("multiProcessorCount", ctypes.c_int),
-        ("kernelExecTimeoutEnabled", ctypes.c_int),
-        ("integrated", ctypes.c_int),
-        ("canMapHostMemory", ctypes.c_int),
-        ("computeMode", ctypes.c_int),
-        ("maxTexture1D", ctypes.c_int),
-        ("maxTexture1DMipmap", ctypes.c_int),
-        ("maxTexture1DLinear", ctypes.c_int),
-        ("maxTexture2D", ctypes.c_int * 2),
-        ("maxTexture2DMipmap", ctypes.c_int * 2),
-        ("maxTexture2DLinear", ctypes.c_int * 3),
-        ("maxTexture2DGather", ctypes.c_int * 2),
-        ("maxTexture3D", ctypes.c_int * 3),
-        ("maxTexture3DAlt", ctypes.c_int * 3),
-        ("maxTextureCubemap", ctypes.c_int),
-        ("maxTexture1DLayered", ctypes.c_int * 2),
-        ("maxTexture2DLayered", ctypes.c_int * 3),
-        ("maxTextureCubemapLayered", ctypes.c_int * 2),
-        ("maxSurface1D", ctypes.c_int),
-        ("maxSurface2D", ctypes.c_int * 2),
-        ("maxSurface3D", ctypes.c_int * 3),
-        ("maxSurface1DLayered", ctypes.c_int * 2),
-        ("maxSurface2DLayered", ctypes.c_int * 3),
-        ("maxSurfaceCubemap", ctypes.c_int),
-        ("maxSurfaceCubemapLayered", ctypes.c_int * 2),
-        ("surfaceAlignment", ctypes.c_size_t),
-        ("concurrentKernels", ctypes.c_int),
-        ("ECCEnabled", ctypes.c_int),
-        ("pciBusID", ctypes.c_int),
-        ("pciDeviceID", ctypes.c_int),
-        ("pciDomainID", ctypes.c_int),
-        ("tccDriver", ctypes.c_int),
-        ("asyncEngineCount", ctypes.c_int),
-        ("unifiedAddressing", ctypes.c_int),
-        ("memoryClockRate", ctypes.c_int),
-        ("memoryBusWidth", ctypes.c_int),
-        ("l2CacheSize", ctypes.c_int),
-        ("persistingL2CacheMaxSize", ctypes.c_int),
-        ("maxThreadsPerMultiProcessor", ctypes.c_int),
-        ("streamPrioritiesSupported", ctypes.c_int),
-        ("globalL1CacheSupported", ctypes.c_int),
-        ("localL1CacheSupported", ctypes.c_int),
-        ("sharedMemPerMultiprocessor", ctypes.c_size_t),
-        ("regsPerMultiprocessor", ctypes.c_int),
-        ("managedMemSupported", ctypes.c_int),
-        ("isMultiGpuBoard", ctypes.c_int),
-        ("multiGpuBoardGroupID", ctypes.c_int),
-        ("hostNativeAtomicSupported", ctypes.c_int),
-        ("singleToDoublePrecisionPerfRatio", ctypes.c_int),
-        ("pageableMemoryAccess", ctypes.c_int),
-        ("concurrentManagedAccess", ctypes.c_int),
-        ("computePreemptionSupported", ctypes.c_int),
-        ("canUseHostPointerForRegisteredMem", ctypes.c_int),
-        ("cooperativeLaunch", ctypes.c_int),
-        ("cooperativeMultiDeviceLaunch", ctypes.c_int),
-        ("sharedMemPerBlockOptin", ctypes.c_size_t),
-        ("pageableMemoryAccessUsesHostPageTables", ctypes.c_int),
-        ("directManagedMemAccessFromHost", ctypes.c_int),
-        ("accessPolicyMaxWindowSize", ctypes.c_int),
-        ("accessPolicyMaxWindowSize", ctypes.c_int),
-        ("reservedSharedMemPerBlock", ctypes.c_size_t),
-        ("hostRegisterSupported", ctypes.c_int),  # new in CUDA 12
-        ("sparseCudaArraySupported", ctypes.c_int),  # new in CUDA 12
-        ("hostRegisterReadOnlySupported", ctypes.c_int),  # new in CUDA 12
-        ("timelineSemaphoreInteropSupported", ctypes.c_int),  # new in CUDA 12
-        ("memoryPoolsSupported", ctypes.c_int),  # new in CUDA 12
-        ("gpuDirectRDMASupported", ctypes.c_int),  # new in CUDA 12
-        ("gpuDirectRDMAFlushWritesOptions", ctypes.c_uint),  # new in CUDA 12
-        ("gpuDirectRDMAWritesOrdering", ctypes.c_int),  # new in CUDA 12
-        ("memoryPoolSupportedHandleTypes", ctypes.c_uint),  # new in CUDA 12
-        ("deferredMappingCudaArraySupported", ctypes.c_int),  # new in CUDA 12
-        ("ipcEventSupported", ctypes.c_int),  # new in CUDA 12
-        ("clusterLaunch", ctypes.c_int),  # new in CUDA 12
-        ("unifiedFunctionPointers", ctypes.c_int),  # new in CUDA 12
-        ("reserved2", ctypes.c_int * 2),
-        ("reserved", ctypes.c_int * 61),
-    ]
-
-
-class cudaDeviceProp_v11(ctypes.Structure):
-    _fields_ = [
-        ("name", ctypes.c_char * 256),
-        ("uuid", ctypes.c_byte * 16),  # cudaUUID_t
-        ("luid", ctypes.c_byte * 8),
-        ("luidDeviceNodeMask", ctypes.c_uint),
-        ("totalGlobalMem", ctypes.c_size_t),
-        ("sharedMemPerBlock", ctypes.c_size_t),
-        ("regsPerBlock", ctypes.c_int),
-        ("warpSize", ctypes.c_int),
-        ("memPitch", ctypes.c_size_t),
-        ("maxThreadsPerBlock", ctypes.c_int),
-        ("maxThreadsDim", ctypes.c_int * 3),
-        ("maxGridSize", ctypes.c_int * 3),
-        ("clockRate", ctypes.c_int),
-        ("totalConstMem", ctypes.c_size_t),
-        ("major", ctypes.c_int),
-        ("minor", ctypes.c_int),
-        ("textureAlignment", ctypes.c_size_t),
-        ("texturePitchAlignment", ctypes.c_size_t),
-        ("deviceOverlap", ctypes.c_int),
-        ("multiProcessorCount", ctypes.c_int),
-        ("kernelExecTimeoutEnabled", ctypes.c_int),
-        ("integrated", ctypes.c_int),
-        ("canMapHostMemory", ctypes.c_int),
-        ("computeMode", ctypes.c_int),
-        ("maxTexture1D", ctypes.c_int),
-        ("maxTexture1DMipmap", ctypes.c_int),
-        ("maxTexture1DLinear", ctypes.c_int),
-        ("maxTexture2D", ctypes.c_int * 2),
-        ("maxTexture2DMipmap", ctypes.c_int * 2),
-        ("maxTexture2DLinear", ctypes.c_int * 3),
-        ("maxTexture2DGather", ctypes.c_int * 2),
-        ("maxTexture3D", ctypes.c_int * 3),
-        ("maxTexture3DAlt", ctypes.c_int * 3),
-        ("maxTextureCubemap", ctypes.c_int),
-        ("maxTexture1DLayered", ctypes.c_int * 2),
-        ("maxTexture2DLayered", ctypes.c_int * 3),
-        ("maxTextureCubemapLayered", ctypes.c_int * 2),
-        ("maxSurface1D", ctypes.c_int),
-        ("maxSurface2D", ctypes.c_int * 2),
-        ("maxSurface3D", ctypes.c_int * 3),
-        ("maxSurface1DLayered", ctypes.c_int * 2),
-        ("maxSurface2DLayered", ctypes.c_int * 3),
-        ("maxSurfaceCubemap", ctypes.c_int),
-        ("maxSurfaceCubemapLayered", ctypes.c_int * 2),
-        ("surfaceAlignment", ctypes.c_size_t),
-        ("concurrentKernels", ctypes.c_int),
-        ("ECCEnabled", ctypes.c_int),
-        ("pciBusID", ctypes.c_int),
-        ("pciDeviceID", ctypes.c_int),
-        ("pciDomainID", ctypes.c_int),
-        ("tccDriver", ctypes.c_int),
-        ("asyncEngineCount", ctypes.c_int),
-        ("unifiedAddressing", ctypes.c_int),
-        ("memoryClockRate", ctypes.c_int),
-        ("memoryBusWidth", ctypes.c_int),
-        ("l2CacheSize", ctypes.c_int),
-        ("persistingL2CacheMaxSize", ctypes.c_int),  # new in CUDA 11
-        ("maxThreadsPerMultiProcessor", ctypes.c_int),
-        ("streamPrioritiesSupported", ctypes.c_int),
-        ("globalL1CacheSupported", ctypes.c_int),
-        ("localL1CacheSupported", ctypes.c_int),
-        ("sharedMemPerMultiprocessor", ctypes.c_size_t),
-        ("regsPerMultiprocessor", ctypes.c_int),
-        ("managedMemSupported", ctypes.c_int),
-        ("isMultiGpuBoard", ctypes.c_int),
-        ("multiGpuBoardGroupID", ctypes.c_int),
-        ("hostNativeAtomicSupported", ctypes.c_int),
-        ("singleToDoublePrecisionPerfRatio", ctypes.c_int),
-        ("pageableMemoryAccess", ctypes.c_int),
-        ("concurrentManagedAccess", ctypes.c_int),
-        ("computePreemptionSupported", ctypes.c_int),
-        ("canUseHostPointerForRegisteredMem", ctypes.c_int),
-        ("cooperativeLaunch", ctypes.c_int),
-        ("cooperativeMultiDeviceLaunch", ctypes.c_int),
-        ("sharedMemPerBlockOptin", ctypes.c_size_t),
-        ("pageableMemoryAccessUsesHostPageTables", ctypes.c_int),
-        ("directManagedMemAccessFromHost", ctypes.c_int),
-        ("maxBlocksPerMultiProcessor", ctypes.c_int),  # new in CUDA 11
-        ("accessPolicyMaxWindowSize", ctypes.c_int),  # new in CUDA 11
-        ("reservedSharedMemPerBlock", ctypes.c_size_t),  # new in CUDA 11
-        ("_reserved", ctypes.c_char * 1024),
-    ]
-
-
-class cudaDeviceProp_v10(ctypes.Structure):
-    _fields_ = [
-        ("name", ctypes.c_char * 256),
-        ("uuid", ctypes.c_byte * 16),  # cudaUUID_t  # new in CUDA 10
-        ("luid", ctypes.c_byte * 8),  # new in CUDA 10
-        ("luidDeviceNodeMask", ctypes.c_uint),  # new in CUDA 10
-        ("totalGlobalMem", ctypes.c_size_t),
-        ("sharedMemPerBlock", ctypes.c_size_t),
-        ("regsPerBlock", ctypes.c_int),
-        ("warpSize", ctypes.c_int),
-        ("memPitch", ctypes.c_size_t),
-        ("maxThreadsPerBlock", ctypes.c_int),
-        ("maxThreadsDim", ctypes.c_int * 3),
-        ("maxGridSize", ctypes.c_int * 3),
-        ("clockRate", ctypes.c_int),
-        ("totalConstMem", ctypes.c_size_t),
-        ("major", ctypes.c_int),
-        ("minor", ctypes.c_int),
-        ("textureAlignment", ctypes.c_size_t),
-        ("texturePitchAlignment", ctypes.c_size_t),
-        ("deviceOverlap", ctypes.c_int),
-        ("multiProcessorCount", ctypes.c_int),
-        ("kernelExecTimeoutEnabled", ctypes.c_int),
-        ("integrated", ctypes.c_int),
-        ("canMapHostMemory", ctypes.c_int),
-        ("computeMode", ctypes.c_int),
-        ("maxTexture1D", ctypes.c_int),
-        ("maxTexture1DMipmap", ctypes.c_int),
-        ("maxTexture1DLinear", ctypes.c_int),
-        ("maxTexture2D", ctypes.c_int * 2),
-        ("maxTexture2DMipmap", ctypes.c_int * 2),
-        ("maxTexture2DLinear", ctypes.c_int * 3),
-        ("maxTexture2DGather", ctypes.c_int * 2),
-        ("maxTexture3D", ctypes.c_int * 3),
-        ("maxTexture3DAlt", ctypes.c_int * 3),
-        ("maxTextureCubemap", ctypes.c_int),
-        ("maxTexture1DLayered", ctypes.c_int * 2),
-        ("maxTexture2DLayered", ctypes.c_int * 3),
-        ("maxTextureCubemapLayered", ctypes.c_int * 2),
-        ("maxSurface1D", ctypes.c_int),
-        ("maxSurface2D", ctypes.c_int * 2),
-        ("maxSurface3D", ctypes.c_int * 3),
-        ("maxSurface1DLayered", ctypes.c_int * 2),
-        ("maxSurface2DLayered", ctypes.c_int * 3),
-        ("maxSurfaceCubemap", ctypes.c_int),
-        ("maxSurfaceCubemapLayered", ctypes.c_int * 2),
-        ("surfaceAlignment", ctypes.c_size_t),
-        ("concurrentKernels", ctypes.c_int),
-        ("ECCEnabled", ctypes.c_int),
-        ("pciBusID", ctypes.c_int),
-        ("pciDeviceID", ctypes.c_int),
-        ("pciDomainID", ctypes.c_int),
-        ("tccDriver", ctypes.c_int),
-        ("asyncEngineCount", ctypes.c_int),
-        ("unifiedAddressing", ctypes.c_int),
-        ("memoryClockRate", ctypes.c_int),
-        ("memoryBusWidth", ctypes.c_int),
-        ("l2CacheSize", ctypes.c_int),
-        ("maxThreadsPerMultiProcessor", ctypes.c_int),
-        ("streamPrioritiesSupported", ctypes.c_int),
-        ("globalL1CacheSupported", ctypes.c_int),
-        ("localL1CacheSupported", ctypes.c_int),
-        ("sharedMemPerMultiprocessor", ctypes.c_size_t),
-        ("regsPerMultiprocessor", ctypes.c_int),
-        ("managedMemSupported", ctypes.c_int),
-        ("isMultiGpuBoard", ctypes.c_int),
-        ("multiGpuBoardGroupID", ctypes.c_int),
-        ("hostNativeAtomicSupported", ctypes.c_int),
-        ("singleToDoublePrecisionPerfRatio", ctypes.c_int),
-        ("pageableMemoryAccess", ctypes.c_int),
-        ("concurrentManagedAccess", ctypes.c_int),
-        ("computePreemptionSupported", ctypes.c_int),
-        ("canUseHostPointerForRegisteredMem", ctypes.c_int),
-        ("cooperativeLaunch", ctypes.c_int),
-        ("cooperativeMultiDeviceLaunch", ctypes.c_int),
-        ("sharedMemPerBlockOptin", ctypes.c_size_t),
-        ("pageableMemoryAccessUsesHostPageTables", ctypes.c_int),
-        ("directManagedMemAccessFromHost", ctypes.c_int),
-        ("_reserved", ctypes.c_char * 1024),
-    ]
-
-
-class cudaDeviceProp(ctypes.Structure):
-    _fields_ = [
-        ("name", ctypes.c_char * 256),
-        ("totalGlobalMem", ctypes.c_size_t),
-        ("sharedMemPerBlock", ctypes.c_size_t),
-        ("regsPerBlock", ctypes.c_int),
-        ("warpSize", ctypes.c_int),
-        ("memPitch", ctypes.c_size_t),
-        ("maxThreadsPerBlock", ctypes.c_int),
-        ("maxThreadsDim", ctypes.c_int * 3),
-        ("maxGridSize", ctypes.c_int * 3),
-        ("clockRate", ctypes.c_int),
-        ("totalConstMem", ctypes.c_size_t),
-        ("major", ctypes.c_int),
-        ("minor", ctypes.c_int),
-        ("textureAlignment", ctypes.c_size_t),
-        ("texturePitchAlignment", ctypes.c_size_t),
-        ("deviceOverlap", ctypes.c_int),
-        ("multiProcessorCount", ctypes.c_int),
-        ("kernelExecTimeoutEnabled", ctypes.c_int),
-        ("integrated", ctypes.c_int),
-        ("canMapHostMemory", ctypes.c_int),
-        ("computeMode", ctypes.c_int),
-        ("maxTexture1D", ctypes.c_int),
-        ("maxTexture1DMipmap", ctypes.c_int),
-        ("maxTexture1DLinear", ctypes.c_int),
-        ("maxTexture2D", ctypes.c_int * 2),
-        ("maxTexture2DMipmap", ctypes.c_int * 2),
-        ("maxTexture2DLinear", ctypes.c_int * 3),
-        ("maxTexture2DGather", ctypes.c_int * 2),
-        ("maxTexture3D", ctypes.c_int * 3),
-        ("maxTexture3DAlt", ctypes.c_int * 3),
-        ("maxTextureCubemap", ctypes.c_int),
-        ("maxTexture1DLayered", ctypes.c_int * 2),
-        ("maxTexture2DLayered", ctypes.c_int * 3),
-        ("maxTextureCubemapLayered", ctypes.c_int * 2),
-        ("maxSurface1D", ctypes.c_int),
-        ("maxSurface2D", ctypes.c_int * 2),
-        ("maxSurface3D", ctypes.c_int * 3),
-        ("maxSurface1DLayered", ctypes.c_int * 2),
-        ("maxSurface2DLayered", ctypes.c_int * 3),
-        ("maxSurfaceCubemap", ctypes.c_int),
-        ("maxSurfaceCubemapLayered", ctypes.c_int * 2),
-        ("surfaceAlignment", ctypes.c_size_t),
-        ("concurrentKernels", ctypes.c_int),
-        ("ECCEnabled", ctypes.c_int),
-        ("pciBusID", ctypes.c_int),
-        ("pciDeviceID", ctypes.c_int),
-        ("pciDomainID", ctypes.c_int),
-        ("tccDriver", ctypes.c_int),
-        ("asyncEngineCount", ctypes.c_int),
-        ("unifiedAddressing", ctypes.c_int),
-        ("memoryClockRate", ctypes.c_int),
-        ("memoryBusWidth", ctypes.c_int),
-        ("l2CacheSize", ctypes.c_int),
-        ("maxThreadsPerMultiProcessor", ctypes.c_int),
-        ("streamPrioritiesSupported", ctypes.c_int),
-        ("globalL1CacheSupported", ctypes.c_int),
-        ("localL1CacheSupported", ctypes.c_int),
-        ("sharedMemPerMultiprocessor", ctypes.c_size_t),
-        ("regsPerMultiprocessor", ctypes.c_int),
-        ("managedMemSupported", ctypes.c_int),
-        ("isMultiGpuBoard", ctypes.c_int),
-        ("multiGpuBoardGroupID", ctypes.c_int),
-        ("hostNativeAtomicSupported", ctypes.c_int),
-        ("singleToDoublePrecisionPerfRatio", ctypes.c_int),
-        ("pageableMemoryAccess", ctypes.c_int),
-        ("concurrentManagedAccess", ctypes.c_int),
-        ("computePreemptionSupported", ctypes.c_int),
-        ("canUseHostPointerForRegisteredMem", ctypes.c_int),
-        ("cooperativeLaunch", ctypes.c_int),
-        ("cooperativeMultiDeviceLaunch", ctypes.c_int),
-        ("sharedMemPerBlockOptin", ctypes.c_size_t),
-        ("pageableMemoryAccessUsesHostPageTables", ctypes.c_int),
-        ("directManagedMemAccessFromHost", ctypes.c_int),
-        ("_reserved", ctypes.c_char * 1024),
-    ]
-
-
-type cudaDeviceProp_t = (
-    cudaDeviceProp_v13
-    | cudaDeviceProp_v12
-    | cudaDeviceProp_v11
-    | cudaDeviceProp_v10
-    | cudaDeviceProp
-)
 
 
 def _load_library(name: str) -> ctypes.CDLL | None:
@@ -560,9 +69,10 @@ class LibraryBase(metaclass=ABCMeta):
         return rc
 
 
-class libcudart(LibraryBase):
-    name = "CUDART"
+class libcuda(LibraryBase):
+    name = "CUDA"
 
+    _initialized = False
     _version = (0, 0)
 
     @classmethod
@@ -570,83 +80,89 @@ class libcudart(LibraryBase):
         system_type = platform.system()
         match system_type:
             case "Windows":
-                arch = platform.architecture()[0]
-                for major, minor in TARGET_CUDA_VERSIONS:
-                    ver = f"{major}{minor}"
-                    cudart = _load_library(f"cudart{arch[:2]}_{ver}.dll")
-                    if cudart is not None:
-                        return cudart
+                return _load_library("nvcuda.dll")
             case "Darwin":
-                for major, _ in groupby(TARGET_CUDA_VERSIONS, key=itemgetter(0)):
-                    cudart = _load_library(f"libcudart.{major}.dylib")
-                    if cudart is not None:
-                        return cudart
-                for major, minor in TARGET_CUDA_VERSIONS:
-                    cudart = _load_library(f"libcudart.{major}.{minor}.dylib")
-                    if cudart is not None:
-                        return cudart
-                return _load_library("libcudart.dylib")
+                return _load_library("libcuda.dylib")
             case _:
-                for major, _ in groupby(TARGET_CUDA_VERSIONS, key=itemgetter(0)):
-                    cudart = _load_library(f"libcudart.so.{major}")
-                    if cudart is not None:
-                        return cudart
-                for major, minor in TARGET_CUDA_VERSIONS:
-                    cudart = _load_library(f"libcudart.so.{major}.{minor}")
-                    if cudart is not None:
-                        return cudart
-                return _load_library("libcudart.so")
-        return None
+                lib = _load_library("libcuda.so.1")
+                if lib is None:
+                    lib = _load_library("libcuda.so")
+                return lib
+
+    @classmethod
+    def ensure_init(cls) -> None:
+        if not cls._initialized:
+            cls.invoke("cuInit", 0)
+            cls._initialized = True
 
     @classmethod
     def get_version(cls) -> tuple[int, int]:
+        # This reports the maximum CUDA version supported by the installed
+        # driver, not the version of a CUDA toolkit (there is none, since we
+        # no longer link against the CUDA runtime library).
+        cls.ensure_init()
         if cls._version == (0, 0):
             raw_ver = ctypes.c_int()
-            cls.invoke("cudaRuntimeGetVersion", ctypes.byref(raw_ver))
+            cls.invoke("cuDriverGetVersion", ctypes.byref(raw_ver))
             cls._version = (raw_ver.value // 1000, (raw_ver.value % 100) // 10)
         return cls._version
 
     @classmethod
     def get_device_count(cls) -> int:
+        cls.ensure_init()
         count = ctypes.c_int()
-        cls.invoke("cudaGetDeviceCount", ctypes.byref(count))
+        cls.invoke("cuDeviceGetCount", ctypes.byref(count))
         return count.value
 
     @classmethod
     def get_device_props(cls, device_idx: int) -> MutableMapping[str, Any]:
-        props_struct: cudaDeviceProp_t
-        if cls.get_version() >= (13, 0):
-            props_struct = cudaDeviceProp_v13()
-        elif cls.get_version() >= (12, 0):
-            props_struct = cudaDeviceProp_v12()
-        elif cls.get_version() >= (11, 0):
-            props_struct = cudaDeviceProp_v11()
-        elif cls.get_version() >= (10, 0):
-            props_struct = cudaDeviceProp_v10()
-        else:
-            props_struct = cudaDeviceProp()
-        cls.invoke("cudaGetDeviceProperties", ctypes.byref(props_struct), device_idx)
-        props: MutableMapping[str, Any] = {
-            # Treat each field as two-tuple assuming that we don't have bit-fields
-            k: getattr(props_struct, k)
-            for k, _ in cast(Sequence[tuple[str, Any]], props_struct._fields_)
-        }
-        pci_bus_id = b" " * 16
-        cls.invoke("cudaDeviceGetPCIBusId", ctypes.c_char_p(pci_bus_id), 16, device_idx)
-        props["name"] = props["name"].decode()
-        props["pciBusID_str"] = pci_bus_id.split(b"\x00")[0].decode()
-        if "uuid" in props:
-            props["uuid"] = bytes(props["uuid"])
-        if "luid" in props:
-            props["luid"] = bytes(props["luid"])
-        return props
+        cls.ensure_init()
+        device = ctypes.c_int()
+        cls.invoke("cuDeviceGet", ctypes.byref(device), device_idx)
 
-    @classmethod
-    def reset(cls) -> None:
-        """
-        Releases the underlying CUDA driver context and resources occupied by it.
-        """
-        cls.invoke("cudaDeviceReset")
+        props: MutableMapping[str, Any] = {}
+
+        name_buf = (ctypes.c_char * 256)()
+        cls.invoke("cuDeviceGetName", ctypes.byref(name_buf), 256, device.value)
+        props["name"] = name_buf.value.decode()
+
+        # cuDeviceGetUuid_v2 was added in CUDA 11.4; drivers older than that
+        # only expose the legacy cuDeviceGetUuid. Both symbols may be absent
+        # on ancient drivers, in which case we simply omit the key (plugin.py
+        # falls back to an all-zero UUID).
+        uuid_buf = (ctypes.c_byte * 16)()
+        try:
+            cls.invoke("cuDeviceGetUuid_v2", ctypes.byref(uuid_buf), device.value)
+            props["uuid"] = bytes(uuid_buf)
+        except AttributeError:
+            try:
+                cls.invoke("cuDeviceGetUuid", ctypes.byref(uuid_buf), device.value)
+                props["uuid"] = bytes(uuid_buf)
+            except AttributeError:
+                pass
+
+        # cuDeviceTotalMem_v2 supersedes the legacy cuDeviceTotalMem.
+        total_mem = ctypes.c_size_t()
+        try:
+            cls.invoke("cuDeviceTotalMem_v2", ctypes.byref(total_mem), device.value)
+        except AttributeError:
+            cls.invoke("cuDeviceTotalMem", ctypes.byref(total_mem), device.value)
+        props["totalGlobalMem"] = total_mem.value
+
+        mp_count = ctypes.c_int()
+        cls.invoke(
+            "cuDeviceGetAttribute",
+            ctypes.byref(mp_count),
+            CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT,
+            device.value,
+        )
+        props["multiProcessorCount"] = mp_count.value
+
+        pci_bus_id = (ctypes.c_char * 16)()
+        cls.invoke("cuDeviceGetPCIBusId", ctypes.byref(pci_bus_id), 16, device.value)
+        props["pciBusID_str"] = pci_bus_id.value.decode()
+
+        return props
 
 
 class nvmlMemoryInfo_t(ctypes.Structure):

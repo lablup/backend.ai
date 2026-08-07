@@ -55,7 +55,7 @@ from ai.backend.common.types import (
 )
 
 from . import __version__
-from .nvidia import LibraryError, libcudart, libnvml
+from .nvidia import LibraryError, libcuda, libnvml
 
 __all__ = (
     "PREFIX",
@@ -320,7 +320,7 @@ class CUDAPlugin(AbstractComputePlugin):
             )
         except ImportError:
             log.warning(
-                "accelerator disabled: CUDA runtime library not loaded", plugin_name=self.key
+                "accelerator disabled: CUDA driver library not loaded", plugin_name=self.key
             )
             self.enabled = False
         except RuntimeError as e:
@@ -404,9 +404,9 @@ class CUDAPlugin(AbstractComputePlugin):
         if not self.enabled:
             return []
         all_devices = []
-        num_devices = libcudart.get_device_count()
+        num_devices = libcuda.get_device_count()
         for dev_id in map(lambda idx: DeviceId(str(idx)), range(num_devices)):
-            raw_info = libcudart.get_device_props(int(dev_id))
+            raw_info = libcuda.get_device_props(int(dev_id))
             sysfs_node_path = f"/sys/bus/pci/devices/{raw_info['pciBusID_str'].lower()}/numa_node"
             node: int | None
             try:
@@ -447,10 +447,10 @@ class CUDAPlugin(AbstractComputePlugin):
                 return {
                     "cuda_support": True,
                     "nvidia_version": libnvml.get_driver_version(),
-                    "cuda_version": "{0[0]}.{0[1]}".format(libcudart.get_version()),
+                    "cuda_version": "{0[0]}.{0[1]}".format(libcuda.get_version()),
                 }
             except ImportError:
-                log.warning("CUDA extra info unavailable: NVML/CUDA runtime library not found")
+                log.warning("CUDA extra info unavailable: NVML/CUDA driver library not found")
             except LibraryError as e:
                 log.warning("CUDA extra info unavailable", exc_info=e)
         return {
