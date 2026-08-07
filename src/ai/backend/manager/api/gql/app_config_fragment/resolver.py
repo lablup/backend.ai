@@ -120,7 +120,7 @@ async def scoped_upsert_app_config_fragments(
     payload = await info.context.adapters.app_config_fragment.scoped_upsert_app_config_fragments(
         input.to_pydantic()
     )
-    return UpsertAppConfigFragmentsPayloadGQL.from_pydantic(payload)
+    return UpsertAppConfigFragmentsPayloadGQL.from_payload(payload)
 
 
 @gql_mutation(
@@ -139,7 +139,7 @@ async def my_upsert_app_config_fragments(
     payload = await info.context.adapters.app_config_fragment.my_upsert_app_config_fragments(
         input.to_pydantic()
     )
-    return UpsertAppConfigFragmentsPayloadGQL.from_pydantic(payload)
+    return UpsertAppConfigFragmentsPayloadGQL.from_payload(payload)
 
 
 @gql_root_field(

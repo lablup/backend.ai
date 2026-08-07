@@ -56,7 +56,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
     gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
@@ -211,7 +211,7 @@ class AppConfigFragmentConnection(Connection[AppConfigFragmentGQL]):
     model=AppConfigFragmentUpsertErrorInfoDTO,
     name="AppConfigFragmentUpsertError",
 )
-class AppConfigFragmentUpsertErrorGQL(PydanticOutputMixin[AppConfigFragmentUpsertErrorInfoDTO]):
+class AppConfigFragmentUpsertErrorGQL:
     config_name: str = gql_field(description="Config name of the item that failed.")
     message: str = gql_field(description="Reason the item failed.")
 
@@ -227,11 +227,23 @@ class AppConfigFragmentUpsertErrorGQL(PydanticOutputMixin[AppConfigFragmentUpser
     model=UpsertAppConfigFragmentsPayloadDTO,
     name="UpsertAppConfigFragmentsPayload",
 )
-class UpsertAppConfigFragmentsPayloadGQL(PydanticOutputMixin[UpsertAppConfigFragmentsPayloadDTO]):
+class UpsertAppConfigFragmentsPayloadGQL:
     items: list[AppConfigFragmentGQL] = gql_field(description="The upserted app config fragments.")
     failed: list[AppConfigFragmentUpsertErrorGQL] = gql_field(
         description="Per-item failures, each naming the config name it targeted."
     )
+
+    @classmethod
+    def from_payload(cls, payload: UpsertAppConfigFragmentsPayloadDTO) -> Self:
+        return cls(
+            items=[AppConfigFragmentGQL.from_pydantic(node) for node in payload.items],
+            failed=[
+                AppConfigFragmentUpsertErrorGQL(
+                    config_name=error.config_name, message=error.message
+                )
+                for error in payload.failed
+            ],
+        )
 
 
 # ---------------------------------------------------------------------------
