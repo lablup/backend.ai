@@ -15,6 +15,7 @@ from ai.backend.common.config import (
     ModelMetadata,
     ModelServiceConfig,
     ModelServiceConfigDraft,
+    PresetModelDefinition,
     _merge_config,
     _merge_config_draft,
     _merge_definition,
@@ -397,6 +398,44 @@ class TestModelDefinitionDraftMerge:
         assert merged.service.health_check.enable is False
         assert merged.service.health_check.path == "/override"
         assert merged.service.health_check.expected_status_code == 101
+
+
+class TestPresetModelDefinition:
+    """Preset definitions must merge over baselines without clobbering them."""
+
+    def test_legacy_row_without_service_merges_with_baseline(self) -> None:
+        # Rows stored via the legacy update API (``ModelDefinition``) may lack ``service``.
+        stored = {"models": [{"name": "llama", "model_path": "/models/llama", "service": None}]}
+        preset_draft = PresetModelDefinition.model_validate(stored).to_draft()
+        baseline = ModelDefinitionDraft.model_validate({
+            "models": [{"service": {"start_command": "serve", "port": 8000}}]
+        })
+        merged = baseline.merge(preset_draft)
+        assert merged.models is not None
+        assert merged.models[0].service is not None
+        assert merged.models[0].service.port == 8000
+
+    def test_sparse_merge_inherits_baseline_defaults(self) -> None:
+        baseline = ModelDefinitionDraft.model_validate({
+            "models": [
+                {
+                    "name": "base",
+                    "model_path": "/models/base",
+                    "service": {"start_command": "serve", "port": 8000},
+                }
+            ]
+        })
+        preset_draft = PresetModelDefinition.model_validate({
+            "models": [{"service": {"start_command": "python serve.py"}}]
+        }).to_draft()
+        merged = baseline.merge(preset_draft)
+        assert merged.models is not None
+        resolved = merged.models[0].to_resolved()
+        assert resolved.name == "base"
+        assert resolved.model_path == "/models/base"
+        assert resolved.service is not None
+        assert resolved.service.port == 8000
+        assert resolved.service.start_command == "python serve.py"
 
 
 class TestHealthCheckJudgment:
