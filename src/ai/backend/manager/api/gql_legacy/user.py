@@ -649,7 +649,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
             totp_activated=row.totp_activated,
             totp_activated_at=row.totp_activated_at,
             sudo_session_enabled=row.sudo_session_enabled,
-            main_access_key=row.main_access_key,
+            main_access_key=row.default_keypair_access_key,
             container_uid=row.container_uid,
             container_main_gid=row.container_main_gid,
             container_gids=row.container_gids,
@@ -679,12 +679,12 @@ class User(graphene.ObjectType):  # type: ignore[misc]
                 ),
             )
             query = (
-                sa.select(users)
+                sa.select(users, UserRow.default_keypair_access_key)
                 .select_from(j)
                 .where(AssociationScopesEntitiesRow.scope_id == str(group_id))
             )
         else:
-            query = sa.select(users).select_from(users)
+            query = sa.select(users, UserRow.default_keypair_access_key).select_from(users)
         if ctx.user["role"] != UserRole.SUPERADMIN:
             query = query.where(users.c.domain_name == ctx.user["domain_name"])
         if domain_name is not None:
@@ -718,7 +718,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", dtparse),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-        "main_access_key": ("main_access_key", None),
+        "main_access_key": (ORMFieldItem(UserRow.default_keypair_access_key), None),
     }
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {
@@ -738,7 +738,6 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", None),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-        "main_access_key": ("main_access_key", None),
     }
 
     @classmethod
@@ -778,9 +777,8 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         if filter is not None:
             if group_id is not None:
                 qfparser = QueryFilterParser({
-                    k: ("users_" + v[0], v[1])
+                    k: ("users_" + v[0], v[1]) if isinstance(v[0], str) else v
                     for k, v in cls._queryfilter_fieldspec.items()
-                    if isinstance(v[0], str)
                 })
             else:
                 qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
@@ -813,14 +811,19 @@ class User(graphene.ObjectType):  # type: ignore[misc]
                 ),
             )
             query = (
-                sa.select(users)
+                sa.select(users, UserRow.default_keypair_access_key)
                 .select_from(j)
                 .where(AssociationScopesEntitiesRow.scope_id == str(group_id))
                 .limit(limit)
                 .offset(offset)
             )
         else:
-            query = sa.select(users).select_from(users).limit(limit).offset(offset)
+            query = (
+                sa.select(users, UserRow.default_keypair_access_key)
+                .select_from(users)
+                .limit(limit)
+                .offset(offset)
+            )
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if status is not None:
@@ -831,9 +834,8 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         if filter is not None:
             if group_id is not None:
                 qfparser = QueryFilterParser({
-                    k: ("users_" + v[0], v[1])
+                    k: ("users_" + v[0], v[1]) if isinstance(v[0], str) else v
                     for k, v in cls._queryfilter_fieldspec.items()
-                    if isinstance(v[0], str)
                 })
             else:
                 qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
@@ -867,7 +869,11 @@ class User(graphene.ObjectType):  # type: ignore[misc]
     ) -> Sequence[User | None]:
         if not emails:
             return []
-        query = sa.select(users).select_from(users).where(users.c.email.in_(emails))
+        query = (
+            sa.select(users, UserRow.default_keypair_access_key)
+            .select_from(users)
+            .where(users.c.email.in_(emails))
+        )
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if status is not None:
@@ -897,7 +903,11 @@ class User(graphene.ObjectType):  # type: ignore[misc]
     ) -> Sequence[User | None]:
         if not user_ids:
             return []
-        query = sa.select(users).select_from(users).where(users.c.uuid.in_(user_ids))
+        query = (
+            sa.select(users, UserRow.default_keypair_access_key)
+            .select_from(users)
+            .where(users.c.uuid.in_(user_ids))
+        )
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if status is not None:
