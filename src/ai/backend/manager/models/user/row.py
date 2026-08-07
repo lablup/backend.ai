@@ -16,7 +16,6 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import (
     Mapped,
-    column_property,
     foreign,
     joinedload,
     mapped_column,
@@ -235,13 +234,6 @@ class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         "container_gids", sa.ARRAY(sa.Integer), nullable=True, server_default=sa.null()
     )
 
-    default_keypair_access_key: Mapped[str | None] = column_property(
-        sa.select(KeyPairRow.access_key)
-        .where((KeyPairRow.user == uuid) & KeyPairRow.is_default)
-        .correlate_except(KeyPairRow)
-        .scalar_subquery()
-    )
-
     # Relationships
     sessions: Mapped[list[SessionRow]] = relationship(
         "SessionRow",
@@ -402,7 +394,7 @@ class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
             email=self.email,
         )
 
-    def to_data(self) -> UserData:
+    def to_data(self, main_access_key: str | None) -> UserData:
         return UserData(
             id=self.uuid,
             uuid=self.uuid,
@@ -426,7 +418,7 @@ class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
             totp_activated=self.totp_activated,
             totp_activated_at=self.totp_activated_at,
             sudo_session_enabled=self.sudo_session_enabled,
-            main_access_key=self.default_keypair_access_key,
+            main_access_key=main_access_key,
             container_uid=self.container_uid,
             container_main_gid=self.container_main_gid,
             container_gids=self.container_gids,

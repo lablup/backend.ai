@@ -32,11 +32,11 @@ class Searcher[TRow: Base, TData](ABC):
         @dataclass
         class UserSearcher(Searcher[UserRow, UserData]):
             def build_select(self) -> sa.sql.Select[Any]:
-                return sa.select(UserRow)
+                return sa.select(UserRow, KeyPairRow.access_key).outerjoin(UserRow.main_keypair)
 
             def to_data(self, row: Row[Any]) -> UserData:
                 user_row: UserRow = row.UserRow
-                return user_row.to_data()
+                return user_row.to_data(row.access_key)
 
         async with ops.read_ops() as r:
             result = await r.search_with_scopes(scopes, UserSearcher(pagination=...))
