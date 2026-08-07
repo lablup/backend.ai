@@ -771,6 +771,17 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     uses: ./.github/workflows/sbom.yml
 
+  # Publishes the lablup/backend.ai-* service images from the wheels built in
+  # this run. Deliberately NOT in make-final-release's `needs`: a Docker Hub
+  # outage must not block the PyPI/GitHub release.
+  build-docker-images:
+    needs: [build-wheels]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: read
+      id-token: write  # the called workflow mints the OIDC token for Docker Hub
+    uses: ./.github/workflows/docker-images.yml
+
   build-supergraph:
     needs: [lint-and-typecheck, test-unit-gate, test-component-gate, test-integration-gate, check-alembic-migrations]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
