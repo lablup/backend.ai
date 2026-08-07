@@ -97,7 +97,12 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
 
-    user_id = graphene.String()
+    user_id = graphene.String(
+        deprecation_reason="Deprecated since 26.9.0. Holds the owner's email address; use user_email for the email or user for the owner's uuid."
+    )
+    user_email = graphene.String(
+        description="Added in 26.9.0. The owner's email address, read from the users table."
+    )
     full_name = graphene.String()
     access_key = graphene.String()
     secret_key = graphene.String()
@@ -161,6 +166,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         return cls(
             id=row.access_key,
             user_id=row.user_id,
+            user_email=row._mapping.get("email"),
             full_name=row._mapping.get("full_name"),
             access_key=row.access_key,
             secret_key=row.secret_key,
@@ -243,7 +249,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
             users,
             keypairs.c.user == users.c.uuid,
         )
-        query = sa.select(keypairs).select_from(j)
+        query = sa.select(keypairs, users.c.email).select_from(j)
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if is_active is not None:

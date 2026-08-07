@@ -1202,7 +1202,10 @@ type UserList implements PaginatedList {
 
 type KeyPair implements Item {
   id: ID
-  user_id: String
+  user_id: String @deprecated(reason: "Deprecated since 26.9.0. Holds the owner's email address; use user_email for the email or user for the owner's uuid.")
+
+  """Added in 26.9.0. The owner's email address, read from the users table."""
+  user_email: String
   full_name: String
   access_key: String
   secret_key: String
