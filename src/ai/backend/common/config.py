@@ -803,11 +803,13 @@ class PresetModelServiceConfig(BaseConfigModel):
 
 class PresetModelConfig(BaseConfigModel):
     """Preset-stored model config. ``name``/``model_path`` may be omitted to
-    inherit merge-chain defaults; the ``service`` block is always present."""
+    inherit merge-chain defaults. ``service`` is required for new preset
+    inputs but may be absent in rows stored via the legacy update API,
+    which accepted ``ModelDefinition`` with an optional ``service``."""
 
     name: str | None = None
     model_path: str | None = None
-    service: PresetModelServiceConfig
+    service: PresetModelServiceConfig | None = None
     metadata: ModelMetadata | None = None
 
 
