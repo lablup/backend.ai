@@ -407,6 +407,7 @@ class ResourceGroupAdapter(BaseAdapter):
             scheduler="fifo",
             description=input.description,
             is_active=True,
+            is_default=input.is_default,
         )
         creator = Creator(spec=creator_spec)
         action_result = await self._processors.scaling_group.create_scaling_group.wait_for_complete(
@@ -437,6 +438,7 @@ class ResourceGroupAdapter(BaseAdapter):
                 if input.is_active is not None
                 else OptionalState.nop()
             ),
+            is_default=OptionalState.from_nullable(input.is_default),
         )
         metadata_spec = ScalingGroupMetadataUpdaterSpec(
             description=(
@@ -605,6 +607,7 @@ class ResourceGroupAdapter(BaseAdapter):
                 if input.is_public is not None
                 else OptionalState.nop()
             ),
+            is_default=OptionalState.from_nullable(input.is_default),
         )
 
         metadata_spec = ScalingGroupMetadataUpdaterSpec(

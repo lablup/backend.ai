@@ -113,7 +113,12 @@ def get(name: str) -> None:
 @click.option("--name", required=True, help="Resource group name.")
 @click.option("--domain-name", required=True, help="Domain name.")
 @click.option("--description", default=None, help="Description.")
-def create(name: str, domain_name: str, description: str | None) -> None:
+@click.option(
+    "--is-default/--no-is-default",
+    default=False,
+    help="Make this the default resource group. Clear the current default first.",
+)
+def create(name: str, domain_name: str, description: str | None, is_default: bool) -> None:
     """Create a new resource group (superadmin only)."""
     from ai.backend.common.dto.manager.v2.resource_group.request import CreateResourceGroupInput
 
@@ -125,6 +130,57 @@ def create(name: str, domain_name: str, description: str | None) -> None:
                     name=name,
                     domain_name=domain_name,
                     description=description,
+                    is_default=is_default,
+                ),
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@resource_group.command()
+@click.argument("name", type=str)
+@click.option("--description", default=None, help="Human-readable description.")
+@click.option(
+    "--is-active/--no-is-active",
+    default=None,
+    help="Whether the resource group accepts new sessions.",
+)
+@click.option(
+    "--is-public/--no-is-public",
+    default=None,
+    help="Whether the resource group is visible to all users.",
+)
+@click.option(
+    "--is-default/--no-is-default",
+    default=None,
+    help="Make this the default resource group. Clear the current default first.",
+)
+def update(
+    name: str,
+    description: str | None,
+    is_active: bool | None,
+    is_public: bool | None,
+    is_default: bool | None,
+) -> None:
+    """Update a resource group (superadmin only). Omitted options keep their current value."""
+    from ai.backend.common.dto.manager.v2.resource_group.request import (
+        UpdateResourceGroupConfigInput,
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.resource_group.update_config(
+                name,
+                UpdateResourceGroupConfigInput(
+                    resource_group_name=name,
+                    description=description,
+                    is_active=is_active,
+                    is_public=is_public,
+                    is_default=is_default,
                 ),
             )
             print_result(result)

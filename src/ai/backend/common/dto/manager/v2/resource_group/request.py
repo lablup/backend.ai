@@ -73,6 +73,13 @@ class CreateResourceGroupInput(BaseRequestModel):
         default=None,
         description="Resource policy name to apply to this resource group.",
     )
+    is_default: bool = Field(
+        default=False,
+        description=(
+            "Make this the default resource group. At most one resource group may hold the"
+            " flag, so this is rejected while another one holds it; clear that one first."
+        ),
+    )
 
     @field_validator("name", mode="before")
     @classmethod
@@ -98,6 +105,14 @@ class UpdateResourceGroupInput(BaseRequestModel):
     is_active: bool | None = Field(
         default=None,
         description="Whether the resource group is active. Leave null to keep existing value.",
+    )
+    is_default: bool | None = Field(
+        default=None,
+        description=(
+            "Whether this is the default resource group. At most one resource group may hold"
+            " the flag, so setting it to true is rejected while another one holds it; clear"
+            " that one first. Leave null to keep existing value."
+        ),
     )
     total_resource_slots: dict[str, Any] | Sentinel | None = Field(
         default=SENTINEL,
@@ -251,6 +266,14 @@ class UpdateResourceGroupConfigInput(BaseRequestModel):
     is_public: bool | None = Field(
         default=None,
         description="Whether the resource group is public. Leave null to keep existing value.",
+    )
+    is_default: bool | None = Field(
+        default=None,
+        description=(
+            "Whether this is the default resource group. At most one resource group may hold"
+            " the flag, so setting it to true is rejected while another one holds it; clear"
+            " that one first. Leave null to keep existing value."
+        ),
     )
     description: str | None = Field(
         default=None,
