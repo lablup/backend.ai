@@ -235,8 +235,6 @@ class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         "container_gids", sa.ARRAY(sa.Integer), nullable=True, server_default=sa.null()
     )
 
-    # A scalar subquery rather than a relationship attribute so that it loads with
-    # the row itself — ``to_data()`` runs on rows fetched without loader options.
     default_keypair_access_key: Mapped[str | None] = column_property(
         sa.select(KeyPairRow.access_key)
         .where((KeyPairRow.user == uuid) & KeyPairRow.is_default)
