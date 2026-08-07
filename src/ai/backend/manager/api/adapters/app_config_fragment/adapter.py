@@ -216,8 +216,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
     ) -> list[AppConfigFragmentNode | None]:
         """The fragments written at one scope for the given config names.
 
-        RBAC-authorized at that scope, so a caller reads only a scope they may read. Meant for
-        fetching the current fragment values before editing them.
+        Meant for fetching the current fragment values before editing them.
         """
         return await self._fragments_by_names(
             AppConfigFragmentSearchScope(

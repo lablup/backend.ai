@@ -108,8 +108,8 @@ async def admin_app_config_fragments(
         added_version="26.8.0",
         description=(
             "Upsert many app config fragments at one scope (insert, or replace config on "
-            "conflict), with per-item partial success (not in effect yet: still "
-            "all-or-nothing). RBAC-authorized at that scope."
+            "conflict), with per-item partial success "
+            "(not in effect yet: still all-or-nothing)."
         ),
     )
 )
@@ -148,7 +148,7 @@ async def my_upsert_app_config_fragments(
         description=(
             "Read the fragments written at one scope for the given config names — the current "
             "values, to inspect before editing them. Answered position by position, null "
-            "where the scope holds no fragment for that name. RBAC-authorized at that scope."
+            "where the scope holds no fragment for that name."
         ),
     )
 )  # type: ignore[misc]
