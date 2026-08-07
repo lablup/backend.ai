@@ -15,6 +15,7 @@ from ai.backend.manager.data.auth.login_session_types import (
     LoginAttemptResult,
     LoginSessionStatus,
 )
+from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.models.agent import AgentRow
 
@@ -148,6 +149,7 @@ class TestLoginSessionForce:
                 user=user_uuid,
                 is_active=True,
                 is_default=True,
+                rate_limit=DEFAULT_KEYPAIR_RATE_LIMIT,
                 resource_policy="test-keypair-policy",
             )
             db_sess.add(keypair)
