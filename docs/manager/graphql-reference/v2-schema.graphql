@@ -8017,12 +8017,12 @@ type Mutation {
   adminUpdateAppConfigAllowList(input: UpdateAppConfigAllowListInput!): UpdateAppConfigAllowListPayload
 
   """
-  Added in 26.8.0. Upsert many app config fragments at one scope (insert, or replace config on conflict), with per-item partial success (not in effect yet: still all-or-nothing).
+  Added in 26.9.0. Upsert many app config fragments at one scope (insert, or replace config on conflict), with per-item partial success (not in effect yet: still all-or-nothing).
   """
   scopedUpsertAppConfigFragments(input: ScopedUpsertAppConfigFragmentsInput!): UpsertAppConfigFragmentsPayload!
 
   """
-  Added in 26.8.0. Upsert many app config fragments at the current user's own user scope, with per-item partial success (not in effect yet: still all-or-nothing).
+  Added in 26.9.0. Upsert many app config fragments at the current user's own user scope, with per-item partial success (not in effect yet: still all-or-nothing).
   """
   myUpsertAppConfigFragments(input: MyUpsertAppConfigFragmentsInput!): UpsertAppConfigFragmentsPayload!
 
