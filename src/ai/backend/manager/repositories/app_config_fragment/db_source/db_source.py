@@ -30,6 +30,7 @@ from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFr
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
+    AppConfigFragmentBatchPurgerByNamesSpec,
     AppConfigFragmentPurgerSpec,
 )
 from ai.backend.manager.repositories.app_config_fragment.upserters import (
@@ -40,7 +41,10 @@ from ai.backend.manager.repositories.base import (
     NoPagination,
     Querier,
 )
-from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
+from ai.backend.manager.repositories.base.rbac.entity_purger import (
+    RBACEntityBatchPurger,
+    RBACEntityPurger,
+)
 from ai.backend.manager.repositories.base.rbac.entity_upserter import (
     ConflictTarget,
     RBACEntityUpserter,
@@ -151,6 +155,44 @@ class AppConfigFragmentDBSource:
                 if index in errors_by_index or spec.fragment_id not in succeeded_ids
             ]
             return AppConfigFragmentBulkResult(succeeded=succeeded, failed=failed)
+
+    @app_config_fragment_db_source_resilience.apply()
+    async def batch_purge_by_names(
+        self,
+        purger_spec: AppConfigFragmentBatchPurgerByNamesSpec,
+    ) -> list[AppConfigFragmentData]:
+        """Purge one scope's fragments for the spec's ``config_names``, all-or-nothing.
+
+        A scope holds at most one fragment per config name, so the names select the rows
+        directly and one batch purge deletes them with their RBAC entries. A name the scope
+        holds no fragment for raises before anything is deleted, so a typo cannot take a
+        neighbouring config with it.
+        """
+        # A name repeated in the request still names one fragment.
+        requested = list(dict.fromkeys(purger_spec.config_names))
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[AppConfigFragmentConditions.by_config_names(requested)],
+        )
+        async with self._rbac_ops_provider.write_ops() as w:
+            found = await w.batch_query_with_scopes(
+                sa.select(AppConfigFragmentRow), querier, [purger_spec.scope]
+            )
+            rows = {
+                row.AppConfigFragmentRow.config_name: row.AppConfigFragmentRow for row in found.rows
+            }
+            missing = [config_name for config_name in requested if config_name not in rows]
+            if missing:
+                raise AppConfigFragmentNotFound(
+                    f"No app config fragment at this scope for: {', '.join(missing)}"
+                )
+            purged = [rows[config_name].to_data() for config_name in requested]
+            result = await w.batch_purge_scoped(RBACEntityBatchPurger(spec=purger_spec))
+            if result.deleted_count != len(requested):
+                raise AppConfigFragmentNotFound(
+                    "Some app config fragments at this scope were purged concurrently"
+                )
+            return purged
 
     @app_config_fragment_db_source_resilience.apply()
     async def admin_search(self, querier: BatchQuerier) -> AppConfigFragmentSearchResult:

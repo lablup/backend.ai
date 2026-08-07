@@ -46,6 +46,7 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
+    AppConfigFragmentBatchPurgerByNamesSpec,
     AppConfigFragmentPurgerSpec,
 )
 from ai.backend.manager.repositories.app_config_fragment.repository import (
@@ -103,6 +104,26 @@ async def database(
 @pytest.fixture
 def repository(database: ExtendedAsyncSAEngine) -> AppConfigFragmentRepository:
     return AppConfigFragmentRepository(RBACOpsProvider(database))
+
+
+@dataclass(frozen=True)
+class _ScopeBinding:
+    """One RBAC scope a fragment is bound to (a row of ``association_scopes_entities``)."""
+
+    scope_type: ScopeType
+    scope_id: str
+
+
+async def _scope_bindings(database: ExtendedAsyncSAEngine, entity_id: str) -> list[_ScopeBinding]:
+    """The RBAC scopes the fragment is currently bound to."""
+    async with database.begin_readonly_session() as db_sess:
+        rows = await db_sess.scalars(
+            sa.select(AssociationScopesEntitiesRow).where(
+                AssociationScopesEntitiesRow.entity_type == EntityType.APP_CONFIG_FRAGMENT,
+                AssociationScopesEntitiesRow.entity_id == entity_id,
+            )
+        )
+        return [_ScopeBinding(scope_type=row.scope_type, scope_id=row.scope_id) for row in rows]
 
 
 def _allow_list_row(config_name: str, scope_type: AppConfigScopeType) -> AppConfigAllowListRow:
@@ -558,6 +579,98 @@ class TestBulkPurge:
             await repository.get_by_id(two_fragments[0].id)
 
 
+class TestPurgeByConfigNames:
+    """The scope's own fragments are addressed by config name, so no id has to be resolved
+    first, and the batch is all-or-nothing."""
+
+    async def test_purges_only_the_named_scope_fragments(
+        self,
+        repository: AppConfigFragmentRepository,
+        fragments_across_scopes: list[AppConfigFragmentData],
+        scope_owners: None,
+    ) -> None:
+        purged = await repository.batch_purge_by_names(
+            AppConfigFragmentBatchPurgerByNamesSpec(
+                scope=AppConfigFragmentSearchScope(
+                    scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
+                ),
+                config_names=["theme"],
+            )
+        )
+
+        expected = [
+            f
+            for f in fragments_across_scopes
+            if f.config_name == "theme"
+            and f.scope_type is AppConfigScopeType.USER
+            and f.scope_id == _USER_SCOPE_ID
+        ]
+        assert [f.id for f in purged] == [f.id for f in expected]
+        with pytest.raises(AppConfigFragmentNotFound):
+            await repository.get_by_id(expected[0].id)
+        # The same config name at every other scope is untouched.
+        survivors = [f for f in fragments_across_scopes if f.id != expected[0].id]
+        for fragment in survivors:
+            assert (await repository.get_by_id(fragment.id)).id == fragment.id
+
+    async def test_purges_nothing_when_one_name_has_no_fragment(
+        self,
+        repository: AppConfigFragmentRepository,
+        fragments_across_scopes: list[AppConfigFragmentData],
+        scope_owners: None,
+    ) -> None:
+        # `menu` exists, but only at the public scope, so the caller's user scope holds none.
+        with pytest.raises(AppConfigFragmentNotFound):
+            await repository.batch_purge_by_names(
+                AppConfigFragmentBatchPurgerByNamesSpec(
+                    scope=AppConfigFragmentSearchScope(
+                        scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
+                    ),
+                    config_names=["theme", "menu"],
+                )
+            )
+
+        for fragment in fragments_across_scopes:
+            assert (await repository.get_by_id(fragment.id)).id == fragment.id
+
+    async def test_purge_removes_the_scope_binding(
+        self,
+        repository: AppConfigFragmentRepository,
+        database: ExtendedAsyncSAEngine,
+        theme_registered: None,
+        scope_owners: None,
+    ) -> None:
+        """A purge by name unbinds the fragment, as a purge by id does.
+
+        Deleting the row alone would leave its scope association behind, pointing at a
+        fragment that no longer exists.
+        """
+        upserted = await repository.bulk_upsert([
+            AppConfigFragmentUpserterSpec(
+                config_name="theme",
+                scope_type=AppConfigScopeType.USER,
+                scope_id=_USER_SCOPE_ID,
+                config={"k": "v"},
+            )
+        ])
+        created = upserted[0]
+        assert await _scope_bindings(database, str(created.id)) == [
+            _ScopeBinding(scope_type=ScopeType.USER, scope_id=str(_USER_ID))
+        ]
+
+        purged = await repository.batch_purge_by_names(
+            AppConfigFragmentBatchPurgerByNamesSpec(
+                scope=AppConfigFragmentSearchScope(
+                    scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
+                ),
+                config_names=["theme"],
+            )
+        )
+
+        assert [f.id for f in purged] == [created.id]
+        assert await _scope_bindings(database, str(created.id)) == []
+
+
 class TestVisibilityConditions:
     async def test_public_visibility_selects_only_public(
         self,
@@ -721,14 +834,6 @@ class TestApplicableFragments:
 
 
 @dataclass(frozen=True)
-class _ScopeBinding:
-    """One RBAC scope a fragment is bound to (a row of ``association_scopes_entities``)."""
-
-    scope_type: ScopeType
-    scope_id: str
-
-
-@dataclass(frozen=True)
 class _FragmentScopeCase:
     """A fragment scope to write at, with the bindings a create at that scope must produce.
 
@@ -744,20 +849,6 @@ class _FragmentScopeCase:
 class TestRBACScopeAssociation:
     """Create binds a ``user`` / ``domain`` fragment to its RBAC scope so the RBAC validator can
     resolve ownership on a later update/purge; ``public`` (GLOBAL, no RBAC scope) gets none."""
-
-    @staticmethod
-    async def _scope_bindings(
-        database: ExtendedAsyncSAEngine, entity_id: str
-    ) -> list[_ScopeBinding]:
-        """The RBAC scopes the fragment is currently bound to."""
-        async with database.begin_readonly_session() as db_sess:
-            rows = await db_sess.scalars(
-                sa.select(AssociationScopesEntitiesRow).where(
-                    AssociationScopesEntitiesRow.entity_type == EntityType.APP_CONFIG_FRAGMENT,
-                    AssociationScopesEntitiesRow.entity_id == entity_id,
-                )
-            )
-            return [_ScopeBinding(scope_type=row.scope_type, scope_id=row.scope_id) for row in rows]
 
     @pytest.mark.parametrize(
         "case",
@@ -795,7 +886,7 @@ class TestRBACScopeAssociation:
                 config={"k": "v"},
             )
         ])
-        assert await self._scope_bindings(database, str(upserted[0].id)) == case.expected_bindings
+        assert await _scope_bindings(database, str(upserted[0].id)) == case.expected_bindings
 
     @pytest.mark.parametrize(
         "case",
@@ -834,10 +925,10 @@ class TestRBACScopeAssociation:
             )
         ])
         created = upserted[0]
-        assert await self._scope_bindings(database, str(created.id)) == case.expected_bindings
+        assert await _scope_bindings(database, str(created.id)) == case.expected_bindings
         purged = await repository.purge(AppConfigFragmentPurgerSpec(fragment_id=created.id))
         assert purged.id == created.id
-        assert await self._scope_bindings(database, str(created.id)) == []
+        assert await _scope_bindings(database, str(created.id)) == []
 
     async def test_bulk_purge_removes_the_scope_binding(
         self,
@@ -859,12 +950,12 @@ class TestRBACScopeAssociation:
             )
         ])
         created = upserted[0]
-        assert await self._scope_bindings(database, str(created.id)) == [
+        assert await _scope_bindings(database, str(created.id)) == [
             _ScopeBinding(scope_type=ScopeType.USER, scope_id=str(_USER_ID))
         ]
         result = await repository.bulk_purge([AppConfigFragmentPurgerSpec(fragment_id=created.id)])
         assert [p.id for p in result.succeeded] == [created.id]
-        assert await self._scope_bindings(database, str(created.id)) == []
+        assert await _scope_bindings(database, str(created.id)) == []
         with pytest.raises(AppConfigFragmentNotFound):
             await repository.get_by_id(created.id)
 

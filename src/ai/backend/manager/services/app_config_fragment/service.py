@@ -7,6 +7,10 @@ from ai.backend.manager.services.app_config_fragment.actions.admin_search import
     AdminSearchAppConfigFragmentAction,
     AdminSearchAppConfigFragmentActionResult,
 )
+from ai.backend.manager.services.app_config_fragment.actions.batch_purge_by_names import (
+    BatchPurgeAppConfigFragmentsByNamesAction,
+    BatchPurgeAppConfigFragmentsByNamesActionResult,
+)
 from ai.backend.manager.services.app_config_fragment.actions.bulk_purge import (
     BulkPurgeAppConfigFragmentAction,
     BulkPurgeAppConfigFragmentActionResult,
@@ -87,6 +91,14 @@ class AppConfigFragmentService:
     ) -> PurgeAppConfigFragmentActionResult:
         data = await self._repository.purge(action.purger_spec)
         return PurgeAppConfigFragmentActionResult(fragment=data)
+
+    async def batch_purge_by_names(
+        self, action: BatchPurgeAppConfigFragmentsByNamesAction
+    ) -> BatchPurgeAppConfigFragmentsByNamesActionResult:
+        fragments = await self._repository.batch_purge_by_names(action.purger_spec)
+        return BatchPurgeAppConfigFragmentsByNamesActionResult(
+            fragments=fragments, _scope=action.purger_spec.scope
+        )
 
     async def bulk_purge(
         self, action: BulkPurgeAppConfigFragmentAction
