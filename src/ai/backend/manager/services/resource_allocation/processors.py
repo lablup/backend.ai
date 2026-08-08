@@ -1,10 +1,7 @@
 """Processors for resource allocation operations."""
 
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.resource_allocation.actions.check_preset_availability import (
     CheckPresetAvailabilityAction,
@@ -37,7 +34,7 @@ from ai.backend.manager.services.resource_allocation.actions.resolve_keypair_con
 from ai.backend.manager.services.resource_allocation.service import ResourceAllocationService
 
 
-class ResourceAllocationProcessors(AbstractProcessorPackage):
+class ResourceAllocationProcessors:
     resolve_keypair_context: ActionProcessor[
         ResolveKeypairContextAction, ResolveKeypairContextActionResult
     ]
@@ -75,15 +72,3 @@ class ResourceAllocationProcessors(AbstractProcessorPackage):
         self.check_preset_availability = ActionProcessor(
             service.check_preset_availability, action_monitors
         )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            ResolveKeypairContextAction.spec(),
-            GetKeypairUsageAction.spec(),
-            GetProjectUsageAction.spec(),
-            GetDomainUsageAction.spec(),
-            GetResourceGroupUsageAction.spec(),
-            GetEffectiveAllocationAction.spec(),
-            CheckPresetAvailabilityAction.spec(),
-        ]

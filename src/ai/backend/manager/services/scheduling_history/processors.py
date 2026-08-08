@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.global_action import GlobalActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions import (
@@ -36,7 +33,7 @@ from .actions import (
 from .service import SchedulingHistoryService
 
 
-class SchedulingHistoryProcessors(AbstractProcessorPackage):
+class SchedulingHistoryProcessors:
     """Processor package for scheduling history operations."""
 
     # Admin processors
@@ -118,21 +115,3 @@ class SchedulingHistoryProcessors(AbstractProcessorPackage):
         self.search_route_scoped_history = ActionProcessor(
             service.search_route_scoped_history, action_monitors
         )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            # Admin actions
-            SearchSessionHistoryAction.spec(),
-            SearchKernelHistoryAction.spec(),
-            SearchDeploymentHistoryAction.spec(),
-            GlobalSearchReplicaGroupHistoryAction.spec(),
-            SearchRouteHistoryAction.spec(),
-            # Scoped actions (added in 26.2.0)
-            SearchSessionScopedHistoryAction.spec(),
-            ResolveKernelSessionAction.spec(),
-            SearchKernelScopedHistoryAction.spec(),
-            SearchDeploymentScopedHistoryAction.spec(),
-            ScopedSearchReplicaGroupHistoryAction.spec(),
-            SearchRouteScopedHistoryAction.spec(),
-        ]

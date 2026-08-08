@@ -1,8 +1,5 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.project_resource_policy.actions.create_project_resource_policy import (
     CreateProjectResourcePolicyAction,
@@ -27,7 +24,7 @@ from ai.backend.manager.services.project_resource_policy.actions.search_project_
 from ai.backend.manager.services.project_resource_policy.service import ProjectResourcePolicyService
 
 
-class ProjectResourcePolicyProcessors(AbstractProcessorPackage):
+class ProjectResourcePolicyProcessors:
     get_project_resource_policy: ActionProcessor[
         GetProjectResourcePolicyAction, GetProjectResourcePolicyActionResult
     ]
@@ -65,13 +62,3 @@ class ProjectResourcePolicyProcessors(AbstractProcessorPackage):
         self.delete_project_resource_policy = ActionProcessor(
             service.delete_project_resource_policy, action_monitors
         )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            GetProjectResourcePolicyAction.spec(),
-            SearchProjectResourcePoliciesAction.spec(),
-            CreateProjectResourcePolicyAction.spec(),
-            ModifyProjectResourcePolicyAction.spec(),
-            DeleteProjectResourcePolicyAction.spec(),
-        ]

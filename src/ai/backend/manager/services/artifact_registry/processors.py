@@ -1,10 +1,7 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.artifact_registry.actions.common.get_meta import (
     GetArtifactRegistryMetaAction,
@@ -78,7 +75,7 @@ from ai.backend.manager.services.artifact_registry.actions.reservoir.update impo
 from .service import ArtifactRegistryService
 
 
-class ArtifactRegistryProcessors(AbstractProcessorPackage):
+class ArtifactRegistryProcessors:
     create_huggingface_registry: ActionProcessor[
         CreateHuggingFaceRegistryAction, CreateHuggingFaceRegistryActionResult
     ]
@@ -206,25 +203,3 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
             service.get_reservoir_registries, action_monitors
         )
         self.get_registry_metas = ActionProcessor(service.get_registry_metas, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateHuggingFaceRegistryAction.spec(),
-            UpdateHuggingFaceRegistryAction.spec(),
-            DeleteHuggingFaceRegistryAction.spec(),
-            GetHuggingFaceRegistryAction.spec(),
-            GetHuggingFaceRegistriesAction.spec(),
-            ListHuggingFaceRegistryAction.spec(),
-            SearchHuggingFaceRegistriesAction.spec(),
-            CreateReservoirRegistryAction.spec(),
-            UpdateReservoirRegistryAction.spec(),
-            DeleteReservoirRegistryAction.spec(),
-            GetReservoirRegistryAction.spec(),
-            GetReservoirRegistriesAction.spec(),
-            ListReservoirRegistriesAction.spec(),
-            SearchReservoirRegistriesAction.spec(),
-            GetArtifactRegistryMetaAction.spec(),
-            GetArtifactRegistryMetasAction.spec(),
-            SearchArtifactRegistriesAction.spec(),
-        ]

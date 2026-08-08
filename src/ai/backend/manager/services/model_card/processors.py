@@ -1,8 +1,7 @@
-from typing import cast, override
+from typing import cast
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validator.base import ActionValidator
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.model_card.actions.available_presets import (
@@ -40,7 +39,7 @@ from ai.backend.manager.services.model_card.actions.update import (
 from ai.backend.manager.services.model_card.service import ModelCardService
 
 
-class ModelCardProcessors(AbstractProcessorPackage):
+class ModelCardProcessors:
     create: ActionProcessor[CreateModelCardAction, CreateModelCardActionResult]
     update: ActionProcessor[UpdateModelCardAction, UpdateModelCardActionResult]
     delete: ActionProcessor[DeleteModelCardAction, DeleteModelCardActionResult]
@@ -72,16 +71,3 @@ class ModelCardProcessors(AbstractProcessorPackage):
         )
         self.scan = ActionProcessor(service.scan, action_monitors)
         self.available_presets = ActionProcessor(service.available_presets, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateModelCardAction.spec(),
-            UpdateModelCardAction.spec(),
-            DeleteModelCardAction.spec(),
-            BulkDeleteModelCardAction.spec(),
-            SearchModelCardsAction.spec(),
-            SearchModelCardsInProjectAction.spec(),
-            ScanProjectModelCardsAction.spec(),
-            AvailablePresetsAction.spec(),
-        ]

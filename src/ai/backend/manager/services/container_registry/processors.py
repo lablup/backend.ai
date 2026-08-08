@@ -1,8 +1,5 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.container_registry.actions.clear_images import (
     ClearImagesAction,
@@ -63,7 +60,7 @@ from ai.backend.manager.services.container_registry.actions.update_registry_quot
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 
 
-class ContainerRegistryProcessors(AbstractProcessorPackage):
+class ContainerRegistryProcessors:
     rescan_images: ActionProcessor[RescanImagesAction, RescanImagesActionResult]
     clear_images: ActionProcessor[ClearImagesAction, ClearImagesActionResult]
     load_container_registries: ActionProcessor[
@@ -135,22 +132,3 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
         self.read_registry_quota = ActionProcessor(service.read_registry_quota, action_monitors)
         self.update_registry_quota = ActionProcessor(service.update_registry_quota, action_monitors)
         self.delete_registry_quota = ActionProcessor(service.delete_registry_quota, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            RescanImagesAction.spec(),
-            ClearImagesAction.spec(),
-            LoadContainerRegistriesAction.spec(),
-            LoadAllContainerRegistriesAction.spec(),
-            GetContainerRegistriesAction.spec(),
-            CreateContainerRegistryAction.spec(),
-            ModifyContainerRegistryAction.spec(),
-            DeleteContainerRegistryAction.spec(),
-            SearchContainerRegistriesAction.spec(),
-            HandleHarborWebhookAction.spec(),
-            CreateRegistryQuotaAction.spec(),
-            ReadRegistryQuotaAction.spec(),
-            UpdateRegistryQuotaAction.spec(),
-            DeleteRegistryQuotaAction.spec(),
-        ]

@@ -1,10 +1,9 @@
-from typing import cast, override
+from typing import cast
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.bulk import BulkActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validator.base import ActionValidator
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.session.actions.batch_get_kernel_resource_allocation import (
@@ -154,7 +153,7 @@ from ai.backend.manager.services.session.actions.upload_files import (
 from ai.backend.manager.services.session.service import SessionService
 
 
-class SessionProcessors(AbstractProcessorPackage):
+class SessionProcessors:
     commit_session: ActionProcessor[CommitSessionAction, CommitSessionActionResult]
     compute_schedule: ActionProcessor[ComputeScheduleAction, ComputeScheduleActionResult]
     complete: ActionProcessor[CompleteAction, CompleteActionResult]
@@ -319,44 +318,3 @@ class SessionProcessors(AbstractProcessorPackage):
             action_monitors,
             validators=rbac_single_entity_validators,
         )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CommitSessionAction.spec(),
-            ComputeScheduleAction.spec(),
-            CompleteAction.spec(),
-            ConvertSessionToImageAction.spec(),
-            CreateClusterAction.spec(),
-            EnqueueSessionAction.spec(),
-            CreateFromParamsAction.spec(),
-            CreateFromTemplateAction.spec(),
-            DestroySessionAction.spec(),
-            DownloadFileAction.spec(),
-            DownloadFilesAction.spec(),
-            ExecuteSessionAction.spec(),
-            GetAbusingReportAction.spec(),
-            GetCommitStatusAction.spec(),
-            GetContainerLogsAction.spec(),
-            GetDependencyGraphAction.spec(),
-            GetDirectAccessInfoAction.spec(),
-            GetSessionInfoAction.spec(),
-            GetStatusHistoryAction.spec(),
-            InterruptSessionAction.spec(),
-            ListFilesAction.spec(),
-            MatchSessionsAction.spec(),
-            RenameSessionAction.spec(),
-            ResolveSessionAction.spec(),
-            ResolveSessionNameAction.spec(),
-            SearchKernelsAction.spec(),
-            BatchGetSessionResourceAllocationAction.spec(),
-            BatchGetKernelResourceAllocationAction.spec(),
-            SearchSessionsAction.spec(),
-            SearchSessionsInProjectAction.spec(),
-            ShutdownServiceAction.spec(),
-            StartServiceAction.spec(),
-            TerminateSessionsAction.spec(),
-            UploadFilesAction.spec(),
-            GetSessionAction.spec(),
-            ModifySessionAction.spec(),
-        ]

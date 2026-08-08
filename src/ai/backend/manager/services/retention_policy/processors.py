@@ -1,8 +1,5 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor.global_action import GlobalActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.services.retention_policy.actions.create import (
     CreateRetentionPolicyAction,
     CreateRetentionPolicyActionResult,
@@ -26,7 +23,7 @@ from ai.backend.manager.services.retention_policy.actions.update import (
 from ai.backend.manager.services.retention_policy.service import RetentionPolicyService
 
 
-class RetentionPolicyProcessors(AbstractProcessorPackage):
+class RetentionPolicyProcessors:
     create: GlobalActionProcessor[CreateRetentionPolicyAction, CreateRetentionPolicyActionResult]
     update: GlobalActionProcessor[UpdateRetentionPolicyAction, UpdateRetentionPolicyActionResult]
     delete: GlobalActionProcessor[DeleteRetentionPolicyAction, DeleteRetentionPolicyActionResult]
@@ -45,13 +42,3 @@ class RetentionPolicyProcessors(AbstractProcessorPackage):
         self.delete = GlobalActionProcessor(service.delete, action_monitors)
         self.purge = GlobalActionProcessor(service.purge, action_monitors)
         self.search = GlobalActionProcessor(service.search, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateRetentionPolicyAction.spec(),
-            UpdateRetentionPolicyAction.spec(),
-            DeleteRetentionPolicyAction.spec(),
-            PurgeRetentionPolicyAction.spec(),
-            SearchRetentionPoliciesAction.spec(),
-        ]

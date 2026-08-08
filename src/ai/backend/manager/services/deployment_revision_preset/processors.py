@@ -1,8 +1,5 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.deployment_revision_preset.actions.create import (
     CreateDeploymentRevisionPresetAction,
@@ -29,7 +26,7 @@ from ai.backend.manager.services.deployment_revision_preset.service import (
 )
 
 
-class DeploymentRevisionPresetProcessors(AbstractProcessorPackage):
+class DeploymentRevisionPresetProcessors:
     create: ActionProcessor[
         CreateDeploymentRevisionPresetAction, CreateDeploymentRevisionPresetActionResult
     ]
@@ -57,13 +54,3 @@ class DeploymentRevisionPresetProcessors(AbstractProcessorPackage):
         self.delete = ActionProcessor(service.delete, action_monitors)
         self.search = ActionProcessor(service.search, action_monitors)
         self.search_resource_slots = ActionProcessor(service.search_resource_slots, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateDeploymentRevisionPresetAction.spec(),
-            UpdateDeploymentRevisionPresetAction.spec(),
-            DeleteDeploymentRevisionPresetAction.spec(),
-            SearchDeploymentRevisionPresetsAction.spec(),
-            SearchPresetResourceSlotsAction.spec(),
-        ]
