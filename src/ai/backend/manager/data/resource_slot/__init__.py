@@ -6,7 +6,6 @@ from .types import (
     ResourceAllocationSearchResult,
     ResourceOccupancy,
     ResourceSlotTypeData,
-    ResourceSlotTypeSearchResult,
 )
 
 __all__ = [
@@ -17,5 +16,4 @@ __all__ = [
     "ResourceAllocationSearchResult",
     "ResourceOccupancy",
     "ResourceSlotTypeData",
-    "ResourceSlotTypeSearchResult",
 ]

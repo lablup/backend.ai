@@ -3,8 +3,15 @@ from __future__ import annotations
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.registry import ProcessorGroup
-from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
-from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult, EntityOpsResult
+from ai.backend.manager.actions.v2.global_scope.processor import (
+    GlobalActionProcessor,
+    PublicActionProcessor,
+)
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    CreatedEntityOpsResult,
+    EntityOpsResult,
+)
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
 from ai.backend.manager.services.resource_slot.actions.create import CreateResourceSlotTypeAction
@@ -25,13 +32,11 @@ from .actions import (
     GetProjectResourceOverviewAction,
     GetProjectResourceOverviewResult,
     GetResourceSlotTypeAction,
-    GetResourceSlotTypeResult,
     SearchAgentResourcesAction,
     SearchAgentResourcesResult,
     SearchResourceAllocationsAction,
     SearchResourceAllocationsResult,
     SearchResourceSlotTypesAction,
-    SearchResourceSlotTypesResult,
 )
 from .service import ResourceSlotService
 
@@ -49,9 +54,13 @@ class ResourceSlotProcessors:
     search_resource_allocations: ActionProcessor[
         SearchResourceAllocationsAction, SearchResourceAllocationsResult
     ]
-    get_resource_slot_type: ActionProcessor[GetResourceSlotTypeAction, GetResourceSlotTypeResult]
-    search_resource_slot_types: ActionProcessor[
-        SearchResourceSlotTypesAction, SearchResourceSlotTypesResult
+    get_resource_slot_type: PublicActionProcessor[
+        GetResourceSlotTypeAction,
+        EntityOpsResult[ResourceSlotTypeData],
+    ]
+    search_resource_slot_types: PublicActionProcessor[
+        SearchResourceSlotTypesAction,
+        BatchOpsResult[ResourceSlotTypeData],
     ]
     get_domain_resource_overview: ActionProcessor[
         GetDomainResourceOverviewAction, GetDomainResourceOverviewResult
@@ -95,12 +104,8 @@ class ResourceSlotProcessors:
         self.search_resource_allocations = ActionProcessor(
             service.search_resource_allocations, action_monitors
         )
-        self.get_resource_slot_type = ActionProcessor(
-            service.get_resource_slot_type, action_monitors
-        )
-        self.search_resource_slot_types = ActionProcessor(
-            service.search_resource_slot_types, action_monitors
-        )
+        self.get_resource_slot_type = group.public_get_ops(GetResourceSlotTypeAction)
+        self.search_resource_slot_types = group.public_search_ops(SearchResourceSlotTypesAction)
         self.get_domain_resource_overview = ActionProcessor(
             service.get_domain_resource_overview, action_monitors
         )

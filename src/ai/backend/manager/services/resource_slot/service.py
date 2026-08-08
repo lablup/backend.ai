@@ -25,15 +25,10 @@ from .actions.get_project_resource_overview import (
     GetProjectResourceOverviewAction,
     GetProjectResourceOverviewResult,
 )
-from .actions.get_resource_slot_type import GetResourceSlotTypeAction, GetResourceSlotTypeResult
 from .actions.search_agent_resources import SearchAgentResourcesAction, SearchAgentResourcesResult
 from .actions.search_resource_allocations import (
     SearchResourceAllocationsAction,
     SearchResourceAllocationsResult,
-)
-from .actions.search_resource_slot_types import (
-    SearchResourceSlotTypesAction,
-    SearchResourceSlotTypesResult,
 )
 
 
@@ -117,23 +112,6 @@ class ResourceSlotService:
     ) -> SearchResourceAllocationsResult:
         result = await self._repository.search_resource_allocations(action.querier)
         return SearchResourceAllocationsResult(
-            items=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
-    async def get_resource_slot_type(
-        self, action: GetResourceSlotTypeAction
-    ) -> GetResourceSlotTypeResult:
-        row = await self._repository.get_slot_type(action.slot_name)
-        return GetResourceSlotTypeResult(item=row.to_data())
-
-    async def search_resource_slot_types(
-        self, action: SearchResourceSlotTypesAction
-    ) -> SearchResourceSlotTypesResult:
-        result = await self._repository.search_slot_types(action.querier)
-        return SearchResourceSlotTypesResult(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,

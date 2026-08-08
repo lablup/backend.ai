@@ -3,41 +3,32 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.resource_slot import RESOURCE_SLOT_TYPE_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
-from ai.backend.manager.repositories.base import BatchQuerier
-
-from .base import ResourceSlotAction
+from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
+from ai.backend.manager.repositories.resource_slot.searchers import ResourceSlotTypeSearcher
 
 
 @dataclass
-class SearchResourceSlotTypesAction(ResourceSlotAction):
-    querier: BatchQuerier
+class SearchResourceSlotTypesAction(
+    SearchGlobalOpsAction[ResourceSlotTypeRow, ResourceSlotTypeData]
+):
+    """Page through the resource slot type catalog; every authenticated user may."""
+
+    searcher: ResourceSlotTypeSearcher
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.RESOURCE_SLOT_TYPE
+        return RESOURCE_SLOT_TYPE_ENTITY_TYPE
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+    def action_name(cls) -> str:
+        return "search_resource_slot_types"
 
     @override
-    def entity_id(self) -> str | None:
-        return None
-
-
-@dataclass
-class SearchResourceSlotTypesResult(BaseActionResult):
-    items: list[ResourceSlotTypeData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    def to_searcher(self) -> ResourceSlotTypeSearcher:
+        return self.searcher
