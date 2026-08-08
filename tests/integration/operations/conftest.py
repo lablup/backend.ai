@@ -7,7 +7,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.manager.models.error_logs import error_logs
+from ai.backend.manager.models.error_logs import ErrorLogRow
 
 
 @pytest.fixture(autouse=True)
@@ -23,4 +23,4 @@ async def _cleanup_error_logs(
     """
     yield
     async with db_engine.begin() as conn:
-        await conn.execute(sa.delete(error_logs))
+        await conn.execute(sa.delete(ErrorLogRow))

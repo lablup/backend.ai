@@ -12,7 +12,7 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.error_log.types import ErrorLogData, ErrorLogListResult
-from ai.backend.manager.models.error_logs import ErrorLogRow, error_logs
+from ai.backend.manager.models.error_logs import ErrorLogRow
 from ai.backend.manager.models.group.row import AssocGroupUserRow, GroupRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -103,9 +103,9 @@ class ErrorLogDBSource:
         """
         async with self._db.begin_session() as db_sess:
             select_query = (
-                sa.select(ErrorLogRow).order_by(sa.desc(error_logs.c.created_at)).limit(page_size)
+                sa.select(ErrorLogRow).order_by(sa.desc(ErrorLogRow.created_at)).limit(page_size)
             )
-            count_query = sa.select(sa.func.count()).select_from(error_logs)
+            count_query = sa.select(sa.func.count()).select_from(ErrorLogRow)
             if page_no > 1:
                 select_query = select_query.offset((page_no - 1) * page_size)
 
@@ -124,11 +124,11 @@ class ErrorLogDBSource:
                 )
                 usr_result = await db_sess.execute(usr_query)
                 user_ids = [row.user_id for row in usr_result]
-                where = error_logs.c.user.in_(user_ids)
+                where = ErrorLogRow.user.in_(user_ids)
                 select_query = select_query.where(where)
                 count_query = count_query.where(where)
             else:
-                user_where = (error_logs.c.user == user_uuid) & (~error_logs.c.is_cleared)
+                user_where = (ErrorLogRow.user == user_uuid) & (~ErrorLogRow.is_cleared)
                 select_query = select_query.where(user_where)
                 count_query = count_query.where(user_where)
 
@@ -139,9 +139,9 @@ class ErrorLogDBSource:
 
             if mark_read and items:
                 read_update_query = (
-                    sa.update(error_logs)
+                    sa.update(ErrorLogRow)
                     .values(is_read=True)
-                    .where(error_logs.c.id.in_([item.id for item in items]))
+                    .where(ErrorLogRow.id.in_([item.id for item in items]))
                 )
                 await db_sess.execute(read_update_query)
 
@@ -163,10 +163,10 @@ class ErrorLogDBSource:
             Number of rows updated (expected 1 on success).
         """
         async with self._db.begin_session() as db_sess:
-            update_query = sa.update(error_logs).values(is_cleared=True)
+            update_query = sa.update(ErrorLogRow).values(is_cleared=True)
 
             if is_superadmin:
-                update_query = update_query.where(error_logs.c.id == log_id)
+                update_query = update_query.where(ErrorLogRow.id == log_id)
             elif is_admin:
                 j = sa.join(
                     GroupRow.__table__,
@@ -181,11 +181,11 @@ class ErrorLogDBSource:
                 usr_result = await db_sess.execute(usr_query)
                 user_ids = [row.user_id for row in usr_result]
                 update_query = update_query.where(
-                    (error_logs.c.user.in_(user_ids)) & (error_logs.c.id == log_id),
+                    (ErrorLogRow.user.in_(user_ids)) & (ErrorLogRow.id == log_id),
                 )
             else:
                 update_query = update_query.where(
-                    (error_logs.c.user == user_uuid) & (error_logs.c.id == log_id),
+                    (ErrorLogRow.user == user_uuid) & (ErrorLogRow.id == log_id),
                 )
 
             update_result = await db_sess.execute(update_query)

@@ -130,7 +130,7 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.scaling_group import scaling_groups, sgroups_for_domains
 from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.session_template import session_templates
+from ai.backend.manager.models.session_template import SessionTemplateRow
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
@@ -976,7 +976,7 @@ async def admin_user_fixture(
         await conn.execute(vfolders.delete())
         await conn.execute(kernels.delete())
         await conn.execute(SessionRow.__table__.delete())
-        await conn.execute(session_templates.delete())
+        await conn.execute(sa.delete(SessionTemplateRow))
         await conn.execute(ImageAliasRow.__table__.delete())
         await conn.execute(ImageRow.__table__.delete())
         # Clean fixture data
@@ -1093,7 +1093,7 @@ async def regular_user_fixture(
     async with db_engine.begin() as conn:
         # Clean side-effect tables that tests may populate via the running server
         await conn.execute(
-            session_templates.delete().where(session_templates.c.user_uuid == str(data.user_uuid))
+            sa.delete(SessionTemplateRow).where(SessionTemplateRow.user_uuid == str(data.user_uuid))
         )
         # Clean fixture data
         await conn.execute(
