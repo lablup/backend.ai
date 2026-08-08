@@ -47,7 +47,11 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import get_allowed_vfolder_hosts_by_user
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
 
 HOST_A = "host-a"
 HOST_B = "host-b"
@@ -99,6 +103,9 @@ class TestGetAllowedVFolderHostsByUserMembership:
                 GroupRow,
                 AgentRow,
                 AssociationScopesEntitiesRow,
+                VirtualScopeRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
             ],
         ):
             yield database_connection
@@ -250,6 +257,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
                     entity_id=str(regular_user),
                 )
             )
+            await VirtualScopeSeeder().enroll_user_in_project(sess, group_a, regular_user)
             await sess.flush()
         yield
 
@@ -270,6 +278,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
                     entity_id=str(regular_user),
                 )
             )
+            await VirtualScopeSeeder().enroll_user_in_project(sess, group_b, regular_user)
             await sess.flush()
         yield
 
