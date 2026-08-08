@@ -90,8 +90,6 @@ class TestUpdateDomainInput:
         req = UpdateDomainInput()
         assert req.description is SENTINEL
         assert isinstance(req.description, Sentinel)
-        assert req.allowed_docker_registries is SENTINEL
-        assert isinstance(req.allowed_docker_registries, Sentinel)
         assert req.integration_name is SENTINEL
         assert isinstance(req.integration_name, Sentinel)
 
@@ -99,6 +97,7 @@ class TestUpdateDomainInput:
         req = UpdateDomainInput()
         assert req.name is None
         assert req.is_active is None
+        assert req.allowed_docker_registries is None
 
     def test_explicit_none_description_signals_clear(self) -> None:
         req = UpdateDomainInput(description=None)
