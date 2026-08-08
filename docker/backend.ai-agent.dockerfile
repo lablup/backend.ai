@@ -28,7 +28,7 @@ RUN mkdir -p /tmp/backend.ai/ipc /var/log/backend.ai /etc/backend.ai /var/lib/ba
 WORKDIR /app
 
 # Copy entrypoint script
-COPY docker/backend.ai-agent-entrypoint.sh /app/entrypoint.sh
+COPY ./docker/backend.ai-agent-entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
 ENTRYPOINT ["/app/entrypoint.sh"]
