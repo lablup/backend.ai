@@ -1,3 +1,5 @@
+# Build context MUST be the repository root (the paths below are context-relative):
+#   docker build -f docker/backend.ai-agent.dockerfile --build-arg PYTHON_VERSION=<ver> --build-arg PKGVER=<ver> .
 ARG PYTHON_VERSION
 FROM python:${PYTHON_VERSION} AS builder
 ARG PKGVER
