@@ -3,7 +3,7 @@
 Covers:
 
 * :class:`ActionTarget` — RBAC element ref (universal across all action shapes).
-* :class:`SearchableActionTarget` — RBAC ref + per-leaf :class:`SearchScope`.
+* :class:`SearchableActionTarget` — RBAC ref + per-leaf :class:`OperationScope`.
 * :class:`BaseBulkAction` parametrized on the target type so consumers see
   ``to_search_scope()`` without isinstance checks.
 """
@@ -22,11 +22,11 @@ from ai.backend.manager.actions.action.types import ActionTarget, SearchableActi
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
 
 @dataclass(frozen=True)
-class _StubSearchScope(SearchScope):
+class _StubOperationScope(OperationScope):
     column_value: str
 
     @override
@@ -43,14 +43,14 @@ class _StubSearchScope(SearchScope):
 @dataclass(frozen=True)
 class _SearchableRefTarget(SearchableActionTarget):
     ref: RBACElementRef
-    scope: _StubSearchScope
+    scope: _StubOperationScope
 
     @override
     def to_rbac_element_ref(self) -> RBACElementRef:
         return self.ref
 
     @override
-    def to_search_scope(self) -> SearchScope:
+    def to_search_scope(self) -> OperationScope:
         return self.scope
 
 
@@ -77,14 +77,14 @@ class TestSearchableActionTarget:
     def test_is_an_action_target(self) -> None:
         target = _SearchableRefTarget(
             ref=RBACElementRef(element_type=RBACElementType.VFOLDER, element_id="vf-1"),
-            scope=_StubSearchScope(column_value="vf-1"),
+            scope=_StubOperationScope(column_value="vf-1"),
         )
 
         assert isinstance(target, ActionTarget)
 
     def test_exposes_both_rbac_ref_and_search_scope(self) -> None:
         ref = RBACElementRef(element_type=RBACElementType.VFOLDER, element_id="vf-1")
-        scope = _StubSearchScope(column_value="vf-1")
+        scope = _StubOperationScope(column_value="vf-1")
         target = _SearchableRefTarget(ref=ref, scope=scope)
 
         assert target.to_rbac_element_ref() == ref
@@ -100,8 +100,8 @@ class TestBulkActionWithSearchableTarget:
     def test_targets_yield_searchable_contract(self) -> None:
         ref_a = RBACElementRef(element_type=RBACElementType.VFOLDER, element_id="vf-a")
         ref_b = RBACElementRef(element_type=RBACElementType.USER, element_id="u-b")
-        scope_a = _StubSearchScope(column_value="vf-a")
-        scope_b = _StubSearchScope(column_value="u-b")
+        scope_a = _StubOperationScope(column_value="vf-a")
+        scope_b = _StubOperationScope(column_value="u-b")
         action = _MockSearchableBulkAction(
             items=[
                 _SearchableRefTarget(ref=ref_a, scope=scope_a),

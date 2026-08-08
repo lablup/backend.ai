@@ -1,6 +1,6 @@
 """Integration tests for ``AuditLogRepository.scoped_search``.
 
-Exercises the OR-union semantics of multiple :class:`SearchScope` inputs
+Exercises the OR-union semantics of multiple :class:`OperationScope` inputs
 against a real database, including mixed entity-tagged and triggered-by
 scopes and combination with ``AuditLogFilter``-style narrowing conditions.
 """
@@ -19,8 +19,8 @@ from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.models.audit_log import AuditLogRow
 from ai.backend.manager.repositories.audit_log import (
     AuditLogRepository,
-    EntityAuditLogSearchScope,
-    TriggeredByAuditLogSearchScope,
+    EntityAuditLogOperationScope,
+    TriggeredByAuditLogOperationScope,
 )
 from ai.backend.manager.repositories.audit_log.creators import SingleEntityAuditLogCreatorSpec
 from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
@@ -145,7 +145,7 @@ class TestScopedSearch:
         seeded_audit_logs: dict[str, uuid.UUID],
     ) -> None:
         scopes = [
-            EntityAuditLogSearchScope(entity_type=RBACElementType.VFOLDER, entity_id=str(_VF_1))
+            EntityAuditLogOperationScope(entity_type=RBACElementType.VFOLDER, entity_id=str(_VF_1))
         ]
 
         result = await audit_log_repository.scoped_search(_empty_querier(), scopes)
@@ -162,7 +162,7 @@ class TestScopedSearch:
         audit_log_repository: AuditLogRepository,
         seeded_audit_logs: dict[str, uuid.UUID],
     ) -> None:
-        scopes = [TriggeredByAuditLogSearchScope(triggered_by=_USER_A)]
+        scopes = [TriggeredByAuditLogOperationScope(triggered_by=_USER_A)]
 
         result = await audit_log_repository.scoped_search(_empty_querier(), scopes)
 
@@ -180,8 +180,10 @@ class TestScopedSearch:
     ) -> None:
         """Multiple scopes return the union — overlapping rows count once."""
         scopes = [
-            EntityAuditLogSearchScope(entity_type=RBACElementType.VFOLDER, entity_id=str(_VF_1)),
-            EntityAuditLogSearchScope(entity_type=RBACElementType.SESSION, entity_id=str(_SESS_1)),
+            EntityAuditLogOperationScope(entity_type=RBACElementType.VFOLDER, entity_id=str(_VF_1)),
+            EntityAuditLogOperationScope(
+                entity_type=RBACElementType.SESSION, entity_id=str(_SESS_1)
+            ),
         ]
 
         result = await audit_log_repository.scoped_search(_empty_querier(), scopes)
@@ -201,8 +203,8 @@ class TestScopedSearch:
     ) -> None:
         """Entity-tagged and triggered-by scopes combine as a single OR group."""
         scopes = [
-            EntityAuditLogSearchScope(entity_type=RBACElementType.VFOLDER, entity_id=str(_VF_1)),
-            TriggeredByAuditLogSearchScope(triggered_by=_USER_B),
+            EntityAuditLogOperationScope(entity_type=RBACElementType.VFOLDER, entity_id=str(_VF_1)),
+            TriggeredByAuditLogOperationScope(triggered_by=_USER_B),
         ]
 
         result = await audit_log_repository.scoped_search(_empty_querier(), scopes)
@@ -227,8 +229,10 @@ class TestScopedSearch:
             orders=[],
         )
         scopes = [
-            EntityAuditLogSearchScope(entity_type=RBACElementType.VFOLDER, entity_id=str(_VF_1)),
-            EntityAuditLogSearchScope(entity_type=RBACElementType.SESSION, entity_id=str(_SESS_2)),
+            EntityAuditLogOperationScope(entity_type=RBACElementType.VFOLDER, entity_id=str(_VF_1)),
+            EntityAuditLogOperationScope(
+                entity_type=RBACElementType.SESSION, entity_id=str(_SESS_2)
+            ),
         ]
 
         result = await audit_log_repository.scoped_search(querier, scopes)

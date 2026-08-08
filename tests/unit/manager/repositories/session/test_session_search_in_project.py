@@ -45,7 +45,7 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.session.repository import SessionRepository
-from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
+from ai.backend.manager.repositories.session.types import ProjectSessionOperationScope
 from ai.backend.testutils.db import with_tables
 
 
@@ -327,7 +327,7 @@ class TestSessionSearchInProject:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_in_project returns only sessions belonging to the specified project."""
-        scope = ProjectSessionSearchScope(project_id=test_data["project_a_id"])
+        scope = ProjectSessionOperationScope(project_id=test_data["project_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -347,7 +347,7 @@ class TestSessionSearchInProject:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_in_project for project_b returns only its session, not project_a's."""
-        scope = ProjectSessionSearchScope(project_id=test_data["project_b_id"])
+        scope = ProjectSessionOperationScope(project_id=test_data["project_b_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -366,7 +366,7 @@ class TestSessionSearchInProject:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_in_project returns correct pagination fields."""
-        scope = ProjectSessionSearchScope(project_id=test_data["project_a_id"])
+        scope = ProjectSessionOperationScope(project_id=test_data["project_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],

@@ -52,7 +52,7 @@ from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
 from ai.backend.manager.repositories.app_config_fragment.types import (
-    AppConfigFragmentSearchScope,
+    AppConfigFragmentOperationScope,
 )
 from ai.backend.manager.repositories.app_config_fragment.upserters import (
     AppConfigFragmentUpserterSpec,
@@ -330,7 +330,7 @@ class TestSearch:
 class _ScopedSearchCase:
     """One scope a scoped search runs against, and the rows it must return."""
 
-    scope: AppConfigFragmentSearchScope
+    scope: AppConfigFragmentOperationScope
     expected_scope_type: AppConfigScopeType
     expected_scope_id: AppConfigScopeID | None
 
@@ -339,7 +339,7 @@ class _ScopedSearchCase:
 class _MissingOwnerCase:
     """A scope whose owner does not exist, and the error the existence check must raise."""
 
-    scope: AppConfigFragmentSearchScope
+    scope: AppConfigFragmentOperationScope
     expected_error: type[BackendAIError]
 
 
@@ -384,21 +384,21 @@ class TestScopedSearch:
         "case",
         [
             _ScopedSearchCase(
-                scope=AppConfigFragmentSearchScope(
+                scope=AppConfigFragmentOperationScope(
                     scope_type=AppConfigScopeType.DOMAIN, scope_id=_DOMAIN_SCOPE_ID
                 ),
                 expected_scope_type=AppConfigScopeType.DOMAIN,
                 expected_scope_id=_DOMAIN_SCOPE_ID,
             ),
             _ScopedSearchCase(
-                scope=AppConfigFragmentSearchScope(
+                scope=AppConfigFragmentOperationScope(
                     scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
                 ),
                 expected_scope_type=AppConfigScopeType.USER,
                 expected_scope_id=_USER_SCOPE_ID,
             ),
             _ScopedSearchCase(
-                scope=AppConfigFragmentSearchScope(
+                scope=AppConfigFragmentOperationScope(
                     scope_type=AppConfigScopeType.PUBLIC, scope_id=None
                 ),
                 expected_scope_type=AppConfigScopeType.PUBLIC,
@@ -430,14 +430,14 @@ class TestScopedSearch:
         "case",
         [
             _MissingOwnerCase(
-                scope=AppConfigFragmentSearchScope(
+                scope=AppConfigFragmentOperationScope(
                     scope_type=AppConfigScopeType.DOMAIN,
                     scope_id=AppConfigScopeID(uuid.uuid4()),
                 ),
                 expected_error=DomainNotFound,
             ),
             _MissingOwnerCase(
-                scope=AppConfigFragmentSearchScope(
+                scope=AppConfigFragmentOperationScope(
                     scope_type=AppConfigScopeType.USER,
                     scope_id=AppConfigScopeID(uuid.uuid4()),
                 ),
@@ -471,10 +471,10 @@ class TestScopedSearch:
         result = await repository.scoped_search(
             BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
             [
-                AppConfigFragmentSearchScope(
+                AppConfigFragmentOperationScope(
                     scope_type=AppConfigScopeType.DOMAIN, scope_id=_DOMAIN_SCOPE_ID
                 ),
-                AppConfigFragmentSearchScope(
+                AppConfigFragmentOperationScope(
                     scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
                 ),
             ],

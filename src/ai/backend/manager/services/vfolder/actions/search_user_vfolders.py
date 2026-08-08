@@ -9,7 +9,7 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.vfolder.types import UserVFolderSearchScope
+from ai.backend.manager.repositories.vfolder.types import UserVFolderOperationScope
 from ai.backend.manager.services.vfolder.actions.base import (
     VFolderScopeAction,
     VFolderScopeActionResult,
@@ -24,7 +24,7 @@ class SearchUserVFoldersAction(VFolderScopeAction):
     Used for "my vfolders" page.
     """
 
-    scope: UserVFolderSearchScope
+    scope: UserVFolderOperationScope
     querier: BatchQuerier
 
     @override

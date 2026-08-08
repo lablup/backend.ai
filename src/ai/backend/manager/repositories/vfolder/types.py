@@ -15,14 +15,14 @@ from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
 
 __all__ = (
     "BulkVFolderPurgeResult",
-    "ProjectVFolderSearchScope",
-    "UserVFolderSearchScope",
+    "ProjectVFolderOperationScope",
+    "UserVFolderOperationScope",
     "VFolderPurgeFailure",
 )
 
@@ -44,7 +44,7 @@ class BulkVFolderPurgeResult:
 
 
 @dataclass(frozen=True)
-class ProjectVFolderSearchScope(SearchScope):
+class ProjectVFolderOperationScope(OperationScope):
     """Required scope for searching vfolders within a project.
 
     Used for project-scoped vfolder search (project admin).
@@ -77,7 +77,7 @@ class ProjectVFolderSearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class UserVFolderSearchScope(SearchScope):
+class UserVFolderOperationScope(OperationScope):
     """Required scope for searching vfolders owned by a specific user.
 
     Used for my_vfolders query (current authenticated user).

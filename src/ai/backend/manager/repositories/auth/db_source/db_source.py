@@ -42,7 +42,7 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
-from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.user import (
     UserRole,
     UserRow,
@@ -680,7 +680,7 @@ class AuthDBSource:
     @auth_db_source_resilience.apply()
     async def search_login_sessions(
         self,
-        scope: SearchScope,
+        scope: OperationScope,
         querier: BatchQuerier,
     ) -> SearchResult[LoginSessionData]:
         """Search login sessions within a given scope."""
@@ -773,7 +773,7 @@ class AuthDBSource:
     @auth_db_source_resilience.apply()
     async def search_login_history(
         self,
-        scope: SearchScope,
+        scope: OperationScope,
         querier: BatchQuerier,
     ) -> SearchResult[LoginHistoryData]:
         """Search login history within a given scope."""

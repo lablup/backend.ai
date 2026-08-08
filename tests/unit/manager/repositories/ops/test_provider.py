@@ -16,10 +16,10 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.manager.errors.repository import EmptySearchScopeError
+from ai.backend.manager.errors.repository import EmptyOperationScopeError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -114,7 +114,7 @@ class ChildDependentCreatorSpec(DependentCreatorSpec[ChildDependency, OpsTestChi
 
 
 @dataclass(frozen=True)
-class ParentDomainScope(SearchScope):
+class ParentDomainScope(OperationScope):
     domain_name: str
 
     @override
@@ -144,7 +144,7 @@ class TestScopeConstraint:
     async def test_with_scopes_rejects_empty_scopes(self) -> None:
         ops = ReadOps(AsyncMock())  # session is never touched before the guard raises
         querier = BatchQuerier(pagination=NoPagination())
-        with pytest.raises(EmptySearchScopeError):
+        with pytest.raises(EmptyOperationScopeError):
             await ops.batch_query_with_scopes(sa.select(OpsTestParentRow), querier, [])
 
 

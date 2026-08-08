@@ -14,25 +14,25 @@ from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowLis
 from ai.backend.manager.data.app_config_allow_list.types import (
     AppConfigAllowListData,
 )
+from ai.backend.manager.errors.app_config import AppConfigDefinitionNotFound
 from ai.backend.manager.errors.repository import (
     EntityNotFoundError,
-    ForeignKeyViolationError,
     UniqueConstraintViolationError,
 )
 from ai.backend.manager.models.app_config_allow_list.conditions import (
     AppConfigAllowListConditions,
 )
+from ai.backend.manager.models.app_config_allow_list.creators import (
+    AppConfigAllowListCreator,
+)
 from ai.backend.manager.models.app_config_allow_list.orders import AppConfigAllowListOrders
+from ai.backend.manager.models.app_config_allow_list.purgers import (
+    AppConfigAllowListPurger,
+)
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.app_config_allow_list.creators import (
-    AppConfigAllowListCreator,
-)
-from ai.backend.manager.repositories.app_config_allow_list.purgers import (
-    AppConfigAllowListPurger,
-)
 from ai.backend.manager.repositories.app_config_allow_list.queriers import (
     AppConfigAllowListQuerier,
 )
@@ -60,6 +60,7 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 
@@ -79,7 +80,7 @@ async def database(
 
 @pytest.fixture
 def repository(database: ExtendedAsyncSAEngine) -> OpsRepository[AppConfigAllowListData]:
-    return OpsRepository(DBOpsProvider(database))
+    return OpsRepository(V2DBOpsProvider(database))
 
 
 @pytest.fixture
@@ -100,7 +101,7 @@ async def _create_entry(
     scope_type: AppConfigScopeType,
     rank: int | None = None,
 ) -> AppConfigAllowListData:
-    return await repository.create(
+    return await repository.create_global_entity(
         AppConfigAllowListCreator(config_name=config_name, scope_type=scope_type, rank=rank)
     )
 
@@ -157,8 +158,9 @@ class TestCreateAndGet:
     async def test_create_requires_registered_config_name(
         self, repository: OpsRepository[AppConfigAllowListData]
     ) -> None:
-        # No app_config_definitions row for "unregistered" -> FK violation.
-        with pytest.raises(ForeignKeyViolationError):
+        # No app_config_definitions row for "unregistered": the creator maps the
+        # FK violation onto the domain error.
+        with pytest.raises(AppConfigDefinitionNotFound):
             await _create_entry(repository, "unregistered", AppConfigScopeType.PUBLIC)
 
     async def test_duplicate_config_name_scope_type_rejected(
@@ -239,7 +241,9 @@ class TestPurge:
         repository: OpsRepository[AppConfigAllowListData],
         existing_entry: AppConfigAllowListData,
     ) -> None:
-        purged = await repository.purge(AppConfigAllowListPurger(allow_list_id=existing_entry.id))
+        purged = await repository.purge_global_entity(
+            AppConfigAllowListPurger(allow_list_id=existing_entry.id)
+        )
         assert purged.id == existing_entry.id
         with pytest.raises(EntityNotFoundError):
             await repository.get(AppConfigAllowListQuerier(allow_list_id=existing_entry.id))
@@ -248,7 +252,9 @@ class TestPurge:
         self, repository: OpsRepository[AppConfigAllowListData]
     ) -> None:
         with pytest.raises(EntityNotFoundError):
-            await repository.purge(AppConfigAllowListPurger(allow_list_id=_missing_id()))
+            await repository.purge_global_entity(
+                AppConfigAllowListPurger(allow_list_id=_missing_id())
+            )
 
     async def test_purge_cascades_to_fragments(
         self,
@@ -268,7 +274,9 @@ class TestPurge:
             )
             await db_sess.flush()
 
-        await repository.purge(AppConfigAllowListPurger(allow_list_id=existing_entry.id))
+        await repository.purge_global_entity(
+            AppConfigAllowListPurger(allow_list_id=existing_entry.id)
+        )
 
         async with database.begin_readonly_session() as db_sess:
             remaining = await db_sess.scalar(

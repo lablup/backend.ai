@@ -97,9 +97,9 @@ from ai.backend.manager.repositories.base import (
     negate_conditions,
 )
 from ai.backend.manager.repositories.scheduling_history.types import (
-    DeploymentHistorySearchScope,
-    RouteHistorySearchScope,
-    SessionSchedulingHistorySearchScope,
+    DeploymentHistoryOperationScope,
+    RouteHistoryOperationScope,
+    SessionSchedulingHistoryOperationScope,
 )
 from ai.backend.manager.services.scheduling_history.actions.global_search_replica_group_history import (
     GlobalSearchReplicaGroupHistoryAction,
@@ -293,7 +293,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         input: AdminSearchSessionHistoriesInput,
     ) -> AdminSearchSessionHistoriesPayload:
         """Search session scheduling histories scoped to a session."""
-        scope = SessionSchedulingHistorySearchScope(session_id=session_id)
+        scope = SessionSchedulingHistoryOperationScope(session_id=session_id)
         querier = self._build_session_querier(input)
         action_result = await self._processors.scheduling_history.search_session_scoped_history.wait_for_complete(
             SearchSessionScopedHistoryAction(scope=scope, querier=querier)
@@ -682,7 +682,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         input: AdminSearchDeploymentHistoriesInput,
     ) -> AdminSearchDeploymentHistoriesPayload:
         """Search deployment histories scoped to a deployment."""
-        scope = DeploymentHistorySearchScope(deployment_id=deployment_id)
+        scope = DeploymentHistoryOperationScope(deployment_id=deployment_id)
         querier = self._build_deployment_querier(input)
         action_result = await self._processors.scheduling_history.search_deployment_scoped_history.wait_for_complete(
             SearchDeploymentScopedHistoryAction(scope=scope, querier=querier)
@@ -1044,7 +1044,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         input: AdminSearchRouteHistoriesInput,
     ) -> AdminSearchRouteHistoriesPayload:
         """Search route histories scoped to a route."""
-        scope = RouteHistorySearchScope(route_id=ReplicaID(route_id))
+        scope = RouteHistoryOperationScope(route_id=ReplicaID(route_id))
         querier = self._build_route_querier(input)
         action_result = (
             await self._processors.scheduling_history.search_route_scoped_history.wait_for_complete(

@@ -32,7 +32,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
-from ai.backend.manager.repositories.vfolder.types import ProjectVFolderSearchScope
+from ai.backend.manager.repositories.vfolder.types import ProjectVFolderOperationScope
 from ai.backend.testutils.db import with_tables
 
 
@@ -216,7 +216,7 @@ class TestVfolderSearchInProject:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_in_project returns only vfolders belonging to the specified project."""
-        scope = ProjectVFolderSearchScope(project_id=test_data["project_a_id"])
+        scope = ProjectVFolderOperationScope(project_id=test_data["project_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -236,7 +236,7 @@ class TestVfolderSearchInProject:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_in_project for project_b returns only its vfolder, not project_a's."""
-        scope = ProjectVFolderSearchScope(project_id=test_data["project_b_id"])
+        scope = ProjectVFolderOperationScope(project_id=test_data["project_b_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -255,7 +255,7 @@ class TestVfolderSearchInProject:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_in_project returns correct pagination fields."""
-        scope = ProjectVFolderSearchScope(project_id=test_data["project_a_id"])
+        scope = ProjectVFolderOperationScope(project_id=test_data["project_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],

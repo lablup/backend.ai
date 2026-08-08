@@ -9,7 +9,7 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_card.types import ModelCardData
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.model_card.types import ProjectModelCardSearchScope
+from ai.backend.manager.repositories.model_card.types import ProjectModelCardOperationScope
 from ai.backend.manager.services.model_card.actions.base import ModelCardScopeAction
 
 
@@ -17,7 +17,7 @@ from ai.backend.manager.services.model_card.actions.base import ModelCardScopeAc
 class SearchModelCardsInProjectAction(ModelCardScopeAction):
     """Search model cards within a MODEL_STORE project scope."""
 
-    scope: ProjectModelCardSearchScope
+    scope: ProjectModelCardOperationScope
     querier: BatchQuerier
 
     @override

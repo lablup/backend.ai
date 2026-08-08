@@ -36,14 +36,14 @@ from ai.backend.manager.data.app_config_allow_list.types import (
 from ai.backend.manager.models.app_config_allow_list.conditions import (
     AppConfigAllowListConditions,
 )
-from ai.backend.manager.models.app_config_allow_list.orders import AppConfigAllowListOrders
-from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.repositories.app_config_allow_list.creators import (
+from ai.backend.manager.models.app_config_allow_list.creators import (
     AppConfigAllowListCreator,
 )
-from ai.backend.manager.repositories.app_config_allow_list.purgers import (
+from ai.backend.manager.models.app_config_allow_list.orders import AppConfigAllowListOrders
+from ai.backend.manager.models.app_config_allow_list.purgers import (
     AppConfigAllowListPurger,
 )
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.app_config_allow_list.queriers import (
     AppConfigAllowListQuerier,
 )

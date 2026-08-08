@@ -123,17 +123,17 @@ from ai.backend.manager.repositories.permission_controller.purgers import (
     PermissionPurgerSpec,
 )
 from ai.backend.manager.repositories.permission_controller.types import (
-    PermissionSearchScope,
-    ScopedRoleSearchScope,
+    PermissionOperationScope,
+    ScopedRoleOperationScope,
 )
 from ai.backend.manager.repositories.role_invitation.creators import (
     RoleInvitationCreatorSpec,
 )
 from ai.backend.manager.repositories.role_invitation.types import (
-    InviteeSearchScope,
-    InviterSearchScope,
+    InviteeOperationScope,
+    InviterOperationScope,
+    RoleInvitationOperationScope,
     RoleInvitationSearchResult,
-    RoleInvitationSearchScope,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -678,7 +678,7 @@ class PermissionDBSource:
     async def search_roles_in_scope(
         self,
         querier: BatchQuerier,
-        scope: ScopedRoleSearchScope,
+        scope: ScopedRoleOperationScope,
     ) -> RoleListResult:
         """Search roles registered in a given scope via association_scopes_entities."""
         async with self._db.begin_readonly_session() as db_sess:
@@ -703,7 +703,7 @@ class PermissionDBSource:
     async def search_permissions(
         self,
         querier: BatchQuerier,
-        scope: PermissionSearchScope | None = None,
+        scope: PermissionOperationScope | None = None,
     ) -> PermissionListResult:
         """Searches permissions with pagination and filtering."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
@@ -1477,7 +1477,7 @@ class PermissionDBSource:
     async def search_invitations_by_invitee(
         self,
         querier: BatchQuerier,
-        scope: InviteeSearchScope,
+        scope: InviteeOperationScope,
     ) -> RoleInvitationSearchResult:
         async with self._db.begin_readonly_session_read_committed() as session:
             query = sa.select(RoleInvitationRow)
@@ -1493,7 +1493,7 @@ class PermissionDBSource:
     async def search_invitations_by_inviter(
         self,
         querier: BatchQuerier,
-        scope: InviterSearchScope,
+        scope: InviterOperationScope,
     ) -> RoleInvitationSearchResult:
         async with self._db.begin_readonly_session_read_committed() as session:
             query = sa.select(RoleInvitationRow)
@@ -1509,7 +1509,7 @@ class PermissionDBSource:
     async def search_invitations_by_role(
         self,
         querier: BatchQuerier,
-        scope: RoleInvitationSearchScope,
+        scope: RoleInvitationOperationScope,
     ) -> RoleInvitationSearchResult:
         async with self._db.begin_readonly_session_read_committed() as session:
             query = sa.select(RoleInvitationRow)

@@ -8,7 +8,7 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.app_config_fragment.types import (
-    AppConfigFragmentSearchScope,
+    AppConfigFragmentOperationScope,
 )
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.app_config_fragment.actions.base import (
@@ -26,7 +26,7 @@ class ScopedSearchAppConfigFragmentAction(AppConfigFragmentScopeAction):
     :class:`BulkUpsertAppConfigFragmentsAction`.
     """
 
-    scope: AppConfigFragmentSearchScope
+    scope: AppConfigFragmentOperationScope
     querier: BatchQuerier
 
     @override
@@ -59,7 +59,7 @@ class ScopedSearchAppConfigFragmentAction(AppConfigFragmentScopeAction):
 @dataclass
 class ScopedSearchAppConfigFragmentActionResult(AppConfigFragmentScopeActionResult):
     #: The searched scope, carried only to report the RBAC scope — not part of the result data.
-    _scope: AppConfigFragmentSearchScope
+    _scope: AppConfigFragmentOperationScope
     data: list[AppConfigFragmentData]
     total_count: int
     has_next_page: bool

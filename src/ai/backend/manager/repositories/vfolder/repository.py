@@ -146,8 +146,8 @@ from ai.backend.manager.repositories.vfolder.creators import VFolderCreatorSpec
 from ai.backend.manager.repositories.vfolder.purge_guards import find_active_vfolder_references
 from ai.backend.manager.repositories.vfolder.types import (
     BulkVFolderPurgeResult,
-    ProjectVFolderSearchScope,
-    UserVFolderSearchScope,
+    ProjectVFolderOperationScope,
+    UserVFolderOperationScope,
     VFolderPurgeFailure,
 )
 
@@ -2363,13 +2363,13 @@ class VfolderRepository:
     async def search_in_project(
         self,
         querier: BatchQuerier,
-        scope: ProjectVFolderSearchScope,
+        scope: ProjectVFolderOperationScope,
     ) -> VFolderSearchResult:
         """Search vfolders scoped to a project.
 
         Args:
             querier: BatchQuerier for filtering, ordering, and pagination
-            scope: ProjectVFolderSearchScope that filters by project and validates existence
+            scope: ProjectVFolderOperationScope that filters by project and validates existence
 
         Returns:
             VFolderSearchResult with items, total count, and pagination info
@@ -2397,13 +2397,13 @@ class VfolderRepository:
     async def search_user_vfolders(
         self,
         querier: BatchQuerier,
-        scope: UserVFolderSearchScope,
+        scope: UserVFolderOperationScope,
     ) -> VFolderSearchResult:
         """Search vfolders scoped to a user.
 
         Args:
             querier: BatchQuerier for filtering, ordering, and pagination
-            scope: UserVFolderSearchScope that filters by user and validates existence
+            scope: UserVFolderOperationScope that filters by user and validates existence
 
         Returns:
             VFolderSearchResult with items, total count, and pagination info

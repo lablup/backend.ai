@@ -16,13 +16,13 @@ from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group.row import GroupRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
 
 __all__ = (
     "GroupSearchResult",
-    "DomainProjectSearchScope",
-    "UserProjectSearchScope",
+    "DomainProjectOperationScope",
+    "UserProjectOperationScope",
 )
 
 
@@ -37,7 +37,7 @@ class GroupSearchResult:
 
 
 @dataclass(frozen=True)
-class DomainProjectSearchScope(SearchScope):
+class DomainProjectOperationScope(OperationScope):
     """Required scope for searching projects within a domain.
 
     Used for domain-scoped project search (domain admin+).
@@ -76,7 +76,7 @@ class DomainProjectSearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class UserProjectSearchScope(SearchScope):
+class UserProjectOperationScope(OperationScope):
     """Required scope for searching projects a user is member of.
 
     Used for user-scoped project search (any authenticated user).

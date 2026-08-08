@@ -10,13 +10,13 @@ from .repository import (
     UserRepository,
 )
 from .types import (
-    DomainUserSearchScope,
-    ProjectUserSearchScope,
+    DomainUserOperationScope,
+    ProjectUserOperationScope,
 )
 
 __all__ = (
-    "DomainUserSearchScope",
-    "ProjectUserSearchScope",
+    "DomainUserOperationScope",
+    "ProjectUserOperationScope",
     "UserConditions",
     "UserOrders",
     "UserRepository",

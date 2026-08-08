@@ -18,8 +18,8 @@ from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogListRe
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.audit_log import (
     AuditLogRepository,
-    EntityAuditLogSearchScope,
-    TriggeredByAuditLogSearchScope,
+    EntityAuditLogOperationScope,
+    TriggeredByAuditLogOperationScope,
 )
 from ai.backend.manager.repositories.audit_log.creators import (
     SingleEntityAuditLogCreatorSpec,
@@ -271,7 +271,7 @@ class TestAuditLogService:
         scoped_search_user_id: uuid.UUID,
         sample_audit_log_data: AuditLogData,
     ) -> None:
-        """Service calls repository.scoped_search with one SearchScope per target."""
+        """Service calls repository.scoped_search with one OperationScope per target."""
         result = await audit_log_service.scoped_search(scoped_search_action)
 
         assert result.data == [sample_audit_log_data]
@@ -281,8 +281,8 @@ class TestAuditLogService:
         assert call_args.args[0] is scoped_search_querier
         scopes = list(call_args.args[1])
         assert scopes == [
-            EntityAuditLogSearchScope(entity_type=RBACElementType.VFOLDER, entity_id="vf-1"),
-            TriggeredByAuditLogSearchScope(triggered_by=str(scoped_search_user_id)),
+            EntityAuditLogOperationScope(entity_type=RBACElementType.VFOLDER, entity_id="vf-1"),
+            TriggeredByAuditLogOperationScope(triggered_by=str(scoped_search_user_id)),
         ]
 
     async def test_scoped_search_records_queried_rbac_refs_on_result(

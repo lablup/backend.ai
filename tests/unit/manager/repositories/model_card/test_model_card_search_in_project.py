@@ -1,7 +1,7 @@
 """Tests for ModelCardDBSource.search_in_project membership check.
 
 Verifies that the virtual-scope-based membership_check_query on
-ProjectModelCardSearchScope correctly gates access:
+ProjectModelCardOperationScope correctly gates access:
 - A user who IS a project member (enrolled in the project's virtual scope) can search.
 - A user who is NOT a project member is rejected with GenericForbidden.
 """
@@ -45,7 +45,7 @@ from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRo
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.pagination import OffsetPagination
 from ai.backend.manager.repositories.model_card.db_source.db_source import ModelCardDBSource
-from ai.backend.manager.repositories.model_card.types import ProjectModelCardSearchScope
+from ai.backend.manager.repositories.model_card.types import ProjectModelCardOperationScope
 from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:
@@ -272,7 +272,7 @@ class TestSearchInProjectMembership:
         test_project: GroupRow,
         member_user: UserRow,
     ) -> None:
-        scope = ProjectModelCardSearchScope(
+        scope = ProjectModelCardOperationScope(
             project_id=test_project.id,
             user_id=member_user.uuid,
         )
@@ -287,7 +287,7 @@ class TestSearchInProjectMembership:
         test_project: GroupRow,
         non_member_user: UserRow,
     ) -> None:
-        scope = ProjectModelCardSearchScope(
+        scope = ProjectModelCardOperationScope(
             project_id=test_project.id,
             user_id=non_member_user.uuid,
         )

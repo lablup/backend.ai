@@ -34,7 +34,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
-from ai.backend.manager.repositories.vfolder.types import UserVFolderSearchScope
+from ai.backend.manager.repositories.vfolder.types import UserVFolderOperationScope
 from ai.backend.testutils.db import with_tables
 
 
@@ -241,7 +241,7 @@ class TestVfolderSearchUserVfolders:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_user_vfolders returns only vfolders where VFolderRow.user matches the target user."""
-        scope = UserVFolderSearchScope(user_id=test_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=test_data["user_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -261,7 +261,7 @@ class TestVfolderSearchUserVfolders:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_user_vfolders for user_b returns only vfolders with user_b as VFolderRow.user."""
-        scope = UserVFolderSearchScope(user_id=test_data["user_b_id"])
+        scope = UserVFolderOperationScope(user_id=test_data["user_b_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -280,7 +280,7 @@ class TestVfolderSearchUserVfolders:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_user_vfolders returns correct pagination fields."""
-        scope = UserVFolderSearchScope(user_id=test_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=test_data["user_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -451,7 +451,7 @@ class TestVfolderSearchUserVfolders:
     ) -> None:
         """search_user_vfolders returns both USER-owned and GROUP-owned vfolders
         as long as VFolderRow.user matches, regardless of ownership_type."""
-        scope = UserVFolderSearchScope(user_id=mixed_ownership_data["user_id"])
+        scope = UserVFolderOperationScope(user_id=mixed_ownership_data["user_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -473,7 +473,7 @@ class TestVfolderSearchUserVfolders:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_user_vfolders raises UserNotFound for a nonexistent user."""
-        scope = UserVFolderSearchScope(user_id=uuid.uuid4())
+        scope = UserVFolderOperationScope(user_id=uuid.uuid4())
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -709,7 +709,7 @@ class TestVfolderSearchUserVfolders:
         permission_data: dict[str, uuid.UUID],
     ) -> None:
         """search_user_vfolders returns vfolders the user owns AND vfolders shared via permission."""
-        scope = UserVFolderSearchScope(user_id=permission_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=permission_data["user_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -731,7 +731,7 @@ class TestVfolderSearchUserVfolders:
         permission_data: dict[str, uuid.UUID],
     ) -> None:
         """search_user_vfolders does not return vfolders the user neither owns nor has permission for."""
-        scope = UserVFolderSearchScope(user_id=permission_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=permission_data["user_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -761,7 +761,7 @@ class TestVfolderSearchUserVfolders:
             )
             await db_sess.flush()
 
-        scope = UserVFolderSearchScope(user_id=permission_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=permission_data["user_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],

@@ -1,5 +1,3 @@
-"""DataPurger implementations for the resource slot repository."""
-
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -16,12 +14,12 @@ from ai.backend.manager.models.resource_slot.row import (
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.repositories.base.purger import DataPurger
-from ai.backend.manager.repositories.base.types import ConflictCheck
+from ai.backend.manager.models.specs.purger import GlobalEntityPurger
+from ai.backend.manager.models.specs.types import ConflictCheck
 
 
 @dataclass
-class ResourceSlotTypePurger(DataPurger[ResourceSlotTypeRow, ResourceSlotTypeData]):
+class ResourceSlotTypePurger(GlobalEntityPurger[ResourceSlotTypeRow, ResourceSlotTypeData]):
     """Purger for a resource slot type, keyed by its ``slot_name`` primary key.
 
     Every table that keeps the name as an FK is declared as a conflict check, so a

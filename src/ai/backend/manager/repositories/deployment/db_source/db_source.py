@@ -190,7 +190,7 @@ from ai.backend.manager.repositories.deployment.creators import (
     DeploymentRevisionCreatorSpec,
 )
 from ai.backend.manager.repositories.deployment.types import (
-    ProjectDeploymentSearchScope,
+    ProjectDeploymentOperationScope,
     RouteData,
     RouteServiceDiscoveryInfo,
     RouteSessionInfo,
@@ -1232,7 +1232,7 @@ class DeploymentDBSource:
     async def search_deployments_in_project(
         self,
         querier: BatchQuerier,
-        scope: ProjectDeploymentSearchScope,
+        scope: ProjectDeploymentOperationScope,
     ) -> DeploymentSummarySearchResult:
         """Search endpoints within a project scope with pagination and filtering.
 

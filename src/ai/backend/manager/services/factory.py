@@ -480,7 +480,7 @@ def create_processors(
                 ProcessorDependencies(
                     monitors=monitors,
                     validators=args.validators,
-                    repository=OpsRepository(repositories.ops_provider),
+                    repository=OpsRepository(repositories.v2_ops_provider),
                 )
             )
         ),
@@ -537,7 +537,7 @@ def create_processors(
                 ProcessorDependencies(
                     monitors=monitors,
                     validators=args.validators,
-                    repository=OpsRepository(repositories.ops_provider),
+                    repository=OpsRepository(repositories.v2_ops_provider),
                 )
             ).group(),
         ),

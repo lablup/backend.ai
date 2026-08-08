@@ -44,6 +44,7 @@ from ai.backend.manager.repositories.model_serving.repositories import ModelServ
 from ai.backend.manager.repositories.notification.repositories import NotificationRepositories
 from ai.backend.manager.repositories.object_storage.repositories import ObjectStorageRepositories
 from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.permission_controller.repositories import (
     PermissionControllerRepositories,
 )
@@ -98,6 +99,7 @@ from ai.backend.manager.repositories.vfs_storage.repositories import VFSStorageR
 class Repositories:
     agent: AgentRepositories
     ops_provider: DBOpsProvider
+    v2_ops_provider: V2DBOpsProvider
     app_config_definition: AppConfigDefinitionRepositories
     app_config_fragment: AppConfigFragmentRepositories
     auth: AuthRepositories
@@ -212,6 +214,7 @@ class Repositories:
         return cls(
             agent=agent_repositories,
             ops_provider=args.ops_provider,
+            v2_ops_provider=args.v2_ops_provider,
             app_config_definition=app_config_definition_repositories,
             app_config_fragment=app_config_fragment_repositories,
             auth=auth_repositories,

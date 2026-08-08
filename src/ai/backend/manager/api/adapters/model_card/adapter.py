@@ -75,8 +75,8 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.model_card.creators import ModelCardCreatorSpec
 from ai.backend.manager.repositories.model_card.purgers import ModelCardPurgerSpec
 from ai.backend.manager.repositories.model_card.types import (
-    ProjectModelCardSearchScope,
-    VFolderModelCardSearchScope,
+    ProjectModelCardOperationScope,
+    VFolderModelCardOperationScope,
 )
 from ai.backend.manager.repositories.model_card.updaters import ModelCardUpdaterSpec
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
@@ -195,7 +195,7 @@ class ModelCardAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        scope = ProjectModelCardSearchScope(project_id=project_id, user_id=me.user_id)
+        scope = ProjectModelCardOperationScope(project_id=project_id, user_id=me.user_id)
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
         querier = self._build_querier(
@@ -221,7 +221,7 @@ class ModelCardAdapter(BaseAdapter):
 
     async def search_by_vfolder(
         self,
-        scope: VFolderModelCardSearchScope,
+        scope: VFolderModelCardOperationScope,
         input: SearchModelCardsInput,
     ) -> SearchModelCardsPayload:
         """Search model cards backed by a specific VFolder.

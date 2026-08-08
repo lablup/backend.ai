@@ -5,7 +5,7 @@
 ## Adapter `my_` pattern
 
 For self-service (`my_`) endpoints, authentication is handled inside the Adapter. The Adapter calls `current_user()`
-to obtain the user context and builds the `SearchScope` from it. The GQL resolver / REST handler does not pass the scope —
+to obtain the user context and builds the `OperationScope` from it. The GQL resolver / REST handler does not pass the scope —
 it only passes the search input DTO. This is to gather the auth logic into the adapter instead of scattering it across every resolver.
 
 ## v2 endpoint verification

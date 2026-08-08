@@ -30,7 +30,7 @@ from ai.backend.manager.api.gql.deployment.types.route import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.deployment.types import (
-    RouteSearchScope,
+    RouteOperationScope,
 )
 
 # Query resolvers
@@ -58,7 +58,7 @@ async def routes(
     pydantic_filter = filter.to_pydantic() if filter else None
     pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
     payload = await info.context.adapters.deployment.search_routes(
-        scope=RouteSearchScope(deployment_id=UUID(endpoint_id)),
+        scope=RouteOperationScope(deployment_id=UUID(endpoint_id)),
         input=SearchRoutesInput(
             filter=pydantic_filter,
             order=pydantic_order,

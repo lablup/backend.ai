@@ -9,7 +9,7 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.repositories.base.querier import BatchQuerier
-from ai.backend.manager.repositories.user.types import ProjectUserSearchScope
+from ai.backend.manager.repositories.user.types import ProjectUserOperationScope
 from ai.backend.manager.services.user.actions.base import UserScopeAction
 
 
@@ -21,7 +21,7 @@ class SearchUsersByProjectAction(UserScopeAction):
     Used for project admin page.
     """
 
-    scope: ProjectUserSearchScope
+    scope: ProjectUserOperationScope
     querier: BatchQuerier
 
     @override

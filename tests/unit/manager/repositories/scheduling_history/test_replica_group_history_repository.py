@@ -59,7 +59,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.scheduling_history import SchedulingHistoryRepository
 from ai.backend.manager.repositories.scheduling_history.types import (
-    DeploymentReplicaGroupHistorySearchScope,
+    DeploymentReplicaGroupHistoryOperationScope,
 )
 from ai.backend.testutils.db import with_tables
 
@@ -461,7 +461,7 @@ class TestReplicaGroupHistoryRepository:
         )
         result = await scheduling_history_repository.scoped_search_replica_group_history(
             querier,
-            [DeploymentReplicaGroupHistorySearchScope(deployment_id=seed.deployment_id)],
+            [DeploymentReplicaGroupHistoryOperationScope(deployment_id=seed.deployment_id)],
         )
 
         assert result.total_count == seed.deployment_count
@@ -484,7 +484,7 @@ class TestReplicaGroupHistoryRepository:
         )
         result = await scheduling_history_repository.scoped_search_replica_group_history(
             querier,
-            [DeploymentReplicaGroupHistorySearchScope(deployment_id=seed.deployment_id)],
+            [DeploymentReplicaGroupHistoryOperationScope(deployment_id=seed.deployment_id)],
         )
 
         # Bounded by the deployment and narrowed by the category condition (only the
@@ -519,7 +519,7 @@ class TestReplicaGroupHistoryRepository:
         )
         result = await scheduling_history_repository.scoped_search_replica_group_history(
             querier,
-            [DeploymentReplicaGroupHistorySearchScope(deployment_id=seed.deployment_id)],
+            [DeploymentReplicaGroupHistoryOperationScope(deployment_id=seed.deployment_id)],
         )
 
         assert result.total_count == seed.target_count
@@ -544,7 +544,7 @@ class TestReplicaGroupHistoryRepository:
         )
         result = await scheduling_history_repository.scoped_search_replica_group_history(
             querier,
-            [DeploymentReplicaGroupHistorySearchScope(deployment_id=seed.deployment_id)],
+            [DeploymentReplicaGroupHistoryOperationScope(deployment_id=seed.deployment_id)],
         )
 
         returned_attempts = [item.attempts for item in result.items]
@@ -567,7 +567,7 @@ class TestReplicaGroupHistoryRepository:
             await scheduling_history_repository.scoped_search_replica_group_history(
                 querier,
                 [
-                    DeploymentReplicaGroupHistorySearchScope(
+                    DeploymentReplicaGroupHistoryOperationScope(
                         deployment_id=DeploymentID(uuid.uuid4())
                     )
                 ],

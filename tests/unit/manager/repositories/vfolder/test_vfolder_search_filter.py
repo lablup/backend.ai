@@ -33,7 +33,7 @@ from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
 from ai.backend.manager.models.vfolder.conditions import VFolderConditions
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
-from ai.backend.manager.repositories.vfolder.types import UserVFolderSearchScope
+from ai.backend.manager.repositories.vfolder.types import UserVFolderOperationScope
 from ai.backend.testutils.db import with_tables
 
 
@@ -351,7 +351,7 @@ class TestVfolderSearchFilter:
         cloneable_data: dict[str, uuid.UUID],
     ) -> None:
         """cloneable={eq: true} returns only cloneable=true vfolders (owned + shared)."""
-        scope = UserVFolderSearchScope(user_id=cloneable_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=cloneable_data["user_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[VFolderConditions.by_cloneable(True)],
@@ -374,7 +374,7 @@ class TestVfolderSearchFilter:
         cloneable_data: dict[str, uuid.UUID],
     ) -> None:
         """cloneable={eq: false} returns only cloneable=false vfolders."""
-        scope = UserVFolderSearchScope(user_id=cloneable_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=cloneable_data["user_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[VFolderConditions.by_cloneable(False)],
@@ -393,7 +393,7 @@ class TestVfolderSearchFilter:
         cloneable_data: dict[str, uuid.UUID],
     ) -> None:
         """No cloneable filter returns all visible vfolders (owned + shared)."""
-        scope = UserVFolderSearchScope(user_id=cloneable_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=cloneable_data["user_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -417,7 +417,7 @@ class TestVfolderSearchFilter:
         cloneable_data: dict[str, uuid.UUID],
     ) -> None:
         """cloneable filter works with pagination (correct total_count and has_next_page)."""
-        scope = UserVFolderSearchScope(user_id=cloneable_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=cloneable_data["user_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=2, offset=0),
             conditions=[VFolderConditions.by_cloneable(True)],
@@ -436,7 +436,7 @@ class TestVfolderSearchFilter:
         cloneable_data: dict[str, uuid.UUID],
     ) -> None:
         """cloneable filter combines correctly with other conditions (usage_mode)."""
-        scope = UserVFolderSearchScope(user_id=cloneable_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=cloneable_data["user_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[

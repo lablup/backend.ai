@@ -9,7 +9,7 @@ from ai.backend.manager.services.permission_contoller.actions.base import RoleAc
 
 
 @dataclass
-class SearchScopedPermissionsAction(RoleAction):
+class OperationScopedPermissionsAction(RoleAction):
     querier: BatchQuerier
 
     @override
@@ -23,5 +23,5 @@ class SearchScopedPermissionsAction(RoleAction):
 
 
 @dataclass
-class SearchScopedPermissionsActionResult(SearchActionResult[PermissionData]):
+class OperationScopedPermissionsActionResult(SearchActionResult[PermissionData]):
     pass

@@ -17,14 +17,14 @@ from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
 
 __all__ = (
     "AvailablePresetsSearchResult",
     "ModelCardSearchResult",
-    "ProjectModelCardSearchScope",
-    "VFolderModelCardSearchScope",
+    "ProjectModelCardOperationScope",
+    "VFolderModelCardOperationScope",
 )
 
 
@@ -49,7 +49,7 @@ class ModelCardSearchResult:
 
 
 @dataclass(frozen=True)
-class ProjectModelCardSearchScope(SearchScope):
+class ProjectModelCardOperationScope(OperationScope):
     """Scope for searching model cards within a MODEL_STORE project.
 
     Includes user_id for membership validation — only project members
@@ -88,7 +88,7 @@ class ProjectModelCardSearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class VFolderModelCardSearchScope(SearchScope):
+class VFolderModelCardOperationScope(OperationScope):
     """Scope for searching model cards backed by a specific VFolder.
 
     Access is delegated to the parent VFolder resolver — if the caller

@@ -7,7 +7,7 @@ from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.role import RoleData
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.permission_controller.types import ScopedRoleSearchScope
+from ai.backend.manager.repositories.permission_controller.types import ScopedRoleOperationScope
 from ai.backend.manager.services.permission_contoller.actions.base import (
     RoleScopeAction,
     RoleScopeActionResult,
@@ -16,7 +16,7 @@ from ai.backend.manager.services.permission_contoller.actions.base import (
 
 @dataclass
 class SearchRolesInScopeAction(RoleScopeAction):
-    scope: ScopedRoleSearchScope
+    scope: ScopedRoleOperationScope
     querier: BatchQuerier
 
     @override

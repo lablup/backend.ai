@@ -169,8 +169,8 @@ from ai.backend.manager.data.deployment.scale_modifier import (
     ModelDeploymentAutoScalingRuleModifier,
 )
 from ai.backend.manager.data.deployment.types import (
-    AccessTokenSearchScope,
-    AutoScalingRuleSearchScope,
+    AccessTokenOperationScope,
+    AutoScalingRuleOperationScope,
     DeploymentMetadata,
     DeploymentNetworkSpec,
     DeploymentPolicyData,
@@ -181,12 +181,12 @@ from ai.backend.manager.data.deployment.types import (
     ModelReplicaData,
     ModelRevisionData,
     MountInfo,
-    ReplicaSearchScope,
+    ReplicaOperationScope,
     ReplicaSpec,
     ResourceSpec,
-    RevisionSearchScope,
+    RevisionOperationScope,
     RouteInfo,
-    RouteSearchScope,
+    RouteOperationScope,
 )
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus as ManagerRouteHealthStatus,
@@ -993,7 +993,7 @@ class DeploymentAdapter(BaseAdapter):
 
     async def search_access_tokens(
         self,
-        scope: AccessTokenSearchScope,
+        scope: AccessTokenOperationScope,
         input: SearchAccessTokensInput,
     ) -> SearchAccessTokensPayload:
         """Search access tokens scoped to a specific deployment."""
@@ -1040,7 +1040,7 @@ class DeploymentAdapter(BaseAdapter):
 
     async def search_rules(
         self,
-        scope: AutoScalingRuleSearchScope,
+        scope: AutoScalingRuleOperationScope,
         input: SearchAutoScalingRulesInput,
     ) -> SearchAutoScalingRulesPayload:
         """Search auto-scaling rules scoped to a specific deployment."""
@@ -1299,7 +1299,7 @@ class DeploymentAdapter(BaseAdapter):
 
     async def search_revisions(
         self,
-        scope: RevisionSearchScope,
+        scope: RevisionOperationScope,
         input: AdminSearchRevisionsInput,
     ) -> AdminSearchRevisionsPayload:
         """Search model revisions scoped to a specific deployment."""
@@ -1365,7 +1365,7 @@ class DeploymentAdapter(BaseAdapter):
 
     async def search_routes(
         self,
-        scope: RouteSearchScope,
+        scope: RouteOperationScope,
         input: SearchRoutesInput,
     ) -> SearchRoutesPayload:
         """Search routes scoped to a specific deployment."""
@@ -1386,7 +1386,7 @@ class DeploymentAdapter(BaseAdapter):
 
     async def search_replicas(
         self,
-        scope: ReplicaSearchScope,
+        scope: ReplicaOperationScope,
         input: SearchReplicasInput,
     ) -> SearchReplicasPayload:
         """Search replicas scoped to a specific deployment."""
@@ -1845,7 +1845,7 @@ class DeploymentAdapter(BaseAdapter):
     def _build_revision_querier(
         self,
         input: AdminSearchRevisionsInput,
-        scope: RevisionSearchScope | None = None,
+        scope: RevisionOperationScope | None = None,
     ) -> BatchQuerier:
         conditions: list[QueryCondition] = []
         if scope is not None:
@@ -1907,7 +1907,7 @@ class DeploymentAdapter(BaseAdapter):
     def _build_route_querier(
         self,
         input: SearchRoutesInput,
-        scope: RouteSearchScope | None = None,
+        scope: RouteOperationScope | None = None,
     ) -> BatchQuerier:
         conditions: list[QueryCondition] = []
         if scope is not None:
@@ -1980,7 +1980,7 @@ class DeploymentAdapter(BaseAdapter):
     def _build_access_token_querier(
         self,
         input: SearchAccessTokensInput,
-        scope: AccessTokenSearchScope | None = None,
+        scope: AccessTokenOperationScope | None = None,
     ) -> BatchQuerier:
         conditions: list[QueryCondition] = []
         if scope is not None:
@@ -2050,7 +2050,7 @@ class DeploymentAdapter(BaseAdapter):
     def _build_auto_scaling_rule_querier(
         self,
         input: SearchAutoScalingRulesInput,
-        scope: AutoScalingRuleSearchScope | None = None,
+        scope: AutoScalingRuleOperationScope | None = None,
     ) -> BatchQuerier:
         conditions: list[QueryCondition] = []
         if scope is not None:
@@ -2195,7 +2195,7 @@ class DeploymentAdapter(BaseAdapter):
     def _build_replica_querier(
         self,
         input: SearchReplicasInput,
-        scope: ReplicaSearchScope | None = None,
+        scope: ReplicaOperationScope | None = None,
     ) -> BatchQuerier:
         conditions: list[QueryCondition] = []
         if scope is not None:

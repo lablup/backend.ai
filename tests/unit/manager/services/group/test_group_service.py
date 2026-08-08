@@ -28,9 +28,9 @@ from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.repositories.group.types import (
-    DomainProjectSearchScope,
+    DomainProjectOperationScope,
     GroupSearchResult,
-    UserProjectSearchScope,
+    UserProjectOperationScope,
 )
 from ai.backend.manager.repositories.group.updaters import GroupUpdaterSpec
 from ai.backend.manager.services.group.actions.create_group import CreateGroupAction
@@ -480,7 +480,7 @@ class TestSearchProjectsByDomain:
             )
         )
 
-        scope = DomainProjectSearchScope(domain_id=DomainID(uuid.uuid4()))
+        scope = DomainProjectOperationScope(domain_id=DomainID(uuid.uuid4()))
         querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
         action = SearchProjectsByDomainAction(scope=scope, querier=querier)
 
@@ -506,7 +506,7 @@ class TestSearchProjectsByDomain:
             )
         )
 
-        scope = DomainProjectSearchScope(domain_id=DomainID(uuid.uuid4()))
+        scope = DomainProjectOperationScope(domain_id=DomainID(uuid.uuid4()))
         querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
         action = SearchProjectsByDomainAction(scope=scope, querier=querier)
 
@@ -544,7 +544,7 @@ class TestSearchProjectsByUser:
             )
         )
 
-        scope = UserProjectSearchScope(user_uuid=user_uuid)
+        scope = UserProjectOperationScope(user_uuid=user_uuid)
         querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
         action = SearchProjectsByUserAction(scope=scope, querier=querier)
 
@@ -570,7 +570,7 @@ class TestSearchProjectsByUser:
             )
         )
 
-        scope = UserProjectSearchScope(user_uuid=user_uuid)
+        scope = UserProjectOperationScope(user_uuid=user_uuid)
         querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
         action = SearchProjectsByUserAction(scope=scope, querier=querier)
 

@@ -12,7 +12,7 @@ from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.domain.types import DomainSearchResult, DomainSearchScope
+from ai.backend.manager.repositories.domain.types import DomainOperationScope, DomainSearchResult
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -74,13 +74,13 @@ class DomainDBSource:
 
     async def search_rg_domains(
         self,
-        scope: DomainSearchScope,
+        scope: DomainOperationScope,
         querier: BatchQuerier,
     ) -> DomainSearchResult:
         """Search domains within a resource group scope.
 
         Args:
-            scope: DomainSearchScope containing resource_group filter.
+            scope: DomainOperationScope containing resource_group filter.
             querier: Contains additional conditions, orders, and pagination.
 
         Returns:

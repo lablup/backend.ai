@@ -24,14 +24,14 @@ from ai.backend.manager.data.kernel.types import (
 from ai.backend.manager.data.session.types import (
     SessionSchedulingHistoryListResult,
 )
-from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.repositories.base import BatchQuerier
 
 from .db_source import SchedulingHistoryDBSource
 from .types import (
-    DeploymentHistorySearchScope,
-    RouteHistorySearchScope,
-    SessionSchedulingHistorySearchScope,
+    DeploymentHistoryOperationScope,
+    RouteHistoryOperationScope,
+    SessionSchedulingHistoryOperationScope,
 )
 
 if TYPE_CHECKING:
@@ -80,7 +80,7 @@ class SchedulingHistoryRepository:
     async def search_session_scoped_history(
         self,
         querier: BatchQuerier,
-        scope: SessionSchedulingHistorySearchScope,
+        scope: SessionSchedulingHistoryOperationScope,
     ) -> SessionSchedulingHistoryListResult:
         """Search session scheduling history within scope."""
         return await self._db_source.search_session_scoped_history(querier, scope)
@@ -109,7 +109,7 @@ class SchedulingHistoryRepository:
     async def search_kernel_scoped_history(
         self,
         querier: BatchQuerier,
-        scopes: Sequence[SearchScope],
+        scopes: Sequence[OperationScope],
     ) -> KernelSchedulingHistoryListResult:
         """Search kernel history whose rows match any of ``scopes`` (OR)."""
         return await self._db_source.search_kernel_scoped_history(querier, scopes)
@@ -130,7 +130,7 @@ class SchedulingHistoryRepository:
     async def search_deployment_scoped_history(
         self,
         querier: BatchQuerier,
-        scope: DeploymentHistorySearchScope,
+        scope: DeploymentHistoryOperationScope,
     ) -> DeploymentHistoryListResult:
         """Search deployment history within scope."""
         return await self._db_source.search_deployment_scoped_history(querier, scope)
@@ -151,7 +151,7 @@ class SchedulingHistoryRepository:
     async def scoped_search_replica_group_history(
         self,
         querier: BatchQuerier,
-        scopes: Sequence[SearchScope],
+        scopes: Sequence[OperationScope],
     ) -> ReplicaGroupHistoryListResult:
         """Search replica-group history whose rows match any of ``scopes`` (OR)."""
         return await self._db_source.scoped_search_replica_group_history(querier, scopes)
@@ -172,7 +172,7 @@ class SchedulingHistoryRepository:
     async def search_route_scoped_history(
         self,
         querier: BatchQuerier,
-        scope: RouteHistorySearchScope,
+        scope: RouteHistoryOperationScope,
     ) -> RouteHistoryListResult:
         """Search route history within scope."""
         return await self._db_source.search_route_scoped_history(querier, scope)

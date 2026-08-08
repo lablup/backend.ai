@@ -28,7 +28,7 @@ from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.group.row import GroupRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
 
 @dataclass
@@ -148,7 +148,7 @@ class RouteServiceDiscoveryInfo:
 
 
 @dataclass(frozen=True)
-class ProjectDeploymentSearchScope(SearchScope):
+class ProjectDeploymentOperationScope(OperationScope):
     """Required scope for searching endpoints within a project.
 
     Used for project-scoped deployment search (project admin).

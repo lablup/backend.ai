@@ -32,7 +32,7 @@ from ai.backend.manager.data.auth.login_session_types import LoginSessionData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.login_session.row import LoginSessionRow
 from ai.backend.manager.repositories.auth.options import LoginSessionConditions, LoginSessionOrders
-from ai.backend.manager.repositories.auth.types import MyLoginSessionSearchScope
+from ai.backend.manager.repositories.auth.types import MyLoginSessionOperationScope
 from ai.backend.manager.repositories.base import combine_conditions_or, negate_conditions
 from ai.backend.manager.services.auth.actions.revoke_login_session import (
     AdminRevokeLoginSessionAction,
@@ -91,7 +91,7 @@ class LoginSessionAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        scope = MyLoginSessionSearchScope(user_id=me.user_id)
+        scope = MyLoginSessionOperationScope(user_id=me.user_id)
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
         querier = self._build_querier(

@@ -45,11 +45,11 @@ from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.pagination import NoPagination
 from ai.backend.manager.repositories.scheduling_history import SchedulingHistoryRepository
 from ai.backend.manager.repositories.scheduling_history.types import (
-    DeploymentHistorySearchScope,
-    DeploymentReplicaGroupHistorySearchScope,
-    RouteHistorySearchScope,
-    SessionKernelHistorySearchScope,
-    SessionSchedulingHistorySearchScope,
+    DeploymentHistoryOperationScope,
+    DeploymentReplicaGroupHistoryOperationScope,
+    RouteHistoryOperationScope,
+    SessionKernelHistoryOperationScope,
+    SessionSchedulingHistoryOperationScope,
 )
 from ai.backend.manager.services.scheduling_history.actions.global_search_replica_group_history import (
     GlobalSearchReplicaGroupHistoryAction,
@@ -285,7 +285,7 @@ class TestSearchDeploymentScopedHistoryAction:
             has_next_page=False,
             has_previous_page=False,
         )
-        scope = DeploymentHistorySearchScope(deployment_id=deployment_id)
+        scope = DeploymentHistoryOperationScope(deployment_id=deployment_id)
 
         action = SearchDeploymentScopedHistoryAction(scope=scope, querier=querier)
         result = await service.search_deployment_scoped_history(action)
@@ -313,7 +313,7 @@ class TestSearchSessionScopedHistoryAction:
                 has_previous_page=False,
             )
         )
-        scope = SessionSchedulingHistorySearchScope(session_id=session_id)
+        scope = SessionSchedulingHistoryOperationScope(session_id=session_id)
 
         action = SearchSessionScopedHistoryAction(scope=scope, querier=querier)
         result = await service.search_session_scoped_history(action)
@@ -363,7 +363,7 @@ class TestSearchRouteScopedHistoryAction:
             has_next_page=False,
             has_previous_page=False,
         )
-        scope = RouteHistorySearchScope(route_id=route_id)
+        scope = RouteHistoryOperationScope(route_id=route_id)
 
         action = SearchRouteScopedHistoryAction(scope=scope, querier=querier)
         result = await service.search_route_scoped_history(action)
@@ -449,7 +449,7 @@ class TestSearchKernelScopedHistoryAction:
         assert action.entity_type() is EntityType.SESSION
         mock_repository.search_kernel_scoped_history.assert_awaited_once_with(
             querier=querier,
-            scopes=[SessionKernelHistorySearchScope(session_id=_SESSION_ID)],
+            scopes=[SessionKernelHistoryOperationScope(session_id=_SESSION_ID)],
         )
 
 
@@ -512,5 +512,5 @@ class TestScopedSearchReplicaGroupHistoryAction:
         assert action.entity_type() is EntityType.MODEL_DEPLOYMENT
         mock_repository.scoped_search_replica_group_history.assert_awaited_once_with(
             querier=querier,
-            scopes=[DeploymentReplicaGroupHistorySearchScope(deployment_id=_DEPLOYMENT_ID)],
+            scopes=[DeploymentReplicaGroupHistoryOperationScope(deployment_id=_DEPLOYMENT_ID)],
         )

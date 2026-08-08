@@ -30,7 +30,7 @@ from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
 from ai.backend.manager.repositories.app_config_fragment.types import (
-    AppConfigFragmentSearchScope,
+    AppConfigFragmentOperationScope,
 )
 from ai.backend.manager.repositories.app_config_fragment.upserters import (
     AppConfigFragmentUpserterSpec,
@@ -71,7 +71,7 @@ _DOMAIN_SCOPE_ID = AppConfigScopeID(_DOMAIN_ID)
 class _ScopedSearchCase:
     """One scope a scoped search runs at, and the RBAC scope id it reports."""
 
-    scope: AppConfigFragmentSearchScope
+    scope: AppConfigFragmentOperationScope
     expected_rbac_scope_id: str
 
 
@@ -167,7 +167,7 @@ class TestAppConfigFragmentService:
                 config={"k": "v"},
             )
         ]
-        scope = AppConfigFragmentSearchScope(scope_type=case.scope_type, scope_id=case.scope_id)
+        scope = AppConfigFragmentOperationScope(scope_type=case.scope_type, scope_id=case.scope_id)
 
         result = await service.bulk_upsert(
             BulkUpsertAppConfigFragmentsAction(scope=scope, upserter_specs=specs)
@@ -242,13 +242,13 @@ class TestAppConfigFragmentService:
         "case",
         [
             _ScopedSearchCase(
-                scope=AppConfigFragmentSearchScope(
+                scope=AppConfigFragmentOperationScope(
                     scope_type=AppConfigScopeType.DOMAIN, scope_id=_DOMAIN_SCOPE_ID
                 ),
                 expected_rbac_scope_id=str(_DOMAIN_SCOPE_ID),
             ),
             _ScopedSearchCase(
-                scope=AppConfigFragmentSearchScope(
+                scope=AppConfigFragmentOperationScope(
                     scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
                 ),
                 expected_rbac_scope_id=str(_USER_SCOPE_ID),
@@ -367,7 +367,9 @@ class TestUpsertActionScope:
     )
     def test_scope_follows_the_written_scope(self, case: _RBACScopeCase) -> None:
         action = BulkUpsertAppConfigFragmentsAction(
-            scope=AppConfigFragmentSearchScope(scope_type=case.scope_type, scope_id=case.scope_id),
+            scope=AppConfigFragmentOperationScope(
+                scope_type=case.scope_type, scope_id=case.scope_id
+            ),
             upserter_specs=[
                 AppConfigFragmentUpserterSpec(
                     config_name="theme",

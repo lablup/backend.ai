@@ -29,7 +29,7 @@ from ai.backend.manager.errors.app_config import (
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
-from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
     AppConfigFragmentPurgerSpec,
 )
@@ -169,7 +169,7 @@ class AppConfigFragmentDBSource:
     async def scoped_search(
         self,
         querier: BatchQuerier,
-        scopes: Sequence[SearchScope],
+        scopes: Sequence[OperationScope],
     ) -> AppConfigFragmentSearchResult:
         """Scoped path: query the fragments written at ``scopes`` (combined with OR)."""
         async with self._rbac_ops_provider.read_ops() as r:

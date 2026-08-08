@@ -18,11 +18,11 @@ import sqlalchemy as sa
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.errors.repository import (
     AmbiguousEntityKeyError,
-    EmptySearchScopeError,
+    EmptyOperationScopeError,
     EntityNotFoundError,
 )
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchPurger,
@@ -175,7 +175,7 @@ class ReadOps:
         self,
         query: sa.sql.Select[Any],
         querier: BatchQuerier,
-        scopes: Sequence[SearchScope],
+        scopes: Sequence[OperationScope],
     ) -> BatchQuerierResult[Row[Any]]:
         """Run a filtered/ordered/paginated query restricted to the given scopes.
 
@@ -183,7 +183,7 @@ class ReadOps:
         unscoped global scan. Use :meth:`batch_query_in_global` for that, explicitly.
         """
         if not scopes:
-            raise EmptySearchScopeError(
+            raise EmptyOperationScopeError(
                 "batch_query_with_scopes requires at least one scope; "
                 "use batch_query_in_global for an explicit unscoped global query."
             )
@@ -191,7 +191,7 @@ class ReadOps:
 
     async def search_with_scopes[TRow: Base, TData](
         self,
-        scopes: Sequence[SearchScope],
+        scopes: Sequence[OperationScope],
         searcher: Searcher[TRow, TData],
     ) -> SearcherResult[TData]:
         """Run a searcher restricted to the given scopes and return converted data.
@@ -200,7 +200,7 @@ class ReadOps:
         own SELECT and row conversion, so no ORM row is returned to the caller.
         """
         if not scopes:
-            raise EmptySearchScopeError(
+            raise EmptyOperationScopeError(
                 "search_with_scopes requires at least one scope; "
                 "use search_in_global for an explicit unscoped global search."
             )
@@ -222,7 +222,7 @@ class ReadOps:
     async def _search[TRow: Base, TData](
         self,
         searcher: Searcher[TRow, TData],
-        scopes: Sequence[SearchScope],
+        scopes: Sequence[OperationScope],
     ) -> SearcherResult[TData]:
         result = await execute_batch_querier(self._sess, searcher.build_select(), searcher, scopes)
         return SearcherResult(
