@@ -354,7 +354,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
                 agg_to_array(groups.c.name).label("groups_name"),
             )
             .select_from(j)
-            .group_by(keypairs, users.c.email, users.c.full_name)
+            .group_by(*keypairs.c, users.c.email, users.c.full_name)
             .limit(limit)
             .offset(offset)
         )
@@ -408,7 +408,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
             )
             .select_from(j)
             .where(keypairs.c.user_id.in_(user_ids))
-            .group_by(keypairs, users.c.email, users.c.full_name)
+            .group_by(*keypairs.c, users.c.email, users.c.full_name)
         )
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
@@ -452,7 +452,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
             )
             .select_from(j)
             .where(keypairs.c.access_key.in_(access_keys))
-            .group_by(keypairs, users.c.email, users.c.full_name)
+            .group_by(*keypairs.c, users.c.email, users.c.full_name)
         )
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)

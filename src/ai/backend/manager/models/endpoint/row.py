@@ -170,7 +170,7 @@ def _get_endpoint_token_endpoint_row_join_condition() -> Any:
     return foreign(EndpointTokenRow.endpoint) == EndpointRow.id
 
 
-class EndpointRow(Base):  # type: ignore[misc]
+class EndpointRow(Base):
     __tablename__ = "endpoints"
 
     __table_args__ = (
@@ -370,7 +370,7 @@ class EndpointRow(Base):  # type: ignore[misc]
         load_created_user: bool = False,
         load_session_owner: bool = False,
         load_revisions: bool = False,
-    ) -> Self:
+    ) -> EndpointRow:
         """
         :raises: sqlalchemy.orm.exc.NoResultFound
         """
@@ -423,7 +423,7 @@ class EndpointRow(Base):  # type: ignore[misc]
         load_session_owner: bool = False,
         load_revisions: bool = False,
         status_filter: Iterable[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
-    ) -> list[Self]:
+    ) -> list[EndpointRow]:
         from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 
         query = (
@@ -475,7 +475,7 @@ class EndpointRow(Base):  # type: ignore[misc]
         load_session_owner: bool = False,
         load_revisions: bool = False,
         status_filter: Iterable[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
-    ) -> Sequence[Self]:
+    ) -> Sequence[EndpointRow]:
         from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 
         query = (
@@ -529,7 +529,7 @@ class EndpointRow(Base):  # type: ignore[misc]
         load_session_owner: bool = False,
         load_revisions: bool = False,
         status_filter: Iterable[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
-    ) -> Sequence[Self]:
+    ) -> Sequence[EndpointRow]:
         from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
         from ai.backend.manager.models.replica_group import ReplicaGroupRow
 
@@ -912,7 +912,7 @@ class EndpointRow(Base):  # type: ignore[misc]
         )
 
 
-class EndpointTokenRow(Base):  # type: ignore[misc]
+class EndpointTokenRow(Base):
     __tablename__ = "endpoint_tokens"
 
     id: Mapped[UUID] = mapped_column(
@@ -975,14 +975,14 @@ class EndpointTokenRow(Base):  # type: ignore[misc]
         project: UUID | None = None,
         user_uuid: UUID | None = None,
         load_endpoint: bool = False,
-    ) -> Sequence[Self]:
+    ) -> Sequence[EndpointTokenRow]:
         query = (
             sa.select(EndpointTokenRow)
             .filter(EndpointTokenRow.endpoint == endpoint_id)
             .order_by(sa.desc(EndpointTokenRow.created_at))
         )
         if load_endpoint:
-            query = query.options(selectinload(EndpointTokenRow.tokens))
+            query = query.options(selectinload(EndpointTokenRow.endpoint_row))
         if project:
             query = query.filter(EndpointTokenRow.project == project)
         if domain:
@@ -1002,10 +1002,10 @@ class EndpointTokenRow(Base):  # type: ignore[misc]
         project: UUID | None = None,
         user_uuid: UUID | None = None,
         load_endpoint: bool = False,
-    ) -> Self:
+    ) -> EndpointTokenRow:
         query = sa.select(EndpointTokenRow).filter(EndpointTokenRow.token == token)
         if load_endpoint:
-            query = query.options(selectinload(EndpointTokenRow.tokens))
+            query = query.options(selectinload(EndpointTokenRow.endpoint_row))
         if project:
             query = query.filter(EndpointTokenRow.project == project)
         if domain:
@@ -1033,7 +1033,7 @@ class EndpointTokenRow(Base):  # type: ignore[misc]
         )
 
 
-class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
+class EndpointAutoScalingRuleRow(Base):
     __tablename__ = "endpoint_auto_scaling_rules"
 
     id: Mapped[UUID] = mapped_column(
@@ -1094,7 +1094,7 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
         endpoint_status_filter: Collection[EndpointLifecycle] = frozenset([
             EndpointLifecycle.CREATED
         ]),
-    ) -> Sequence[Self]:
+    ) -> Sequence[EndpointAutoScalingRuleRow]:
         query = sa.select(EndpointAutoScalingRuleRow)
         if endpoint_status_filter:
             query = (

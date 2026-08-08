@@ -53,9 +53,9 @@ from ai.backend.manager.models.virtual_scope.entity_membership import EntityMemb
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.db.engine import create_async_engine
 from ai.backend.manager.utils import query_userinfo, query_userinfo_from_session
-from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.db import TableOrORM, with_tables
 
-ALL_ROWS = [
+ALL_ROWS: list[TableOrORM] = [
     DomainRow,
     ScalingGroupRow,
     UserResourcePolicyRow,

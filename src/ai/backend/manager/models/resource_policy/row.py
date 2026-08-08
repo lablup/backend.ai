@@ -41,7 +41,7 @@ __all__: Sequence[str] = (
 )
 
 
-class KeyPairResourcePolicyRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class KeyPairResourcePolicyRow(CreatedAtMixin, Base):
     __tablename__ = "keypair_resource_policies"
     # A cap outside the requestable priority range is unsatisfiable: a
     # negative one would reject every session create for the keypair.
@@ -121,7 +121,7 @@ class KeyPairResourcePolicyRow(CreatedAtMixin, Base):  # type: ignore[misc]
 keypair_resource_policies = KeyPairResourcePolicyRow.__table__
 
 
-class UserResourcePolicyRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class UserResourcePolicyRow(CreatedAtMixin, Base):
     __tablename__ = "user_resource_policies"
 
     name: Mapped[str] = mapped_column("name", sa.String(length=256), primary_key=True)
@@ -187,7 +187,7 @@ class UserResourcePolicyRow(CreatedAtMixin, Base):  # type: ignore[misc]
 user_resource_policies = UserResourcePolicyRow.__table__
 
 
-class ProjectResourcePolicyRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class ProjectResourcePolicyRow(CreatedAtMixin, Base):
     __tablename__ = "project_resource_policies"
 
     name: Mapped[str] = mapped_column("name", sa.String(length=256), primary_key=True)

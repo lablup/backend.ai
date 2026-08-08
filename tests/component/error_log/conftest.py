@@ -13,7 +13,7 @@ from ai.backend.manager.api.rest.error_log.handler import ErrorLogHandler
 from ai.backend.manager.api.rest.error_log.registry import register_error_log_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
-from ai.backend.manager.models.error_logs import error_logs
+from ai.backend.manager.models.error_logs import ErrorLogRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.error_log.repository import ErrorLogRepository
 from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
@@ -48,4 +48,4 @@ async def _cleanup_error_logs(
     """Clean error_logs table after each test to avoid FK violations during teardown."""
     yield
     async with db_engine.begin() as conn:
-        await conn.execute(sa.delete(error_logs))
+        await conn.execute(sa.delete(ErrorLogRow))

@@ -888,11 +888,11 @@ class DeploymentDBSource:
             endpoint = result.scalar_one_or_none()
             if not endpoint:
                 raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
-            query = sa.select(EndpointAutoScalingRuleRow).where(
+            rules_query = sa.select(EndpointAutoScalingRuleRow).where(
                 EndpointAutoScalingRuleRow.endpoint == endpoint_id
             )
-            result = await db_sess.execute(query)
-            rows = result.scalars().all()
+            rules_result = await db_sess.execute(rules_query)
+            rows = rules_result.scalars().all()
             return [row.to_autoscaling_rule() for row in rows]
 
     async def update_autoscaling_rule(
@@ -1428,7 +1428,7 @@ class DeploymentDBSource:
                 .where(EndpointRow.lifecycle_stage.in_(EndpointLifecycle.need_scaling_states()))
                 .join(
                     EndpointAutoScalingRuleRow,
-                    EndpointRow.id == EndpointAutoScalingRuleRow.endpoint_id,
+                    EndpointRow.id == EndpointAutoScalingRuleRow.endpoint,
                 )
                 .options(
                     selectinload(EndpointRow.current_revision_row),
@@ -1451,9 +1451,9 @@ class DeploymentDBSource:
             # Group rules by endpoint
             rules_by_endpoint: dict[uuid.UUID, list[AutoScalingRule]] = {}
             for rule_row in rule_rows:
-                if rule_row.endpoint_id not in rules_by_endpoint:
-                    rules_by_endpoint[rule_row.endpoint_id] = []
-                rules_by_endpoint[rule_row.endpoint_id].append(rule_row.to_autoscaling_rule())
+                if rule_row.endpoint not in rules_by_endpoint:
+                    rules_by_endpoint[rule_row.endpoint] = []
+                rules_by_endpoint[rule_row.endpoint].append(rule_row.to_autoscaling_rule())
 
             # Build result
             result = []

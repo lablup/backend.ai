@@ -46,7 +46,7 @@ def _get_object_permission_rows_join_condition() -> sa.ColumnElement[bool]:
     return RoleRow.id == foreign(ObjectPermissionRow.role_id)
 
 
-class RoleRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class RoleRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "roles"
     __table_args__ = (sa.Index("ix_id_status", "id", "status"),)
 

@@ -71,7 +71,7 @@ class SimplePurgerSpec[TRow: Base](PurgerSpec[TRow]):
 # =============================================================================
 
 
-class PurgerTestRowInt(Base):  # type: ignore[misc]
+class PurgerTestRowInt(Base):
     """ORM model for single-row purger testing with integer PK."""
 
     __tablename__ = "test_purger_int_pk"
@@ -82,7 +82,7 @@ class PurgerTestRowInt(Base):  # type: ignore[misc]
     status: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="pending")
 
 
-class PurgerTestRowUUID(Base):  # type: ignore[misc]
+class PurgerTestRowUUID(Base):
     """ORM model for single-row purger testing with UUID PK."""
 
     __tablename__ = "test_purger_uuid_pk"
@@ -276,7 +276,7 @@ class SimpleBatchPurgerSpec(BatchPurgerSpec[Base]):
         return self._conflict_checks
 
 
-class BatchPurgerBasicRow(Base):  # type: ignore[misc]
+class BatchPurgerBasicRow(Base):
     """ORM model for basic batch purger testing."""
 
     __tablename__ = "test_batch_purger_basic"
@@ -287,7 +287,7 @@ class BatchPurgerBasicRow(Base):  # type: ignore[misc]
     status = sa.Column(sa.String(20), nullable=False)
 
 
-class BatchPurgerBatchingRow(Base):  # type: ignore[misc]
+class BatchPurgerBatchingRow(Base):
     """ORM model for batch purger batching tests."""
 
     __tablename__ = "test_batch_purger_batching"
@@ -298,7 +298,7 @@ class BatchPurgerBatchingRow(Base):  # type: ignore[misc]
     status = sa.Column(sa.String(20), nullable=False)
 
 
-class BatchPurgerEdgeCaseRow(Base):  # type: ignore[misc]
+class BatchPurgerEdgeCaseRow(Base):
     """ORM model for batch purger edge case tests."""
 
     __tablename__ = "test_batch_purger_empty"
@@ -546,7 +546,7 @@ class TestBatchPurgerEdgeCases:
             assert result.deleted_count == 0
 
 
-class BatchPurgerTestRow(Base):  # type: ignore[misc]
+class BatchPurgerTestRow(Base):
     """ORM model for batch purger testing using declarative mapping."""
 
     __tablename__ = "test_batch_purger_orm"
@@ -664,7 +664,7 @@ class TestBatchPurgerWithORMModel:
 # =============================================================================
 
 
-class BatchPurgerCompositePKRow(Base):  # type: ignore[misc]
+class BatchPurgerCompositePKRow(Base):
     """ORM model for composite PK batch purger testing."""
 
     __tablename__ = "test_batch_purger_composite_pk"
@@ -806,7 +806,7 @@ class TestBatchPurgerCompositePK:
 # =============================================================================
 
 
-class PurgerParentRow(Base):  # type: ignore[misc]
+class PurgerParentRow(Base):
     """Parent ORM model for IntegrityError testing."""
 
     __tablename__ = "test_purger_ie_parent"
@@ -816,7 +816,7 @@ class PurgerParentRow(Base):  # type: ignore[misc]
     name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
 
 
-class PurgerChildRow(Base):  # type: ignore[misc]
+class PurgerChildRow(Base):
     """Child ORM model with FK reference to parent for IntegrityError testing."""
 
     __tablename__ = "test_purger_ie_child"
@@ -975,7 +975,7 @@ class TestBatchPurgerIntegrityError:
 # =============================================================================
 
 
-class BulkPurgerPartialTestRow(Base):  # type: ignore[misc]
+class BulkPurgerPartialTestRow(Base):
     """ORM model for bulk purger partial testing."""
 
     __tablename__ = "test_bulk_purger_partial"
@@ -985,7 +985,7 @@ class BulkPurgerPartialTestRow(Base):  # type: ignore[misc]
     name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
 
 
-class BulkPurgerPartialParentRow(Base):  # type: ignore[misc]
+class BulkPurgerPartialParentRow(Base):
     """Parent ORM model for FK violation testing in bulk purger partial."""
 
     __tablename__ = "test_bulk_purger_partial_parent"
@@ -995,7 +995,7 @@ class BulkPurgerPartialParentRow(Base):  # type: ignore[misc]
     name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
 
 
-class BulkPurgerPartialChildRow(Base):  # type: ignore[misc]
+class BulkPurgerPartialChildRow(Base):
     """Child ORM model for FK violation testing in bulk purger partial."""
 
     __tablename__ = "test_bulk_purger_partial_child"
@@ -1260,7 +1260,7 @@ class TestBulkPurgerPartial:
 # =============================================================================
 
 
-class EagerJoinPurgerParentRow(Base):  # type: ignore[misc]
+class EagerJoinPurgerParentRow(Base):
     """Parent referenced by an eagerly-joined child relationship."""
 
     __tablename__ = "test_eager_join_purger_parent"
@@ -1270,7 +1270,7 @@ class EagerJoinPurgerParentRow(Base):  # type: ignore[misc]
     name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
 
 
-class EagerJoinPurgerChildRow(Base):  # type: ignore[misc]
+class EagerJoinPurgerChildRow(Base):
     """Child whose ``select()`` compiles its FROM to an _ORMJoin via ``lazy="joined"``.
 
     Regression guard for BA-6952: ``execute_batch_purger`` used to read the target

@@ -49,7 +49,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.domain.db_source import DomainDBSource
-from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.db import TableOrORM, with_tables
 
 
 def _make_password_info() -> PasswordInfo:
@@ -62,7 +62,7 @@ def _make_password_info() -> PasswordInfo:
 
 
 # Row imports above ensure mapper initialization (FK dependency order).
-_WITH_TABLES = [
+_WITH_TABLES: list[TableOrORM] = [
     DomainRow,
     ScalingGroupRow,
     UserResourcePolicyRow,

@@ -16,7 +16,7 @@ from ai.backend.manager.models.base import (
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
 
-class EntityMembershipRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class EntityMembershipRow(CreatedAtMixin, Base):
     __tablename__ = "entity_memberships"
     __table_args__ = (
         sa.Index(

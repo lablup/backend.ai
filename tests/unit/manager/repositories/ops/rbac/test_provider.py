@@ -140,7 +140,7 @@ _UPSERT_EXISTING_ROW_ID = UUID("11111111-1111-1111-1111-111111111111")
 # =============================================================================
 
 
-class OpsRBACScopeRow(Base):  # type: ignore[misc]
+class OpsRBACScopeRow(Base):
     """Synthetic scope-entity row for RBAC ops scope-creation testing."""
 
     __tablename__ = "test_ops_rbac_scope"
@@ -200,7 +200,7 @@ class StubMember(ScopeMember):
         return self.role_user
 
 
-class RBACOpsTestRow(Base):  # type: ignore[misc]
+class RBACOpsTestRow(Base):
     __tablename__ = "test_rbac_ops_entity"
     __table_args__ = {"extend_existing": True}
 
@@ -208,7 +208,7 @@ class RBACOpsTestRow(Base):  # type: ignore[misc]
     name: Mapped[str] = mapped_column(sa.String(64), nullable=False, unique=True)
 
 
-class RBACOpsBlockerRow(Base):  # type: ignore[misc]
+class RBACOpsBlockerRow(Base):
     """Referencing row whose RESTRICT foreign key makes its target's delete fail."""
 
     __tablename__ = "test_rbac_ops_blocker"
@@ -281,7 +281,7 @@ _SCOPE_TABLES = [
 async def scope_tables(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[None, None]:
-    async with with_tables(database_connection, _SCOPE_TABLES):  # type: ignore[arg-type]
+    async with with_tables(database_connection, _SCOPE_TABLES):
         yield
 
 
@@ -308,7 +308,7 @@ _ENTITY_MEMBER_TABLES = [
 async def entity_member_tables(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[None, None]:
-    async with with_tables(database_connection, _ENTITY_MEMBER_TABLES):  # type: ignore[arg-type]
+    async with with_tables(database_connection, _ENTITY_MEMBER_TABLES):
         yield
 
 
@@ -1251,7 +1251,7 @@ _SCOPE_DELETE_TABLES = [
 async def scope_delete_tables(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[None, None]:
-    async with with_tables(database_connection, _SCOPE_DELETE_TABLES):  # type: ignore[arg-type]
+    async with with_tables(database_connection, _SCOPE_DELETE_TABLES):
         yield
 
 
@@ -1396,7 +1396,7 @@ class TestScopeDeletionVirtualScopeCleanup:
 # =============================================================================
 
 
-class RBACOpsUpsertRow(Base):  # type: ignore[misc]
+class RBACOpsUpsertRow(Base):
     """Upsert target: one row per (name, scope_type, scope_id), public rows keyed by name."""
 
     __tablename__ = "test_rbac_ops_upsert"
@@ -1422,7 +1422,7 @@ class RBACOpsUpsertRow(Base):  # type: ignore[misc]
     value: Mapped[str] = mapped_column(sa.String(64), nullable=False)
 
 
-class RBACOpsUpsertGatedRow(Base):  # type: ignore[misc]
+class RBACOpsUpsertGatedRow(Base):
     """Upsert target whose self-referencing FK gates the insert."""
 
     __tablename__ = "test_rbac_ops_upsert_gated"
@@ -1440,7 +1440,7 @@ class RBACOpsUpsertGatedRow(Base):  # type: ignore[misc]
     )
 
 
-class RBACOpsUpsertCompositePKRow(Base):  # type: ignore[misc]
+class RBACOpsUpsertCompositePKRow(Base):
     """Upsert target with a composite primary key, which the write op rejects."""
 
     __tablename__ = "test_rbac_ops_upsert_composite_pk"
@@ -1566,7 +1566,7 @@ _UPSERT_GATED_TABLES = [RBACOpsUpsertGatedRow, AssociationScopesEntitiesRow]
 async def upsert_tables(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[None, None]:
-    async with with_tables(database_connection, _UPSERT_TABLES):  # type: ignore[arg-type]
+    async with with_tables(database_connection, _UPSERT_TABLES):
         yield
 
 
@@ -1574,7 +1574,7 @@ async def upsert_tables(
 async def upsert_gated_tables(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[None, None]:
-    async with with_tables(database_connection, _UPSERT_GATED_TABLES):  # type: ignore[arg-type]
+    async with with_tables(database_connection, _UPSERT_GATED_TABLES):
         yield
 
 

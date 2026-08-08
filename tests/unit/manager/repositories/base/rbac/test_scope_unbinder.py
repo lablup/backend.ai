@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-class ScopeUnbinderMappingRow(Base):  # type: ignore[misc]
+class ScopeUnbinderMappingRow(Base):
     """N:N mapping row for scope unbinder testing."""
 
     __tablename__ = "test_scope_unbinder_mapping"
@@ -135,7 +135,7 @@ class UnbinderSeedContext:
 async def create_tables(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[None, None]:
-    async with with_tables(database_connection, UNBINDER_TABLES):  # type: ignore[arg-type]
+    async with with_tables(database_connection, UNBINDER_TABLES):
         yield
 
 

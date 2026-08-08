@@ -18,7 +18,7 @@ from ai.backend.manager.models.base import (
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
 
-class RolePermissionPresetRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class RolePermissionPresetRow(CreatedAtMixin, Base):
     __tablename__ = "role_permission_presets"
     __table_args__ = (
         sa.UniqueConstraint(

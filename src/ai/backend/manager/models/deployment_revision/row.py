@@ -79,7 +79,7 @@ def _get_routings_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     return DeploymentRevisionRow.id == foreign(RoutingRow.revision)
 
 
-class DeploymentRevisionRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class DeploymentRevisionRow(CreatedAtMixin, Base):
     """
     Represents a deployment revision (K8s ReplicaSet equivalent).
 

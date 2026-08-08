@@ -838,7 +838,7 @@ def set_if_set(
 
 def orm_set_if_set(
     src: object,
-    target: MutableMapping[str, Any],
+    target: object,
     name: str,
     *,
     clean_func: Callable[[Any], Any] | None = None,

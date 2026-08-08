@@ -212,7 +212,7 @@ class BatchQuerier:
 
 
 @dataclass
-class BatchQuerierResult[TRow: Base]:
+class BatchQuerierResult[TRow]:
     """Result of executing a batch query with querier."""
 
     rows: list[TRow]

@@ -1461,31 +1461,31 @@ class QuotaScope(graphene.ObjectType):  # type: ignore[misc]
             async with graph_ctx.db.begin_readonly_session() as sess:
                 await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)
                 if qsid.scope_type == QuotaScopeType.USER:
-                    query = (
+                    user_query = (
                         sa.select(UserRow)
                         .where(UserRow.uuid == qsid.scope_id)
                         .options(selectinload(UserRow.resource_policy_row))
                     )
-                    result = await sess.scalar(query)
-                    if result is None:
+                    user_row = await sess.scalar(user_query)
+                    if user_row is None:
                         raise QuotaScopeNotFoundError(
                             f"User not found for quota scope id: {self.quota_scope_id}"
                         ) from e
                     resource_policy_constraint: int | None = (
-                        result.resource_policy_row.max_quota_scope_size
+                        user_row.resource_policy_row.max_quota_scope_size
                     )
                 else:
-                    query = (
+                    group_query = (
                         sa.select(GroupRow)
                         .where(GroupRow.id == qsid.scope_id)
                         .options(selectinload(GroupRow.resource_policy_row))
                     )
-                    result = await sess.scalar(query)
-                    if result is None:
+                    group_row = await sess.scalar(group_query)
+                    if group_row is None:
                         raise QuotaScopeNotFoundError(
                             f"Group not found for quota scope id: {self.quota_scope_id}"
                         ) from e
-                    resource_policy_constraint = result.resource_policy_row.max_quota_scope_size
+                    resource_policy_constraint = group_row.resource_policy_row.max_quota_scope_size
                 if resource_policy_constraint is not None and resource_policy_constraint < 0:
                     resource_policy_constraint = None
 

@@ -49,7 +49,7 @@ class ItemData:
     category: str
 
 
-class ItemRow(Base):  # type: ignore[misc]
+class ItemRow(Base):
     """ORM model for searcher testing."""
 
     __tablename__ = "test_searcher_item"

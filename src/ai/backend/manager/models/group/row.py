@@ -124,7 +124,7 @@ container_registry_iv = t.Dict({}) | t.Dict({
 })
 
 
-class AssocGroupUserRow(Base):  # type: ignore[misc]
+class AssocGroupUserRow(Base):
     """DEPRECATED -- scheduled for sunset.
 
     Project membership is moving to ``association_scopes_entities`` (ASE) with
@@ -163,7 +163,7 @@ class AssocGroupUserRow(Base):  # type: ignore[misc]
 association_groups_users = AssocGroupUserRow.__table__
 
 
-class GroupRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class GroupRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "groups"
     __table_args__ = (
         sa.UniqueConstraint("name", "domain_name", name="uq_groups_name_domain_name"),
@@ -337,7 +337,7 @@ class GroupRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         project_id: uuid.UUID,
         *,
         db: ExtendedAsyncSAEngine,
-    ) -> Self:
+    ) -> GroupRow:
         """
         Query a project by its ID with related resource policies.
         Args:
@@ -449,7 +449,7 @@ class ProjectModel(RBACModel[ProjectPermission]):
 
 
 def _build_group_query(
-    cond: sa.sql.expression.BinaryExpression[Any], domain_name: str
+    cond: sa.sql.expression.ColumnElement[bool], domain_name: str
 ) -> sa.sql.Select[Any]:
     return (
         sa.select(groups.c.id)

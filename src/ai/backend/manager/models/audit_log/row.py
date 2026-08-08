@@ -23,7 +23,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 __all__ = ("AuditLogRow",)
 
 
-class AuditLogRow(Base):  # type: ignore[misc]
+class AuditLogRow(Base):
     """One audit record. ``action_kind`` says which shape wrote it; the target columns
     carry what that shape has. NULL ``action_kind`` means the row predates the column.
     """

@@ -38,7 +38,7 @@ __all__ = (
 )
 
 
-class ResourceSlotTypeRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class ResourceSlotTypeRow(LifecycleTimestampsMixin, Base):
     """Registry of known resource slot types with display metadata.
 
     Primary key is slot_name (e.g., 'cpu', 'mem', 'cuda.device').
@@ -127,7 +127,7 @@ class ResourceSlotTypeRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         )
 
 
-class AgentResourceRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class AgentResourceRow(LifecycleTimestampsMixin, Base):
     """Per-agent, per-slot resource capacity and usage.
 
     Composite primary key: (agent_id, slot_name).
@@ -181,7 +181,7 @@ class AgentResourceRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     )
 
 
-class ResourceAllocationRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class ResourceAllocationRow(CreatedAtMixin, Base):
     """Per-kernel, per-slot resource allocation.
 
     Composite primary key: (kernel_id, slot_name).
@@ -253,7 +253,7 @@ class ResourceAllocationRow(CreatedAtMixin, Base):  # type: ignore[misc]
     )
 
 
-class ModelCardResourceRequirementRow(Base):  # type: ignore[misc]
+class ModelCardResourceRequirementRow(Base):
     """Per-model-card, per-slot minimum resource requirement.
 
     Composite primary key: (model_card_id, slot_name).
@@ -283,7 +283,7 @@ class ModelCardResourceRequirementRow(Base):  # type: ignore[misc]
     )
 
 
-class PresetResourceSlotRow(Base):  # type: ignore[misc]
+class PresetResourceSlotRow(Base):
     """Per-preset, per-slot resource allocation.
 
     Composite primary key: (preset_id, slot_name).
@@ -313,7 +313,7 @@ class PresetResourceSlotRow(Base):  # type: ignore[misc]
     )
 
 
-class DeploymentRevisionResourceSlotRow(Base):  # type: ignore[misc]
+class DeploymentRevisionResourceSlotRow(Base):
     """Per-revision, per-slot resource allocation.
 
     Composite primary key: (revision_id, slot_name).

@@ -24,7 +24,7 @@ from ai.backend.manager.models.base import (
 )
 
 
-class AssociationScopesEntitiesRow(Base):  # type: ignore[misc]
+class AssociationScopesEntitiesRow(Base):
     __tablename__ = "association_scopes_entities"
     __table_args__ = (
         sa.Index("ix_association_scopes_entities_entity", "entity_type", "entity_id"),

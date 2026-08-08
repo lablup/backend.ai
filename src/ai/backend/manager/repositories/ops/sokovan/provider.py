@@ -31,7 +31,9 @@ class Transition[TStatusRow: Base, THistoryRow: ReconcileHistoryMixin]:
     category); the new history creator carries this transition's sub_steps.
     """
 
-    new_history: Creator[THistoryRow]
+    # THistoryRow rows always inherit Base alongside the mixin, but Python typing
+    # cannot express the intersection bound Creator requires.
+    new_history: Creator[THistoryRow]  # type: ignore[type-var]
     match_conditions: Sequence[QueryCondition]
     status_updater: Updater[TStatusRow] | None = None
 

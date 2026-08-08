@@ -11,7 +11,7 @@ from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 __all__ = ("AppConfigDefinitionRow",)
 
 
-class AppConfigDefinitionRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class AppConfigDefinitionRow(LifecycleTimestampsMixin, Base):
     """One registered ``config_name`` (admin-managed).
 
     Purging a row cascades to its allow-list entries (``ON DELETE CASCADE``) and,

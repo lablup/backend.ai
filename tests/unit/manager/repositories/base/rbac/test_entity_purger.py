@@ -56,7 +56,7 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-class RBACEntityPurgerTestRow(Base):  # type: ignore[misc]
+class RBACEntityPurgerTestRow(Base):
     """ORM model implementing RBACEntityRowProtocol for entity purger testing."""
 
     __tablename__ = "test_rbac_purger"
@@ -76,7 +76,7 @@ class RBACEntityPurgerTestRow(Base):  # type: ignore[misc]
         return ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(self.id))
 
 
-class RBACEntityPurgerRestrictReferrer(Base):  # type: ignore[misc]
+class RBACEntityPurgerRestrictReferrer(Base):
     """Downstream row that pins ``RBACEntityPurgerTestRow`` via FK RESTRICT.
 
     Mirrors the ``model_cards.vfolder → vfolders.id`` relationship used in
@@ -239,7 +239,7 @@ async def create_tables(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[None, None]:
     """Create RBAC entity purger test tables."""
-    async with with_tables(database_connection, ENTITY_PURGER_TABLES):  # type: ignore[arg-type]
+    async with with_tables(database_connection, ENTITY_PURGER_TABLES):
         yield
 
 
@@ -909,7 +909,7 @@ class TestRBACEntityBatchPurger:
 # =============================================================================
 
 
-class CompositePKPurgerTestRow(Base):  # type: ignore[misc]
+class CompositePKPurgerTestRow(Base):
     """ORM model with composite primary key for testing rejection."""
 
     __tablename__ = "test_rbac_purger_composite_pk"

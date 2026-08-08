@@ -66,13 +66,13 @@ from ai.backend.manager.sokovan.deployment.route.handlers.observer import (
     RouteObserver,
 )
 from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
-from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.db import TableOrORM, with_tables
 
 # Tables `RoutingRow` transitively requires for its FK constraints to be
 # created. We do NOT populate most of these — only the rows the routes
 # themselves need (one domain, scaling group, two policies, one user,
 # one project, one endpoint).
-_REQUIRED_TABLES = [
+_REQUIRED_TABLES: list[TableOrORM] = [
     DomainRow,
     ScalingGroupRow,
     UserResourcePolicyRow,

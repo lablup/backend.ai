@@ -38,7 +38,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
-class UpdaterTestRowInt(Base):  # type: ignore[misc]
+class UpdaterTestRowInt(Base):
     """ORM model for updater testing with integer PK."""
 
     __tablename__ = "test_updater_int_pk"
@@ -50,7 +50,7 @@ class UpdaterTestRowInt(Base):  # type: ignore[misc]
     value: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
 
 
-class UpdaterTestRowUUID(Base):  # type: ignore[misc]
+class UpdaterTestRowUUID(Base):
     """ORM model for updater testing with UUID PK."""
 
     __tablename__ = "test_updater_uuid_pk"
@@ -61,7 +61,7 @@ class UpdaterTestRowUUID(Base):  # type: ignore[misc]
     status: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="pending")
 
 
-class UpdaterTestRowStr(Base):  # type: ignore[misc]
+class UpdaterTestRowStr(Base):
     """ORM model for updater testing with string PK."""
 
     __tablename__ = "test_updater_str_pk"
@@ -691,7 +691,7 @@ class TestBatchUpdater:
 # --- Integrity error handling tests ---
 
 
-class UpdaterTestRowWithUnique(Base):  # type: ignore[misc]
+class UpdaterTestRowWithUnique(Base):
     """ORM model for updater integrity error testing with a unique constraint on name."""
 
     __tablename__ = "test_updater_unique"
@@ -935,7 +935,7 @@ class TestBatchUpdaterIntegrityError:
 # =============================================================================
 
 
-class BulkUpdaterPartialTestRow(Base):  # type: ignore[misc]
+class BulkUpdaterPartialTestRow(Base):
     """ORM model for bulk updater partial testing.
 
     ``name`` carries a UNIQUE constraint so an update colliding with another row's

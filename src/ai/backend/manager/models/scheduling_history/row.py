@@ -36,7 +36,7 @@ __all__ = (
 )
 
 
-class SessionSchedulingHistoryRow(Base):  # type: ignore[misc]
+class SessionSchedulingHistoryRow(Base):
     __tablename__ = "session_scheduling_history"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -108,7 +108,7 @@ class SessionSchedulingHistoryRow(Base):  # type: ignore[misc]
         )
 
 
-class KernelSchedulingHistoryRow(Base):  # type: ignore[misc]
+class KernelSchedulingHistoryRow(Base):
     __tablename__ = "kernel_scheduling_history"
 
     id: Mapped[KernelSchedulingHistoryID] = mapped_column(
@@ -177,7 +177,7 @@ class KernelSchedulingHistoryRow(Base):  # type: ignore[misc]
         )
 
 
-class DeploymentHistoryRow(Base):  # type: ignore[misc]
+class DeploymentHistoryRow(Base):
     __tablename__ = "deployment_history"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -247,7 +247,7 @@ class DeploymentHistoryRow(Base):  # type: ignore[misc]
         )
 
 
-class RouteHistoryRow(Base):  # type: ignore[misc]
+class RouteHistoryRow(Base):
     __tablename__ = "route_history"
 
     id: Mapped[uuid.UUID] = mapped_column(

@@ -44,6 +44,7 @@ from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRo
 from ai.backend.manager.repositories.group.db_source import GroupDBSource
 from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
 
 
 class TestUnassignUsersFromProject:
@@ -200,6 +201,7 @@ class TestUnassignUsersFromProject:
                     resource_policy=policy_name,
                 )
             )
+            await VirtualScopeSeeder().seed_user_scope(session, user_uuid)
             await session.commit()
         return user_uuid
 
@@ -219,6 +221,7 @@ class TestUnassignUsersFromProject:
                     relation_type=RelationType.AUTO,
                 ),
             )
+            await VirtualScopeSeeder().enroll_user_in_project(session, project_id, user_id)
             await session.commit()
 
     @pytest.fixture

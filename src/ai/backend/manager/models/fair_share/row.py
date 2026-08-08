@@ -83,7 +83,7 @@ def _resource_slot_to_slot_quantities(slot: ResourceSlot) -> list[SlotQuantity]:
     return [SlotQuantity(slot_name=k, quantity=Decimal(str(v))) for k, v in slot.items()]
 
 
-class DomainFairShareRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class DomainFairShareRow(LifecycleTimestampsMixin, Base):
     """Per-domain Fair Share state.
 
     Stores weight (configured value) and calculated values together for current state.
@@ -279,7 +279,7 @@ class DomainFairShareRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         )
 
 
-class ProjectFairShareRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class ProjectFairShareRow(LifecycleTimestampsMixin, Base):
     """Per-project Fair Share state.
 
     One row per (resource_group, project_id) combination.
@@ -461,7 +461,7 @@ class ProjectFairShareRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         )
 
 
-class UserFairShareRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class UserFairShareRow(LifecycleTimestampsMixin, Base):
     """Per-user Fair Share state.
 
     Since a User can belong to multiple Projects, distinguished by

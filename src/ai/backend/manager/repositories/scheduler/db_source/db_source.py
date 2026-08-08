@@ -464,9 +464,9 @@ class ScheduleDBSource:
                     ra.c.free_at.is_(None),
                 )
             )
-            for row in ra_result:
-                kernel_slots[KernelId(row.kernel_id)][ResourceSlotName(row.slot_name)] = (
-                    row.requested
+            for ra_row in ra_result:
+                kernel_slots[KernelId(ra_row.kernel_id)][ResourceSlotName(ra_row.slot_name)] = (
+                    ra_row.requested
                 )
 
         group_policies = await self._fetch_session_group_policies(

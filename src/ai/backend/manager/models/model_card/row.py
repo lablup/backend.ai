@@ -41,7 +41,7 @@ def _format_min_quantity(value: Decimal | str) -> str:
     return format(decimal_value.normalize(), "f")
 
 
-class ModelCardRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class ModelCardRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "model_cards"
 
     __table_args__ = (

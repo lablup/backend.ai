@@ -135,7 +135,7 @@ class ScalingGroupOpts(BackendAISchema):
 # each domain, group, and keypair.
 
 
-class ScalingGroupForDomainRow(Base):  # type: ignore[misc]
+class ScalingGroupForDomainRow(Base):
     __tablename__ = "sgroups_for_domains"
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
@@ -165,7 +165,7 @@ class ScalingGroupForDomainRow(Base):  # type: ignore[misc]
 sgroups_for_domains = ScalingGroupForDomainRow.__table__
 
 
-class ScalingGroupForProjectRow(Base):  # type: ignore[misc]
+class ScalingGroupForProjectRow(Base):
     __tablename__ = "sgroups_for_groups"
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
@@ -196,7 +196,7 @@ class ScalingGroupForProjectRow(Base):  # type: ignore[misc]
 sgroups_for_groups = ScalingGroupForProjectRow.__table__
 
 
-class ScalingGroupForKeypairsRow(Base):  # type: ignore[misc]
+class ScalingGroupForKeypairsRow(Base):
     __tablename__ = "sgroups_for_keypairs"
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
@@ -226,7 +226,7 @@ class ScalingGroupForKeypairsRow(Base):  # type: ignore[misc]
 sgroups_for_keypairs = ScalingGroupForKeypairsRow.__table__
 
 
-class ScalingGroupRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class ScalingGroupRow(CreatedAtMixin, Base):
     __tablename__ = "scaling_groups"
     __table_args__ = (
         # Partial unique index: at most one row may have is_default = true.
@@ -383,7 +383,7 @@ class ScalingGroupRow(CreatedAtMixin, Base):  # type: ignore[misc]
         conditions: Iterable[QueryCondition],
         *,
         db: ExtendedAsyncSAEngine,
-    ) -> list[Self]:
+    ) -> list[ScalingGroupRow]:
         stmt = sa.select(ScalingGroupRow)
         for cond in conditions:
             stmt = cond(stmt)
@@ -812,6 +812,6 @@ async def get_scaling_groups(
     if sgroup_ids is not None:
         _stmt = _stmt.where(ScalingGroupRow.id.in_(sgroup_ids))
     async for row in await db_session.stream_scalars(_stmt):
-        permissions = await permission_ctx.calculate_final_permission(row)
+        permissions = await permission_ctx.calculate_final_permission(row.name)
         ret.append(ScalingGroupModel.from_row(row, permissions))
     return ret

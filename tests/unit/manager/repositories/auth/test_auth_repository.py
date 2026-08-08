@@ -63,6 +63,7 @@ from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRo
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
 
 
 @dataclass
@@ -355,6 +356,9 @@ class TestAuthRepository:
                 )
             )
             await db_sess.flush()
+            await VirtualScopeSeeder().enroll_user_in_project(
+                db_sess, group_id, sample_user_data.uuid
+            )
             await db_sess.refresh(group)
 
             group_data = GroupData(

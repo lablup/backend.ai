@@ -9,7 +9,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
-from typing import cast, override
+from typing import Any, cast, override
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -683,7 +683,7 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
 
         repo_call = configure_repository.create_access_token.await_args
         assert repo_call is not None
-        creator = cast(RBACEntityCreator[object], repo_call.args[0])
+        creator = cast(RBACEntityCreator[Any], repo_call.args[0])
         spec = cast(EndpointTokenCreatorSpec, creator.spec)
         assert spec.token == sample_coordinator_jwt
 

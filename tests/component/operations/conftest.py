@@ -23,7 +23,7 @@ from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.agent import agents
-from ai.backend.manager.models.error_logs import error_logs
+from ai.backend.manager.models.error_logs import ErrorLogRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.error_log.repository import ErrorLogRepository
 from ai.backend.manager.repositories.manager_admin.repository import ManagerAdminRepository
@@ -131,5 +131,5 @@ async def _cleanup_side_effects(
     """
     yield
     async with db_engine.begin() as conn:
-        await conn.execute(sa.delete(error_logs))
+        await conn.execute(sa.delete(ErrorLogRow))
         await conn.execute(sa.delete(agents))

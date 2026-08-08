@@ -23,7 +23,7 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.error_logs import ErrorLogRow, error_logs
+from ai.backend.manager.models.error_logs import ErrorLogRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -364,7 +364,7 @@ class TestErrorLogRepository:
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 # TODO: Refactor after adding Condition type
-                lambda: error_logs.c.source == target_source,
+                lambda: ErrorLogRow.source == target_source,
             ],
             orders=[],
         )
@@ -385,7 +385,7 @@ class TestErrorLogRepository:
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 # TODO: Refactor after adding Condition type
-                lambda: error_logs.c.severity == ErrorLogSeverity.CRITICAL.value,
+                lambda: ErrorLogRow.severity == ErrorLogSeverity.CRITICAL.value,
             ],
             orders=[],
         )
@@ -408,7 +408,7 @@ class TestErrorLogRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
-            orders=[error_logs.c.source.asc()],
+            orders=[ErrorLogRow.source.asc()],
         )
 
         result = await error_log_repository.search(querier=querier)
@@ -427,7 +427,7 @@ class TestErrorLogRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
-            orders=[error_logs.c.source.desc()],
+            orders=[ErrorLogRow.source.desc()],
         )
 
         result = await error_log_repository.search(querier=querier)
@@ -506,9 +506,9 @@ class TestErrorLogRepository:
             pagination=OffsetPagination(limit=5, offset=2),
             conditions=[
                 # TODO: Refactor after adding Condition type
-                lambda: error_logs.c.severity == ErrorLogSeverity.ERROR.value,
+                lambda: ErrorLogRow.severity == ErrorLogSeverity.ERROR.value,
             ],
-            orders=[error_logs.c.source.asc()],
+            orders=[ErrorLogRow.source.asc()],
         )
 
         result = await error_log_repository.search(querier=querier)

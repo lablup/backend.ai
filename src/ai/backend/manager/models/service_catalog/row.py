@@ -28,7 +28,7 @@ __all__ = (
 )
 
 
-class ServiceCatalogRow(Base):  # type: ignore[misc]
+class ServiceCatalogRow(Base):
     """A registered service instance in the service catalog.
 
     Tracks service identity, health status, and heartbeat information.
@@ -87,7 +87,7 @@ class ServiceCatalogRow(Base):  # type: ignore[misc]
     )
 
 
-class ServiceCatalogEndpointRow(Base):  # type: ignore[misc]
+class ServiceCatalogEndpointRow(Base):
     """An endpoint exposed by a service instance.
 
     Describes how a specific role/scope of a service can be reached.

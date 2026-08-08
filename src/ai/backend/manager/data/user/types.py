@@ -7,8 +7,6 @@ from datetime import datetime
 from typing import Any, Self, override
 from uuid import UUID
 
-from sqlalchemy.engine import Row
-
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.identifier.domain import DomainID
@@ -116,7 +114,7 @@ class UserData:
         return {RBACElementType.USER: user_permissions, **resource_entity_permissions}
 
     @classmethod
-    def from_row(cls, row: Row[Any]) -> Self:
+    def from_row(cls, row: Any) -> Self:
         """
         Deprecated: Use `UserRow.to_data()` method instead.
         """

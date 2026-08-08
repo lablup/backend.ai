@@ -65,7 +65,7 @@ __all__: Sequence[str] = (
 )
 
 
-class AgentRow(Base):  # type: ignore[misc]
+class AgentRow(Base):
     __tablename__ = "agents"
 
     uuid: Mapped[AgentUUID] = mapped_column(

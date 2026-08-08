@@ -135,7 +135,7 @@ def _get_main_keypair_join_condition() -> Any:
     return KeyPairRow.access_key == foreign(UserRow.main_access_key)
 
 
-class UserRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class UserRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "users"
 
     uuid: Mapped[uuid_mod.UUID] = mapped_column(

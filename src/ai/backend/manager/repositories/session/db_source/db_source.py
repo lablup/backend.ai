@@ -53,7 +53,7 @@ from ai.backend.manager.models.session import (
     SessionRow,
     batch_populate_session_occupied_slots,
 )
-from ai.backend.manager.models.session_template import session_templates
+from ai.backend.manager.models.session_template import SessionTemplateRow
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
@@ -184,10 +184,10 @@ class SessionDBSource:
     ) -> dict[str, Any] | None:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select(session_templates.c.template)
-                .select_from(session_templates)
+                sa.select(SessionTemplateRow.template)
+                .select_from(SessionTemplateRow)
                 .where(
-                    (session_templates.c.id == template_id) & session_templates.c.is_active,
+                    (SessionTemplateRow.id == template_id) & SessionTemplateRow.is_active,
                 )
             )
             return await conn.scalar(query)
@@ -198,10 +198,10 @@ class SessionDBSource:
     ) -> dict[str, Any] | None:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select(session_templates)
-                .select_from(session_templates)
+                sa.select(SessionTemplateRow.__table__)
+                .select_from(SessionTemplateRow)
                 .where(
-                    (session_templates.c.id == template_id) & session_templates.c.is_active,
+                    (SessionTemplateRow.id == template_id) & SessionTemplateRow.is_active,
                 )
             )
             result = await conn.execute(query)

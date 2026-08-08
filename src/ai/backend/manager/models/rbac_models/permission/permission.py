@@ -22,7 +22,7 @@ from ai.backend.manager.models.base import (
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
 
-class PermissionRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class PermissionRow(CreatedAtMixin, Base):
     __tablename__ = "permissions"
     __table_args__ = (
         sa.Index("ix_permissions_role_scope", "role_id", "scope_type", "scope_id"),

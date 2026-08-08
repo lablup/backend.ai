@@ -22,14 +22,14 @@ branch_labels = None
 depends_on = None
 
 
-def get_container_registry_row_schema() -> type[Base]:
+def get_container_registry_row_schema() -> type[Any]:
     class ContainerRegistryType(enum.StrEnum):
         DOCKER = "docker"
         HARBOR = "harbor"
         HARBOR2 = "harbor2"
         LOCAL = "local"
 
-    class ContainerRegistryRow(Base):  # type: ignore[misc]
+    class ContainerRegistryRow(Base):
         __tablename__ = "container_registries"
         __table_args__ = {"extend_existing": True}
         id = IDColumn()
@@ -52,13 +52,13 @@ def get_container_registry_row_schema() -> type[Base]:
     return ContainerRegistryRow
 
 
-def get_image_row_schema() -> type[Base]:
+def get_image_row_schema() -> type[Any]:
     class ImageType(enum.Enum):
         COMPUTE = "compute"
         SYSTEM = "system"
         SERVICE = "service"
 
-    class ImageRow(Base):  # type: ignore[misc]
+    class ImageRow(Base):
         __tablename__ = "images"
         __table_args__ = {"extend_existing": True}
         id = IDColumn("id")
@@ -72,7 +72,9 @@ def get_image_row_schema() -> type[Base]:
             index=True,
         )
         tag = sa.Column("tag", sa.TEXT)
-        registry = sa.Column("registry", sa.String, nullable=False, index=True)
+        registry = sa.Column(  # type: ignore[assignment]  # shadows DeclarativeBase.registry
+            "registry", sa.String, nullable=False, index=True
+        )
         registry_id = sa.Column("registry_id", GUID, nullable=False, index=True)
         architecture = sa.Column(
             "architecture", sa.String, nullable=False, index=True, default="x86_64"

@@ -39,7 +39,7 @@ def _get_association_vfs_storage_join_cond() -> sa.sql.elements.ColumnElement[An
     return VFSStorageRow.id == foreign(AssociationArtifactsStorageRow.storage_namespace_id)
 
 
-class AssociationArtifactsStorageRow(Base):  # type: ignore[misc]
+class AssociationArtifactsStorageRow(Base):
     """
     Association table for linking artifacts to storage namespace.
     """

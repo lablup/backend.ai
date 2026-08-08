@@ -11,7 +11,7 @@ from ai.backend.manager.models.base import GUID, Base
 __all__ = ("AuditLogScopeRow",)
 
 
-class AuditLogScopeRow(Base):  # type: ignore[misc]
+class AuditLogScopeRow(Base):
     """A scope the audited entity belongs to.
 
     An entity can sit in several scopes at once, so scopes live here rather than as
