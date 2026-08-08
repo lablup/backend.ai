@@ -21,7 +21,7 @@ from typing import (
 from aiohttp import web
 from aiohttp.web_urldispatcher import UrlMappingMatchInfo
 from multidict import CIMultiDictProxy, MultiMapping
-from pydantic import AliasChoices, ConfigDict, RootModel
+from pydantic import AliasChoices, ConfigDict, RootModel, model_validator
 from pydantic.fields import FieldInfo
 from pydantic_core._pydantic_core import ValidationError
 
@@ -54,6 +54,25 @@ class BaseRequestModel(BackendAISchema):
         arbitrary_types_allowed=True,
         validate_by_name=True,
     )
+
+    @model_validator(mode="after")
+    def _forget_sentinel_fields(self) -> Self:
+        """Treat a field assigned ``SENTINEL`` as one the caller never mentioned.
+
+        A three-state field spells "no change" as ``SENTINEL`` and "clear this" as
+        ``None``, but only pydantic's own notion of unset — a field missing from
+        ``model_fields_set`` — serializes as an absent key. Assigning ``SENTINEL``
+        marks the field set, and ``mode="json"`` then renders it as its ``enum.auto()``
+        value, which an int-typed field re-parses as a value.
+
+        Discarding it makes the two spellings of "not mentioned" equivalent, so
+        ``exclude_unset`` alone puts the right body on the wire. The attribute keeps its
+        ``SENTINEL`` value, so ``x is SENTINEL`` still reads true.
+        """
+        for name in type(self).model_fields:
+            if getattr(self, name, None) is SENTINEL:
+                self.__pydantic_fields_set__.discard(name)
+        return self
 
 
 class BaseFieldModel(BackendAISchema):

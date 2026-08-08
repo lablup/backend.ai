@@ -106,6 +106,7 @@ def update(
     category_id: UUID | None,
 ) -> None:
     """Update a prometheus query definition (superadmin only)."""
+    from ai.backend.common.api_handlers import SENTINEL
     from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
         ModifyQueryDefinitionInput,
     )
@@ -119,10 +120,12 @@ def update(
                     name=name,
                     metric_name=metric_name,
                     query_template=query_template,
-                    time_window=time_window,
-                    description=description,
                     rank=rank,
-                    category_id=category_id,
+                    # These three are nullable-clearable: SENTINEL keeps the stored
+                    # value, whereas a null would clear it.
+                    time_window=time_window if time_window is not None else SENTINEL,
+                    description=description if description is not None else SENTINEL,
+                    category_id=category_id if category_id is not None else SENTINEL,
                 ),
             )
             print_result(result)
