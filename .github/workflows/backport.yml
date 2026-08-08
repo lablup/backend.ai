@@ -76,6 +76,7 @@ jobs:
         with:
           ref: ${{ matrix.target_branch }}
       - name: Cherry-pick
+        id: pick
         env:
           COMMIT_AUTHOR: ${{ matrix.author }}
           COMMIT_AUTHOR_EMAIL: ${{ matrix.author_email }}
@@ -84,17 +85,25 @@ jobs:
           git config user.name "$COMMIT_AUTHOR"
           git config user.email "$COMMIT_AUTHOR_EMAIL"
           git fetch origin main "$TARGET_COMMIT"
-          # Deliberately without `-X theirs`: a conflict must surface as a
-          # failure rather than be resolved by overwriting the release branch.
-          git cherry-pick "$TARGET_COMMIT"
-      - name: Report the conflict
-        if: failure()
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ matrix.pr_number }}
-          TARGET_BRANCH: ${{ matrix.target_branch }}
-        run: |
-          gh pr comment "$PR_NUMBER" -b "The backport to \`$TARGET_BRANCH\` did not apply cleanly and has to be done by hand."
+          # Generated API docs: keep the release branch's copy (update-api-schema
+          # regenerates them on the backport PR).
+          git config merge.ours.driver true
+          printf '%s\n' \
+            "docs/manager/rest-reference/openapi.json merge=ours" \
+            "docs/manager/graphql-reference/*.graphql merge=ours" \
+            >> .git/info/attributes
+          if ! git cherry-pick "$TARGET_COMMIT"; then
+            # Source conflict: commit the markers as-is so the pull request is
+            # still created (without auto-merge) -- CI fails on it until a
+            # human resolves the markers on its branch.
+            {
+              echo "conflict_files<<EOF"
+              git diff --name-only --diff-filter=U
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            git add -A
+            GIT_EDITOR=true git cherry-pick --continue
+          fi
       - name: Create the backport pull request
         id: pr
         uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676  # v7
@@ -112,7 +121,22 @@ jobs:
             ${{ matrix.labels }}
           assignees: ${{ matrix.author_login }}
       - name: Enable auto-merge
-        if: ${{ steps.pr.outputs.pull-request-number }}
+        if: ${{ steps.pr.outputs.pull-request-number && steps.pick.outputs.conflict_files == '' }}
         env:
           GH_TOKEN: ${{ secrets.OCTODOG }}
         run: gh pr merge "${{ steps.pr.outputs.pull-request-number }}" --auto --squash
+      - name: Report the conflict
+        if: ${{ failure() || steps.pick.outputs.conflict_files != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ matrix.pr_number }}
+          TARGET_BRANCH: ${{ matrix.target_branch }}
+          CONFLICT_FILES: ${{ steps.pick.outputs.conflict_files }}
+          BACKPORT_PR_URL: ${{ steps.pr.outputs.pull-request-url }}
+        run: |
+          if [ -n "$BACKPORT_PR_URL" ] && [ -n "$CONFLICT_FILES" ]; then
+            body=$(printf 'The backport to `%s` hit conflicts: %s was created with the conflict markers committed in:\n\n```\n%s\n```\n\nCI on it fails until the markers are resolved; check out its branch, fix, push, and merge it by hand (auto-merge is not enabled for conflicted backports).' "$TARGET_BRANCH" "$BACKPORT_PR_URL" "$CONFLICT_FILES")
+          else
+            body="The backport to \`$TARGET_BRANCH\` did not apply cleanly and has to be done by hand."
+          fi
+          gh pr comment "$PR_NUMBER" -b "$body"
