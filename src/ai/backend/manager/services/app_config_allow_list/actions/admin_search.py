@@ -27,5 +27,10 @@ class AdminSearchAppConfigAllowListAction(
         return APP_CONFIG_ALLOW_LIST_ENTITY_TYPE
 
     @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "admin_search_app_config_allow_lists"
+
+    @override
     def to_searcher(self) -> AppConfigAllowListSearcher:
         return self.searcher

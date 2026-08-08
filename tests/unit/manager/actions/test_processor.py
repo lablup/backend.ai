@@ -267,6 +267,7 @@ class TestAuditLogMonitorActorIdentities:
         spec = self._recorded_spec(mock_audit_log_repository)
         assert spec.triggered_by == str(user.user_id)
         assert spec.acted_as == user.user_id
+        assert spec.action_name == "session:create"
 
     async def test_impersonation_records_both_identities(
         self,

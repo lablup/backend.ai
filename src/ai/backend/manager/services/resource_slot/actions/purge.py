@@ -23,5 +23,10 @@ class PurgeResourceSlotTypeAction(PurgeGlobalOpsAction[ResourceSlotTypeRow, Reso
         return RESOURCE_SLOT_TYPE_ENTITY_TYPE
 
     @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "purge_resource_slot_type"
+
+    @override
     def to_purger(self) -> ResourceSlotTypePurger:
         return self.purger

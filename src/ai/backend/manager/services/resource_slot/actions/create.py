@@ -25,5 +25,10 @@ class CreateResourceSlotTypeAction(
         return RESOURCE_SLOT_TYPE_ENTITY_TYPE
 
     @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "create_resource_slot_type"
+
+    @override
     def to_creator(self) -> ResourceSlotTypeCreator:
         return self.creator

@@ -29,5 +29,10 @@ class UpdateResourceSlotTypeAction(
         return RESOURCE_SLOT_TYPE_ENTITY_TYPE
 
     @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "update_resource_slot_type"
+
+    @override
     def to_updater(self) -> ResourceSlotTypeUpdater:
         return self.updater

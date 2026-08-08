@@ -5,11 +5,17 @@ recursing ``__subclasses__()`` from the five v2 action bases finds every concret
 v2 action class defined. The two sets matching is what catches an action that was
 defined but never wired. A new v2 wiring extends this guard by being imported and
 constructed here.
+
+The same sweep also holds every action to the audit identity contract: the
+``(entity_type, operation, action_name)`` triple must be unique and the name must
+be a lowercase snake_case phrase, so recorded rows stay distinguishable and
+filterable.
 """
 
 from __future__ import annotations
 
 import inspect
+import re
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -34,6 +40,8 @@ _V2_ACTION_BASES: tuple[type[Any], ...] = (
     BaseGlobalAction,
     BaseLookupAction,
 )
+
+_SNAKE_CASE = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)*$")
 
 
 def _concrete_v2_action_classes() -> set[type[Any]]:
@@ -79,3 +87,28 @@ def test_every_defined_v2_action_is_wired() -> None:
     defined = sorted(cls.spec().type() for cls in _concrete_v2_action_classes())
 
     assert wired == defined
+
+
+def test_action_names_follow_the_snake_case_convention() -> None:
+    for cls in _concrete_v2_action_classes():
+        name = cls.action_name()
+        assert _SNAKE_CASE.fullmatch(name), (
+            f"{cls.__module__}.{cls.__qualname__} declares action_name()={name!r}, "
+            "which is not a lowercase snake_case phrase."
+        )
+
+
+def test_identity_triple_is_unique_across_v2_actions() -> None:
+    """Audit rows identify the run by (entity_type, operation, action_name).
+
+    Two actions sharing all three would be indistinguishable once recorded — the
+    ambiguity ``action_name`` exists to prevent.
+    """
+    seen: dict[tuple[str, str, str], type[Any]] = {}
+    for cls in _concrete_v2_action_classes():
+        triple = (str(cls.entity_type()), str(cls.operation_type()), cls.action_name())
+        holder = seen.setdefault(triple, cls)
+        assert holder is cls, (
+            f"{cls.__module__}.{cls.__qualname__} and {holder.__module__}.{holder.__qualname__} "
+            f"both record as {triple}; declare a distinct action_name() on one of them."
+        )

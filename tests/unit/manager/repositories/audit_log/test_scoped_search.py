@@ -69,6 +69,7 @@ async def _seed(
             action_id=uuid.uuid4(),
             entity_type=entity_type,
             operation=operation,
+            action_name=f"{operation}_{entity_type}",
             created_at=datetime.now(UTC),
             description=f"{entity_type} {operation}",
             status=OperationStatus.SUCCESS,
