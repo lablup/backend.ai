@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Any, override
+from typing import Any
 
 from aiohttp_sse import EventSourceResponse
 
@@ -7,7 +7,6 @@ from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.events.hub.propagators.session import SessionEventPropagator
 from ai.backend.manager.services.events.actions.resolve_group_for_events import (
     ResolveGroupForEventsAction,
@@ -20,7 +19,7 @@ from ai.backend.manager.services.events.actions.resolve_session_for_events impor
 from ai.backend.manager.services.events.service import EventsService
 
 
-class EventsProcessors(AbstractProcessorPackage):
+class EventsProcessors:
     _service: EventsService
     event_hub: EventHub
     event_fetcher: EventFetcher
@@ -50,10 +49,3 @@ class EventsProcessors(AbstractProcessorPackage):
         filters: Mapping[str, Any],
     ) -> SessionEventPropagator:
         return self._service.create_session_propagator(response, filters)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            ResolveSessionForEventsAction.spec(),
-            ResolveGroupForEventsAction.spec(),
-        ]

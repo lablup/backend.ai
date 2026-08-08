@@ -29,7 +29,9 @@ grows a branch; the generic services take no hook or callback to hide one in.
 ## Processor rules
 
 - Wrap every service method in an `ActionProcessor`. Do NOT expose raw service methods to handlers.
-- It MUST inherit from `AbstractProcessorPackage` and override `supported_actions()`.
+- v2 processors MUST be built through the `ProcessorGroup` factories, passing the action
+  class as the first argument — the registry accumulates the wired specs
+  (`ProcessorRegistry.wired_specs()`), so no hand-written action list exists.
 
 ## What belongs here
 

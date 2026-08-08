@@ -1,8 +1,5 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.runtime_variant_preset.actions.create import (
     CreateRuntimeVariantPresetAction,
@@ -23,7 +20,7 @@ from ai.backend.manager.services.runtime_variant_preset.actions.update import (
 from ai.backend.manager.services.runtime_variant_preset.service import RuntimeVariantPresetService
 
 
-class RuntimeVariantPresetProcessors(AbstractProcessorPackage):
+class RuntimeVariantPresetProcessors:
     create: ActionProcessor[
         CreateRuntimeVariantPresetAction, CreateRuntimeVariantPresetActionResult
     ]
@@ -47,12 +44,3 @@ class RuntimeVariantPresetProcessors(AbstractProcessorPackage):
         self.update = ActionProcessor(service.update, action_monitors)
         self.delete = ActionProcessor(service.delete, action_monitors)
         self.search = ActionProcessor(service.search, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateRuntimeVariantPresetAction.spec(),
-            UpdateRuntimeVariantPresetAction.spec(),
-            DeleteRuntimeVariantPresetAction.spec(),
-            SearchRuntimeVariantPresetsAction.spec(),
-        ]

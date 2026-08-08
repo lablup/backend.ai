@@ -1,9 +1,6 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.artifact.actions.delegate_scan import (
     DelegateScanArtifactsAction,
@@ -57,7 +54,7 @@ from ai.backend.manager.services.artifact.actions.upsert_multi import (
 from .service import ArtifactService
 
 
-class ArtifactProcessors(AbstractProcessorPackage):
+class ArtifactProcessors:
     scan: ActionProcessor[ScanArtifactsAction, ScanArtifactsActionResult]
     get: SingleEntityActionProcessor[GetArtifactAction, GetArtifactActionResult]
     search_artifacts: ActionProcessor[SearchArtifactsAction, SearchArtifactsActionResult]
@@ -103,20 +100,3 @@ class ArtifactProcessors(AbstractProcessorPackage):
         self.delete_artifacts = ActionProcessor(service.delete_artifacts, action_monitors)
         self.restore_artifacts = ActionProcessor(service.restore_artifacts, action_monitors)
         self.delegate_scan = ActionProcessor(service.delegate_scan_artifacts, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            ScanArtifactsAction.spec(),
-            DelegateScanArtifactsAction.spec(),
-            GetArtifactAction.spec(),
-            SearchArtifactsAction.spec(),
-            SearchArtifactsWithRevisionsAction.spec(),
-            GetArtifactRevisionsAction.spec(),
-            UpdateArtifactAction.spec(),
-            UpsertArtifactsAction.spec(),
-            RetrieveModelAction.spec(),
-            RetrieveModelsAction.spec(),
-            DeleteArtifactsAction.spec(),
-            RestoreArtifactsAction.spec(),
-        ]

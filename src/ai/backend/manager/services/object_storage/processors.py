@@ -1,8 +1,5 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.object_storage.actions.create import (
     CreateObjectStorageAction,
@@ -39,7 +36,7 @@ from ai.backend.manager.services.object_storage.actions.update import (
 from ai.backend.manager.services.object_storage.service import ObjectStorageService
 
 
-class ObjectStorageProcessors(AbstractProcessorPackage):
+class ObjectStorageProcessors:
     create: ActionProcessor[CreateObjectStorageAction, CreateObjectStorageActionResult]
     update: ActionProcessor[UpdateObjectStorageAction, UpdateObjectStorageActionResult]
     delete: ActionProcessor[DeleteObjectStorageAction, DeleteObjectStorageActionResult]
@@ -73,16 +70,3 @@ class ObjectStorageProcessors(AbstractProcessorPackage):
             service.get_presigned_upload_url, action_monitors
         )
         self.search_object_storages = ActionProcessor(service.search, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateObjectStorageAction.spec(),
-            UpdateObjectStorageAction.spec(),
-            DeleteObjectStorageAction.spec(),
-            GetObjectStorageAction.spec(),
-            ListObjectStorageAction.spec(),
-            GetDownloadPresignedURLAction.spec(),
-            GetUploadPresignedURLAction.spec(),
-            SearchObjectStoragesAction.spec(),
-        ]

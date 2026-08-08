@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions import (
@@ -38,7 +35,7 @@ from .service import ExportService
 __all__ = ("ExportProcessors",)
 
 
-class ExportProcessors(AbstractProcessorPackage):
+class ExportProcessors:
     """Processor package for export operations.
 
     Provides processors for:
@@ -92,19 +89,3 @@ class ExportProcessors(AbstractProcessorPackage):
         self.export_my_keypairs_csv = ActionProcessor(
             service.export_my_keypairs_csv, action_monitors
         )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            ListReportsAction.spec(),
-            GetReportAction.spec(),
-            ExportUsersCSVAction.spec(),
-            ExportSessionsCSVAction.spec(),
-            ExportProjectsCSVAction.spec(),
-            ExportKeypairsCSVAction.spec(),
-            ExportAuditLogsCSVAction.spec(),
-            ExportSessionsByProjectCSVAction.spec(),
-            ExportUsersByDomainCSVAction.spec(),
-            ExportMySessionsCSVAction.spec(),
-            ExportMyKeypairsCSVAction.spec(),
-        ]

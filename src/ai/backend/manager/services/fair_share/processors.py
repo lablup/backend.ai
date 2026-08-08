@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions import (
@@ -46,7 +43,7 @@ from .service import FairShareService
 __all__ = ("FairShareProcessors",)
 
 
-class FairShareProcessors(AbstractProcessorPackage):
+class FairShareProcessors:
     """Processor package for fair share operations."""
 
     # Domain Fair Share
@@ -156,28 +153,3 @@ class FairShareProcessors(AbstractProcessorPackage):
         self.bulk_upsert_user_fair_share_weight = ActionProcessor(
             service.bulk_upsert_user_fair_share_weight, action_monitors
         )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            # Domain
-            GetDomainFairShareAction.spec(),
-            SearchDomainFairSharesAction.spec(),
-            SearchRGDomainFairSharesAction.spec(),
-            # Project
-            GetProjectFairShareAction.spec(),
-            SearchProjectFairSharesAction.spec(),
-            SearchRGProjectFairSharesAction.spec(),
-            # User
-            GetUserFairShareAction.spec(),
-            SearchUserFairSharesAction.spec(),
-            SearchRGUserFairSharesAction.spec(),
-            # Upsert Weight
-            UpsertDomainFairShareWeightAction.spec(),
-            UpsertProjectFairShareWeightAction.spec(),
-            UpsertUserFairShareWeightAction.spec(),
-            # Bulk Upsert Weight
-            BulkUpsertDomainFairShareWeightAction.spec(),
-            BulkUpsertProjectFairShareWeightAction.spec(),
-            BulkUpsertUserFairShareWeightAction.spec(),
-        ]

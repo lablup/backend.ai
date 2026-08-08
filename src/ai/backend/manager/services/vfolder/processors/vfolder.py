@@ -1,10 +1,7 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
@@ -117,7 +114,7 @@ from ai.backend.manager.services.vfolder.actions.vfolder_v2 import (
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 
 
-class VFolderProcessors(AbstractProcessorPackage):
+class VFolderProcessors:
     create_vfolder: ScopeActionProcessor[CreateVFolderAction, CreateVFolderActionResult]
     get_vfolder: SingleEntityActionProcessor[GetVFolderAction, GetVFolderActionResult]
     list_vfolder: ScopeActionProcessor[ListVFolderAction, ListVFolderActionResult]
@@ -302,47 +299,3 @@ class VFolderProcessors(AbstractProcessorPackage):
             action_monitors,
             validators=scope_rbac_validators,
         )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateVFolderAction.spec(),
-            GetVFolderAction.spec(),
-            ListVFolderAction.spec(),
-            SearchVFoldersInProjectAction.spec(),
-            SearchUserVFoldersAction.spec(),
-            UpdateVFolderAttributeAction.spec(),
-            MoveToTrashVFolderAction.spec(),
-            RestoreVFolderFromTrashAction.spec(),
-            DeleteForeverVFolderAction.spec(),
-            PurgeVFolderAction.spec(),
-            ForceDeleteVFolderAction.spec(),
-            CloneVFolderAction.spec(),
-            GetTaskLogsAction.spec(),
-            ListAllowedTypesAction.spec(),
-            ListAllHostsAction.spec(),
-            GetVolumePerfMetricAction.spec(),
-            GetVFolderUsageLegacyAction.spec(),
-            GetVFolderUsedBytesAction.spec(),
-            ListHostsAction.spec(),
-            GetMyStorageHostPermissionsAction.spec(),
-            GetQuotaAction.spec(),
-            UpdateQuotaAction.spec(),
-            ChangeVFolderOwnershipAction.spec(),
-            ListMountsAction.spec(),
-            MountHostAction.spec(),
-            UmountHostAction.spec(),
-            GetFstabContentsAction.spec(),
-            GetAccessibleVFolderAction.spec(),
-            GetVFolderLegacyRowAction.spec(),
-            BatchLoadVFoldersByIdsAction.spec(),
-            ResolveIdsByNamesAction.spec(),
-            CreateVFolderV2Action.spec(),
-            CreateUploadSessionV2Action.spec(),
-            GetVFolderV2Action.spec(),
-            GetVFolderUsageAction.spec(),
-            DeleteVFolderV2Action.spec(),
-            PurgeVFolderV2Action.spec(),
-            CloneVFolderV2Action.spec(),
-            CreateVFolderInProjectAction.spec(),
-        ]

@@ -1,17 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, override
-
 from ai.backend.manager.actions.registry import ProcessorRegistry
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
-from ai.backend.manager.actions.v2.ops.base import (
-    CreateGlobalOpsAction,
-    GetSingleEntityOpsAction,
-    PurgeSingleEntityOpsAction,
-    SearchGlobalOpsAction,
-    UpdateSingleEntityOpsAction,
-)
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     CreatedEntityOpsResult,
@@ -36,44 +26,34 @@ from ai.backend.manager.services.app_config_allow_list.actions.update import (
 )
 
 
-class AppConfigAllowListProcessors(AbstractProcessorPackage):
+class AppConfigAllowListProcessors:
     """Every operation runs straight against ops, so this domain has no service."""
 
     create: GlobalActionProcessor[
-        CreateGlobalOpsAction[Any, AppConfigAllowListData],
+        CreateAppConfigAllowListAction,
         CreatedEntityOpsResult[AppConfigAllowListData],
     ]
     get: SingleEntityActionProcessor[
-        GetSingleEntityOpsAction[Any, AppConfigAllowListData],
+        GetAppConfigAllowListAction,
         EntityOpsResult[AppConfigAllowListData],
     ]
     update: SingleEntityActionProcessor[
-        UpdateSingleEntityOpsAction[Any, AppConfigAllowListData],
+        UpdateAppConfigAllowListAction,
         EntityOpsResult[AppConfigAllowListData],
     ]
     purge: SingleEntityActionProcessor[
-        PurgeSingleEntityOpsAction[Any, AppConfigAllowListData],
+        PurgeAppConfigAllowListAction,
         EntityOpsResult[AppConfigAllowListData],
     ]
     admin_search: GlobalActionProcessor[
-        SearchGlobalOpsAction[Any, AppConfigAllowListData],
+        AdminSearchAppConfigAllowListAction,
         BatchOpsResult[AppConfigAllowListData],
     ]
 
     def __init__(self, registry: ProcessorRegistry[AppConfigAllowListData]) -> None:
         p = registry.group()
-        self.create = p.global_create_ops()
-        self.get = p.single_get_ops()
-        self.update = p.single_update_ops()
-        self.purge = p.single_purge_ops()
-        self.admin_search = p.global_search_ops()
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateAppConfigAllowListAction.spec(),
-            GetAppConfigAllowListAction.spec(),
-            AdminSearchAppConfigAllowListAction.spec(),
-            UpdateAppConfigAllowListAction.spec(),
-            PurgeAppConfigAllowListAction.spec(),
-        ]
+        self.create = p.global_create_ops(CreateAppConfigAllowListAction)
+        self.get = p.single_get_ops(GetAppConfigAllowListAction)
+        self.update = p.single_update_ops(UpdateAppConfigAllowListAction)
+        self.purge = p.single_purge_ops(PurgeAppConfigAllowListAction)
+        self.admin_search = p.global_search_ops(AdminSearchAppConfigAllowListAction)

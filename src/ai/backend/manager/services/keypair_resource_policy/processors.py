@@ -1,8 +1,5 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
     CreateKeyPairResourcePolicyAction,
@@ -33,7 +30,7 @@ from ai.backend.manager.services.keypair_resource_policy.service import (
 )
 
 
-class KeypairResourcePolicyProcessors(AbstractProcessorPackage):
+class KeypairResourcePolicyProcessors:
     get_keypair_resource_policy: ActionProcessor[
         GetKeypairResourcePolicyAction, GetKeypairResourcePolicyActionResult
     ]
@@ -77,14 +74,3 @@ class KeypairResourcePolicyProcessors(AbstractProcessorPackage):
         self.delete_keypair_resource_policy = ActionProcessor(
             service.delete_keypair_resource_policy, action_monitors
         )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            GetKeypairResourcePolicyAction.spec(),
-            GetMyKeypairResourcePolicyAction.spec(),
-            SearchKeypairResourcePoliciesAction.spec(),
-            CreateKeyPairResourcePolicyAction.spec(),
-            ModifyKeyPairResourcePolicyAction.spec(),
-            DeleteKeyPairResourcePolicyAction.spec(),
-        ]

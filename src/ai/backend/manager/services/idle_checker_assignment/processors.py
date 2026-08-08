@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.bulk import BulkActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.idle_checker_assignment.actions.admin_search import (
     AdminSearchIdleCheckerAssignmentsAction,
@@ -31,7 +28,7 @@ from ai.backend.manager.services.idle_checker_assignment.actions.update import (
 from ai.backend.manager.services.idle_checker_assignment.service import IdleCheckerAssignmentService
 
 
-class IdleCheckerAssignmentProcessors(AbstractProcessorPackage):
+class IdleCheckerAssignmentProcessors:
     create: ActionProcessor[
         CreateIdleCheckerAssignmentAction, CreateIdleCheckerAssignmentActionResult
     ]
@@ -69,13 +66,3 @@ class IdleCheckerAssignmentProcessors(AbstractProcessorPackage):
             monitors=action_monitors,
             validators=[validators.rbac.bulk],
         )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateIdleCheckerAssignmentAction.spec(),
-            UpdateIdleCheckerAssignmentAction.spec(),
-            PurgeIdleCheckerAssignmentAction.spec(),
-            AdminSearchIdleCheckerAssignmentsAction.spec(),
-            ScopedSearchIdleCheckerAssignmentsAction.spec(),
-        ]

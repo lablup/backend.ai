@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions.create_cluster_template import (
@@ -52,7 +49,7 @@ from .service import TemplateService
 __all__ = ("TemplateProcessors",)
 
 
-class TemplateProcessors(AbstractProcessorPackage):
+class TemplateProcessors:
     """Processor package for session and cluster template operations."""
 
     create_task: ActionProcessor[CreateTaskTemplateAction, CreateTaskTemplateActionResult]
@@ -84,18 +81,3 @@ class TemplateProcessors(AbstractProcessorPackage):
         self.get_cluster = ActionProcessor(service.get_cluster_template, action_monitors)
         self.update_cluster = ActionProcessor(service.update_cluster_template, action_monitors)
         self.delete_cluster = ActionProcessor(service.delete_cluster_template, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateTaskTemplateAction.spec(),
-            ListTaskTemplatesAction.spec(),
-            GetTaskTemplateAction.spec(),
-            UpdateTaskTemplateAction.spec(),
-            DeleteTaskTemplateAction.spec(),
-            CreateClusterTemplateAction.spec(),
-            ListClusterTemplatesAction.spec(),
-            GetClusterTemplateAction.spec(),
-            UpdateClusterTemplateAction.spec(),
-            DeleteClusterTemplateAction.spec(),
-        ]

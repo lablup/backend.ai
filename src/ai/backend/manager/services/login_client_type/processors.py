@@ -1,8 +1,5 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.services.login_client_type.actions.create import (
     CreateLoginClientTypeAction,
     CreateLoginClientTypeActionResult,
@@ -29,7 +26,7 @@ from ai.backend.manager.services.login_client_type.admin_service import (
 from ai.backend.manager.services.login_client_type.service import LoginClientTypeService
 
 
-class LoginClientTypeProcessors(AbstractProcessorPackage):
+class LoginClientTypeProcessors:
     get: ActionProcessor[GetLoginClientTypeAction, GetLoginClientTypeActionResult]
     search: ActionProcessor[SearchLoginClientTypesAction, SearchLoginClientTypesActionResult]
 
@@ -41,15 +38,8 @@ class LoginClientTypeProcessors(AbstractProcessorPackage):
         self.get = ActionProcessor(service.get, action_monitors)
         self.search = ActionProcessor(service.search, action_monitors)
 
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            GetLoginClientTypeAction.spec(),
-            SearchLoginClientTypesAction.spec(),
-        ]
 
-
-class LoginClientTypeAdminProcessors(AbstractProcessorPackage):
+class LoginClientTypeAdminProcessors:
     create: ActionProcessor[CreateLoginClientTypeAction, CreateLoginClientTypeActionResult]
     update: ActionProcessor[UpdateLoginClientTypeAction, UpdateLoginClientTypeActionResult]
     delete: ActionProcessor[DeleteLoginClientTypeAction, DeleteLoginClientTypeActionResult]
@@ -62,11 +52,3 @@ class LoginClientTypeAdminProcessors(AbstractProcessorPackage):
         self.create = ActionProcessor(service.create, action_monitors)
         self.update = ActionProcessor(service.update, action_monitors)
         self.delete = ActionProcessor(service.delete, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateLoginClientTypeAction.spec(),
-            UpdateLoginClientTypeAction.spec(),
-            DeleteLoginClientTypeAction.spec(),
-        ]

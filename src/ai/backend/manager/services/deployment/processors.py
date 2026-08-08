@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast, override
+from typing import TYPE_CHECKING, cast
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validator.base import ActionValidator
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.deployment.actions.access_token.bulk_delete_access_tokens import (
@@ -149,7 +148,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.deployment.service import DeploymentService
 
 
-class DeploymentProcessors(AbstractProcessorPackage):
+class DeploymentProcessors:
     """Processors for deployment operations."""
 
     # Deployment CRUD
@@ -337,49 +336,3 @@ class DeploymentProcessors(AbstractProcessorPackage):
             service.bulk_delete_access_tokens, action_monitors
         )
         self.search_access_tokens = ActionProcessor(service.search_access_tokens, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            # Deployment CRUD
-            CreateDeploymentAction.spec(),
-            CreateLegacyDeploymentAction.spec(),
-            UpdateDeploymentAction.spec(),
-            ReplaceDeploymentOptionsAction.spec(),
-            DestroyDeploymentAction.spec(),
-            SearchDeploymentsAction.spec(),
-            SearchLegacyDeploymentsAction.spec(),
-            SearchDeploymentsInProjectAction.spec(),
-            GetDeploymentByIdAction.spec(),
-            GetLegacyDeploymentByIdAction.spec(),
-            GetDeploymentPolicyAction.spec(),
-            SearchDeploymentPoliciesAction.spec(),
-            UpsertDeploymentPolicyAction.spec(),
-            # Revision operations
-            AddModelRevisionAction.spec(),
-            GetRevisionByIdAction.spec(),
-            SearchRevisionsAction.spec(),
-            SearchRevisionResourceSlotsAction.spec(),
-            ActivateRevisionAction.spec(),
-            RefreshDeploymentRevisionsAction.spec(),
-            # Route operations
-            SyncReplicaAction.spec(),
-            SearchRoutesAction.spec(),
-            UpdateRouteTrafficStatusAction.spec(),
-            # Replica operations
-            GetReplicaByIdAction.spec(),
-            SearchReplicasAction.spec(),
-            # Auto-scaling rules
-            CreateAutoScalingRuleAction.spec(),
-            GetAutoScalingRuleAction.spec(),
-            UpdateAutoScalingRuleAction.spec(),
-            DeleteAutoScalingRuleAction.spec(),
-            BulkDeleteAutoScalingRulesAction.spec(),
-            SearchAutoScalingRulesAction.spec(),
-            # Access token
-            CreateAccessTokenAction.spec(),
-            GetAccessTokenAction.spec(),
-            DeleteAccessTokenAction.spec(),
-            BulkDeleteAccessTokensAction.spec(),
-            SearchAccessTokensAction.spec(),
-        ]

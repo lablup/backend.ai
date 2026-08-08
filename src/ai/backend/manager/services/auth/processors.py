@@ -1,10 +1,7 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.auth.actions.authorize import (
     AuthorizeAction,
@@ -72,7 +69,7 @@ from ai.backend.manager.services.auth.actions.upload_ssh_keypair import (
 from ai.backend.manager.services.auth.service import AuthService
 
 
-class AuthProcessors(AbstractProcessorPackage):
+class AuthProcessors:
     logout: ActionProcessor[LogoutAction, LogoutActionResult]
     signout: ActionProcessor[SignoutAction, SignoutActionResult]
     update_full_name: ActionProcessor[UpdateFullNameAction, UpdateFullNameActionResult]
@@ -160,29 +157,3 @@ class AuthProcessors(AbstractProcessorPackage):
             service.my_revoke_login_session, action_monitors
         )
         self.admin_unblock_user = ActionProcessor(service.admin_unblock_user, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            LogoutAction.spec(),
-            SignoutAction.spec(),
-            UpdateFullNameAction.spec(),
-            GetSSHKeypairAction.spec(),
-            GenerateSSHKeypairAction.spec(),
-            UploadSSHKeypairAction.spec(),
-            GetRoleAction.spec(),
-            AuthorizeAction.spec(),
-            SignupAction.spec(),
-            UpdatePasswordAction.spec(),
-            UpdatePasswordNoAuthAction.spec(),
-            ResolveAccessKeyScopeAction.spec(),
-            ResolveUserScopeAction.spec(),
-            ResolveUserIDByAccessKeyAction.spec(),
-            AdminSearchLoginSessionsAction.spec(),
-            SearchLoginSessionsAction.spec(),
-            AdminSearchLoginHistoryAction.spec(),
-            SearchLoginHistoryAction.spec(),
-            AdminRevokeLoginSessionAction.spec(),
-            MyRevokeLoginSessionAction.spec(),
-            AdminUnblockUserAction.spec(),
-        ]

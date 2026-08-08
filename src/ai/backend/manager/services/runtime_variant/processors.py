@@ -1,8 +1,5 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.runtime_variant.actions.create import (
     CreateRuntimeVariantAction,
@@ -27,7 +24,7 @@ from ai.backend.manager.services.runtime_variant.actions.update import (
 from ai.backend.manager.services.runtime_variant.service import RuntimeVariantService
 
 
-class RuntimeVariantProcessors(AbstractProcessorPackage):
+class RuntimeVariantProcessors:
     create: ActionProcessor[CreateRuntimeVariantAction, CreateRuntimeVariantActionResult]
     update: ActionProcessor[UpdateRuntimeVariantAction, UpdateRuntimeVariantActionResult]
     delete: ActionProcessor[DeleteRuntimeVariantAction, DeleteRuntimeVariantActionResult]
@@ -47,13 +44,3 @@ class RuntimeVariantProcessors(AbstractProcessorPackage):
         self.delete = ActionProcessor(service.delete, action_monitors)
         self.search = ActionProcessor(service.search, action_monitors)
         self.resolve_by_name = ActionProcessor(service.resolve_by_name, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateRuntimeVariantAction.spec(),
-            UpdateRuntimeVariantAction.spec(),
-            DeleteRuntimeVariantAction.spec(),
-            SearchRuntimeVariantsAction.spec(),
-            ResolveRuntimeVariantByNameAction.spec(),
-        ]

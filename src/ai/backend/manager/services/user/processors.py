@@ -1,10 +1,9 @@
-from typing import cast, override
+from typing import cast
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validator.base import ActionValidator
 from ai.backend.manager.actions.validator.scope import ScopeActionValidator
 from ai.backend.manager.actions.validator.single_entity import SingleEntityActionValidator
@@ -99,7 +98,7 @@ from ai.backend.manager.services.user.actions.user_month_stats import (
 from ai.backend.manager.services.user.service import UserService
 
 
-class UserProcessors(AbstractProcessorPackage):
+class UserProcessors:
     # Scope actions with RBAC
     create_user: ScopeActionProcessor[CreateUserAction, CreateUserActionResult]
     search_users_by_domain: ActionProcessor[
@@ -261,39 +260,3 @@ class UserProcessors(AbstractProcessorPackage):
         self.admin_get_ssh_keypair = ActionProcessor(
             user_service.admin_get_ssh_keypair, action_monitors
         )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateUserAction.spec(),
-            BulkCreateUserAction.spec(),
-            ModifyUserAction.spec(),
-            ModifyUserByIdAction.spec(),
-            BulkModifyUserAction.spec(),
-            DeleteUserAction.spec(),
-            DeleteUserByIdAction.spec(),
-            GetUserAction.spec(),
-            PurgeUserAction.spec(),
-            PurgeUserByIdAction.spec(),
-            BulkPurgeUserAction.spec(),
-            UserMonthStatsAction.spec(),
-            AdminMonthStatsAction.spec(),
-            SearchUsersAction.spec(),
-            SearchUsersByDomainAction.spec(),
-            SearchUsersByProjectAction.spec(),
-            SearchUsersByRoleAction.spec(),
-            IssueMyKeypairAction.spec(),
-            RevokeMyKeypairAction.spec(),
-            SwitchMyMainAccessKeyAction.spec(),
-            UpdateMyKeypairAction.spec(),
-            SearchMyKeypairsAction.spec(),
-            SearchKeypairsByResourcePolicyAction.spec(),
-            AdminCreateKeypairAction.spec(),
-            AdminUpdateKeypairAction.spec(),
-            AdminDeleteKeypairAction.spec(),
-            AdminSearchKeypairsAction.spec(),
-            AdminGetKeypairAction.spec(),
-            AdminRegisterSSHKeypairAction.spec(),
-            AdminDeleteSSHKeypairAction.spec(),
-            AdminGetSSHKeypairAction.spec(),
-        ]
