@@ -1,0 +1,42 @@
+name: cancel-superseded
+
+# `ci.yml` relies on `cancel-in-progress` to stop the previous run when a new
+# push lands, but when two pushes arrive close together that cancel is
+# intermittently missed: the newer run then sits pending, jobless, until the
+# older one finishes. This workflow cancels the superseded run explicitly.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# No concurrency group on purpose: sharing a group (or any cancel-in-progress
+# of its own) would expose this workflow to the very pending glitch it exists
+# to correct. Runs are cheap and idempotent, so letting every event run is fine.
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cancel:
+    # A fork's pull_request carries a read-only token that cannot cancel runs,
+    # and its branch name may collide with an unrelated same-repo branch, so
+    # fork PRs are out of scope for now (pull_request_target is a later
+    # decision).
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the canceller script
+        uses: actions/checkout@v6
+        with:
+          lfs: false
+          sparse-checkout: .github/scripts
+      - name: Cancel superseded ci runs
+        # A branch name is written by someone else; it is never interpolated
+        # into the shell, only handed over as an argument.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.head_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: .github/scripts/cancel-superseded-runs.sh "$REPO" ci.yml "$BRANCH" "$HEAD_SHA"
