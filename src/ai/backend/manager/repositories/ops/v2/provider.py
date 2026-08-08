@@ -9,9 +9,9 @@ removing the legacy provider later touches nothing here.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -30,6 +30,7 @@ from ai.backend.manager.errors.permission import VirtualScopeNotFound
 from ai.backend.manager.errors.repository import (
     AmbiguousEntityKeyError,
     EmptySearchScopeError,
+    EntityNotFoundError,
     UnsupportedCompositePrimaryKeyError,
     UpsertEmptyResultError,
 )
@@ -58,7 +59,7 @@ from ai.backend.manager.repositories.base.integrity import (
     match_integrity_error,
     parse_integrity_error,
 )
-from ai.backend.manager.repositories.base.purger import validate_conflict_checks
+from ai.backend.manager.repositories.base.purger import DataBatchPurger, validate_conflict_checks
 from ai.backend.manager.repositories.base.querier import (
     DataFinder,
     DataQuerier,
@@ -68,6 +69,13 @@ from ai.backend.manager.repositories.base.querier import (
 )
 from ai.backend.manager.repositories.base.rbac.utils import bulk_insert_on_conflict_do_nothing
 from ai.backend.manager.repositories.base.searcher import Searcher, SearcherResult
+from ai.backend.manager.repositories.base.types import BulkResultWithFailures
+from ai.backend.manager.repositories.base.updater import (
+    DataBatchUpdater,
+    DataUpdater,
+    Updater,
+    execute_updater,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -254,6 +262,210 @@ class V2WriteOps(V2ReadOps):
         )
         await self._record_memberships([upserter.membership().membership_of(row)])
         return upserter.to_data(row)
+
+    async def bulk_create_scoped_entities[TRow: Base, TData](
+        self, creators: Sequence[ScopedEntityCreator[TRow, TData]]
+    ) -> list[TData]:
+        """Insert scoped rows atomically in one flush, registering each membership."""
+        if not creators:
+            return []
+        rows = [creator.build_row() for creator in creators]
+        self._sess.add_all(rows)
+        try:
+            await self._sess.flush()
+        except sa.exc.IntegrityError as e:
+            # Use first creator's checks (all specs share the same creator subclass)
+            match_integrity_error(parse_integrity_error(e), creators[0].integrity_error_checks())
+        await self._record_memberships([
+            creator.membership().membership_of(row)
+            for creator, row in zip(creators, rows, strict=True)
+        ])
+        return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
+
+    async def bulk_purge_scoped_entities[TRow: Base, TData](
+        self, purgers: Mapping[EntityID, ScopedEntityPurger[TRow, TData]]
+    ) -> BulkResultWithFailures[TData]:
+        """Delete each named scoped entity independently; a row and its membership
+        removal share one savepoint, and a missing row is answered with
+        :class:`EntityNotFoundError` rather than skipped."""
+        successes: dict[EntityID, TData] = {}
+        errors: dict[EntityID, Exception] = {}
+        for entity_id, purger in purgers.items():
+            try:
+                async with self._sess.begin_nested():
+                    data = await self.purge_scoped_entity(purger)
+                    if data is None:
+                        raise EntityNotFoundError(
+                            f"{purger.row_class().__name__} {purger.pk_value()} not found"
+                        )
+                    successes[entity_id] = data
+            except Exception as e:
+                errors[entity_id] = e
+        return BulkResultWithFailures(successes=successes, errors=errors)
+
+    async def update_data[TRow: Base, TData](
+        self, updater: DataUpdater[TRow, TData]
+    ) -> TData | None:
+        """Update a single row by primary key and return it as its ``data/`` type.
+
+        Updates carry no membership work, so the legacy update spec stays the
+        contract across all three families.
+        """
+        result = await execute_updater(
+            self._sess, Updater(spec=updater, pk_value=updater.pk_value())
+        )
+        if result is None:
+            return None
+        return updater.to_data(result.row)
+
+    async def bulk_update_data[TRow: Base, TData](
+        self, updaters: Mapping[EntityID, DataUpdater[TRow, TData]]
+    ) -> BulkResultWithFailures[TData]:
+        """Update each named entity independently in its own savepoint, reporting
+        per entity — a missing row is an answer, not a gap."""
+        successes: dict[EntityID, TData] = {}
+        errors: dict[EntityID, Exception] = {}
+        for entity_id, updater in updaters.items():
+            try:
+                async with self._sess.begin_nested():
+                    result = await execute_updater(
+                        self._sess, Updater(spec=updater, pk_value=updater.pk_value())
+                    )
+                    if result is None:
+                        raise EntityNotFoundError(
+                            f"{updater.row_class.__name__} {updater.pk_value()} not found"
+                        )
+                    successes[entity_id] = updater.to_data(result.row)
+            except Exception as e:
+                errors[entity_id] = e
+        return BulkResultWithFailures(successes=successes, errors=errors)
+
+    async def batch_update_in_scopes[TRow: Base, TData](
+        self, scopes: Sequence[SearchScope], updater: DataBatchUpdater[TRow, TData]
+    ) -> list[TData]:
+        """Update every matching row within ``scopes``; at least one is required.
+
+        The scope conditions are injected into the statement itself, so the spec's
+        conditions cannot widen the write past the scopes the caller named. Same
+        combination rule as the scoped search: scope conditions form one OR group,
+        AND-merged with the spec's conditions.
+        """
+        if not scopes:
+            raise EmptySearchScopeError(
+                "batch_update_in_scopes requires at least one scope; "
+                "use batch_update_in_global for an explicit unscoped batch update."
+            )
+        await self._validate_scope_existence(scopes)
+        return await self._batch_update_returning(updater, self._scopes_condition(scopes))
+
+    async def batch_update_in_global[TRow: Base, TData](
+        self, updater: DataBatchUpdater[TRow, TData]
+    ) -> list[TData]:
+        """Update every matching row across the table, with NO scope filter.
+
+        Carries the same authority requirement as the global search: superadmin
+        endpoints or internal system operations only.
+        """
+        return await self._batch_update_returning(updater, None)
+
+    async def batch_purge_in_scopes[TRow: Base, TData](
+        self, scopes: Sequence[SearchScope], purger: DataBatchPurger[TRow, TData]
+    ) -> list[TData]:
+        """Delete every row the spec selects within ``scopes``; at least one is
+        required. Scope conditions are injected into the selecting subquery.
+
+        Carries no membership work: reserve it for global- and field-family
+        entities until a scoped-family batch purge that deregisters exists.
+        """
+        if not scopes:
+            raise EmptySearchScopeError(
+                "batch_purge_in_scopes requires at least one scope; "
+                "use batch_purge_in_global for an explicit unscoped batch purge."
+            )
+        await self._validate_scope_existence(scopes)
+        return await self._batch_purge_returning(purger, self._scopes_condition(scopes))
+
+    async def batch_purge_in_global[TRow: Base, TData](
+        self, purger: DataBatchPurger[TRow, TData]
+    ) -> list[TData]:
+        """Delete every row the spec selects across the table, with NO scope filter.
+
+        Same authority requirement as the global search; same membership caveat as
+        :meth:`batch_purge_in_scopes`.
+        """
+        return await self._batch_purge_returning(purger, None)
+
+    async def _batch_update_returning[TRow: Base, TData](
+        self,
+        updater: DataBatchUpdater[TRow, TData],
+        scope_condition: sa.ColumnElement[bool] | None,
+    ) -> list[TData]:
+        row_class = updater.row_class
+        table = row_class.__table__
+        stmt = sa.update(table).values(updater.build_values())
+        for condition in updater.conditions():
+            stmt = stmt.where(condition())
+        if scope_condition is not None:
+            stmt = stmt.where(scope_condition)
+        stmt = stmt.returning(*table.columns)
+        try:
+            result = await self._sess.execute(stmt)
+        except sa.exc.IntegrityError as e:
+            match_integrity_error(parse_integrity_error(e), updater.integrity_error_checks)
+        return [updater.to_data(row_class(**dict(r._mapping))) for r in result.fetchall()]
+
+    async def _batch_purge_returning[TRow: Base, TData](
+        self,
+        purger: DataBatchPurger[TRow, TData],
+        scope_condition: sa.ColumnElement[bool] | None,
+        batch_size: int = 1000,
+    ) -> list[TData]:
+        base_subquery = purger.build_subquery()
+        entity = base_subquery.column_descriptions[0]["entity"]
+        table = sa.inspect(entity).local_table
+        pk_columns = list(table.primary_key.columns)
+        row_class = cast("type[TRow]", entity)
+
+        await validate_conflict_checks(self._sess, purger.conflict_checks())
+
+        removed: list[TData] = []
+        while True:
+            selecting = purger.build_subquery()
+            if scope_condition is not None:
+                selecting = selecting.where(scope_condition)
+            sub = selecting.subquery()
+            pk_subquery = sa.select(*[sub.c[pk.key] for pk in pk_columns]).limit(batch_size)
+            stmt = (
+                sa.delete(table)
+                .where(sa.tuple_(*pk_columns).in_(pk_subquery))
+                .returning(*table.columns)
+            )
+            try:
+                result = await self._sess.execute(stmt)
+            except sa.exc.IntegrityError as e:
+                raise parse_integrity_error(e) from e
+            rows = result.fetchall()
+            removed.extend(purger.to_data(row_class(**dict(r._mapping))) for r in rows)
+            if len(rows) < batch_size:
+                break
+        return removed
+
+    def _scopes_condition(self, scopes: Sequence[SearchScope]) -> sa.ColumnElement[bool]:
+        return sa.or_(*[scope.to_condition()() for scope in scopes])
+
+    async def _validate_scope_existence(self, scopes: Sequence[SearchScope]) -> None:
+        checks = [check for scope in scopes for check in scope.existence_checks]
+        if not checks:
+            return
+        select_clauses = [
+            sa.exists().where(check.column == check.value).label(f"check_{i}")
+            for i, check in enumerate(checks)
+        ]
+        result = await self._sess.execute(sa.select(*select_clauses))
+        row = result.mappings().one()
+        for i, check in enumerate(checks):
+            if not row[f"check_{i}"]:
+                raise check.error
 
     async def _insert_row(self, row: Base, checks: Sequence[IntegrityErrorCheck]) -> None:
         self._sess.add(row)

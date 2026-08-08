@@ -1,5 +1,3 @@
-"""DataCreator implementations for the resource slot repository."""
-
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -12,13 +10,13 @@ from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource_slot import ResourceSlotTypeAlreadyExists
 from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
 from ai.backend.manager.models.resource_slot.types import NumberFormat
-from ai.backend.manager.repositories.base.creator import DataCreator
-from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
+from ai.backend.manager.models.specs.creator import GlobalEntityCreator
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
 @dataclass
-class ResourceSlotTypeCreator(DataCreator[ResourceSlotTypeRow, ResourceSlotTypeData]):
-    """Creator for a resource slot type.
+class ResourceSlotTypeCreator(GlobalEntityCreator[ResourceSlotTypeRow, ResourceSlotTypeData]):
+    """Creator for a resource slot type — a global catalog row.
 
     Registering a name that already exists fails rather than overwriting: the
     catalog row is the FK target of five tables, so replacing one silently would
@@ -36,7 +34,6 @@ class ResourceSlotTypeCreator(DataCreator[ResourceSlotTypeRow, ResourceSlotTypeD
     number_format: NumberFormat
     rank: int
 
-    @property
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
         return (

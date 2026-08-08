@@ -38,6 +38,8 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_slot.creators import ResourceSlotTypeCreator
+from ai.backend.manager.models.resource_slot.purgers import ResourceSlotTypePurger
 from ai.backend.manager.models.resource_slot.row import (
     AgentResourceRow,
     DeploymentRevisionResourceSlotRow,
@@ -54,11 +56,8 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base.creator import Creator, execute_creator
-from ai.backend.manager.repositories.base.purger import Purger, execute_purger
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
-from ai.backend.manager.repositories.resource_slot.creators import ResourceSlotTypeCreator
-from ai.backend.manager.repositories.resource_slot.purgers import ResourceSlotTypePurger
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_slot.updaters import ResourceSlotTypeUpdater
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
@@ -165,9 +164,8 @@ class TestResourceSlotTypeCreator:
             display_name="TPU",
             rank=7,
         )
-        async with db_with_referencing_tables.begin_session() as db_sess:
-            result = await execute_creator(db_sess, Creator(spec=creator))
-            data = creator.to_data(result.row)
+        async with V2DBOpsProvider(db_with_referencing_tables).write_ops() as w:
+            data = await w.create_global_entity(creator)
 
         assert data.slot_name == "tpu.device"
         assert data.slot_type == "unique"
@@ -183,9 +181,9 @@ class TestResourceSlotTypeCreator:
         uuids = set()
         for name in ("cpu", "mem"):
             creator = _creator(name, SlotTypes.COUNT)
-            async with db_with_referencing_tables.begin_session() as db_sess:
-                result = await execute_creator(db_sess, Creator(spec=creator))
-                uuids.add(creator.to_data(result.row).uuid)
+            async with V2DBOpsProvider(db_with_referencing_tables).write_ops() as w:
+                data = await w.create_global_entity(creator)
+                uuids.add(data.uuid)
         assert len(uuids) == 2
 
     async def test_existing_name_conflicts_and_leaves_the_row_alone(
@@ -199,8 +197,8 @@ class TestResourceSlotTypeCreator:
             display_name="Overwritten",
         )
         with pytest.raises(ResourceSlotTypeAlreadyExists):
-            async with db_with_referencing_tables.begin_session() as db_sess:
-                await execute_creator(db_sess, Creator(spec=creator))
+            async with V2DBOpsProvider(db_with_referencing_tables).write_ops() as w:
+                await w.create_global_entity(creator)
 
         async with db_with_referencing_tables.begin_readonly_session() as db_sess:
             row = await db_sess.scalar(
@@ -258,10 +256,10 @@ class TestResourceSlotTypePurger:
         existing_slot_type: str,
     ) -> None:
         purger = ResourceSlotTypePurger(slot_name=existing_slot_type)
-        async with db_with_referencing_tables.begin_session() as db_sess:
-            result = await execute_purger(db_sess, Purger(spec=purger))
-            assert result is not None
-            assert purger.to_data(result.row).slot_name == existing_slot_type
+        async with V2DBOpsProvider(db_with_referencing_tables).write_ops() as w:
+            data = await w.purge_global_entity(purger)
+            assert data is not None
+            assert data.slot_name == existing_slot_type
 
         async with db_with_referencing_tables.begin_readonly_session() as db_sess:
             remaining = await db_sess.scalar(
@@ -321,8 +319,8 @@ class TestResourceSlotTypePurger:
 
         purger = ResourceSlotTypePurger(slot_name=existing_slot_type)
         with pytest.raises(ResourceSlotTypeInUse):
-            async with db_with_referencing_tables.begin_session() as db_sess:
-                await execute_purger(db_sess, Purger(spec=purger))
+            async with V2DBOpsProvider(db_with_referencing_tables).write_ops() as w:
+                await w.purge_global_entity(purger)
 
         async with db_with_referencing_tables.begin_readonly_session() as db_sess:
             remaining = await db_sess.scalar(

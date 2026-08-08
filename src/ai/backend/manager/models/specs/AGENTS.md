@@ -35,6 +35,13 @@ membership)?**
 - Do NOT override `membership_of()` — it is `@final`; answer the three hooks
   (`entity_type` / `entity_id(row)` / `parent_scope(row)`) instead.
 
+## Naming: family vs operation scope
+
+`…_global_entity` / `…_scoped_entity` / `…_field_entity` methods name the
+**membership family** (what is written); `…_in_global` / `…_in_scopes` name the
+**operation scope** (where a read looks). Never drop the `_entity` suffix from
+family methods — that is what keeps the two axes apart.
+
 ## Owner existence for field rows
 
 Do NOT pre-read the owner to check existence. Declare the FK violation in

@@ -37,18 +37,18 @@ from ai.backend.manager.errors.repository import (
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.specs.creator import GlobalEntityCreator
+from ai.backend.manager.models.specs.purger import GlobalEntityPurger
+from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
+from ai.backend.manager.models.specs.upserter import GlobalEntityUpserter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.creator import DataCreator
 from ai.backend.manager.repositories.base.pagination import OffsetPagination
-from ai.backend.manager.repositories.base.purger import DataBatchPurger, DataPurger
+from ai.backend.manager.repositories.base.purger import DataBatchPurger
 from ai.backend.manager.repositories.base.querier import DataFinder, DataQuerier
 from ai.backend.manager.repositories.base.searcher import Searcher
-from ai.backend.manager.repositories.base.types import ConflictCheck
 from ai.backend.manager.repositories.base.updater import DataBatchUpdater, DataUpdater
-from ai.backend.manager.repositories.base.upserter import DataUpserter
-from ai.backend.manager.repositories.ops.base.provider import DBOpsProvider
 from ai.backend.manager.repositories.ops.repository import OpsRepository
-from ai.backend.manager.repositories.role_preset.creators import RolePresetCreatorSpec
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.role_preset.purgers import RolePresetPurgerSpec
 from ai.backend.manager.repositories.role_preset.updaters import (
     RolePresetDeletedFlagUpdaterSpec,
@@ -59,15 +59,25 @@ from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 
 # =============================================================================
-# The domain's specs, each gaining one `to_data`.
-#
-# Subclassed here rather than edited in place so this demonstration changes no domain
-# code; a domain adopting the generic repository would add the method to its own spec.
+# The domain's specs, adapted here rather than edited in place so this demonstration
+# changes no domain code. The write specs sit on the v2 global family (a preset is a
+# system-wide catalog row); the read/update specs still gain only the one `to_data`.
 # =============================================================================
 
 
 @dataclass
-class _PresetCreator(RolePresetCreatorSpec, DataCreator[RolePresetRow, RolePresetData]):
+class _PresetCreator(GlobalEntityCreator[RolePresetRow, RolePresetData]):
+    name: str
+    scope_type: RBACScopeType
+
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_row(self) -> RolePresetRow:
+        return RolePresetRow(name=self.name, scope_type=self.scope_type)
+
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
         return row.to_data()
@@ -100,18 +110,17 @@ class _PresetDeleter(RolePresetDeletedFlagUpdaterSpec, DataUpdater[RolePresetRow
 
 
 @dataclass
-class _PresetPurger(RolePresetPurgerSpec, DataPurger[RolePresetRow, RolePresetData]):
+class _PresetPurger(RolePresetPurgerSpec, GlobalEntityPurger[RolePresetRow, RolePresetData]):
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
         return row.to_data()
 
 
 @dataclass
-class _PresetUpserter(DataUpserter[RolePresetRow, RolePresetData]):
+class _PresetUpserter(GlobalEntityUpserter[RolePresetRow, RolePresetData]):
     target: RolePresetID
     name: str
 
-    @property
     @override
     def row_class(self) -> type[RolePresetRow]:
         return RolePresetRow
@@ -119,6 +128,10 @@ class _PresetUpserter(DataUpserter[RolePresetRow, RolePresetData]):
     @override
     def index_elements(self) -> list[str]:
         return ["id"]
+
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
 
     @override
     def build_insert_values(self) -> dict[str, Any]:
@@ -256,25 +269,27 @@ async def database(
 @pytest.fixture
 def repository(database: ExtendedAsyncSAEngine) -> OpsRepository[RolePresetData]:
     # The ops provider is the only thing it takes.
-    return OpsRepository[RolePresetData](DBOpsProvider(database))
+    return OpsRepository[RolePresetData](V2DBOpsProvider(database))
 
 
 @pytest.fixture
 def view_repository(database: ExtendedAsyncSAEngine) -> OpsRepository[_PresetView]:
     """The same generic repository, reading the entity as a lighter view."""
-    return OpsRepository[_PresetView](DBOpsProvider(database))
+    return OpsRepository[_PresetView](V2DBOpsProvider(database))
 
 
 @pytest.fixture
 async def preset(repository: OpsRepository[RolePresetData]) -> RolePresetData:
-    return await repository.create(_PresetCreator(name="default", scope_type=RBACScopeType.DOMAIN))
+    return await repository.create_global_entity(
+        _PresetCreator(name="default", scope_type=RBACScopeType.DOMAIN)
+    )
 
 
 class TestCreate:
     async def test_create_returns_the_data_type(
         self, repository: OpsRepository[RolePresetData]
     ) -> None:
-        created = await repository.create(
+        created = await repository.create_global_entity(
             _PresetCreator(name="analysts", scope_type=RBACScopeType.PROJECT)
         )
 
@@ -313,7 +328,9 @@ class TestFind:
         self, repository: OpsRepository[RolePresetData], preset: RolePresetData
     ) -> None:
         # `name` carries no unique constraint, so the same name can land twice.
-        await repository.create(_PresetCreator(name="default", scope_type=RBACScopeType.PROJECT))
+        await repository.create_global_entity(
+            _PresetCreator(name="default", scope_type=RBACScopeType.PROJECT)
+        )
 
         with pytest.raises(AmbiguousEntityKeyError):
             await repository.find(_PresetByName(name="default"))
@@ -347,29 +364,13 @@ class TestUpdate:
             )
 
 
-class TestBulkCreate:
-    async def test_all_rows_are_inserted(self, repository: OpsRepository[RolePresetData]) -> None:
-        created = await repository.bulk_create([
-            _PresetCreator(name="a", scope_type=RBACScopeType.DOMAIN),
-            _PresetCreator(name="b", scope_type=RBACScopeType.PROJECT),
-        ])
-
-        assert [c.name for c in created] == ["a", "b"]
-        assert all(c.id is not None for c in created)
-
-    async def test_empty_input_writes_nothing(
-        self, repository: OpsRepository[RolePresetData]
-    ) -> None:
-        assert await repository.bulk_create([]) == []
-
-
 class TestBulkUpdate:
     """The bulk shape answers for every entity the caller named, one by one."""
 
     async def test_each_named_entity_is_answered_for(
         self, repository: OpsRepository[RolePresetData], preset: RolePresetData
     ) -> None:
-        other = await repository.create(
+        other = await repository.create_global_entity(
             _PresetCreator(name="other", scope_type=RBACScopeType.DOMAIN)
         )
 
@@ -398,31 +399,18 @@ class TestBulkUpdate:
         assert (await repository.get(_PresetQuerier(target=preset.id))).name == "written"
 
 
-class TestBulkPurge:
-    async def test_each_named_entity_is_answered_for(
-        self, repository: OpsRepository[RolePresetData], preset: RolePresetData
-    ) -> None:
-        absent = RolePresetID(uuid.uuid4())
-
-        result = await repository.bulk_purge({
-            preset.id: _PresetPurger(preset_id=preset.id),
-            absent: _PresetPurger(preset_id=absent),
-        })
-
-        assert result.successes[preset.id].id == preset.id
-        assert isinstance(result.errors[absent], EntityNotFoundError)
-        with pytest.raises(EntityNotFoundError):
-            await repository.get(_PresetQuerier(target=preset.id))
-
-
 class TestBatchUpdate:
     async def test_every_matching_row_comes_back(
         self, repository: OpsRepository[RolePresetData], preset: RolePresetData
     ) -> None:
-        await repository.create(_PresetCreator(name="other", scope_type=RBACScopeType.DOMAIN))
-        await repository.create(_PresetCreator(name="elsewhere", scope_type=RBACScopeType.PROJECT))
+        await repository.create_global_entity(
+            _PresetCreator(name="other", scope_type=RBACScopeType.DOMAIN)
+        )
+        await repository.create_global_entity(
+            _PresetCreator(name="elsewhere", scope_type=RBACScopeType.PROJECT)
+        )
 
-        updated = await repository.batch_update(
+        updated = await repository.batch_update_in_global(
             _PresetBatchUpdater(deleted=True, scope=RBACScopeType.DOMAIN)
         )
 
@@ -434,7 +422,7 @@ class TestBatchUpdate:
         self, repository: OpsRepository[RolePresetData]
     ) -> None:
         assert (
-            await repository.batch_update(
+            await repository.batch_update_in_global(
                 _PresetBatchUpdater(deleted=True, scope=RBACScopeType.PROJECT)
             )
             == []
@@ -445,9 +433,11 @@ class TestBatchPurge:
     async def test_every_matching_row_is_removed_and_named(
         self, repository: OpsRepository[RolePresetData], preset: RolePresetData
     ) -> None:
-        await repository.create(_PresetCreator(name="default", scope_type=RBACScopeType.PROJECT))
+        await repository.create_global_entity(
+            _PresetCreator(name="default", scope_type=RBACScopeType.PROJECT)
+        )
 
-        removed = await repository.batch_purge(_PresetBatchPurger(name="default"))
+        removed = await repository.batch_purge_in_global(_PresetBatchPurger(name="default"))
 
         assert len(removed) == 2
         assert {r.name for r in removed} == {"default"}
@@ -457,7 +447,7 @@ class TestBatchPurge:
     async def test_no_match_returns_nothing(
         self, repository: OpsRepository[RolePresetData], preset: RolePresetData
     ) -> None:
-        assert await repository.batch_purge(_PresetBatchPurger(name="absent")) == []
+        assert await repository.batch_purge_in_global(_PresetBatchPurger(name="absent")) == []
 
 
 class TestUpsert:
@@ -466,7 +456,9 @@ class TestUpsert:
     ) -> None:
         target = RolePresetID(uuid.uuid4())
 
-        upserted = await repository.upsert(_PresetUpserter(target=target, name="fresh"))
+        upserted = await repository.upsert_global_entity(
+            _PresetUpserter(target=target, name="fresh")
+        )
 
         assert upserted.id == target
         assert upserted.name == "fresh"
@@ -474,7 +466,9 @@ class TestUpsert:
     async def test_upsert_updates_on_conflict(
         self, repository: OpsRepository[RolePresetData], preset: RolePresetData
     ) -> None:
-        upserted = await repository.upsert(_PresetUpserter(target=preset.id, name="replaced"))
+        upserted = await repository.upsert_global_entity(
+            _PresetUpserter(target=preset.id, name="replaced")
+        )
 
         assert upserted.id == preset.id
         assert upserted.name == "replaced"
@@ -486,7 +480,7 @@ class TestPurge:
     async def test_purged_row_is_gone(
         self, repository: OpsRepository[RolePresetData], preset: RolePresetData
     ) -> None:
-        purged = await repository.purge(_PresetPurger(preset_id=preset.id))
+        purged = await repository.purge_global_entity(_PresetPurger(preset_id=preset.id))
 
         assert purged.id == preset.id
         with pytest.raises(EntityNotFoundError):
@@ -494,7 +488,7 @@ class TestPurge:
 
     async def test_missing_row_raises(self, repository: OpsRepository[RolePresetData]) -> None:
         with pytest.raises(EntityNotFoundError):
-            await repository.purge(_PresetPurger(preset_id=uuid.uuid4()))
+            await repository.purge_global_entity(_PresetPurger(preset_id=uuid.uuid4()))
 
 
 # =============================================================================
@@ -578,7 +572,9 @@ class TestSearch:
         view_repository: OpsRepository[_PresetView],
         preset: RolePresetData,
     ) -> None:
-        await repository.create(_PresetCreator(name="other", scope_type=RBACScopeType.DOMAIN))
+        await repository.create_global_entity(
+            _PresetCreator(name="other", scope_type=RBACScopeType.DOMAIN)
+        )
 
         result = await view_repository.search_in_scopes(
             scopes=[_NamedScope(name="default")],

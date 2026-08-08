@@ -7,12 +7,12 @@ from typing import override
 from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
 from ai.backend.manager.data.app_config_allow_list.types import AppConfigAllowListData
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
-from ai.backend.manager.repositories.base.purger import DataPurger
-from ai.backend.manager.repositories.base.types import ConflictCheck
+from ai.backend.manager.models.specs.purger import GlobalEntityPurger
+from ai.backend.manager.models.specs.types import ConflictCheck
 
 
 @dataclass
-class AppConfigAllowListPurger(DataPurger[AppConfigAllowListRow, AppConfigAllowListData]):
+class AppConfigAllowListPurger(GlobalEntityPurger[AppConfigAllowListRow, AppConfigAllowListData]):
     """Purger for deleting an app config allow-list entry."""
 
     allow_list_id: AppConfigAllowListID

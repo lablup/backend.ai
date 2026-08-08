@@ -51,6 +51,7 @@ from ai.backend.manager.models.resource_slot.conditions import (
     ResourceAllocationConditions,
     ResourceSlotTypeConditions,
 )
+from ai.backend.manager.models.resource_slot.creators import ResourceSlotTypeCreator
 from ai.backend.manager.models.resource_slot.orders import (
     AGENT_RESOURCE_DEFAULT_FORWARD_ORDER,
     AGENT_RESOURCE_TIEBREAKER_ORDER,
@@ -62,10 +63,9 @@ from ai.backend.manager.models.resource_slot.orders import (
     resolve_resource_allocation_order,
     resolve_slot_type_order,
 )
+from ai.backend.manager.models.resource_slot.purgers import ResourceSlotTypePurger
 from ai.backend.manager.models.resource_slot.types import NumberFormat
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.resource_slot.creators import ResourceSlotTypeCreator
-from ai.backend.manager.repositories.resource_slot.purgers import ResourceSlotTypePurger
 from ai.backend.manager.repositories.resource_slot.updaters import ResourceSlotTypeUpdater
 from ai.backend.manager.services.resource_slot.actions.create import CreateResourceSlotTypeAction
 from ai.backend.manager.services.resource_slot.actions.get_agent_resource_by_slot import (

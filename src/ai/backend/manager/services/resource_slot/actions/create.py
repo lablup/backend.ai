@@ -7,8 +7,8 @@ from ai.backend.common.data.entity.resource_slot import RESOURCE_SLOT_TYPE_ENTIT
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import CreateGlobalOpsAction
 from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
+from ai.backend.manager.models.resource_slot.creators import ResourceSlotTypeCreator
 from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
-from ai.backend.manager.repositories.resource_slot.creators import ResourceSlotTypeCreator
 
 
 @dataclass
