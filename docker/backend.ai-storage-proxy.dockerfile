@@ -1,7 +1,7 @@
 ARG PYTHON_VERSION
 FROM python:${PYTHON_VERSION} AS builder
 ARG PKGVER
-COPY dist /dist
+COPY ./dist /dist
 RUN pip wheel --wheel-dir=/wheels --no-cache-dir backend.ai-storage-proxy==${PKGVER} --find-links=/dist
 
 FROM python:${PYTHON_VERSION}
