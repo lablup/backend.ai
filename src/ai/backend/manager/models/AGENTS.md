@@ -1,12 +1,15 @@
 # Manager Models layer — Guardrails
 
-> This layer defines only the ORM schema. For query patterns see `/repository-guide`; for data type conventions see
-> `manager/data/AGENTS.md`.
+> This layer defines the ORM schema and the declarative write specs. For query patterns see `/repository-guide`; for
+> data type conventions see `manager/data/AGENTS.md`.
 
 ## Directory structure (per domain)
 
 Every domain follows `models/{domain}/__init__.py` + `row.py` (ORM classes).
 The single-file shorthand (`models/{domain}.py`) is legacy — do not add new ones.
+
+Domains migrated to the v2 write specs add `creators.py` / `purgers.py` / `upserters.py` / `membership.py`
+next to `row.py`. The spec bases live in `models/specs/` — read `models/specs/AGENTS.md` before touching them.
 
 ## Row class rules
 
