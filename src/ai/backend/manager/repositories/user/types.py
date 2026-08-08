@@ -20,19 +20,19 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
 
 __all__ = (
-    "DomainUserSearchScope",
-    "ProjectUserSearchScope",
-    "RoleUserSearchScope",
+    "DomainUserOperationScope",
+    "ProjectUserOperationScope",
+    "RoleUserOperationScope",
 )
 
 
 @dataclass(frozen=True)
-class DomainUserSearchScope(SearchScope):
+class DomainUserOperationScope(OperationScope):
     """Required scope for searching users within a domain.
 
     Used for domain_users query (domain admin+).
@@ -65,7 +65,7 @@ class DomainUserSearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class ProjectUserSearchScope(SearchScope):
+class ProjectUserOperationScope(OperationScope):
     """Required scope for searching users within a project.
 
     Used for project_users query (project member+).
@@ -100,7 +100,7 @@ class ProjectUserSearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class RoleUserSearchScope(SearchScope):
+class RoleUserOperationScope(OperationScope):
     """Required scope for searching users assigned to a role.
 
     Requires JOIN with user_roles table.

@@ -60,7 +60,7 @@ from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAct
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.specs.creator import ScopedEntityCreator
 from ai.backend.manager.models.specs.membership import ScopedMembership
 from ai.backend.manager.models.specs.purger import ScopedEntityPurger
@@ -308,7 +308,7 @@ class _PresetSearcher(Searcher[RolePresetRow, _PresetData]):
 
 
 @dataclass(frozen=True)
-class _ProjectScope(SearchScope):
+class _ProjectScope(OperationScope):
     project_id: uuid.UUID
 
     @override
@@ -636,14 +636,14 @@ class _BulkCreateAction(
 class _BatchUpdateAction(BaseScopeAction, BatchUpdateOpsAction[RolePresetRow, _PresetData]):
     scope: ScopeRef
     updater: _PresetBatchUpdater
-    scopes: list[SearchScope] = field(default_factory=list)
+    scopes: list[OperationScope] = field(default_factory=list)
 
     @override
     def to_batch_updater(self) -> DataBatchUpdater[RolePresetRow, _PresetData]:
         return self.updater
 
     @override
-    def search_scopes(self) -> Sequence[SearchScope]:
+    def operation_scopes(self) -> Sequence[OperationScope]:
         return self.scopes
 
     @override
@@ -670,14 +670,14 @@ class _BatchUpdateAction(BaseScopeAction, BatchUpdateOpsAction[RolePresetRow, _P
 class _BatchPurgeAction(BaseScopeAction, BatchPurgeOpsAction[RolePresetRow, _PresetData]):
     scope: ScopeRef
     purger: _PresetBatchPurger
-    scopes: list[SearchScope] = field(default_factory=list)
+    scopes: list[OperationScope] = field(default_factory=list)
 
     @override
     def to_batch_purger(self) -> DataBatchPurger[RolePresetRow, _PresetData]:
         return self.purger
 
     @override
-    def search_scopes(self) -> Sequence[SearchScope]:
+    def operation_scopes(self) -> Sequence[OperationScope]:
         return self.scopes
 
     @override
@@ -730,14 +730,14 @@ class _GlobalSearchAction(BaseGlobalAction, GlobalSearchOpsAction[RolePresetRow,
 class _SearchAction(BaseScopeAction, SearchOpsAction[RolePresetRow, _PresetData]):
     scope: ScopeRef
     searcher: _PresetSearcher
-    scopes: list[SearchScope] = field(default_factory=list)
+    scopes: list[OperationScope] = field(default_factory=list)
 
     @override
     def to_searcher(self) -> Searcher[RolePresetRow, _PresetData]:
         return self.searcher
 
     @override
-    def search_scopes(self) -> Sequence[SearchScope]:
+    def operation_scopes(self) -> Sequence[OperationScope]:
         return self.scopes
 
     @override

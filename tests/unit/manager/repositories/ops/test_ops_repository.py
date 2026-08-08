@@ -31,12 +31,12 @@ from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.errors.repository import (
     AmbiguousEntityKeyError,
-    EmptySearchScopeError,
+    EmptyOperationScopeError,
     EntityNotFoundError,
 )
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.specs.creator import GlobalEntityCreator
 from ai.backend.manager.models.specs.purger import GlobalEntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
@@ -497,7 +497,7 @@ class TestPurge:
 
 
 @dataclass(frozen=True)
-class _NamedScope(SearchScope):
+class _NamedScope(OperationScope):
     name: str
 
     @override
@@ -515,14 +515,14 @@ class _SearchPresetsAction(BaseScopeAction, SearchOpsAction[RolePresetRow, _Pres
     """The only file a pass-through domain still writes: the action."""
 
     scope: ScopeRef
-    scopes: tuple[SearchScope, ...] = ()
+    scopes: tuple[OperationScope, ...] = ()
 
     @override
     def to_searcher(self) -> Searcher[RolePresetRow, _PresetView]:
         return _PresetSearcher(pagination=OffsetPagination(offset=0, limit=20))
 
     @override
-    def search_scopes(self) -> Sequence[SearchScope]:
+    def operation_scopes(self) -> Sequence[OperationScope]:
         return self.scopes
 
     @override
@@ -561,7 +561,7 @@ class TestSearch:
     ) -> None:
         # A caller whose RBAC resolution came back empty asked for nothing, not for
         # everything; the global scan is a separate call.
-        with pytest.raises(EmptySearchScopeError):
+        with pytest.raises(EmptyOperationScopeError):
             await view_repository.search_in_scopes(
                 scopes=[], searcher=_PresetSearcher(pagination=OffsetPagination(offset=0, limit=20))
             )

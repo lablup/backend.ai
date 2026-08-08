@@ -62,7 +62,7 @@ class UnsupportedCompositePrimaryKeyError(RepositoryError):
         )
 
 
-class EmptySearchScopeError(RepositoryError, web.HTTPBadRequest):
+class EmptyOperationScopeError(RepositoryError, web.HTTPBadRequest):
     """Raised when a scoped search is requested with no search scopes.
 
     A scoped query must carry at least one scope; an empty scope list would silently
@@ -70,8 +70,8 @@ class EmptySearchScopeError(RepositoryError, web.HTTPBadRequest):
     genuinely need an unscoped query must use the explicit global query path instead.
     """
 
-    error_type = "https://api.backend.ai/probs/empty-search-scope"
-    error_title = "Search scope must not be empty."
+    error_type = "https://api.backend.ai/probs/empty-operation-scope"
+    error_title = "Operation scope must not be empty."
 
     @override
     def error_code(self) -> ErrorCode:

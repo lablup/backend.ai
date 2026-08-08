@@ -10,7 +10,7 @@ from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.creator import (
     FieldEntityCreator,
     GlobalEntityCreator,
@@ -64,7 +64,7 @@ __all__ = (
     "BatchPurgeScopeOpsAction",
     "BatchUpdateGlobalOpsAction",
     "BatchPurgeGlobalOpsAction",
-    "SearchScopeOpsAction",
+    "OperationScopeOpsAction",
     "CreateGlobalOpsAction",
     "UpdateGlobalOpsAction",
     "PurgeGlobalOpsAction",
@@ -152,7 +152,7 @@ class FieldEntityCreateOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](Ops
 
     The owner id is declared here rather than leaning on the shape's
     ``entity_id()``: the shape names the RBAC target (the owner), while this axis
-    supplies the execution input — the same split ``SearchOpsAction.search_scopes``
+    supplies the execution input — the same split ``SearchOpsAction.operation_scopes``
     keeps from ``scope_targets``.
     """
 
@@ -218,10 +218,10 @@ class BatchUpdateOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
     @abstractmethod
-    def search_scopes(self) -> Sequence[SearchScope]:
+    def operation_scopes(self) -> Sequence[OperationScope]:
         """Return the scopes the write is restricted to. Never empty.
 
-        Same contract as ``SearchOpsAction.search_scopes``: distinct from the RBAC
+        Same contract as ``SearchOpsAction.operation_scopes``: distinct from the RBAC
         ``scope_targets()`` the shape axis declares, and an empty sequence is
         rejected rather than widened into an unscoped sweep.
         """
@@ -246,7 +246,7 @@ class BatchPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
     @abstractmethod
-    def search_scopes(self) -> Sequence[SearchScope]:
+    def operation_scopes(self) -> Sequence[OperationScope]:
         """Return the scopes the delete is restricted to. Never empty."""
         raise NotImplementedError
 
@@ -314,7 +314,7 @@ class SearchOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
     @abstractmethod
-    def search_scopes(self) -> Sequence[SearchScope]:
+    def operation_scopes(self) -> Sequence[OperationScope]:
         """Return the scopes the search is restricted to. Never empty.
 
         These are the models-layer query scopes, distinct from the RBAC
@@ -480,7 +480,9 @@ class BatchPurgeScopeOpsAction[TRow: Base, TData](
         return ActionOperationType.PURGE
 
 
-class SearchScopeOpsAction[TRow: Base, TData](BaseScopeAction, SearchOpsAction[TRow, TData], ABC):
+class OperationScopeOpsAction[TRow: Base, TData](
+    BaseScopeAction, SearchOpsAction[TRow, TData], ABC
+):
     """A page read from within the scopes the action names."""
 
     @override

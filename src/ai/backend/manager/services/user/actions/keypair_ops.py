@@ -17,8 +17,8 @@ from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.keypair.types import (
-    KeypairResourcePolicyKeypairSearchScope,
-    UserKeypairSearchScope,
+    KeypairResourcePolicyKeypairOperationScope,
+    UserKeypairOperationScope,
 )
 from ai.backend.manager.services.user.actions.base import UserAction
 
@@ -130,7 +130,7 @@ class SwitchMyMainAccessKeyActionResult(BaseActionResult):
 class SearchMyKeypairsAction(UserAction):
     """Search keypairs owned by the current user."""
 
-    scope: UserKeypairSearchScope
+    scope: UserKeypairOperationScope
     querier: BatchQuerier
 
     @override
@@ -266,7 +266,7 @@ class SearchKeypairsByResourcePolicyAction(BaseScopeAction):
     owned by others through the resource policy node.
     """
 
-    scope: KeypairResourcePolicyKeypairSearchScope
+    scope: KeypairResourcePolicyKeypairOperationScope
     querier: BatchQuerier
 
     @override

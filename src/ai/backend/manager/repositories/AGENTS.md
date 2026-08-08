@@ -5,7 +5,7 @@
 ## Directory structure (per domain)
 
 - `repository.py` (single-entity CRUD), `repositories.py` (multi-entity container / `RepositoryArgs`),
-  `types.py` (SearchScope + SearchResult), `options.py` (QueryCondition/QueryOrder),
+  `types.py` (OperationScope + SearchResult), `options.py` (QueryCondition/QueryOrder),
   `db_source/db_source.py` (queries). Optional: `creators.py` / `updaters.py` / `purgers.py` / `upserters.py`.
 - Separate out db_source so it is clear which source a Repository uses.
 - Do NOT write a `repository.py` / `db_source.py` for an operation that only hands a spec to
@@ -38,7 +38,7 @@
   boundary, and align repository methods to the service operation.
 - Create db sessions only in public methods, and reuse them only in private methods.
 
-## SearchScope
+## OperationScope
 
 - `@dataclass(frozen=True)`, implement `to_condition() -> QueryCondition` (`types.py`).
 

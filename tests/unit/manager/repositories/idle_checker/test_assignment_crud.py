@@ -25,7 +25,7 @@ from ai.backend.manager.errors.idle_checker import (
     IdleCheckerAssignmentScopeNotFound,
     IdleCheckerNotFound,
 )
-from ai.backend.manager.errors.repository import EmptySearchScopeError
+from ai.backend.manager.errors.repository import EmptyOperationScopeError
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.idle_checker.conditions import IdleCheckerAssignmentConditions
@@ -53,7 +53,7 @@ from ai.backend.manager.repositories.idle_checker.creators import (
 )
 from ai.backend.manager.repositories.idle_checker.purgers import IdleCheckerAssignmentPurgerSpec
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
-from ai.backend.manager.repositories.idle_checker.types import IdleCheckerAssignmentSearchScope
+from ai.backend.manager.repositories.idle_checker.types import IdleCheckerAssignmentOperationScope
 from ai.backend.manager.repositories.idle_checker.updaters import IdleCheckerAssignmentUpdaterSpec
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.types import OptionalState
@@ -393,16 +393,20 @@ class TestIdleCheckerAssignmentRepository:
 
         single_scope_result = await repository.scoped_search_assignments(
             BatchQuerier(pagination=NoPagination()),
-            [IdleCheckerAssignmentSearchScope(scope_type=ScopeType.DOMAIN, scope_id=domain_id)],
+            [IdleCheckerAssignmentOperationScope(scope_type=ScopeType.DOMAIN, scope_id=domain_id)],
         )
         mixed_union_result = await repository.scoped_search_assignments(
             BatchQuerier(pagination=NoPagination()),
             [
-                IdleCheckerAssignmentSearchScope(scope_type=ScopeType.DOMAIN, scope_id=domain_id),
-                IdleCheckerAssignmentSearchScope(
+                IdleCheckerAssignmentOperationScope(
+                    scope_type=ScopeType.DOMAIN, scope_id=domain_id
+                ),
+                IdleCheckerAssignmentOperationScope(
                     scope_type=ScopeType.RESOURCE_GROUP, scope_id=resource_group_id
                 ),
-                IdleCheckerAssignmentSearchScope(scope_type=ScopeType.PROJECT, scope_id=project_id),
+                IdleCheckerAssignmentOperationScope(
+                    scope_type=ScopeType.PROJECT, scope_id=project_id
+                ),
             ],
         )
 
@@ -422,7 +426,7 @@ class TestIdleCheckerAssignmentRepository:
         self,
         repository: IdleCheckerRepository,
     ) -> None:
-        with pytest.raises(EmptySearchScopeError):
+        with pytest.raises(EmptyOperationScopeError):
             await repository.scoped_search_assignments(
                 BatchQuerier(pagination=NoPagination()),
                 [],

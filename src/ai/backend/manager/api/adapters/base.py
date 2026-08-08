@@ -118,7 +118,7 @@ class BaseAdapter(BaseFilterAdapter):
         No ``base_conditions``: it was how a fixed filter — a foreign-key scope, mostly —
         got prepended before there was a scope to say it with. A scoped search now names
         its scopes on the action, so a caller reaching for this should be adding a
-        ``SearchScope`` instead.
+        ``OperationScope`` instead.
         """
         querier = self._build_querier(
             conditions=conditions,

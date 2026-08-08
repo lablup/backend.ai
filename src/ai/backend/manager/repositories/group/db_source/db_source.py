@@ -97,9 +97,9 @@ from ai.backend.manager.repositories.group.purgers import (
 )
 from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
 from ai.backend.manager.repositories.group.types import (
-    DomainProjectSearchScope,
+    DomainProjectOperationScope,
     GroupSearchResult,
-    UserProjectSearchScope,
+    UserProjectOperationScope,
 )
 from ai.backend.manager.repositories.ops.rbac.provider import (
     EntityMembersAddition,
@@ -815,13 +815,13 @@ class GroupDBSource:
 
     async def search_projects_by_domain(
         self,
-        scope: DomainProjectSearchScope,
+        scope: DomainProjectOperationScope,
         querier: BatchQuerier,
     ) -> GroupSearchResult:
         """Search projects within a domain.
 
         Args:
-            scope: DomainProjectSearchScope defining the domain to search within.
+            scope: DomainProjectOperationScope defining the domain to search within.
             querier: Contains conditions, orders, and pagination.
 
         Returns:
@@ -842,7 +842,7 @@ class GroupDBSource:
 
     async def search_projects_by_user(
         self,
-        scope: UserProjectSearchScope,
+        scope: UserProjectOperationScope,
         querier: BatchQuerier,
     ) -> GroupSearchResult:
         """Search projects a user is member of.
@@ -851,7 +851,7 @@ class GroupDBSource:
         the membership predicate.
 
         Args:
-            scope: UserProjectSearchScope defining the user to search for.
+            scope: UserProjectOperationScope defining the user to search for.
             querier: Contains conditions, orders, and pagination.
 
         Returns:

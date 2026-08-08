@@ -43,7 +43,7 @@ from ai.backend.manager.models.idle_checker.row import (
 )
 from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
 from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
-from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.repositories.base import (
@@ -197,7 +197,7 @@ class IdleCheckerDBSource:
     async def scoped_search_assignments(
         self,
         querier: BatchQuerier,
-        scopes: Sequence[SearchScope],
+        scopes: Sequence[OperationScope],
     ) -> SearchResult[IdleCheckerAssignmentData]:
         """Search bindings whose rows match any of ``scopes`` (OR), narrowed by ``querier``."""
         async with self._ops.read_ops() as r:

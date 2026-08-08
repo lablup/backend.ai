@@ -24,16 +24,16 @@ from ai.backend.manager.repositories.base import BatchQuerier, BulkCreator, Crea
 from .db_source import ResourceUsageHistoryDBSource
 from .types import (
     DomainUsageBucketData,
+    DomainUsageBucketOperationScope,
     DomainUsageBucketSearchResult,
-    DomainUsageBucketSearchScope,
     KernelUsageRecordData,
     KernelUsageRecordSearchResult,
     ProjectUsageBucketData,
+    ProjectUsageBucketOperationScope,
     ProjectUsageBucketSearchResult,
-    ProjectUsageBucketSearchScope,
     UserUsageBucketData,
+    UserUsageBucketOperationScope,
     UserUsageBucketSearchResult,
-    UserUsageBucketSearchScope,
 )
 
 if TYPE_CHECKING:
@@ -186,7 +186,7 @@ class ResourceUsageHistoryRepository:
     async def search_domain_usage_buckets(
         self,
         querier: BatchQuerier,
-        scope: DomainUsageBucketSearchScope | None = None,
+        scope: DomainUsageBucketOperationScope | None = None,
     ) -> DomainUsageBucketSearchResult:
         """Search domain usage buckets with pagination."""
         return await self._db_source.search_domain_usage_buckets(querier, scope)
@@ -213,7 +213,7 @@ class ResourceUsageHistoryRepository:
     async def search_project_usage_buckets(
         self,
         querier: BatchQuerier,
-        scope: ProjectUsageBucketSearchScope | None = None,
+        scope: ProjectUsageBucketOperationScope | None = None,
     ) -> ProjectUsageBucketSearchResult:
         """Search project usage buckets with pagination."""
         return await self._db_source.search_project_usage_buckets(querier, scope)
@@ -240,7 +240,7 @@ class ResourceUsageHistoryRepository:
     async def search_user_usage_buckets(
         self,
         querier: BatchQuerier,
-        scope: UserUsageBucketSearchScope | None = None,
+        scope: UserUsageBucketOperationScope | None = None,
     ) -> UserUsageBucketSearchResult:
         """Search user usage buckets with pagination."""
         return await self._db_source.search_user_usage_buckets(querier, scope)

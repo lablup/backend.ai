@@ -129,7 +129,7 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
+from ai.backend.manager.repositories.session.types import ProjectSessionOperationScope
 from ai.backend.manager.services.session.actions.batch_get_kernel_resource_allocation import (
     BatchGetKernelResourceAllocationAction,
 )
@@ -639,7 +639,7 @@ class SessionAdapter(BaseAdapter):
 
     async def gql_search_by_project(
         self,
-        scope: ProjectSessionSearchScope,
+        scope: ProjectSessionOperationScope,
         input: AdminSearchSessionsInput,
     ) -> AdminSearchSessionsPayload:
         """Search sessions within a project, cursor-based pagination."""

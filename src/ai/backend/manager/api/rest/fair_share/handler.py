@@ -75,9 +75,9 @@ from ai.backend.manager.repositories.base import (
     NoPagination,
 )
 from ai.backend.manager.repositories.fair_share.types import (
-    DomainFairShareSearchScope,
-    ProjectFairShareSearchScope,
-    UserFairShareSearchScope,
+    DomainFairShareOperationScope,
+    ProjectFairShareOperationScope,
+    UserFairShareOperationScope,
 )
 from ai.backend.manager.services.fair_share.actions import (
     BulkUpsertDomainFairShareWeightAction,
@@ -566,7 +566,7 @@ class FairShareAPIHandler:
 
         querier = self._adapter.build_domain_fair_share_querier_rg(body.parsed)
         resource_group_id = await self._resolve_resource_group_id(path.parsed.resource_group)
-        scope = DomainFairShareSearchScope(resource_group_id=resource_group_id)
+        scope = DomainFairShareOperationScope(resource_group_id=resource_group_id)
 
         action_result = await self._fair_share.search_rg_domain_fair_shares.wait_for_complete(
             SearchRGDomainFairSharesAction(
@@ -617,7 +617,7 @@ class FairShareAPIHandler:
 
         querier = self._adapter.build_project_fair_share_querier_rg(body.parsed)
         resource_group_id = await self._resolve_resource_group_id(path.parsed.resource_group)
-        scope = ProjectFairShareSearchScope(
+        scope = ProjectFairShareOperationScope(
             domain_name=path.parsed.domain_name,
             resource_group_id=resource_group_id,
         )
@@ -673,7 +673,7 @@ class FairShareAPIHandler:
 
         querier = self._adapter.build_user_fair_share_querier_rg(body.parsed)
         resource_group_id = await self._resolve_resource_group_id(path.parsed.resource_group)
-        scope = UserFairShareSearchScope(
+        scope = UserFairShareOperationScope(
             domain_name=path.parsed.domain_name,
             project_id=path.parsed.project_id,
             resource_group_id=resource_group_id,

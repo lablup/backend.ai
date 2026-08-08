@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.models.scopes import OperationScope
 
 
 @dataclass
@@ -26,5 +26,5 @@ class ActionTarget(ABC):
 
 class SearchableActionTarget(ActionTarget):
     @abstractmethod
-    def to_search_scope(self) -> SearchScope:
+    def to_search_scope(self) -> OperationScope:
         raise NotImplementedError

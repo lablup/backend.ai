@@ -17,11 +17,11 @@ from ai.backend.manager.data.role_preset.types import (
     RolePresetData,
     RolePresetSearchResult,
 )
-from ai.backend.manager.errors.repository import EmptySearchScopeError
+from ai.backend.manager.errors.repository import EmptyOperationScopeError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.repositories.base import (
     OffsetPagination,
     Searcher,
@@ -76,8 +76,8 @@ class ItemSearcher(Searcher[ItemRow, ItemData]):
 
 
 @dataclass(frozen=True)
-class CategoryScope(SearchScope):
-    """SearchScope restricting rows to a single category."""
+class CategoryScope(OperationScope):
+    """OperationScope restricting rows to a single category."""
 
     category: str
     checks: Sequence[ExistenceCheck[Any]] = field(default_factory=tuple)
@@ -227,7 +227,7 @@ class TestSearcher:
     ) -> None:
         """An empty scope list would degrade into an unscoped scan, so it is refused."""
         async with ops.read_ops() as r:
-            with pytest.raises(EmptySearchScopeError):
+            with pytest.raises(EmptyOperationScopeError):
                 await r.search_with_scopes(
                     [],
                     ItemSearcher(pagination=OffsetPagination(offset=0, limit=10)),

@@ -116,15 +116,15 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.keypair.types import (
-    KeypairResourcePolicyKeypairSearchScope,
-    UserKeypairSearchScope,
+    KeypairResourcePolicyKeypairOperationScope,
+    UserKeypairOperationScope,
 )
 from ai.backend.manager.repositories.keypair.updaters import KeyPairUpdaterSpec
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.types import (
-    DomainUserSearchScope,
-    ProjectUserSearchScope,
-    RoleUserSearchScope,
+    DomainUserOperationScope,
+    ProjectUserOperationScope,
+    RoleUserOperationScope,
 )
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
@@ -261,7 +261,7 @@ class UserAdapter(BaseAdapter):
 
     async def gql_search_by_domain(
         self,
-        scope: DomainUserSearchScope,
+        scope: DomainUserOperationScope,
         input: AdminSearchUsersInput,
     ) -> AdminSearchUsersPayload:
         """Search users within a domain, cursor-based pagination."""
@@ -290,7 +290,7 @@ class UserAdapter(BaseAdapter):
 
     async def gql_search_by_project(
         self,
-        scope: ProjectUserSearchScope,
+        scope: ProjectUserOperationScope,
         input: AdminSearchUsersInput,
     ) -> AdminSearchUsersPayload:
         """Search users within a project, cursor-based pagination."""
@@ -344,7 +344,7 @@ class UserAdapter(BaseAdapter):
     ) -> SearchUsersPayload:
         """Search users within a domain."""
         querier = self._build_search_querier(input)
-        scope = DomainUserSearchScope(domain_name=domain_name)
+        scope = DomainUserOperationScope(domain_name=domain_name)
         action_result = await self._processors.user.search_users_by_domain.wait_for_complete(
             SearchUsersByDomainAction(scope=scope, querier=querier)
         )
@@ -364,7 +364,7 @@ class UserAdapter(BaseAdapter):
     ) -> SearchUsersPayload:
         """Search users within a project."""
         querier = self._build_search_querier(input)
-        scope = ProjectUserSearchScope(project_id=project_id)
+        scope = ProjectUserOperationScope(project_id=project_id)
         action_result = await self._processors.user.search_users_by_project.wait_for_complete(
             SearchUsersByProjectAction(scope=scope, querier=querier)
         )
@@ -384,7 +384,7 @@ class UserAdapter(BaseAdapter):
     ) -> SearchUsersPayload:
         """Search users assigned to a role."""
         querier = self._build_search_querier(input)
-        scope = RoleUserSearchScope(role_id=role_id)
+        scope = RoleUserOperationScope(role_id=role_id)
         action_result = await self._processors.user.search_users_by_role.wait_for_complete(
             SearchUsersByRoleAction(scope=scope, querier=querier)
         )
@@ -720,7 +720,7 @@ class UserAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        scope = UserKeypairSearchScope(user_uuid=me.user_id)
+        scope = UserKeypairOperationScope(user_uuid=me.user_id)
         conditions = self._convert_keypair_filter(input.filter) if input.filter else []
         orders = self._convert_keypair_orders(input.order) if input.order else []
         querier = self._build_querier(
@@ -746,7 +746,7 @@ class UserAdapter(BaseAdapter):
 
     async def gql_search_keypairs_by_resource_policy(
         self,
-        scope: KeypairResourcePolicyKeypairSearchScope,
+        scope: KeypairResourcePolicyKeypairOperationScope,
         input: SearchKeypairsRequest,
     ) -> SearchResult[KeypairNode]:
         """Search keypairs assigned to a keypair resource policy (GQL connection).

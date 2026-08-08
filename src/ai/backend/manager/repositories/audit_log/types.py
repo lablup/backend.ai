@@ -11,16 +11,16 @@ import sqlalchemy as sa
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.models.audit_log import AuditLogRow
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
 __all__ = (
-    "EntityAuditLogSearchScope",
-    "TriggeredByAuditLogSearchScope",
+    "EntityAuditLogOperationScope",
+    "TriggeredByAuditLogOperationScope",
 )
 
 
 @dataclass(frozen=True)
-class EntityAuditLogSearchScope(SearchScope):
+class EntityAuditLogOperationScope(OperationScope):
     """Audit log rows tagged with one ``(entity_type, entity_id)`` pair.
 
     One scope = one item of a scoped audit-log query; the repository layer
@@ -54,7 +54,7 @@ class EntityAuditLogSearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class TriggeredByAuditLogSearchScope(SearchScope):
+class TriggeredByAuditLogOperationScope(OperationScope):
     """Audit log rows triggered by a single actor user."""
 
     triggered_by: str

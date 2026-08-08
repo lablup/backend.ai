@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from ai.backend.manager.data.role_invitation.types import RoleInvitationData
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.role_invitation.row import RoleInvitationRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
 
 @dataclass
@@ -26,7 +26,7 @@ class RoleInvitationSearchResult:
 
 
 @dataclass(frozen=True)
-class InviteeSearchScope(SearchScope):
+class InviteeOperationScope(OperationScope):
     """Scope for searching invitations addressed to a specific user."""
 
     invitee_user_id: UUID
@@ -48,7 +48,7 @@ class InviteeSearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class InviterSearchScope(SearchScope):
+class InviterOperationScope(OperationScope):
     """Scope for searching invitations sent by a specific user."""
 
     inviter_user_id: UUID
@@ -70,7 +70,7 @@ class InviterSearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class RoleInvitationSearchScope(SearchScope):
+class RoleInvitationOperationScope(OperationScope):
     """Scope for searching invitations for a specific role."""
 
     role_id: UUID

@@ -37,7 +37,7 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam, RoleIdPathParam
-from ai.backend.manager.repositories.permission_controller.types import ScopedRoleSearchScope
+from ai.backend.manager.repositories.permission_controller.types import ScopedRoleOperationScope
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
@@ -88,7 +88,7 @@ class V2RBACHandler:
     ) -> APIResponse:
         """Search roles registered in a project scope."""
         result = await self._adapter.search_roles_in_scope(
-            ScopedRoleSearchScope(
+            ScopedRoleOperationScope(
                 element_type=RBACElementType.PROJECT, scope_id=str(path.parsed.project_id)
             ),
             body.parsed,

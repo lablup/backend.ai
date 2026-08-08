@@ -21,4 +21,4 @@ and makes the dependency explicit with `DependentCreatorSpec`.
 ## Scope filter default
 
 `batch_query_with_scopes` is the default in order to enforce RBAC scopes. `batch_query_in_global`
-bypasses the filter, so restrict it to superadmin/internal paths, and block empty scopes with `EmptySearchScopeError`.
+bypasses the filter, so restrict it to superadmin/internal paths, and block empty scopes with `EmptyOperationScopeError`.

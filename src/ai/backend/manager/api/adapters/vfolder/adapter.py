@@ -95,8 +95,8 @@ from ai.backend.manager.models.vfolder.orders import (
 )
 from ai.backend.manager.repositories.base import combine_conditions_or, negate_conditions
 from ai.backend.manager.repositories.vfolder.types import (
-    ProjectVFolderSearchScope,
-    UserVFolderSearchScope,
+    ProjectVFolderOperationScope,
+    UserVFolderOperationScope,
 )
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.vfolder.actions.admin_search_vfolders import (
@@ -287,7 +287,7 @@ class VFolderAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        scope = UserVFolderSearchScope(user_id=me.user_id)
+        scope = UserVFolderOperationScope(user_id=me.user_id)
         conditions = self._convert_vfolder_filter(input.filter) if input.filter else []
         orders = self._convert_vfolder_orders(input.order) if input.order else []
         querier = self._build_querier(
@@ -320,7 +320,7 @@ class VFolderAdapter(BaseAdapter):
 
         Used for the project admin page.
         """
-        scope = ProjectVFolderSearchScope(project_id=project_id)
+        scope = ProjectVFolderOperationScope(project_id=project_id)
         conditions = self._convert_vfolder_filter(input.filter) if input.filter else []
         orders = self._convert_vfolder_orders(input.order) if input.order else []
         querier = self._build_querier(

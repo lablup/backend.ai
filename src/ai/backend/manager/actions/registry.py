@@ -47,12 +47,12 @@ from ai.backend.manager.actions.v2.ops.base import (
     DeleteBulkOpsAction,
     DeleteSingleEntityOpsAction,
     GetSingleEntityOpsAction,
+    OperationScopeOpsAction,
     PurgeBulkOpsAction,
     PurgeFieldEntityOpsAction,
     PurgeGlobalOpsAction,
     PurgeSingleEntityOpsAction,
     SearchGlobalOpsAction,
-    SearchScopeOpsAction,
     UpdateBulkOpsAction,
     UpdateGlobalOpsAction,
     UpdateSingleEntityOpsAction,
@@ -396,7 +396,7 @@ class ProcessorGroup[TData: EntityData]:
             validators=(*self._deps.validators.scope, *validators),
         )
 
-    def scope_search_ops[TAction: SearchScopeOpsAction[Any, Any]](
+    def scope_search_ops[TAction: OperationScopeOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
         *,

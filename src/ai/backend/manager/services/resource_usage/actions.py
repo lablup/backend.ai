@@ -12,11 +12,11 @@ from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base import BatchQuerier, QueryPagination
 from ai.backend.manager.repositories.resource_usage_history import (
     DomainUsageBucketData,
-    DomainUsageBucketSearchScope,
+    DomainUsageBucketOperationScope,
     ProjectUsageBucketData,
-    ProjectUsageBucketSearchScope,
+    ProjectUsageBucketOperationScope,
     UserUsageBucketData,
-    UserUsageBucketSearchScope,
+    UserUsageBucketOperationScope,
 )
 
 # Domain Usage Buckets
@@ -158,10 +158,10 @@ class SearchUserUsageBucketsActionResult(BaseActionResult):
 
 
 @dataclass
-class SearchScopedDomainUsageBucketsAction(DomainUsageBucketAction):
+class OperationScopedDomainUsageBucketsAction(DomainUsageBucketAction):
     """Search domain usage buckets within scope."""
 
-    scope: DomainUsageBucketSearchScope
+    scope: DomainUsageBucketOperationScope
     querier: BatchQuerier
 
     @override
@@ -175,7 +175,7 @@ class SearchScopedDomainUsageBucketsAction(DomainUsageBucketAction):
 
 
 @dataclass
-class SearchScopedDomainUsageBucketsActionResult(BaseActionResult):
+class OperationScopedDomainUsageBucketsActionResult(BaseActionResult):
     """Result of scoped domain usage bucket search."""
 
     items: list[DomainUsageBucketData]
@@ -189,10 +189,10 @@ class SearchScopedDomainUsageBucketsActionResult(BaseActionResult):
 
 
 @dataclass
-class SearchScopedProjectUsageBucketsAction(ProjectUsageBucketAction):
+class OperationScopedProjectUsageBucketsAction(ProjectUsageBucketAction):
     """Search project usage buckets within scope."""
 
-    scope: ProjectUsageBucketSearchScope
+    scope: ProjectUsageBucketOperationScope
     querier: BatchQuerier
 
     @override
@@ -206,7 +206,7 @@ class SearchScopedProjectUsageBucketsAction(ProjectUsageBucketAction):
 
 
 @dataclass
-class SearchScopedProjectUsageBucketsActionResult(BaseActionResult):
+class OperationScopedProjectUsageBucketsActionResult(BaseActionResult):
     """Result of scoped project usage bucket search."""
 
     items: list[ProjectUsageBucketData]
@@ -220,10 +220,10 @@ class SearchScopedProjectUsageBucketsActionResult(BaseActionResult):
 
 
 @dataclass
-class SearchScopedUserUsageBucketsAction(UserUsageBucketAction):
+class OperationScopedUserUsageBucketsAction(UserUsageBucketAction):
     """Search user usage buckets within scope."""
 
-    scope: UserUsageBucketSearchScope
+    scope: UserUsageBucketOperationScope
     querier: BatchQuerier
 
     @override
@@ -237,7 +237,7 @@ class SearchScopedUserUsageBucketsAction(UserUsageBucketAction):
 
 
 @dataclass
-class SearchScopedUserUsageBucketsActionResult(BaseActionResult):
+class OperationScopedUserUsageBucketsActionResult(BaseActionResult):
     """Result of scoped user usage bucket search."""
 
     items: list[UserUsageBucketData]

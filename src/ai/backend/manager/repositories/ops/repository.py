@@ -41,7 +41,7 @@ from typing import Any
 
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.errors.repository import EntityNotFoundError
-from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.creator import (
     FieldEntityCreator,
     GlobalEntityCreator,
@@ -98,13 +98,13 @@ class OpsRepository[TData]:
 
     async def search_in_scopes(
         self,
-        scopes: Sequence[SearchScope],
+        scopes: Sequence[OperationScope],
         searcher: Searcher[Any, TData],
     ) -> SearcherResult[TData]:
         """Read a page restricted to ``scopes``, which must not be empty.
 
         No fallback for an empty sequence: ops rejects one with
-        ``EmptySearchScopeError`` and that rejection is the point. A caller whose RBAC
+        ``EmptyOperationScopeError`` and that rejection is the point. A caller whose RBAC
         resolution came back empty is asking for nothing, not for everything, and
         widening it here would hand them every row.
         """
@@ -182,7 +182,7 @@ class OpsRepository[TData]:
             return await w.bulk_purge_scoped_entities(purgers)
 
     async def batch_update_in_scopes(
-        self, scopes: Sequence[SearchScope], updater: DataBatchUpdater[Any, TData]
+        self, scopes: Sequence[OperationScope], updater: DataBatchUpdater[Any, TData]
     ) -> list[TData]:
         """Update every matching row within ``scopes``, which must not be empty."""
         async with self._ops.write_ops() as w:
@@ -194,7 +194,7 @@ class OpsRepository[TData]:
             return await w.batch_update_in_global(updater)
 
     async def batch_purge_in_scopes(
-        self, scopes: Sequence[SearchScope], purger: DataBatchPurger[Any, TData]
+        self, scopes: Sequence[OperationScope], purger: DataBatchPurger[Any, TData]
     ) -> list[TData]:
         """Delete every selected row within ``scopes``, which must not be empty."""
         async with self._ops.write_ops() as w:

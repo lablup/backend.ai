@@ -98,7 +98,7 @@ class SearchService[TData: EntityData]:
     """Runs the action's searcher over the scopes it names.
 
     Raises rather than widening if the action names none: see
-    ``SearchOpsAction.search_scopes``. An unscoped read is
+    ``SearchOpsAction.operation_scopes``. An unscoped read is
     :class:`GlobalSearchService`, wired from a different action shape.
     """
 
@@ -109,7 +109,7 @@ class SearchService[TData: EntityData]:
 
     async def execute(self, action: SearchOpsAction[Any, TData]) -> ScopedBatchOpsResult[TData]:
         result = await self._repository.search_in_scopes(
-            action.search_scopes(), action.to_searcher()
+            action.operation_scopes(), action.to_searcher()
         )
         return ScopedBatchOpsResult(
             items=result.items,
@@ -277,7 +277,7 @@ class BatchUpdateService[TData: EntityData]:
     async def execute(self, action: BatchUpdateOpsAction[Any, TData]) -> EntitiesOpsResult[TData]:
         return EntitiesOpsResult(
             items=await self._repository.batch_update_in_scopes(
-                action.search_scopes(), action.to_batch_updater()
+                action.operation_scopes(), action.to_batch_updater()
             )
         )
 
@@ -309,7 +309,7 @@ class BatchPurgeService[TData: EntityData]:
     async def execute(self, action: BatchPurgeOpsAction[Any, TData]) -> EntitiesOpsResult[TData]:
         return EntitiesOpsResult(
             items=await self._repository.batch_purge_in_scopes(
-                action.search_scopes(), action.to_batch_purger()
+                action.operation_scopes(), action.to_batch_purger()
             )
         )
 

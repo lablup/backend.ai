@@ -6,16 +6,16 @@ from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.resource_usage_history import ResourceUsageHistoryRepository
 
 from .actions import (
+    OperationScopedDomainUsageBucketsAction,
+    OperationScopedDomainUsageBucketsActionResult,
+    OperationScopedProjectUsageBucketsAction,
+    OperationScopedProjectUsageBucketsActionResult,
+    OperationScopedUserUsageBucketsAction,
+    OperationScopedUserUsageBucketsActionResult,
     SearchDomainUsageBucketsAction,
     SearchDomainUsageBucketsActionResult,
     SearchProjectUsageBucketsAction,
     SearchProjectUsageBucketsActionResult,
-    SearchScopedDomainUsageBucketsAction,
-    SearchScopedDomainUsageBucketsActionResult,
-    SearchScopedProjectUsageBucketsAction,
-    SearchScopedProjectUsageBucketsActionResult,
-    SearchScopedUserUsageBucketsAction,
-    SearchScopedUserUsageBucketsActionResult,
     SearchUserUsageBucketsAction,
     SearchUserUsageBucketsActionResult,
 )
@@ -96,14 +96,14 @@ class ResourceUsageService:
 
     async def search_scoped_domain_usage_buckets(
         self,
-        action: SearchScopedDomainUsageBucketsAction,
-    ) -> SearchScopedDomainUsageBucketsActionResult:
+        action: OperationScopedDomainUsageBucketsAction,
+    ) -> OperationScopedDomainUsageBucketsActionResult:
         """Search domain usage buckets within scope."""
         result = await self._repository.search_domain_usage_buckets(
             action.querier,
             action.scope,
         )
-        return SearchScopedDomainUsageBucketsActionResult(
+        return OperationScopedDomainUsageBucketsActionResult(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
@@ -112,14 +112,14 @@ class ResourceUsageService:
 
     async def search_scoped_project_usage_buckets(
         self,
-        action: SearchScopedProjectUsageBucketsAction,
-    ) -> SearchScopedProjectUsageBucketsActionResult:
+        action: OperationScopedProjectUsageBucketsAction,
+    ) -> OperationScopedProjectUsageBucketsActionResult:
         """Search project usage buckets within scope."""
         result = await self._repository.search_project_usage_buckets(
             action.querier,
             action.scope,
         )
-        return SearchScopedProjectUsageBucketsActionResult(
+        return OperationScopedProjectUsageBucketsActionResult(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
@@ -128,14 +128,14 @@ class ResourceUsageService:
 
     async def search_scoped_user_usage_buckets(
         self,
-        action: SearchScopedUserUsageBucketsAction,
-    ) -> SearchScopedUserUsageBucketsActionResult:
+        action: OperationScopedUserUsageBucketsAction,
+    ) -> OperationScopedUserUsageBucketsActionResult:
         """Search user usage buckets within scope."""
         result = await self._repository.search_user_usage_buckets(
             action.querier,
             action.scope,
         )
-        return SearchScopedUserUsageBucketsActionResult(
+        return OperationScopedUserUsageBucketsActionResult(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,

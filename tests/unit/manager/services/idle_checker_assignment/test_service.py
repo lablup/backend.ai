@@ -9,7 +9,7 @@ from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
-from ai.backend.manager.repositories.idle_checker.types import IdleCheckerAssignmentSearchScope
+from ai.backend.manager.repositories.idle_checker.types import IdleCheckerAssignmentOperationScope
 from ai.backend.manager.services.idle_checker_assignment.actions.scoped_search import (
     IdleCheckerAssignmentScopeTarget,
     ScopedSearchIdleCheckerAssignmentsAction,
@@ -64,10 +64,10 @@ class TestIdleCheckerAssignmentService:
 
         called_scopes = repository.scoped_search_assignments.await_args.args[1]
         assert called_scopes == [
-            IdleCheckerAssignmentSearchScope(
+            IdleCheckerAssignmentOperationScope(
                 scope_type=ScopeType.DOMAIN, scope_id=domain_target.scope_id
             ),
-            IdleCheckerAssignmentSearchScope(
+            IdleCheckerAssignmentOperationScope(
                 scope_type=ScopeType.PROJECT, scope_id=project_target.scope_id
             ),
         ]

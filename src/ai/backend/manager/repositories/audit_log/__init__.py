@@ -4,7 +4,7 @@ from .creators import AuditLogCreatorSpec
 from .options import AuditLogConditions, AuditLogOrders
 from .repositories import AuditLogRepositories
 from .repository import AuditLogRepository
-from .types import EntityAuditLogSearchScope, TriggeredByAuditLogSearchScope
+from .types import EntityAuditLogOperationScope, TriggeredByAuditLogOperationScope
 
 __all__ = (
     "AuditLogConditions",
@@ -12,6 +12,6 @@ __all__ = (
     "AuditLogOrders",
     "AuditLogRepositories",
     "AuditLogRepository",
-    "EntityAuditLogSearchScope",
-    "TriggeredByAuditLogSearchScope",
+    "EntityAuditLogOperationScope",
+    "TriggeredByAuditLogOperationScope",
 )

@@ -64,8 +64,8 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
 from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
 from ai.backend.manager.repositories.group.types import (
-    DomainProjectSearchScope,
-    UserProjectSearchScope,
+    DomainProjectOperationScope,
+    UserProjectOperationScope,
 )
 from ai.backend.manager.repositories.group.updaters import GroupUpdaterSpec
 from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
@@ -269,7 +269,7 @@ class ProjectAdapter(BaseAdapter):
     ) -> AdminSearchGroupsPayload:
         """Search projects within a domain."""
         domain_id = await self._resolve_domain_id(domain_name)
-        scope = DomainProjectSearchScope(domain_id=domain_id)
+        scope = DomainProjectOperationScope(domain_id=domain_id)
         conditions = self._convert_group_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
         base_conditions: list[QueryCondition] = [scope.to_condition()]
@@ -299,7 +299,7 @@ class ProjectAdapter(BaseAdapter):
 
     async def search_by_user(
         self,
-        scope: UserProjectSearchScope,
+        scope: UserProjectOperationScope,
         input: AdminSearchProjectsInput,
     ) -> AdminSearchGroupsPayload:
         """Search projects a user is a member of."""

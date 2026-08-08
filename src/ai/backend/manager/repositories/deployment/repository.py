@@ -110,7 +110,7 @@ from ai.backend.manager.repositories.scheduling_history.creators import Deployme
 from .db_source import DeploymentDBSource
 from .storage_source import DeploymentStorageSource
 from .types import (
-    ProjectDeploymentSearchScope,
+    ProjectDeploymentOperationScope,
     RouteData,
     RouteServiceDiscoveryInfo,
     RouteSessionInfo,
@@ -1533,7 +1533,7 @@ class DeploymentRepository:
     async def search_deployments_in_project(
         self,
         querier: BatchQuerier,
-        scope: ProjectDeploymentSearchScope,
+        scope: ProjectDeploymentOperationScope,
     ) -> DeploymentSummarySearchResult:
         """Search endpoints within a project scope with pagination and filtering."""
         return await self._db_source.search_deployments_in_project(querier, scope)

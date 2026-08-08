@@ -27,7 +27,7 @@ from ai.backend.manager.data.auth.login_session_types import LoginHistoryData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.login_session.row import LoginHistoryRow
 from ai.backend.manager.repositories.auth.options import LoginHistoryConditions, LoginHistoryOrders
-from ai.backend.manager.repositories.auth.types import MyLoginHistorySearchScope
+from ai.backend.manager.repositories.auth.types import MyLoginHistoryOperationScope
 from ai.backend.manager.repositories.base import combine_conditions_or, negate_conditions
 from ai.backend.manager.services.auth.actions.search_login_history import (
     AdminSearchLoginHistoryAction,
@@ -81,7 +81,7 @@ class LoginHistoryAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        scope = MyLoginHistorySearchScope(user_id=me.user_id)
+        scope = MyLoginHistoryOperationScope(user_id=me.user_id)
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
         querier = self._build_querier(

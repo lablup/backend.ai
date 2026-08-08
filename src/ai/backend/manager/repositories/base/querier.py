@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
 from .pagination import PageInfoResult, QueryPagination
 
@@ -302,7 +302,7 @@ async def execute_batch_querier(
     db_sess: SASession,
     query: sa.sql.Select[Any],
     querier: BatchQueryOptions,
-    scopes: Sequence[SearchScope] = (),
+    scopes: Sequence[OperationScope] = (),
 ) -> BatchQuerierResult[Row[Any]]:
     """Execute query with batch querier and return rows with total_count and pagination info.
 
@@ -313,7 +313,7 @@ async def execute_batch_querier(
         db_sess: Database session
         query: Base SELECT query (without count window function)
         querier: BatchQuerier for filtering, ordering, and pagination
-        scopes: Optional sequence of SearchScope. Each scope contributes its own
+        scopes: Optional sequence of OperationScope. Each scope contributes its own
             existence checks (aggregated and validated in a single query) and its
             own to_condition() result. The to_condition() results form a single
             OR group that is AND-merged with querier.conditions.

@@ -1,6 +1,6 @@
 """Types for keypair repository operations.
 
-Contains SearchScope dataclasses for keypair search operations.
+Contains OperationScope dataclasses for keypair search operations.
 """
 
 from __future__ import annotations
@@ -17,17 +17,17 @@ from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user.row import UserRow
 
 __all__ = (
-    "UserKeypairSearchScope",
-    "KeypairResourcePolicyKeypairSearchScope",
+    "UserKeypairOperationScope",
+    "KeypairResourcePolicyKeypairOperationScope",
 )
 
 
 @dataclass(frozen=True)
-class UserKeypairSearchScope(SearchScope):
+class UserKeypairOperationScope(OperationScope):
     """Required scope for searching keypairs owned by a specific user.
 
     Used for my_keypairs query (current authenticated user).
@@ -60,7 +60,7 @@ class UserKeypairSearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class KeypairResourcePolicyKeypairSearchScope(SearchScope):
+class KeypairResourcePolicyKeypairOperationScope(OperationScope):
     """Required scope for searching keypairs assigned to a keypair resource policy.
 
     Used by the ``keypairs`` connection on the keypair resource policy node.

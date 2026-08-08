@@ -143,7 +143,7 @@ from repositories.base.types import QueryCondition
 
 
 @dataclass(frozen=True)
-class DomainFairShareSearchScope:
+class DomainFairShareOperationScope:
     """Scope for domain-level fair share search."""
 
     resource_group: str
@@ -179,7 +179,7 @@ async def get_domain_fair_shares(
     """Get domain fair shares for a resource group."""
     repository = request.app["repositories"].fair_share
 
-    scope = DomainFairShareSearchScope(
+    scope = DomainFairShareOperationScope(
         resource_group=resource_group,
         domain_name=domain_name,
     )

@@ -106,8 +106,8 @@ from ai.backend.manager.repositories.base.rbac.entity_purger import (
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.keypair.creators import KeyPairCreatorSpec
 from ai.backend.manager.repositories.keypair.types import (
-    KeypairResourcePolicyKeypairSearchScope,
-    UserKeypairSearchScope,
+    KeypairResourcePolicyKeypairOperationScope,
+    UserKeypairOperationScope,
 )
 from ai.backend.manager.repositories.ops.rbac.provider import (
     EntityMembersAddition,
@@ -132,9 +132,9 @@ from ai.backend.manager.repositories.user.purgers import (
     create_user_vfolder_permission_purger,
 )
 from ai.backend.manager.repositories.user.types import (
-    DomainUserSearchScope,
-    ProjectUserSearchScope,
-    RoleUserSearchScope,
+    DomainUserOperationScope,
+    ProjectUserOperationScope,
+    RoleUserOperationScope,
 )
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec, UserUpdateSpec
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
@@ -1049,13 +1049,13 @@ class UserDBSource:
 
     async def search_users_by_domain(
         self,
-        scope: DomainUserSearchScope,
+        scope: DomainUserOperationScope,
         querier: BatchQuerier,
     ) -> UserSearchResult:
         """Search users within a domain.
 
         Args:
-            scope: DomainUserSearchScope defining the domain to search within.
+            scope: DomainUserOperationScope defining the domain to search within.
             querier: BatchQuerier containing conditions, orders, and pagination.
 
         Returns:
@@ -1075,7 +1075,7 @@ class UserDBSource:
 
     async def search_users_by_project(
         self,
-        scope: ProjectUserSearchScope,
+        scope: ProjectUserOperationScope,
         querier: BatchQuerier,
     ) -> UserSearchResult:
         """Search users within a project.
@@ -1084,7 +1084,7 @@ class UserDBSource:
         the membership predicate.
 
         Args:
-            scope: ProjectUserSearchScope defining the project to search within.
+            scope: ProjectUserOperationScope defining the project to search within.
             querier: BatchQuerier containing conditions, orders, and pagination.
 
         Returns:
@@ -1104,7 +1104,7 @@ class UserDBSource:
 
     async def search_users_by_role(
         self,
-        scope: RoleUserSearchScope,
+        scope: RoleUserOperationScope,
         querier: BatchQuerier,
     ) -> UserSearchResult:
         """Search users assigned to a role.
@@ -1270,7 +1270,7 @@ class UserDBSource:
 
     async def search_my_keypairs(
         self,
-        scope: UserKeypairSearchScope,
+        scope: UserKeypairOperationScope,
         querier: BatchQuerier,
     ) -> SearchResult[KeyPairData]:
         """Search keypairs owned by the scoped user.
@@ -1295,7 +1295,7 @@ class UserDBSource:
 
     async def search_keypairs_by_resource_policy(
         self,
-        scope: KeypairResourcePolicyKeypairSearchScope,
+        scope: KeypairResourcePolicyKeypairOperationScope,
         querier: BatchQuerier,
     ) -> SearchResult[KeyPairData]:
         """Search keypairs assigned to a keypair resource policy.

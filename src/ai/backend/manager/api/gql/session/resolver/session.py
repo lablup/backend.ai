@@ -109,10 +109,10 @@ async def project_sessions_v2(
     limit: int | None = None,
     offset: int | None = None,
 ) -> SessionV2ConnectionGQL | None:
-    from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
+    from ai.backend.manager.repositories.session.types import ProjectSessionOperationScope
 
     payload = await info.context.adapters.session.gql_search_by_project(
-        scope=ProjectSessionSearchScope(project_id=scope.project_id),
+        scope=ProjectSessionOperationScope(project_id=scope.project_id),
         input=AdminSearchSessionsInput(
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,

@@ -56,7 +56,7 @@ from ai.backend.manager.repositories.domain.purgers import (
     DomainKernelBatchPurgerSpec,
     DomainPurgerSpec,
 )
-from ai.backend.manager.repositories.domain.types import DomainSearchResult, DomainSearchScope
+from ai.backend.manager.repositories.domain.types import DomainOperationScope, DomainSearchResult
 from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
 from ai.backend.manager.repositories.ops.rbac.provider import (
     RBACOpsProvider,
@@ -439,13 +439,13 @@ class DomainRepository:
 
     async def search_rg_domains(
         self,
-        scope: DomainSearchScope,
+        scope: DomainOperationScope,
         querier: BatchQuerier,
     ) -> DomainSearchResult:
         """Search domains within a resource group scope.
 
         Args:
-            scope: DomainSearchScope containing resource_group filter.
+            scope: DomainOperationScope containing resource_group filter.
             querier: Contains additional conditions, orders, and pagination.
 
         Returns:

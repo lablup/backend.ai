@@ -29,7 +29,7 @@ from ai.backend.manager.data.permission.types import (
 from ai.backend.manager.errors.permission import VirtualScopeNotFound
 from ai.backend.manager.errors.repository import (
     AmbiguousEntityKeyError,
-    EmptySearchScopeError,
+    EmptyOperationScopeError,
     EntityNotFoundError,
     UnsupportedCompositePrimaryKeyError,
     UpsertEmptyResultError,
@@ -38,7 +38,7 @@ from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
-from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.creator import (
     FieldEntityCreator,
     GlobalEntityCreator,
@@ -123,12 +123,12 @@ class V2ReadOps:
 
     async def search_with_scopes[TRow: Base, TData](
         self,
-        scopes: Sequence[SearchScope],
+        scopes: Sequence[OperationScope],
         searcher: Searcher[TRow, TData],
     ) -> SearcherResult[TData]:
         """Run a searcher restricted to the given scopes; at least one is required."""
         if not scopes:
-            raise EmptySearchScopeError(
+            raise EmptyOperationScopeError(
                 "search_with_scopes requires at least one scope; "
                 "use search_in_global for an explicit unscoped global search."
             )
@@ -148,7 +148,7 @@ class V2ReadOps:
     async def _search[TRow: Base, TData](
         self,
         searcher: Searcher[TRow, TData],
-        scopes: Sequence[SearchScope],
+        scopes: Sequence[OperationScope],
     ) -> SearcherResult[TData]:
         result = await execute_batch_querier(self._sess, searcher.build_select(), searcher, scopes)
         return SearcherResult(
@@ -341,7 +341,7 @@ class V2WriteOps(V2ReadOps):
         return BulkResultWithFailures(successes=successes, errors=errors)
 
     async def batch_update_in_scopes[TRow: Base, TData](
-        self, scopes: Sequence[SearchScope], updater: DataBatchUpdater[TRow, TData]
+        self, scopes: Sequence[OperationScope], updater: DataBatchUpdater[TRow, TData]
     ) -> list[TData]:
         """Update every matching row within ``scopes``; at least one is required.
 
@@ -351,7 +351,7 @@ class V2WriteOps(V2ReadOps):
         AND-merged with the spec's conditions.
         """
         if not scopes:
-            raise EmptySearchScopeError(
+            raise EmptyOperationScopeError(
                 "batch_update_in_scopes requires at least one scope; "
                 "use batch_update_in_global for an explicit unscoped batch update."
             )
@@ -369,7 +369,7 @@ class V2WriteOps(V2ReadOps):
         return await self._batch_update_returning(updater, None)
 
     async def batch_purge_in_scopes[TRow: Base, TData](
-        self, scopes: Sequence[SearchScope], purger: DataBatchPurger[TRow, TData]
+        self, scopes: Sequence[OperationScope], purger: DataBatchPurger[TRow, TData]
     ) -> list[TData]:
         """Delete every row the spec selects within ``scopes``; at least one is
         required. Scope conditions are injected into the selecting subquery.
@@ -378,7 +378,7 @@ class V2WriteOps(V2ReadOps):
         entities until a scoped-family batch purge that deregisters exists.
         """
         if not scopes:
-            raise EmptySearchScopeError(
+            raise EmptyOperationScopeError(
                 "batch_purge_in_scopes requires at least one scope; "
                 "use batch_purge_in_global for an explicit unscoped batch purge."
             )
@@ -450,10 +450,10 @@ class V2WriteOps(V2ReadOps):
                 break
         return removed
 
-    def _scopes_condition(self, scopes: Sequence[SearchScope]) -> sa.ColumnElement[bool]:
+    def _scopes_condition(self, scopes: Sequence[OperationScope]) -> sa.ColumnElement[bool]:
         return sa.or_(*[scope.to_condition()() for scope in scopes])
 
-    async def _validate_scope_existence(self, scopes: Sequence[SearchScope]) -> None:
+    async def _validate_scope_existence(self, scopes: Sequence[OperationScope]) -> None:
         checks = [check for scope in scopes for check in scope.existence_checks]
         if not checks:
             return

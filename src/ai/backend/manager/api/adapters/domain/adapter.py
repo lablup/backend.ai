@@ -43,7 +43,7 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
-from ai.backend.manager.repositories.domain.types import DomainSearchScope
+from ai.backend.manager.repositories.domain.types import DomainOperationScope
 from ai.backend.manager.repositories.domain.updaters import DomainNodeUpdaterSpec
 from ai.backend.manager.services.domain.actions.create_domain_node import CreateDomainNodeAction
 from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
@@ -139,7 +139,7 @@ class DomainAdapter(BaseAdapter):
 
     async def search_rg_domains(
         self,
-        scope: DomainSearchScope,
+        scope: DomainOperationScope,
         input: AdminSearchDomainsInput,
     ) -> AdminSearchDomainsPayload:
         """Search domains within a resource group scope."""

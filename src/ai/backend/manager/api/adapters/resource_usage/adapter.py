@@ -59,23 +59,23 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.repositories.resource_usage_history import (
     DomainUsageBucketConditions,
     DomainUsageBucketData,
+    DomainUsageBucketOperationScope,
     DomainUsageBucketOrders,
-    DomainUsageBucketSearchScope,
     ProjectUsageBucketConditions,
     ProjectUsageBucketData,
+    ProjectUsageBucketOperationScope,
     ProjectUsageBucketOrders,
-    ProjectUsageBucketSearchScope,
     UserUsageBucketConditions,
     UserUsageBucketData,
+    UserUsageBucketOperationScope,
     UserUsageBucketOrders,
-    UserUsageBucketSearchScope,
 )
 from ai.backend.manager.services.resource_usage.actions import (
+    OperationScopedDomainUsageBucketsAction,
+    OperationScopedProjectUsageBucketsAction,
+    OperationScopedUserUsageBucketsAction,
     SearchDomainUsageBucketsAction,
     SearchProjectUsageBucketsAction,
-    SearchScopedDomainUsageBucketsAction,
-    SearchScopedProjectUsageBucketsAction,
-    SearchScopedUserUsageBucketsAction,
     SearchUserUsageBucketsAction,
 )
 
@@ -249,7 +249,7 @@ class ResourceUsageAdapter(BaseAdapter):
         """Search domain usage buckets scoped to a domain/resource-group."""
         limit = input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT
         offset = input.offset if input.offset is not None else 0
-        scope = DomainUsageBucketSearchScope(
+        scope = DomainUsageBucketOperationScope(
             domain_name=input.domain_name,
             resource_group=input.resource_group,
         )
@@ -259,7 +259,7 @@ class ResourceUsageAdapter(BaseAdapter):
             pagination=OffsetPagination(limit=limit, offset=offset),
         )
         action_result = await self._processors.resource_usage.search_scoped_domain_usage_buckets.wait_for_complete(
-            SearchScopedDomainUsageBucketsAction(scope=scope, querier=querier)
+            OperationScopedDomainUsageBucketsAction(scope=scope, querier=querier)
         )
         has_next_page = (offset + len(action_result.items)) < action_result.total_count
         has_previous_page = offset > 0
@@ -276,7 +276,7 @@ class ResourceUsageAdapter(BaseAdapter):
         """Search project usage buckets scoped to a domain/resource-group/project."""
         limit = input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT
         offset = input.offset if input.offset is not None else 0
-        scope = ProjectUsageBucketSearchScope(
+        scope = ProjectUsageBucketOperationScope(
             domain_name=input.domain_name,
             resource_group=input.resource_group,
             project_id=input.project_id,
@@ -287,7 +287,7 @@ class ResourceUsageAdapter(BaseAdapter):
             pagination=OffsetPagination(limit=limit, offset=offset),
         )
         action_result = await self._processors.resource_usage.search_scoped_project_usage_buckets.wait_for_complete(
-            SearchScopedProjectUsageBucketsAction(scope=scope, querier=querier)
+            OperationScopedProjectUsageBucketsAction(scope=scope, querier=querier)
         )
         has_next_page = (offset + len(action_result.items)) < action_result.total_count
         has_previous_page = offset > 0
@@ -304,7 +304,7 @@ class ResourceUsageAdapter(BaseAdapter):
         """Search user usage buckets scoped to a domain/resource-group/project/user."""
         limit = input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT
         offset = input.offset if input.offset is not None else 0
-        scope = UserUsageBucketSearchScope(
+        scope = UserUsageBucketOperationScope(
             domain_name=input.domain_name,
             resource_group=input.resource_group,
             project_id=input.project_id,
@@ -316,7 +316,7 @@ class ResourceUsageAdapter(BaseAdapter):
             pagination=OffsetPagination(limit=limit, offset=offset),
         )
         action_result = await self._processors.resource_usage.search_scoped_user_usage_buckets.wait_for_complete(
-            SearchScopedUserUsageBucketsAction(scope=scope, querier=querier)
+            OperationScopedUserUsageBucketsAction(scope=scope, querier=querier)
         )
         has_next_page = (offset + len(action_result.items)) < action_result.total_count
         has_previous_page = offset > 0
@@ -331,7 +331,7 @@ class ResourceUsageAdapter(BaseAdapter):
 
     async def gql_search_domain_scoped(
         self,
-        scope: DomainUsageBucketSearchScope,
+        scope: DomainUsageBucketOperationScope,
         filter: DomainUsageBucketFilter | None = None,
         order: list[DomainUsageBucketOrderBy] | None = None,
         first: int | None = None,
@@ -356,7 +356,7 @@ class ResourceUsageAdapter(BaseAdapter):
             offset=offset,
         )
         action_result = await self._processors.resource_usage.search_scoped_domain_usage_buckets.wait_for_complete(
-            SearchScopedDomainUsageBucketsAction(scope=scope, querier=querier)
+            OperationScopedDomainUsageBucketsAction(scope=scope, querier=querier)
         )
         return AdminSearchDomainUsageBucketsPayload(
             items=[self._domain_bucket_to_dto(item) for item in action_result.items],
@@ -367,7 +367,7 @@ class ResourceUsageAdapter(BaseAdapter):
 
     async def gql_search_project_scoped(
         self,
-        scope: ProjectUsageBucketSearchScope,
+        scope: ProjectUsageBucketOperationScope,
         filter: ProjectUsageBucketFilter | None = None,
         order: list[ProjectUsageBucketOrderBy] | None = None,
         first: int | None = None,
@@ -392,7 +392,7 @@ class ResourceUsageAdapter(BaseAdapter):
             offset=offset,
         )
         action_result = await self._processors.resource_usage.search_scoped_project_usage_buckets.wait_for_complete(
-            SearchScopedProjectUsageBucketsAction(scope=scope, querier=querier)
+            OperationScopedProjectUsageBucketsAction(scope=scope, querier=querier)
         )
         return AdminSearchProjectUsageBucketsPayload(
             items=[self._project_bucket_to_dto(item) for item in action_result.items],
@@ -403,7 +403,7 @@ class ResourceUsageAdapter(BaseAdapter):
 
     async def gql_search_user_scoped(
         self,
-        scope: UserUsageBucketSearchScope,
+        scope: UserUsageBucketOperationScope,
         filter: UserUsageBucketFilter | None = None,
         order: list[UserUsageBucketOrderBy] | None = None,
         first: int | None = None,
@@ -428,7 +428,7 @@ class ResourceUsageAdapter(BaseAdapter):
             offset=offset,
         )
         action_result = await self._processors.resource_usage.search_scoped_user_usage_buckets.wait_for_complete(
-            SearchScopedUserUsageBucketsAction(scope=scope, querier=querier)
+            OperationScopedUserUsageBucketsAction(scope=scope, querier=querier)
         )
         return AdminSearchUserUsageBucketsPayload(
             items=[self._user_bucket_to_dto(item) for item in action_result.items],

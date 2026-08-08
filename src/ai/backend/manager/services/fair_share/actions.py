@@ -19,9 +19,9 @@ from ai.backend.manager.data.fair_share import (
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base import BatchQuerier, QueryPagination
 from ai.backend.manager.repositories.fair_share.types import (
-    DomainFairShareSearchScope,
-    ProjectFairShareSearchScope,
-    UserFairShareSearchScope,
+    DomainFairShareOperationScope,
+    ProjectFairShareOperationScope,
+    UserFairShareOperationScope,
 )
 
 # Domain Fair Share
@@ -103,7 +103,7 @@ class SearchRGDomainFairSharesAction(DomainFairShareAction):
     entities without fair share records.
     """
 
-    scope: DomainFairShareSearchScope
+    scope: DomainFairShareOperationScope
     querier: BatchQuerier
 
     @override
@@ -207,7 +207,7 @@ class SearchRGProjectFairSharesAction(ProjectFairShareAction):
     entities without fair share records.
     """
 
-    scope: ProjectFairShareSearchScope
+    scope: ProjectFairShareOperationScope
     querier: BatchQuerier
 
     @override
@@ -312,7 +312,7 @@ class SearchRGUserFairSharesAction(UserFairShareAction):
     entities without fair share records.
     """
 
-    scope: UserFairShareSearchScope
+    scope: UserFairShareOperationScope
     querier: BatchQuerier
 
     @override

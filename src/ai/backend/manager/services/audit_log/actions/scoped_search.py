@@ -13,10 +13,10 @@ from ai.backend.manager.actions.action.types import SearchableActionTarget
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.repositories.audit_log.types import (
-    EntityAuditLogSearchScope,
-    TriggeredByAuditLogSearchScope,
+    EntityAuditLogOperationScope,
+    TriggeredByAuditLogOperationScope,
 )
 from ai.backend.manager.repositories.base import BatchQuerier
 
@@ -33,8 +33,8 @@ class EntityAuditLogTarget(SearchableActionTarget):
         return RBACElementRef(element_type=self.element_type, element_id=self.element_id)
 
     @override
-    def to_search_scope(self) -> SearchScope:
-        return EntityAuditLogSearchScope(
+    def to_search_scope(self) -> OperationScope:
+        return EntityAuditLogOperationScope(
             entity_type=self.element_type,
             entity_id=self.element_id,
         )
@@ -54,8 +54,8 @@ class TriggeredByAuditLogTarget(SearchableActionTarget):
         )
 
     @override
-    def to_search_scope(self) -> SearchScope:
-        return TriggeredByAuditLogSearchScope(triggered_by=str(self.user_id))
+    def to_search_scope(self) -> OperationScope:
+        return TriggeredByAuditLogOperationScope(triggered_by=str(self.user_id))
 
 
 @dataclass

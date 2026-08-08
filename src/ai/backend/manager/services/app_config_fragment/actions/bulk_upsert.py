@@ -11,7 +11,7 @@ from ai.backend.manager.data.app_config_fragment.types import (
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.app_config_fragment.types import (
-    AppConfigFragmentSearchScope,
+    AppConfigFragmentOperationScope,
 )
 from ai.backend.manager.repositories.app_config_fragment.upserters import (
     AppConfigFragmentUpserterSpec,
@@ -30,7 +30,7 @@ class BulkUpsertAppConfigFragmentsAction(AppConfigFragmentScopeAction):
     scope — the same gate a create at that scope crosses.
     """
 
-    scope: AppConfigFragmentSearchScope
+    scope: AppConfigFragmentOperationScope
     upserter_specs: list[AppConfigFragmentUpserterSpec]
 
     @override
@@ -61,7 +61,7 @@ class BulkUpsertAppConfigFragmentsActionResult(AppConfigFragmentScopeActionResul
     items: list[AppConfigFragmentData]
     failed: list[AppConfigFragmentUpsertItemError]
     #: The scope the upsert ran at, carried only to report the RBAC scope.
-    _scope: AppConfigFragmentSearchScope
+    _scope: AppConfigFragmentOperationScope
 
     @override
     def scope_type(self) -> ScopeType:

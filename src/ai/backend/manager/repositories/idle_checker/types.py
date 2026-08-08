@@ -17,11 +17,11 @@ from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
 
 @dataclass(frozen=True)
-class IdleCheckerAssignmentSearchScope(SearchScope):
+class IdleCheckerAssignmentOperationScope(OperationScope):
     """Idle checker bindings attached to one ``(scope_type, scope_id)`` pair.
 
     One scope = one item of a scoped binding query; the repository layer

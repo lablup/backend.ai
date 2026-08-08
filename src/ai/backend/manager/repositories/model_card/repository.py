@@ -23,7 +23,7 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.model_card.types import (
     AvailablePresetsSearchResult,
     ModelCardSearchResult,
-    ProjectModelCardSearchScope,
+    ProjectModelCardOperationScope,
 )
 from ai.backend.manager.repositories.model_card.upserters import ModelCardScanUpserterSpec
 
@@ -70,7 +70,7 @@ class ModelCardRepository:
     async def search_in_project(
         self,
         querier: BatchQuerier,
-        scope: ProjectModelCardSearchScope,
+        scope: ProjectModelCardOperationScope,
     ) -> ModelCardSearchResult:
         return await self._db_source.search_in_project(querier, scope)
 
