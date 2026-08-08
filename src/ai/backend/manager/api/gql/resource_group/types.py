@@ -81,6 +81,7 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     ReplaceResourceGroupDefaultSessionOptionsPayload as ReplaceResourceGroupDefaultSessionOptionsPayloadDTO,
 )
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import PreemptionOrder
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
@@ -580,6 +581,17 @@ class UpdateResourceGroupInput(PydanticInputMixin[UpdateResourceGroupConfigInput
         description="Whether the resource group is public. Leave null to keep existing value.",
         default=None,
     )
+    is_default: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Whether this is the default resource group. At most one resource group may"
+                " hold the flag, so setting it to true is rejected while another one holds it;"
+                " clear that one first. Leave null to keep existing value."
+            ),
+        ),
+        default=None,
+    )
 
     # Metadata fields (ScalingGroupMetadataUpdaterSpec)
     description: str | None = gql_field(
@@ -641,6 +653,16 @@ class CreateResourceGroupInputGQL(PydanticInputMixin[CreateResourceGroupInputDTO
     name: str = gql_field(description="Resource group name.")
     domain_name: str = gql_field(description="Domain to create the resource group in.")
     description: str | None = gql_field(default=None, description="Optional description.")
+    is_default: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Make this the default resource group. At most one resource group may hold"
+                " the flag, so this is rejected while another one holds it; clear that one first."
+            ),
+        ),
+        default=False,
+    )
 
 
 @gql_pydantic_type(
