@@ -53,7 +53,7 @@ def _get_session_row_join_condition() -> sa.ColumnElement[bool]:
     return KeyPairRow.access_key == foreign(SessionRow.access_key)
 
 
-class KeyPairRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class KeyPairRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "keypairs"
     __table_args__ = (
         # Partial unique index: at most one keypair per user may have is_default = true.

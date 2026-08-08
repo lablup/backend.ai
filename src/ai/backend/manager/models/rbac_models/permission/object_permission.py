@@ -42,7 +42,7 @@ def _get_scope_association_join_condition() -> sa.ColumnElement[bool]:
     )
 
 
-class ObjectPermissionRow(Base):  # type: ignore[misc]
+class ObjectPermissionRow(Base):
     """DEPRECATED: The ``object_permissions`` table is no longer used and scheduled for removal."""
 
     __tablename__ = "object_permissions"

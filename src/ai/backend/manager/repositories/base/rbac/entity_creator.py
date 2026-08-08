@@ -12,7 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.permission.types import RBACElementType, RelationType
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
+from ai.backend.manager.errors.repository import (
+    RepositoryError,
+    UnsupportedCompositePrimaryKeyError,
+)
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -25,6 +28,13 @@ from ai.backend.manager.repositories.base.integrity import (
 from ai.backend.manager.repositories.base.rbac.utils import bulk_insert_on_conflict_do_nothing
 
 TRow = TypeVar("TRow", bound=Base)
+
+
+def _flushed_pk(row: Base) -> object:
+    identity = inspect(row).identity
+    if identity is None:
+        raise RepositoryError("row must be flushed before extracting its pk")
+    return identity[0]
 
 
 # =============================================================================
@@ -102,7 +112,7 @@ async def execute_rbac_entity_creator[TRow: Base](
     pk_columns = mapper.primary_key
     if len(pk_columns) != 1:
         raise UnsupportedCompositePrimaryKeyError(
-            f"Entity creator only supports single-column primary keys (table: {mapper.local_table.name})",
+            f"Entity creator only supports single-column primary keys (table: {mapper.class_.__table__.name})",
         )
 
     # 1. Build and insert row
@@ -116,8 +126,7 @@ async def execute_rbac_entity_creator[TRow: Base](
         match_integrity_error(parsed, spec.integrity_error_checks)
 
     # 3. Extract RBAC info and insert associations for all scopes
-    instance_state = inspect(row)
-    pk_value = instance_state.identity[0]
+    pk_value = _flushed_pk(row)
     entity_type = creator.element_type.to_entity_type()
     associations = [
         AssociationScopesEntitiesRow(
@@ -204,7 +213,7 @@ async def execute_rbac_bulk_entity_creator[TRow: Base](
     pk_columns = mapper.primary_key
     if len(pk_columns) != 1:
         raise UnsupportedCompositePrimaryKeyError(
-            f"Entity creator only supports single-column primary keys (table: {mapper.local_table.name})",
+            f"Entity creator only supports single-column primary keys (table: {mapper.class_.__table__.name})",
         )
 
     # 2. Flush to get DB-generated IDs and insert associations
@@ -222,7 +231,7 @@ async def execute_rbac_bulk_entity_creator[TRow: Base](
             scope_type=creator.scope_ref.element_type.to_scope_type(),
             scope_id=creator.scope_ref.element_id,
             entity_type=entity_type,
-            entity_id=str(inspect(row).identity[0]),
+            entity_id=str(_flushed_pk(row)),
             relation_type=creator.relation_type,
         )
         for row in rows
@@ -266,7 +275,7 @@ async def execute_rbac_entity_creators[TRow: Base](
     pk_columns = mapper.primary_key
     if len(pk_columns) != 1:
         raise UnsupportedCompositePrimaryKeyError(
-            f"Entity creator only supports single-column primary keys (table: {mapper.local_table.name})",
+            f"Entity creator only supports single-column primary keys (table: {mapper.class_.__table__.name})",
         )
 
     # 2. Single flush to get all DB-generated IDs
@@ -281,7 +290,7 @@ async def execute_rbac_entity_creators[TRow: Base](
     # 3. Collect all associations from each creator's scope refs
     associations: list[AssociationScopesEntitiesRow] = []
     for creator, row in zip(creators, rows, strict=True):
-        pk_value = inspect(row).identity[0]
+        pk_value = _flushed_pk(row)
         entity_type = creator.element_type.to_entity_type()
         for scope_ref in creator.all_scope_refs():
             associations.append(

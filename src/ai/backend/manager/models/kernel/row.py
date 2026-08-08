@@ -138,7 +138,7 @@ def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     return UserRow.uuid == foreign(KernelRow.user_uuid)
 
 
-class KernelRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class KernelRow(CreatedAtMixin, Base):
     __tablename__ = "kernels"
 
     # The Backend.AI-side UUID for each kernel
@@ -237,7 +237,11 @@ class KernelRow(CreatedAtMixin, Base):  # type: ignore[misc]
     architecture: Mapped[str | None] = mapped_column(
         "architecture", sa.String(length=32), default="x86_64", nullable=True
     )
-    registry: Mapped[str | None] = mapped_column("registry", sa.String(length=512), nullable=True)
+    # The column name shadows DeclarativeBase.registry; harmless at runtime since
+    # SQLAlchemy resolves the mapper registry at Base-class creation time.
+    registry: Mapped[str | None] = mapped_column(  # type: ignore[assignment,misc]
+        "registry", sa.String(length=512), nullable=True
+    )
     tag: Mapped[str | None] = mapped_column("tag", sa.String(length=64), nullable=True)
     # Resource occupation
     container_id: Mapped[str | None] = mapped_column(

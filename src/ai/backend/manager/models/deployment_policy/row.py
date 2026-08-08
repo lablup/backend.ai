@@ -29,7 +29,7 @@ __all__ = ("DeploymentPolicyRow",)
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class DeploymentPolicyRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class DeploymentPolicyRow(LifecycleTimestampsMixin, Base):
     """
     Represents a deployment policy for a deployment.
 

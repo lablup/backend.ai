@@ -33,7 +33,7 @@ from pydantic import BaseModel
 from sqlalchemy.dialects.postgresql import ARRAY, CIDR, ENUM, JSONB, UUID
 from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
-from sqlalchemy.orm import registry
+from sqlalchemy.orm import DeclarativeBase, registry
 from sqlalchemy.types import CHAR, SchemaType, TypeDecorator, TypeEngine, Unicode, UnicodeText
 
 from ai.backend.common import validators as tx
@@ -73,7 +73,15 @@ convention = {
 }
 metadata = sa.MetaData(naming_convention=convention)
 mapper_registry = registry(metadata=metadata)
-Base: Any = mapper_registry.generate_base()  # TODO: remove Any after #422 is merged
+
+
+class Base(DeclarativeBase):
+    registry = mapper_registry
+    metadata = mapper_registry.metadata
+    # Narrowed from the stubs' ClassVar[FromClause]; declarative mapping always
+    # materializes __table__ as a real Table.
+    __table__: ClassVar[sa.Table]
+
 
 # Subpackages to skip when dynamically importing model modules
 _SKIP_SUBPACKAGES: Final[frozenset[str]] = frozenset({"alembic", "hasher", "minilang", "rbac"})

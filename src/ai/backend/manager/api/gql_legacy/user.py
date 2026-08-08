@@ -248,7 +248,7 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
     _external_table_filters: Mapping[str, ExternalTableFilterSpec] = {
         "project_name": ExternalTableFilterSpec(
             field_name="project_name",
-            target_table=cast(sa.Table, GroupRow.__table__),
+            target_table=GroupRow.__table__,
             target_column="name",
             join_builder=_project_membership_join,
         ),
@@ -390,7 +390,7 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         )
 
         if external_filters_to_apply and external_table_filter:
-            user_table = cast(sa.Table, UserRow.__table__)
+            user_table = UserRow.__table__
 
             join_clause: sa.Table | sa.sql.Join = user_table
             for spec in external_filters_to_apply.values():

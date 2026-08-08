@@ -12,7 +12,7 @@ from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 __all__ = ("RuntimeVariantRow",)
 
 
-class RuntimeVariantRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class RuntimeVariantRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "runtime_variants"
 
     id: Mapped[RuntimeVariantID] = mapped_column(

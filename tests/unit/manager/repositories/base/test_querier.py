@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-class QuerierTestRowInt(Base):  # type: ignore[misc]
+class QuerierTestRowInt(Base):
     """ORM model for querier testing with integer PK."""
 
     __tablename__ = "test_querier_int_pk"
@@ -51,7 +51,7 @@ class QuerierTestRowInt(Base):  # type: ignore[misc]
     value = sa.Column(sa.String(100), nullable=True)
 
 
-class QuerierTestRowUUID(Base):  # type: ignore[misc]
+class QuerierTestRowUUID(Base):
     """ORM model for querier testing with UUID PK."""
 
     __tablename__ = "test_querier_uuid_pk"
@@ -226,7 +226,7 @@ class TestQuerierUUIDPK:
 # =============================================================================
 
 
-class BatchQuerierTestRow(Base):  # type: ignore[misc]
+class BatchQuerierTestRow(Base):
     """ORM model for batch querier testing."""
 
     __tablename__ = "test_batch_querier_orm"
@@ -376,7 +376,7 @@ class TestScopeValidationError2(BackendAIError):
         )
 
 
-class ScopeValidationTestRow(Base):  # type: ignore[misc]
+class ScopeValidationTestRow(Base):
     """ORM model for scope validation testing."""
 
     __tablename__ = "test_scope_validation"

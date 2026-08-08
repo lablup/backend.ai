@@ -10,7 +10,6 @@ from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
-    Self,
     override,
 )
 from uuid import UUID
@@ -365,7 +364,7 @@ def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     return UserRow.uuid == foreign(SessionRow.user_uuid)
 
 
-class SessionRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class SessionRow(CreatedAtMixin, Base):
     __tablename__ = "sessions"
     id: Mapped[SessionId] = mapped_column(
         "id", SessionIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
@@ -917,7 +916,7 @@ class SessionRow(CreatedAtMixin, Base):  # type: ignore[misc]
         options: Iterable[QueryOption] = tuple(),
         *,
         db: ExtendedAsyncSAEngine,
-    ) -> list[Self]:
+    ) -> list[SessionRow]:
         stmt = sa.select(SessionRow)
         for cond in conditions:
             stmt = cond(stmt)
@@ -1244,7 +1243,7 @@ def by_raw_filter(filter_spec: FieldSpecType, raw_filter: str) -> QueryCondition
     return _by_raw_filter
 
 
-class SessionDependencyRow(Base):  # type: ignore[misc]
+class SessionDependencyRow(Base):
     __tablename__ = "session_dependencies"
     session_id: Mapped[UUID] = mapped_column(
         "session_id",

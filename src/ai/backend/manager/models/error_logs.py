@@ -6,6 +6,7 @@ from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.orm import Mapped
 
 from ai.backend.manager.data.error_log.types import (
     ErrorLogContent,
@@ -48,8 +49,22 @@ error_logs = sa.Table(
 )
 
 
-class ErrorLogRow(Base):  # type: ignore[misc]
+class ErrorLogRow(Base):
     __table__ = error_logs
+
+    id: Mapped[uuid.UUID]
+    created_at: Mapped[datetime]
+    severity: Mapped[str]
+    source: Mapped[str]
+    user: Mapped[uuid.UUID | None]
+    is_read: Mapped[bool]
+    is_cleared: Mapped[bool]
+    message: Mapped[str]
+    context_lang: Mapped[str]
+    context_env: Mapped[dict[str, Any]]
+    request_url: Mapped[str | None]
+    request_status: Mapped[int | None]
+    traceback: Mapped[str | None]
 
     def __init__(
         self,

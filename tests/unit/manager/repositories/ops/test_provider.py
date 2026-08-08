@@ -38,7 +38,7 @@ from ai.backend.manager.repositories.ops import DBOpsProvider, ReadOps
 from ai.backend.testutils.db import with_tables
 
 
-class OpsTestParentRow(Base):  # type: ignore[misc]
+class OpsTestParentRow(Base):
     __tablename__ = "test_ops_parent"
     __table_args__ = {"extend_existing": True}
 
@@ -47,7 +47,7 @@ class OpsTestParentRow(Base):  # type: ignore[misc]
     domain_name: Mapped[str] = mapped_column(sa.String(64), nullable=False)
 
 
-class OpsTestChildRow(Base):  # type: ignore[misc]
+class OpsTestChildRow(Base):
     __tablename__ = "test_ops_child"
     __table_args__ = {"extend_existing": True}
 

@@ -41,7 +41,7 @@ __all__ = (
 )
 
 
-class KernelUsageRecordRow(Base):  # type: ignore[misc]
+class KernelUsageRecordRow(Base):
     """Per-period kernel resource usage records (raw data).
 
     Each record represents kernel resource usage during a specific
@@ -94,7 +94,7 @@ class KernelUsageRecordRow(Base):  # type: ignore[misc]
     )
 
 
-class DomainUsageBucketRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class DomainUsageBucketRow(LifecycleTimestampsMixin, Base):
     """Per-domain period-based resource usage aggregation.
 
     Cache summing all Project/User usage within the domain.
@@ -151,7 +151,7 @@ class DomainUsageBucketRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc
     )
 
 
-class ProjectUsageBucketRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class ProjectUsageBucketRow(LifecycleTimestampsMixin, Base):
     """Per-project period-based resource usage aggregation.
 
     Cache summing all User usage within the project.
@@ -209,7 +209,7 @@ class ProjectUsageBucketRow(LifecycleTimestampsMixin, Base):  # type: ignore[mis
     )
 
 
-class UserUsageBucketRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class UserUsageBucketRow(LifecycleTimestampsMixin, Base):
     """Per-user period-based resource usage aggregation (computation cache).
 
     Cache aggregating raw data from kernel_usage_records per decay_unit period.
@@ -280,7 +280,7 @@ class UserUsageBucketRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     )
 
 
-class UsageBucketEntryRow(Base):  # type: ignore[misc]
+class UsageBucketEntryRow(Base):
     """Per-slot normalized entry for a usage bucket.
 
     ``resource_usage`` holds resource-seconds (occupied slots integrated over the

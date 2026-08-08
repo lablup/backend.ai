@@ -2027,6 +2027,7 @@ class VfolderRepository:
         """
         vf_user_cond = None
         vf_group_cond: sa.ColumnElement[bool] | None = None
+        invited_perm_cond: sa.ColumnElement[bool]
 
         match perm:
             case VFolderPermissionSetAlias():

@@ -1324,7 +1324,7 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
             )
             .select_from(j)
             .options(selectinload(SessionRow.kernels.and_(KernelRow.cluster_role == DEFAULT_ROLE)))
-            .group_by(SessionRow, UserRow.email, UserRow.full_name)
+            .group_by(*SessionRow.__table__.c, UserRow.email, UserRow.full_name)
             .limit(limit)
             .offset(offset)
         )

@@ -13,7 +13,7 @@ from ai.backend.manager.models.base import GUID, Base, StrEnumType
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 
-class RoleInvitationRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class RoleInvitationRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "role_invitations"
     __table_args__ = (
         sa.Index(

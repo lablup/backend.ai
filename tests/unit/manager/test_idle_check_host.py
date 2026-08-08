@@ -80,11 +80,11 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.db.engine import create_async_engine
-from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.db import TableOrORM, with_tables
 
 IDLE_LOGGER_NAME = "ai.backend.manager.idle"
 
-_IDLE_ROWS = [
+_IDLE_ROWS: list[TableOrORM] = [
     DomainRow,
     ScalingGroupRow,
     UserResourcePolicyRow,

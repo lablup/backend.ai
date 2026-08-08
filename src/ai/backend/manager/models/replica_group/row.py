@@ -57,7 +57,7 @@ def _get_target_revision_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     return foreign(ReplicaGroupRow.target_revision_id) == DeploymentRevisionRow.id
 
 
-class ReplicaGroupRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class ReplicaGroupRow(LifecycleTimestampsMixin, Base):
     """
     A group of replicas (routes) within a single deployment.
 

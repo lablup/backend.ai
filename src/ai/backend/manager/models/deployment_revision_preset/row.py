@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 __all__ = ("DeploymentRevisionPresetRow",)
 
 
-class DeploymentRevisionPresetRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class DeploymentRevisionPresetRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "deployment_revision_presets"
 
     __table_args__ = (

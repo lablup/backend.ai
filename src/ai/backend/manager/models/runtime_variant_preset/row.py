@@ -35,7 +35,7 @@ def _get_runtime_variant_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     return foreign(RuntimeVariantPresetRow.runtime_variant) == RuntimeVariantRow.id
 
 
-class RuntimeVariantPresetRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class RuntimeVariantPresetRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "runtime_variant_presets"
 
     __table_args__ = (

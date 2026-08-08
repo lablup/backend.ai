@@ -11,7 +11,7 @@ from ai.backend.manager.models.base import GUID, Base, StrEnumType
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 
-class RetentionPolicyRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class RetentionPolicyRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "retention_policies"
     __table_args__ = (sa.UniqueConstraint("category", name="uq_retention_policies_category"),)
 

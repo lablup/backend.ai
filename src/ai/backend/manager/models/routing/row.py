@@ -58,7 +58,7 @@ def _get_replica_group_join_condition() -> sa.ColumnElement[bool]:
     return foreign(RoutingRow.replica_group_id) == ReplicaGroupRow.id
 
 
-class RoutingRow(Base):  # type: ignore[misc]
+class RoutingRow(Base):
     __tablename__ = "routings"
     __table_args__ = (
         sa.UniqueConstraint("endpoint", "session", name="uq_routings_endpoint_session"),

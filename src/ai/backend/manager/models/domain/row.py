@@ -83,7 +83,7 @@ def row_to_data(row: DomainRow | Row[Any]) -> DomainData:
     )
 
 
-class DomainRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class DomainRow(CreatedAtMixin, Base):
     __tablename__ = "domains"
 
     name: Mapped[str] = mapped_column(

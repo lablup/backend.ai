@@ -12,7 +12,7 @@ from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 __all__ = ("AgentInstalledImageRow",)
 
 
-class AgentInstalledImageRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class AgentInstalledImageRow(CreatedAtMixin, Base):
     """One row per (agent, image) installation.
 
     Composite primary key: (agent_id, image_id). All writes go through

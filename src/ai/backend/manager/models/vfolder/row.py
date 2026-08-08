@@ -292,7 +292,7 @@ class VFolderCloneInfo(NamedTuple):
     cloneable: bool
 
 
-class VFolderRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class VFolderRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "vfolders"
 
     id: Mapped[VFolderUUID] = mapped_column(
@@ -475,7 +475,7 @@ vfolder_attachment = sa.Table(
 )
 
 
-class VFolderInvitationRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class VFolderInvitationRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "vfolder_invitations"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -505,7 +505,7 @@ class VFolderInvitationRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc
 vfolder_invitations = VFolderInvitationRow.__table__
 
 
-class VFolderPermissionRow(Base):  # type: ignore[misc]
+class VFolderPermissionRow(Base):
     __tablename__ = "vfolder_permissions"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -873,7 +873,7 @@ async def update_vfolder_status(
     force: bool = False,
 ) -> None:
     vfolder_info_len = len(vfolder_ids)
-    cond = vfolders.c.id.in_(vfolder_ids)
+    cond: sa.ColumnElement[bool] = vfolders.c.id.in_(vfolder_ids)
     if vfolder_info_len == 0:
         return
     if vfolder_info_len == 1:
@@ -1014,8 +1014,8 @@ async def ensure_quota_scope_accessible_by_user(
     user: Mapping[str, Any],
 ) -> None:
     # Lookup user table to match if quota is scoped to the user
-    query = sa.select(UserRow).where(UserRow.uuid == quota_scope.scope_id)
-    quota_scope_user: UserRow | None = await conn.scalar(query)
+    user_query = sa.select(UserRow).where(UserRow.uuid == quota_scope.scope_id)
+    quota_scope_user: UserRow | None = await conn.scalar(user_query)
     if quota_scope_user:
         match user["role"]:
             case UserRole.SUPERADMIN:
@@ -1029,8 +1029,8 @@ async def ensure_quota_scope_accessible_by_user(
         raise InvalidAPIParameters
 
     # Lookup group table to match if quota is scoped to the group
-    query = sa.select(GroupRow).where(GroupRow.id == quota_scope.scope_id)
-    quota_scope_group: GroupRow | None = await conn.scalar(query)
+    group_query = sa.select(GroupRow).where(GroupRow.id == quota_scope.scope_id)
+    quota_scope_group: GroupRow | None = await conn.scalar(group_query)
     if quota_scope_group:
         match user["role"]:
             case UserRole.SUPERADMIN:

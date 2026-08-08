@@ -18,7 +18,7 @@ from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 __all__ = ("AppConfigFragmentRow",)
 
 
-class AppConfigFragmentRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class AppConfigFragmentRow(LifecycleTimestampsMixin, Base):
     """One scoped app config fragment — a single JSON document at ``(config_name, scope_type, scope_id)``.
 
     A fragment's merge priority is its allow-list entry's ``rank`` — the fragment

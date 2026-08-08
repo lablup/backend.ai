@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
-class UpserterTestRow(Base):  # type: ignore[misc]
+class UpserterTestRow(Base):
     """ORM model for upserter testing with PK as business key."""
 
     __tablename__ = "test_upserter_orm"
