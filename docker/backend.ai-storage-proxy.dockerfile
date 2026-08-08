@@ -1,3 +1,5 @@
+# Build context MUST be the repository root (the paths below are context-relative):
+#   docker build -f docker/backend.ai-storage-proxy.dockerfile --build-arg PYTHON_VERSION=<ver> --build-arg PKGVER=<ver> .
 ARG PYTHON_VERSION
 FROM python:${PYTHON_VERSION} AS builder
 ARG PKGVER
@@ -15,4 +17,3 @@ RUN mkdir -p /var/log/backend.ai /etc/backend.ai
 WORKDIR /app
 
 CMD ["python", "-m", "ai.backend.storage.server", "-f", "/etc/backend.ai/storage-proxy.toml"]
-
