@@ -26,6 +26,11 @@ class PurgeAppConfigAllowListAction(
         return APP_CONFIG_ALLOW_LIST_ENTITY_TYPE
 
     @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "purge_app_config_allow_list"
+
+    @override
     def entity_id(self) -> EntityID:
         return self.purger.allow_list_id
 

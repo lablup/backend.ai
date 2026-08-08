@@ -545,6 +545,11 @@ class _SearchPresetsAction(BaseScopeAction, SearchOpsAction[RolePresetRow, _Pres
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
 
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "search_role_presets"
+
 
 class TestSearch:
     async def test_global_search_returns_every_row(

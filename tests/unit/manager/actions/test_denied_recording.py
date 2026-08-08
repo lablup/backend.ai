@@ -45,6 +45,11 @@ class _Action(BaseSingleEntityAction):
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.DELETE
 
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "delete_session"
+
 
 @dataclass
 class _Result:

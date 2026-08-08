@@ -18,6 +18,12 @@ grows a branch; the generic services take no hook or callback to hide one in.
 - Action and ActionResult MUST be `@dataclass(frozen=True)`.
 - Exactly one `Action` + `ActionResult` pair per action file.
 - Every concrete Action MUST override `entity_id()` and `operation_type()`.
+- v2 actions declare `action_name()`, recorded on audit rows: `<verb>_<entity>` in
+  lowercase snake_case (plural entity for searches, e.g. `search_resource_slot_types`;
+  qualifier prefix where the path differs, e.g. `admin_search_...`). Never derive it
+  from the class name — a rename must not split the audit history. The
+  `(entity_type, operation_type, action_name)` triple must be unique
+  (`tests/unit/manager/actions/test_registry_catalog.py`).
 
 ## Service method rules
 

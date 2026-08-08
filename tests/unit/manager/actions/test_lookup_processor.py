@@ -56,6 +56,11 @@ class _Action(BaseLookupAction):
     def entity_type(cls) -> EntityType:
         return EntityType("image")
 
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "lookup_image"
+
     @override
     def lookup_key(self) -> LookupKey:
         return self.key

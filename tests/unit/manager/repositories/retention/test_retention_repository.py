@@ -304,6 +304,7 @@ class TestLogsRetention:
                 AuditLogRow(
                     entity_type="t",
                     operation="op",
+                    action_name="op_t",
                     action_id=uuid.uuid4(),
                     description="old",
                     created_at=_OLD,

@@ -50,6 +50,7 @@ class BulkActionAuditLogMonitor(BulkActionMonitor):
                     action_id=meta.action_id,
                     entity_type=action.entity_type(),
                     operation=action.operation_type(),
+                    action_name=action.action_name(),
                     created_at=meta.started_at,
                     description=entity_result.description,
                     status=entity_result.status,

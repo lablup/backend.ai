@@ -311,6 +311,11 @@ class _GetAction(BaseSingleEntityAction, GetOpsAction[RolePresetRow, _PresetData
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.GET
 
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "get_role_preset"
+
 
 @dataclass
 class _DeleteAction(BaseSingleEntityAction, UpdateOpsAction[RolePresetRow, _PresetData]):
@@ -337,6 +342,11 @@ class _DeleteAction(BaseSingleEntityAction, UpdateOpsAction[RolePresetRow, _Pres
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.DELETE
 
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "delete_role_preset"
+
 
 @dataclass
 class _CreateAction(BaseScopeAction, CreateOpsAction[RolePresetRow, _PresetData]):
@@ -360,6 +370,11 @@ class _CreateAction(BaseScopeAction, CreateOpsAction[RolePresetRow, _PresetData]
     @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "create_role_preset"
 
 
 @dataclass
@@ -385,6 +400,11 @@ class _UpdateAction(BaseSingleEntityAction, UpdateOpsAction[RolePresetRow, _Pres
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "update_role_preset"
+
 
 @dataclass
 class _PurgeAction(BaseSingleEntityAction, PurgeOpsAction[RolePresetRow, _PresetData]):
@@ -408,6 +428,11 @@ class _PurgeAction(BaseSingleEntityAction, PurgeOpsAction[RolePresetRow, _Preset
     @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.PURGE
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "purge_role_preset"
 
 
 @dataclass
@@ -434,6 +459,11 @@ class _UpsertAction(BaseSingleEntityAction, UpsertOpsAction[RolePresetRow, _Pres
     @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "upsert_role_preset"
 
 
 @dataclass(frozen=True)
@@ -468,6 +498,11 @@ class _LookupAction(BaseLookupAction, LookupOpsAction[RolePresetRow, _PresetData
     def entity_type(cls) -> EntityType:
         return _ENTITY_TYPE
 
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "lookup_role_preset"
+
 
 @dataclass
 class _BulkUpdateAction(BaseBulkAction, BulkUpdateOpsAction[RolePresetRow, _PresetData]):
@@ -492,6 +527,11 @@ class _BulkUpdateAction(BaseBulkAction, BulkUpdateOpsAction[RolePresetRow, _Pres
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "update_role_presets"
+
 
 @dataclass
 class _BulkPurgeAction(BaseBulkAction, BulkPurgeOpsAction[RolePresetRow, _PresetData]):
@@ -514,6 +554,11 @@ class _BulkPurgeAction(BaseBulkAction, BulkPurgeOpsAction[RolePresetRow, _Preset
     @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.PURGE
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "purge_role_presets"
 
 
 @dataclass
@@ -539,6 +584,11 @@ class _BulkCreateAction(BaseScopeAction, BulkCreateOpsAction[RolePresetRow, _Pre
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
 
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "create_role_presets"
+
 
 @dataclass
 class _BatchUpdateAction(BaseScopeAction, BatchUpdateOpsAction[RolePresetRow, _PresetData]):
@@ -562,6 +612,11 @@ class _BatchUpdateAction(BaseScopeAction, BatchUpdateOpsAction[RolePresetRow, _P
     @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "batch_update_role_presets"
 
 
 @dataclass
@@ -587,6 +642,11 @@ class _BatchPurgeAction(BaseScopeAction, BatchPurgeOpsAction[RolePresetRow, _Pre
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.PURGE
 
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "batch_purge_role_presets"
+
 
 @dataclass
 class _GlobalSearchAction(BaseGlobalAction, GlobalSearchOpsAction[RolePresetRow, _PresetData]):
@@ -607,6 +667,11 @@ class _GlobalSearchAction(BaseGlobalAction, GlobalSearchOpsAction[RolePresetRow,
     @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "admin_search_role_presets"
 
 
 @dataclass
@@ -636,6 +701,11 @@ class _SearchAction(BaseScopeAction, SearchOpsAction[RolePresetRow, _PresetData]
     @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "search_role_presets"
 
 
 # =============================================================================

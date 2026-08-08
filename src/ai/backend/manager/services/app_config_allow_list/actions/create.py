@@ -27,5 +27,10 @@ class CreateAppConfigAllowListAction(
         return APP_CONFIG_ALLOW_LIST_ENTITY_TYPE
 
     @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "create_app_config_allow_list"
+
+    @override
     def to_creator(self) -> AppConfigAllowListCreator:
         return self.creator
