@@ -22,6 +22,10 @@
 #   - only runs older than <head-sha>'s own run are touched, so a canceller
 #     that executes late can never cancel a run newer than its event.
 #
+# A run with a hung job ignores the graceful cancel and stays in_progress
+# indefinitely, so after cancelling, the script waits for the runs to actually
+# complete and force-cancels whatever survived the wait.
+#
 # The arguments decide everything -- no CI environment is read and nothing has
 # to be checked out. `gh` takes its credentials from GH_TOKEN under CI and from
 # `gh auth login` elsewhere. Run it against the live repository:
@@ -87,6 +91,7 @@ if [ -z "$targets" ]; then
   exit 0
 fi
 
+cancelled=()
 while read -r id status sha; do
   if [ "$dry_run" = 1 ]; then
     echo "Would cancel run $id ($status, $sha): superseded by $head_sha."
@@ -95,7 +100,31 @@ while read -r id status sha; do
   # A run may finish between the listing and the cancel; that is not a failure.
   if gh api --silent -X POST "repos/$repo/actions/runs/$id/cancel"; then
     echo "Cancelled run $id ($status, $sha): superseded by $head_sha."
+    cancelled+=("$id")
   else
     echo "Run $id ($status, $sha) refused the cancel; likely finished already."
   fi
 done <<< "$targets"
+[ "${#cancelled[@]}" -eq 0 ] && exit 0
+
+# The cancel above is a request, not a result: a run whose job hangs ignores
+# it and keeps blocking the superseding run. Wait for the cancelled runs to
+# actually complete, then force-cancel the survivors.
+for _ in 1 2 3 4 5 6; do
+  sleep 10
+  remaining=()
+  for id in "${cancelled[@]}"; do
+    if [ "$(gh api "repos/$repo/actions/runs/$id" --jq .status)" != "completed" ]; then
+      remaining+=("$id")
+    fi
+  done
+  [ "${#remaining[@]}" -eq 0 ] && exit 0
+  cancelled=("${remaining[@]}")
+done
+for id in "${cancelled[@]}"; do
+  if gh api --silent -X POST "repos/$repo/actions/runs/$id/force-cancel"; then
+    echo "Force-cancelled run $id: it survived the graceful cancel."
+  else
+    echo "Run $id refused the force-cancel; check it by hand."
+  fi
+done
