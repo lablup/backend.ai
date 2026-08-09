@@ -56,7 +56,6 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_slot.updaters import ResourceSlotTypeUpdater
 from ai.backend.manager.types import OptionalState
@@ -222,12 +221,11 @@ class TestResourceSlotTypeUpdater:
             enabled=OptionalState.update(False),
             required=OptionalState.update(True),
         )
-        async with db_with_referencing_tables.begin_session() as db_sess:
-            result = await execute_updater(
-                db_sess, Updater(spec=updater, pk_value=updater.pk_value())
-            )
-            assert result is not None
-            data = updater.to_data(result.row)
+        provider = V2DBOpsProvider(db_with_referencing_tables)
+        async with provider.write_ops() as w:
+            data_or_none = await w.update_data(updater)
+        assert data_or_none is not None
+        data = data_or_none
 
         assert data.enabled is False
         assert data.required is True
@@ -242,11 +240,9 @@ class TestResourceSlotTypeUpdater:
             slot_name="no.such.slot",
             enabled=OptionalState.update(False),
         )
-        async with db_with_referencing_tables.begin_session() as db_sess:
-            result = await execute_updater(
-                db_sess, Updater(spec=updater, pk_value=updater.pk_value())
-            )
-        assert result is None
+        provider = V2DBOpsProvider(db_with_referencing_tables)
+        async with provider.write_ops() as w:
+            assert await w.update_data(updater) is None
 
 
 class TestResourceSlotTypePurger:
