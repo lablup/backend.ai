@@ -12,8 +12,9 @@ import pytest
 
 from ai.backend.manager.errors.object_storage import ObjectStorageNotFoundError
 from ai.backend.manager.models.object_storage import ObjectStorageRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
 from ai.backend.testutils.db import with_tables
 

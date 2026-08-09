@@ -78,9 +78,9 @@ from ai.backend.manager.models.notification.orders import (
     NotificationChannelOrders,
     NotificationRuleOrders,
 )
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    OffsetPagination,
     Updater,
     combine_conditions_or,
     negate_conditions,

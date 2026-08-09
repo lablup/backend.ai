@@ -17,9 +17,9 @@ from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurgerSpec
-from ai.backend.manager.repositories.base.types import ConflictCheck
 
 
 @dataclass

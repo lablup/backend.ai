@@ -7,5 +7,5 @@ __all__ = (
 
 
 # Raw strings mirroring the RBAC-managed RBACElementType.CONTAINER_REGISTRY value.
-CONTAINER_REGISTRY_SCOPE_TYPE = ScopeType("container_registry")
 CONTAINER_REGISTRY_ENTITY_TYPE = EntityType("container_registry")
+CONTAINER_REGISTRY_SCOPE_TYPE = ScopeType(CONTAINER_REGISTRY_ENTITY_TYPE)

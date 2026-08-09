@@ -218,11 +218,10 @@ from ai.backend.manager.models.role_invitation.conditions import (
     RoleInvitationOrders,
 )
 from ai.backend.manager.models.role_invitation.row import RoleInvitationRow
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkCreator,
-    NoPagination,
-    OffsetPagination,
     Purger,
     combine_conditions_or,
     negate_conditions,

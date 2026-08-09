@@ -5,7 +5,7 @@ Kernel and session-related exceptions.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, override
+from typing import Any, override
 
 from aiohttp import web
 
@@ -20,9 +20,6 @@ from ai.backend.common.json import dump_json
 from ai.backend.manager.exceptions import AgentError
 
 from .common import ObjectNotFound
-
-if TYPE_CHECKING:
-    pass
 
 
 class KernelNotReady(BackendAIError, web.HTTPBadRequest):

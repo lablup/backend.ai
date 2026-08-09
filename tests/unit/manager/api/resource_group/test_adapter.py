@@ -23,7 +23,7 @@ from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroup
 from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
 from ai.backend.manager.models.scaling_group.orders import ScalingGroupOrders
 from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
-from ai.backend.manager.repositories.base import OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 
 
 def _get_pagination_spec() -> PaginationSpec:

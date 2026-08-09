@@ -7,5 +7,5 @@ __all__ = (
 
 
 # Raw strings mirroring the RBAC-managed RBACElementType.PROJECT value.
-PROJECT_SCOPE_TYPE = ScopeType("project")
 PROJECT_ENTITY_TYPE = EntityType("project")
+PROJECT_SCOPE_TYPE = ScopeType(PROJECT_ENTITY_TYPE)

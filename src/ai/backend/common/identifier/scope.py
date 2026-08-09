@@ -1,9 +1,10 @@
-import uuid
+from ai.backend.common.identifier.entity import EntityID
 
 __all__ = ("ScopeID",)
 
 
-# A scope's identifier. Polymorphic across scope kinds (domain/project/user/...);
-# the concrete kind is discriminated by the accompanying scope_type, so this is
-# a transparent alias for uuid.UUID rather than a distinct NewType.
-type ScopeID = uuid.UUID
+# A scope's identifier. Every scope doubles as an entity, so this is an alias of
+# EntityID rather than a separate UUID alias: the subset relation is visible in
+# the type. The concrete scope kind is discriminated by the accompanying
+# scope_type, as the entity kind is by entity_type.
+type ScopeID = EntityID

@@ -102,8 +102,12 @@ from ai.backend.manager.errors.service import (
 )
 from ai.backend.manager.models.endpoint import EndpointLifecycle
 from ai.backend.manager.models.routing import RouteStatus
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Creator,
+)
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.model_serving.creators import EndpointTokenCreatorSpec
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository

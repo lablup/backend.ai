@@ -36,6 +36,7 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import (
     PasswordHashAlgorithm,
     PasswordInfo,
@@ -49,7 +50,6 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkCreator,
     Creator,
-    OffsetPagination,
     execute_bulk_creator,
 )
 from ai.backend.manager.repositories.error_log import ErrorLogCreatorSpec, ErrorLogRepository

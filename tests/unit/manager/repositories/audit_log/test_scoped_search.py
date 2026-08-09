@@ -17,13 +17,17 @@ import pytest
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.models.audit_log import AuditLogRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.audit_log import (
     AuditLogRepository,
     EntityAuditLogOperationScope,
     TriggeredByAuditLogOperationScope,
 )
 from ai.backend.manager.repositories.audit_log.creators import SingleEntityAuditLogCreatorSpec
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Creator,
+)
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.testutils.db import with_tables
 

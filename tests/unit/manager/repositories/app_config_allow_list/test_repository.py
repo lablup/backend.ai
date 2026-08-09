@@ -32,6 +32,11 @@ from ai.backend.manager.models.app_config_allow_list.purgers import (
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
+from ai.backend.manager.models.specs.pagination import (
+    CursorBackwardPagination,
+    CursorForwardPagination,
+    OffsetPagination,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_allow_list.queriers import (
     AppConfigAllowListQuerier,
@@ -53,9 +58,6 @@ from ai.backend.manager.repositories.app_config_definition.repository import (
 )
 from ai.backend.manager.repositories.base import (
     Creator,
-    CursorBackwardPagination,
-    CursorForwardPagination,
-    OffsetPagination,
     Purger,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider

@@ -70,10 +70,8 @@ from ai.backend.common.dto.manager.fair_share import (
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    NoPagination,
-)
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.fair_share.types import (
     DomainFairShareOperationScope,
     ProjectFairShareOperationScope,

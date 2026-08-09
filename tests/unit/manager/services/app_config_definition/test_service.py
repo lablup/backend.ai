@@ -14,6 +14,7 @@ from ai.backend.manager.data.app_config_definition.types import (
     AppConfigDefinitionListResult,
 )
 from ai.backend.manager.errors.app_config import AppConfigDefinitionNotFound
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.app_config_definition.creators import (
     AppConfigDefinitionCreatorSpec,
 )
@@ -26,7 +27,6 @@ from ai.backend.manager.repositories.app_config_definition.repository import (
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
-    OffsetPagination,
     Purger,
 )
 from ai.backend.manager.services.app_config_definition.actions.admin_search import (

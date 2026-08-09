@@ -26,10 +26,10 @@ from ai.backend.manager.models.rbac_models.permission.object_permission import O
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.repositories.base.creator import CreatorSpec, DependentCreatorSpec
-from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 
 @dataclass

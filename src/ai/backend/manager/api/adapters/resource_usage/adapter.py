@@ -50,9 +50,9 @@ from ai.backend.manager.models.resource_usage_history.row import (
     ProjectUsageBucketRow,
     UserUsageBucketRow,
 )
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    OffsetPagination,
     combine_conditions_or,
     negate_conditions,
 )

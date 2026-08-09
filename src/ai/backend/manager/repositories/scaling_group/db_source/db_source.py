@@ -13,7 +13,7 @@ from ai.backend.common.data.entity.resource_group import (
     RESOURCE_GROUP_ENTITY_TYPE,
     RESOURCE_GROUP_SCOPE_TYPE,
 )
-from ai.backend.common.data.entity.types import EntityRef, ScopeRef, ScopeType
+from ai.backend.common.data.entity.types import EntityRef, EntityType, ScopeRef, ScopeType
 from ai.backend.common.exception import DomainNotFound
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
@@ -41,6 +41,7 @@ from ai.backend.manager.models.scaling_group import (
     ScalingGroupRow,
     query_allowed_sgroups,
 )
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.creator import (
     BulkCreator,
@@ -48,7 +49,6 @@ from ai.backend.manager.repositories.base.creator import (
     Creator,
     execute_bulk_creator,
 )
-from ai.backend.manager.repositories.base.pagination import NoPagination
 from ai.backend.manager.repositories.base.purger import (
     BatchPurger,
     Purger,
@@ -119,7 +119,7 @@ class ScalingGroupDBSource:
     def _scope_ref_of(self, ref: RBACElementRef) -> ScopeRef:
         """Convert an RBAC element ref addressing a scope-capable element to a ScopeRef."""
         return ScopeRef(
-            scope_type=ScopeType(ref.element_type.value),
+            scope_type=ScopeType(EntityType(ref.element_type.value)),
             scope_id=uuid.UUID(ref.element_id),
         )
 

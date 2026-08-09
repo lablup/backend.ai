@@ -42,9 +42,9 @@ from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
     get_scaling_groups,
 )
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
-from ai.backend.manager.repositories.base.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.repositories.base.purger import BatchPurger
 from ai.backend.manager.repositories.base.querier import BatchQuerier, Querier
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator

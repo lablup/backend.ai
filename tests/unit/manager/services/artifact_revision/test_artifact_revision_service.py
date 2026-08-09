@@ -36,9 +36,10 @@ from ai.backend.manager.errors.artifact import (
 )
 from ai.backend.manager.errors.artifact_registry import InvalidArtifactRegistryTypeError
 from ai.backend.manager.errors.common import ServerMisconfiguredError
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
 from ai.backend.manager.repositories.reservoir_registry.repository import (

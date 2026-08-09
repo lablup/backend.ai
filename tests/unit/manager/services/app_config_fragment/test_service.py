@@ -23,6 +23,7 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentUpsertItemError,
 )
 from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
     AppConfigFragmentPurgerSpec,
 )
@@ -35,10 +36,7 @@ from ai.backend.manager.repositories.app_config_fragment.types import (
 from ai.backend.manager.repositories.app_config_fragment.upserters import (
     AppConfigFragmentUpserterSpec,
 )
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
-)
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
     AdminSearchAppConfigFragmentAction,
 )

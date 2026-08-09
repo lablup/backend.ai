@@ -13,7 +13,7 @@ from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.manager.errors.app_config import AppConfigFragmentWriteNotAllowed
 from ai.backend.manager.errors.repository import ForeignKeyViolationError
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
-from ai.backend.manager.repositories.base import IntegrityErrorCheck
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.base.upserter import UpserterSpec
 
 

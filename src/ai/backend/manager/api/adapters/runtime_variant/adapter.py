@@ -31,9 +31,9 @@ from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.runtime_variant.conditions import RuntimeVariantConditions
 from ai.backend.manager.models.runtime_variant.orders import RuntimeVariantOrders
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    OffsetPagination,
     combine_conditions_or,
     negate_conditions,
 )

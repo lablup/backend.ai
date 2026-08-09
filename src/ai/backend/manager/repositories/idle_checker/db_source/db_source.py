@@ -46,14 +46,13 @@ from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.repositories.base import (
     BatchPurger,
     BatchQuerier,
     BatchUpdater,
     BulkCreator,
     Creator,
-    NoPagination,
-    OffsetPagination,
     Purger,
     Querier,
     Updater,

@@ -1,3 +1,5 @@
+from typing import Any
+
 from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry import ProcessorDependencies, ProcessorRegistry
@@ -109,7 +111,13 @@ from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
 )
 from ai.backend.manager.services.permission_contoller.service import PermissionControllerService
-from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs, Services
+from ai.backend.manager.services.processors import (
+    ProcessorArgs,
+    Processors,
+    ProcessorsBundle,
+    ServiceArgs,
+    Services,
+)
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
@@ -466,24 +474,26 @@ def create_processors(
     args: ProcessorArgs,
     monitors: ActionMonitors,
     validators: ActionValidators,
-) -> Processors:
+) -> ProcessorsBundle:
     services = create_services(args.service_args)
     repositories = args.service_args.repositories
     # Legacy BaseAction-era packages consume the flat monitor list; packages migrated
     # to the pure-ABC frameworks pick the per-type monitors from `monitors` instead.
     action_monitors = monitors.legacy
-    return Processors(
+    # One registry shared by every v2-wired package: each package wires through its
+    # own group, and the registry's wired_specs() is the catalog of every
+    # registered action.
+    registry: ProcessorRegistry[Any] = ProcessorRegistry(
+        ProcessorDependencies(
+            monitors=monitors,
+            validators=args.validators,
+            repository=OpsRepository(repositories.v2_ops_provider),
+        )
+    )
+    processors = Processors(
         agent=AgentProcessors(services.agent, action_monitors, validators),
         app_config=AppConfigProcessors(services.app_config, action_monitors),
-        app_config_allow_list=AppConfigAllowListProcessors(
-            ProcessorRegistry(
-                ProcessorDependencies(
-                    monitors=monitors,
-                    validators=args.validators,
-                    repository=OpsRepository(repositories.v2_ops_provider),
-                )
-            )
-        ),
+        app_config_allow_list=AppConfigAllowListProcessors(registry.group()),
         app_config_fragment=AppConfigFragmentProcessors(
             services.app_config_fragment, action_monitors, validators
         ),
@@ -533,13 +543,7 @@ def create_processors(
             services.resource_slot,
             action_monitors,
             validators,
-            ProcessorRegistry(
-                ProcessorDependencies(
-                    monitors=monitors,
-                    validators=args.validators,
-                    repository=OpsRepository(repositories.v2_ops_provider),
-                )
-            ).group(),
+            registry.group(),
         ),
         retention_policy=RetentionPolicyProcessors(services.retention_policy, action_monitors),
         role_preset=RolePresetProcessors(services.role_preset, action_monitors, validators),
@@ -611,3 +615,4 @@ def create_processors(
             event_fetcher=args.event_fetcher,
         ),
     )
+    return ProcessorsBundle(processors=processors, registry=registry)

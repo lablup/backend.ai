@@ -174,7 +174,7 @@ class TestCheckPermissionViaVirtualScope:
             db_sess.add(
                 VirtualScopeRow(
                     id=ids.virtual_scope_id,
-                    scope_type=ScopeType("project"),
+                    scope_type=ScopeType(EntityType("project")),
                     scope_id=ids.owner_scope_id,
                 )
             )
@@ -183,7 +183,7 @@ class TestCheckPermissionViaVirtualScope:
             db_sess.add(
                 ScopeBindingRow(
                     virtual_scope_id=ids.virtual_scope_id,
-                    scope_type=ScopeType("project"),
+                    scope_type=ScopeType(EntityType("project")),
                     scope_id=ids.bound_scope_id,
                     permission_cap=spec.scope_cap,
                 )

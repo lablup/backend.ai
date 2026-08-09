@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.manager.actions.registry import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
@@ -50,10 +50,9 @@ class AppConfigAllowListProcessors:
         BatchOpsResult[AppConfigAllowListData],
     ]
 
-    def __init__(self, registry: ProcessorRegistry[AppConfigAllowListData]) -> None:
-        p = registry.group()
-        self.create = p.global_create_ops(CreateAppConfigAllowListAction)
-        self.get = p.single_get_ops(GetAppConfigAllowListAction)
-        self.update = p.single_update_ops(UpdateAppConfigAllowListAction)
-        self.purge = p.global_purge_ops(PurgeAppConfigAllowListAction)
-        self.admin_search = p.global_search_ops(AdminSearchAppConfigAllowListAction)
+    def __init__(self, group: ProcessorGroup[AppConfigAllowListData]) -> None:
+        self.create = group.global_create_ops(CreateAppConfigAllowListAction)
+        self.get = group.single_get_ops(GetAppConfigAllowListAction)
+        self.update = group.single_update_ops(UpdateAppConfigAllowListAction)
+        self.purge = group.global_purge_ops(PurgeAppConfigAllowListAction)
+        self.admin_search = group.global_search_ops(AdminSearchAppConfigAllowListAction)

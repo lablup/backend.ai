@@ -96,7 +96,7 @@ class TestProcessingComposer:
         mock_dispatcher_class.return_value = mock_event_dispatcher
 
         mock_processors = MagicMock()
-        mock_create_processors.return_value = mock_processors
+        mock_create_processors.return_value = MagicMock(processors=mock_processors)
 
         mock_dispatchers = MagicMock()
         mock_dispatchers_class.return_value = mock_dispatchers
@@ -168,7 +168,7 @@ class TestProcessingComposer:
 
         mock_processors = MagicMock()
         mock_create_processors.side_effect = lambda *a, **kw: _track(
-            "Processors.create", mock_processors
+            "Processors.create", MagicMock(processors=mock_processors)
         )
 
         mock_dispatchers = MagicMock()

@@ -85,10 +85,9 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
 from ai.backend.manager.models.scaling_group.orders import ScalingGroupOrders
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    NoPagination,
-    OffsetPagination,
     combine_conditions_or,
     negate_conditions,
 )

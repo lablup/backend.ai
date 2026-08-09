@@ -29,9 +29,9 @@ from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.login_client_type.conditions import LoginClientTypeConditions
 from ai.backend.manager.models.login_client_type.orders import LoginClientTypeOrders
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    OffsetPagination,
     combine_conditions_or,
     negate_conditions,
 )

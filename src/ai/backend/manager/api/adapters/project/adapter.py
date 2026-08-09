@@ -53,9 +53,9 @@ from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.group.conditions import GroupConditions
 from ai.backend.manager.models.group.orders import GroupOrders
 from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    NoPagination,
     combine_conditions_or,
     negate_conditions,
 )

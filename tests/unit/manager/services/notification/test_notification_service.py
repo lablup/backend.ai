@@ -32,8 +32,9 @@ from ai.backend.manager.errors.notification import (
     NotificationRuleNotFound,
     NotificationTemplateRenderingFailure,
 )
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.notification.notification_center import NotificationCenter
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.notification import NotificationRepository

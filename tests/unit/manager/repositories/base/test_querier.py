@@ -21,10 +21,10 @@ from ai.backend.common.exception import (
 from ai.backend.manager.models.base import Base, IDColumn
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BatchQuerierResult,
-    OffsetPagination,
     Querier,
     QuerierResult,
     execute_batch_querier,

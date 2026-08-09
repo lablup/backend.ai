@@ -46,7 +46,8 @@ from ai.backend.manager.data.permission.role import (
 )
 from ai.backend.manager.data.permission.status import PermissionStatus, RoleStatus
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.permission_contoller.actions.assign_role import AssignRoleAction
 from ai.backend.manager.services.permission_contoller.actions.create_role import CreateRoleAction
 from ai.backend.manager.services.permission_contoller.actions.delete_role import DeleteRoleAction

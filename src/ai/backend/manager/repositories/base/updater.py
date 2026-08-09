@@ -14,9 +14,10 @@ from sqlalchemy.engine import CursorResult
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.specs import updater as specs_updater
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 from .integrity import match_integrity_error, parse_integrity_error
-from .types import IntegrityErrorCheck
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -72,42 +73,15 @@ class UpdaterSpec[TRow: Base](ABC):
             setattr(row, column, value)
 
 
-class DataUpdater[TRow: Base, TData](UpdaterSpec[TRow], ABC):
-    """An updater spec that names its target row and how the updated row becomes data.
+class DataUpdater[TRow: Base, TData](
+    UpdaterSpec[TRow], specs_updater.DataUpdater[TRow, TData], ABC
+):
+    """Legacy-compatible view of the v2 update spec.
 
-    ``UpdaterSpec`` says only what to set, leaving ``pk_value`` on the
-    :class:`Updater` wrapper and the conversion to the caller. Carrying both here makes
-    it self-contained, so the ops layer returns the ``data/`` type and the ORM row never
-    leaves it.
-
-    Example:
-        class UserRenamer(DataUpdater[UserRow, UserData]):
-            @property
-            def row_class(self) -> type[UserRow]:
-                return UserRow
-
-            def pk_value(self) -> UUID:
-                return self._user_id
-
-            def build_values(self) -> dict[str, Any]:
-                return {"name": self._new_name}
-
-            def to_data(self, row: UserRow) -> UserData:
-                return row.to_data()
-
-        async with ops.write_ops() as w:
-            user = await w.update_data(UserRenamer(user_id, "Bob"))
+    The declaration lives in ``models/specs/updater.py``; this adds the legacy
+    ``UpdaterSpec`` contract on top, so existing executors and domain specs keep
+    working during the transition.
     """
-
-    @abstractmethod
-    def pk_value(self) -> UUID | str | int:
-        """Return the primary key value identifying the target row."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def to_data(self, row: TRow) -> TData:
-        """Convert the updated row into its ``data/`` type."""
-        raise NotImplementedError
 
 
 class BatchUpdaterSpec[TRow: Base](ABC):
@@ -143,43 +117,10 @@ class BatchUpdaterSpec[TRow: Base](ABC):
         return ()
 
 
-class DataBatchUpdater[TRow: Base, TData](BatchUpdaterSpec[TRow], ABC):
-    """A batch updater that names its own conditions and how each updated row becomes data.
-
-    ``BatchUpdaterSpec`` says only what to set, leaving the conditions on the
-    :class:`BatchUpdater` wrapper, and the ops layer reports a row count. Carrying both
-    the conditions and ``to_data`` here makes the spec self-contained and lets the
-    operation return what it actually wrote — which the scope shape needs, since a run
-    over a scope reports the entities it touched through its result.
-
-    Example:
-        class ExpireSessions(DataBatchUpdater[SessionRow, SessionData]):
-            @property
-            def row_class(self) -> type[SessionRow]:
-                return SessionRow
-
-            def conditions(self) -> list[QueryCondition]:
-                return [lambda: SessionRow.status == SessionStatus.PENDING]
-
-            def build_values(self) -> dict[str, Any]:
-                return {"status": SessionStatus.CANCELLED}
-
-            def to_data(self, row: SessionRow) -> SessionData:
-                return row.to_data()
-
-        async with ops.write_ops() as w:
-            cancelled = await w.batch_update_data(ExpireSessions())
-    """
-
-    @abstractmethod
-    def conditions(self) -> list[QueryCondition]:
-        """Return the WHERE clauses selecting the rows to update (AND combined)."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def to_data(self, row: TRow) -> TData:
-        """Convert one updated row into its ``data/`` type."""
-        raise NotImplementedError
+class DataBatchUpdater[TRow: Base, TData](
+    BatchUpdaterSpec[TRow], specs_updater.DataBatchUpdater[TRow, TData], ABC
+):
+    """Legacy-compatible view of the v2 batch update spec; see :class:`DataUpdater`."""
 
 
 @dataclass

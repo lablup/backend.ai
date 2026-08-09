@@ -42,7 +42,7 @@ from ai.backend.manager.repositories.base import (
     DataBatchPurger,
     DataBatchUpdater,
     DataCreator,
-    DataFinder,
+    DataLookup,
     DataPurger,
     DataQuerier,
     DataUpdater,
@@ -133,7 +133,7 @@ class ReadOps:
             return None
         return querier.to_data(result.row)
 
-    async def find_data[TRow: Base, TData](self, finder: DataFinder[TRow, TData]) -> TData | None:
+    async def lookup_data[TRow: Base, TData](self, lookup: DataLookup[TRow, TData]) -> TData | None:
         """Fetch one row by a key that is not its primary key, as its ``data/`` type.
 
         Reads at most two rows and rejects the second: a lookup key is expected to be
@@ -141,9 +141,9 @@ class ReadOps:
         that should enforce it is missing. Answering with an arbitrary one would hide
         both. No count is computed, unlike the search path.
         """
-        row_class = finder.row_class()
+        row_class = lookup.row_class()
         query = sa.select(row_class)
-        for condition in finder.conditions():
+        for condition in lookup.conditions():
             query = query.where(condition())
         result = await self._sess.execute(query.limit(2))
         rows = result.scalars().all()
@@ -153,7 +153,7 @@ class ReadOps:
             raise AmbiguousEntityKeyError(
                 f"The given key matches more than one {row_class.__name__}"
             )
-        return finder.to_data(rows[0])
+        return lookup.to_data(rows[0])
 
     async def batch_query_in_global(
         self,
@@ -226,7 +226,8 @@ class ReadOps:
     ) -> SearcherResult[TData]:
         result = await execute_batch_querier(self._sess, searcher.build_select(), searcher, scopes)
         return SearcherResult(
-            items=[searcher.to_data(row) for row in result.rows],
+            # build_select selects a single entity, so the row's first element is TRow.
+            items=[searcher.to_data(row[0]) for row in result.rows],
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,

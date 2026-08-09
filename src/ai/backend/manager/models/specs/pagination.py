@@ -1,16 +1,17 @@
-"""Pagination strategies for repository queries."""
+"""Pagination declarations the search specs carry, applied by the ops layer."""
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, Any, TypeVar, override
 
 import sqlalchemy as sa
 
+from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 
-from .types import TRow
+TRow = TypeVar("TRow", bound=Base)
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row

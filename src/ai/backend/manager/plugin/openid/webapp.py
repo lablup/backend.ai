@@ -32,10 +32,10 @@ from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.webapp import WebappPlugin
-from ai.backend.manager.repositories.base.pagination import NoPagination
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.ops.rbac.provider import (
     FullUserCreation,

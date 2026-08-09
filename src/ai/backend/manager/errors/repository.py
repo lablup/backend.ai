@@ -18,7 +18,12 @@ from ai.backend.common.exception import (
 
 
 class RepositoryError(BackendAIError):
-    """Base class for repository layer errors."""
+    """Base class for repository layer errors.
+
+    Carries no ``web.HTTP*`` mixin on purpose — a status here would precede every
+    subclass's own mixin in the MRO. Each concrete error mixes in the status it
+    answers with; never raise this base directly.
+    """
 
     error_type = "https://api.backend.ai/probs/repository-error"
     error_title = "Repository operation failed."
@@ -32,7 +37,7 @@ class RepositoryError(BackendAIError):
         )
 
 
-class UpsertEmptyResultError(RepositoryError):
+class UpsertEmptyResultError(RepositoryError, web.HTTPInternalServerError):
     """Raised when upsert operation returns no rows."""
 
     error_type = "https://api.backend.ai/probs/upsert-empty-result"
@@ -47,7 +52,7 @@ class UpsertEmptyResultError(RepositoryError):
         )
 
 
-class UnsupportedCompositePrimaryKeyError(RepositoryError):
+class UnsupportedCompositePrimaryKeyError(RepositoryError, web.HTTPInternalServerError):
     """Raised when an operation requires a single-column primary key but the table has a composite key."""
 
     error_type = "https://api.backend.ai/probs/unsupported-composite-pk"

@@ -23,9 +23,9 @@ from ai.backend.manager.models.scaling_group import (
     ScalingGroupRow,
 )
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.repositories.base.purger import BatchPurger, BatchPurgerSpec, PurgerSpec
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurgerSpec
-from ai.backend.manager.repositories.base.types import ConflictCheck
 
 
 @dataclass

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from ai.backend.manager.actions.registry import ProcessorRegistry
 from ai.backend.manager.actions.v2.validators import ActionValidators
 
 # fmt: off
@@ -530,3 +531,14 @@ class Processors:
     events: EventsProcessors
     login_client_type: LoginClientTypeProcessors
     login_client_type_admin: LoginClientTypeAdminProcessors
+
+
+@dataclass
+class ProcessorsBundle:
+    """What processor assembly hands back, without widening the Processors contract:
+    the processors themselves, plus the one registry every v2-wired package
+    registered through — its wired_specs() is the catalog of every registered
+    action."""
+
+    processors: Processors
+    registry: ProcessorRegistry[Any]

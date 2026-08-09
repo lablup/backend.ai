@@ -30,6 +30,7 @@ from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowLi
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
     AppConfigFragmentPurgerSpec,
 )
@@ -38,7 +39,6 @@ from ai.backend.manager.repositories.app_config_fragment.upserters import (
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    NoPagination,
     Querier,
 )
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger

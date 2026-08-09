@@ -18,8 +18,8 @@ from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.base import CreatorSpec
-from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 
 @dataclass

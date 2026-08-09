@@ -38,15 +38,15 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.specs.creator import GlobalEntityCreator
-from ai.backend.manager.models.specs.purger import GlobalEntityPurger
+from ai.backend.manager.models.specs.lookup import DataLookup
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.purger import DataBatchPurger, GlobalEntityPurger
+from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
+from ai.backend.manager.models.specs.updater import DataBatchUpdater, DataUpdater
 from ai.backend.manager.models.specs.upserter import GlobalEntityUpserter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.pagination import OffsetPagination
-from ai.backend.manager.repositories.base.purger import DataBatchPurger
-from ai.backend.manager.repositories.base.querier import DataFinder, DataQuerier
-from ai.backend.manager.repositories.base.searcher import Searcher
-from ai.backend.manager.repositories.base.updater import DataBatchUpdater, DataUpdater
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.role_preset.purgers import RolePresetPurgerSpec
@@ -223,7 +223,7 @@ class _PresetView(EntityData):
 
 
 @dataclass
-class _PresetByName(DataFinder[RolePresetRow, RolePresetData]):
+class _PresetByName(DataLookup[RolePresetRow, RolePresetData]):
     """Resolves a preset by its name, the way a lookup action would."""
 
     name: str
@@ -248,9 +248,8 @@ class _PresetSearcher(Searcher[RolePresetRow, _PresetView]):
         return sa.select(RolePresetRow)
 
     @override
-    def to_data(self, row: Any) -> _PresetView:
-        preset_row: RolePresetRow = row.RolePresetRow
-        return _PresetView(id=preset_row.id, name=preset_row.name)
+    def to_data(self, row: RolePresetRow) -> _PresetView:
+        return _PresetView(id=row.id, name=row.name)
 
 
 # =============================================================================
@@ -312,17 +311,17 @@ class TestGet:
             await repository.get(_PresetQuerier(target=uuid.uuid4()))
 
 
-class TestFind:
+class TestLookup:
     async def test_a_unique_key_resolves(
         self, repository: OpsRepository[RolePresetData], preset: RolePresetData
     ) -> None:
-        found = await repository.find(_PresetByName(name="default"))
+        found = await repository.lookup(_PresetByName(name="default"))
 
         assert found.id == preset.id
 
     async def test_an_unmatched_key_raises(self, repository: OpsRepository[RolePresetData]) -> None:
         with pytest.raises(EntityNotFoundError):
-            await repository.find(_PresetByName(name="absent"))
+            await repository.lookup(_PresetByName(name="absent"))
 
     async def test_an_ambiguous_key_raises(
         self, repository: OpsRepository[RolePresetData], preset: RolePresetData
@@ -333,7 +332,7 @@ class TestFind:
         )
 
         with pytest.raises(AmbiguousEntityKeyError):
-            await repository.find(_PresetByName(name="default"))
+            await repository.lookup(_PresetByName(name="default"))
 
 
 class TestUpdate:
@@ -595,7 +594,7 @@ class TestFullStack:
             service.execute
         )
         action = _SearchPresetsAction(
-            scope=ScopeRef(scope_type=ScopeType("domain"), scope_id=uuid.uuid4()),
+            scope=ScopeRef(scope_type=ScopeType(EntityType("domain")), scope_id=uuid.uuid4()),
             scopes=(_NamedScope(name="default"),),
         )
 

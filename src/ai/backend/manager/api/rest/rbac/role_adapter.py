@@ -25,7 +25,11 @@ from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.rbac_models.conditions import RoleConditions
 from ai.backend.manager.models.rbac_models.orders import RoleOrders
 from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination, Purger
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Purger,
+)
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.purgers import RolePurgerSpec

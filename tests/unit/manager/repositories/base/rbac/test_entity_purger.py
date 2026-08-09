@@ -34,6 +34,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.repositories.base.rbac.entity_purger import (
     RBACEntityBatchPurger,
     RBACEntityBatchPurgerResult,
@@ -44,7 +45,6 @@ from ai.backend.manager.repositories.base.rbac.entity_purger import (
     execute_rbac_entity_batch_purger,
     execute_rbac_entity_purger,
 )
-from ai.backend.manager.repositories.base.types import ConflictCheck
 from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:

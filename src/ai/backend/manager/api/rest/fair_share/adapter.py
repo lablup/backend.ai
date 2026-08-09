@@ -77,7 +77,8 @@ from ai.backend.manager.models.fair_share.orders import (
     RGUserFairShareOrders,
     UserFairShareOrders,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.resource_usage_history.options import (
     DomainUsageBucketConditions,
     DomainUsageBucketOrders,

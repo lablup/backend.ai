@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import override
@@ -41,8 +41,8 @@ class ProcessorsDependency(NonMonitorableDependencyProvider[ProcessorsProviderIn
 
     @asynccontextmanager
     @override
-    async def provide(self, setup_input: ProcessorsProviderInput) -> AsyncIterator[Processors]:
-        processors = create_processors(
+    async def provide(self, setup_input: ProcessorsProviderInput) -> AsyncGenerator[Processors]:
+        bundle = create_processors(
             ProcessorArgs(
                 service_args=setup_input.service_args,
                 event_hub=setup_input.event_hub,
@@ -52,4 +52,4 @@ class ProcessorsDependency(NonMonitorableDependencyProvider[ProcessorsProviderIn
             setup_input.action_monitors,
             setup_input.validators,
         )
-        yield processors
+        yield bundle.processors

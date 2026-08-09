@@ -22,16 +22,12 @@ from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
-from ai.backend.manager.repositories.base import (
-    OffsetPagination,
-    Searcher,
-)
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:
-    from sqlalchemy.engine import Row
-
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
@@ -70,9 +66,8 @@ class ItemSearcher(Searcher[ItemRow, ItemData]):
         return sa.select(ItemRow)
 
     @override
-    def to_data(self, row: Row[Any]) -> ItemData:
-        item_row: ItemRow = row.ItemRow
-        return item_row.to_data()
+    def to_data(self, row: ItemRow) -> ItemData:
+        return row.to_data()
 
 
 @dataclass(frozen=True)
@@ -262,9 +257,8 @@ class RolePresetSearcher(Searcher[RolePresetRow, RolePresetData]):
         return sa.select(RolePresetRow)
 
     @override
-    def to_data(self, row: Row[Any]) -> RolePresetData:
-        preset_row: RolePresetRow = row.RolePresetRow
-        return preset_row.to_data()
+    def to_data(self, row: RolePresetRow) -> RolePresetData:
+        return row.to_data()
 
 
 class TestPassThroughDomainWiring:

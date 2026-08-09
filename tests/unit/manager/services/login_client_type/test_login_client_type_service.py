@@ -16,7 +16,8 @@ from ai.backend.manager.data.login_client_type.types import (
     LoginClientTypeSearchResult,
 )
 from ai.backend.manager.errors.auth import LoginClientTypeConflict, LoginClientTypeNotFound
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.login_client_type.admin_repository import (

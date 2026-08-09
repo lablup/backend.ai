@@ -83,6 +83,7 @@ from ai.backend.manager.models.rbac_models.permission.permission import Permissi
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.user import (
     ACTIVE_USER_STATUSES,
     UserRole,
@@ -121,7 +122,6 @@ from ai.backend.manager.models.vfolder.conditions import VFolderConditions
 from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    IntegrityErrorCheck,
     execute_batch_querier,
 )
 from ai.backend.manager.repositories.base.integrity import match_integrity_error

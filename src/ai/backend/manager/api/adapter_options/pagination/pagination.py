@@ -11,13 +11,13 @@ from dataclasses import dataclass
 from ai.backend.manager.api.adapter_options.cursor.cursor import decode_cursor
 from ai.backend.manager.errors.api import InvalidCursor, InvalidGraphQLParameters
 from ai.backend.manager.models.clauses import QueryOrder
-from ai.backend.manager.repositories.base import (
+from ai.backend.manager.models.specs.pagination import (
     CursorBackwardPagination,
-    CursorConditionFactory,
     CursorForwardPagination,
     OffsetPagination,
     QueryPagination,
 )
+from ai.backend.manager.repositories.base import CursorConditionFactory
 
 DEFAULT_PAGINATION_LIMIT = 10
 

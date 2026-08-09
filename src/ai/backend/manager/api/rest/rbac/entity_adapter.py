@@ -12,10 +12,8 @@ from ai.backend.common.dto.manager.rbac.request import (
 from ai.backend.common.dto.manager.rbac.response import EntityDTO
 from ai.backend.manager.data.permission.entity import EntityData
 from ai.backend.manager.models.rbac_models.conditions import EntityScopeConditions
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
-)
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 __all__ = ("EntityAdapter",)

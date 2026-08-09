@@ -21,9 +21,9 @@ from ai.backend.manager.models.scaling_group import (
     ScalingGroupOpts,
     ScalingGroupRow,
 )
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.base.creator import CreatorSpec
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.ops.rbac.provider import ScopeCreation
 from ai.backend.manager.repositories.permission_controller.role_manager import (
     ScopeSystemRoleData,

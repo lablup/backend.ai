@@ -21,13 +21,13 @@ from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
 from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
     RBACScopeEntityUnbinder,
     RBACUnbinderResult,
     execute_rbac_scope_entity_unbinder,
 )
-from ai.backend.manager.repositories.base.types import ConflictCheck
 from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:

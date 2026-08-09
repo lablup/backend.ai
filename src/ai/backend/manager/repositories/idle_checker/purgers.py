@@ -15,10 +15,10 @@ from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerRow,
     SessionIdleCheckRow,
 )
+from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.repositories.base import BatchPurgerSpec
 from ai.backend.manager.repositories.base.purger import PurgerSpec
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurgerSpec
-from ai.backend.manager.repositories.base.types import ConflictCheck
 from ai.backend.manager.repositories.idle_checker.types import SessionIdleCheckPair
 
 

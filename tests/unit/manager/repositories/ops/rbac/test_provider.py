@@ -70,12 +70,13 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, ScalingGroupRow
+from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
-from ai.backend.manager.repositories.base import CreatorSpec, IntegrityErrorCheck
+from ai.backend.manager.repositories.base import CreatorSpec
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.rbac.entity_purger import (
     RBACEntityBatchPurger,
@@ -87,7 +88,6 @@ from ai.backend.manager.repositories.base.rbac.entity_upserter import (
     ConflictTarget,
     RBACEntityUpserter,
 )
-from ai.backend.manager.repositories.base.types import ConflictCheck
 from ai.backend.manager.repositories.base.upserter import UpserterSpec
 from ai.backend.manager.repositories.ops.rbac.provider import (
     EntityMembersAddition,
@@ -122,10 +122,10 @@ _ORM_CLUSTER = (
 )
 
 # A scope that carries roles must name a type the permission layer knows.
-_TEST_SCOPE_TYPE = ScopeType(PermissionScopeType.PROJECT.value)
+_TEST_SCOPE_TYPE = ScopeType(VirtualScopeEntityType(PermissionScopeType.PROJECT.value))
 _TEST_ENTITY_TYPE = VirtualScopeEntityType(PermissionScopeType.PROJECT.value)
 _TEST_MEMBER_ENTITY_TYPE = VirtualScopeEntityType(RBACElementType.USER.value)
-_TEST_MEMBER_SCOPE_TYPE = ScopeType(RBACElementType.USER.value)
+_TEST_MEMBER_SCOPE_TYPE = ScopeType(VirtualScopeEntityType(RBACElementType.USER.value))
 
 _USER_SCOPE_ID = str(uuid.uuid4())
 _USER_SCOPE_REF = RBACElementRef(RBACElementType.USER, _USER_SCOPE_ID)
@@ -1091,7 +1091,10 @@ class TestAddBulkMembersPartial:
                 ScopeRef(scope_type=_TEST_MEMBER_SCOPE_TYPE, scope_id=valid.member_id)
             )
             await w.ensure_scope(
-                ScopeRef(scope_type=ScopeType("unregistered-type"), scope_id=invalid.member_id)
+                ScopeRef(
+                    scope_type=ScopeType(VirtualScopeEntityType("unregistered-type")),
+                    scope_id=invalid.member_id,
+                )
             )
             result = await w.add_bulk_members_partial(
                 EntityMembersAddition(scope=scope, members=[valid, invalid])
@@ -1947,7 +1950,9 @@ class TestResolveScopeTemplateValues:
     ) -> None:
         """A scope type without a registered row resolves to None; others still resolve."""
         seed = scope_name_seed
-        unregistered = ScopeRef(scope_type=ScopeType("unregistered"), scope_id=uuid.uuid4())
+        unregistered = ScopeRef(
+            scope_type=ScopeType(VirtualScopeEntityType("unregistered")), scope_id=uuid.uuid4()
+        )
 
         async with provider.write_ops() as w:
             result = await w._resolve_scope_template_values([unregistered, seed.domain_ref])

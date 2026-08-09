@@ -9,7 +9,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy import Row
 
-from ai.backend.manager.repositories.base import (
+from ai.backend.manager.models.specs.pagination import (
     CursorBackwardPagination,
     CursorForwardPagination,
     NoPagination,
