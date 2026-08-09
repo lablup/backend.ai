@@ -7,5 +7,5 @@ __all__ = (
 
 
 # Raw strings mirroring the RBAC-managed RBACElementType.RESOURCE_GROUP value.
-RESOURCE_GROUP_SCOPE_TYPE = ScopeType("resource_group")
 RESOURCE_GROUP_ENTITY_TYPE = EntityType("resource_group")
+RESOURCE_GROUP_SCOPE_TYPE = ScopeType(RESOURCE_GROUP_ENTITY_TYPE)

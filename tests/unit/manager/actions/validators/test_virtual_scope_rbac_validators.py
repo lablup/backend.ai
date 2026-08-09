@@ -205,7 +205,7 @@ class _BulkVfolderUpdateAction(BaseBulkAction):
 
 
 def _domain_scope(scope_id: ScopeID) -> ScopeRef:
-    return ScopeRef(scope_type=ScopeType("domain"), scope_id=scope_id)
+    return ScopeRef(scope_type=ScopeType(EntityType("domain")), scope_id=scope_id)
 
 
 def _make_user_data(user_id: uuid.UUID, *, is_superadmin: bool) -> UserData:
@@ -317,7 +317,7 @@ async def _seed_vs_chain(
         db_sess.add(
             VirtualScopeRow(
                 id=vs_id,
-                scope_type=ScopeType(owner_scope_type),
+                scope_type=ScopeType(EntityType(owner_scope_type)),
                 scope_id=owner_scope_id,
             )
         )
@@ -325,7 +325,7 @@ async def _seed_vs_chain(
         db_sess.add(
             ScopeBindingRow(
                 virtual_scope_id=vs_id,
-                scope_type=ScopeType(owner_scope_type),
+                scope_type=ScopeType(EntityType(owner_scope_type)),
                 scope_id=owner_scope_id,
                 permission_cap=scope_cap,
             )
