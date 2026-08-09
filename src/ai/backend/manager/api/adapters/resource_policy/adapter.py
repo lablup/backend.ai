@@ -84,6 +84,7 @@ from ai.backend.manager.models.resource_policy.conditions import (
     UserResourcePolicyConditions,
 )
 from ai.backend.manager.models.resource_policy.creators import (
+    KeyPairResourcePolicyCreator,
     ProjectResourcePolicyCreator,
     UserResourcePolicyCreator,
 )
@@ -96,13 +97,11 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.keypair_resource_policy.creators import (
-    KeyPairResourcePolicyCreatorSpec,
+from ai.backend.manager.repositories.keypair_resource_policy.searchers import (
+    KeyPairResourcePolicySearcher,
 )
 from ai.backend.manager.repositories.keypair_resource_policy.updaters import (
-    KeyPairResourcePolicyUpdaterSpec,
+    KeyPairResourcePolicyUpdater,
 )
 from ai.backend.manager.repositories.project_resource_policy.searchers import (
     ProjectResourcePolicySearcher,
@@ -200,7 +199,7 @@ class ResourcePolicyAdapter(BaseAdapter):
     # ── Keypair Resource Policy ──
 
     async def admin_get_keypair_resource_policy(self, name: str) -> KeypairResourcePolicyNode:
-        result = await self._processors.keypair_resource_policy.get_keypair_resource_policy.wait_for_complete(
+        result = await self._processors.keypair_resource_policy.get_keypair_resource_policy.run(
             GetKeypairResourcePolicyAction(name=name)
         )
         return self._keypair_policy_data_to_node(result.data)
@@ -211,7 +210,8 @@ class ResourcePolicyAdapter(BaseAdapter):
     ) -> SearchKeypairResourcePoliciesPayload:
         conditions = self._convert_keypair_filter(input.filter) if input.filter else []
         orders = self._resolve_keypair_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            KeyPairResourcePolicySearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_KEYPAIR_RP_PAGINATION_SPEC,
@@ -222,8 +222,10 @@ class ResourcePolicyAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.keypair_resource_policy.search_keypair_resource_policies.wait_for_complete(
-            SearchKeypairResourcePoliciesAction(querier=querier)
+        result = (
+            await self._processors.keypair_resource_policy.search_keypair_resource_policies.run(
+                SearchKeypairResourcePoliciesAction(searcher=searcher)
+            )
         )
         items = [self._keypair_policy_data_to_node(d) for d in result.items]
         return SearchKeypairResourcePoliciesPayload(items=items, total_count=result.total_count)
@@ -231,7 +233,7 @@ class ResourcePolicyAdapter(BaseAdapter):
     async def admin_create_keypair_resource_policy(
         self, input: CreateKeypairResourcePolicyInput
     ) -> CreateKeypairResourcePolicyPayload:
-        spec = KeyPairResourcePolicyCreatorSpec(
+        creator = KeyPairResourcePolicyCreator(
             name=input.name,
             default_for_unspecified=input.default_for_unspecified,
             total_resource_slots=self._entries_to_resource_slot(input.total_resource_slots),
@@ -248,23 +250,19 @@ class ResourcePolicyAdapter(BaseAdapter):
             max_containers_per_session=input.max_containers_per_session,
             idle_timeout=input.idle_timeout,
             allowed_vfolder_hosts=self._entries_to_vfolder_hosts(input.allowed_vfolder_hosts),
-            max_quota_scope_size=None,
-            max_vfolder_count=None,
-            max_vfolder_size=None,
         )
-        result = await self._processors.keypair_resource_policy.create_keypair_resource_policy.wait_for_complete(
-            CreateKeyPairResourcePolicyAction(creator=Creator(spec=spec))
+        result = await self._processors.keypair_resource_policy.create_keypair_resource_policy.run(
+            CreateKeyPairResourcePolicyAction(creator=creator)
         )
         return CreateKeypairResourcePolicyPayload(
-            keypair_resource_policy=self._keypair_policy_data_to_node(
-                result.keypair_resource_policy
-            )
+            keypair_resource_policy=self._keypair_policy_data_to_node(result.data)
         )
 
     async def admin_update_keypair_resource_policy(
         self, name: str, input: UpdateKeypairResourcePolicyInput
     ) -> UpdateKeypairResourcePolicyPayload:
-        spec = KeyPairResourcePolicyUpdaterSpec(
+        updater = KeyPairResourcePolicyUpdater(
+            name=name,
             default_for_unspecified=(
                 OptionalState.update(input.default_for_unspecified)
                 if input.default_for_unspecified is not None
@@ -337,20 +335,17 @@ class ResourcePolicyAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
         )
-        updater: Updater[KeyPairResourcePolicyRow] = Updater(spec=spec, pk_value=name)
-        result = await self._processors.keypair_resource_policy.modify_keypair_resource_policy.wait_for_complete(
-            ModifyKeyPairResourcePolicyAction(name=name, updater=updater)
+        result = await self._processors.keypair_resource_policy.modify_keypair_resource_policy.run(
+            ModifyKeyPairResourcePolicyAction(updater=updater)
         )
         return UpdateKeypairResourcePolicyPayload(
-            keypair_resource_policy=self._keypair_policy_data_to_node(
-                result.keypair_resource_policy
-            )
+            keypair_resource_policy=self._keypair_policy_data_to_node(result.data)
         )
 
     async def admin_delete_keypair_resource_policy(
         self, input: DeleteKeypairResourcePolicyInput
     ) -> DeleteKeypairResourcePolicyPayload:
-        await self._processors.keypair_resource_policy.delete_keypair_resource_policy.wait_for_complete(
+        await self._processors.keypair_resource_policy.delete_keypair_resource_policy.run(
             DeleteKeyPairResourcePolicyAction(name=input.name)
         )
         return DeleteKeypairResourcePolicyPayload(name=input.name)

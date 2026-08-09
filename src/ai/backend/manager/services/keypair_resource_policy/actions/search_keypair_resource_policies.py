@@ -1,36 +1,38 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.resource_policy import (
+    KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE,
+)
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.keypair_resource_policy.actions.base import (
-    KeypairResourcePolicyAction,
+from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
+from ai.backend.manager.repositories.keypair_resource_policy.searchers import (
+    KeyPairResourcePolicySearcher,
 )
 
 
 @dataclass
-class SearchKeypairResourcePoliciesAction(KeypairResourcePolicyAction):
-    querier: BatchQuerier
+class SearchKeypairResourcePoliciesAction(
+    SearchGlobalOpsAction[KeyPairResourcePolicyRow, KeyPairResourcePolicyData]
+):
+    """Page through the keypair resource policy catalog."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    searcher: KeyPairResourcePolicySearcher
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass
-class SearchKeypairResourcePoliciesActionResult(BaseActionResult):
-    items: list[KeyPairResourcePolicyData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    def entity_type(cls) -> EntityType:
+        return KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "admin_search_keypair_resource_policies"
+
+    @override
+    def to_searcher(self) -> KeyPairResourcePolicySearcher:
+        return self.searcher

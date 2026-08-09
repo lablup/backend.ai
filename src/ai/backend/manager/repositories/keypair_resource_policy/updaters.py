@@ -1,18 +1,22 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
 
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
-from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
-from ai.backend.manager.repositories.base.updater import UpdaterSpec
+from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
+from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.types import OptionalState, TriState
 
 
 @dataclass
-class KeyPairResourcePolicyUpdaterSpec(UpdaterSpec["KeyPairResourcePolicyRow"]):
-    """UpdaterSpec for keypair resource policy updates."""
-
+class KeyPairResourcePolicyUpdater(
+    DataUpdater[KeyPairResourcePolicyRow, KeyPairResourcePolicyData]
+):
+    name: str
     allowed_vfolder_hosts: OptionalState[dict[str, Any]] = field(default_factory=OptionalState.nop)
     default_for_unspecified: OptionalState[DefaultForUnspecified] = field(
         default_factory=OptionalState.nop
@@ -36,6 +40,15 @@ class KeyPairResourcePolicyUpdaterSpec(UpdaterSpec["KeyPairResourcePolicyRow"]):
         return KeyPairResourcePolicyRow
 
     @override
+    def pk_value(self) -> str:
+        return self.name
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
     def build_values(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
         self.allowed_vfolder_hosts.update_dict(to_update, "allowed_vfolder_hosts")
@@ -55,3 +68,7 @@ class KeyPairResourcePolicyUpdaterSpec(UpdaterSpec["KeyPairResourcePolicyRow"]):
         self.max_session_lifetime.update_dict(to_update, "max_session_lifetime")
         self.total_resource_slots.update_dict(to_update, "total_resource_slots")
         return to_update
+
+    @override
+    def to_data(self, row: KeyPairResourcePolicyRow) -> KeyPairResourcePolicyData:
+        return row.to_dataclass()

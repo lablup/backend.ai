@@ -16,7 +16,6 @@ from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.resource_policy import (
-    KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
     keypair_resource_policies,
@@ -24,8 +23,6 @@ from ai.backend.manager.models.resource_policy import (
     user_resource_policies,
 )
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.types import OptionalState, TriState
 
 from .base import (
@@ -35,14 +32,12 @@ from .base import (
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.resource_policy.creators import (
+        KeyPairResourcePolicyCreator,
         ProjectResourcePolicyCreator,
         UserResourcePolicyCreator,
     )
-    from ai.backend.manager.repositories.keypair_resource_policy.creators import (
-        KeyPairResourcePolicyCreatorSpec,
-    )
     from ai.backend.manager.repositories.keypair_resource_policy.updaters import (
-        KeyPairResourcePolicyUpdaterSpec,
+        KeyPairResourcePolicyUpdater,
     )
     from ai.backend.manager.repositories.project_resource_policy.updaters import (
         ProjectResourcePolicyUpdater,
@@ -52,22 +47,6 @@ if TYPE_CHECKING:
     )
 
     from .schema import GraphQueryContext
-
-
-def _get_keypair_resource_policy_creator_spec() -> type[KeyPairResourcePolicyCreatorSpec]:
-    from ai.backend.manager.repositories.keypair_resource_policy.creators import (
-        KeyPairResourcePolicyCreatorSpec,
-    )
-
-    return KeyPairResourcePolicyCreatorSpec
-
-
-def _get_keypair_resource_policy_updater_spec() -> type[KeyPairResourcePolicyUpdaterSpec]:
-    from ai.backend.manager.repositories.keypair_resource_policy.updaters import (
-        KeyPairResourcePolicyUpdaterSpec,
-    )
-
-    return KeyPairResourcePolicyUpdaterSpec
 
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -268,7 +247,7 @@ class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):  # type: ignor
     max_pending_session_count = graphene.Int(description="Added in 24.03.4.")
     max_pending_session_resource_slots = graphene.JSONString(description="Added in 24.03.4.")
 
-    def to_creator(self, name: str) -> Creator[KeyPairResourcePolicyRow]:
+    def to_creator(self, name: str) -> KeyPairResourcePolicyCreator:
         default_for_unspecified = DefaultForUnspecified[self.default_for_unspecified]
         total_resource_slots = ResourceSlot.from_user_input(self.total_resource_slots, None)
 
@@ -281,27 +260,23 @@ class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):  # type: ignor
         def value_or_none(value: Any) -> Any:
             return value if value is not Undefined else None
 
-        CreatorSpec = _get_keypair_resource_policy_creator_spec()
-        return Creator(
-            spec=CreatorSpec(
-                name=name,
-                default_for_unspecified=default_for_unspecified,
-                total_resource_slots=total_resource_slots,
-                max_session_lifetime=value_or_none(self.max_session_lifetime),
-                max_concurrent_sessions=value_or_none(self.max_concurrent_sessions),
-                max_concurrent_sftp_sessions=value_or_none(self.max_concurrent_sftp_sessions),
-                max_containers_per_session=value_or_none(self.max_containers_per_session),
-                idle_timeout=value_or_none(self.idle_timeout),
-                allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
-                max_vfolder_count=value_or_none(self.max_vfolder_count),
-                max_vfolder_size=value_or_none(self.max_vfolder_size),
-                max_quota_scope_size=value_or_none(self.max_quota_scope_size),
-                max_pending_session_count=value_or_none(self.max_pending_session_count),
-                max_pending_session_resource_slots=value_or_none(
-                    max_pending_session_resource_slots
-                ),
-                max_priority=None,
-            )
+        from ai.backend.manager.models.resource_policy.creators import (
+            KeyPairResourcePolicyCreator,
+        )
+
+        return KeyPairResourcePolicyCreator(
+            name=name,
+            default_for_unspecified=default_for_unspecified,
+            total_resource_slots=total_resource_slots,
+            max_session_lifetime=value_or_none(self.max_session_lifetime),
+            max_concurrent_sessions=value_or_none(self.max_concurrent_sessions),
+            max_concurrent_sftp_sessions=value_or_none(self.max_concurrent_sftp_sessions),
+            max_containers_per_session=value_or_none(self.max_containers_per_session),
+            idle_timeout=value_or_none(self.idle_timeout),
+            allowed_vfolder_hosts=value_or_none(self.allowed_vfolder_hosts),
+            max_pending_session_count=value_or_none(self.max_pending_session_count),
+            max_pending_session_resource_slots=value_or_none(max_pending_session_resource_slots),
+            max_priority=None,
         )
 
 
@@ -320,7 +295,7 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):  # type: ignor
     max_pending_session_count = graphene.Int(description="Added in 24.03.4.")
     max_pending_session_resource_slots = graphene.JSONString(description="Added in 24.03.4.")
 
-    def to_updater(self, name: str) -> Updater[KeyPairResourcePolicyRow]:
+    def to_updater(self, name: str) -> KeyPairResourcePolicyUpdater:
         default_for_unspecified = (
             DefaultForUnspecified[self.default_for_unspecified]
             if self.default_for_unspecified is not Undefined
@@ -333,40 +308,37 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):  # type: ignor
             else Undefined
         )
 
-        UpdaterSpec = _get_keypair_resource_policy_updater_spec()
-        return Updater(
-            spec=UpdaterSpec(
-                default_for_unspecified=OptionalState[DefaultForUnspecified].from_graphql(
-                    default_for_unspecified
-                ),
-                total_resource_slots=OptionalState[ResourceSlot].from_graphql(total_resource_slots),
-                max_session_lifetime=OptionalState[int].from_graphql(self.max_session_lifetime),
-                max_concurrent_sessions=OptionalState[int].from_graphql(
-                    self.max_concurrent_sessions
-                ),
-                max_concurrent_sftp_sessions=OptionalState[int].from_graphql(
-                    self.max_concurrent_sftp_sessions
-                ),
-                max_containers_per_session=OptionalState[int].from_graphql(
-                    self.max_containers_per_session
-                ),
-                idle_timeout=OptionalState[int].from_graphql(self.idle_timeout),
-                allowed_vfolder_hosts=OptionalState[dict[str, Any]].from_graphql(
-                    self.allowed_vfolder_hosts
-                ),
-                max_vfolder_count=OptionalState[int].from_graphql(self.max_vfolder_count),
-                max_vfolder_size=OptionalState[int].from_graphql(self.max_vfolder_size),
-                max_quota_scope_size=OptionalState[int].from_graphql(self.max_quota_scope_size),
-                max_pending_session_count=TriState[int].from_graphql(
-                    self.max_pending_session_count
-                ),
-                max_pending_session_resource_slots=TriState[ResourceSlot].from_graphql(
-                    ResourceSlot.from_user_input(self.max_pending_session_resource_slots, None)
-                    if isinstance(self.max_pending_session_resource_slots, dict)
-                    else self.max_pending_session_resource_slots
-                ),
+        from ai.backend.manager.repositories.keypair_resource_policy.updaters import (
+            KeyPairResourcePolicyUpdater,
+        )
+
+        return KeyPairResourcePolicyUpdater(
+            name=name,
+            default_for_unspecified=OptionalState[DefaultForUnspecified].from_graphql(
+                default_for_unspecified
             ),
-            pk_value=name,
+            total_resource_slots=OptionalState[ResourceSlot].from_graphql(total_resource_slots),
+            max_session_lifetime=OptionalState[int].from_graphql(self.max_session_lifetime),
+            max_concurrent_sessions=OptionalState[int].from_graphql(self.max_concurrent_sessions),
+            max_concurrent_sftp_sessions=OptionalState[int].from_graphql(
+                self.max_concurrent_sftp_sessions
+            ),
+            max_containers_per_session=OptionalState[int].from_graphql(
+                self.max_containers_per_session
+            ),
+            idle_timeout=OptionalState[int].from_graphql(self.idle_timeout),
+            allowed_vfolder_hosts=OptionalState[dict[str, Any]].from_graphql(
+                self.allowed_vfolder_hosts
+            ),
+            max_vfolder_count=OptionalState[int].from_graphql(self.max_vfolder_count),
+            max_vfolder_size=OptionalState[int].from_graphql(self.max_vfolder_size),
+            max_quota_scope_size=OptionalState[int].from_graphql(self.max_quota_scope_size),
+            max_pending_session_count=TriState[int].from_graphql(self.max_pending_session_count),
+            max_pending_session_resource_slots=TriState[ResourceSlot].from_graphql(
+                ResourceSlot.from_user_input(self.max_pending_session_resource_slots, None)
+                if isinstance(self.max_pending_session_resource_slots, dict)
+                else self.max_pending_session_resource_slots
+            ),
         )
 
 
@@ -394,7 +366,7 @@ class CreateKeyPairResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.keypair_resource_policy.create_keypair_resource_policy.wait_for_complete(
+        await graph_ctx.processors.keypair_resource_policy.create_keypair_resource_policy.run(
             CreateKeyPairResourcePolicyAction(props.to_creator(name))
         )
 
@@ -427,8 +399,8 @@ class ModifyKeyPairResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.keypair_resource_policy.modify_keypair_resource_policy.wait_for_complete(
-            ModifyKeyPairResourcePolicyAction(name, props.to_updater(name))
+        await graph_ctx.processors.keypair_resource_policy.modify_keypair_resource_policy.run(
+            ModifyKeyPairResourcePolicyAction(props.to_updater(name))
         )
 
         return ModifyKeyPairResourcePolicy(
@@ -458,7 +430,7 @@ class DeleteKeyPairResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.keypair_resource_policy.delete_keypair_resource_policy.wait_for_complete(
+        await graph_ctx.processors.keypair_resource_policy.delete_keypair_resource_policy.run(
             DeleteKeyPairResourcePolicyAction(name)
         )
         return DeleteKeyPairResourcePolicy(

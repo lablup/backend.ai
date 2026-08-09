@@ -1,32 +1,41 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
-from ai.backend.manager.services.keypair_resource_policy.actions.base import (
-    KeypairResourcePolicyAction,
+from ai.backend.common.data.entity.resource_policy import (
+    KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE,
 )
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import PurgeGlobalOpsAction
+from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
+from ai.backend.manager.models.resource_policy.purgers import (
+    KeyPairResourcePolicyPurger,
+)
+from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
 
 
 @dataclass
-class DeleteKeyPairResourcePolicyAction(KeypairResourcePolicyAction):
+class DeleteKeyPairResourcePolicyAction(
+    PurgeGlobalOpsAction[KeyPairResourcePolicyRow, KeyPairResourcePolicyData]
+):
+    """Remove a keypair resource policy.
+
+    Purge-shaped: the table carries no lifecycle column, so deleting one has
+    always been the row leaving the table."""
+
     name: str
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.DELETE
-
-
-@dataclass
-class DeleteKeyPairResourcePolicyActionResult(BaseActionResult):
-    keypair_resource_policy: KeyPairResourcePolicyData
+    def action_name(cls) -> str:
+        return "admin_delete_keypair_resource_policy"
 
     @override
-    def entity_id(self) -> str | None:
-        return self.keypair_resource_policy.name
+    def to_purger(self) -> KeyPairResourcePolicyPurger:
+        return KeyPairResourcePolicyPurger(name=self.name)

@@ -507,7 +507,7 @@ def create_processors(
         ),
         session=SessionProcessors(services.session, action_monitors, validators),
         keypair_resource_policy=KeypairResourcePolicyProcessors(
-            services.keypair_resource_policy, action_monitors, validators
+            services.keypair_resource_policy, action_monitors, registry.group()
         ),
         manager_admin=ManagerAdminProcessors(services.manager_admin, action_monitors, validators),
         user_resource_policy=UserResourcePolicyProcessors(

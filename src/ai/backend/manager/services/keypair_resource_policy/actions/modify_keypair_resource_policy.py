@@ -1,35 +1,38 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.resource_policy import (
+    KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE,
+)
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import UpdateGlobalOpsAction
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
-from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.services.keypair_resource_policy.actions.base import (
-    KeypairResourcePolicyAction,
+from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
+from ai.backend.manager.repositories.keypair_resource_policy.updaters import (
+    KeyPairResourcePolicyUpdater,
 )
 
 
 @dataclass
-class ModifyKeyPairResourcePolicyAction(KeypairResourcePolicyAction):
-    name: str
-    updater: Updater[KeyPairResourcePolicyRow]
+class ModifyKeyPairResourcePolicyAction(
+    UpdateGlobalOpsAction[KeyPairResourcePolicyRow, KeyPairResourcePolicyData]
+):
+    """Retune one keypair resource policy; the name stays the key."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    updater: KeyPairResourcePolicyUpdater
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
-
-
-@dataclass
-class ModifyKeyPairResourcePolicyActionResult(BaseActionResult):
-    keypair_resource_policy: KeyPairResourcePolicyData
+    def entity_type(cls) -> EntityType:
+        return KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return self.keypair_resource_policy.name
+    @classmethod
+    def action_name(cls) -> str:
+        return "admin_update_keypair_resource_policy"
+
+    @override
+    def to_updater(self) -> KeyPairResourcePolicyUpdater:
+        return self.updater
