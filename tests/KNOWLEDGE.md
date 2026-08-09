@@ -1,6 +1,17 @@
-# Testing guidelines — Contexts
+---
+name: testing-strategy-rationale
+type: design-rationale
+description: real-DB vs mocked layer strategy rationale, behavior-not-implementation anti-examples, local pants test targeting guidance
+scope: tests
+keywords: [pants, mock, repository, integration, behavior]
+generated:
+  by: claude-code/fable-5
+  at: 2026-08-10
+status: stable
+---
+# Testing guidelines — Knowledge
 
-> For the rules, see `AGENTS.md` in this directory. For the workflow, patterns, and code examples, see the `/tdd-guide` skill.
+> For the rules, see `AGENTS.md` in this directory. For the workflow, patterns, and code examples, see the `/test-guide` skill.
 
 ## Rationale for the strategy distinction (real DB vs mocked)
 
