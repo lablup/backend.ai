@@ -1,6 +1,6 @@
 # Manager Repositories layer — Guardrails
 
-> For background, see `CONTEXTS.md` in the same directory; for implementation patterns, the `/repository-guide` skill.
+> For background, see `KNOWLEDGE.md` in the same directory; for implementation patterns, the `/repository-guide` skill.
 
 ## Directory structure (per domain)
 

@@ -1,6 +1,6 @@
 # Manager API layer — Guardrails
 
-> For background and verification procedures, see `CONTEXTS.md` in the same directory; for implementation patterns, see the `/api-guide` skill.
+> For background and verification procedures, see `KNOWLEDGE.md` in the same directory; for implementation patterns, see the `/api-guide` skill.
 
 ## Handler style
 

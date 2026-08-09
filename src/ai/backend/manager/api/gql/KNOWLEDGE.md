@@ -1,6 +1,27 @@
-# Manager GraphQL layer — Contexts
+---
+name: gql-federation-and-pagination
+type: constraints
+description: adapter-backed resolvers and the scoped/admin_/public operation surface, federation name-collision caveat (V2-suffixed schema names), cursor vs offset pagination mode behavior
+scope: src/ai/backend/manager/api/gql
+keywords: [federation, supergraph, Strawberry, Graphene, V2, cursor, offset, pagination]
+sources:
+  - scripts/generate-graphql-schema.sh
+generated:
+  by: claude-code/fable-5
+  at: 2026-08-10
+status: stable
+---
+# Manager GraphQL layer — Knowledge
 
 > For the rules, see `AGENTS.md` in the same directory; for implementation patterns, see the `/api-guide` skill.
+
+## Adapter dependency and operation surface
+
+Resolvers hold no behavior — every resolver calls the shared per-entity adapter
+(`api/adapters/`). The operation surface follows the API-layer naming: scoped queries
+take caller-supplied scopes (parent-fixed variants are the outgoing pattern — do not
+add new ones), `admin_`-prefixed fields are superadmin global operations, and bare
+global reads are public to every authenticated user.
 
 ## Federation name-collision caveat
 
