@@ -42,6 +42,7 @@ __all__ = (
     "SearchOpsAction",
     "GlobalSearchOpsAction",
     "GlobalEntityCreateOpsAction",
+    "GlobalEntityWithFieldsCreateOpsAction",
     "EntityCreateOpsAction",
     "RoleManagedEntityCreateOpsAction",
     "FieldEntityCreateOpsAction",
@@ -70,6 +71,7 @@ __all__ = (
     "OperationScopeOpsAction",
     "SearchGlobalOpsAction",
     "CreateGlobalOpsAction",
+    "CreateGlobalWithFieldsOpsAction",
     "CreateEntityOpsAction",
     "CreateRoleManagedEntityOpsAction",
     "CreateFieldEntityOpsAction",
@@ -194,6 +196,28 @@ class GlobalEntityCreateOpsAction[TRow: Base, TData](OpsBackendAction):
     @abstractmethod
     def to_creator(self) -> GlobalEntityCreator[TRow, TData]:
         """Return the insert spec this action executes."""
+        raise NotImplementedError
+
+
+class GlobalEntityWithFieldsCreateOpsAction[TRow: Base, TData, TFieldRow: Base, TFieldData](
+    OpsBackendAction
+):
+    """Carries a global insert spec together with the field specs it owns.
+
+    The field creators build from the parent's id, which does not exist until the
+    parent row does — the same shape ``FieldEntityCreator.build_row(owner_id)``
+    already has. Declared as one action so the two writes share a transaction:
+    splitting them into two actions would let the parent survive a failed field row.
+    """
+
+    @abstractmethod
+    def to_creator(self) -> GlobalEntityCreator[TRow, TData]:
+        """Return the insert spec for the owning row."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_field_creators(self) -> Sequence[FieldEntityCreator[EntityID, TFieldRow, TFieldData]]:
+        """Return one insert spec per field row created under the owner."""
         raise NotImplementedError
 
 
@@ -515,6 +539,19 @@ class CreateGlobalOpsAction[TRow: Base, TData](
     BaseGlobalAction, GlobalEntityCreateOpsAction[TRow, TData], ABC
 ):
     """An insert of one row of system-wide state."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
+
+
+class CreateGlobalWithFieldsOpsAction[TRow: Base, TData, TFieldRow: Base, TFieldData](
+    BaseGlobalAction,
+    GlobalEntityWithFieldsCreateOpsAction[TRow, TData, TFieldRow, TFieldData],
+    ABC,
+):
+    """An insert of one row of system-wide state together with the rows it owns."""
 
     @override
     @classmethod

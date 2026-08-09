@@ -53,6 +53,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     CreateEntityOpsAction,
     CreateFieldEntityOpsAction,
     CreateGlobalOpsAction,
+    CreateGlobalWithFieldsOpsAction,
     CreateRoleManagedEntityOpsAction,
     DeleteBulkOpsAction,
     DeleteSingleEntityOpsAction,
@@ -76,6 +77,7 @@ from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     BulkOpsResult,
     CreatedEntityOpsResult,
+    CreatedEntityWithFieldsOpsResult,
     EntitiesOpsResult,
     EntityOpsResult,
     LookupOpsResult,
@@ -114,6 +116,7 @@ from ai.backend.manager.services.ops.service import (
     GlobalBulkCreateService,
     GlobalBulkPurgeService,
     GlobalCreateService,
+    GlobalCreateWithFieldsService,
     GlobalPurgeService,
     GlobalSearchService,
     GlobalUpsertService,
@@ -335,6 +338,20 @@ class ProcessorGroup[TData: EntityData]:
         self._record(action_cls.spec())
         return GlobalActionProcessor(
             GlobalCreateService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.global_scope, *monitors),
+            validators=(*self._deps.validators.global_scope, *validators),
+        )
+
+    def global_create_with_fields_ops[TAction: CreateGlobalWithFieldsOpsAction[Any, Any, Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[GlobalActionValidator] = (),
+        monitors: Sequence[GlobalActionMonitor] = (),
+    ) -> GlobalActionProcessor[TAction, CreatedEntityWithFieldsOpsResult[TData, Any]]:
+        self._record(action_cls.spec())
+        return GlobalActionProcessor(
+            GlobalCreateWithFieldsService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.global_scope, *monitors),
             validators=(*self._deps.validators.global_scope, *validators),
         )

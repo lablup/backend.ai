@@ -26,6 +26,7 @@ from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 __all__ = (
     "EntityOpsResult",
     "CreatedEntityOpsResult",
+    "CreatedEntityWithFieldsOpsResult",
     "LookupOpsResult",
     "EntitiesOpsResult",
     "BulkOpsResult",
@@ -58,6 +59,19 @@ class CreatedEntityOpsResult[TData: EntityData](EntityOpsResult[TData], BaseScop
     @override
     def entity_ids(self) -> Sequence[EntityID]:
         return (self.data.entity_id(),)
+
+
+@dataclass
+class CreatedEntityWithFieldsOpsResult[TData: EntityData, TFieldData](
+    CreatedEntityOpsResult[TData]
+):
+    """The entity a create produced, and the field rows created under it.
+
+    Reports the entity alone as what was touched: the field rows are owned by it
+    and carry no independent identity for the audit trail to name.
+    """
+
+    fields: list[TFieldData]
 
 
 @dataclass

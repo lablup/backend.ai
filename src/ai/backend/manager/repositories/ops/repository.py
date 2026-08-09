@@ -40,6 +40,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from ai.backend.common.data.entity.types import EntityData
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.scopes import OperationScope
@@ -58,7 +59,7 @@ from ai.backend.manager.models.specs.purger import (
 )
 from ai.backend.manager.models.specs.querier import DataQuerier
 from ai.backend.manager.models.specs.searcher import Searcher, SearcherResult
-from ai.backend.manager.models.specs.types import BulkResultWithFailures
+from ai.backend.manager.models.specs.types import BulkResultWithFailures, EntityWithFieldsResult
 from ai.backend.manager.models.specs.updater import DataBatchUpdater, DataUpdater
 from ai.backend.manager.models.specs.upserter import (
     EntityUpserter,
@@ -132,6 +133,22 @@ class OpsRepository[TData]:
     async def create_global_entity(self, creator: GlobalEntityCreator[Any, TData]) -> TData:
         async with self._ops.write_ops() as w:
             return await w.create_global_entity(creator)
+
+    async def create_global_entity_with_fields[TEntityData: EntityData, TFieldData](
+        self,
+        creator: GlobalEntityCreator[Any, TEntityData],
+        field_creators: Sequence[FieldEntityCreator[Any, Any, TFieldData]],
+    ) -> EntityWithFieldsResult[TEntityData, TFieldData]:
+        """Insert a global row and the field rows it owns, in one transaction.
+
+        The owner id is not known until the parent row exists, which is exactly what
+        ``FieldEntityCreator.build_row(owner_id)`` is shaped for; the two writes share
+        this session so a failed field row takes the parent down with it.
+        """
+        async with self._ops.write_ops() as w:
+            data = await w.create_global_entity(creator)
+            fields = await w.bulk_create_field_entities(data.entity_id(), field_creators)
+            return EntityWithFieldsResult(data=data, fields=fields)
 
     async def create_entity(self, creator: EntityCreator[Any, TData]) -> TData:
         """Insert one entity row; the write provisions its virtual scope and joins

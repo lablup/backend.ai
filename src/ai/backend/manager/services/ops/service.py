@@ -37,6 +37,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     GlobalEntityCreateOpsAction,
     GlobalEntityPurgeOpsAction,
     GlobalEntityUpsertOpsAction,
+    GlobalEntityWithFieldsCreateOpsAction,
     GlobalSearchOpsAction,
     LookupOpsAction,
     RoleManagedEntityBulkCreateOpsAction,
@@ -49,6 +50,7 @@ from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     BulkOpsResult,
     CreatedEntityOpsResult,
+    CreatedEntityWithFieldsOpsResult,
     EntitiesOpsResult,
     EntityOpsResult,
     LookupOpsResult,
@@ -62,6 +64,7 @@ __all__ = (
     "SearchService",
     "GlobalSearchService",
     "GlobalCreateService",
+    "GlobalCreateWithFieldsService",
     "EntityCreateService",
     "RoleManagedEntityCreateService",
     "FieldCreateService",
@@ -176,6 +179,23 @@ class GlobalCreateService[TData: EntityData]:
         return CreatedEntityOpsResult(
             data=await self._repository.create_global_entity(action.to_creator())
         )
+
+
+class GlobalCreateWithFieldsService[TData: EntityData]:
+    """Inserts a global row and the field rows it owns, in one transaction."""
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: GlobalEntityWithFieldsCreateOpsAction[Any, TData, Any, Any]
+    ) -> CreatedEntityWithFieldsOpsResult[TData, Any]:
+        result = await self._repository.create_global_entity_with_fields(
+            action.to_creator(), action.to_field_creators()
+        )
+        return CreatedEntityWithFieldsOpsResult(data=result.data, fields=result.fields)
 
 
 class EntityCreateService[TData: EntityData]:
