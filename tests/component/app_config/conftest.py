@@ -98,7 +98,7 @@ def app_config_definition_adapter(
 def app_config_allow_list_adapter(
     database_engine: ExtendedAsyncSAEngine,
 ) -> AppConfigAllowListAdapter:
-    """This domain runs straight against ops, so it takes a processor registry, not a service."""
+    """This domain runs straight against ops, so it takes a processor group, not a service."""
     processors = MagicMock()
     processors.app_config_allow_list = AppConfigAllowListProcessors(
         ProcessorRegistry(
@@ -107,7 +107,7 @@ def app_config_allow_list_adapter(
                 validators=ActionValidators(),
                 repository=OpsRepository(V2DBOpsProvider(database_engine)),
             )
-        )
+        ).group()
     )
     return AppConfigAllowListAdapter(processors)
 

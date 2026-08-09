@@ -74,16 +74,13 @@ def _ops_registry() -> ProcessorRegistry[Any]:
 
 
 def test_every_defined_v2_action_is_wired() -> None:
-    allow_list_registry = _ops_registry()
-    AppConfigAllowListProcessors(allow_list_registry)
-    resource_slot_registry = _ops_registry()
-    ResourceSlotProcessors(MagicMock(), [], MagicMock(), resource_slot_registry.group())
+    # One shared registry, as in the production wiring: every v2 package registers
+    # through it, so its wired_specs() is the complete catalog of registered actions.
+    registry = _ops_registry()
+    AppConfigAllowListProcessors(registry.group())
+    ResourceSlotProcessors(MagicMock(), [], MagicMock(), registry.group())
 
-    wired = sorted(
-        spec.type()
-        for registry in (allow_list_registry, resource_slot_registry)
-        for spec in registry.wired_specs()
-    )
+    wired = sorted(spec.type() for spec in registry.wired_specs())
     defined = sorted(cls.spec().type() for cls in _concrete_v2_action_classes())
 
     assert wired == defined
