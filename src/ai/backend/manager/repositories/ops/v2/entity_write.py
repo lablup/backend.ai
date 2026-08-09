@@ -116,7 +116,7 @@ class V2EntityWriteOps(V2WriteOpsBase):
         await self._enroll_member(scope, creator.member_of(row))
         return creator.to_data(row)
 
-    async def bulk_create_entities[TRow: Base, TData](
+    async def atomic_create_entities[TRow: Base, TData](
         self, creators: Sequence[EntityCreator[TRow, TData]]
     ) -> list[TData]:
         """Insert entity rows atomically in one flush, provisioning each row's
@@ -131,7 +131,7 @@ class V2EntityWriteOps(V2WriteOpsBase):
             await self._enroll_member(scope, creator.member_of(row))
         return [creator.to_data(row) for creator, row in zip(creators, rows, strict=True)]
 
-    async def bulk_create_role_managed_entities[TRow: Base, TData](
+    async def atomic_create_role_managed_entities[TRow: Base, TData](
         self, creators: Sequence[RoleManagedEntityCreator[TRow, TData]]
     ) -> list[TData]:
         """Insert role-managed entity rows atomically, provisioning each row's
@@ -164,7 +164,7 @@ class V2EntityWriteOps(V2WriteOpsBase):
         await self._teardown_scope(purger.scope_of())
         return purger.to_data(row)
 
-    async def bulk_purge_entities[TRow: Base, TData](
+    async def partial_bulk_purge_entities[TRow: Base, TData](
         self, purgers: Mapping[EntityID, EntityPurger[TRow, TData]]
     ) -> BulkResultWithFailures[TData]:
         """Delete each named entity independently; a row and its scope teardown

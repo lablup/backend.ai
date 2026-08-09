@@ -23,6 +23,16 @@
   `tests/unit/manager/actions/test_registry_catalog.py` —
   otherwise `test_every_defined_v2_action_is_wired` fails.
 
+## Many-row writes
+
+- An action that writes several rows says which failure mode it takes: an
+  `AtomicCreate*` base raises and the run is recorded as one failure, a
+  `PartialBulk*` base returns per-entity verdicts and the run itself succeeds.
+  No base is unmarked, and the mode is never an argument.
+- `Bulk` in a base name means the `BaseBulkAction` shape — the caller named the
+  entities, so each is answered for. A many-row write whose target is a single
+  scope, owner, or the system is not bulk-shaped.
+
 ## Gates
 
 - `global` runs behind the SUPERADMIN gate. Global reads open to all

@@ -373,7 +373,7 @@ class TestBulkUpdate:
             _PresetCreator(name="other", scope_type=RBACScopeType.DOMAIN)
         )
 
-        result = await repository.bulk_update({
+        result = await repository.partial_bulk_update({
             preset.id: _PresetUpdater(name=OptionalState.update("a"), target=preset.id),
             other.id: _PresetUpdater(name=OptionalState.update("b"), target=other.id),
         })
@@ -387,7 +387,7 @@ class TestBulkUpdate:
     ) -> None:
         absent = RolePresetID(uuid.uuid4())
 
-        result = await repository.bulk_update({
+        result = await repository.partial_bulk_update({
             preset.id: _PresetUpdater(name=OptionalState.update("written"), target=preset.id),
             absent: _PresetUpdater(name=OptionalState.update("nowhere"), target=absent),
         })

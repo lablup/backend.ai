@@ -39,34 +39,34 @@ from ai.backend.manager.actions.v2.lookup.monitor import LookupActionMonitor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.lookup.validator import LookupActionValidator
 from ai.backend.manager.actions.v2.ops.base import (
+    AtomicCreateEntityOpsAction,
+    AtomicCreateFieldEntityOpsAction,
+    AtomicCreateGlobalEntityOpsAction,
+    AtomicCreateRoleManagedEntityOpsAction,
     BatchPurgeGlobalOpsAction,
     BatchPurgeScopeOpsAction,
     BatchUpdateGlobalOpsAction,
     BatchUpdateScopeOpsAction,
-    BulkCreateEntityOpsAction,
-    BulkCreateFieldEntityOpsAction,
-    BulkCreateGlobalEntityOpsAction,
-    BulkCreateRoleManagedEntityOpsAction,
-    BulkPurgeEntityOpsAction,
-    BulkPurgeFieldEntityOpsAction,
-    BulkPurgeGlobalEntityOpsAction,
     CreateEntityOpsAction,
     CreateFieldEntityOpsAction,
     CreateGlobalOpsAction,
     CreateGlobalWithFieldsOpsAction,
     CreateRoleManagedEntityOpsAction,
-    DeleteBulkOpsAction,
+    DeletePartialBulkOpsAction,
     DeleteSingleEntityOpsAction,
     GetGlobalOpsAction,
     GetSingleEntityOpsAction,
     LookupEntityOpsAction,
     OperationScopeOpsAction,
+    PartialBulkPurgeEntityOpsAction,
+    PartialBulkPurgeFieldEntityOpsAction,
+    PartialBulkPurgeGlobalEntityOpsAction,
     PurgeEntityOpsAction,
     PurgeFieldEntityOpsAction,
     PurgeGlobalOpsAction,
     SearchGlobalOpsAction,
-    UpdateBulkOpsAction,
     UpdateGlobalOpsAction,
+    UpdatePartialBulkOpsAction,
     UpdateSingleEntityOpsAction,
     UpsertEntityOpsAction,
     UpsertFieldEntityOpsAction,
@@ -97,31 +97,31 @@ from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.ops.service import (
     BatchPurgeService,
     BatchUpdateService,
-    BulkDeleteService,
-    BulkUpdateService,
     DeleteService,
-    EntityBulkCreateService,
-    EntityBulkPurgeService,
+    EntityAtomicCreateService,
     EntityCreateService,
+    EntityPartialBulkPurgeService,
     EntityPurgeService,
     EntityUpsertService,
-    FieldBulkCreateService,
-    FieldBulkPurgeService,
+    FieldAtomicCreateService,
     FieldCreateService,
+    FieldPartialBulkPurgeService,
     FieldPurgeService,
     FieldUpsertService,
     GetService,
+    GlobalAtomicCreateService,
     GlobalBatchPurgeService,
     GlobalBatchUpdateService,
-    GlobalBulkCreateService,
-    GlobalBulkPurgeService,
     GlobalCreateService,
     GlobalCreateWithFieldsService,
+    GlobalPartialBulkPurgeService,
     GlobalPurgeService,
     GlobalSearchService,
     GlobalUpsertService,
     LookupService,
-    RoleManagedEntityBulkCreateService,
+    PartialBulkDeleteService,
+    PartialBulkUpdateService,
+    RoleManagedEntityAtomicCreateService,
     RoleManagedEntityCreateService,
     RoleManagedEntityUpsertService,
     SearchService,
@@ -398,7 +398,7 @@ class ProcessorGroup[TData: EntityData]:
             validators=(*self._deps.validators.single_entity, *validators),
         )
 
-    def global_bulk_create_ops[TAction: BulkCreateGlobalEntityOpsAction[Any, Any]](
+    def global_atomic_create_ops[TAction: AtomicCreateGlobalEntityOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
         *,
@@ -407,12 +407,12 @@ class ProcessorGroup[TData: EntityData]:
     ) -> GlobalActionProcessor[TAction, EntitiesOpsResult[TData]]:
         self._record(action_cls.spec())
         return GlobalActionProcessor(
-            GlobalBulkCreateService(self._deps.repository).execute,
+            GlobalAtomicCreateService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.global_scope, *monitors),
             validators=(*self._deps.validators.global_scope, *validators),
         )
 
-    def entity_bulk_create_ops[TAction: BulkCreateEntityOpsAction[Any, Any]](
+    def entity_atomic_create_ops[TAction: AtomicCreateEntityOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
         *,
@@ -421,12 +421,12 @@ class ProcessorGroup[TData: EntityData]:
     ) -> ScopeActionProcessor[TAction, EntitiesOpsResult[TData]]:
         self._record(action_cls.spec())
         return ScopeActionProcessor(
-            EntityBulkCreateService(self._deps.repository).execute,
+            EntityAtomicCreateService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.scope, *monitors),
             validators=(*self._deps.validators.scope, *validators),
         )
 
-    def role_managed_bulk_create_ops[TAction: BulkCreateRoleManagedEntityOpsAction[Any, Any]](
+    def role_managed_atomic_create_ops[TAction: AtomicCreateRoleManagedEntityOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
         *,
@@ -435,12 +435,12 @@ class ProcessorGroup[TData: EntityData]:
     ) -> ScopeActionProcessor[TAction, EntitiesOpsResult[TData]]:
         self._record(action_cls.spec())
         return ScopeActionProcessor(
-            RoleManagedEntityBulkCreateService(self._deps.repository).execute,
+            RoleManagedEntityAtomicCreateService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.scope, *monitors),
             validators=(*self._deps.validators.scope, *validators),
         )
 
-    def field_bulk_create_ops[TAction: BulkCreateFieldEntityOpsAction[Any, Any, Any]](
+    def field_atomic_create_ops[TAction: AtomicCreateFieldEntityOpsAction[Any, Any, Any]](
         self,
         action_cls: type[TAction],
         *,
@@ -449,7 +449,7 @@ class ProcessorGroup[TData: EntityData]:
     ) -> SingleEntityActionProcessor[TAction, EntitiesOpsResult[TData]]:
         self._record(action_cls.spec())
         return SingleEntityActionProcessor(
-            FieldBulkCreateService(self._deps.repository).execute,
+            FieldAtomicCreateService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.single_entity, *monitors),
             validators=(*self._deps.validators.single_entity, *validators),
         )
@@ -496,7 +496,7 @@ class ProcessorGroup[TData: EntityData]:
             validators=(*self._deps.validators.single_entity, *validators),
         )
 
-    def global_bulk_purge_ops[TAction: BulkPurgeGlobalEntityOpsAction[Any, Any]](
+    def global_partial_bulk_purge_ops[TAction: PartialBulkPurgeGlobalEntityOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
         *,
@@ -505,12 +505,12 @@ class ProcessorGroup[TData: EntityData]:
     ) -> BulkActionProcessor[TAction, BulkOpsResult[TData]]:
         self._record(action_cls.spec())
         return BulkActionProcessor(
-            GlobalBulkPurgeService(self._deps.repository).execute,
+            GlobalPartialBulkPurgeService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.bulk, *monitors),
             validators=(*self._deps.validators.bulk, *validators),
         )
 
-    def entity_bulk_purge_ops[TAction: BulkPurgeEntityOpsAction[Any, Any]](
+    def entity_partial_bulk_purge_ops[TAction: PartialBulkPurgeEntityOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
         *,
@@ -519,12 +519,12 @@ class ProcessorGroup[TData: EntityData]:
     ) -> BulkActionProcessor[TAction, BulkOpsResult[TData]]:
         self._record(action_cls.spec())
         return BulkActionProcessor(
-            EntityBulkPurgeService(self._deps.repository).execute,
+            EntityPartialBulkPurgeService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.bulk, *monitors),
             validators=(*self._deps.validators.bulk, *validators),
         )
 
-    def field_bulk_purge_ops[TAction: BulkPurgeFieldEntityOpsAction[Any, Any]](
+    def field_partial_bulk_purge_ops[TAction: PartialBulkPurgeFieldEntityOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
         *,
@@ -533,7 +533,7 @@ class ProcessorGroup[TData: EntityData]:
     ) -> BulkActionProcessor[TAction, BulkOpsResult[TData]]:
         self._record(action_cls.spec())
         return BulkActionProcessor(
-            FieldBulkPurgeService(self._deps.repository).execute,
+            FieldPartialBulkPurgeService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.bulk, *monitors),
             validators=(*self._deps.validators.bulk, *validators),
         )
@@ -636,7 +636,7 @@ class ProcessorGroup[TData: EntityData]:
             validators=(*self._deps.validators.single_entity, *validators),
         )
 
-    def bulk_update_ops[TAction: UpdateBulkOpsAction[Any, Any]](
+    def partial_bulk_update_ops[TAction: UpdatePartialBulkOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
         *,
@@ -645,12 +645,12 @@ class ProcessorGroup[TData: EntityData]:
     ) -> BulkActionProcessor[TAction, BulkOpsResult[TData]]:
         self._record(action_cls.spec())
         return BulkActionProcessor(
-            BulkUpdateService(self._deps.repository).execute,
+            PartialBulkUpdateService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.bulk, *monitors),
             validators=(*self._deps.validators.bulk, *validators),
         )
 
-    def bulk_delete_ops[TAction: DeleteBulkOpsAction[Any, Any]](
+    def partial_bulk_delete_ops[TAction: DeletePartialBulkOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
         *,
@@ -659,7 +659,7 @@ class ProcessorGroup[TData: EntityData]:
     ) -> BulkActionProcessor[TAction, BulkOpsResult[TData]]:
         self._record(action_cls.spec())
         return BulkActionProcessor(
-            BulkDeleteService(self._deps.repository).execute,
+            PartialBulkDeleteService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.bulk, *monitors),
             validators=(*self._deps.validators.bulk, *validators),
         )

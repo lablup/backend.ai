@@ -29,7 +29,7 @@ class V2FieldWriteOps(V2WriteOpsBase):
         await self._insert_row(row, creator.integrity_error_checks())
         return creator.to_data(row)
 
-    async def bulk_create_field_entities[TOwnerID: EntityID, TRow: Base, TData](
+    async def atomic_create_field_entities[TOwnerID: EntityID, TRow: Base, TData](
         self, owner_id: TOwnerID, creators: Sequence[FieldEntityCreator[TOwnerID, TRow, TData]]
     ) -> list[TData]:
         """Insert field rows sharing one owner, atomically in a single flush."""
@@ -57,7 +57,7 @@ class V2FieldWriteOps(V2WriteOpsBase):
             return None
         return purger.to_data(row)
 
-    async def bulk_purge_field_entities[TRow: Base, TData](
+    async def partial_bulk_purge_field_entities[TRow: Base, TData](
         self, purgers: Mapping[EntityID, FieldEntityPurger[TRow, TData]]
     ) -> BulkResultWithFailures[TData]:
         """Delete each named field row independently in its own savepoint; a

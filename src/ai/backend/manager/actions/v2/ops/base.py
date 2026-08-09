@@ -46,22 +46,22 @@ __all__ = (
     "EntityCreateOpsAction",
     "RoleManagedEntityCreateOpsAction",
     "FieldEntityCreateOpsAction",
-    "GlobalEntityBulkCreateOpsAction",
-    "EntityBulkCreateOpsAction",
-    "RoleManagedEntityBulkCreateOpsAction",
-    "FieldEntityBulkCreateOpsAction",
+    "GlobalEntityAtomicCreateOpsAction",
+    "EntityAtomicCreateOpsAction",
+    "RoleManagedEntityAtomicCreateOpsAction",
+    "FieldEntityAtomicCreateOpsAction",
     "GlobalEntityPurgeOpsAction",
     "EntityPurgeOpsAction",
     "FieldEntityPurgeOpsAction",
-    "GlobalEntityBulkPurgeOpsAction",
-    "EntityBulkPurgeOpsAction",
-    "FieldEntityBulkPurgeOpsAction",
+    "GlobalEntityPartialBulkPurgeOpsAction",
+    "EntityPartialBulkPurgeOpsAction",
+    "FieldEntityPartialBulkPurgeOpsAction",
     "GlobalEntityUpsertOpsAction",
     "EntityUpsertOpsAction",
     "RoleManagedEntityUpsertOpsAction",
     "FieldEntityUpsertOpsAction",
     "UpdateOpsAction",
-    "BulkUpdateOpsAction",
+    "PartialBulkUpdateOpsAction",
     "BatchUpdateOpsAction",
     "GlobalBatchUpdateOpsAction",
     "BatchPurgeOpsAction",
@@ -75,16 +75,16 @@ __all__ = (
     "CreateEntityOpsAction",
     "CreateRoleManagedEntityOpsAction",
     "CreateFieldEntityOpsAction",
-    "BulkCreateGlobalEntityOpsAction",
-    "BulkCreateEntityOpsAction",
-    "BulkCreateRoleManagedEntityOpsAction",
-    "BulkCreateFieldEntityOpsAction",
+    "AtomicCreateGlobalEntityOpsAction",
+    "AtomicCreateEntityOpsAction",
+    "AtomicCreateRoleManagedEntityOpsAction",
+    "AtomicCreateFieldEntityOpsAction",
     "PurgeGlobalOpsAction",
     "PurgeEntityOpsAction",
     "PurgeFieldEntityOpsAction",
-    "BulkPurgeGlobalEntityOpsAction",
-    "BulkPurgeEntityOpsAction",
-    "BulkPurgeFieldEntityOpsAction",
+    "PartialBulkPurgeGlobalEntityOpsAction",
+    "PartialBulkPurgeEntityOpsAction",
+    "PartialBulkPurgeFieldEntityOpsAction",
     "UpsertGlobalOpsAction",
     "UpsertEntityOpsAction",
     "UpsertRoleManagedEntityOpsAction",
@@ -92,8 +92,8 @@ __all__ = (
     "UpdateGlobalOpsAction",
     "UpdateSingleEntityOpsAction",
     "DeleteSingleEntityOpsAction",
-    "UpdateBulkOpsAction",
-    "DeleteBulkOpsAction",
+    "UpdatePartialBulkOpsAction",
+    "DeletePartialBulkOpsAction",
     "BatchUpdateScopeOpsAction",
     "BatchUpdateGlobalOpsAction",
     "BatchPurgeScopeOpsAction",
@@ -261,7 +261,7 @@ class FieldEntityCreateOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](Ops
         raise NotImplementedError
 
 
-class GlobalEntityBulkCreateOpsAction[TRow: Base, TData](OpsBackendAction):
+class GlobalEntityAtomicCreateOpsAction[TRow: Base, TData](OpsBackendAction):
     """A create of several global rows at once, atomically; nothing is registered."""
 
     @abstractmethod
@@ -270,7 +270,7 @@ class GlobalEntityBulkCreateOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
-class EntityBulkCreateOpsAction[TRow: Base, TData](OpsBackendAction):
+class EntityAtomicCreateOpsAction[TRow: Base, TData](OpsBackendAction):
     """A create of several entity rows at once, atomically; each row's scope is
     provisioned with it."""
 
@@ -280,7 +280,7 @@ class EntityBulkCreateOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
-class RoleManagedEntityBulkCreateOpsAction[TRow: Base, TData](OpsBackendAction):
+class RoleManagedEntityAtomicCreateOpsAction[TRow: Base, TData](OpsBackendAction):
     """An atomic create of several role-managed entity rows, preset roles included."""
 
     @abstractmethod
@@ -289,7 +289,9 @@ class RoleManagedEntityBulkCreateOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
-class FieldEntityBulkCreateOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](OpsBackendAction):
+class FieldEntityAtomicCreateOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](
+    OpsBackendAction
+):
     """A create of several field rows sharing one owner, atomically."""
 
     @abstractmethod
@@ -332,7 +334,7 @@ class FieldEntityPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
-class GlobalEntityBulkPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
+class GlobalEntityPartialBulkPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
     """A hard delete of global entities the caller named, each answered for
     separately; no membership involved."""
 
@@ -342,7 +344,7 @@ class GlobalEntityBulkPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
-class EntityBulkPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
+class EntityPartialBulkPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
     """A hard delete of entities the caller named, each answered for separately;
     every row's scope is torn down with it."""
 
@@ -352,7 +354,7 @@ class EntityBulkPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
-class FieldEntityBulkPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
+class FieldEntityPartialBulkPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
     """A hard delete of field rows the caller named, each answered for
     separately; authorized through the owner the shape names."""
 
@@ -416,7 +418,7 @@ class UpdateOpsAction[TRow: Base, TData](OpsBackendAction):
         raise NotImplementedError
 
 
-class BulkUpdateOpsAction[TRow: Base, TData](OpsBackendAction):
+class PartialBulkUpdateOpsAction[TRow: Base, TData](OpsBackendAction):
     """An update of entities the caller named, each answered for separately.
 
     A mapping rather than a list: the bulk shape reports per entity, and pairing the
@@ -600,8 +602,8 @@ class CreateFieldEntityOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](
         return ActionOperationType.CREATE
 
 
-class BulkCreateGlobalEntityOpsAction[TRow: Base, TData](
-    BaseGlobalAction, GlobalEntityBulkCreateOpsAction[TRow, TData], ABC
+class AtomicCreateGlobalEntityOpsAction[TRow: Base, TData](
+    BaseGlobalAction, GlobalEntityAtomicCreateOpsAction[TRow, TData], ABC
 ):
     """An atomic insert of several rows of system-wide state."""
 
@@ -611,8 +613,8 @@ class BulkCreateGlobalEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.CREATE
 
 
-class BulkCreateEntityOpsAction[TRow: Base, TData](
-    BaseScopeAction, EntityBulkCreateOpsAction[TRow, TData], ABC
+class AtomicCreateEntityOpsAction[TRow: Base, TData](
+    BaseScopeAction, EntityAtomicCreateOpsAction[TRow, TData], ABC
 ):
     """An atomic insert of several entity rows."""
 
@@ -622,8 +624,8 @@ class BulkCreateEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.CREATE
 
 
-class BulkCreateRoleManagedEntityOpsAction[TRow: Base, TData](
-    BaseScopeAction, RoleManagedEntityBulkCreateOpsAction[TRow, TData], ABC
+class AtomicCreateRoleManagedEntityOpsAction[TRow: Base, TData](
+    BaseScopeAction, RoleManagedEntityAtomicCreateOpsAction[TRow, TData], ABC
 ):
     """An atomic insert of several role-managed entity rows."""
 
@@ -633,8 +635,8 @@ class BulkCreateRoleManagedEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.CREATE
 
 
-class BulkCreateFieldEntityOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](
-    BaseSingleEntityAction, FieldEntityBulkCreateOpsAction[TOwnerID, TRow, TData], ABC
+class AtomicCreateFieldEntityOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](
+    BaseSingleEntityAction, FieldEntityAtomicCreateOpsAction[TOwnerID, TRow, TData], ABC
 ):
     """An atomic insert of several field rows, authorized against their one owner."""
 
@@ -677,8 +679,8 @@ class PurgeFieldEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.PURGE
 
 
-class BulkPurgeGlobalEntityOpsAction[TRow: Base, TData](
-    BaseBulkAction, GlobalEntityBulkPurgeOpsAction[TRow, TData], ABC
+class PartialBulkPurgeGlobalEntityOpsAction[TRow: Base, TData](
+    BaseBulkAction, GlobalEntityPartialBulkPurgeOpsAction[TRow, TData], ABC
 ):
     """A hard delete over the global entities the caller named."""
 
@@ -688,8 +690,8 @@ class BulkPurgeGlobalEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.PURGE
 
 
-class BulkPurgeEntityOpsAction[TRow: Base, TData](
-    BaseBulkAction, EntityBulkPurgeOpsAction[TRow, TData], ABC
+class PartialBulkPurgeEntityOpsAction[TRow: Base, TData](
+    BaseBulkAction, EntityPartialBulkPurgeOpsAction[TRow, TData], ABC
 ):
     """A hard delete over the entities the caller named."""
 
@@ -699,8 +701,8 @@ class BulkPurgeEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.PURGE
 
 
-class BulkPurgeFieldEntityOpsAction[TRow: Base, TData](
-    BaseBulkAction, FieldEntityBulkPurgeOpsAction[TRow, TData], ABC
+class PartialBulkPurgeFieldEntityOpsAction[TRow: Base, TData](
+    BaseBulkAction, FieldEntityPartialBulkPurgeOpsAction[TRow, TData], ABC
 ):
     """A hard delete over the field rows the caller named."""
 
@@ -804,7 +806,9 @@ class DeleteSingleEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.DELETE
 
 
-class UpdateBulkOpsAction[TRow: Base, TData](BaseBulkAction, BulkUpdateOpsAction[TRow, TData], ABC):
+class UpdatePartialBulkOpsAction[TRow: Base, TData](
+    BaseBulkAction, PartialBulkUpdateOpsAction[TRow, TData], ABC
+):
     """A write over the entities the caller named. A bulk soft delete carries this too."""
 
     @override
@@ -813,7 +817,9 @@ class UpdateBulkOpsAction[TRow: Base, TData](BaseBulkAction, BulkUpdateOpsAction
         return ActionOperationType.UPDATE
 
 
-class DeleteBulkOpsAction[TRow: Base, TData](BaseBulkAction, BulkUpdateOpsAction[TRow, TData], ABC):
+class DeletePartialBulkOpsAction[TRow: Base, TData](
+    BaseBulkAction, PartialBulkUpdateOpsAction[TRow, TData], ABC
+):
     """A soft delete over the entities the caller named."""
 
     @override

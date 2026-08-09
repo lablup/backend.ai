@@ -585,7 +585,7 @@ class TestEntityCreate:
         repository: OpsRepository[_EntityData],
         parent_id: UUID,
     ) -> None:
-        created = await repository.bulk_create_entities([
+        created = await repository.atomic_create_entities([
             _Creator(name="a", parents=(parent_id,)),
             _Creator(name="b", parents=(parent_id,)),
         ])
@@ -600,7 +600,7 @@ class TestEntityCreate:
         self, database: ExtendedAsyncSAEngine, repository: OpsRepository[_EntityData]
     ) -> None:
         with pytest.raises(RepositoryIntegrityError):
-            await repository.bulk_create_entities([
+            await repository.atomic_create_entities([
                 _Creator(name="dup"),
                 _Creator(name="dup"),
             ])
@@ -670,7 +670,7 @@ class TestRoleManagedEntityCreate:
         repository: OpsRepository[_EntityData],
         presets: None,
     ) -> None:
-        created = await repository.bulk_create_role_managed_entities([
+        created = await repository.atomic_create_role_managed_entities([
             _RoleManagedCreator(name="a"),
             _RoleManagedCreator(name="b"),
         ])
@@ -741,7 +741,7 @@ class TestEntityPurge:
         data = await repository.create_entity(_Creator(name="a"))
         absent = uuid.uuid4()
 
-        result = await repository.bulk_purge_entities({
+        result = await repository.partial_bulk_purge_entities({
             data.id: _Purger(target=data.id),
             absent: _Purger(target=absent),
         })

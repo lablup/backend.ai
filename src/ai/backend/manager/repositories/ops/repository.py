@@ -147,7 +147,7 @@ class OpsRepository[TData]:
         """
         async with self._ops.write_ops() as w:
             data = await w.create_global_entity(creator)
-            fields = await w.bulk_create_field_entities(data.entity_id(), field_creators)
+            fields = await w.atomic_create_field_entities(data.entity_id(), field_creators)
             return EntityWithFieldsResult(data=data, fields=fields)
 
     async def create_entity(self, creator: EntityCreator[Any, TData]) -> TData:
@@ -171,33 +171,33 @@ class OpsRepository[TData]:
         async with self._ops.write_ops() as w:
             return await w.create_field_entity(owner_id, creator)
 
-    async def bulk_create_global_entities(
+    async def atomic_create_global_entities(
         self, creators: Sequence[GlobalEntityCreator[Any, TData]]
     ) -> list[TData]:
         """Insert several global rows atomically; nothing is registered."""
         async with self._ops.write_ops() as w:
-            return await w.bulk_create_global_entities(creators)
+            return await w.atomic_create_global_entities(creators)
 
-    async def bulk_create_entities(
+    async def atomic_create_entities(
         self, creators: Sequence[EntityCreator[Any, TData]]
     ) -> list[TData]:
         """Insert several entity rows atomically, provisioning each row's scope."""
         async with self._ops.write_ops() as w:
-            return await w.bulk_create_entities(creators)
+            return await w.atomic_create_entities(creators)
 
-    async def bulk_create_role_managed_entities(
+    async def atomic_create_role_managed_entities(
         self, creators: Sequence[RoleManagedEntityCreator[Any, TData]]
     ) -> list[TData]:
         """Insert several role-managed entity rows atomically, preset roles included."""
         async with self._ops.write_ops() as w:
-            return await w.bulk_create_role_managed_entities(creators)
+            return await w.atomic_create_role_managed_entities(creators)
 
-    async def bulk_create_field_entities(
+    async def atomic_create_field_entities(
         self, owner_id: Any, creators: Sequence[FieldEntityCreator[Any, Any, TData]]
     ) -> list[TData]:
         """Insert several field rows sharing one owner, atomically."""
         async with self._ops.write_ops() as w:
-            return await w.bulk_create_field_entities(owner_id, creators)
+            return await w.atomic_create_field_entities(owner_id, creators)
 
     async def purge_global_entity(self, purger: GlobalEntityPurger[Any, TData]) -> TData:
         async with self._ops.write_ops() as w:
@@ -228,26 +228,26 @@ class OpsRepository[TData]:
                 )
             return data
 
-    async def bulk_purge_global_entities(
+    async def partial_bulk_purge_global_entities(
         self, purgers: Mapping[EntityID, GlobalEntityPurger[Any, TData]]
     ) -> BulkResultWithFailures[TData]:
         """Hard-delete each named global entity independently, answering for every one."""
         async with self._ops.write_ops() as w:
-            return await w.bulk_purge_global_entities(purgers)
+            return await w.partial_bulk_purge_global_entities(purgers)
 
-    async def bulk_purge_entities(
+    async def partial_bulk_purge_entities(
         self, purgers: Mapping[EntityID, EntityPurger[Any, TData]]
     ) -> BulkResultWithFailures[TData]:
         """Hard-delete each named entity independently, answering for every one."""
         async with self._ops.write_ops() as w:
-            return await w.bulk_purge_entities(purgers)
+            return await w.partial_bulk_purge_entities(purgers)
 
-    async def bulk_purge_field_entities(
+    async def partial_bulk_purge_field_entities(
         self, purgers: Mapping[EntityID, FieldEntityPurger[Any, TData]]
     ) -> BulkResultWithFailures[TData]:
         """Hard-delete each named field row independently; authorized through the owner."""
         async with self._ops.write_ops() as w:
-            return await w.bulk_purge_field_entities(purgers)
+            return await w.partial_bulk_purge_field_entities(purgers)
 
     async def upsert_global_entity(self, upserter: GlobalEntityUpserter[Any, TData]) -> TData:
         """Insert or update a global row on conflict. Never absent."""
@@ -284,7 +284,7 @@ class OpsRepository[TData]:
                 )
             return data
 
-    async def bulk_update(
+    async def partial_bulk_update(
         self, updaters: Mapping[EntityID, DataUpdater[Any, TData]]
     ) -> BulkResultWithFailures[TData]:
         """Update each named entity independently, answering for every one of them.
@@ -293,7 +293,7 @@ class OpsRepository[TData]:
         each one's fate belongs in the answer rather than aborting the rest.
         """
         async with self._ops.write_ops() as w:
-            return await w.bulk_update_data(updaters)
+            return await w.partial_bulk_update_data(updaters)
 
     async def batch_update_in_scopes(
         self, scopes: Sequence[OperationScope], updater: DataBatchUpdater[Any, TData]

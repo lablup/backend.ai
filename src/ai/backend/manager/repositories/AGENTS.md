@@ -30,6 +30,10 @@
   - Judge by import path (`models.specs.*` is v2) — `repositories.base` re-exports some
     v2 types and bridge classes like `DataBatchPurger` share names, so never judge by
     the class name alone.
+- A v2 ops method that writes several rows names its failure mode: `atomic_*` raises and
+  writes nothing on the first failure, `partial_*` isolates each item in a savepoint and
+  answers per item. There is no unmarked default, and the two are never selected by an
+  argument — the return type differs (`list` vs `BulkResultWithFailures`).
 - The new path for the standard six operations is `OpsRepository` (`V2DBOpsProvider`).
   The legacy `DBOpsProvider` path (including `create_dependent` and
   `create_with_next_value`) is for existing code only — when a new domain needs those

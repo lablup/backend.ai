@@ -35,7 +35,7 @@ class V2UpdateWriteOps(V2WriteOpsBase):
             return None
         return updater.to_data(row)
 
-    async def bulk_update_data[TRow: Base, TData](
+    async def partial_bulk_update_data[TRow: Base, TData](
         self, updaters: Mapping[EntityID, DataUpdater[TRow, TData]]
     ) -> BulkResultWithFailures[TData]:
         """Update each named entity independently in its own savepoint, reporting

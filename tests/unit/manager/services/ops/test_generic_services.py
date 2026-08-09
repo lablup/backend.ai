@@ -36,22 +36,22 @@ from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.base import (
     BatchPurgeOpsAction,
     BatchUpdateOpsAction,
-    BulkUpdateOpsAction,
-    EntityBulkCreateOpsAction,
-    EntityBulkPurgeOpsAction,
+    EntityAtomicCreateOpsAction,
     EntityCreateOpsAction,
+    EntityPartialBulkPurgeOpsAction,
     EntityPurgeOpsAction,
     EntityUpsertOpsAction,
-    FieldEntityBulkCreateOpsAction,
-    FieldEntityBulkPurgeOpsAction,
+    FieldEntityAtomicCreateOpsAction,
+    FieldEntityPartialBulkPurgeOpsAction,
     FieldEntityUpsertOpsAction,
     GetOpsAction,
-    GlobalEntityBulkCreateOpsAction,
-    GlobalEntityBulkPurgeOpsAction,
+    GlobalEntityAtomicCreateOpsAction,
+    GlobalEntityPartialBulkPurgeOpsAction,
     GlobalEntityUpsertOpsAction,
     GlobalSearchOpsAction,
     LookupOpsAction,
-    RoleManagedEntityBulkCreateOpsAction,
+    PartialBulkUpdateOpsAction,
+    RoleManagedEntityAtomicCreateOpsAction,
     RoleManagedEntityCreateOpsAction,
     RoleManagedEntityUpsertOpsAction,
     SearchOpsAction,
@@ -104,24 +104,24 @@ from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.ops.service import (
     BatchPurgeService,
     BatchUpdateService,
-    BulkDeleteService,
-    BulkUpdateService,
     DeleteService,
-    EntityBulkCreateService,
-    EntityBulkPurgeService,
+    EntityAtomicCreateService,
     EntityCreateService,
+    EntityPartialBulkPurgeService,
     EntityPurgeService,
     EntityUpsertService,
-    FieldBulkCreateService,
-    FieldBulkPurgeService,
+    FieldAtomicCreateService,
+    FieldPartialBulkPurgeService,
     FieldUpsertService,
     GetService,
-    GlobalBulkCreateService,
-    GlobalBulkPurgeService,
+    GlobalAtomicCreateService,
+    GlobalPartialBulkPurgeService,
     GlobalSearchService,
     GlobalUpsertService,
     LookupService,
-    RoleManagedEntityBulkCreateService,
+    PartialBulkDeleteService,
+    PartialBulkUpdateService,
+    RoleManagedEntityAtomicCreateService,
     RoleManagedEntityCreateService,
     RoleManagedEntityUpsertService,
     SearchService,
@@ -793,7 +793,7 @@ class _LookupAction(BaseLookupAction, LookupOpsAction[RolePresetRow, _PresetData
 
 
 @dataclass
-class _BulkUpdateAction(BaseBulkAction, BulkUpdateOpsAction[RolePresetRow, _PresetData]):
+class _BulkUpdateAction(BaseBulkAction, PartialBulkUpdateOpsAction[RolePresetRow, _PresetData]):
     updaters: dict[EntityID, _PresetUpdater]
 
     @override
@@ -822,7 +822,7 @@ class _BulkUpdateAction(BaseBulkAction, BulkUpdateOpsAction[RolePresetRow, _Pres
 
 
 @dataclass
-class _BulkPurgeAction(BaseBulkAction, EntityBulkPurgeOpsAction[RolePresetRow, _PresetData]):
+class _BulkPurgeAction(BaseBulkAction, EntityPartialBulkPurgeOpsAction[RolePresetRow, _PresetData]):
     purgers: dict[EntityID, _PresetPurger]
 
     @override
@@ -850,7 +850,7 @@ class _BulkPurgeAction(BaseBulkAction, EntityBulkPurgeOpsAction[RolePresetRow, _
 
 
 @dataclass
-class _BulkCreateAction(BaseScopeAction, EntityBulkCreateOpsAction[RolePresetRow, _PresetData]):
+class _BulkCreateAction(BaseScopeAction, EntityAtomicCreateOpsAction[RolePresetRow, _PresetData]):
     scope: ScopeRef
     creators: list[_PresetCreator]
 
@@ -906,7 +906,7 @@ class _GlobalUpsertAction(
 
 @dataclass
 class _BulkCreateGlobalAction(
-    BaseGlobalAction, GlobalEntityBulkCreateOpsAction[RolePresetRow, _PresetData]
+    BaseGlobalAction, GlobalEntityAtomicCreateOpsAction[RolePresetRow, _PresetData]
 ):
     creators: list[_PresetGlobalCreator]
 
@@ -932,7 +932,7 @@ class _BulkCreateGlobalAction(
 
 @dataclass
 class _BulkPurgeGlobalAction(
-    BaseBulkAction, GlobalEntityBulkPurgeOpsAction[RolePresetRow, _PresetData]
+    BaseBulkAction, GlobalEntityPartialBulkPurgeOpsAction[RolePresetRow, _PresetData]
 ):
     purgers: dict[EntityID, _PresetGlobalPurger]
 
@@ -962,7 +962,7 @@ class _BulkPurgeGlobalAction(
 
 @dataclass
 class _BulkCreateFieldAction(
-    BaseSingleEntityAction, FieldEntityBulkCreateOpsAction[uuid.UUID, RolePresetRow, _PresetData]
+    BaseSingleEntityAction, FieldEntityAtomicCreateOpsAction[uuid.UUID, RolePresetRow, _PresetData]
 ):
     owner: uuid.UUID
     creators: list[_PresetFieldCreator]
@@ -997,7 +997,7 @@ class _BulkCreateFieldAction(
 
 @dataclass
 class _BulkPurgeFieldAction(
-    BaseBulkAction, FieldEntityBulkPurgeOpsAction[RolePresetRow, _PresetData]
+    BaseBulkAction, FieldEntityPartialBulkPurgeOpsAction[RolePresetRow, _PresetData]
 ):
     purgers: dict[EntityID, _PresetFieldPurger]
 
@@ -1093,7 +1093,7 @@ class _RoleManagedCreateAction(
 
 @dataclass
 class _RoleManagedBulkCreateAction(
-    BaseScopeAction, RoleManagedEntityBulkCreateOpsAction[RolePresetRow, _PresetData]
+    BaseScopeAction, RoleManagedEntityAtomicCreateOpsAction[RolePresetRow, _PresetData]
 ):
     scope: ScopeRef
     creators: list[_PresetRoleManagedCreator]
@@ -1308,10 +1308,10 @@ def repository(stored: _PresetData) -> MagicMock:
     ):
         setattr(mock, operation, AsyncMock(return_value=stored))
     for operation in (
-        "bulk_create_entities",
-        "bulk_create_role_managed_entities",
-        "bulk_create_global_entities",
-        "bulk_create_field_entities",
+        "atomic_create_entities",
+        "atomic_create_role_managed_entities",
+        "atomic_create_global_entities",
+        "atomic_create_field_entities",
         "batch_update_in_scopes",
         "batch_update_in_global",
         "batch_purge_in_scopes",
@@ -1319,10 +1319,10 @@ def repository(stored: _PresetData) -> MagicMock:
     ):
         setattr(mock, operation, AsyncMock(return_value=[stored]))
     for operation in (
-        "bulk_update",
-        "bulk_purge_entities",
-        "bulk_purge_global_entities",
-        "bulk_purge_field_entities",
+        "partial_bulk_update",
+        "partial_bulk_purge_entities",
+        "partial_bulk_purge_global_entities",
+        "partial_bulk_purge_field_entities",
     ):
         setattr(
             mock,
@@ -1477,52 +1477,52 @@ async def test_lookup_runs_under_the_lookup_processor(
     assert result.resolved_entity_id() == stored.id
 
 
-async def test_bulk_create_forwards_every_creator(
+async def test_atomic_create_forwards_every_creator(
     repository: MagicMock, stored: _PresetData, scope: ScopeRef
 ) -> None:
-    service: EntityBulkCreateService[_PresetData] = EntityBulkCreateService(repository)
+    service: EntityAtomicCreateService[_PresetData] = EntityAtomicCreateService(repository)
     creators = [_PresetCreator(), _PresetCreator()]
 
     result = await service.execute(_BulkCreateAction(scope=scope, creators=creators))
 
     assert result.items == [stored]
-    repository.bulk_create_entities.assert_awaited_once_with(creators)
+    repository.atomic_create_entities.assert_awaited_once_with(creators)
 
 
-async def test_bulk_update_answers_for_every_named_entity(
+async def test_partial_bulk_update_answers_for_every_named_entity(
     repository: MagicMock, stored: _PresetData
 ) -> None:
-    service: BulkUpdateService[_PresetData] = BulkUpdateService(repository)
+    service: PartialBulkUpdateService[_PresetData] = PartialBulkUpdateService(repository)
     updaters = {stored.id: _PresetUpdater(target=stored.id)}
 
     result = await service.execute(_BulkUpdateAction(updaters=updaters))
 
     assert [r.entity_id for r in result.entity_results()] == [stored.id]
-    repository.bulk_update.assert_awaited_once_with(updaters)
+    repository.partial_bulk_update.assert_awaited_once_with(updaters)
 
 
-async def test_bulk_delete_writes_through_the_update_path(
+async def test_partial_bulk_delete_writes_through_the_update_path(
     repository: MagicMock, stored: _PresetData
 ) -> None:
-    service: BulkDeleteService[_PresetData] = BulkDeleteService(repository)
+    service: PartialBulkDeleteService[_PresetData] = PartialBulkDeleteService(repository)
     updaters = {stored.id: _PresetUpdater(target=stored.id, values={"deleted": True})}
 
     result = await service.execute(_BulkUpdateAction(updaters=updaters))
 
     assert [r.entity_id for r in result.entity_results()] == [stored.id]
-    repository.bulk_update.assert_awaited_once_with(updaters)
+    repository.partial_bulk_update.assert_awaited_once_with(updaters)
 
 
-async def test_bulk_purge_answers_for_every_named_entity(
+async def test_partial_bulk_purge_answers_for_every_named_entity(
     repository: MagicMock, stored: _PresetData
 ) -> None:
-    service: EntityBulkPurgeService[_PresetData] = EntityBulkPurgeService(repository)
+    service: EntityPartialBulkPurgeService[_PresetData] = EntityPartialBulkPurgeService(repository)
     purgers = {stored.id: _PresetPurger(target=stored.id)}
 
     result = await service.execute(_BulkPurgeAction(purgers=purgers))
 
     assert [r.entity_id for r in result.entity_results()] == [stored.id]
-    repository.bulk_purge_entities.assert_awaited_once_with(purgers)
+    repository.partial_bulk_purge_entities.assert_awaited_once_with(purgers)
 
 
 async def test_role_managed_create_forwards_the_action_s_creator(
@@ -1539,18 +1539,18 @@ async def test_role_managed_create_forwards_the_action_s_creator(
     repository.create_role_managed_entity.assert_awaited_once_with(creator)
 
 
-async def test_role_managed_bulk_create_forwards_every_creator(
+async def test_role_managed_atomic_create_forwards_every_creator(
     repository: MagicMock, stored: _PresetData, scope: ScopeRef
 ) -> None:
-    service: RoleManagedEntityBulkCreateService[_PresetData] = RoleManagedEntityBulkCreateService(
-        repository
+    service: RoleManagedEntityAtomicCreateService[_PresetData] = (
+        RoleManagedEntityAtomicCreateService(repository)
     )
     creators = [_PresetRoleManagedCreator(), _PresetRoleManagedCreator()]
 
     result = await service.execute(_RoleManagedBulkCreateAction(scope=scope, creators=creators))
 
     assert result.items == [stored]
-    repository.bulk_create_role_managed_entities.assert_awaited_once_with(creators)
+    repository.atomic_create_role_managed_entities.assert_awaited_once_with(creators)
 
 
 async def test_role_managed_upsert_forwards_the_action_s_upserter(
@@ -1579,53 +1579,53 @@ async def test_global_upsert_forwards_the_action_s_upserter(
     repository.upsert_global_entity.assert_awaited_once_with(upserter)
 
 
-async def test_global_bulk_create_forwards_every_creator(
+async def test_global_atomic_create_forwards_every_creator(
     repository: MagicMock, stored: _PresetData
 ) -> None:
-    service: GlobalBulkCreateService[_PresetData] = GlobalBulkCreateService(repository)
+    service: GlobalAtomicCreateService[_PresetData] = GlobalAtomicCreateService(repository)
     creators = [_PresetGlobalCreator(), _PresetGlobalCreator()]
 
     result = await service.execute(_BulkCreateGlobalAction(creators=creators))
 
     assert result.items == [stored]
-    repository.bulk_create_global_entities.assert_awaited_once_with(creators)
+    repository.atomic_create_global_entities.assert_awaited_once_with(creators)
 
 
-async def test_field_bulk_create_forwards_owner_and_creators(
+async def test_field_atomic_create_forwards_owner_and_creators(
     repository: MagicMock, stored: _PresetData
 ) -> None:
-    service: FieldBulkCreateService[_PresetData] = FieldBulkCreateService(repository)
+    service: FieldAtomicCreateService[_PresetData] = FieldAtomicCreateService(repository)
     owner = uuid.uuid4()
     creators = [_PresetFieldCreator(), _PresetFieldCreator()]
 
     result = await service.execute(_BulkCreateFieldAction(owner=owner, creators=creators))
 
     assert result.items == [stored]
-    repository.bulk_create_field_entities.assert_awaited_once_with(owner, creators)
+    repository.atomic_create_field_entities.assert_awaited_once_with(owner, creators)
 
 
-async def test_global_bulk_purge_answers_for_every_named_entity(
+async def test_global_partial_bulk_purge_answers_for_every_named_entity(
     repository: MagicMock, stored: _PresetData
 ) -> None:
-    service: GlobalBulkPurgeService[_PresetData] = GlobalBulkPurgeService(repository)
+    service: GlobalPartialBulkPurgeService[_PresetData] = GlobalPartialBulkPurgeService(repository)
     purgers = {stored.id: _PresetGlobalPurger(target=stored.id)}
 
     result = await service.execute(_BulkPurgeGlobalAction(purgers=purgers))
 
     assert [r.entity_id for r in result.entity_results()] == [stored.id]
-    repository.bulk_purge_global_entities.assert_awaited_once_with(purgers)
+    repository.partial_bulk_purge_global_entities.assert_awaited_once_with(purgers)
 
 
-async def test_field_bulk_purge_answers_for_every_named_entity(
+async def test_field_partial_bulk_purge_answers_for_every_named_entity(
     repository: MagicMock, stored: _PresetData
 ) -> None:
-    service: FieldBulkPurgeService[_PresetData] = FieldBulkPurgeService(repository)
+    service: FieldPartialBulkPurgeService[_PresetData] = FieldPartialBulkPurgeService(repository)
     purgers = {stored.id: _PresetFieldPurger(target=stored.id)}
 
     result = await service.execute(_BulkPurgeFieldAction(purgers=purgers))
 
     assert [r.entity_id for r in result.entity_results()] == [stored.id]
-    repository.bulk_purge_field_entities.assert_awaited_once_with(purgers)
+    repository.partial_bulk_purge_field_entities.assert_awaited_once_with(purgers)
 
 
 async def test_field_upsert_forwards_owner_and_upserter(

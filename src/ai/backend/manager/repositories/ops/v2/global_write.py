@@ -28,7 +28,7 @@ class V2GlobalWriteOps(V2WriteOpsBase):
         await self._insert_row(row, creator.integrity_error_checks())
         return creator.to_data(row)
 
-    async def bulk_create_global_entities[TRow: Base, TData](
+    async def atomic_create_global_entities[TRow: Base, TData](
         self, creators: Sequence[GlobalEntityCreator[TRow, TData]]
     ) -> list[TData]:
         """Insert global rows atomically in one flush; nothing is registered."""
@@ -55,7 +55,7 @@ class V2GlobalWriteOps(V2WriteOpsBase):
             return None
         return purger.to_data(row)
 
-    async def bulk_purge_global_entities[TRow: Base, TData](
+    async def partial_bulk_purge_global_entities[TRow: Base, TData](
         self, purgers: Mapping[EntityID, GlobalEntityPurger[TRow, TData]]
     ) -> BulkResultWithFailures[TData]:
         """Delete each named global entity independently in its own savepoint; a
