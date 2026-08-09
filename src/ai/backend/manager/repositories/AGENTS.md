@@ -21,6 +21,19 @@
 
 ## Data access
 
+- New write specs use the `models/specs/` lineage only:
+  - write families: `GlobalEntity*` / `Entity*` / `RoleManagedEntity*` / `FieldEntity*` (Creator/Purger/Upserter)
+  - read/update: `DataQuerier`, `DataLookup`, `Searcher`, `DataUpdater`
+- No new use of the legacy specs — transition-only maintenance of existing code:
+  - `repositories/base/`: `CreatorSpec`, `DataCreator`, `UpserterSpec`, `PurgerSpec`
+  - `repositories/base/rbac/`: the `RBACEntityCreator` / `RBACEntityUpserter` / `RBACEntityPurger` family
+  - Judge by import path (`models.specs.*` is v2) — `repositories.base` re-exports some
+    v2 types and bridge classes like `DataBatchPurger` share names, so never judge by
+    the class name alone.
+- The new path for the standard six operations is `OpsRepository` (`V2DBOpsProvider`).
+  The legacy `DBOpsProvider` path (including `create_dependent` and
+  `create_with_next_value`) is for existing code only — when a new domain needs those
+  capabilities, report it as a v2 gap (see the demotion mapping in `services/KNOWLEDGE.md`).
 - For general API paths, prefer using `DBOpsProvider` (`write_ops` / `read_ops`). Internal operations may use db directly,
   but separating into a repository is the default.
 - ops use the default provider; keep a separate provider only for common operations in specific situations such as sokovan.
