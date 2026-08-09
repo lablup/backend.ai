@@ -157,15 +157,9 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.keypair_resource_policy.service import (
         KeypairResourcePolicyService,
     )
-    from ai.backend.manager.services.login_client_type.admin_service import (
-        LoginClientTypeAdminService,
-    )
     from ai.backend.manager.services.login_client_type.processors import (
         LoginClientTypeAdminProcessors,
         LoginClientTypeProcessors,
-    )
-    from ai.backend.manager.services.login_client_type.service import (
-        LoginClientTypeService,
     )
     from ai.backend.manager.services.manager_admin.processors import (
         ManagerAdminProcessors,
@@ -452,8 +446,6 @@ class Services:
     resource_allocation: ResourceAllocationService
     stream: StreamService
     events: EventsService
-    login_client_type: LoginClientTypeService
-    login_client_type_admin: LoginClientTypeAdminService
 
 
 @dataclass

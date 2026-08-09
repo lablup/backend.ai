@@ -1,31 +1,37 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.login_client_type import LOGIN_CLIENT_TYPE_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import PurgeGlobalOpsAction
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
-from ai.backend.manager.services.login_client_type.actions.base import LoginClientTypeAction
+from ai.backend.manager.models.login_client_type.purgers import LoginClientTypePurger
+from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 
 
 @dataclass
-class DeleteLoginClientTypeAction(LoginClientTypeAction):
+class DeleteLoginClientTypeAction(PurgeGlobalOpsAction[LoginClientTypeRow, LoginClientTypeData]):
+    """Remove a login client type from the catalog.
+
+    Purge-shaped: the table carries no lifecycle column, so deleting one has always
+    been the row leaving the table.
+    """
+
     id: UUID
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.id)
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return LOGIN_CLIENT_TYPE_ENTITY_TYPE
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.DELETE
-
-
-@dataclass
-class DeleteLoginClientTypeActionResult(BaseActionResult):
-    login_client_type: LoginClientTypeData
+    def action_name(cls) -> str:
+        return "delete_login_client_type"
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.login_client_type.id)
+    def to_purger(self) -> LoginClientTypePurger:
+        return LoginClientTypePurger(login_client_type_id=self.id)

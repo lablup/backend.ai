@@ -1,54 +1,54 @@
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
+from __future__ import annotations
+
+from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import (
+    GlobalActionProcessor,
+    PublicActionProcessor,
+)
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    CreatedEntityOpsResult,
+    EntityOpsResult,
+)
+from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 from ai.backend.manager.services.login_client_type.actions.create import (
     CreateLoginClientTypeAction,
-    CreateLoginClientTypeActionResult,
 )
 from ai.backend.manager.services.login_client_type.actions.delete import (
     DeleteLoginClientTypeAction,
-    DeleteLoginClientTypeActionResult,
 )
 from ai.backend.manager.services.login_client_type.actions.get import (
     GetLoginClientTypeAction,
-    GetLoginClientTypeActionResult,
 )
 from ai.backend.manager.services.login_client_type.actions.search import (
     SearchLoginClientTypesAction,
-    SearchLoginClientTypesActionResult,
 )
 from ai.backend.manager.services.login_client_type.actions.update import (
     UpdateLoginClientTypeAction,
-    UpdateLoginClientTypeActionResult,
 )
-from ai.backend.manager.services.login_client_type.admin_service import (
-    LoginClientTypeAdminService,
-)
-from ai.backend.manager.services.login_client_type.service import LoginClientTypeService
 
 
 class LoginClientTypeProcessors:
-    get: ActionProcessor[GetLoginClientTypeAction, GetLoginClientTypeActionResult]
-    search: ActionProcessor[SearchLoginClientTypesAction, SearchLoginClientTypesActionResult]
+    """The catalog's reads, open to every authenticated user."""
 
-    def __init__(
-        self,
-        service: LoginClientTypeService,
-        action_monitors: list[ActionMonitor],
-    ) -> None:
-        self.get = ActionProcessor(service.get, action_monitors)
-        self.search = ActionProcessor(service.search, action_monitors)
+    get: PublicActionProcessor[GetLoginClientTypeAction, EntityOpsResult[LoginClientTypeData]]
+    search: PublicActionProcessor[SearchLoginClientTypesAction, BatchOpsResult[LoginClientTypeData]]
+
+    def __init__(self, group: ProcessorGroup[LoginClientTypeData]) -> None:
+        self.get = group.public_get_ops(GetLoginClientTypeAction)
+        self.search = group.public_search_ops(SearchLoginClientTypesAction)
 
 
 class LoginClientTypeAdminProcessors:
-    create: ActionProcessor[CreateLoginClientTypeAction, CreateLoginClientTypeActionResult]
-    update: ActionProcessor[UpdateLoginClientTypeAction, UpdateLoginClientTypeActionResult]
-    delete: ActionProcessor[DeleteLoginClientTypeAction, DeleteLoginClientTypeActionResult]
+    """The catalog's writes, behind the SUPERADMIN gate."""
 
-    def __init__(
-        self,
-        service: LoginClientTypeAdminService,
-        action_monitors: list[ActionMonitor],
-    ) -> None:
-        self.create = ActionProcessor(service.create, action_monitors)
-        self.update = ActionProcessor(service.update, action_monitors)
-        self.delete = ActionProcessor(service.delete, action_monitors)
+    create: GlobalActionProcessor[
+        CreateLoginClientTypeAction, CreatedEntityOpsResult[LoginClientTypeData]
+    ]
+    update: GlobalActionProcessor[UpdateLoginClientTypeAction, EntityOpsResult[LoginClientTypeData]]
+    delete: GlobalActionProcessor[DeleteLoginClientTypeAction, EntityOpsResult[LoginClientTypeData]]
+
+    def __init__(self, group: ProcessorGroup[LoginClientTypeData]) -> None:
+        self.create = group.global_create_ops(CreateLoginClientTypeAction)
+        self.update = group.global_update_ops(UpdateLoginClientTypeAction)
+        self.delete = group.global_purge_ops(DeleteLoginClientTypeAction)

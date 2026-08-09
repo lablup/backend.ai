@@ -80,14 +80,10 @@ from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
 )
 from ai.backend.manager.services.keypair_resource_policy.service import KeypairResourcePolicyService
-from ai.backend.manager.services.login_client_type.admin_service import (
-    LoginClientTypeAdminService,
-)
 from ai.backend.manager.services.login_client_type.processors import (
     LoginClientTypeAdminProcessors,
     LoginClientTypeProcessors,
 )
-from ai.backend.manager.services.login_client_type.service import LoginClientTypeService
 from ai.backend.manager.services.manager_admin.processors import ManagerAdminProcessors
 from ai.backend.manager.services.manager_admin.service import ManagerAdminService
 from ai.backend.manager.services.metric.processors import MetricProcessors
@@ -380,12 +376,6 @@ def create_services(args: ServiceArgs) -> Services:
         app_config_definition=AppConfigDefinitionService(
             repository=repositories.app_config_definition.repository,
         ),
-        login_client_type=LoginClientTypeService(
-            repository=repositories.auth.login_client_type,
-        ),
-        login_client_type_admin=LoginClientTypeAdminService(
-            admin_repository=repositories.auth.login_client_type_admin,
-        ),
         notification=NotificationService(
             repository=repositories.notification.repository,
             notification_center=args.notification_center,
@@ -572,10 +562,8 @@ def create_processors(
         app_config_definition=AppConfigDefinitionProcessors(
             services.app_config_definition, action_monitors
         ),
-        login_client_type=LoginClientTypeProcessors(services.login_client_type, action_monitors),
-        login_client_type_admin=LoginClientTypeAdminProcessors(
-            services.login_client_type_admin, action_monitors
-        ),
+        login_client_type=LoginClientTypeProcessors(registry.group()),
+        login_client_type_admin=LoginClientTypeAdminProcessors(registry.group()),
         notification=NotificationProcessors(services.notification, action_monitors, validators),
         object_storage=ObjectStorageProcessors(
             services.object_storage, action_monitors, validators
