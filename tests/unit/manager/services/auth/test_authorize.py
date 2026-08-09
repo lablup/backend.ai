@@ -8,6 +8,9 @@ from aiohttp import web
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.resource_policy import (
+    UserResourcePolicyUUID,
+)
 from ai.backend.common.plugin.hook import HookPluginContext, HookResult, HookResults
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
@@ -67,6 +70,7 @@ def mock_user_resource_policy_repository() -> AsyncMock:
     mock_repo = AsyncMock(spec=UserResourcePolicyRepository)
     # Default: policy with no concurrent login limit (unlimited)
     mock_repo.get_by_name.return_value = UserResourcePolicyData(
+        uuid=UserResourcePolicyUUID(uuid4()),
         name="default",
         max_vfolder_count=10,
         max_quota_scope_size=0,
@@ -472,6 +476,7 @@ async def test_authorize_force_invalidates_existing_sessions(
 
     # Set max_concurrent_logins=1 so that the one live session triggers force-eviction.
     mock_user_resource_policy_repository.get_by_name.return_value = UserResourcePolicyData(
+        uuid=UserResourcePolicyUUID(uuid4()),
         name="default",
         max_vfolder_count=10,
         max_quota_scope_size=0,

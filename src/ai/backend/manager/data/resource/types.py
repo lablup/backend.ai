@@ -2,8 +2,15 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, override
 
+from ai.backend.common.data.entity.types import EntityData
+from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.identifier.resource_policy import (
+    KeyPairResourcePolicyUUID,
+    ProjectResourcePolicyUUID,
+    UserResourcePolicyUUID,
+)
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.types import (
     DefaultForUnspecified,
@@ -14,7 +21,10 @@ from ai.backend.common.types import (
 
 
 @dataclass
-class UserResourcePolicyData:
+class UserResourcePolicyData(EntityData):
+    """One user resource policy. Keyed by ``name``; ``uuid`` is its ``EntityID``."""
+
+    uuid: UserResourcePolicyUUID
     name: str
     created_at: datetime | None = field(compare=False, default=None)
     max_vfolder_count: int = 0
@@ -23,18 +33,32 @@ class UserResourcePolicyData:
     max_customized_image_count: int = 3
     max_concurrent_logins: int | None = None
 
+    @override
+    def entity_id(self) -> EntityID:
+        return self.uuid
+
 
 @dataclass
-class ProjectResourcePolicyData:
+class ProjectResourcePolicyData(EntityData):
+    """One project resource policy. Keyed by ``name``; ``uuid`` is its ``EntityID``."""
+
+    uuid: ProjectResourcePolicyUUID
     name: str
     created_at: datetime | None = field(compare=False, default=None)
     max_vfolder_count: int = 0
     max_quota_scope_size: int = 0
     max_network_count: int = 0
 
+    @override
+    def entity_id(self) -> EntityID:
+        return self.uuid
+
 
 @dataclass
-class KeyPairResourcePolicyData:
+class KeyPairResourcePolicyData(EntityData):
+    """One keypair resource policy. Keyed by ``name``; ``uuid`` is its ``EntityID``."""
+
+    uuid: KeyPairResourcePolicyUUID
     name: str
     created_at: datetime | None = field(compare=False)
     default_for_unspecified: DefaultForUnspecified
@@ -48,6 +72,10 @@ class KeyPairResourcePolicyData:
     max_containers_per_session: int
     idle_timeout: int
     allowed_vfolder_hosts: dict[str, Any]
+
+    @override
+    def entity_id(self) -> EntityID:
+        return self.uuid
 
 
 @dataclass

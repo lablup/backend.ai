@@ -9,10 +9,14 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
+from uuid import uuid4
 
 import pytest
 
 from ai.backend.common.exception import KeypairResourcePolicyNotFound
+from ai.backend.common.identifier.resource_policy import (
+    KeyPairResourcePolicyUUID,
+)
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.repositories.base.creator import Creator
@@ -55,6 +59,7 @@ class TestCreateKeypairResourcePolicy:
     @pytest.fixture
     def sample_policy_data(self) -> KeyPairResourcePolicyData:
         return KeyPairResourcePolicyData(
+            uuid=KeyPairResourcePolicyUUID(uuid4()),
             name="test-policy",
             created_at=datetime.now(tz=UTC),
             default_for_unspecified=DefaultForUnspecified.LIMITED,
@@ -75,6 +80,7 @@ class TestCreateKeypairResourcePolicy:
     @pytest.fixture
     def minimal_policy_data(self) -> KeyPairResourcePolicyData:
         return KeyPairResourcePolicyData(
+            uuid=KeyPairResourcePolicyUUID(uuid4()),
             name="minimal-policy",
             created_at=datetime.now(tz=UTC),
             default_for_unspecified=DefaultForUnspecified.LIMITED,
@@ -216,6 +222,7 @@ class TestModifyKeypairResourcePolicy:
     @pytest.fixture
     def modified_policy_data(self) -> KeyPairResourcePolicyData:
         return KeyPairResourcePolicyData(
+            uuid=KeyPairResourcePolicyUUID(uuid4()),
             name="test-policy",
             created_at=datetime.now(tz=UTC),
             default_for_unspecified=DefaultForUnspecified.LIMITED,
@@ -234,6 +241,7 @@ class TestModifyKeypairResourcePolicy:
     @pytest.fixture
     def nullified_policy_data(self) -> KeyPairResourcePolicyData:
         return KeyPairResourcePolicyData(
+            uuid=KeyPairResourcePolicyUUID(uuid4()),
             name="test-policy",
             created_at=datetime.now(tz=UTC),
             default_for_unspecified=DefaultForUnspecified.LIMITED,
@@ -318,6 +326,7 @@ class TestModifyKeypairResourcePolicy:
         """Modify keypair resource policy with resource slots replacement should succeed."""
         new_slots = ResourceSlot.from_user_input({"cpu": "100", "mem": "512g", "gpu": "8"}, None)
         expected_policy = KeyPairResourcePolicyData(
+            uuid=KeyPairResourcePolicyUUID(uuid4()),
             name="test-policy",
             created_at=datetime.now(tz=UTC),
             default_for_unspecified=DefaultForUnspecified.LIMITED,
@@ -386,6 +395,7 @@ class TestDeleteKeypairResourcePolicy:
     @pytest.fixture
     def sample_policy_data(self) -> KeyPairResourcePolicyData:
         return KeyPairResourcePolicyData(
+            uuid=KeyPairResourcePolicyUUID(uuid4()),
             name="test-policy",
             created_at=datetime.now(tz=UTC),
             default_for_unspecified=DefaultForUnspecified.LIMITED,

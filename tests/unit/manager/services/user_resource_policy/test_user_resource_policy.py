@@ -4,10 +4,14 @@ These tests verify that the service methods work correctly with mocked repositor
 """
 
 from unittest.mock import AsyncMock, MagicMock
+from uuid import uuid4
 
 import pytest
 
 from ai.backend.common.exception import UserResourcePolicyNotFound
+from ai.backend.common.identifier.resource_policy import (
+    UserResourcePolicyUUID,
+)
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.validators import ActionValidators
@@ -80,6 +84,7 @@ def processors(
 def sample_policy_data() -> UserResourcePolicyData:
     """Create sample user resource policy data."""
     return UserResourcePolicyData(
+        uuid=UserResourcePolicyUUID(uuid4()),
         name="test-policy",
         max_vfolder_count=10,
         max_quota_scope_size=1000000,
@@ -214,6 +219,7 @@ class TestModifyUserResourcePolicy:
     ) -> None:
         """Test modify user resource policy service method"""
         expected_data = UserResourcePolicyData(
+            uuid=UserResourcePolicyUUID(uuid4()),
             name="test-policy",
             max_vfolder_count=20,
             max_quota_scope_size=2000000,
@@ -328,6 +334,7 @@ class TestProcessorsIntegration:
     ) -> None:
         """Test that processors work correctly with the service"""
         expected_data = UserResourcePolicyData(
+            uuid=UserResourcePolicyUUID(uuid4()),
             name="processor-test",
             max_vfolder_count=15,
             max_quota_scope_size=1500000,

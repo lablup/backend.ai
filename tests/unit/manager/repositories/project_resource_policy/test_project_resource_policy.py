@@ -8,11 +8,15 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
 
 import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ai.backend.common.identifier.resource_policy import (
+    ProjectResourcePolicyUUID,
+)
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.repository import RepositoryIntegrityError
@@ -125,6 +129,7 @@ class TestProjectResourcePolicyRepository:
     def sample_policy_data(self) -> ProjectResourcePolicyData:
         """Create sample project resource policy data for testing"""
         return ProjectResourcePolicyData(
+            uuid=ProjectResourcePolicyUUID(uuid4()),
             name="test-policy",
             max_vfolder_count=10,
             max_quota_scope_size=1073741824,  # 1GB
@@ -155,6 +160,7 @@ class TestProjectResourcePolicyRepository:
 
         # Create expected policy data
         expected_policy_data = ProjectResourcePolicyData(
+            uuid=ProjectResourcePolicyUUID(uuid4()),
             name="new-policy",
             max_vfolder_count=20,
             max_quota_scope_size=2147483648,  # 2GB
@@ -421,6 +427,7 @@ class TestProjectResourcePolicyRepository:
         creator = Creator(spec=spec)
 
         mock_policy_data = ProjectResourcePolicyData(
+            uuid=ProjectResourcePolicyUUID(uuid4()),
             name=name,
             max_vfolder_count=max_vfolder_count,
             max_quota_scope_size=max_quota_scope_size,

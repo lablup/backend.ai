@@ -10,6 +10,9 @@ import pytest
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import UserResourcePolicyNotFound
+from ai.backend.common.identifier.resource_policy import (
+    UserResourcePolicyUUID,
+)
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
@@ -76,6 +79,7 @@ def _make_action(*, force: bool = False) -> AuthorizeAction:
 
 def _make_policy(max_concurrent_logins: int | None) -> UserResourcePolicyData:
     return UserResourcePolicyData(
+        uuid=UserResourcePolicyUUID(uuid4()),
         name=_DEFAULT_RESOURCE_POLICY,
         max_vfolder_count=10,
         max_quota_scope_size=0,

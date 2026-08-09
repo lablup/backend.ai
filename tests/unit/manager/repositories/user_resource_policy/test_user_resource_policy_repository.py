@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
+from uuid import uuid4
 
 import pytest
 
 from ai.backend.common.exception import UserResourcePolicyNotFound
+from ai.backend.common.identifier.resource_policy import (
+    UserResourcePolicyUUID,
+)
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -167,6 +171,7 @@ class TestUserResourcePolicyRepository:
                     max_customized_image_count=OptionalState.nop(),
                 ),
                 UserResourcePolicyData(
+                    uuid=UserResourcePolicyUUID(uuid4()),
                     name="test-policy",
                     max_vfolder_count=20,
                     max_quota_scope_size=1000000,  # unchanged
@@ -182,6 +187,7 @@ class TestUserResourcePolicyRepository:
                     max_customized_image_count=OptionalState.nop(),
                 ),
                 UserResourcePolicyData(
+                    uuid=UserResourcePolicyUUID(uuid4()),
                     name="test-policy",
                     max_vfolder_count=20,
                     max_quota_scope_size=2000000,
@@ -197,6 +203,7 @@ class TestUserResourcePolicyRepository:
                     max_customized_image_count=OptionalState.update(7),
                 ),
                 UserResourcePolicyData(
+                    uuid=UserResourcePolicyUUID(uuid4()),
                     name="test-policy",
                     max_vfolder_count=25,
                     max_quota_scope_size=3000000,
@@ -212,6 +219,7 @@ class TestUserResourcePolicyRepository:
                     max_customized_image_count=OptionalState.nop(),
                 ),
                 UserResourcePolicyData(
+                    uuid=UserResourcePolicyUUID(uuid4()),
                     name="test-policy",
                     max_vfolder_count=15,
                     max_quota_scope_size=1000000,  # unchanged
