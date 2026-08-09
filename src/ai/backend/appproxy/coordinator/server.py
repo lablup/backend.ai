@@ -17,7 +17,15 @@ import sys
 import time
 import traceback
 import uuid
-from collections.abc import AsyncGenerator, AsyncIterator, Callable, Iterable, Mapping, Sequence
+from collections.abc import (
+    AsyncGenerator,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Iterable,
+    Mapping,
+    Sequence,
+)
 from contextlib import AsyncExitStack, asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
@@ -33,7 +41,7 @@ import jinja2
 import memray
 import pyroscope
 import uvloop
-from aiohttp import web
+from aiohttp import hdrs, web
 from pydantic import ValidationError
 from setproctitle import setproctitle
 
@@ -42,6 +50,7 @@ from ai.backend.appproxy.common.defs import (
     AGENTID_COORDINATOR,
     APPPROXY_ANYCAST_STREAM_KEY,
     APPPROXY_BROADCAST_CHANNEL,
+    MEDIA_TYPE_JSON,
 )
 from ai.backend.appproxy.common.errors import (
     GenericBadRequest,
@@ -192,63 +201,70 @@ async def api_middleware(request: web.Request, handler: WebRequestHandler) -> we
     return await _handler(request)
 
 
+def _render_error_response(request: web.Request, ex: BackendAIError) -> web.StreamResponse:
+    # The coordinator only serves JSON APIs, so default to JSON when the client sent no
+    # Accept header. The HTML template remains for clients that prefer text/html.
+    accept = request.headers.get(hdrs.ACCEPT, MEDIA_TYPE_JSON)
+    if mime_match(accept, MEDIA_TYPE_JSON):
+        return web.json_response(
+            ensure_json_serializable(ex.body_dict),
+            status=ex.status_code,
+        )
+    return aiohttp_jinja2.render_template(
+        "error",
+        request,
+        ex.body_dict,
+        status=ex.status_code,
+    )
+
+
 @web.middleware
 async def exception_middleware(
     request: web.Request, handler: WebRequestHandler
 ) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
+    # The inner block turns every exception into a BackendAIError; the outer one renders
+    # it, so no error can escape through aiohttp's default rendering.
     try:
-        resp = await handler(request)
-    except (BackendAISchemaValidationFailed, ValidationError) as ex:
-        # ``ValidationError`` covers plain ``BaseModel`` subclasses that
-        # skip the ``BackendAISchema`` auto-conversion override.
-        log.exception(
-            "Failed to create response model: {}",
-            json.dumps(ex.errors(), indent=2, default=str),
-        )
-        raise InternalServerError() from ex
-    except BackendAIError as ex:
-        if ex.status_code == 500:
-            log.warning("Internal server error raised inside handlers")
-        log.exception("")
-        # The coordinator only serves JSON APIs, so default to JSON when the
-        # client did not send an Accept header. The HTML template is kept as a
-        # fallback for clients that explicitly prefer text/html (e.g. browsers).
-        if mime_match(request.headers.get("accept", "application/json"), "application/json"):
-            return web.json_response(
-                ensure_json_serializable(ex.body_dict),
-                status=ex.status_code,
-                headers={"Access-Control-Allow-Origin": "*"},
+        try:
+            return await handler(request)
+        except (BackendAISchemaValidationFailed, ValidationError) as ex:
+            # ``ValidationError`` covers plain ``BaseModel`` subclasses that
+            # skip the ``BackendAISchema`` auto-conversion override.
+            log.exception(
+                "Failed to create response model: {}",
+                json.dumps(ex.errors(), indent=2, default=str),
             )
-        return aiohttp_jinja2.render_template(
-            "error",
-            request,
-            ex.body_dict,
-            status=ex.status_code,
-        )
-    except web.HTTPException as ex:
-        if ex.status_code == 404:
-            raise URLNotFound(extra_data=request.path) from ex
-        if ex.status_code == 405:
-            concrete_ex = cast(web.HTTPMethodNotAllowed, ex)
-            raise MethodNotAllowed(
-                extra_msg=f"Method {concrete_ex.method} not allowed",
-                extra_data={"allowed_methods": list(concrete_ex.allowed_methods)},
-            ) from ex
-        log.warning("Bad request: {0!r}", ex)
-        raise GenericBadRequest from ex
-    except asyncio.CancelledError as e:
-        # The server is closing or the client has disconnected in the middle of
-        # request.  Atomic requests are still executed to their ends.
-        log.debug("Request cancelled ({0} {1})", request.method, request.rel_url)
-        raise e
-    except Exception as e:
-        log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
-        if root_ctx.local_config.debug.enabled:
-            raise InternalServerError(traceback.format_exc()) from e
-        raise InternalServerError() from e
-    else:
-        return resp
+            raise InternalServerError() from ex
+        except BackendAIError as ex:
+            if ex.status_code >= 500:
+                log.exception("Server error raised inside handlers")
+            else:
+                log.warning("Client error: {0!r}", ex)
+            raise
+        except web.HTTPException as ex:
+            if ex.status_code == 404:
+                raise URLNotFound(extra_data=request.path) from ex
+            if ex.status_code == 405:
+                concrete_ex = cast(web.HTTPMethodNotAllowed, ex)
+                raise MethodNotAllowed(
+                    extra_msg=f"Method {concrete_ex.method} not allowed",
+                    extra_data={"allowed_methods": list(concrete_ex.allowed_methods)},
+                ) from ex
+            log.warning("Bad request: {0!r}", ex)
+            raise GenericBadRequest from ex
+        except asyncio.CancelledError as e:
+            # The server is closing or the client has disconnected in the middle of
+            # request.  Atomic requests are still executed to their ends.
+            log.debug("Request cancelled ({0} {1})", request.method, request.rel_url)
+            raise e
+        except Exception as e:
+            log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
+            if root_ctx.local_config.debug.enabled:
+                raise InternalServerError(traceback.format_exc()) from e
+            raise InternalServerError() from e
+    except BackendAIError as ex:
+        return _render_error_response(request, ex)
 
 
 @asynccontextmanager
@@ -859,6 +875,28 @@ async def on_prepare(_request: web.Request, response: web.StreamResponse) -> Non
     response.headers["Server"] = "BackendAI"
 
 
+def make_error_cors_fallback(
+    owner_app: web.Application,
+) -> Callable[[web.Request, web.StreamResponse], Awaitable[None]]:
+    """
+    Keep error responses readable cross-origin on routes not registered through
+    aiohttp-cors. Wildcard, not an echoed origin, since some routes redirect cross-origin.
+    """
+
+    async def _fallback(request: web.Request, response: web.StreamResponse) -> None:
+        apps = request.match_info.apps
+        # Only the innermost app acts, so this runs after that app's own aiohttp-cors
+        # handler, which asserts the header is still unset.
+        if not apps or apps[-1] is not owner_app:
+            return
+        if response.status < 400 or hdrs.ACCESS_CONTROL_ALLOW_ORIGIN in response.headers:
+            return
+        response.headers[hdrs.ACCESS_CONTROL_ALLOW_ORIGIN] = "*"
+        response.headers[hdrs.ACCESS_CONTROL_EXPOSE_HEADERS] = "*"
+
+    return _fallback
+
+
 async def status(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     request["do_not_print_access_log"] = True
@@ -892,6 +930,8 @@ def _init_subapp(
     global_middlewares: Iterable[WebMiddleware],
 ) -> None:
     subapp.on_response_prepare.append(on_prepare)
+    # After create_app()'s aiohttp_cors.setup(), before add_subapp() freezes the signal.
+    subapp.on_response_prepare.append(make_error_cors_fallback(subapp))
 
     async def _set_root_ctx(subapp: web.Application) -> None:
         # Allow subapp's access to the root app properties.
@@ -1018,6 +1058,8 @@ def build_root_app(
     # should be done in create_app() in other modules.
     cors.add(app.router.add_route("GET", "/status", status))
     cors.add(app.router.add_route("GET", "/metrics", metrics))
+    # After aiohttp_cors.setup() above.
+    app.on_response_prepare.append(make_error_cors_fallback(app))
     for pkg_name in subapp_pkgs:
         if pidx == 0:
             log.info("Loading module: {0}", pkg_name[1:])

@@ -4,10 +4,14 @@ from typing import override
 
 import aiohttp_jinja2
 import jwt
-from aiohttp import web
+from aiohttp import hdrs, web
 from aiohttp_remotes import XForwardedStrict
 
-from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
+from ai.backend.appproxy.common.defs import (
+    MEDIA_TYPE_HTML,
+    MEDIA_TYPE_JSON,
+    PERMIT_COOKIE_NAME,
+)
 from ai.backend.appproxy.common.errors import ClientIPNotAllowed, InvalidCredentials
 from ai.backend.appproxy.common.types import RouteInfo, WebRequestHandler
 from ai.backend.appproxy.common.utils import ensure_json_serializable, is_permit_valid, mime_match
@@ -131,9 +135,8 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
         except BackendAIError as ex:
             if ex.status_code == 500:
                 log.exception("Internal server error raised inside handlers")
-            if mime_match(
-                request.headers.get("accept", "text/html"), "application/json", strict=True
-            ):
+            accept = request.headers.get(hdrs.ACCEPT, MEDIA_TYPE_HTML)
+            if mime_match(accept, MEDIA_TYPE_JSON, strict=True):
                 return web.json_response(
                     ensure_json_serializable(ex.body_dict),
                     status=ex.status_code,

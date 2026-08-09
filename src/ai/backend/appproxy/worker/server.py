@@ -32,7 +32,7 @@ import jinja2
 import memray
 import pyroscope
 import uvloop
-from aiohttp import web
+from aiohttp import hdrs, web
 from aiohttp.web_app import CleanupError
 from setproctitle import setproctitle
 from tenacity import AsyncRetrying, TryAgain, retry_if_exception_type, wait_exponential
@@ -42,6 +42,8 @@ from ai.backend.appproxy.common.defs import (
     AGENTID_WORKER,
     APPPROXY_ANYCAST_STREAM_KEY,
     APPPROXY_BROADCAST_CHANNEL,
+    MEDIA_TYPE_HTML,
+    MEDIA_TYPE_JSON,
 )
 from ai.backend.appproxy.common.errors import (
     CoordinatorConnectionError,
@@ -200,7 +202,8 @@ async def exception_middleware(
     except BackendAIError as ex:
         if ex.status_code == 500:
             log.exception("Internal server error raised inside handlers")
-        if mime_match(request.headers.get("accept", "text/html"), "application/json", strict=True):
+        accept = request.headers.get(hdrs.ACCEPT, MEDIA_TYPE_HTML)
+        if mime_match(accept, MEDIA_TYPE_JSON, strict=True):
             return web.json_response(
                 ensure_json_serializable(ex.body_dict),
                 status=ex.status_code,
