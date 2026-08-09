@@ -20,7 +20,6 @@ from ai.backend.manager.data.resource_slot.types import (
     ReconciliationResult,
     ResourceAllocationSearchResult,
     ResourceOccupancy,
-    ResourceSlotTypeSearchResult,
 )
 from ai.backend.manager.models.resource_slot import (
     AgentResourceRow,
@@ -73,16 +72,6 @@ class ResourceSlotRepository:
     async def all_slot_types(self) -> list[ResourceSlotTypeRow]:
         """List all registered resource slot types."""
         return await self._db_source.all_slot_types()
-
-    @resource_slot_repository_resilience.apply()
-    async def get_slot_type(self, slot_name: str) -> ResourceSlotTypeRow:
-        """Get a specific resource slot type by name."""
-        return await self._db_source.get_slot_type(slot_name)
-
-    @resource_slot_repository_resilience.apply()
-    async def search_slot_types(self, querier: BatchQuerier) -> ResourceSlotTypeSearchResult:
-        """Paginated search across resource slot types."""
-        return await self._db_source.search_slot_types(querier)
 
     # ==================== agent_resources ====================
 

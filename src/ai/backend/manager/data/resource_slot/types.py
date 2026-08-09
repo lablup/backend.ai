@@ -59,14 +59,6 @@ class ResourceSlotTypeData(EntityData):
 
 
 @dataclass(frozen=True)
-class ResourceSlotTypeSearchResult:
-    items: list[ResourceSlotTypeData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
-
-
-@dataclass(frozen=True)
 class AgentResourceData:
     agent_id: str
     slot_name: str

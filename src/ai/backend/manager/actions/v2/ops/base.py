@@ -96,6 +96,7 @@ __all__ = (
     "BatchUpdateGlobalOpsAction",
     "BatchPurgeScopeOpsAction",
     "BatchPurgeGlobalOpsAction",
+    "GetGlobalOpsAction",
 )
 
 
@@ -714,6 +715,20 @@ class UpsertFieldEntityOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPSERT
+
+
+class GetGlobalOpsAction[TRow: Base, TData](BaseGlobalAction, GetOpsAction[TRow, TData], ABC):
+    """A read of one row of system-wide state, named by the key its querier carries.
+
+    Global rather than single-entity for the same reason the update is: the row
+    belongs to no RBAC scope, and the catalogs this shape serves are keyed by a
+    name the caller passes as-is.
+    """
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
 
 class UpdateGlobalOpsAction[TRow: Base, TData](BaseGlobalAction, UpdateOpsAction[TRow, TData], ABC):

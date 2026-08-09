@@ -67,6 +67,7 @@ from ai.backend.manager.models.resource_slot.purgers import ResourceSlotTypePurg
 from ai.backend.manager.models.resource_slot.types import NumberFormat
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.resource_slot.searchers import ResourceSlotTypeSearcher
 from ai.backend.manager.repositories.resource_slot.updaters import ResourceSlotTypeUpdater
 from ai.backend.manager.services.resource_slot.actions.create import CreateResourceSlotTypeAction
 from ai.backend.manager.services.resource_slot.actions.get_agent_resource_by_slot import (
@@ -119,12 +120,10 @@ class ResourceSlotAdapter(BaseAdapter):
         Returns:
             Pydantic payload with items and pagination info.
         """
-        querier = self._build_slot_type_querier(input)
+        searcher = self._build_slot_type_searcher(input)
 
-        action_result = (
-            await self._processors.resource_slot.search_resource_slot_types.wait_for_complete(
-                SearchResourceSlotTypesAction(querier=querier)
-            )
+        action_result = await self._processors.resource_slot.search_resource_slot_types.run(
+            SearchResourceSlotTypesAction(searcher=searcher)
         )
 
         return AdminSearchResourceSlotTypesPayload(
@@ -134,8 +133,10 @@ class ResourceSlotAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    def _build_slot_type_querier(self, input: AdminSearchResourceSlotTypesInput) -> BatchQuerier:
-        """Build a BatchQuerier for resource slot type search."""
+    def _build_slot_type_searcher(
+        self, input: AdminSearchResourceSlotTypesInput
+    ) -> ResourceSlotTypeSearcher:
+        """Build a Searcher for resource slot type search."""
         conditions = self._convert_slot_type_filter(input.filter) if input.filter else []
         orders = (
             self._convert_slot_type_orders(input.order)
@@ -144,7 +145,7 @@ class ResourceSlotAdapter(BaseAdapter):
         )
         orders.append(SLOT_TYPE_TIEBREAKER_ORDER)
         pagination = self._build_slot_type_pagination(input)
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+        return ResourceSlotTypeSearcher(conditions=conditions, orders=orders, pagination=pagination)
 
     def _convert_slot_type_filter(self, filter: ResourceSlotTypeFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
@@ -475,12 +476,10 @@ class ResourceSlotAdapter(BaseAdapter):
 
     async def get_slot_type(self, slot_name: str) -> ResourceSlotTypeNode:
         """Retrieve a single resource slot type by slot name."""
-        action_result = (
-            await self._processors.resource_slot.get_resource_slot_type.wait_for_complete(
-                GetResourceSlotTypeAction(slot_name=slot_name)
-            )
+        action_result = await self._processors.resource_slot.get_resource_slot_type.run(
+            GetResourceSlotTypeAction(slot_name=slot_name)
         )
-        return self._slot_type_data_to_node(action_result.item)
+        return self._slot_type_data_to_node(action_result.data)
 
     async def get_agent_resource(self, agent_id: str, slot_name: str) -> AgentResourceNode:
         """Retrieve a single agent resource by agent ID and slot name."""

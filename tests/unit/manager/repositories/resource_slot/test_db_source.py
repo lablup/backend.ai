@@ -16,9 +16,6 @@ from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, SlotName
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.errors.resource_slot import (
-    ResourceSlotTypeNotFound,
-)
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
@@ -53,23 +50,6 @@ class TestSlotTypes:
         names = [t.slot_name for t in types]
         assert "cpu" in names
         assert "mem" in names
-
-    async def test_get_slot_type_found(
-        self,
-        db_source: ResourceSlotDBSource,
-        slot_types: list[str],
-    ) -> None:
-        slot_type = await db_source.get_slot_type("cpu")
-        assert slot_type.slot_name == "cpu"
-        assert slot_type.slot_type == "count"
-
-    async def test_get_slot_type_not_found(
-        self,
-        db_source: ResourceSlotDBSource,
-        slot_types: list[str],
-    ) -> None:
-        with pytest.raises(ResourceSlotTypeNotFound):
-            await db_source.get_slot_type("nonexistent")
 
 
 class TestAgentResources:

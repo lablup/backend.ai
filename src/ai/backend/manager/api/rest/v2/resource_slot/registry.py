@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.rest.middleware.auth import superadmin_required
+from ai.backend.manager.api.rest.middleware.auth import auth_required, superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
 from .handler import V2ResourceSlotHandler
@@ -24,7 +24,7 @@ def register_v2_resource_slot_routes(
         "POST",
         "/slot-types/search",
         handler.search_slot_types,
-        middlewares=[superadmin_required],
+        middlewares=[auth_required],
     )
     registry.add(
         "POST",

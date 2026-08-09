@@ -20,8 +20,8 @@ from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.resource_slot.conditions import ResourceSlotTypeConditions
 from ai.backend.manager.models.resource_slot.orders import ResourceSlotTypeOrders
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
+from ai.backend.manager.repositories.resource_slot.searchers import ResourceSlotTypeSearcher
 
 __all__ = ("ResourceSlotAdapter",)
 
@@ -45,12 +45,12 @@ class ResourceSlotAdapter(BaseFilterAdapter):
             rank=data.rank,
         )
 
-    def build_querier(self, request: SearchResourceSlotTypesRequest) -> BatchQuerier:
-        """Build a BatchQuerier from search request."""
+    def build_searcher(self, request: SearchResourceSlotTypesRequest) -> ResourceSlotTypeSearcher:
+        """Build a Searcher from search request."""
         conditions = self._convert_filter(request.filter) if request.filter else []
         orders = [self._convert_order(o) for o in request.order] if request.order else []
 
-        return BatchQuerier(
+        return ResourceSlotTypeSearcher(
             conditions=conditions,
             orders=orders,
             pagination=OffsetPagination(limit=request.limit, offset=request.offset),

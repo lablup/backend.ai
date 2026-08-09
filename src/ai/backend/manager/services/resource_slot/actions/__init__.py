@@ -16,13 +16,13 @@ from .get_project_resource_overview import (
     GetProjectResourceOverviewAction,
     GetProjectResourceOverviewResult,
 )
-from .get_resource_slot_type import GetResourceSlotTypeAction, GetResourceSlotTypeResult
+from .get_resource_slot_type import GetResourceSlotTypeAction
 from .search_agent_resources import SearchAgentResourcesAction, SearchAgentResourcesResult
 from .search_resource_allocations import (
     SearchResourceAllocationsAction,
     SearchResourceAllocationsResult,
 )
-from .search_resource_slot_types import SearchResourceSlotTypesAction, SearchResourceSlotTypesResult
+from .search_resource_slot_types import SearchResourceSlotTypesAction
 
 __all__ = (
     "GetAgentResourceBySlotAction",
@@ -38,11 +38,9 @@ __all__ = (
     "GetProjectResourceOverviewAction",
     "GetProjectResourceOverviewResult",
     "GetResourceSlotTypeAction",
-    "GetResourceSlotTypeResult",
     "SearchAgentResourcesAction",
     "SearchAgentResourcesResult",
     "SearchResourceAllocationsAction",
     "SearchResourceAllocationsResult",
     "SearchResourceSlotTypesAction",
-    "SearchResourceSlotTypesResult",
 )

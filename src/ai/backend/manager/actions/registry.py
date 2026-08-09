@@ -29,7 +29,10 @@ from ai.backend.manager.actions.v2.bulk.result import BaseBulkActionResult
 from ai.backend.manager.actions.v2.bulk.validator import BulkActionValidator
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.global_scope.monitor import GlobalActionMonitor
-from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import (
+    GlobalActionProcessor,
+    PublicActionProcessor,
+)
 from ai.backend.manager.actions.v2.global_scope.validator import GlobalActionValidator
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction, BaseLookupActionResult
 from ai.backend.manager.actions.v2.lookup.monitor import LookupActionMonitor
@@ -53,6 +56,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     CreateRoleManagedEntityOpsAction,
     DeleteBulkOpsAction,
     DeleteSingleEntityOpsAction,
+    GetGlobalOpsAction,
     GetSingleEntityOpsAction,
     LookupEntityOpsAction,
     OperationScopeOpsAction,
@@ -272,6 +276,36 @@ class ProcessorGroup[TData: EntityData]:
     ) -> GlobalActionProcessor[TAction, BatchOpsResult[TData]]:
         self._record(action_cls.spec())
         return GlobalActionProcessor(
+            GlobalSearchService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.global_scope, *monitors),
+            validators=(*self._deps.validators.global_scope, *validators),
+        )
+
+    def public_get_ops[TAction: GetGlobalOpsAction[Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[GlobalActionValidator] = (),
+        monitors: Sequence[GlobalActionMonitor] = (),
+    ) -> PublicActionProcessor[TAction, EntityOpsResult[TData]]:
+        self._record(action_cls.spec())
+        return PublicActionProcessor(
+            action_cls,
+            GetService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.global_scope, *monitors),
+            validators=(*self._deps.validators.global_scope, *validators),
+        )
+
+    def public_search_ops[TAction: SearchGlobalOpsAction[Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[GlobalActionValidator] = (),
+        monitors: Sequence[GlobalActionMonitor] = (),
+    ) -> PublicActionProcessor[TAction, BatchOpsResult[TData]]:
+        self._record(action_cls.spec())
+        return PublicActionProcessor(
+            action_cls,
             GlobalSearchService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.global_scope, *monitors),
             validators=(*self._deps.validators.global_scope, *validators),
