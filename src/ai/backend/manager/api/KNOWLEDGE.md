@@ -35,6 +35,14 @@ Adapter-side patterns: [adapters/KNOWLEDGE.md](adapters/KNOWLEDGE.md).
 | scoped operation (`scoped/search` paths) | one operation over caller-supplied scopes | RBAC per scope |
 | `my_*` | self-service — the caller is the scope | authenticated (adapter resolves the user) |
 
+## The v1 surfaces are frozen
+
+REST v1 and the graphene GQL line (`gql_legacy/`) are replacement targets, not
+maintenance targets. Anything built on them raises the cost of the v2
+replacement, and a v1-only change leaves the other surface (and the SDK/CLI)
+behind — so both additions and modifications go to v2; v1 accepts critical
+fixes only.
+
 ## v2 endpoint verification
 
 Verify new API endpoints against the live server before committing. For server restart, `./bai` commands, and log checks, see

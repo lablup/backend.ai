@@ -15,6 +15,8 @@
   no direct Processor/Service calls. The Adapter is shared with the GQL layer.
 - **Legacy REST (v1):** The handler calls the Processor directly (`await self._foo.wait_for_complete(FooAction(...))`).
 - All new API endpoints follow the v2 pattern.
+- **Avoid both adding to and modifying REST v1 and the graphene GQL line (`gql_legacy/`)** —
+  changes go to v2; v1 accepts critical fixes only (rationale: `KNOWLEDGE.md`).
 
 ## Naming & scope
 

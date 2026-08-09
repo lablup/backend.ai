@@ -56,6 +56,22 @@ Actor convention: `<producer>/<version>` for agents (e.g. `claude-code/fable-5`)
   update the affected document **in the same change**. Routine task-level edits
   are not a trigger — the test is whether the document's assumptions still hold.
 
+## Body structure
+
+- **The document's job is the package's background knowledge** — what a
+  newcomer must assume before touching the package. Local curiosities without
+  that frame do not stand alone.
+- **Open with why the package exists** — the reason it is defined as its own
+  package and what role it plays for its consumers — before any specific
+  topic.
+- **The heading is the claim**: each section heading states one claim; the
+  body backs it with 2-4 single-sentence bullets. Comparisons and
+  enumerations use tables or list syntax — never a long paragraph. Prose
+  paragraphs are allowed only in the opening section, two sentences at most.
+- A parent document never restates knowledge a subpackage document owns —
+  link it from the header pointer or where the context needs it. Every
+  section must be knowledge about this package itself.
+
 ## Size and splitting
 
 - **One `KNOWLEDGE.md` per package.** The document follows the package
