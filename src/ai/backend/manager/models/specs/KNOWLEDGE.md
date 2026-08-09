@@ -3,7 +3,7 @@ name: write-spec-family-design
 type: design-rationale
 description: write-spec family (Entity/Global/Field) selection criteria, why the three families share no common ABC, why the role-managed root is not an EntityCreator subtype, the distinction between member_of and cap-based sharing, open scope-type strings
 scope: src/ai/backend/manager/models/specs
-keywords: [EntityCreator, GlobalEntityCreator, FieldEntityCreator, RoleManagedEntityCreator, RoleTemplateSource, member_of, scope_of, virtual-scope, preset-role]
+keywords: [EntityCreator, GlobalEntityCreator, FieldEntityCreator, RoleManagedEntityCreator, RoleTemplateSource, member_of, scope_of, virtual-scope, preset-role, DataUpdater, soft-delete]
 sources:
   - src/ai/backend/manager/models/specs/creator.py
   - src/ai/backend/manager/models/specs/role_template.py
@@ -48,6 +48,27 @@ execution path.
 - If `RoleManagedEntityCreator` were a subtype of `EntityCreator`, it would pass type checking on the plain `create_entity` path and silently skip preset roles.
 - The entity hooks are duplicated onto the combined root so that the only path that accepts it is the role-managed path.
 - `RoleTemplateSource` remains the sole shared base because no write path accepts it on its own.
+
+## Soft delete is guarded by the absence of a field
+
+The same mechanism as the family roots: what stops a write is the shape of the
+declaration, not a check at execution time.
+
+A soft delete is an UPDATE at the DB, so ops cannot tell it apart from an edit —
+there is no delete operation to generalize and no place there to enforce
+anything. What separates them is the action's `operation_type()`, which decides
+the RBAC permission and the audit row's `operation`.
+
+That leaves one hole: an ordinary edit that writes the lifecycle column would be
+recorded as `UPDATE`, and the deletion would never appear in the trail. Removing
+the field from the general updater closes it — the edit path has nothing to make
+the transition with. Splitting delete and restore into their own updaters with
+constant `build_values()` closes the rest: a transition value taken as an
+argument is a value that can be passed wrong.
+
+Which column carries the state is domain knowledge and varies (`deleted` on a
+role preset, `status` on a vfolder or user), which is why this is a rule about
+the general updater's fields rather than about a column name.
 
 ## member_of is membership, not sharing
 

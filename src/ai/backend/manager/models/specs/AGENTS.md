@@ -52,6 +52,19 @@ spec there.
   accepted, and permission-carrying paths convert lazily.
 - Do NOT keep module-level declaration instances (no `X_MEMBERSHIP = ...()`).
 
+## Soft delete belongs to its own updaters
+
+- The lifecycle column a domain deletes by — `deleted`, `status`, whichever
+  carries the removed state — is NOT exposed on the general `DataUpdater`. With
+  no field for it, the ordinary edit path cannot make the transition at all.
+- Soft delete and restore each get their own updater, and `build_values()`
+  returns a constant. A transition value taken as an argument is a value that can
+  be passed wrong.
+- Naming: `<Entity>SoftDeleteUpdater` / `<Entity>RestoreUpdater`.
+- ops executes both as an update — the DB operation is an UPDATE, so no delete
+  operation exists to generalize. What records the run as a delete is the
+  action's `operation_type()`; see `../../actions/AGENTS.md`.
+
 ## Naming: family vs operation scope
 
 `…_global_entity` / `…_entity` / `…_field_entity` methods name the **write

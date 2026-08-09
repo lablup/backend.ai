@@ -33,6 +33,15 @@
   entities, so each is answered for. A many-row write whose target is a single
   scope, owner, or the system is not bulk-shaped.
 
+## Soft delete
+
+- A soft delete inherits a `Delete*` base so it declares
+  `operation_type() == DELETE`, and carries an updater that writes only the
+  lifecycle column (`models/specs/AGENTS.md`). It runs through the update path;
+  the declared operation is what RBAC checks and what the audit row records.
+- Do NOT reach the same transition through an update-shaped action — the run
+  would be recorded as `UPDATE` and the deletion would vanish from the trail.
+
 ## Gates
 
 - `global` runs behind the SUPERADMIN gate. Global reads open to all
