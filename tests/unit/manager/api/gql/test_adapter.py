@@ -18,7 +18,7 @@ from ai.backend.manager.api.gql.adapter import (
 )
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.errors.api import InvalidCursor, InvalidGraphQLParameters
-from ai.backend.manager.repositories.base import (
+from ai.backend.manager.models.specs.pagination import (
     CursorBackwardPagination,
     CursorForwardPagination,
     OffsetPagination,

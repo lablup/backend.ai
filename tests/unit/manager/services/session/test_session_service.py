@@ -47,8 +47,9 @@ from ai.backend.manager.data.session.types import SessionData, SessionListResult
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.errors.storage import VFolderBadRequest
 from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.services.session.actions.complete import (
     CompleteAction,

@@ -41,6 +41,7 @@ from ai.backend.manager.models.scaling_group import (
     ScalingGroupRow,
     query_allowed_sgroups,
 )
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.creator import (
     BulkCreator,
@@ -48,7 +49,6 @@ from ai.backend.manager.repositories.base.creator import (
     Creator,
     execute_bulk_creator,
 )
-from ai.backend.manager.repositories.base.pagination import NoPagination
 from ai.backend.manager.repositories.base.purger import (
     BatchPurger,
     Purger,

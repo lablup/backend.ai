@@ -82,7 +82,8 @@ from ai.backend.manager.data.model_serving.types import (
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.resource import RuntimeVariantNotFound
 from ai.backend.manager.models.runtime_variant.conditions import RuntimeVariantConditions
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     ResolveAccessKeyScopeAction,
 )

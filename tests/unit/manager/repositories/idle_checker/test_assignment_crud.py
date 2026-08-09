@@ -39,11 +39,11 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
 )
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
-    NoPagination,
     Updater,
 )
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger

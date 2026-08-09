@@ -11,9 +11,9 @@ from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.permission.types import RBACElementType, RelationType
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.repository import (
-    RepositoryError,
     UnsupportedCompositePrimaryKeyError,
 )
 from ai.backend.manager.models.base import Base
@@ -33,7 +33,7 @@ TRow = TypeVar("TRow", bound=Base)
 def _flushed_pk(row: Base) -> object:
     identity = inspect(row).identity
     if identity is None:
-        raise RepositoryError("row must be flushed before extracting its pk")
+        raise UnreachableError("row must be flushed before extracting its pk")
     return identity[0]
 
 

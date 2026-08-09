@@ -43,7 +43,8 @@ from ai.backend.manager.models.scheduling_history.orders import (
     RouteHistoryOrders,
     SessionSchedulingHistoryOrders,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 __all__ = ("SchedulingHistoryAdapter",)

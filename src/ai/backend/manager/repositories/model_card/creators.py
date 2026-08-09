@@ -11,8 +11,8 @@ from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import ModelCardConflict
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.resource_slot.row import ModelCardResourceRequirementRow
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.base.creator import CreatorSpec
-from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 
 @dataclass

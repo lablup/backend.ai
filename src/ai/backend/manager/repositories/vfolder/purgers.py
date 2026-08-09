@@ -9,6 +9,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.models.vfolder.row import (
     VFolderInvitationRow,
     VFolderPermissionRow,
@@ -18,7 +19,6 @@ from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
 from ai.backend.manager.repositories.base.rbac.entity_purger import (
     RBACEntityPurgerSpec,
 )
-from ai.backend.manager.repositories.base.types import ConflictCheck
 
 
 @dataclass

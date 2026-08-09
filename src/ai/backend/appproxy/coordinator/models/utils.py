@@ -8,7 +8,6 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
 from contextlib import asynccontextmanager as actxmgr
 from typing import (
-    TYPE_CHECKING,
     Any,
     Concatenate,
     ParamSpec,
@@ -38,15 +37,11 @@ from yarl import URL
 
 from ai.backend.appproxy.common.errors import DatabaseError
 from ai.backend.appproxy.coordinator.config import DBConfig
+from ai.backend.appproxy.coordinator.defs import LockID
 from ai.backend.appproxy.coordinator.errors import TransactionResultError
 from ai.backend.common.json import ExtendedJSONEncoder
-from ai.backend.logging import BraceStyleAdapter
-
-if TYPE_CHECKING:
-    pass
-
-from ai.backend.appproxy.coordinator.defs import LockID
 from ai.backend.common.types import Sentinel
+from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 column_constraints = ["nullable", "index", "unique", "primary_key"]

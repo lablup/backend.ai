@@ -8,7 +8,8 @@ import pytest
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.idle_checker.types import IdleCheckerAssignmentOperationScope
 from ai.backend.manager.services.idle_checker_assignment.actions.scoped_search import (
     IdleCheckerAssignmentScopeTarget,

@@ -77,6 +77,7 @@ from ai.backend.manager.models.session import (
     by_status,
     by_user_id,
 )
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.types import join_by_related_field
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -94,7 +95,6 @@ from ai.backend.manager.models.virtual_scope.queries import user_scope_membershi
 from ai.backend.manager.repositories.base.creator import (
     Creator,
 )
-from ai.backend.manager.repositories.base.pagination import NoPagination
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,

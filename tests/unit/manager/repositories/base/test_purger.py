@@ -18,6 +18,7 @@ from ai.backend.manager.errors.repository import (
     UnsupportedCompositePrimaryKeyError,
 )
 from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.repositories.base import (
     BatchPurger,
     BatchPurgerResult,
@@ -31,7 +32,6 @@ from ai.backend.manager.repositories.base import (
     execute_purger,
 )
 from ai.backend.manager.repositories.base.purger import PurgerSpec
-from ai.backend.manager.repositories.base.types import ConflictCheck
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

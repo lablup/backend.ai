@@ -24,13 +24,13 @@ from ai.backend.manager.errors.repository import (
     UniqueConstraintViolationError,
 )
 from ai.backend.manager.models.base import GUID, Base
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.base import (
     BulkCreator,
     BulkCreatorResult,
     Creator,
     CreatorResult,
     CreatorSpec,
-    IntegrityErrorCheck,
     execute_bulk_creator,
     execute_bulk_creator_partial,
     execute_creator,

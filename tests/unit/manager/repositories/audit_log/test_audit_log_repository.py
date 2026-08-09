@@ -17,10 +17,14 @@ from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.models.audit_log import AuditLogRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.audit_log import AuditLogRepository
 from ai.backend.manager.repositories.audit_log.creators import GlobalAuditLogCreatorSpec
 from ai.backend.manager.repositories.audit_log.options import AuditLogConditions
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Creator,
+)
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.testutils.db import with_tables
 

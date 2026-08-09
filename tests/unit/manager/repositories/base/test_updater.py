@@ -19,6 +19,7 @@ from ai.backend.manager.errors.repository import (
     UniqueConstraintViolationError,
 )
 from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.base import (
     BatchUpdater,
     BatchUpdaterResult,
@@ -32,7 +33,6 @@ from ai.backend.manager.repositories.base import (
     execute_bulk_updater_partial,
     execute_updater,
 )
-from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

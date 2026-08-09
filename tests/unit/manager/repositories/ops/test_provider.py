@@ -20,20 +20,20 @@ from ai.backend.manager.errors.repository import EmptyOperationScopeError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
     CreatorSpec,
     DependentCreatorSpec,
-    NoPagination,
     Purger,
     Querier,
     Updater,
     UpdaterSpec,
 )
 from ai.backend.manager.repositories.base.purger import PurgerSpec
-from ai.backend.manager.repositories.base.types import ConflictCheck
 from ai.backend.manager.repositories.ops import DBOpsProvider, ReadOps
 from ai.backend.testutils.db import with_tables
 

@@ -14,10 +14,10 @@ from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.user import UserCreationBadRequest
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.repositories.base.creator import Creator, CreatorSpec
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.ops.rbac.provider import ScopeCreation
 from ai.backend.manager.repositories.permission_controller.role_manager import (
     ScopeSystemRoleData,

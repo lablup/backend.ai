@@ -16,11 +16,11 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.base.creator import (
     CreatorSpec,
     DependentCreatorSpec,
 )
-from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 
 @dataclass

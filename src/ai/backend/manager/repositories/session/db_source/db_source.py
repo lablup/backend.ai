@@ -54,11 +54,11 @@ from ai.backend.manager.models.session import (
     batch_populate_session_occupied_slots,
 )
 from ai.backend.manager.models.session_template import SessionTemplateRow
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    NoPagination,
     execute_batch_querier,
 )
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater

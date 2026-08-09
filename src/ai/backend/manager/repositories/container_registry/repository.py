@@ -38,9 +38,9 @@ from ai.backend.manager.models.container_registry import (
     ContainerRegistryValidatorArgs,
 )
 from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.pagination import NoPagination
 from ai.backend.manager.repositories.base.purger import BatchPurger, Purger
 from ai.backend.manager.repositories.base.querier import (
     BatchQuerier,

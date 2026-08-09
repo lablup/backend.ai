@@ -11,7 +11,8 @@ from ai.backend.manager.data.role_invitation.types import RoleInvitationState
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.role_invitation import DuplicateRoleInvitationError
 from ai.backend.manager.models.role_invitation.row import RoleInvitationRow
-from ai.backend.manager.repositories.base import CreatorSpec, IntegrityErrorCheck
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+from ai.backend.manager.repositories.base import CreatorSpec
 
 
 @dataclass

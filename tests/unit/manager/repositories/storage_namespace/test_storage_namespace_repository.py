@@ -10,9 +10,10 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.storage_namespace.repository import (
     StorageNamespaceRepository,
 )

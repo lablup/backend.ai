@@ -33,8 +33,8 @@ from ai.backend.manager.data.user.types import (
 )
 from ai.backend.manager.errors.user import UserConflict, UserNotFound, UserPurgeFailure
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec

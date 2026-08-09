@@ -19,7 +19,11 @@ from ai.backend.manager.data.error_log.types import (
     ErrorLogSeverity,
 )
 from ai.backend.manager.errors.resource import DBOperationFailed
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Creator,
+)
 from ai.backend.manager.repositories.error_log import ErrorLogCreatorSpec, ErrorLogRepository
 from ai.backend.manager.services.error_log.actions import CreateErrorLogAction
 from ai.backend.manager.services.error_log.actions.mark_cleared import MarkClearedErrorLogAction

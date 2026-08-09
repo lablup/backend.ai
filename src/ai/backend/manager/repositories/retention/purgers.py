@@ -16,8 +16,8 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
-from ai.backend.manager.repositories.base.types import ConflictCheck
 
 
 @dataclass

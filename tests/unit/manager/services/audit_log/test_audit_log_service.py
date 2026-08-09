@@ -16,6 +16,7 @@ from ai.backend.manager.actions.action.types import SearchableActionTarget
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
 from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogListResult
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.audit_log import (
     AuditLogRepository,
     EntityAuditLogOperationScope,
@@ -24,7 +25,10 @@ from ai.backend.manager.repositories.audit_log import (
 from ai.backend.manager.repositories.audit_log.creators import (
     SingleEntityAuditLogCreatorSpec,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Creator,
+)
 from ai.backend.manager.services.audit_log.actions.create import CreateAuditLogAction
 from ai.backend.manager.services.audit_log.actions.scoped_search import (
     EntityAuditLogTarget,

@@ -21,11 +21,11 @@ from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.session.row import AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES
 from ai.backend.manager.models.session_group.row import SessionGroupRow
+from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.vfolder import VFolderPermissionRow
 from ai.backend.manager.repositories.base.purger import BatchPurger, BatchPurgerSpec
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityBatchPurgerSpec
-from ai.backend.manager.repositories.base.types import ConflictCheck
 
 
 @dataclass
