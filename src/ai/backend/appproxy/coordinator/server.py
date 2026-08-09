@@ -50,6 +50,7 @@ from ai.backend.appproxy.common.defs import (
     AGENTID_COORDINATOR,
     APPPROXY_ANYCAST_STREAM_KEY,
     APPPROXY_BROADCAST_CHANNEL,
+    ERROR_TEMPLATE_NAME,
     MEDIA_TYPE_JSON,
 )
 from ai.backend.appproxy.common.errors import (
@@ -211,7 +212,7 @@ def _render_error_response(request: web.Request, ex: BackendAIError) -> web.Stre
             status=ex.status_code,
         )
     return aiohttp_jinja2.render_template(
-        "error",
+        ERROR_TEMPLATE_NAME,
         request,
         ex.body_dict,
         status=ex.status_code,

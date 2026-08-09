@@ -12,5 +12,7 @@ PERMIT_COOKIE_NAME: Final[str] = "appproxy_permit"
 MEDIA_TYPE_JSON: Final[str] = "application/json"
 MEDIA_TYPE_HTML: Final[str] = "text/html"
 
+ERROR_TEMPLATE_NAME: Final[str] = "error.jinja2"
+
 AGENTID_COORDINATOR = AgentId("appproxy-coordinator")
 AGENTID_WORKER = AgentId("appproxy-worker")

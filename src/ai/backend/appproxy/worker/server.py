@@ -42,6 +42,7 @@ from ai.backend.appproxy.common.defs import (
     AGENTID_WORKER,
     APPPROXY_ANYCAST_STREAM_KEY,
     APPPROXY_BROADCAST_CHANNEL,
+    ERROR_TEMPLATE_NAME,
     MEDIA_TYPE_HTML,
     MEDIA_TYPE_JSON,
 )
@@ -210,7 +211,7 @@ async def exception_middleware(
                 headers={"Access-Control-Allow-Origin": "*"},
             )
         return aiohttp_jinja2.render_template(
-            "error.jinja2",
+            ERROR_TEMPLATE_NAME,
             request,
             ex.body_dict,
             status=ex.status_code,

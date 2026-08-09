@@ -8,6 +8,7 @@ from aiohttp import hdrs, web
 from aiohttp_remotes import XForwardedStrict
 
 from ai.backend.appproxy.common.defs import (
+    ERROR_TEMPLATE_NAME,
     MEDIA_TYPE_HTML,
     MEDIA_TYPE_JSON,
     PERMIT_COOKIE_NAME,
@@ -143,7 +144,7 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
                     headers={"Access-Control-Allow-Origin": "*"},
                 )
             return aiohttp_jinja2.render_template(
-                "error.jinja2",
+                ERROR_TEMPLATE_NAME,
                 request,
                 ex.body_dict,
                 status=ex.status_code,
