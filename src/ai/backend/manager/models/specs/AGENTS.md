@@ -60,7 +60,8 @@ spec there.
 - Soft delete and restore each get their own updater, and `build_values()`
   returns a constant. A transition value taken as an argument is a value that can
   be passed wrong.
-- Naming: `<Entity>SoftDeleteUpdater` / `<Entity>RestoreUpdater`.
+- Naming: `<Entity>SoftDeleteUpdater` / `<Entity>RestoreUpdater`, carried by a
+  `Delete*` and a `Restore*` action base respectively.
 - ops executes both as an update — the DB operation is an UPDATE, so no delete
   operation exists to generalize. What records the run as a delete is the
   action's `operation_type()`; see `../../actions/AGENTS.md`.

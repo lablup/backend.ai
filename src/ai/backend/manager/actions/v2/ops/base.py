@@ -92,8 +92,10 @@ __all__ = (
     "UpdateGlobalOpsAction",
     "UpdateSingleEntityOpsAction",
     "DeleteSingleEntityOpsAction",
+    "RestoreSingleEntityOpsAction",
     "UpdatePartialBulkOpsAction",
     "DeletePartialBulkOpsAction",
+    "RestorePartialBulkOpsAction",
     "BatchUpdateScopeOpsAction",
     "BatchUpdateGlobalOpsAction",
     "BatchPurgeScopeOpsAction",
@@ -806,6 +808,19 @@ class DeleteSingleEntityOpsAction[TRow: Base, TData](
         return ActionOperationType.DELETE
 
 
+class RestoreSingleEntityOpsAction[TRow: Base, TData](
+    BaseSingleEntityAction, UpdateOpsAction[TRow, TData], ABC
+):
+    """A single-entity restore: the soft delete run backwards, so it carries an
+    updater too. Recorded as ``RESTORE`` while checking the soft-delete permission —
+    undoing a delete reaches nothing the deleter could not already reach."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.RESTORE
+
+
 class UpdatePartialBulkOpsAction[TRow: Base, TData](
     BaseBulkAction, PartialBulkUpdateOpsAction[TRow, TData], ABC
 ):
@@ -826,6 +841,17 @@ class DeletePartialBulkOpsAction[TRow: Base, TData](
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.DELETE
+
+
+class RestorePartialBulkOpsAction[TRow: Base, TData](
+    BaseBulkAction, PartialBulkUpdateOpsAction[TRow, TData], ABC
+):
+    """A restore over the entities the caller named."""
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.RESTORE
 
 
 class BatchUpdateScopeOpsAction[TRow: Base, TData](

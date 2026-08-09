@@ -39,6 +39,9 @@
   `operation_type() == DELETE`, and carries an updater that writes only the
   lifecycle column (`models/specs/AGENTS.md`). It runs through the update path;
   the declared operation is what RBAC checks and what the audit row records.
+- The reverse transition inherits a `Restore*` base and declares `RESTORE`, never
+  `UPDATE` — the audit says restore while the permission checked stays
+  soft-delete.
 - Do NOT reach the same transition through an update-shaped action — the run
   would be recorded as `UPDATE` and the deletion would vanish from the trail.
 

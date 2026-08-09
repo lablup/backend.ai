@@ -64,6 +64,8 @@ from ai.backend.manager.actions.v2.ops.base import (
     PurgeEntityOpsAction,
     PurgeFieldEntityOpsAction,
     PurgeGlobalOpsAction,
+    RestorePartialBulkOpsAction,
+    RestoreSingleEntityOpsAction,
     SearchGlobalOpsAction,
     UpdateGlobalOpsAction,
     UpdatePartialBulkOpsAction,
@@ -120,7 +122,9 @@ from ai.backend.manager.services.ops.service import (
     GlobalUpsertService,
     LookupService,
     PartialBulkDeleteService,
+    PartialBulkRestoreService,
     PartialBulkUpdateService,
+    RestoreService,
     RoleManagedEntityAtomicCreateService,
     RoleManagedEntityCreateService,
     RoleManagedEntityUpsertService,
@@ -636,6 +640,20 @@ class ProcessorGroup[TData: EntityData]:
             validators=(*self._deps.validators.single_entity, *validators),
         )
 
+    def single_restore_ops[TAction: RestoreSingleEntityOpsAction[Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[SingleEntityActionValidator] = (),
+        monitors: Sequence[SingleEntityActionMonitor] = (),
+    ) -> SingleEntityActionProcessor[TAction, EntityOpsResult[TData]]:
+        self._record(action_cls.spec())
+        return SingleEntityActionProcessor(
+            RestoreService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.single_entity, *monitors),
+            validators=(*self._deps.validators.single_entity, *validators),
+        )
+
     def partial_bulk_update_ops[TAction: UpdatePartialBulkOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
@@ -660,6 +678,20 @@ class ProcessorGroup[TData: EntityData]:
         self._record(action_cls.spec())
         return BulkActionProcessor(
             PartialBulkDeleteService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.bulk, *monitors),
+            validators=(*self._deps.validators.bulk, *validators),
+        )
+
+    def partial_bulk_restore_ops[TAction: RestorePartialBulkOpsAction[Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[BulkActionValidator] = (),
+        monitors: Sequence[BulkActionMonitor] = (),
+    ) -> BulkActionProcessor[TAction, BulkOpsResult[TData]]:
+        self._record(action_cls.spec())
+        return BulkActionProcessor(
+            PartialBulkRestoreService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.bulk, *monitors),
             validators=(*self._deps.validators.bulk, *validators),
         )

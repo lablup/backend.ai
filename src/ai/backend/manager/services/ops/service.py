@@ -84,8 +84,10 @@ __all__ = (
     "FieldUpsertService",
     "UpdateService",
     "DeleteService",
+    "RestoreService",
     "PartialBulkUpdateService",
     "PartialBulkDeleteService",
+    "PartialBulkRestoreService",
     "BatchUpdateService",
     "GlobalBatchUpdateService",
     "BatchPurgeService",
@@ -491,6 +493,24 @@ class DeleteService[TData]:
         return EntityOpsResult(data=await self._repository.update(action.to_updater()))
 
 
+class RestoreService[TData]:
+    """Restores by applying the action's updater.
+
+    Identical to :class:`DeleteService` under the hood, and to
+    :class:`UpdateService` before it: the restore is the same status transition
+    written backwards. The action declares ``operation_type() == RESTORE``, so the
+    audit trail says restore while the permission checked stays soft-delete.
+    """
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: UpdateOpsAction[Any, TData]) -> EntityOpsResult[TData]:
+        return EntityOpsResult(data=await self._repository.update(action.to_updater()))
+
+
 class PartialBulkUpdateService[TData]:
     """Updates each entity the action named, answering for every one of them."""
 
@@ -510,6 +530,19 @@ class PartialBulkDeleteService[TData]:
     Takes ``PartialBulkUpdateOpsAction`` for the same reason the single-entity delete does: the
     status transition is domain knowledge and ops has no delete operation to generalize.
     """
+
+    _repository: OpsRepository[TData]
+
+    def __init__(self, repository: OpsRepository[TData]) -> None:
+        self._repository = repository
+
+    async def execute(self, action: PartialBulkUpdateOpsAction[Any, TData]) -> BulkOpsResult[TData]:
+        result = await self._repository.partial_bulk_update(action.to_updaters())
+        return BulkOpsResult(successes=result.successes, errors=result.errors)
+
+
+class PartialBulkRestoreService[TData]:
+    """Restores each entity the action named, answering for every one of them."""
 
     _repository: OpsRepository[TData]
 
