@@ -36,6 +36,7 @@ from .base import (
 if TYPE_CHECKING:
     from ai.backend.manager.models.resource_policy.creators import (
         ProjectResourcePolicyCreator,
+        UserResourcePolicyCreator,
     )
     from ai.backend.manager.repositories.keypair_resource_policy.creators import (
         KeyPairResourcePolicyCreatorSpec,
@@ -46,11 +47,8 @@ if TYPE_CHECKING:
     from ai.backend.manager.repositories.project_resource_policy.updaters import (
         ProjectResourcePolicyUpdater,
     )
-    from ai.backend.manager.repositories.user_resource_policy.creators import (
-        UserResourcePolicyCreatorSpec,
-    )
     from ai.backend.manager.repositories.user_resource_policy.updaters import (
-        UserResourcePolicyUpdaterSpec,
+        UserResourcePolicyUpdater,
     )
 
     from .schema import GraphQueryContext
@@ -70,22 +68,6 @@ def _get_keypair_resource_policy_updater_spec() -> type[KeyPairResourcePolicyUpd
     )
 
     return KeyPairResourcePolicyUpdaterSpec
-
-
-def _get_user_resource_policy_creator_spec() -> type[UserResourcePolicyCreatorSpec]:
-    from ai.backend.manager.repositories.user_resource_policy.creators import (
-        UserResourcePolicyCreatorSpec,
-    )
-
-    return UserResourcePolicyCreatorSpec
-
-
-def _get_user_resource_policy_updater_spec() -> type[UserResourcePolicyUpdaterSpec]:
-    from ai.backend.manager.repositories.user_resource_policy.updaters import (
-        UserResourcePolicyUpdaterSpec,
-    )
-
-    return UserResourcePolicyUpdaterSpec
 
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -589,21 +571,20 @@ class CreateUserResourcePolicyInput(graphene.InputObjectType):  # type: ignore[m
         description="Added in 24.03.0. Maximum available number of customized images one can publish to."
     )
 
-    def to_creator(self, name: str) -> Creator[UserResourcePolicyRow]:
+    def to_creator(self, name: str) -> UserResourcePolicyCreator:
+        from ai.backend.manager.models.resource_policy.creators import UserResourcePolicyCreator
+
         def value_or_default(value: Any, default: int) -> int:
             return value if value is not Undefined and value is not None else default
 
-        CreatorSpec = _get_user_resource_policy_creator_spec()
-        return Creator(
-            spec=CreatorSpec(
-                name=name,
-                max_vfolder_count=value_or_default(self.max_vfolder_count, 0),
-                max_quota_scope_size=value_or_default(self.max_quota_scope_size, 0),
-                max_session_count_per_model_session=value_or_default(
-                    self.max_session_count_per_model_session, 0
-                ),
-                max_customized_image_count=value_or_default(self.max_customized_image_count, 3),
-            )
+        return UserResourcePolicyCreator(
+            name=name,
+            max_vfolder_count=value_or_default(self.max_vfolder_count, 0),
+            max_quota_scope_size=value_or_default(self.max_quota_scope_size, 0),
+            max_session_count_per_model_session=value_or_default(
+                self.max_session_count_per_model_session, 0
+            ),
+            max_customized_image_count=value_or_default(self.max_customized_image_count, 3),
         )
 
 
@@ -621,20 +602,21 @@ class ModifyUserResourcePolicyInput(graphene.InputObjectType):  # type: ignore[m
         description="Added in 24.03.0. Maximum available number of customized images one can publish to."
     )
 
-    def to_updater(self, name: str) -> Updater[UserResourcePolicyRow]:
-        UpdaterSpec = _get_user_resource_policy_updater_spec()
-        return Updater(
-            spec=UpdaterSpec(
-                max_vfolder_count=OptionalState[int].from_graphql(self.max_vfolder_count),
-                max_quota_scope_size=OptionalState[int].from_graphql(self.max_quota_scope_size),
-                max_session_count_per_model_session=OptionalState[int].from_graphql(
-                    self.max_session_count_per_model_session
-                ),
-                max_customized_image_count=OptionalState[int].from_graphql(
-                    self.max_customized_image_count
-                ),
+    def to_updater(self, name: str) -> UserResourcePolicyUpdater:
+        from ai.backend.manager.repositories.user_resource_policy.updaters import (
+            UserResourcePolicyUpdater,
+        )
+
+        return UserResourcePolicyUpdater(
+            name=name,
+            max_vfolder_count=OptionalState[int].from_graphql(self.max_vfolder_count),
+            max_quota_scope_size=OptionalState[int].from_graphql(self.max_quota_scope_size),
+            max_session_count_per_model_session=OptionalState[int].from_graphql(
+                self.max_session_count_per_model_session
             ),
-            pk_value=name,
+            max_customized_image_count=OptionalState[int].from_graphql(
+                self.max_customized_image_count
+            ),
         )
 
 
@@ -662,10 +644,8 @@ class CreateUserResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await (
-            graph_ctx.processors.user_resource_policy.create_user_resource_policy.wait_for_complete(
-                CreateUserResourcePolicyAction(props.to_creator(name))
-            )
+        await graph_ctx.processors.user_resource_policy.create_user_resource_policy.run(
+            CreateUserResourcePolicyAction(props.to_creator(name))
         )
 
         return CreateUserResourcePolicy(
@@ -697,10 +677,8 @@ class ModifyUserResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await (
-            graph_ctx.processors.user_resource_policy.modify_user_resource_policy.wait_for_complete(
-                ModifyUserResourcePolicyAction(name, props.to_updater(name))
-            )
+        await graph_ctx.processors.user_resource_policy.modify_user_resource_policy.run(
+            ModifyUserResourcePolicyAction(props.to_updater(name))
         )
 
         return ModifyUserResourcePolicy(
@@ -730,10 +708,8 @@ class DeleteUserResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await (
-            graph_ctx.processors.user_resource_policy.delete_user_resource_policy.wait_for_complete(
-                DeleteUserResourcePolicyAction(name)
-            )
+        await graph_ctx.processors.user_resource_policy.delete_user_resource_policy.run(
+            DeleteUserResourcePolicyAction(name)
         )
 
         return DeleteUserResourcePolicy(

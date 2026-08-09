@@ -83,7 +83,10 @@ from ai.backend.manager.models.resource_policy.conditions import (
     ProjectResourcePolicyConditions,
     UserResourcePolicyConditions,
 )
-from ai.backend.manager.models.resource_policy.creators import ProjectResourcePolicyCreator
+from ai.backend.manager.models.resource_policy.creators import (
+    ProjectResourcePolicyCreator,
+    UserResourcePolicyCreator,
+)
 from ai.backend.manager.models.resource_policy.orders import (
     KeypairResourcePolicyOrders,
     ProjectResourcePolicyOrders,
@@ -107,11 +110,11 @@ from ai.backend.manager.repositories.project_resource_policy.searchers import (
 from ai.backend.manager.repositories.project_resource_policy.updaters import (
     ProjectResourcePolicyUpdater,
 )
-from ai.backend.manager.repositories.user_resource_policy.creators import (
-    UserResourcePolicyCreatorSpec,
+from ai.backend.manager.repositories.user_resource_policy.searchers import (
+    UserResourcePolicySearcher,
 )
 from ai.backend.manager.repositories.user_resource_policy.updaters import (
-    UserResourcePolicyUpdaterSpec,
+    UserResourcePolicyUpdater,
 )
 from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
     CreateKeyPairResourcePolicyAction,
@@ -364,10 +367,8 @@ class ResourcePolicyAdapter(BaseAdapter):
     # ── User Resource Policy ──
 
     async def admin_get_user_resource_policy(self, name: str) -> UserResourcePolicyNode:
-        result = (
-            await self._processors.user_resource_policy.get_user_resource_policy.wait_for_complete(
-                GetUserResourcePolicyAction(name=name)
-            )
+        result = await self._processors.user_resource_policy.get_user_resource_policy.run(
+            GetUserResourcePolicyAction(name=name)
         )
         return self._user_policy_data_to_node(result.data)
 
@@ -377,7 +378,8 @@ class ResourcePolicyAdapter(BaseAdapter):
     ) -> SearchUserResourcePoliciesPayload:
         conditions = self._convert_user_filter(input.filter) if input.filter else []
         orders = self._resolve_user_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            UserResourcePolicySearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_USER_RP_PAGINATION_SPEC,
@@ -388,8 +390,8 @@ class ResourcePolicyAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.user_resource_policy.search_user_resource_policies.wait_for_complete(
-            SearchUserResourcePoliciesAction(querier=querier)
+        result = await self._processors.user_resource_policy.search_user_resource_policies.run(
+            SearchUserResourcePoliciesAction(searcher=searcher)
         )
         items = [self._user_policy_data_to_node(d) for d in result.items]
         return SearchUserResourcePoliciesPayload(items=items, total_count=result.total_count)
@@ -397,7 +399,7 @@ class ResourcePolicyAdapter(BaseAdapter):
     async def admin_create_user_resource_policy(
         self, input: CreateUserResourcePolicyInput
     ) -> CreateUserResourcePolicyPayload:
-        spec = UserResourcePolicyCreatorSpec(
+        creator = UserResourcePolicyCreator(
             name=input.name,
             max_vfolder_count=input.max_vfolder_count,
             max_concurrent_logins=input.max_concurrent_logins,
@@ -405,17 +407,18 @@ class ResourcePolicyAdapter(BaseAdapter):
             max_session_count_per_model_session=input.max_session_count_per_model_session,
             max_customized_image_count=input.max_customized_image_count,
         )
-        result = await self._processors.user_resource_policy.create_user_resource_policy.wait_for_complete(
-            CreateUserResourcePolicyAction(creator=Creator(spec=spec))
+        result = await self._processors.user_resource_policy.create_user_resource_policy.run(
+            CreateUserResourcePolicyAction(creator=creator)
         )
         return CreateUserResourcePolicyPayload(
-            user_resource_policy=self._user_policy_data_to_node(result.user_resource_policy)
+            user_resource_policy=self._user_policy_data_to_node(result.data)
         )
 
     async def admin_update_user_resource_policy(
         self, name: str, input: UpdateUserResourcePolicyInput
     ) -> UpdateUserResourcePolicyPayload:
-        spec = UserResourcePolicyUpdaterSpec(
+        updater = UserResourcePolicyUpdater(
+            name=name,
             max_vfolder_count=(
                 OptionalState.nop()
                 if isinstance(input.max_vfolder_count, Sentinel)
@@ -448,18 +451,17 @@ class ResourcePolicyAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
         )
-        updater: Updater[UserResourcePolicyRow] = Updater(spec=spec, pk_value=name)
-        result = await self._processors.user_resource_policy.modify_user_resource_policy.wait_for_complete(
-            ModifyUserResourcePolicyAction(name=name, updater=updater)
+        result = await self._processors.user_resource_policy.modify_user_resource_policy.run(
+            ModifyUserResourcePolicyAction(updater=updater)
         )
         return UpdateUserResourcePolicyPayload(
-            user_resource_policy=self._user_policy_data_to_node(result.user_resource_policy)
+            user_resource_policy=self._user_policy_data_to_node(result.data)
         )
 
     async def admin_delete_user_resource_policy(
         self, input: DeleteUserResourcePolicyInput
     ) -> DeleteUserResourcePolicyPayload:
-        await self._processors.user_resource_policy.delete_user_resource_policy.wait_for_complete(
+        await self._processors.user_resource_policy.delete_user_resource_policy.run(
             DeleteUserResourcePolicyAction(name=input.name)
         )
         return DeleteUserResourcePolicyPayload(name=input.name)

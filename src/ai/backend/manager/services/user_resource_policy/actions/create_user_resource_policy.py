@@ -1,32 +1,38 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.resource_policy import (
+    USER_RESOURCE_POLICY_ENTITY_TYPE,
+)
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import CreateGlobalOpsAction
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
-from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.services.user_resource_policy.actions.base import UserResourcePolicyAction
+from ai.backend.manager.models.resource_policy.creators import (
+    UserResourcePolicyCreator,
+)
+from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
 
 
 @dataclass
-class CreateUserResourcePolicyAction(UserResourcePolicyAction):
-    creator: Creator[UserResourcePolicyRow]
+class CreateUserResourcePolicyAction(
+    CreateGlobalOpsAction[UserResourcePolicyRow, UserResourcePolicyData]
+):
+    """Register a user resource policy."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    creator: UserResourcePolicyCreator
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
-
-
-@dataclass
-class CreateUserResourcePolicyActionResult(BaseActionResult):
-    user_resource_policy: UserResourcePolicyData
+    def entity_type(cls) -> EntityType:
+        return USER_RESOURCE_POLICY_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return self.user_resource_policy.name
+    @classmethod
+    def action_name(cls) -> str:
+        return "admin_create_user_resource_policy"
+
+    @override
+    def to_creator(self) -> UserResourcePolicyCreator:
+        return self.creator

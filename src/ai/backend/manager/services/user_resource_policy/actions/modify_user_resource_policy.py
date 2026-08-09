@@ -1,33 +1,38 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.resource_policy import (
+    USER_RESOURCE_POLICY_ENTITY_TYPE,
+)
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import UpdateGlobalOpsAction
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
-from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.services.user_resource_policy.actions.base import UserResourcePolicyAction
+from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
+from ai.backend.manager.repositories.user_resource_policy.updaters import (
+    UserResourcePolicyUpdater,
+)
 
 
 @dataclass
-class ModifyUserResourcePolicyAction(UserResourcePolicyAction):
-    name: str
-    updater: Updater[UserResourcePolicyRow]
+class ModifyUserResourcePolicyAction(
+    UpdateGlobalOpsAction[UserResourcePolicyRow, UserResourcePolicyData]
+):
+    """Retune one user resource policy; the name stays the key."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    updater: UserResourcePolicyUpdater
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
-
-
-@dataclass
-class ModifyUserResourcePolicyActionResult(BaseActionResult):
-    user_resource_policy: UserResourcePolicyData
+    def entity_type(cls) -> EntityType:
+        return USER_RESOURCE_POLICY_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return self.user_resource_policy.name
+    @classmethod
+    def action_name(cls) -> str:
+        return "admin_update_user_resource_policy"
+
+    @override
+    def to_updater(self) -> UserResourcePolicyUpdater:
+        return self.updater

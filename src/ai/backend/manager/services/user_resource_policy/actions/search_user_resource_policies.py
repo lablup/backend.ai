@@ -1,36 +1,38 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.resource_policy import (
+    USER_RESOURCE_POLICY_ENTITY_TYPE,
+)
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.user_resource_policy.actions.base import (
-    UserResourcePolicyAction,
+from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
+from ai.backend.manager.repositories.user_resource_policy.searchers import (
+    UserResourcePolicySearcher,
 )
 
 
 @dataclass
-class SearchUserResourcePoliciesAction(UserResourcePolicyAction):
-    querier: BatchQuerier
+class SearchUserResourcePoliciesAction(
+    SearchGlobalOpsAction[UserResourcePolicyRow, UserResourcePolicyData]
+):
+    """Page through the user resource policy catalog."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    searcher: UserResourcePolicySearcher
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass
-class SearchUserResourcePoliciesActionResult(BaseActionResult):
-    items: list[UserResourcePolicyData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    def entity_type(cls) -> EntityType:
+        return USER_RESOURCE_POLICY_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "admin_search_user_resource_policies"
+
+    @override
+    def to_searcher(self) -> UserResourcePolicySearcher:
+        return self.searcher

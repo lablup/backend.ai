@@ -42,6 +42,9 @@ from ai.backend.manager.services.project_resource_policy.processors import (
 from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
 from ai.backend.manager.services.retention_policy.processors import RetentionPolicyProcessors
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
+from ai.backend.manager.services.user_resource_policy.processors import (
+    UserResourcePolicyProcessors,
+)
 
 _V2_ACTION_BASES: tuple[type[Any], ...] = (
     BaseSingleEntityAction,
@@ -95,6 +98,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     LoginClientTypeAdminProcessors(registry.group())
     ServiceCatalogProcessors(registry.group())
     ProjectResourcePolicyProcessors(registry.group())
+    UserResourcePolicyProcessors(MagicMock(), [], registry.group())
 
     wired = sorted(spec.type() for spec in registry.wired_specs())
     defined = sorted(cls.spec().type() for cls in _concrete_v2_action_classes())

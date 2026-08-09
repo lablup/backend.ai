@@ -6,9 +6,7 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.exception import UserResourcePolicyNotFound
-from ai.backend.common.identifier.resource_policy import (
-    UserResourcePolicyUUID,
-)
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -34,21 +32,12 @@ from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.user_resource_policy.creators import (
-    UserResourcePolicyCreatorSpec,
-)
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
-from ai.backend.manager.repositories.user_resource_policy.updaters import (
-    UserResourcePolicyUpdaterSpec,
-)
-from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
 
 
@@ -120,34 +109,10 @@ class TestUserResourcePolicyRepository:
 
         yield policy_row.to_dataclass()
 
-    async def test_create_policy(self, repository: UserResourcePolicyRepository) -> None:
-        """Test creating a new user resource policy"""
-        policy_name = "test-policy-create"
-        max_vfolder_count = 10
-        max_quota_scope_size = 1000000
-        max_session_count_per_model_session = 5
-        max_customized_image_count = 3
-
-        spec = UserResourcePolicyCreatorSpec(
-            name=policy_name,
-            max_vfolder_count=max_vfolder_count,
-            max_quota_scope_size=max_quota_scope_size,
-            max_session_count_per_model_session=max_session_count_per_model_session,
-            max_customized_image_count=max_customized_image_count,
-        )
-
-        result = await repository.create(Creator(spec=spec))
-        assert isinstance(result, UserResourcePolicyData)
-        assert result.name == "test-policy-create"
-        assert result.max_vfolder_count == max_vfolder_count
-        assert result.max_quota_scope_size == max_quota_scope_size
-        assert result.max_session_count_per_model_session == max_session_count_per_model_session
-        assert result.max_customized_image_count == max_customized_image_count
-
     async def test_get_by_name_success(
         self, repository: UserResourcePolicyRepository, sample_policy: UserResourcePolicyData
     ) -> None:
-        """Test getting a policy by name successfully"""
+        """Reads the policy the name addresses."""
         result = await repository.get_by_name(sample_policy.name)
 
         assert isinstance(result, UserResourcePolicyData)
@@ -156,207 +121,51 @@ class TestUserResourcePolicyRepository:
         assert result.max_quota_scope_size == sample_policy.max_quota_scope_size
 
     async def test_get_by_name_not_found(self, repository: UserResourcePolicyRepository) -> None:
-        """Test getting a policy by name when it doesn't exist"""
+        """An unknown name is an error, not an empty answer."""
         with pytest.raises(UserResourcePolicyNotFound):
             await repository.get_by_name("non-existing")
 
-    @pytest.mark.parametrize(
-        "updater_spec,expected_updates",
-        [
-            (
-                UserResourcePolicyUpdaterSpec(
-                    max_vfolder_count=OptionalState.update(20),
-                    max_quota_scope_size=OptionalState.nop(),
-                    max_session_count_per_model_session=OptionalState.nop(),
-                    max_customized_image_count=OptionalState.nop(),
-                ),
-                UserResourcePolicyData(
-                    uuid=UserResourcePolicyUUID(uuid4()),
-                    name="test-policy",
-                    max_vfolder_count=20,
-                    max_quota_scope_size=1000000,  # unchanged
-                    max_session_count_per_model_session=5,  # unchanged
-                    max_customized_image_count=3,  # unchanged
-                ),
-            ),
-            (
-                UserResourcePolicyUpdaterSpec(
-                    max_vfolder_count=OptionalState.update(20),
-                    max_quota_scope_size=OptionalState.update(2000000),
-                    max_session_count_per_model_session=OptionalState.nop(),
-                    max_customized_image_count=OptionalState.nop(),
-                ),
-                UserResourcePolicyData(
-                    uuid=UserResourcePolicyUUID(uuid4()),
-                    name="test-policy",
-                    max_vfolder_count=20,
-                    max_quota_scope_size=2000000,
-                    max_session_count_per_model_session=5,  # unchanged
-                    max_customized_image_count=3,  # unchanged
-                ),
-            ),
-            (
-                UserResourcePolicyUpdaterSpec(
-                    max_vfolder_count=OptionalState.update(25),
-                    max_quota_scope_size=OptionalState.update(3000000),
-                    max_session_count_per_model_session=OptionalState.update(10),
-                    max_customized_image_count=OptionalState.update(7),
-                ),
-                UserResourcePolicyData(
-                    uuid=UserResourcePolicyUUID(uuid4()),
-                    name="test-policy",
-                    max_vfolder_count=25,
-                    max_quota_scope_size=3000000,
-                    max_session_count_per_model_session=10,
-                    max_customized_image_count=7,
-                ),
-            ),
-            (
-                UserResourcePolicyUpdaterSpec(
-                    max_vfolder_count=OptionalState.update(15),
-                    max_quota_scope_size=OptionalState.nop(),
-                    max_session_count_per_model_session=OptionalState.update(8),
-                    max_customized_image_count=OptionalState.nop(),
-                ),
-                UserResourcePolicyData(
-                    uuid=UserResourcePolicyUUID(uuid4()),
-                    name="test-policy",
-                    max_vfolder_count=15,
-                    max_quota_scope_size=1000000,  # unchanged
-                    max_session_count_per_model_session=8,
-                    max_customized_image_count=3,  # unchanged
-                ),
-            ),
-        ],
-    )
-    async def test_update_policy_success(
+    async def test_get_by_user_id_resolves_through_the_user(
         self,
         repository: UserResourcePolicyRepository,
-        sample_policy: UserResourcePolicyData,
-        updater_spec: UserResourcePolicyUpdaterSpec,
-        expected_updates: UserResourcePolicyData,
-    ) -> None:
-        """Test updating a policy successfully with various field combinations"""
-        updater = Updater(spec=updater_spec, pk_value=sample_policy.name)
-        result = await repository.update(updater)
-
-        assert isinstance(result, UserResourcePolicyData)
-        assert result.name == sample_policy.name
-        assert result.max_vfolder_count == expected_updates.max_vfolder_count
-        assert result.max_quota_scope_size == expected_updates.max_quota_scope_size
-        assert (
-            result.max_session_count_per_model_session
-            == expected_updates.max_session_count_per_model_session
-        )
-        assert result.max_customized_image_count == expected_updates.max_customized_image_count
-
-    async def test_update_policy_not_found(self, repository: UserResourcePolicyRepository) -> None:
-        """Test updating a policy that doesn't exist"""
-        updater = Updater(
-            spec=UserResourcePolicyUpdaterSpec(max_vfolder_count=OptionalState.update(20)),
-            pk_value="non-existing",
-        )
-        with pytest.raises(UserResourcePolicyNotFound):
-            await repository.update(updater)
-
-    async def test_delete_policy_success(
-        self, repository: UserResourcePolicyRepository, sample_policy: UserResourcePolicyData
-    ) -> None:
-        """Test deleting a policy successfully"""
-        result = await repository.delete(sample_policy.name)
-
-        assert isinstance(result, UserResourcePolicyData)
-        assert result.name == sample_policy.name
-
-        # Verify it's actually deleted
-        with pytest.raises(UserResourcePolicyNotFound):
-            await repository.get_by_name(sample_policy.name)
-
-    async def test_delete_policy_not_found(self, repository: UserResourcePolicyRepository) -> None:
-        """Test deleting a policy that doesn't exist"""
-        with pytest.raises(UserResourcePolicyNotFound):
-            await repository.delete("non-existing")
-
-    async def test_create_and_get_roundtrip(self, repository: UserResourcePolicyRepository) -> None:
-        """Test creating a policy and retrieving it"""
-        policy_name = "test-policy-roundtrip"
-        max_vfolder_count = 15
-        max_quota_scope_size = 500000
-        max_session_count_per_model_session = 10
-        max_customized_image_count = 5
-
-        created = await repository.create(
-            Creator(
-                spec=UserResourcePolicyCreatorSpec(
-                    name=policy_name,
-                    max_vfolder_count=max_vfolder_count,
-                    max_quota_scope_size=max_quota_scope_size,
-                    max_session_count_per_model_session=max_session_count_per_model_session,
-                    max_customized_image_count=max_customized_image_count,
-                )
-            )
-        )
-        retrieved = await repository.get_by_name(created.name)
-
-        assert created.name == retrieved.name
-        assert created.max_vfolder_count == retrieved.max_vfolder_count
-        assert created.max_quota_scope_size == retrieved.max_quota_scope_size
-        assert (
-            created.max_session_count_per_model_session
-            == retrieved.max_session_count_per_model_session
-        )
-        assert created.max_customized_image_count == retrieved.max_customized_image_count
-
-    @pytest.mark.parametrize(
-        "max_concurrent_logins",
-        [None, 0, 10],
-        ids=["none-unlimited", "zero", "ten"],
-    )
-    async def test_create_and_get_roundtrip_max_concurrent_logins(
-        self,
-        repository: UserResourcePolicyRepository,
-        max_concurrent_logins: int | None,
-    ) -> None:
-        """Test that max_concurrent_logins round-trips correctly for None, 0, and positive values."""
-        policy_name = f"test-policy-mcl-{max_concurrent_logins}"
-        created = await repository.create(
-            Creator(
-                spec=UserResourcePolicyCreatorSpec(
-                    name=policy_name,
-                    max_vfolder_count=5,
-                    max_quota_scope_size=0,
-                    max_session_count_per_model_session=3,
-                    max_customized_image_count=2,
-                    max_concurrent_logins=max_concurrent_logins,
-                )
-            )
-        )
-        retrieved = await repository.get_by_name(created.name)
-
-        assert retrieved.max_concurrent_logins == max_concurrent_logins
-
-    async def test_update_max_concurrent_logins_nullify_clears_to_none(
-        self,
-        repository: UserResourcePolicyRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         sample_policy: UserResourcePolicyData,
     ) -> None:
-        """Test that TriState.nullify() clears max_concurrent_logins back to None."""
-        # First, set a non-null value
-        updater_set = Updater(
-            spec=UserResourcePolicyUpdaterSpec(
-                max_concurrent_logins=TriState.update(7),
-            ),
-            pk_value=sample_policy.name,
-        )
-        result_set = await repository.update(updater_set)
-        assert result_set.max_concurrent_logins == 7
+        """The join through ``users`` is why this repository still exists."""
+        user_id = uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                DomainRow(
+                    name="default",
+                    description="test domain",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    allowed_docker_registries=[],
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                UserRow(
+                    uuid=user_id,
+                    username="policy-owner",
+                    email="policy-owner@example.com",
+                    password=None,
+                    need_password_change=False,
+                    status=UserStatus.ACTIVE,
+                    status_info="active",
+                    domain_name="default",
+                    role=UserRole.USER,
+                    resource_policy=sample_policy.name,
+                )
+            )
+            await db_sess.flush()
 
-        # Then nullify it
-        updater_clear = Updater(
-            spec=UserResourcePolicyUpdaterSpec(
-                max_concurrent_logins=TriState.nullify(),
-            ),
-            pk_value=sample_policy.name,
-        )
-        result_cleared = await repository.update(updater_clear)
-        assert result_cleared.max_concurrent_logins is None
+        result = await repository.get_by_user_id(user_id)
+
+        assert result.name == sample_policy.name
+
+    async def test_get_by_user_id_not_found(self, repository: UserResourcePolicyRepository) -> None:
+        """A user with no policy row is an error, not an empty answer."""
+        with pytest.raises(UserResourcePolicyNotFound):
+            await repository.get_by_user_id(uuid4())

@@ -1,13 +1,20 @@
+from __future__ import annotations
+
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    CreatedEntityOpsResult,
+    EntityOpsResult,
+)
+from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.services.user_resource_policy.actions.create_user_resource_policy import (
     CreateUserResourcePolicyAction,
-    CreateUserResourcePolicyActionResult,
 )
 from ai.backend.manager.services.user_resource_policy.actions.delete_user_resource_policy import (
     DeleteUserResourcePolicyAction,
-    DeleteUserResourcePolicyActionResult,
 )
 from ai.backend.manager.services.user_resource_policy.actions.get_my_user_resource_policy import (
     GetMyUserResourcePolicyAction,
@@ -15,60 +22,49 @@ from ai.backend.manager.services.user_resource_policy.actions.get_my_user_resour
 )
 from ai.backend.manager.services.user_resource_policy.actions.get_user_resource_policy import (
     GetUserResourcePolicyAction,
-    GetUserResourcePolicyActionResult,
 )
 from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
     ModifyUserResourcePolicyAction,
-    ModifyUserResourcePolicyActionResult,
 )
 from ai.backend.manager.services.user_resource_policy.actions.search_user_resource_policies import (
     SearchUserResourcePoliciesAction,
-    SearchUserResourcePoliciesActionResult,
 )
 from ai.backend.manager.services.user_resource_policy.service import UserResourcePolicyService
 
 
 class UserResourcePolicyProcessors:
-    get_user_resource_policy: ActionProcessor[
-        GetUserResourcePolicyAction, GetUserResourcePolicyActionResult
+    get_user_resource_policy: GlobalActionProcessor[
+        GetUserResourcePolicyAction, EntityOpsResult[UserResourcePolicyData]
     ]
     get_my_user_resource_policy: ActionProcessor[
         GetMyUserResourcePolicyAction, GetMyUserResourcePolicyActionResult
     ]
-    search_user_resource_policies: ActionProcessor[
-        SearchUserResourcePoliciesAction, SearchUserResourcePoliciesActionResult
+    search_user_resource_policies: GlobalActionProcessor[
+        SearchUserResourcePoliciesAction, BatchOpsResult[UserResourcePolicyData]
     ]
-    create_user_resource_policy: ActionProcessor[
-        CreateUserResourcePolicyAction, CreateUserResourcePolicyActionResult
+    create_user_resource_policy: GlobalActionProcessor[
+        CreateUserResourcePolicyAction, CreatedEntityOpsResult[UserResourcePolicyData]
     ]
-    modify_user_resource_policy: ActionProcessor[
-        ModifyUserResourcePolicyAction, ModifyUserResourcePolicyActionResult
+    modify_user_resource_policy: GlobalActionProcessor[
+        ModifyUserResourcePolicyAction, EntityOpsResult[UserResourcePolicyData]
     ]
-    delete_user_resource_policy: ActionProcessor[
-        DeleteUserResourcePolicyAction, DeleteUserResourcePolicyActionResult
+    delete_user_resource_policy: GlobalActionProcessor[
+        DeleteUserResourcePolicyAction, EntityOpsResult[UserResourcePolicyData]
     ]
 
     def __init__(
         self,
         service: UserResourcePolicyService,
         action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
+        group: ProcessorGroup[UserResourcePolicyData],
     ) -> None:
-        self.get_user_resource_policy = ActionProcessor(
-            service.get_user_resource_policy, action_monitors
-        )
+        self.get_user_resource_policy = group.global_get_ops(GetUserResourcePolicyAction)
         self.get_my_user_resource_policy = ActionProcessor(
             service.get_my_user_resource_policy, action_monitors
         )
-        self.search_user_resource_policies = ActionProcessor(
-            service.search_user_resource_policies, action_monitors
+        self.search_user_resource_policies = group.global_search_ops(
+            SearchUserResourcePoliciesAction
         )
-        self.create_user_resource_policy = ActionProcessor(
-            service.create_user_resource_policy, action_monitors
-        )
-        self.modify_user_resource_policy = ActionProcessor(
-            service.modify_user_resource_policy, action_monitors
-        )
-        self.delete_user_resource_policy = ActionProcessor(
-            service.delete_user_resource_policy, action_monitors
-        )
+        self.create_user_resource_policy = group.global_create_ops(CreateUserResourcePolicyAction)
+        self.modify_user_resource_policy = group.global_update_ops(ModifyUserResourcePolicyAction)
+        self.delete_user_resource_policy = group.global_purge_ops(DeleteUserResourcePolicyAction)
