@@ -50215,7 +50215,7 @@
           }
         },
         "parameters": [],
-        "description": "Search resource slot types with filters, orders, and pagination.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Search resource slot types with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/resource-slots/slot-types": {
@@ -64743,7 +64743,7 @@
           }
         },
         "parameters": [],
-        "description": "Search resource slot types with filters, orders, and pagination.\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
+        "description": "Search resource slot types with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/resource-slot-types/{slot_name}": {
@@ -64772,7 +64772,7 @@
             }
           }
         ],
-        "description": "Get a single resource slot type by slot_name.\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
+        "description": "Get a single resource slot type by slot_name.\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/resource/prometheus-query-definitions": {
