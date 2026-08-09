@@ -1,20 +1,16 @@
-"""Searcher for repository list queries."""
+"""List-read spec of the v2 lineage: select, conversion, and query options in one."""
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import sqlalchemy as sa
 
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-
-from .pagination import QueryPagination
-
-if TYPE_CHECKING:
-    from sqlalchemy.engine import Row
+from ai.backend.manager.models.specs.pagination import QueryPagination
 
 
 @dataclass
@@ -34,9 +30,8 @@ class Searcher[TRow: Base, TData](ABC):
             def build_select(self) -> sa.sql.Select[Any]:
                 return sa.select(UserRow)
 
-            def to_data(self, row: Row[Any]) -> UserData:
-                user_row: UserRow = row.UserRow
-                return user_row.to_data()
+            def to_data(self, row: UserRow) -> UserData:
+                return row.to_data()
 
         async with ops.read_ops() as r:
             result = await r.search_with_scopes(scopes, UserSearcher(pagination=...))
@@ -57,8 +52,12 @@ class Searcher[TRow: Base, TData](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def to_data(self, row: Row[Any]) -> TData:
-        """Convert one fetched row into its ``data/`` type."""
+    def to_data(self, row: TRow) -> TData:
+        """Convert one fetched row into its ``data/`` type.
+
+        Receives the ORM entity itself: ``build_select`` selects a single entity,
+        and the ops layer extracts it from the result row before converting.
+        """
         raise NotImplementedError
 
 

@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
 
 from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
 from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
 from ai.backend.manager.models.resource_slot.types import NumberFormat
-from ai.backend.manager.repositories.base.updater import DataUpdater
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.types import OptionalState
 
 
@@ -41,6 +43,11 @@ class ResourceSlotTypeUpdater(DataUpdater[ResourceSlotTypeRow, ResourceSlotTypeD
     @override
     def pk_value(self) -> str:
         return self.slot_name
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
 
     @override
     def build_values(self) -> dict[str, Any]:

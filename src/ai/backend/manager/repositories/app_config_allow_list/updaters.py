@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
 
 from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
 from ai.backend.manager.data.app_config_allow_list.types import AppConfigAllowListData
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
-from ai.backend.manager.repositories.base.updater import DataUpdater
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.types import OptionalState
 
 
@@ -33,6 +35,11 @@ class AppConfigAllowListUpdater(DataUpdater[AppConfigAllowListRow, AppConfigAllo
     @override
     def pk_value(self) -> AppConfigAllowListID:
         return self.allow_list_id
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
 
     @override
     def build_values(self) -> dict[str, Any]:
