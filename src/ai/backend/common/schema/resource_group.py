@@ -11,7 +11,12 @@ from datetime import timedelta
 
 from pydantic import ConfigDict, field_serializer
 
-from ai.backend.common.types import BackendAISchema, PreemptionMode, PreemptionOrder
+from ai.backend.common.types import (
+    BackendAISchema,
+    PreemptionMode,
+    PreemptionOrder,
+    PreemptionVictimScope,
+)
 
 __all__ = ("PreemptionConfig",)
 
@@ -33,6 +38,9 @@ class PreemptionConfig(BackendAISchema):
 
     preemption_min_runtime: timedelta = timedelta(seconds=0)
     """Minimum session runtime before it becomes preemptible (0 = disabled)"""
+
+    victim_scope: PreemptionVictimScope = PreemptionVictimScope.USER
+    """Which owner scope preemption victims are drawn from"""
 
     @field_serializer("order", mode="plain")
     def serialize_order(self, value: PreemptionOrder) -> str:

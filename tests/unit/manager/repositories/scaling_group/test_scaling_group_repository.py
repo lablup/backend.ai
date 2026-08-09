@@ -10,9 +10,16 @@ from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import ScalingGroupConflict
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
-from ai.backend.common.types import AccessKey, DefaultForUnspecified, ResourceSlot, SessionTypes
+from ai.backend.common.types import (
+    AccessKey,
+    DefaultForUnspecified,
+    PreemptionVictimScope,
+    ResourceSlot,
+    SessionTypes,
+)
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.data.scaling_group.types import PreemptionConfig as DataPreemptionConfig
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
@@ -737,6 +744,29 @@ class TestScalingGroupRepositoryDB:
         assert result.scheduler.name.value == "drf"
         assert SessionTypes.BATCH in result.scheduler.options.allowed_session_types
         assert result.network.use_host_network is True
+
+    async def test_update_preemption_victim_scope_round_trips(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        sample_scaling_group_for_update: str,
+    ) -> None:
+        """A preemption-config update persists ``victim_scope`` and the
+        re-read data reflects it."""
+        spec = ScalingGroupUpdaterSpec(
+            scheduler=ScalingGroupSchedulerConfigUpdaterSpec(
+                preemption_config=OptionalState.update(
+                    DataPreemptionConfig(
+                        enabled=True,
+                        victim_scope=PreemptionVictimScope.DOMAIN,
+                    )
+                ),
+            ),
+        )
+        updater = Updater(spec=spec, pk_value=sample_scaling_group_for_update)
+        result = await scaling_group_repository.update_scaling_group(updater)
+
+        assert result.scheduler.options.preemption.enabled is True
+        assert result.scheduler.options.preemption.victim_scope == PreemptionVictimScope.DOMAIN
 
     async def test_update_scaling_group_not_found(
         self,
