@@ -67,9 +67,6 @@ from ai.backend.manager.repositories.resource_usage_history.repositories import 
     ResourceUsageHistoryRepositories,
 )
 from ai.backend.manager.repositories.retention.repositories import RetentionRepositories
-from ai.backend.manager.repositories.retention_policy.repositories import (
-    RetentionPolicyRepositories,
-)
 from ai.backend.manager.repositories.role_preset.repositories import RolePresetRepositories
 from ai.backend.manager.repositories.runtime_variant.repositories import RuntimeVariantRepositories
 from ai.backend.manager.repositories.runtime_variant_preset.repositories import (
@@ -127,7 +124,6 @@ class Repositories:
     reservoir_registry: ReservoirRegistryRepositories
     resource_preset: ResourcePresetRepositories
     resource_slot: ResourceSlotRepositories
-    retention_policy: RetentionPolicyRepositories
     role_preset: RolePresetRepositories
     runtime_variant: RuntimeVariantRepositories
     runtime_variant_preset: RuntimeVariantPresetRepositories
@@ -185,7 +181,6 @@ class Repositories:
         reservoir_registry_repositories = ReservoirRegistryRepositories.create(args)
         resource_preset_repositories = ResourcePresetRepositories.create(args)
         resource_slot_repositories = ResourceSlotRepositories.create(args)
-        retention_policy_repositories = RetentionPolicyRepositories.create(args)
         role_preset_repositories = RolePresetRepositories.create(args)
         runtime_variant_repositories = RuntimeVariantRepositories.create(args)
         runtime_variant_preset_repositories = RuntimeVariantPresetRepositories.create(args)
@@ -242,7 +237,6 @@ class Repositories:
             reservoir_registry=reservoir_registry_repositories,
             resource_preset=resource_preset_repositories,
             resource_slot=resource_slot_repositories,
-            retention_policy=retention_policy_repositories,
             role_preset=role_preset_repositories,
             runtime_variant=runtime_variant_repositories,
             runtime_variant_preset=runtime_variant_preset_repositories,

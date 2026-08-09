@@ -260,9 +260,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.retention_policy.processors import (
         RetentionPolicyProcessors,
     )
-    from ai.backend.manager.services.retention_policy.service import (
-        RetentionPolicyService,
-    )
     from ai.backend.manager.services.role_preset.processors import (
         RolePresetProcessors,
     )
@@ -427,7 +424,6 @@ class Services:
     prometheus_query_preset_category: PrometheusQueryPresetCategoryService
     resource_preset: ResourcePresetService
     resource_slot: ResourceSlotService
-    retention_policy: RetentionPolicyService
     role_preset: RolePresetService
     runtime_variant: RuntimeVariantService
     runtime_variant_preset: RuntimeVariantPresetService

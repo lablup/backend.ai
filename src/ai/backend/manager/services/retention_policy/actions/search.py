@@ -3,34 +3,30 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.retention_policy import RETENTION_POLICY_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.retention.types import RetentionPolicyData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.retention_policy.actions.base import RetentionPolicyAction
+from ai.backend.manager.models.retention.row import RetentionPolicyRow
+from ai.backend.manager.repositories.retention_policy.searchers import RetentionPolicySearcher
 
 
 @dataclass
-class SearchRetentionPoliciesAction(RetentionPolicyAction):
-    querier: BatchQuerier
+class SearchRetentionPoliciesAction(SearchGlobalOpsAction[RetentionPolicyRow, RetentionPolicyData]):
+    """Page through the retention policy catalog."""
+
+    searcher: RetentionPolicySearcher
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+    def entity_type(cls) -> EntityType:
+        return RETENTION_POLICY_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return None
-
-
-@dataclass
-class SearchRetentionPoliciesActionResult(BaseActionResult):
-    items: list[RetentionPolicyData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_retention_policies"
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def to_searcher(self) -> RetentionPolicySearcher:
+        return self.searcher
