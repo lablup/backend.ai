@@ -2,11 +2,12 @@
 
 This file contains the core rules for AI coding agents. For detailed patterns and workflows, use the skills and documents below.
 
-## Document structure (AGENTS.md / CONTEXTS.md)
+## Document structure (AGENTS.md / KNOWLEDGE.md)
 
 - **`AGENTS.md`**: Guardrails (rules) only. Concise and imperative. Always auto-loaded (`CLAUDE.md` is a symlink to this file).
-- **`CONTEXTS.md`**: Background read for development (assumptions, rationale, caveats, examples, development context). Updated relatively often as assumptions and such change. Read on demand, with a pointer placed at the top of the corresponding `AGENTS.md`.
-- **`README.md`**: A document for humans to understand the component's composition. Should not change often. Does not duplicate AGENTS/CONTEXTS.
+- **`KNOWLEDGE.md`**: Background knowledge (assumptions, rationale, decision tables, caveats) with a fixed frontmatter schema. Read on demand — find documents with `python3 scripts/knowledge/search.py <term>`; the schema and authoring rules live in the `/knowledge` skill. `knowledge-check.yml` validates conformance on PRs.
+- A change that shifts a base assumption — an `AGENTS.md` rule rewrite, a migration completing — updates the affected `KNOWLEDGE.md` in the same change. Routine task-level edits do not.
+- **`README.md`**: A document for humans to understand the component's composition. Should not change often. Does not duplicate AGENTS/KNOWLEDGE.
 - Place a rule **only once, at the highest level** of its scope — global at this root, component-global at the component top level. Do not duplicate an upper-level rule lower down.
 
 ## Writing style
@@ -46,6 +47,7 @@ When to use:
 - Running component servers directly → `/local-dev`
 - Submitting PR (backport targeting) → `/submit`
 - Preparing release → `/release`
+- Searching or writing background knowledge (`KNOWLEDGE.md`) → `/knowledge`
 
 Skills source: `.claude/skills/{name}/SKILL.md`
 
@@ -120,7 +122,7 @@ test, and log-checking procedures, see the `/local-dev`, `/bai-cli`, and `/obser
 
 ## Development guidelines
 
-**Document-first:** Before making changes, read the `AGENTS.md` in the relevant directory, and if you need more context, read `CONTEXTS.md` in the same directory.
+**Document-first:** Before making changes, read the `AGENTS.md` in the relevant directory, and if you need more context, search the `KNOWLEDGE.md` documents (`/knowledge`).
 
 **BEP-first:** For significant features, use the `/bep-guide` skill. Check `proposals/README.md` for an existing BEP or create a new one.
 

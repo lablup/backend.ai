@@ -32,6 +32,7 @@ current, see `AGENTS.md` in this directory.
 | `alembic-rebase.py` | Rebases a migration branch when alembic heads have diverged | person (`src/ai/backend/README.md`) |
 | `generate-rbac-fixture-permissions.py` | Re-emits the managed permission rows of `fixtures/manager/example-roles.json` | person |
 | `download-webui-release.sh` | Downloads and unpacks a WebUI bundle into `src/ai/backend/web` | person; `release.sh` |
+| `knowledge/search.py` | Lists or searches `KNOWLEDGE.md` frontmatter across the repository | person; Claude Code (`/knowledge`) |
 
 ## Commit and push
 
@@ -51,6 +52,7 @@ current, see `AGENTS.md` in this directory.
 | `assign-pr-number.py` | Renames news fragments to the assigned PR number | auto — `assign-pr-number.yml` (via `timeline-check.yml`) |
 | `check-multiple-alembic-heads.py` | Fails the build when the migration graph has more than one head | auto — `ci.yml` |
 | `check-alembic-revision.py` | Rejects a migration whose `upgrade()` / `downgrade()` is empty | auto — `ci.yml` |
+| `knowledge/check.py` | Validates `KNOWLEDGE.md` frontmatter, paths, and body links | auto — `knowledge-check.yml`; person |
 | `get-platform-suffix.py` | Prints the `<os>-<arch>` suffix used in artifact names | auto — `ci.yml`, `build-test.yml` |
 | `.github/scripts/decide-backport-targets.sh` | Reads `.github/maintained-versions.yml` and the `Backport:` trailer to decide the target branches | auto — `backport.yml` |
 | `update-default-seccomp.sh` | Refreshes `default-seccomp.json` from the upstream moby profile | auto — `update-seccomp-profile.yml` (monthly); person |
@@ -101,3 +103,4 @@ current, see `AGENTS.md` in this directory.
 | `e2e-model-store/` | Numbered end-to-end model-store scenarios, run in order by `run-all.sh` against a live local stack |
 | `storage-proxy/` | `upgrade.sh` (storage migration entry point) and the Ceph test-cluster provisioning under `ceph/` |
 | `hooks/` | AI-agent hooks; see the "Commit and push" table |
+| `knowledge/` | `KNOWLEDGE.md` tooling — shared frontmatter parser, `search.py`, `check.py` |
