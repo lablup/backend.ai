@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Any, override
 from uuid import UUID
 
+from ai.backend.common.data.entity.types import EntityData
+from ai.backend.common.identifier.entity import EntityID
 from ai.backend.common.types import ServiceCatalogStatus
 
 
@@ -21,7 +23,7 @@ class ServiceCatalogEndpointData:
 
 
 @dataclass
-class ServiceCatalogData:
+class ServiceCatalogData(EntityData):
     id: UUID
     service_group: str
     instance_id: str
@@ -34,3 +36,7 @@ class ServiceCatalogData:
     last_heartbeat: datetime
     config_hash: str
     endpoints: list[ServiceCatalogEndpointData] = field(default_factory=list)
+
+    @override
+    def entity_id(self) -> EntityID:
+        return self.id

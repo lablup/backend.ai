@@ -155,7 +155,6 @@ from ai.backend.manager.services.scaling_group.service import ScalingGroupServic
 from ai.backend.manager.services.scheduling_history.processors import SchedulingHistoryProcessors
 from ai.backend.manager.services.scheduling_history.service import SchedulingHistoryService
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
-from ai.backend.manager.services.service_catalog.service import ServiceCatalogService
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 from ai.backend.manager.services.storage_namespace.processors import StorageNamespaceProcessors
@@ -436,7 +435,6 @@ def create_services(args: ServiceArgs) -> Services:
         audit_log=AuditLogService(repositories.audit_log.repository),
         idle_checker_assignment=IdleCheckerAssignmentService(repositories.idle_checker.repository),
         scheduling_history=SchedulingHistoryService(repositories.scheduling_history.repository),
-        service_catalog=ServiceCatalogService(args.db),
         template=TemplateService(
             repository=repositories.template.repository,
         ),
@@ -590,9 +588,7 @@ def create_processors(
         scheduling_history=SchedulingHistoryProcessors(
             services.scheduling_history, action_monitors, validators
         ),
-        service_catalog=ServiceCatalogProcessors(
-            services.service_catalog, action_monitors, validators
-        ),
+        service_catalog=ServiceCatalogProcessors(registry.group()),
         template=TemplateProcessors(services.template, action_monitors, validators),
         resource_allocation=ResourceAllocationProcessors(
             services.resource_allocation, action_monitors, validators

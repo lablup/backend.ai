@@ -287,9 +287,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.service_catalog.processors import (
         ServiceCatalogProcessors,
     )
-    from ai.backend.manager.services.service_catalog.service import (
-        ServiceCatalogService,
-    )
     from ai.backend.manager.services.session.processors import (
         SessionProcessors,
     )
@@ -441,7 +438,6 @@ class Services:
     audit_log: AuditLogService
     idle_checker_assignment: IdleCheckerAssignmentService
     scheduling_history: SchedulingHistoryService
-    service_catalog: ServiceCatalogService
     template: TemplateService
     resource_allocation: ResourceAllocationService
     stream: StreamService
