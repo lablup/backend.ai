@@ -34,17 +34,17 @@ from .base import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.models.resource_policy.creators import (
+        ProjectResourcePolicyCreator,
+    )
     from ai.backend.manager.repositories.keypair_resource_policy.creators import (
         KeyPairResourcePolicyCreatorSpec,
     )
     from ai.backend.manager.repositories.keypair_resource_policy.updaters import (
         KeyPairResourcePolicyUpdaterSpec,
     )
-    from ai.backend.manager.repositories.project_resource_policy.creators import (
-        ProjectResourcePolicyCreatorSpec,
-    )
     from ai.backend.manager.repositories.project_resource_policy.updaters import (
-        ProjectResourcePolicyUpdaterSpec,
+        ProjectResourcePolicyUpdater,
     )
     from ai.backend.manager.repositories.user_resource_policy.creators import (
         UserResourcePolicyCreatorSpec,
@@ -70,22 +70,6 @@ def _get_keypair_resource_policy_updater_spec() -> type[KeyPairResourcePolicyUpd
     )
 
     return KeyPairResourcePolicyUpdaterSpec
-
-
-def _get_project_resource_policy_creator_spec() -> type[ProjectResourcePolicyCreatorSpec]:
-    from ai.backend.manager.repositories.project_resource_policy.creators import (
-        ProjectResourcePolicyCreatorSpec,
-    )
-
-    return ProjectResourcePolicyCreatorSpec
-
-
-def _get_project_resource_policy_updater_spec() -> type[ProjectResourcePolicyUpdaterSpec]:
-    from ai.backend.manager.repositories.project_resource_policy.updaters import (
-        ProjectResourcePolicyUpdaterSpec,
-    )
-
-    return ProjectResourcePolicyUpdaterSpec
 
 
 def _get_user_resource_policy_creator_spec() -> type[UserResourcePolicyCreatorSpec]:
@@ -861,18 +845,19 @@ class CreateProjectResourcePolicyInput(graphene.InputObjectType):  # type: ignor
         description="Added in 24.12.0. Limitation of the number of networks created on behalf of project. Set as -1 to allow creating unlimited networks."
     )
 
-    def to_creator(self, name: str) -> Creator[ProjectResourcePolicyRow]:
+    def to_creator(self, name: str) -> ProjectResourcePolicyCreator:
+        from ai.backend.manager.models.resource_policy.creators import (
+            ProjectResourcePolicyCreator,
+        )
+
         def value_or_default(value: Any, default: int) -> int:
             return value if value is not Undefined and value is not None else default
 
-        CreatorSpec = _get_project_resource_policy_creator_spec()
-        return Creator(
-            spec=CreatorSpec(
-                name=name,
-                max_vfolder_count=value_or_default(self.max_vfolder_count, 0),
-                max_quota_scope_size=value_or_default(self.max_quota_scope_size, 0),
-                max_network_count=value_or_default(self.max_network_count, 0),
-            )
+        return ProjectResourcePolicyCreator(
+            name=name,
+            max_vfolder_count=value_or_default(self.max_vfolder_count, 0),
+            max_quota_scope_size=value_or_default(self.max_quota_scope_size, 0),
+            max_network_count=value_or_default(self.max_network_count, 0),
         )
 
 
@@ -888,16 +873,17 @@ class ModifyProjectResourcePolicyInput(graphene.InputObjectType):  # type: ignor
         description="Added in 24.12.0. Limitation of the number of networks created on behalf of project. Set as -1 to allow creating unlimited networks."
     )
 
-    def to_updater(self, name: str) -> Updater[ProjectResourcePolicyRow]:
-        UpdaterSpec = _get_project_resource_policy_updater_spec()
-        return Updater(
-            spec=UpdaterSpec(
-                max_vfolder_count=OptionalState[int].from_graphql(self.max_vfolder_count),
-                max_quota_scope_size=OptionalState[int].from_graphql(self.max_quota_scope_size),
-                max_vfolder_size=OptionalState[int].from_graphql(self.max_vfolder_size),
-                max_network_count=OptionalState[int].from_graphql(self.max_network_count),
-            ),
-            pk_value=name,
+    def to_updater(self, name: str) -> ProjectResourcePolicyUpdater:
+        from ai.backend.manager.repositories.project_resource_policy.updaters import (
+            ProjectResourcePolicyUpdater,
+        )
+
+        return ProjectResourcePolicyUpdater(
+            name=name,
+            max_vfolder_count=OptionalState[int].from_graphql(self.max_vfolder_count),
+            max_quota_scope_size=OptionalState[int].from_graphql(self.max_quota_scope_size),
+            max_vfolder_size=OptionalState[int].from_graphql(self.max_vfolder_size),
+            max_network_count=OptionalState[int].from_graphql(self.max_network_count),
         )
 
 
@@ -925,7 +911,7 @@ class CreateProjectResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.project_resource_policy.create_project_resource_policy.wait_for_complete(
+        await graph_ctx.processors.project_resource_policy.create_project_resource_policy.run(
             CreateProjectResourcePolicyAction(props.to_creator(name))
         )
 
@@ -958,8 +944,8 @@ class ModifyProjectResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.project_resource_policy.modify_project_resource_policy.wait_for_complete(
-            ModifyProjectResourcePolicyAction(name, props.to_updater(name))
+        await graph_ctx.processors.project_resource_policy.modify_project_resource_policy.run(
+            ModifyProjectResourcePolicyAction(props.to_updater(name))
         )
 
         return ModifyProjectResourcePolicy(
@@ -989,7 +975,7 @@ class DeleteProjectResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.project_resource_policy.delete_project_resource_policy.wait_for_complete(
+        await graph_ctx.processors.project_resource_policy.delete_project_resource_policy.run(
             DeleteProjectResourcePolicyAction(name)
         )
 

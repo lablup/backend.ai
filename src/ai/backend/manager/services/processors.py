@@ -212,9 +212,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.project_resource_policy.processors import (
         ProjectResourcePolicyProcessors,
     )
-    from ai.backend.manager.services.project_resource_policy.service import (
-        ProjectResourcePolicyService,
-    )
     from ai.backend.manager.services.prometheus_query_preset.processors import (
         PrometheusQueryPresetProcessors,
     )
@@ -410,7 +407,6 @@ class Services:
     keypair_resource_policy: KeypairResourcePolicyService
     manager_admin: ManagerAdminService
     user_resource_policy: UserResourcePolicyService
-    project_resource_policy: ProjectResourcePolicyService
     prometheus_query_preset: PrometheusQueryPresetService
     prometheus_query_preset_category: PrometheusQueryPresetCategoryService
     resource_preset: ResourcePresetService

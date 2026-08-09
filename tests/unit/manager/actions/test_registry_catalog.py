@@ -36,6 +36,9 @@ from ai.backend.manager.services.login_client_type.processors import (
     LoginClientTypeAdminProcessors,
     LoginClientTypeProcessors,
 )
+from ai.backend.manager.services.project_resource_policy.processors import (
+    ProjectResourcePolicyProcessors,
+)
 from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
 from ai.backend.manager.services.retention_policy.processors import RetentionPolicyProcessors
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
@@ -91,6 +94,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     LoginClientTypeProcessors(registry.group())
     LoginClientTypeAdminProcessors(registry.group())
     ServiceCatalogProcessors(registry.group())
+    ProjectResourcePolicyProcessors(registry.group())
 
     wired = sorted(spec.type() for spec in registry.wired_specs())
     defined = sorted(cls.spec().type() for cls in _concrete_v2_action_classes())

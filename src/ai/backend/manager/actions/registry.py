@@ -281,6 +281,20 @@ class ProcessorGroup[TData: EntityData]:
             validators=(*self._deps.validators.global_scope, *validators),
         )
 
+    def global_get_ops[TAction: GetGlobalOpsAction[Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[GlobalActionValidator] = (),
+        monitors: Sequence[GlobalActionMonitor] = (),
+    ) -> GlobalActionProcessor[TAction, EntityOpsResult[TData]]:
+        self._record(action_cls.spec())
+        return GlobalActionProcessor(
+            GetService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.global_scope, *monitors),
+            validators=(*self._deps.validators.global_scope, *validators),
+        )
+
     def public_get_ops[TAction: GetGlobalOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],

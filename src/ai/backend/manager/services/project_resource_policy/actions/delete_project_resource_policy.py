@@ -1,33 +1,41 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
-from ai.backend.manager.services.project_resource_policy.actions.base import (
-    ProjectResourcePolicyAction,
+from ai.backend.common.data.entity.resource_policy import (
+    PROJECT_RESOURCE_POLICY_ENTITY_TYPE,
 )
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import PurgeGlobalOpsAction
+from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
+from ai.backend.manager.models.resource_policy.purgers import (
+    ProjectResourcePolicyPurger,
+)
+from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
 
 
 @dataclass
-class DeleteProjectResourcePolicyAction(ProjectResourcePolicyAction):
+class DeleteProjectResourcePolicyAction(
+    PurgeGlobalOpsAction[ProjectResourcePolicyRow, ProjectResourcePolicyData]
+):
+    """Remove a project resource policy.
+
+    Purge-shaped: the table carries no lifecycle column, so deleting one has
+    always been the row leaving the table."""
+
     name: str
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return PROJECT_RESOURCE_POLICY_ENTITY_TYPE
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.DELETE
-
-
-@dataclass
-class DeleteProjectResourcePolicyActionResult(BaseActionResult):
-    # TODO: Create return type.
-    project_resource_policy: ProjectResourcePolicyData
+    def action_name(cls) -> str:
+        return "admin_delete_project_resource_policy"
 
     @override
-    def entity_id(self) -> str | None:
-        return self.project_resource_policy.name
+    def to_purger(self) -> ProjectResourcePolicyPurger:
+        return ProjectResourcePolicyPurger(name=self.name)

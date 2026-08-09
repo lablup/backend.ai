@@ -118,7 +118,6 @@ from ai.backend.manager.services.processors import (
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
-from ai.backend.manager.services.project_resource_policy.service import ProjectResourcePolicyService
 from ai.backend.manager.services.prometheus_query_preset.processors import (
     PrometheusQueryPresetProcessors,
 )
@@ -302,9 +301,6 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         user_resource_policy=UserResourcePolicyService(
             repositories.user_resource_policy.repository
-        ),
-        project_resource_policy=ProjectResourcePolicyService(
-            repositories.project_resource_policy.repository
         ),
         prometheus_query_preset=PrometheusQueryPresetService(
             repository=repositories.prometheus_query_preset.repository,
@@ -517,9 +513,7 @@ def create_processors(
         user_resource_policy=UserResourcePolicyProcessors(
             services.user_resource_policy, action_monitors, validators
         ),
-        project_resource_policy=ProjectResourcePolicyProcessors(
-            services.project_resource_policy, action_monitors, validators
-        ),
+        project_resource_policy=ProjectResourcePolicyProcessors(registry.group()),
         prometheus_query_preset=PrometheusQueryPresetProcessors(
             services.prometheus_query_preset, action_monitors, validators
         ),

@@ -48,9 +48,6 @@ from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.permission_controller.repositories import (
     PermissionControllerRepositories,
 )
-from ai.backend.manager.repositories.project_resource_policy.repositories import (
-    ProjectResourcePolicyRepositories,
-)
 from ai.backend.manager.repositories.prometheus_query_preset import (
     PrometheusQueryPresetRepositories,
 )
@@ -117,7 +114,6 @@ class Repositories:
     model_serving: ModelServingRepositories
     notification: NotificationRepositories
     permission_controller: PermissionControllerRepositories
-    project_resource_policy: ProjectResourcePolicyRepositories
     prometheus_query_preset: PrometheusQueryPresetRepositories
     prometheus_query_preset_category: PrometheusQueryPresetCategoryRepositories
     replica_group: ReplicaGroupRepositories
@@ -172,7 +168,6 @@ class Repositories:
         model_serving_repositories = ModelServingRepositories.create(args)
         notification_repositories = NotificationRepositories.create(args)
         permission_controller_repositories = PermissionControllerRepositories.create(args)
-        project_resource_policy_repositories = ProjectResourcePolicyRepositories.create(args)
         prometheus_query_preset_repositories = PrometheusQueryPresetRepositories.create(args)
         prometheus_query_preset_category_repositories = (
             PrometheusQueryPresetCategoryRepositories.create(args)
@@ -230,7 +225,6 @@ class Repositories:
             model_serving=model_serving_repositories,
             notification=notification_repositories,
             permission_controller=permission_controller_repositories,
-            project_resource_policy=project_resource_policy_repositories,
             prometheus_query_preset=prometheus_query_preset_repositories,
             prometheus_query_preset_category=prometheus_query_preset_category_repositories,
             replica_group=replica_group_repositories,
