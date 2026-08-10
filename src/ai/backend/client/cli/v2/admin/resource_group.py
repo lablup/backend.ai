@@ -114,7 +114,8 @@ def get(name: str) -> None:
 @click.option("--domain-name", required=True, help="Domain name.")
 @click.option("--description", default=None, help="Description.")
 @click.option(
-    "--is-default/--no-is-default",
+    "--set-default/--unset-default",
+    "is_default",
     default=False,
     help="Make this the default resource group. Clear the current default first.",
 )
@@ -154,7 +155,8 @@ def create(name: str, domain_name: str, description: str | None, is_default: boo
     help="Whether the resource group is visible to all users.",
 )
 @click.option(
-    "--is-default/--no-is-default",
+    "--set-default/--unset-default",
+    "is_default",
     default=None,
     help="Make this the default resource group. Clear the current default first.",
 )
