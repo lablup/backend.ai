@@ -44,6 +44,7 @@ from ai.backend.manager.services.project_resource_policy.processors import (
 )
 from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
 from ai.backend.manager.services.retention_policy.processors import RetentionPolicyProcessors
+from ai.backend.manager.services.role_preset.processors import RolePresetProcessors
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
 from ai.backend.manager.services.user_resource_policy.processors import (
     UserResourcePolicyProcessors,
@@ -103,6 +104,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     ProjectResourcePolicyProcessors(registry.group())
     UserResourcePolicyProcessors(MagicMock(), [], registry.group())
     KeypairResourcePolicyProcessors(MagicMock(), [], registry.group())
+    RolePresetProcessors(registry.group(), registry.group())
 
     wired = sorted(spec.type() for spec in registry.wired_specs())
     defined = sorted(cls.spec().type() for cls in _concrete_v2_action_classes())

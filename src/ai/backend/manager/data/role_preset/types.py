@@ -2,12 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import override
 
+from ai.backend.common.data.entity.types import EntityData
 from ai.backend.common.data.permission.types import (
     EntityType,
     OperationType,
     RBACElementType,
 )
+from ai.backend.common.identifier.entity import EntityID
 from ai.backend.common.identifier.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.manager.data.common.bulk import (
@@ -18,16 +21,20 @@ from ai.backend.manager.data.common.bulk import (
 
 
 @dataclass(frozen=True)
-class RolePermissionPresetData:
+class RolePermissionPresetData(EntityData):
     id: RolePermissionPresetID
     role_preset_id: RolePresetID
     entity_type: EntityType
     operation: OperationType
     created_at: datetime
 
+    @override
+    def entity_id(self) -> EntityID:
+        return self.id
+
 
 @dataclass(frozen=True)
-class RolePresetData:
+class RolePresetData(EntityData):
     id: RolePresetID
     name: str
     role_name_template: str | None
@@ -36,6 +43,10 @@ class RolePresetData:
     deleted: bool
     created_at: datetime
     updated_at: datetime
+
+    @override
+    def entity_id(self) -> EntityID:
+        return self.id
 
 
 @dataclass(frozen=True)

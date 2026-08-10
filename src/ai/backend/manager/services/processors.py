@@ -254,9 +254,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.role_preset.processors import (
         RolePresetProcessors,
     )
-    from ai.backend.manager.services.role_preset.service import (
-        RolePresetService,
-    )
     from ai.backend.manager.services.runtime_variant.processors import (
         RuntimeVariantProcessors,
     )
@@ -411,7 +408,6 @@ class Services:
     prometheus_query_preset_category: PrometheusQueryPresetCategoryService
     resource_preset: ResourcePresetService
     resource_slot: ResourceSlotService
-    role_preset: RolePresetService
     runtime_variant: RuntimeVariantService
     runtime_variant_preset: RuntimeVariantPresetService
     deployment_revision_preset: DeploymentRevisionPresetService

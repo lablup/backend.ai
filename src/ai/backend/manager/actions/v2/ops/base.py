@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
-from typing import override
+from typing import Any, override
 
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.common.identifier.entity import EntityID as OwnerEntityID
@@ -218,7 +218,7 @@ class GlobalEntityWithFieldsCreateOpsAction[TRow: Base, TData, TFieldRow: Base, 
         raise NotImplementedError
 
     @abstractmethod
-    def to_field_creators(self) -> Sequence[FieldEntityCreator[EntityID, TFieldRow, TFieldData]]:
+    def to_field_creators(self) -> Sequence[FieldEntityCreator[Any, TFieldRow, TFieldData]]:
         """Return one insert spec per field row created under the owner."""
         raise NotImplementedError
 
