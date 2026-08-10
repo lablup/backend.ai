@@ -62,6 +62,7 @@ from .api.rest.middleware import (
     build_auth_middleware,
     build_exception_middleware,
 )
+from .api.rest.middleware.auth import TRUSTED_PROXY_NETWORKS_KEY, parse_trusted_proxy_networks
 from .api.rest.routing import RouteRegistry
 from .config.bootstrap import BootstrapConfig
 from .config.unified import EventLoopType
@@ -362,6 +363,7 @@ async def server_main(
         # This must be inserted BEFORE auth middleware so that request.remote is
         # resolved to the real client IP before authentication runs.
         trusted_proxies = dep_resources.bootstrap.config_provider.config.manager.trusted_proxies
+        root_app[TRUSTED_PROXY_NETWORKS_KEY] = parse_trusted_proxy_networks(trusted_proxies)
         if trusted_proxies:
             from aiohttp_remotes import XForwardedStrict
 

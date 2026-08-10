@@ -823,7 +823,11 @@ class ManagerConfig(BaseConfigSchema):
                 "When configured, the manager uses aiohttp_remotes.XForwardedStrict middleware "
                 "to securely resolve client IPs from X-Forwarded-For headers. "
                 "Only proxies in this list are trusted to set forwarding headers. "
-                "If empty (default), the manager falls back to manual X-Forwarded-For parsing."
+                "The X-Forwarded-URL header, which overrides the host and path used for HMAC "
+                "signature verification, is also honored only when the request comes from one of "
+                "these proxies. "
+                "If empty (default), the manager falls back to manual X-Forwarded-For parsing and "
+                "accepts X-Forwarded-URL from any client, which is deprecated."
             ),
             added_version="26.4.2",
             example=ConfigExample(local="", prod='["10.0.0.0/8", "172.16.0.0/12"]'),
