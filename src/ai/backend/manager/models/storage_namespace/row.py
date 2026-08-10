@@ -47,7 +47,6 @@ class StorageNamespaceRow(Base):
 
     object_storage_row: Mapped[ObjectStorageRow] = relationship(
         "ObjectStorageRow",
-        back_populates="namespace_rows",
         primaryjoin=_get_storage_namespace_join_cond,
     )
 

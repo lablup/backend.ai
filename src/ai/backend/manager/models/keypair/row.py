@@ -104,9 +104,7 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):
         primaryjoin=_get_session_row_join_condition,
         foreign_keys="SessionRow.access_key",
     )
-    resource_policy_row: Mapped[KeyPairResourcePolicyRow] = relationship(
-        "KeyPairResourcePolicyRow", back_populates="keypairs"
-    )
+    resource_policy_row: Mapped[KeyPairResourcePolicyRow] = relationship("KeyPairResourcePolicyRow")
     sgroup_for_keypairs_rows: Mapped[list[ScalingGroupForKeypairsRow]] = relationship(
         "ScalingGroupForKeypairsRow",
     )

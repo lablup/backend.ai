@@ -228,9 +228,7 @@ class GroupRow(LifecycleTimestampsMixin, Base):
     users: Mapped[list[AssocGroupUserRow]] = relationship(
         "AssocGroupUserRow", back_populates="group"
     )
-    resource_policy_row: Mapped[ProjectResourcePolicyRow] = relationship(
-        "ProjectResourcePolicyRow", back_populates="projects"
-    )
+    resource_policy_row: Mapped[ProjectResourcePolicyRow] = relationship("ProjectResourcePolicyRow")
     kernels: Mapped[list[KernelRow]] = relationship("KernelRow", back_populates="group_row")
     networks: Mapped[list[NetworkRow]] = relationship(
         "NetworkRow",
@@ -246,7 +244,6 @@ class GroupRow(LifecycleTimestampsMixin, Base):
         list[AssociationContainerRegistriesGroupsRow]
     ] = relationship(
         "AssociationContainerRegistriesGroupsRow",
-        back_populates="group_row",
         primaryjoin=_get_association_container_registries_groups_join_condition,
     )
 

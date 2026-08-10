@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Any, Self
+from typing import Any, Self
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.object_permission import ObjectPermissionData
@@ -17,29 +17,6 @@ from ai.backend.manager.models.base import (
     Base,
     StrEnumType,
 )
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-        AssociationScopesEntitiesRow,
-    )
-    from ai.backend.manager.models.rbac_models.role import RoleRow
-
-
-def _get_role_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.rbac_models.role import RoleRow
-
-    return RoleRow.id == foreign(ObjectPermissionRow.role_id)
-
-
-def _get_scope_association_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-        AssociationScopesEntitiesRow,
-    )
-
-    return sa.and_(
-        ObjectPermissionRow.entity_type == foreign(AssociationScopesEntitiesRow.entity_type),
-        ObjectPermissionRow.entity_id == foreign(AssociationScopesEntitiesRow.entity_id),
-    )
 
 
 class ObjectPermissionRow(Base):
@@ -69,19 +46,6 @@ class ObjectPermissionRow(Base):
     )  # e.g., "project_id", "user_id" etc.
     operation: Mapped[OperationType] = mapped_column(
         "operation", StrEnumType(OperationType, length=32), nullable=False
-    )
-
-    role_row: Mapped[RoleRow | None] = relationship(
-        "RoleRow",
-        back_populates="object_permission_rows",
-        primaryjoin=_get_role_join_condition,
-        viewonly=True,
-    )
-    scope_association_rows: Mapped[list[AssociationScopesEntitiesRow]] = relationship(
-        "AssociationScopesEntitiesRow",
-        primaryjoin=_get_scope_association_join_condition,
-        viewonly=True,
-        uselist=True,
     )
 
     def object_id(self) -> ObjectId:

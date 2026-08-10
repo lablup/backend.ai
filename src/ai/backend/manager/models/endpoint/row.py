@@ -307,7 +307,6 @@ class EndpointRow(Base):
 
     revisions: Mapped[list[DeploymentRevisionRow]] = relationship(
         "DeploymentRevisionRow",
-        back_populates="endpoint_row",
         primaryjoin=_get_endpoint_revisions_join_condition,
         order_by="DeploymentRevisionRow.revision_number.desc()",
     )
@@ -345,14 +344,12 @@ class EndpointRow(Base):
 
     auto_scaling_policy: Mapped[DeploymentAutoScalingPolicyRow | None] = relationship(
         "DeploymentAutoScalingPolicyRow",
-        back_populates="endpoint_row",
         primaryjoin=_get_endpoint_auto_scaling_policy_join_condition,
         uselist=False,
     )
 
     deployment_policy: Mapped[DeploymentPolicyRow | None] = relationship(
         "DeploymentPolicyRow",
-        back_populates="endpoint_row",
         primaryjoin=_get_deployment_policy_join_condition,
         uselist=False,
     )

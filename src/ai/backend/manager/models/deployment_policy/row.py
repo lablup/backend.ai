@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.identifier.deployment import DeploymentID
@@ -20,9 +19,6 @@ from ai.backend.manager.models.base import (
     StrEnumType,
 )
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.endpoint import EndpointRow
 
 __all__ = ("DeploymentPolicyRow",)
 
@@ -68,13 +64,6 @@ class DeploymentPolicyRow(LifecycleTimestampsMixin, Base):
         pgsql.JSONB(),
         nullable=False,
         server_default="{}",
-    )
-
-    endpoint_row: Mapped[EndpointRow | None] = relationship(
-        "EndpointRow",
-        back_populates="deployment_policy",
-        foreign_keys=[endpoint],
-        uselist=False,
     )
 
     def to_data(self) -> DeploymentPolicyData:

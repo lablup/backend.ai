@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Self
+from typing import Self
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.defs.session import SESSION_PRIORITY_MAX, SESSION_PRIORITY_MIN
 from ai.backend.common.types import (
@@ -24,11 +24,6 @@ from ai.backend.manager.models.base import (
     VFolderHostPermissionColumn,
 )
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.group import GroupRow
-    from ai.backend.manager.models.keypair import KeyPairRow
-    from ai.backend.manager.models.user import UserRow
 
 __all__: Sequence[str] = (
     "DefaultForUnspecified",
@@ -92,10 +87,6 @@ class KeyPairResourcePolicyRow(CreatedAtMixin, Base):
     # TODO: implement with a many-to-many association table
     # allowed_scaling_groups: Mapped[list[str]] = mapped_column(sa.Array(sa.String), nullable=False)
 
-    keypairs: Mapped[list[KeyPairRow]] = relationship(
-        "KeyPairRow", back_populates="resource_policy_row"
-    )
-
     def to_dataclass(
         self,
     ) -> KeyPairResourcePolicyData:
@@ -140,8 +131,6 @@ class UserResourcePolicyRow(CreatedAtMixin, Base):
     max_concurrent_logins: Mapped[int | None] = mapped_column(
         "max_concurrent_logins", sa.Integer(), nullable=True, default=None
     )
-
-    users: Mapped[list[UserRow]] = relationship("UserRow", back_populates="resource_policy_row")
 
     def __init__(
         self,
@@ -199,10 +188,6 @@ class ProjectResourcePolicyRow(CreatedAtMixin, Base):
     )
     max_network_count: Mapped[int] = mapped_column(
         "max_network_count", sa.Integer(), nullable=False
-    )
-
-    projects: Mapped[list[GroupRow]] = relationship(
-        "GroupRow", back_populates="resource_policy_row"
     )
 
     def __init__(
