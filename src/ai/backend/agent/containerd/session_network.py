@@ -29,11 +29,15 @@ from ai.backend.agent.containerd.oci import OWNER_AGENT_LABEL, SESSION_ID_LABEL
 from ai.backend.agent.containerd.orchestrator import ContainerdKernelOrchestrator, LaunchResult
 from ai.backend.agent.containerd.runtime.interface import ExecResult, OciRuntime
 from ai.backend.agent.containerd.session_tracker import SessionContainerTracker, TeardownScope
-from ai.backend.agent.errors.network import SessionNetworkGone, UnusableVtep
+from ai.backend.agent.errors.network import (
+    ClusterDNSStartError,
+    SessionNetworkGone,
+    UnusableVtep,
+)
 from ai.backend.agent.network.cni import CniRunner
 from ai.backend.agent.network.coordinator import SessionClusterNames, SessionNetworkCoordinator
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator, LocalSubnetLayout
-from ai.backend.agent.network.native_attacher import HostLocalIpam
+from ai.backend.agent.network.native_attacher import CLUSTER_DNS_REDIRECT_PORT, HostLocalIpam
 from ai.backend.agent.network.privnet.resolver import (
     ClusterDNSServer,
     ClusterResolver,
@@ -698,38 +702,52 @@ class ContainerdSessionNetwork:
     async def ensure_cluster_dns(self, session_id: str) -> None:
         """Bring up the session's cluster DNS server on its LOCAL gateway, if not already up.
 
-        Idempotent and best-effort, and deliberately called **after a container attaches** rather
-        than at session setup: in privnet mode the session's LOCAL block (and thus its gateway) is
-        not allocated until the first attach, so the gateway is simply unknown at ``ensure_session``
-        time. A missing gateway or a failed bind is logged at debug and skipped, never fatal — the
-        container still resolves peers via ``/etc/hosts`` and non-cluster names via the upstream
-        nameservers its ``/etc/resolv.conf`` also lists (see cluster-name-resolution.md, phase 5)."""
+        Idempotent, and deliberately called **after a container attaches**: in privnet mode the
+        session's LOCAL block (and thus its gateway) is not allocated until the first attach, so the
+        gateway is unknown at ``ensure_session`` time. The attach also installs the ``:53 -> high
+        port`` redirect (``native_attacher``), so the resolver binds the **high port** unprivileged;
+        the container still points its ``/etc/resolv.conf`` at ``gateway:53``.
+
+        **Fail-loud on a bind failure** (not best-effort): phase 5 removed the ``/etc/hosts`` peer
+        map, so a resolver that does not start leaves cluster names unresolvable and the session
+        would hang at rendezvous with no visible cause. A genuinely absent session (no coordinator)
+        is still a silent no-op."""
         if session_id in self._dns_servers:
             return
         coordinator = self._coordinators.get(session_id)
         if coordinator is None:
-            return
+            return  # session not set up on this node; nothing to serve
         gateway = await self.local_gateway_of(session_id)
         if gateway is None:
-            log.debug("no LOCAL gateway yet for session {}; cluster DNS deferred", session_id)
-            return
+            # After an attach the LOCAL block exists, so a missing gateway is a real fault, not the
+            # pre-attach "not ready yet" state — cluster names would be unresolvable. Fail loudly.
+            raise ClusterDNSStartError(
+                f"no LOCAL gateway for session {session_id}; cannot start the cluster resolver"
+            )
         upstreams = resolve_container_dns(self._configured_dns).nameservers
         resolver = ClusterResolver(
             SessionClusterNames(coordinator, session_id), make_upstream_forwarder(upstreams)
         )
-        server = ClusterDNSServer(resolver, gateway)
+        server = ClusterDNSServer(resolver, gateway, port=CLUSTER_DNS_REDIRECT_PORT)
         try:
             await server.start()
         except OSError as e:
-            log.warning("could not start cluster DNS for {} on {}: {}", session_id, gateway, e)
-            return
+            raise ClusterDNSStartError(
+                f"could not bind the cluster resolver for session {session_id} on"
+                f" {gateway}:{CLUSTER_DNS_REDIRECT_PORT}: {e}"
+            ) from e
         # Another kernel of this session may have started the server across the awaits above; if so,
         # keep the first and drop this one so its socket does not leak.
         if session_id in self._dns_servers:
             await server.stop()
             return
         self._dns_servers[session_id] = server
-        log.info("cluster DNS for session {} started on {}", session_id, gateway)
+        log.info(
+            "cluster DNS for session {} listening on {}:{} (:53 redirected by native_attacher)",
+            session_id,
+            gateway,
+            CLUSTER_DNS_REDIRECT_PORT,
+        )
 
     async def _stop_cluster_dns(self, session_id: str) -> None:
         server = self._dns_servers.pop(session_id, None)

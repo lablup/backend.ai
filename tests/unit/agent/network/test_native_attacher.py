@@ -295,11 +295,10 @@ class TestNativeAttachStatic:
         # no mac in config -> the NIC keeps its kernel-assigned (random) address
         assert "link set baimulti0 address" not in flat
 
-    async def test_add_static_pins_mac_when_config_carries_one(
-        self, tmp_path: Path, monkeypatch: Any
-    ) -> None:
-        # Overlay endpoints carry a deterministic MAC (mac_for_ip); the NIC must own it,
-        # set while down (before `up`), so peers' pre-programmed FDB/ARP resolves to it.
+    async def test_add_pins_mac_from_runtime_config(self, tmp_path: Path, monkeypatch: Any) -> None:
+        # Overlay endpoints carry a deterministic MAC (mac_for_ip) via the standard ``mac``
+        # capability, delivered in runtimeConfig; the NIC must own it, set while down (before
+        # `up`), so peers' pre-programmed FDB/ARP resolves to it.
         rec = _RunRecorder(existing={"baimulti4097"})
         monkeypatch.setattr(na, "_run", rec)
         runner = NativeBridgeAttachRunner(ipam_state_dir=tmp_path)
@@ -308,7 +307,7 @@ class TestNativeAttachStatic:
             ifname="baimulti0",
             netns=_NETNS,
             container_id="cid",
-            config={**_STATIC_CFG, "mac": "02:42:0a:80:05:07"},
+            config={**_STATIC_CFG, "runtimeConfig": {"mac": "02:42:0a:80:05:07"}},
         )
         flat = rec.flat()
         set_mac = (
@@ -341,6 +340,12 @@ class TestNativeAttachLocal:
             "iptables -t nat -A POSTROUTING -s 172.30.1.0/24 ! -d 172.30.1.0/24 -j MASQUERADE"
             in flat
         )
+        # The cluster DNS redirect: container resolv.conf points at gateway:53, redirected to the
+        # agent's unprivileged resolver on the gateway high port (dockerd embedded-DNS parity).
+        assert (
+            f"iptables -t nat -A PREROUTING -d 172.30.1.1/32 -p udp --dport 53 "
+            f"-j DNAT --to-destination 172.30.1.1:{na.CLUSTER_DNS_REDIRECT_PORT}" in flat
+        )
         # LOCAL-bridge FORWARD isolation (Docker-parity): egress to the uplink + its established
         # return + intra-bridge (same session) are accepted; everything else destined to the bridge
         # -- notably another session's LOCAL bridge -- is dropped. A blanket -i/-o bridge ACCEPT
@@ -358,6 +363,25 @@ class TestNativeAttachLocal:
         assert "iptables -I FORWARD -o bailo4097 -j DROP" in flat  # cross-session / unsolicited
         # the old blanket accept that leaked across sessions must be gone
         assert "iptables -I FORWARD -i bailo4097 -j ACCEPT" not in flat
+
+    async def test_add_local_pins_ip_from_runtime_config_ips(
+        self, tmp_path: Path, monkeypatch: Any
+    ) -> None:
+        # Single-node cluster peers pin a deterministic address via the standard ``ips`` capability
+        # (runtimeConfig), keeping host-local's gateway + MASQ — replaces the old ipam.requested_ip.
+        rec = _RunRecorder(existing=set())
+        monkeypatch.setattr(na, "_run", rec)
+        runner = NativeBridgeAttachRunner(uplink="eth0", ipam_state_dir=tmp_path)
+        result = await runner(
+            "ADD",
+            ifname="eth0",
+            netns=_NETNS,
+            container_id="cid",
+            config={**_LOCAL_CFG, "runtimeConfig": {"ips": ["172.30.1.42/24"]}},
+        )
+        assert result == {"ips": [{"address": "172.30.1.42/24"}]}  # the pinned address, not .2
+        flat = rec.flat()
+        assert "nsenter --net=/proc/4242/ns/net -- ip addr add 172.30.1.42/24 dev eth0" in flat
 
     async def test_an_already_attached_container_is_a_noop(
         self, tmp_path: Path, monkeypatch: Any

@@ -14,6 +14,8 @@ import pytest
 
 import ai.backend.agent.containerd.session_network as session_network_mod
 from ai.backend.agent.containerd.session_network import ContainerdSessionNetwork
+from ai.backend.agent.errors.network import ClusterDNSStartError
+from ai.backend.agent.network.native_attacher import CLUSTER_DNS_REDIRECT_PORT
 
 
 def _network(subnet: str | None) -> ContainerdSessionNetwork:
@@ -76,13 +78,16 @@ def _with_coordinator(net: ContainerdSessionNetwork, session_id: str) -> None:
 
 
 class TestClusterDNSLifecycle:
-    async def test_start_binds_the_session_gateway(self) -> None:
+    async def test_start_binds_the_gateway_high_port(self) -> None:
         net = _network("10.128.5.0/26")
         _with_coordinator(net, "s1")
         await net.ensure_cluster_dns("s1")
         assert len(_FakeDNSServer.instances) == 1
         server = _FakeDNSServer.instances[0]
         assert server.bind_host == "10.128.5.1"
+        # Binds the UNPRIVILEGED high port; native_attacher redirects :53 -> this port.
+        assert server.port == CLUSTER_DNS_REDIRECT_PORT
+        assert server.port >= 1024
         assert server.started
 
     async def test_is_idempotent_across_repeated_attaches(self) -> None:
@@ -99,11 +104,13 @@ class TestClusterDNSLifecycle:
         await net.ensure_cluster_dns("s1")
         assert _FakeDNSServer.instances == []
 
-    async def test_deferred_without_a_gateway(self) -> None:
-        # Best-effort: gateway not allocated yet -> no server, no raise (a later attach retries).
+    async def test_missing_gateway_fails_loud(self) -> None:
+        # After an attach the gateway must exist; its absence means cluster names are unresolvable
+        # (phase 5 removed the /etc/hosts fallback), so fail the kernel rather than come up broken.
         net = _network(None)
         _with_coordinator(net, "s1")
-        await net.ensure_cluster_dns("s1")
+        with pytest.raises(ClusterDNSStartError):
+            await net.ensure_cluster_dns("s1")
         assert _FakeDNSServer.instances == []
 
     async def test_stop_stops_and_forgets_the_server(self) -> None:
@@ -116,12 +123,15 @@ class TestClusterDNSLifecycle:
         # A second stop is a no-op (already forgotten), not an error.
         await net._stop_cluster_dns("s1")
 
-    async def test_a_failed_bind_is_swallowed(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_a_failed_bind_fails_loud(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # A bind failure must fail the kernel, not be swallowed — else the session hangs at
+        # rendezvous with cluster names unresolvable and no visible cause.
         net = _network("10.128.5.0/26")
         _with_coordinator(net, "s1")
         failing = Mock()
         failing.start = AsyncMock(side_effect=OSError("address in use"))
         monkeypatch.setattr(session_network_mod, "ClusterDNSServer", lambda *a, **k: failing)
-        await net.ensure_cluster_dns("s1")  # must not raise
-        # The half-started server is not registered, so teardown won't try to stop it.
+        with pytest.raises(ClusterDNSStartError):
+            await net.ensure_cluster_dns("s1")
+        # The failed server is not registered, so teardown won't try to stop it.
         await net._stop_cluster_dns("s1")

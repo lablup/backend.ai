@@ -162,6 +162,27 @@ class PortForwardError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class ClusterDNSStartError(BackendAIError, web.HTTPInternalServerError):
+    """The per-session cluster DNS resolver could not be bound.
+
+    Peers resolve through this resolver — the static ``/etc/hosts`` peer map was removed in favour
+    of it (cluster-name-resolution.md, phase 5). So a resolver that fails to start leaves cluster
+    hostnames unresolvable, and the session would hang at rendezvous with no visible cause. Fail the
+    kernel loudly here instead of coming up silently broken.
+    """
+
+    error_type = "https://api.backend.ai/probs/agent/cluster-dns-start-error"
+    error_title = "Failed to start the session's cluster DNS resolver."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class NetworkStateStoreConflict(BackendAIError, web.HTTPInternalServerError):
     """A network state store on disk disagrees with its owner's in-memory state.
 

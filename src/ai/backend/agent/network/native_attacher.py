@@ -34,6 +34,14 @@ from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
+# The high port the agent's cluster DNS resolver binds on the LOCAL gateway. A container's
+# resolv.conf points at ``gateway:53``; this runner installs an iptables DNAT redirecting that to
+# ``gateway:<this port>``, so the resolver needs NO privileged-port capability (it binds a high
+# port) while only this runner — which already holds CAP_NET_ADMIN in the privnet or the privileged
+# agent — touches the :53 rule. This is exactly how dockerd's embedded DNS avoids binding :53
+# (127.0.0.11 on a high port + an iptables redirect). See cluster-name-resolution.md.
+CLUSTER_DNS_REDIRECT_PORT = 15353
+
 _DEFAULT_IPAM_STATE_DIR = Path("/var/lib/backend.ai/net-ipam")
 _NETNS_PID_RE = re.compile(r"/proc/(\d+)/ns/net")
 
@@ -49,6 +57,14 @@ async def _run(argv: Sequence[str], *, check: bool = True) -> tuple[int, bytes, 
             f"command failed (rc={rc}): {' '.join(argv)}: {err.decode(errors='replace').strip()}"
         )
     return rc, out, err
+
+
+def _first_cidr_addr(ips: Any) -> str | None:
+    """The bare address from a CNI ``ips`` capability arg (a list of CIDR strings). None when the
+    arg is absent/empty, so the host-local pool picks the address instead."""
+    if not ips:
+        return None
+    return str(ips[0]).split("/")[0]
 
 
 def _pid_from_netns(netns: str) -> str:
@@ -274,9 +290,18 @@ class NativeBridgeAttachRunner:
         raise ValueError(f"unsupported CNI command: {command}")
 
     async def _resolve_ip(
-        self, ifname: str, container_id: str, ipam: Mapping[str, Any]
+        self,
+        ifname: str,
+        container_id: str,
+        ipam: Mapping[str, Any],
+        *,
+        requested: str | None = None,
     ) -> tuple[str, str, str | None, str | None]:
-        """Return (ip, prefixlen, gateway, subnet); gateway/subnet are None for static IPAM."""
+        """Return (ip, prefixlen, gateway, subnet); gateway/subnet are None for static IPAM.
+
+        ``requested`` is the address pinned via the standard ``ips`` capability (runtimeConfig);
+        the host-local pool honours it, keeping its gateway + MASQ. It never applies to static
+        IPAM, whose address is fixed in ``addresses``."""
         if ipam.get("type") == "static":
             cidr = ipam["addresses"][0]["address"]
             ip, prefix = cidr.split("/")
@@ -285,7 +310,7 @@ class NativeBridgeAttachRunner:
         network = ipaddress.ip_network(subnet)
         gateway = str(next(iter(network.hosts())))  # first host == the bridge gateway
         ip = await self._ipam.allocate(
-            subnet, container_id, ifname, reserve=[gateway], requested=ipam.get("requested_ip")
+            subnet, container_id, ifname, reserve=[gateway], requested=requested
         )
         return ip, str(network.prefixlen), gateway, subnet
 
@@ -295,7 +320,12 @@ class NativeBridgeAttachRunner:
         bridge = str(config["bridge"])
         mtu = str(int(config.get("mtu") or 1500))
         ipam = config.get("ipam") or {}
-        ip, prefix, gateway, subnet = await self._resolve_ip(ifname, container_id, ipam)
+        # runtimeConfig carries the standard capability args the provisioner injected: ``ips``
+        # (pinned address) and ``mac`` (pinned NIC address). See CniInvocation.effective_config.
+        runtime_config = config.get("runtimeConfig") or {}
+        ip, prefix, gateway, subnet = await self._resolve_ip(
+            ifname, container_id, ipam, requested=_first_cidr_addr(runtime_config.get("ips"))
+        )
 
         gw_on_bridge = f"{gateway}/{prefix}" if config.get("isGateway") and gateway else None
         await self._ensure_bridge(bridge, mtu, gw_on_bridge)
@@ -320,10 +350,10 @@ class NativeBridgeAttachRunner:
                 await _run(["ip", "link", "set", host_veth, "up"])
                 ns = ["nsenter", "--net=" + netns, "--"]
                 await _run(ns + ["ip", "link", "set", tmp_veth, "name", ifname])
-                # Pin the NIC's MAC when the config specifies one (overlay endpoints): peers program
-                # FDB/ARP to this exact address, so the container NIC must own it or inbound unicast
-                # is dropped. Set while the link is down, before bringing it up.
-                if mac := config.get("mac"):
+                # Pin the NIC's MAC when the ``mac`` capability arg is present (overlay endpoints):
+                # peers program FDB/ARP to this exact address, so the container NIC must own it or
+                # inbound unicast is dropped. Set while the link is down, before bringing it up.
+                if mac := runtime_config.get("mac"):
                     await _run(ns + ["ip", "link", "set", ifname, "address", str(mac)])
                 await _run(ns + ["ip", "addr", "add", f"{ip}/{prefix}", "dev", ifname])
                 await _run(ns + ["ip", "link", "set", ifname, "up"])
@@ -347,6 +377,11 @@ class NativeBridgeAttachRunner:
         if config.get("ipMasq") and subnet:
             await self._ensure_masq(subnet)
             await self._ensure_forward_accept(bridge)
+            # The LOCAL gateway is where the session's cluster resolver is reached (resolv.conf
+            # nameserver). Install the :53 -> high-port redirect here — the one privileged step —
+            # so the resolver itself can bind unprivileged. Idempotent per session gateway.
+            if gateway:
+                await self._ensure_dns_redirect(gateway)
         return {"ips": [{"address": f"{ip}/{prefix}"}]}
 
     async def _is_wired(self, host_veth: str, netns: str, ifname: str) -> bool:
@@ -373,6 +408,8 @@ class NativeBridgeAttachRunner:
             if remaining == 0 and config.get("ipMasq"):
                 await self._del_masq(subnet)
                 await self._del_forward_accept(str(config["bridge"]))
+                gateway = str(next(iter(ipaddress.ip_network(subnet).hosts())))
+                await self._del_dns_redirect(gateway)
 
     async def _ensure_bridge(self, bridge: str, mtu: str, gw_cidr: str | None) -> None:
         rc, _, _ = await _run(["ip", "link", "show", bridge], check=False)
@@ -395,6 +432,28 @@ class NativeBridgeAttachRunner:
 
     async def _del_masq(self, subnet: str) -> None:
         await _run(["iptables", "-t", "nat", "-D", *self._masq_rule(subnet)], check=False)
+
+    def _dns_redirect_rule(self, gateway: str) -> list[str]:
+        # A container's resolv.conf points at gateway:53; its query arrives here (from the
+        # container netns via veth) at PREROUTING. Redirect it to the agent's unprivileged resolver
+        # on gateway:CLUSTER_DNS_REDIRECT_PORT. DNAT to the same address, new port — the redirect
+        # that lets the resolver skip the :53 privileged bind (dockerd embedded-DNS parity).
+        return [
+            "PREROUTING",
+            "-d", f"{gateway}/32",
+            "-p", "udp", "--dport", "53",
+            "-j", "DNAT",
+            "--to-destination", f"{gateway}:{CLUSTER_DNS_REDIRECT_PORT}",
+        ]  # fmt: skip
+
+    async def _ensure_dns_redirect(self, gateway: str) -> None:
+        rule = self._dns_redirect_rule(gateway)
+        rc, _, _ = await _run(["iptables", "-t", "nat", "-C", *rule], check=False)
+        if rc != 0:
+            await _run(["iptables", "-t", "nat", "-A", *rule], check=False)
+
+    async def _del_dns_redirect(self, gateway: str) -> None:
+        await _run(["iptables", "-t", "nat", "-D", *self._dns_redirect_rule(gateway)], check=False)
 
     async def _resolve_uplink(self) -> str:
         """The node's egress uplink. Taken from config when given (the privnet passes it), else
