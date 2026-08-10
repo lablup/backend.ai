@@ -458,9 +458,11 @@ class IdleCheckerDBSource:
                         spec=SessionIdleCheckJudgmentBatchUpdaterSpec(judgments),
                         conditions=[
                             SessionIdleCheckConditions.by_pairs(pairs),
-                            SessionIdleCheckConditions.by_status_not_equals(
-                                IdleCheckPhase.IDLE_EXPIRED
-                            ),
+                            SessionIdleCheckConditions.by_statuses((
+                                IdleCheckPhase.READY_TO_CHECK,
+                                IdleCheckPhase.ACTIVE,
+                                IdleCheckPhase.IDLE,
+                            )),
                         ],
                     )
                 )
