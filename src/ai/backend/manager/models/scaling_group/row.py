@@ -305,7 +305,6 @@ class ScalingGroupRow(CreatedAtMixin, Base):
 
     agents: Mapped[list[AgentRow]] = relationship(
         "AgentRow",
-        back_populates="scaling_group_row",
         foreign_keys="[AgentRow.scaling_group]",
     )
 

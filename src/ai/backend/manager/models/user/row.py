@@ -46,13 +46,8 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.domain import DomainRow
-    from ai.backend.manager.models.group import AssocGroupUserRow
-    from ai.backend.manager.models.kernel import KernelRow
     from ai.backend.manager.models.keypair import KeyPairRow
-    from ai.backend.manager.models.rbac_models import UserRoleRow
     from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
-    from ai.backend.manager.models.session import SessionRow
-    from ai.backend.manager.models.vfolder import VFolderRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -81,40 +76,10 @@ INACTIVE_USER_STATUSES = (
 
 
 # Defined for avoiding circular import
-def _get_session_row_join_condition() -> Any:
-    from ai.backend.manager.models.session import SessionRow
-
-    return UserRow.uuid == foreign(SessionRow.user_uuid)
-
-
-def _get_kernel_row_join_condition() -> Any:
-    from ai.backend.manager.models.kernel import KernelRow
-
-    return UserRow.uuid == foreign(KernelRow.user_uuid)
-
-
-def _get_vfolder_rows_join_condition() -> Any:
-    from ai.backend.manager.models.vfolder import VFolderRow
-
-    return UserRow.uuid == foreign(VFolderRow.user)
-
-
-def _get_role_assignments_join_condition() -> Any:
-    from ai.backend.manager.models.rbac_models import UserRoleRow
-
-    return UserRow.uuid == foreign(UserRoleRow.user_id)
-
-
 def _get_domain_join_condition() -> Any:
     from ai.backend.manager.models.domain import DomainRow
 
     return DomainRow.name == foreign(UserRow.domain_name)
-
-
-def _get_groups_join_condition() -> Any:
-    from ai.backend.manager.models.group import AssocGroupUserRow
-
-    return foreign(AssocGroupUserRow.user_id) == UserRow.uuid
 
 
 def _get_resource_policy_join_condition() -> Any:
@@ -228,23 +193,8 @@ class UserRow(LifecycleTimestampsMixin, Base):
     )
 
     # Relationships
-    sessions: Mapped[list[SessionRow]] = relationship(
-        "SessionRow",
-        back_populates="user",
-        primaryjoin=_get_session_row_join_condition,
-        foreign_keys="SessionRow.user_uuid",
-    )
-    kernels: Mapped[list[KernelRow]] = relationship(
-        "KernelRow",
-        back_populates="user_row",
-        primaryjoin=_get_kernel_row_join_condition,
-        foreign_keys="KernelRow.user_uuid",
-    )
     domain: Mapped[DomainRow | None] = relationship(
         "DomainRow", primaryjoin=_get_domain_join_condition
-    )
-    groups: Mapped[list[AssocGroupUserRow]] = relationship(
-        "AssocGroupUserRow", back_populates="user", primaryjoin=_get_groups_join_condition
     )
     resource_policy_row: Mapped[UserResourcePolicyRow] = relationship(
         "UserResourcePolicyRow",
@@ -261,17 +211,6 @@ class UserRow(LifecycleTimestampsMixin, Base):
         "KeyPairRow",
         primaryjoin=_get_main_keypair_join_condition,
         foreign_keys="UserRow.main_access_key",
-    )
-
-    vfolder_rows: Mapped[list[VFolderRow]] = relationship(
-        "VFolderRow",
-        back_populates="user_row",
-        primaryjoin=_get_vfolder_rows_join_condition,
-    )
-
-    role_assignments: Mapped[list[UserRoleRow]] = relationship(
-        "UserRoleRow",
-        primaryjoin=_get_role_assignments_join_condition,
     )
 
     @classmethod

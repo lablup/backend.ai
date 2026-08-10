@@ -377,19 +377,11 @@ class VFolderRow(LifecycleTimestampsMixin, Base):
     # Relationships
     user_row: Mapped[UserRow | None] = relationship(
         "UserRow",
-        back_populates="vfolder_rows",
         primaryjoin=_get_user_row_join_condition,
     )
     group_row: Mapped[GroupRow | None] = relationship(
         "GroupRow",
-        back_populates="vfolder_rows",
         primaryjoin=_get_group_row_join_condition,
-    )
-    permission_rows: Mapped[list[VFolderPermissionRow]] = relationship(
-        "VFolderPermissionRow", back_populates="vfolder_row"
-    )
-    invitation_rows: Mapped[list[VFolderInvitationRow]] = relationship(
-        "VFolderInvitationRow", back_populates="vfolder_row"
     )
 
     @classmethod
@@ -497,7 +489,7 @@ class VFolderInvitationRow(LifecycleTimestampsMixin, Base):
     )
 
     # Relationships
-    vfolder_row: Mapped[VFolderRow] = relationship("VFolderRow", back_populates="invitation_rows")
+    vfolder_row: Mapped[VFolderRow] = relationship("VFolderRow")
 
 
 # NOTE: Deprecated legacy table reference for backward compatibility.
@@ -523,9 +515,6 @@ class VFolderPermissionRow(Base):
     user: Mapped[uuid.UUID] = mapped_column(
         "user", GUID, sa.ForeignKey("users.uuid"), nullable=False
     )
-
-    # Relationships
-    vfolder_row: Mapped[VFolderRow] = relationship("VFolderRow", back_populates="permission_rows")
 
 
 # NOTE: Deprecated legacy table reference for backward compatibility.

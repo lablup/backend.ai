@@ -435,12 +435,11 @@ class KernelRow(CreatedAtMixin, Base):
         "ImageRow",
         foreign_keys="KernelRow.image_id",
     )
-    agent_row: Mapped[AgentRow | None] = relationship("AgentRow", back_populates="kernels")
-    group_row: Mapped[GroupRow] = relationship("GroupRow", back_populates="kernels")
+    agent_row: Mapped[AgentRow | None] = relationship("AgentRow")
+    group_row: Mapped[GroupRow] = relationship("GroupRow")
     user_row: Mapped[UserRow] = relationship(
         "UserRow",
         primaryjoin=_get_user_row_join_condition,
-        back_populates="kernels",
         foreign_keys="KernelRow.user_uuid",
     )
 

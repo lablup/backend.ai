@@ -70,7 +70,6 @@ class NetworkRow(LifecycleTimestampsMixin, Base):
 
     project_row: Mapped[GroupRow] = relationship(
         "GroupRow",
-        back_populates="networks",
         primaryjoin=_get_project_join_condition,
     )
     domain_row: Mapped[DomainRow] = relationship(
