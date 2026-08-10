@@ -17143,7 +17143,7 @@
             "type": "string"
           },
           "query_template": {
-            "description": "PromQL template with placeholders",
+            "description": "PromQL template with Jinja placeholders ({{ labels }}, {{ window }}, {{ group_by }})",
             "title": "Query Template",
             "type": "string"
           },
@@ -17481,7 +17481,7 @@
               }
             ],
             "default": null,
-            "description": "Updated PromQL template with placeholders",
+            "description": "Updated PromQL template with Jinja placeholders ({{ labels }}, {{ window }}, {{ group_by }})",
             "title": "Query Template"
           },
           "time_window": {
