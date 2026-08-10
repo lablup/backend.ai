@@ -404,6 +404,22 @@ class TestClusterNameResolution:
         assert coord.resolve_cluster_name("s1", "nope") is None
         assert coord.resolve_cluster_name("other", "sub1") is None  # session-scoped
 
+    async def test_reverse_lookup_resolves_ip_to_hostname(self) -> None:
+        # PTR: the ip -> hostname direction, over both etcd and static names, session-scoped.
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_member(_PEER2)
+        etcd.seed_endpoint(
+            "c-remote", "10.128.5.20", "02:42:0a:80:05:14", agent_id="a2", cluster_hostname="sub1"
+        )
+        coord = _coordinator(etcd, RecordingBackend())
+        coord.register_static_names("s1", {"main1": "172.30.0.2"})
+        await coord.reconcile_endpoints("s1")
+        assert coord.resolve_cluster_ip("s1", "10.128.5.20") == "sub1"  # etcd map
+        assert coord.resolve_cluster_ip("s1", "172.30.0.2") == "main1"  # static map
+        assert coord.resolve_cluster_ip("s1", "10.0.0.9") is None  # unknown
+        assert coord.resolve_cluster_ip("other", "10.128.5.20") is None  # session-scoped
+
     async def test_etcd_names_win_over_static(self) -> None:
         etcd = FakeEtcd()
         etcd.seed_member(_SELF)

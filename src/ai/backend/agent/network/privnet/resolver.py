@@ -24,6 +24,7 @@ import dns.asyncquery
 import dns.exception
 import dns.flags
 import dns.message
+import dns.name
 import dns.rcode
 import dns.rdataclass
 import dns.rdatatype
@@ -41,13 +42,29 @@ _DNS_PORT = 53
 
 
 class ClusterNameSource(Protocol):
-    """Resolves a bare cluster hostname (e.g. ``sub1``) to its IPv4 address, or ``None`` when the
-    name is not one this session owns. Implemented over the control-plane etcd view."""
+    """Resolves this session's cluster names both ways: a bare hostname (e.g. ``sub1``) to its IPv4
+    address, and — for PTR — an IPv4 address back to its hostname. Either returns ``None`` when the
+    name/address is not one this session owns. Implemented over the control-plane etcd view."""
 
     def resolve_name(self, hostname: str) -> str | None: ...
 
+    def resolve_ip(self, ip: str) -> str | None: ...
+
 
 Forwarder = Callable[[dns.message.Message], Awaitable[dns.message.Message]]
+
+
+def _ptr_qname_to_ipv4(name: dns.name.Name) -> str | None:
+    """``1.7.128.10.in-addr.arpa.`` → ``10.128.7.1``, or ``None`` if not a v4 reverse name. Some
+    collectives (OpenMPI) verify a peer by reverse-resolving the address they connected to."""
+    text = name.to_text(omit_final_dot=True).lower()
+    suffix = ".in-addr.arpa"
+    if not text.endswith(suffix):
+        return None
+    octets = text[: -len(suffix)].split(".")
+    if len(octets) != 4 or not all(o.isdigit() and 0 <= int(o) <= 255 for o in octets):
+        return None
+    return ".".join(reversed(octets))
 
 
 def make_upstream_forwarder(
@@ -104,6 +121,8 @@ class ClusterResolver:
         question = query.question[0]
         if question.rdclass != dns.rdataclass.IN:
             return await self._forward(query)
+        if question.rdtype == dns.rdatatype.PTR:
+            return self._resolve_ptr(query, question) or await self._forward(query)
         hostname = question.name.to_text(omit_final_dot=True).lower()
         ip = self._names.resolve_name(hostname)
         if ip is None:
@@ -112,6 +131,22 @@ class ClusterResolver:
         resp.flags |= dns.flags.AA
         if question.rdtype == dns.rdatatype.A:
             resp.answer.append(dns.rrset.from_text(question.name, self._ttl, "IN", "A", ip))
+        return resp
+
+    def _resolve_ptr(
+        self, query: dns.message.Message, question: dns.rrset.RRset
+    ) -> dns.message.Message | None:
+        """Answer a reverse (PTR) query for a cluster IP, or ``None`` to forward — the address is not
+        a v4 reverse name, or not one this session owns."""
+        ip = _ptr_qname_to_ipv4(question.name)
+        if ip is None:
+            return None
+        name = self._names.resolve_ip(ip)
+        if name is None:
+            return None
+        resp = dns.message.make_response(query)
+        resp.flags |= dns.flags.AA
+        resp.answer.append(dns.rrset.from_text(question.name, self._ttl, "IN", "PTR", f"{name}."))
         return resp
 
 

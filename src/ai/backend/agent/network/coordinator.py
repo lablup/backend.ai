@@ -289,6 +289,16 @@ class SessionNetworkCoordinator:
             return ip
         return (self._static_names.get(session_id) or {}).get(key)
 
+    def resolve_cluster_ip(self, session_id: str, ip: str) -> str | None:
+        """The reverse of ``resolve_cluster_name``: the cluster hostname assigned to ``ip`` in this
+        session, or ``None``. Answers PTR queries. The etcd-backed map wins over static names, as in
+        the forward direction. Linear over a session's few peers — no reverse index to keep in sync."""
+        for table in (self._names.get(session_id) or {}, self._static_names.get(session_id) or {}):
+            for hostname, host_ip in table.items():
+                if host_ip == ip:
+                    return hostname
+        return None
+
     def register_static_names(self, session_id: str, names: Mapping[str, str]) -> None:
         """Register agent-computed ``hostname -> ip`` names for a session (single-node
         ``cluster_host_ips``), so the resolver can answer them even though nothing is written to
@@ -382,3 +392,6 @@ class SessionClusterNames:
 
     def resolve_name(self, hostname: str) -> str | None:
         return self._coordinator.resolve_cluster_name(self._session_id, hostname)
+
+    def resolve_ip(self, ip: str) -> str | None:
+        return self._coordinator.resolve_cluster_ip(self._session_id, ip)

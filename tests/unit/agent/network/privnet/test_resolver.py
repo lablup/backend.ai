@@ -29,9 +29,13 @@ from ai.backend.agent.network.privnet.resolver import (
 class _FakeNames:
     def __init__(self, mapping: Mapping[str, str]) -> None:
         self._mapping = dict(mapping)
+        self._reverse = {ip: host for host, ip in mapping.items()}
 
     def resolve_name(self, hostname: str) -> str | None:
         return self._mapping.get(hostname)
+
+    def resolve_ip(self, ip: str) -> str | None:
+        return self._reverse.get(ip)
 
 
 def _forwarded_marker() -> Forwarder:
@@ -94,6 +98,29 @@ class TestClusterResolve:
             dns.rrset.RRset(dns.name.from_text("main1."), dns.rdataclass.IN, dns.rdatatype.A)
         )
         resp = await resolver.resolve(query)
+        assert resp.rcode() == dns.rcode.REFUSED
+
+
+class TestReversePtr:
+    async def test_a_cluster_ip_gets_an_authoritative_ptr(self) -> None:
+        resolver = _resolver({"sub1": "10.128.7.1"})
+        # 10.128.7.1 reversed -> 1.7.128.10.in-addr.arpa
+        resp = await resolver.resolve(dns.message.make_query("1.7.128.10.in-addr.arpa.", "PTR"))
+        assert resp.rcode() == dns.rcode.NOERROR
+        assert resp.flags & dns.flags.AA
+        assert len(resp.answer) == 1
+        rrset = resp.answer[0]
+        assert rrset.rdtype == dns.rdatatype.PTR
+        assert str(rrset[0]) == "sub1."
+
+    async def test_an_unknown_ip_ptr_is_forwarded(self) -> None:
+        resolver = _resolver({"sub1": "10.128.7.1"})
+        resp = await resolver.resolve(dns.message.make_query("9.9.9.9.in-addr.arpa.", "PTR"))
+        assert resp.rcode() == dns.rcode.REFUSED  # not a cluster IP -> forwarded upstream
+
+    async def test_a_non_reverse_ptr_is_forwarded(self) -> None:
+        resolver = _resolver({"sub1": "10.128.7.1"})
+        resp = await resolver.resolve(dns.message.make_query("example.com.", "PTR"))
         assert resp.rcode() == dns.rcode.REFUSED
 
 
