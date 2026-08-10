@@ -3,8 +3,7 @@ from __future__ import annotations
 import ctypes
 import platform
 from abc import ABCMeta, abstractmethod
-from collections.abc import MutableMapping
-from typing import Any, NamedTuple
+from typing import Any, ClassVar, NamedTuple
 
 # ref: https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__DEVICE.html
 CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT = 16
@@ -42,7 +41,10 @@ def _load_library(name: str) -> ctypes.CDLL | None:
 class LibraryBase(metaclass=ABCMeta):
     name = "LIBRARY"
 
-    _lib = None
+    # The class-level caches below (_lib here; _initialized/_version/_init_error
+    # in subclasses) are mutated without locking. This is safe because all
+    # callers run on the agent's single event-loop thread.
+    _lib: ClassVar[ctypes.CDLL | None] = None
 
     @classmethod
     @abstractmethod
@@ -57,11 +59,13 @@ class LibraryBase(metaclass=ABCMeta):
             raise ImportError(f"Could not load the {cls.name} library!")
 
     @classmethod
+    def has_symbol(cls, name: str) -> bool:
+        cls._ensure_lib()
+        return hasattr(cls._lib, name)
+
+    @classmethod
     def invoke(cls, func_name: str, *args: Any, check_rc: bool = True) -> int:
-        try:
-            cls._ensure_lib()
-        except ImportError:
-            raise
+        cls._ensure_lib()
         func = getattr(cls._lib, func_name)
         rc = func(*args)
         if check_rc and rc != 0:
@@ -69,11 +73,21 @@ class LibraryBase(metaclass=ABCMeta):
         return rc
 
 
+class CudaDeviceProps(NamedTuple):
+    name: str
+    uuid: bytes | None
+    total_global_mem: int
+    multiprocessor_count: int
+    pci_bus_id: str
+
+
 class libcuda(LibraryBase):
     name = "CUDA"
 
-    _initialized = False
-    _version = (0, 0)
+    # Single-threaded caches; see the note on LibraryBase.
+    _initialized: ClassVar[bool] = False
+    _version: ClassVar[tuple[int, int]] = (0, 0)
+    _init_error: ClassVar[LibraryError | None] = None
 
     @classmethod
     def load_library(cls) -> ctypes.CDLL | None:
@@ -84,15 +98,24 @@ class libcuda(LibraryBase):
             case "Darwin":
                 return _load_library("libcuda.dylib")
             case _:
-                lib = _load_library("libcuda.so.1")
-                if lib is None:
-                    lib = _load_library("libcuda.so")
-                return lib
+                # Load only the driver SONAME (libcuda.so.1). The bare
+                # libcuda.so symlink is provided by the CUDA toolkit's
+                # link-time stub library, which would load successfully but
+                # then fail cuInit with confusing errors.
+                return _load_library("libcuda.so.1")
 
     @classmethod
     def ensure_init(cls) -> None:
+        # A failed cuInit is sticky: retrying against a broken driver is
+        # pointless and slow, so we cache the error and re-raise it as-is.
+        if cls._init_error is not None:
+            raise cls._init_error
         if not cls._initialized:
-            cls.invoke("cuInit", 0)
+            try:
+                cls.invoke("cuInit", 0)
+            except LibraryError as e:
+                cls._init_error = e
+                raise
             cls._initialized = True
 
     @classmethod
@@ -100,7 +123,9 @@ class libcuda(LibraryBase):
         # This reports the maximum CUDA version supported by the installed
         # driver, not the version of a CUDA toolkit (there is none, since we
         # no longer link against the CUDA runtime library).
-        cls.ensure_init()
+        # cuDriverGetVersion is documented to be callable before cuInit, so we
+        # deliberately skip ensure_init() to keep version reporting working on
+        # GPU-less hosts where cuInit would fail.
         if cls._version == (0, 0):
             raw_ver = ctypes.c_int()
             cls.invoke("cuDriverGetVersion", ctypes.byref(raw_ver))
@@ -115,39 +140,35 @@ class libcuda(LibraryBase):
         return count.value
 
     @classmethod
-    def get_device_props(cls, device_idx: int) -> MutableMapping[str, Any]:
+    def get_device_props(cls, device_idx: int) -> CudaDeviceProps:
         cls.ensure_init()
         device = ctypes.c_int()
         cls.invoke("cuDeviceGet", ctypes.byref(device), device_idx)
 
-        props: MutableMapping[str, Any] = {}
-
         name_buf = (ctypes.c_char * 256)()
         cls.invoke("cuDeviceGetName", ctypes.byref(name_buf), 256, device.value)
-        props["name"] = name_buf.value.decode()
+        name = name_buf.value.decode()
 
-        # cuDeviceGetUuid_v2 was added in CUDA 11.4; drivers older than that
-        # only expose the legacy cuDeviceGetUuid. Both symbols may be absent
-        # on ancient drivers, in which case we simply omit the key (plugin.py
-        # falls back to an all-zero UUID).
+        # cuDeviceGetUuid_v2 (added in CUDA 11.4) returns the MIG-instance
+        # UUID when the device is a MIG instance, while the legacy
+        # cuDeviceGetUuid returns the parent GPU's UUID. We deterministically
+        # prefer _v2 and fall back to the legacy symbol only on drivers that
+        # lack it. Both symbols may be absent on ancient drivers, in which
+        # case uuid is None (plugin.py falls back to an all-zero UUID).
+        device_uuid: bytes | None = None
         uuid_buf = (ctypes.c_byte * 16)()
-        try:
+        if cls.has_symbol("cuDeviceGetUuid_v2"):
             cls.invoke("cuDeviceGetUuid_v2", ctypes.byref(uuid_buf), device.value)
-            props["uuid"] = bytes(uuid_buf)
-        except AttributeError:
-            try:
-                cls.invoke("cuDeviceGetUuid", ctypes.byref(uuid_buf), device.value)
-                props["uuid"] = bytes(uuid_buf)
-            except AttributeError:
-                pass
+            device_uuid = bytes(uuid_buf)
+        elif cls.has_symbol("cuDeviceGetUuid"):
+            cls.invoke("cuDeviceGetUuid", ctypes.byref(uuid_buf), device.value)
+            device_uuid = bytes(uuid_buf)
 
-        # cuDeviceTotalMem_v2 supersedes the legacy cuDeviceTotalMem.
+        # cuDeviceTotalMem_v2 exists in every supported driver (CUDA >= 3.2);
+        # the legacy cuDeviceTotalMem uses the old 32-bit ABI and would
+        # truncate sizes above 4 GiB, so we never fall back to it.
         total_mem = ctypes.c_size_t()
-        try:
-            cls.invoke("cuDeviceTotalMem_v2", ctypes.byref(total_mem), device.value)
-        except AttributeError:
-            cls.invoke("cuDeviceTotalMem", ctypes.byref(total_mem), device.value)
-        props["totalGlobalMem"] = total_mem.value
+        cls.invoke("cuDeviceTotalMem_v2", ctypes.byref(total_mem), device.value)
 
         mp_count = ctypes.c_int()
         cls.invoke(
@@ -156,13 +177,17 @@ class libcuda(LibraryBase):
             CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT,
             device.value,
         )
-        props["multiProcessorCount"] = mp_count.value
 
         pci_bus_id = (ctypes.c_char * 16)()
         cls.invoke("cuDeviceGetPCIBusId", ctypes.byref(pci_bus_id), 16, device.value)
-        props["pciBusID_str"] = pci_bus_id.value.decode()
 
-        return props
+        return CudaDeviceProps(
+            name=name,
+            uuid=device_uuid,
+            total_global_mem=total_mem.value,
+            multiprocessor_count=mp_count.value,
+            pci_bus_id=pci_bus_id.value.decode(),
+        )
 
 
 class nvmlMemoryInfo_t(ctypes.Structure):
@@ -203,7 +228,8 @@ class DeviceStat(NamedTuple):
 class libnvml(LibraryBase):
     name = "NVML"
 
-    _initialized = False
+    # Single-threaded cache; see the note on LibraryBase.
+    _initialized: ClassVar[bool] = False
 
     @classmethod
     def load_library(cls) -> ctypes.CDLL | None:
@@ -216,7 +242,6 @@ class libnvml(LibraryBase):
         if lib is None:
             lib = _load_library("libnvidia-ml.so.1")
         return lib
-        return None
 
     @classmethod
     def ensure_init(cls) -> None:

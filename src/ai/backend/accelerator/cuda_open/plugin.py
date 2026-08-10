@@ -157,26 +157,25 @@ class CUDAPlugin(AbstractComputePlugin):
         num_devices = libcuda.get_device_count()
         for dev_id in map(lambda idx: DeviceId(str(idx)), range(num_devices)):
             raw_info = libcuda.get_device_props(int(dev_id))
-            sysfs_node_path = f"/sys/bus/pci/devices/{raw_info['pciBusID_str'].lower()}/numa_node"
+            sysfs_node_path = f"/sys/bus/pci/devices/{raw_info.pci_bus_id.lower()}/numa_node"
             node: int | None
             try:
                 node = int(Path(sysfs_node_path).read_text().strip())
             except OSError:
                 node = None
-            dev_uuid, raw_dev_uuid = None, raw_info.get("uuid", None)
-            if raw_dev_uuid is not None:
-                dev_uuid = str(uuid.UUID(bytes=raw_dev_uuid))
+            if raw_info.uuid is not None:
+                dev_uuid = str(uuid.UUID(bytes=raw_info.uuid))
             else:
                 dev_uuid = "00000000-0000-0000-0000-000000000000"
             if dev_uuid in self.device_mask:
                 continue
             dev_info = CUDADevice(
                 device_id=DeviceId(dev_id),
-                hw_location=raw_info["pciBusID_str"],
+                hw_location=raw_info.pci_bus_id,
                 numa_node=node,
-                memory_size=raw_info["totalGlobalMem"],
-                processing_units=raw_info["multiProcessorCount"],
-                model_name=raw_info["name"],
+                memory_size=raw_info.total_global_mem,
+                processing_units=raw_info.multiprocessor_count,
+                model_name=raw_info.name,
                 uuid=dev_uuid,
             )
             all_devices.append(dev_info)
