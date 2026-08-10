@@ -108,7 +108,7 @@ from ai.backend.manager.repositories.ops.rbac.provider import (
     ScopeCreation,
     ScopeDeletion,
     ScopeEntityMember,
-    ScopeMember,
+    ScopeUserMember,
 )
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.role_manager import (
@@ -117,23 +117,6 @@ from ai.backend.manager.repositories.permission_controller.role_manager import (
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-@dataclass
-class ProjectUserMember(ScopeMember):
-    """A user joining or leaving a project scope; ``manage_roles`` controls whether the
-    membership change also grants/revokes the user's roles at the project scope."""
-
-    user_id: UserID
-    manage_roles: bool = True
-
-    @override
-    def entity_ref(self) -> EntityRef:
-        return EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=self.user_id)
-
-    @override
-    def assign_role_on(self) -> UserID | None:
-        return self.user_id if self.manage_roles else None
 
 
 @dataclass
@@ -278,7 +261,7 @@ class GroupDBSource:
         await w.add_bulk_members(
             EntityMembersAddition(
                 scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
-                members=[ProjectUserMember(user_id=UserID(row.uuid)) for row in new_user_rows],
+                members=[ScopeUserMember(user_id=UserID(row.uuid)) for row in new_user_rows],
             )
         )
 
@@ -633,7 +616,8 @@ class GroupDBSource:
         Validates that the role exists, filters to users in the project's domain
         that are not already assigned, writes each new member's virtual-scope
         membership and scope association, and creates user-role mappings for the
-        specified role.
+        specified role. Membership grants the project's ``auto_assign`` roles on
+        top of that role.
 
         Returns the list of newly assigned users.
         """
@@ -653,10 +637,7 @@ class GroupDBSource:
             await w.add_bulk_members(
                 EntityMembersAddition(
                     scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
-                    members=[
-                        ProjectUserMember(user_id=UserID(row.uuid), manage_roles=False)
-                        for row in new_user_rows
-                    ],
+                    members=[ScopeUserMember(user_id=UserID(row.uuid)) for row in new_user_rows],
                 )
             )
             user_role_specs = [
@@ -731,7 +712,7 @@ class GroupDBSource:
             await w.add_bulk_members(
                 EntityMembersAddition(
                     scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
-                    members=[ProjectUserMember(user_id=user_id, manage_roles=False)],
+                    members=[ScopeUserMember(user_id=user_id)],
                 )
             )
 
