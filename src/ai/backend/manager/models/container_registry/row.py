@@ -34,7 +34,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.association_container_registries_groups import (
         AssociationContainerRegistriesGroupsRow,
     )
-    from ai.backend.manager.models.image import ImageRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -99,12 +98,6 @@ class ContainerRegistryValidator:
                 pass
 
 
-def _get_image_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.image import ImageRow
-
-    return ContainerRegistryRow.id == foreign(ImageRow.registry_id)
-
-
 def _get_association_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.association_container_registries_groups import (
         AssociationContainerRegistriesGroupsRow,
@@ -146,17 +139,10 @@ class ContainerRegistryRow(Base):
         "extra", sa.JSON, nullable=True, default=None
     )
 
-    image_rows: Mapped[list[ImageRow]] = relationship(
-        "ImageRow",
-        back_populates="registry_row",
-        primaryjoin=_get_image_join_condition,
-    )
-
     association_container_registries_groups_rows: Mapped[
         list[AssociationContainerRegistriesGroupsRow]
     ] = relationship(
         "AssociationContainerRegistriesGroupsRow",
-        back_populates="container_registry_row",
         primaryjoin=_get_association_join_condition,
     )
 

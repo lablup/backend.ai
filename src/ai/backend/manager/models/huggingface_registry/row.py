@@ -16,18 +16,11 @@ from ai.backend.manager.models.base import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.artifact import ArtifactRow
     from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = ("HuggingFaceRegistryRow",)
-
-
-def _get_registry_artifact_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.artifact import ArtifactRow
-
-    return HuggingFaceRegistryRow.id == foreign(ArtifactRow.registry_id)
 
 
 def _get_registry_meta_join_condition() -> sa.ColumnElement[bool]:
@@ -45,12 +38,6 @@ class HuggingFaceRegistryRow(Base):
     url: Mapped[str] = mapped_column("url", sa.String, nullable=False)
     token: Mapped[str | None] = mapped_column("token", sa.String, nullable=True, default=None)
 
-    artifacts: Mapped[list[ArtifactRow]] = relationship(
-        "ArtifactRow",
-        back_populates="huggingface_registry",
-        primaryjoin=_get_registry_artifact_join_condition,
-        viewonly=True,
-    )
     meta: Mapped[ArtifactRegistryRow | None] = relationship(
         "ArtifactRegistryRow",
         back_populates="huggingface_registries",

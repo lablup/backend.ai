@@ -84,21 +84,18 @@ class ArtifactRow(Base):
 
     huggingface_registry: Mapped[HuggingFaceRegistryRow] = relationship(
         "HuggingFaceRegistryRow",
-        back_populates="artifacts",
         primaryjoin=lambda: foreign(ArtifactRow.registry_id) == HuggingFaceRegistryRow.id,
-        overlaps="reservoir_registry,artifacts",
+        overlaps="reservoir_registry",
     )
 
     reservoir_registry: Mapped[ReservoirRegistryRow] = relationship(
         "ReservoirRegistryRow",
-        back_populates="artifacts",
         primaryjoin=lambda: foreign(ArtifactRow.registry_id) == ReservoirRegistryRow.id,
-        overlaps="huggingface_registry,artifacts",
+        overlaps="huggingface_registry",
     )
 
     revision_rows: Mapped[list[ArtifactRevisionRow]] = relationship(
         "ArtifactRevisionRow",
-        back_populates="artifact",
         primaryjoin=_get_artifact_revision_join_cond,
     )
 

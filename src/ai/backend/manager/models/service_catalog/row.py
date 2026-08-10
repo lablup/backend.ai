@@ -72,7 +72,6 @@ class ServiceCatalogRow(Base):
 
     endpoints: Mapped[list[ServiceCatalogEndpointRow]] = relationship(
         "ServiceCatalogEndpointRow",
-        back_populates="service",
         cascade="all, delete-orphan",
     )
 
@@ -111,11 +110,6 @@ class ServiceCatalogEndpointRow(Base):
     protocol: Mapped[str] = mapped_column("protocol", sa.String(length=16), nullable=False)
     metadata_: Mapped[dict[str, Any]] = mapped_column(
         "metadata", JSONB, nullable=True, server_default=sa.text("'{}'::jsonb")
-    )
-
-    service: Mapped[ServiceCatalogRow] = relationship(
-        "ServiceCatalogRow",
-        back_populates="endpoints",
     )
 
     __table_args__ = (

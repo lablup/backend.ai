@@ -31,13 +31,6 @@ from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 if TYPE_CHECKING:
     from .permission.object_permission import ObjectPermissionRow
-    from .user_role import UserRoleRow
-
-
-def _get_mapped_user_role_rows_join_condition() -> sa.ColumnElement[bool]:
-    from .user_role import UserRoleRow
-
-    return RoleRow.id == foreign(UserRoleRow.role_id)
 
 
 def _get_object_permission_rows_join_condition() -> sa.ColumnElement[bool]:
@@ -80,14 +73,8 @@ class RoleRow(LifecycleTimestampsMixin, Base):
         "deleted_at", sa.DateTime(timezone=True), nullable=True
     )
 
-    mapped_user_role_rows: Mapped[list[UserRoleRow]] = relationship(
-        "UserRoleRow",
-        back_populates="role_row",
-        primaryjoin=_get_mapped_user_role_rows_join_condition,
-    )
     object_permission_rows: Mapped[list[ObjectPermissionRow]] = relationship(
         "ObjectPermissionRow",
-        back_populates="role_row",
         primaryjoin=_get_object_permission_rows_join_condition,
         viewonly=True,
     )

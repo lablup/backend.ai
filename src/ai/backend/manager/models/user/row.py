@@ -248,7 +248,6 @@ class UserRow(LifecycleTimestampsMixin, Base):
     )
     resource_policy_row: Mapped[UserResourcePolicyRow] = relationship(
         "UserResourcePolicyRow",
-        back_populates="users",
         primaryjoin=_get_resource_policy_join_condition,
     )
     keypairs: Mapped[list[KeyPairRow]] = relationship(
@@ -272,7 +271,6 @@ class UserRow(LifecycleTimestampsMixin, Base):
 
     role_assignments: Mapped[list[UserRoleRow]] = relationship(
         "UserRoleRow",
-        back_populates="user_row",
         primaryjoin=_get_role_assignments_join_condition,
     )
 

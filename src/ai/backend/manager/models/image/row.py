@@ -224,7 +224,6 @@ class ImageRow(CreatedAtMixin, Base):
     # sessions = relationship("SessionRow", back_populates="image_row")
     registry_row = relationship(
         "ContainerRegistryRow",
-        back_populates="image_rows",
         primaryjoin=_get_container_registry_join_condition,
     )
 

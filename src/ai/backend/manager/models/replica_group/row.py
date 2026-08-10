@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
@@ -23,38 +22,9 @@ from ai.backend.manager.views.replica_group import (
     ReplicaGroupScalingSchedulingView,
 )
 
-if TYPE_CHECKING:
-    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-    from ai.backend.manager.models.endpoint import EndpointRow
-    from ai.backend.manager.models.routing import RoutingRow
-
 __all__ = ("ReplicaGroupRow",)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-def _get_deployment_join_condition() -> sa.sql.elements.ColumnElement[Any]:
-    from ai.backend.manager.models.endpoint import EndpointRow
-
-    return foreign(ReplicaGroupRow.deployment_id) == EndpointRow.id
-
-
-def _get_replicas_join_condition() -> sa.sql.elements.ColumnElement[Any]:
-    from ai.backend.manager.models.routing import RoutingRow
-
-    return ReplicaGroupRow.id == foreign(RoutingRow.replica_group_id)
-
-
-def _get_current_revision_join_condition() -> sa.sql.elements.ColumnElement[Any]:
-    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-
-    return foreign(ReplicaGroupRow.current_revision_id) == DeploymentRevisionRow.id
-
-
-def _get_target_revision_join_condition() -> sa.sql.elements.ColumnElement[Any]:
-    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-
-    return foreign(ReplicaGroupRow.target_revision_id) == DeploymentRevisionRow.id
 
 
 class ReplicaGroupRow(LifecycleTimestampsMixin, Base):
@@ -153,29 +123,6 @@ class ReplicaGroupRow(LifecycleTimestampsMixin, Base):
         "rollout",
         PydanticColumn(ReplicaGroupRolloutSpec),
         nullable=False,
-    )
-
-    endpoint_row: Mapped[EndpointRow] = relationship(
-        "EndpointRow",
-        primaryjoin=_get_deployment_join_condition,
-        viewonly=True,
-    )
-    replicas: Mapped[list[RoutingRow]] = relationship(
-        "RoutingRow",
-        primaryjoin=_get_replicas_join_condition,
-        viewonly=True,
-    )
-    current_revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
-        "DeploymentRevisionRow",
-        primaryjoin=_get_current_revision_join_condition,
-        viewonly=True,
-        uselist=False,
-    )
-    target_revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
-        "DeploymentRevisionRow",
-        primaryjoin=_get_target_revision_join_condition,
-        viewonly=True,
-        uselist=False,
     )
 
     def to_deploy_scheduling_view(self) -> ReplicaGroupDeploySchedulingView:
