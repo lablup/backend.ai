@@ -27,7 +27,7 @@ from ai.backend.manager.views.sokovan.allocation import (
 )
 from ai.backend.manager.views.sokovan.resource_group import ResourceGroupMeta
 from ai.backend.manager.views.sokovan.scheduling import SchedulingData
-from ai.backend.manager.views.sokovan.snapshot import SystemSnapshot, UserVictimCandidates
+from ai.backend.manager.views.sokovan.snapshot import ScopeVictimCandidates, SystemSnapshot
 from ai.backend.manager.views.sokovan.workload import SessionWorkload
 
 from .selectors.selector import (
@@ -336,11 +336,11 @@ class SessionProvisioner:
         state: SchedulingState,
         session_workload: SessionWorkload,
         claimed_victim_ids: set[SessionId],
-    ) -> UserVictimCandidates | None:
+    ) -> ScopeVictimCandidates | None:
         """The owner's victim candidates still unclaimed by this pass's
         earlier preemption plans (None when nothing is reclaimable)."""
-        owner_candidates = state.snapshot.resource_group.preemption_candidates.by_user.get(
-            session_workload.meta.owner.user_uuid
+        owner_candidates = state.snapshot.resource_group.preemption_candidates.candidates_for(
+            session_workload.meta
         )
         if owner_candidates is None:
             return None
@@ -351,7 +351,7 @@ class SessionProvisioner:
         ]
         if not remaining:
             return None
-        return UserVictimCandidates(candidates=remaining)
+        return ScopeVictimCandidates(candidates=remaining)
 
     @staticmethod
     def _build_session_allocation(
