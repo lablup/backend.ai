@@ -150,10 +150,13 @@ class _ResolverProtocol(asyncio.DatagramProtocol):
 
 
 class ClusterDNSServer:
-    """A per-node cluster DNS listener bound to a gateway address the privnet owns.
+    """A per-node cluster DNS listener.
 
-    ``start`` binds UDP ``bind_host:port``; ``stop`` closes it. TCP is intentionally omitted — an
-    ``A`` answer for one hostname fits a UDP datagram; large-response TCP fallback is future work.
+    ``start`` binds UDP ``bind_host:port`` and, when ``port`` is 0, reports the OS-assigned port via
+    ``port`` — the resolver binds ``127.0.0.1:0`` (an ephemeral, guaranteed-free port that can never
+    collide), and the privileged layer redirects ``gateway:53`` to it. ``stop`` closes it. TCP is
+    intentionally omitted — an ``A`` answer for one hostname fits a UDP datagram; large-response TCP
+    fallback is future work.
     """
 
     _resolver: ClusterResolver
@@ -167,6 +170,11 @@ class ClusterDNSServer:
         self._port = port
         self._transport = None
 
+    @property
+    def port(self) -> int:
+        """The bound port — the OS-assigned one after ``start`` when constructed with ``port=0``."""
+        return self._port
+
     async def start(self) -> None:
         loop = asyncio.get_running_loop()
         transport, _ = await loop.create_datagram_endpoint(
@@ -174,6 +182,9 @@ class ClusterDNSServer:
             local_addr=(self._bind_host, self._port),
         )
         self._transport = transport
+        # Read back the actual port: with port=0 the OS picked a free one, which the caller needs to
+        # program the :53 redirect at.
+        self._port = transport.get_extra_info("sockname")[1]
         log.info("cluster DNS resolver listening on {}:{}", self._bind_host, self._port)
 
     async def stop(self) -> None:

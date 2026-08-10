@@ -41,7 +41,12 @@ from ai.backend.agent.containerd.oci import SESSION_ID_LABEL
 from ai.backend.agent.errors.network import UnusableVtep
 from ai.backend.agent.network.cni import CniAttacher, plan_to_invocations
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator, get_local_subnet_allocator
-from ai.backend.agent.network.native_attacher import HostLocalIpam, get_host_local_ipam
+from ai.backend.agent.network.native_attacher import (
+    HostLocalIpam,
+    get_host_local_ipam,
+    redirect_session_dns,
+    remove_dns_redirect,
+)
 from ai.backend.agent.network.port_forward import PortForwarder, forwards_for
 from ai.backend.agent.network.privnet import netns as netns_mod
 from ai.backend.agent.network.privnet import policy
@@ -488,6 +493,12 @@ class PrivNetServer:
                         return PrivNetResponse(ok=True, forwards=await self._list_ports())
                     case PrivNetOp.LOCAL_SUBNET:
                         return PrivNetResponse(ok=True, subnet=await self._local_subnet(session_id))
+                    case PrivNetOp.SETUP_DNS_REDIRECT:
+                        await self._setup_dns_redirect(session_id, req.dns_port)
+                        return PrivNetResponse(ok=True)
+                    case PrivNetOp.TEARDOWN_DNS_REDIRECT:
+                        await remove_dns_redirect(session_id)
+                        return PrivNetResponse(ok=True)
             except (policy.PolicyViolation, netns_mod.NetnsError, PrivNetError) as e:
                 return PrivNetResponse(ok=False, error=str(e))
             except Exception:
@@ -643,6 +654,18 @@ class PrivNetServer:
         stray kernel could then strand.
         """
         return await self._local_subnets.subnet_of(session_id)
+
+    async def _setup_dns_redirect(self, session_id: str, dns_port: int | None) -> None:
+        """Redirect this session's gateway ``:53`` to the agent's resolver on ``127.0.0.1:dns_port``.
+
+        The agent supplies only the loopback port it bound; the privnet derives the gateway from the
+        session's own LOCAL block (never trusting the agent for it), so a compromised agent can point
+        :53 at its own loopback port and nothing else. No block yet ⇒ nothing to redirect."""
+        port = policy.validate_dns_port(dns_port)
+        subnet = await self._local_subnets.subnet_of(session_id)
+        if subnet is None:
+            return
+        await redirect_session_dns(subnet, port, session_id)
 
     async def _detach(self, session_id: str, container_id: str | None) -> None:
         if container_id is None:

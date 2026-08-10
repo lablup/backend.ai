@@ -197,6 +197,23 @@ class PrivNetBackendProxy(AbstractNetworkAgentPluginV2["AbstractKernel"]):
         )
 
     @override
+    async def setup_dns_redirect(self, session_id: str, loopback_port: int) -> None:
+        # The agent bound the resolver on 127.0.0.1:<loopback_port> and hands only that port down;
+        # the privnet derives the gateway from the session it owns and installs the :53 DNAT — a
+        # compromised agent can point :53 at its own loopback port, nothing else.
+        await self._client.call(
+            PrivNetRequest(
+                op=PrivNetOp.SETUP_DNS_REDIRECT, session_id=session_id, dns_port=loopback_port
+            )
+        )
+
+    @override
+    async def teardown_dns_redirect(self, session_id: str) -> None:
+        await self._client.call(
+            PrivNetRequest(op=PrivNetOp.TEARDOWN_DNS_REDIRECT, session_id=session_id)
+        )
+
+    @override
     async def attach_endpoint(
         self,
         kernel_config: KernelCreationConfig,

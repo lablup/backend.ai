@@ -2,7 +2,7 @@
 
 import asyncio
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 import pytest
 
@@ -340,12 +340,9 @@ class TestNativeAttachLocal:
             "iptables -t nat -A POSTROUTING -s 172.30.1.0/24 ! -d 172.30.1.0/24 -j MASQUERADE"
             in flat
         )
-        # The cluster DNS redirect: container resolv.conf points at gateway:53, redirected to the
-        # agent's unprivileged resolver on the gateway high port (dockerd embedded-DNS parity).
-        assert (
-            f"iptables -t nat -A PREROUTING -d 172.30.1.1/32 -p udp --dport 53 "
-            f"-j DNAT --to-destination 172.30.1.1:{na.CLUSTER_DNS_REDIRECT_PORT}" in flat
-        )
+        # The cluster DNS redirect is NOT installed at attach — it is a separate, port-carrying step
+        # (install_dns_redirect), so it must not appear here.
+        assert "--dport 53" not in flat
         # LOCAL-bridge FORWARD isolation (Docker-parity): egress to the uplink + its established
         # return + intra-bridge (same session) are accepted; everything else destined to the bridge
         # -- notably another session's LOCAL bridge -- is dropped. A blanket -i/-o bridge ACCEPT
@@ -486,3 +483,48 @@ class TestUnsupported:
         runner = NativeBridgeAttachRunner(ipam_state_dir=tmp_path)
         with pytest.raises(ValueError):
             await runner("CHECK", ifname="eth0", netns=_NETNS, container_id="c", config=_LOCAL_CFG)
+
+
+class TestClusterDnsRedirect:
+    async def test_install_sets_route_localnet_and_dnat(self, monkeypatch: Any) -> None:
+        rec = _RunRecorder()
+        monkeypatch.setattr(na, "_run", rec)
+        await na.install_dns_redirect("172.30.1.1", 45321, "sid-1")
+        flat = rec.flat()
+        # route_localnet lets DNAT-to-loopback work for bridge traffic (dockerd parity).
+        assert "sysctl -w net.ipv4.conf.all.route_localnet=1" in flat
+        assert (
+            "iptables -t nat -A PREROUTING -d 172.30.1.1/32 -p udp --dport 53 "
+            "-m comment --comment bai-dns:sid-1 -j DNAT --to-destination 127.0.0.1:45321" in flat
+        )
+
+    async def test_redirect_session_dns_uses_the_gateway(self, monkeypatch: Any) -> None:
+        rec = _RunRecorder()
+        monkeypatch.setattr(na, "_run", rec)
+        await na.redirect_session_dns("172.30.1.0/24", 40000, "sid-2")
+        flat = rec.flat()
+        assert "-d 172.30.1.1/32" in flat  # the subnet's first host = the gateway
+        assert "--to-destination 127.0.0.1:40000" in flat
+
+    async def test_remove_deletes_the_tagged_rule(self, monkeypatch: Any) -> None:
+        class _Rec(_RunRecorder):
+            @override
+            async def __call__(self, argv: Any, *, check: bool = True) -> tuple[int, bytes, bytes]:
+                argv = list(argv)
+                if argv[:4] == ["iptables", "-t", "nat", "-S"]:
+                    self.calls.append(argv)
+                    return (
+                        0,
+                        b"-A PREROUTING -d 172.30.1.1/32 -p udp -m udp --dport 53 "
+                        b"-m comment --comment bai-dns:sid-3 -j DNAT "
+                        b"--to-destination 127.0.0.1:40000\n",
+                        b"",
+                    )
+                return await super().__call__(argv, check=check)
+
+        rec = _Rec()
+        monkeypatch.setattr(na, "_run", rec)
+        await na.remove_dns_redirect("sid-3")
+        # the -A rule tagged for this session is converted to -D and deleted
+        assert "iptables -t nat -D PREROUTING" in rec.flat()
+        assert "bai-dns:sid-3" in rec.flat()

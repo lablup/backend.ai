@@ -19,6 +19,7 @@ from ai.backend.agent.errors.network import OverlayAddressNotAssigned
 from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.network.caps import probe_caps
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator, get_local_subnet_allocator
+from ai.backend.agent.network.native_attacher import redirect_session_dns, remove_dns_redirect
 from ai.backend.agent.plugin.network_v2 import AbstractNetworkAgentPluginV2
 from ai.backend.common.network.types import (
     AgentNetworkCaps,
@@ -178,7 +179,14 @@ def overlay_cni_config(meta: SessionNetMeta, ip: str | None = None) -> dict[str,
             f"no manager-assigned overlay IP for session {meta.session_id}; "
             "cannot attach to the stretched overlay without a cluster-unique address"
         )
-    config: dict[str, Any] = {
+    # The overlay NIC's MAC is pinned to the deterministic address the manager programs into every
+    # peer's FDB/ARP (mac_for_ip) — otherwise the veth gets a random MAC and a peer's unicast frame
+    # (dst=02:42:<ip>) arriving over the tunnel does not match the NIC and is dropped, breaking
+    # cross-node overlay traffic. The pin is expressed in standard CNI vocabulary: the config
+    # DECLARES the ``mac`` capability, and the value is supplied out-of-band as a capability arg
+    # (overlay_mac_capability_args) that the provisioner injects into runtimeConfig — so a real CNI
+    # ``bridge`` binary honours it, unlike the old non-standard top-level ``mac`` key it would drop.
+    return {
         "cniVersion": "1.0.0",
         "name": f"bai-overlay-{meta.session_id}",
         "type": "bridge",
@@ -187,15 +195,14 @@ def overlay_cni_config(meta: SessionNetMeta, ip: str | None = None) -> dict[str,
         "ipMasq": False,
         "mtu": meta.mtu,
         "ipam": _overlay_ipam(meta, ip),
+        "capabilities": {"mac": True},
     }
-    # Pin the overlay NIC's MAC to the same deterministic address the manager programs into
-    # every peer's FDB/ARP (mac_for_ip). Without this the veth gets a random MAC, so a peer's
-    # unicast frame (dst=02:42:<ip>) arriving over the tunnel would not match the container
-    # NIC and be dropped — breaking cross-node overlay traffic. Only meaningful with a static
-    # (manager-assigned) IP; host-local fallback has no pre-programmed ARP to match.
-    if ip is not None:
-        config["mac"] = mac_for_ip(ip)
-    return config
+
+
+def overlay_mac_capability_args(ip: str) -> dict[str, Any]:
+    """The standard ``mac`` capability arg pinning the overlay NIC to its deterministic address
+    (mac_for_ip), which every peer's FDB/ARP is programmed to."""
+    return {"mac": mac_for_ip(ip)}
 
 
 def local_bridge_dev(vni: int) -> str:
@@ -216,17 +223,15 @@ def local_cni_config(
     (option C, rejected in §9).
 
     ``static_ip`` pins the container at a specific address in the subnet (single-node cluster
-    peers, so /etc/hosts resolves) while keeping the gateway + MASQ that a plain static IPAM would
-    drop; None keeps the dynamic host-local pick for ordinary single-kernel sessions.
+    peers, so /etc/hosts resolves) while keeping host-local's pool + gateway + MASQ; None keeps
+    the dynamic host-local pick for ordinary single-kernel sessions.
 
-    Note ``requested_ip`` is OUR extension, honoured by NativeBridgeAttachRunner (the only runner
-    the agent builds). The upstream host-local *binary* would ignore an unknown key and hand out a
-    dynamic address instead — silently breaking the pin — so a config carrying it must not be
-    driven through the real /opt/cni/bin plugin without teaching that path CNI_ARGS ``IP=``."""
-    ipam: dict[str, Any] = {"type": "host-local", "subnet": subnet}
-    if static_ip is not None:
-        ipam["requested_ip"] = static_ip
-    return {
+    The pin is expressed in standard CNI vocabulary: when ``static_ip`` is set the config DECLARES
+    the ``ips`` capability, and the address is supplied out-of-band as a capability arg
+    (local_ip_capability_args) that the provisioner injects into runtimeConfig. This replaces the
+    old non-standard ``ipam.requested_ip`` key, which a real host-local binary would ignore —
+    silently handing out a dynamic address and breaking the pin."""
+    config: dict[str, Any] = {
         "cniVersion": "1.0.0",
         "name": f"bai-local-{session_id}",
         "type": "bridge",
@@ -235,8 +240,18 @@ def local_cni_config(
         "isDefaultGateway": True,
         "ipMasq": True,
         "hairpinMode": False,
-        "ipam": ipam,
+        "ipam": {"type": "host-local", "subnet": subnet},
     }
+    if static_ip is not None:
+        config["capabilities"] = {"ips": True}
+    return config
+
+
+def local_ip_capability_args(subnet: str, static_ip: str) -> dict[str, Any]:
+    """The standard ``ips`` capability arg pinning the LOCAL NIC to ``static_ip`` within ``subnet``
+    (single-node cluster peers, so /etc/hosts resolves). CNI ``ips`` args are CIDR strings."""
+    prefixlen = ipaddress.ip_network(subnet).prefixlen
+    return {"ips": [f"{static_ip}/{prefixlen}"]}
 
 
 async def _run_command(argv: Sequence[str]) -> None:
@@ -419,6 +434,18 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                 log.debug("endpoint entry {} already gone in session {}", ip, session_id)
 
     @override
+    async def setup_dns_redirect(self, session_id: str, loopback_port: int) -> None:
+        # In-process (privileged agent) path: this backend holds CAP_NET_ADMIN, so install the
+        # :53 -> 127.0.0.1:<port> redirect directly. In privnet mode the proxy sends this to the
+        # privnet instead. Idempotent (replaces any prior rule).
+        if (subnet := await self._local_subnets.subnet_of(session_id)) is not None:
+            await redirect_session_dns(subnet, loopback_port, session_id)
+
+    @override
+    async def teardown_dns_redirect(self, session_id: str) -> None:
+        await remove_dns_redirect(session_id)
+
+    @override
     async def attach_endpoint(
         self,
         kernel_config: KernelCreationConfig,
@@ -447,6 +474,10 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                     interface_name=OVERLAY_IFNAME,
                     role=NetworkRole.OVERLAY,
                     cni_config=overlay_cni_config(meta, overlay_ip),
+                    # overlay_cni_config raises when overlay_ip is None, so the guard is defensive.
+                    cni_capability_args=(
+                        overlay_mac_capability_args(overlay_ip) if overlay_ip else None
+                    ),
                 ),
             ]
         )

@@ -34,13 +34,64 @@ from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-# The high port the agent's cluster DNS resolver binds on the LOCAL gateway. A container's
-# resolv.conf points at ``gateway:53``; this runner installs an iptables DNAT redirecting that to
-# ``gateway:<this port>``, so the resolver needs NO privileged-port capability (it binds a high
-# port) while only this runner — which already holds CAP_NET_ADMIN in the privnet or the privileged
-# agent — touches the :53 rule. This is exactly how dockerd's embedded DNS avoids binding :53
-# (127.0.0.11 on a high port + an iptables redirect). See cluster-name-resolution.md.
-CLUSTER_DNS_REDIRECT_PORT = 15353
+# --- cluster DNS redirect (BEP-1062) -------------------------------------------------------------
+# A container's resolv.conf points at ``gateway:53``; the agent's cluster resolver binds an
+# UNPRIVILEGED ephemeral loopback port (``127.0.0.1:<port>``), and these helpers install the one
+# privileged piece — an iptables DNAT redirecting ``gateway:53`` to that loopback port. So the
+# resolver needs no privileged-port capability, and only the CAP_NET_ADMIN holder (the privnet, or
+# the privileged agent) touches iptables. This mirrors how dockerd's embedded DNS avoids binding :53
+# (127.0.0.11 + an iptables redirect). The rule is comment-tagged per session so a re-install with a
+# new ephemeral port (e.g. after an agent restart) replaces the old one and teardown removes it
+# without needing to remember the port. See cluster-name-resolution.md.
+_DNS_COMMENT_PREFIX = "bai-dns:"
+
+
+def _dns_redirect_add_args(gateway: str, loopback_port: int, session_id: str) -> list[str]:
+    return [
+        "iptables", "-t", "nat", "-A", "PREROUTING",
+        "-d", f"{gateway}/32", "-p", "udp", "--dport", "53",
+        "-m", "comment", "--comment", f"{_DNS_COMMENT_PREFIX}{session_id}",
+        "-j", "DNAT", "--to-destination", f"127.0.0.1:{loopback_port}",
+    ]  # fmt: skip
+
+
+async def _remove_dns_redirects(session_id: str) -> None:
+    """Delete every DNS-redirect rule tagged for this session (there is normally one). Comment-based
+    so it works without knowing the ephemeral port — used both to replace on re-install and to tear
+    down."""
+    _, out, _ = await _run(["iptables", "-t", "nat", "-S", "PREROUTING"], check=False)
+    tag = f"{_DNS_COMMENT_PREFIX}{session_id}"
+    for line in out.decode(errors="replace").splitlines():
+        if tag not in line:
+            continue
+        args = line.split()
+        if args and args[0] == "-A":
+            args[0] = "-D"
+            await _run(["iptables", "-t", "nat", *args], check=False)
+
+
+async def install_dns_redirect(gateway: str, loopback_port: int, session_id: str) -> None:
+    """Redirect ``gateway:53`` to ``127.0.0.1:<loopback_port>`` for this session, replacing any prior
+    rule. DNAT-to-loopback for traffic arriving on a bridge needs ``route_localnet`` (Linux drops
+    martian packets routed to 127/8 otherwise) — the same knob dockerd sets. ``conf.all`` is used
+    (the kernel ORs it with the per-device flag) so no per-bridge name is needed; the redirect
+    itself is confined to ``gateway:53``, so nothing else routes to loopback."""
+    await _run(["sysctl", "-w", "net.ipv4.conf.all.route_localnet=1"], check=False)
+    await _remove_dns_redirects(session_id)
+    await _run(_dns_redirect_add_args(gateway, loopback_port, session_id), check=False)
+
+
+async def remove_dns_redirect(session_id: str) -> None:
+    await _remove_dns_redirects(session_id)
+
+
+async def redirect_session_dns(subnet: str, loopback_port: int, session_id: str) -> None:
+    """Install the ``:53`` redirect for a session given its LOCAL ``subnet`` — the gateway is the
+    subnet's first host. Shared by the two privileged sites (the privnet server and the in-process
+    backends), so the gateway derivation lives in one place."""
+    gateway = str(next(iter(ipaddress.ip_network(subnet).hosts())))
+    await install_dns_redirect(gateway, loopback_port, session_id)
+
 
 _DEFAULT_IPAM_STATE_DIR = Path("/var/lib/backend.ai/net-ipam")
 _NETNS_PID_RE = re.compile(r"/proc/(\d+)/ns/net")
@@ -377,11 +428,6 @@ class NativeBridgeAttachRunner:
         if config.get("ipMasq") and subnet:
             await self._ensure_masq(subnet)
             await self._ensure_forward_accept(bridge)
-            # The LOCAL gateway is where the session's cluster resolver is reached (resolv.conf
-            # nameserver). Install the :53 -> high-port redirect here — the one privileged step —
-            # so the resolver itself can bind unprivileged. Idempotent per session gateway.
-            if gateway:
-                await self._ensure_dns_redirect(gateway)
         return {"ips": [{"address": f"{ip}/{prefix}"}]}
 
     async def _is_wired(self, host_veth: str, netns: str, ifname: str) -> bool:
@@ -408,8 +454,6 @@ class NativeBridgeAttachRunner:
             if remaining == 0 and config.get("ipMasq"):
                 await self._del_masq(subnet)
                 await self._del_forward_accept(str(config["bridge"]))
-                gateway = str(next(iter(ipaddress.ip_network(subnet).hosts())))
-                await self._del_dns_redirect(gateway)
 
     async def _ensure_bridge(self, bridge: str, mtu: str, gw_cidr: str | None) -> None:
         rc, _, _ = await _run(["ip", "link", "show", bridge], check=False)
@@ -432,28 +476,6 @@ class NativeBridgeAttachRunner:
 
     async def _del_masq(self, subnet: str) -> None:
         await _run(["iptables", "-t", "nat", "-D", *self._masq_rule(subnet)], check=False)
-
-    def _dns_redirect_rule(self, gateway: str) -> list[str]:
-        # A container's resolv.conf points at gateway:53; its query arrives here (from the
-        # container netns via veth) at PREROUTING. Redirect it to the agent's unprivileged resolver
-        # on gateway:CLUSTER_DNS_REDIRECT_PORT. DNAT to the same address, new port — the redirect
-        # that lets the resolver skip the :53 privileged bind (dockerd embedded-DNS parity).
-        return [
-            "PREROUTING",
-            "-d", f"{gateway}/32",
-            "-p", "udp", "--dport", "53",
-            "-j", "DNAT",
-            "--to-destination", f"{gateway}:{CLUSTER_DNS_REDIRECT_PORT}",
-        ]  # fmt: skip
-
-    async def _ensure_dns_redirect(self, gateway: str) -> None:
-        rule = self._dns_redirect_rule(gateway)
-        rc, _, _ = await _run(["iptables", "-t", "nat", "-C", *rule], check=False)
-        if rc != 0:
-            await _run(["iptables", "-t", "nat", "-A", *rule], check=False)
-
-    async def _del_dns_redirect(self, gateway: str) -> None:
-        await _run(["iptables", "-t", "nat", "-D", *self._dns_redirect_rule(gateway)], check=False)
 
     async def _resolve_uplink(self) -> str:
         """The node's egress uplink. Taken from config when given (the privnet passes it), else

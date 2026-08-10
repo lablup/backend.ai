@@ -74,6 +74,17 @@ def validate_container_id(value: str) -> str:
     return value
 
 
+def validate_dns_port(value: int | None) -> int:
+    """Bound the agent-supplied cluster-DNS loopback port. The DNAT destination host is fixed to
+    127.0.0.1 (never the agent's choice), so the agent influences only *which* of its own loopback
+    ports :53 redirects to — hence just the unprivileged-port range check."""
+    if value is None:
+        raise PolicyViolation("missing dns_port")
+    if not (_MIN_HOST_PORT <= value <= _MAX_PORT):
+        raise PolicyViolation("dns_port out of range")
+    return value
+
+
 def validate_port_pairs(
     value: tuple[tuple[int, int, str | None], ...] | None,
 ) -> tuple[tuple[int, int, str | None], ...]:

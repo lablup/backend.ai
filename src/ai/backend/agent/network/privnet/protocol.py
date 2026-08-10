@@ -45,6 +45,12 @@ class PrivNetOp(enum.StrEnum):
     # assigned (to write /etc/hosts for a single-node cluster), it does not declare one — the
     # inverse of the trust concern the rest of this protocol guards against.
     LOCAL_SUBNET = "local_subnet"
+    # Cluster DNS: redirect the session gateway's :53 to the agent's unprivileged resolver, which
+    # binds an ephemeral loopback port (127.0.0.1:<dns_port>) and sends that port here. The privnet
+    # derives the gateway/bridge from the session it owns; the agent supplies only the loopback port
+    # it bound — it cannot point :53 at anything but its own loopback. See cluster-name-resolution.md.
+    SETUP_DNS_REDIRECT = "setup_dns_redirect"
+    TEARDOWN_DNS_REDIRECT = "teardown_dns_redirect"
 
 
 class ProtocolError(RuntimeError):
@@ -129,6 +135,10 @@ class PrivNetRequest:
     # PrivNetOp.PUBLISH_PORTS), so a compromised agent can pick the publish interface but not the
     # redirect target.
     ports: tuple[tuple[int, int, str | None], ...] | None = None
+    # SETUP_DNS_REDIRECT only: the ephemeral loopback port the agent's resolver bound. The redirect
+    # destination is fixed to 127.0.0.1:<this> — the agent picks only its own local port, never the
+    # host or address.
+    dns_port: int | None = None
 
     def encode(self) -> bytes:
         payload: dict[str, Any] = {"op": str(self.op), "session_id": self.session_id}
@@ -138,6 +148,8 @@ class PrivNetRequest:
             payload["network_config"] = self.network_config
         if self.ports is not None:
             payload["ports"] = [list(pair) for pair in self.ports]
+        if self.dns_port is not None:
+            payload["dns_port"] = self.dns_port
         for key in ("vtep_ip", "ip", "mac", "local_ip"):
             value = getattr(self, key)
             if value is not None:
@@ -171,12 +183,16 @@ class PrivNetRequest:
             if value is not None and not isinstance(value, str):
                 raise ProtocolError(f"{key} must be a string")
             fields[key] = value
+        dns_port = data.get("dns_port")
+        if dns_port is not None and (not isinstance(dns_port, int) or isinstance(dns_port, bool)):
+            raise ProtocolError("dns_port must be an integer")
         return cls(
             op=op,
             session_id=session_id,
             container_id=container_id,
             network_config=network_config,
             ports=_decode_ports(data.get("ports")),
+            dns_port=dns_port,
             **fields,
         )
 

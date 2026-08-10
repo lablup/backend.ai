@@ -95,6 +95,18 @@ class AbstractNetworkAgentPluginV2[TKernel: AbstractKernel](AbstractPlugin, meta
         """Remove a departed endpoint's forwarding + ARP state. Idempotent; default no-op."""
         pass
 
+    async def setup_dns_redirect(self, session_id: str, loopback_port: int) -> None:
+        """Redirect the session gateway's ``:53`` to the agent's cluster resolver, which bound
+        ``127.0.0.1:<loopback_port>``. The privileged holder (privnet, or the privileged in-process
+        backend) derives the gateway from the session and installs the iptables DNAT — the agent
+        supplies only the local port it bound. Idempotent (replaces any prior rule); default no-op.
+        See cluster-name-resolution.md."""
+        pass
+
+    async def teardown_dns_redirect(self, session_id: str) -> None:
+        """Remove the session's ``:53`` cluster-DNS redirect. Idempotent; default no-op."""
+        pass
+
     @abstractmethod
     async def attach_endpoint(
         self,

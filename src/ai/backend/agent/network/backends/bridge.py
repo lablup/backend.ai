@@ -23,9 +23,11 @@ from ai.backend.agent.network.backends.vxlan import (
     link_del_args,
     local_bridge_dev,
     local_cni_config,
+    local_ip_capability_args,
 )
 from ai.backend.agent.network.caps import probe_caps
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator, get_local_subnet_allocator
+from ai.backend.agent.network.native_attacher import redirect_session_dns, remove_dns_redirect
 from ai.backend.agent.plugin.network_v2 import AbstractNetworkAgentPluginV2
 from ai.backend.common.network.types import (
     AgentNetworkCaps,
@@ -133,6 +135,17 @@ class BridgeNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         pass
 
     @override
+    async def setup_dns_redirect(self, session_id: str, loopback_port: int) -> None:
+        # In-process (privileged agent) path: install the :53 -> 127.0.0.1:<port> redirect directly.
+        # In privnet mode the proxy sends this to the privnet instead. Idempotent.
+        if (subnet := await self._local_subnets.subnet_of(session_id)) is not None:
+            await redirect_session_dns(subnet, loopback_port, session_id)
+
+    @override
+    async def teardown_dns_redirect(self, session_id: str) -> None:
+        await remove_dns_redirect(session_id)
+
+    @override
     async def attach_endpoint(
         self,
         kernel_config: KernelCreationConfig,
@@ -144,7 +157,9 @@ class BridgeNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         # written into /etc/hosts; the agent computes it and passes it through kernel_config (the
         # same channel the overlay uses for its manager-assigned IP). Absent for an ordinary
         # single-kernel session — the host-local pool then picks the address.
-        static_ip = cast(Mapping[str, Any], kernel_config).get("local_static_ip")
+        raw_static_ip = cast(Mapping[str, Any], kernel_config).get("local_static_ip")
+        static_ip = str(raw_static_ip) if raw_static_ip else None
+        subnet = await self._subnet(meta.session_id)
         return EndpointPlan(
             attachments=[
                 NetworkAttachSpec(
@@ -155,8 +170,11 @@ class BridgeNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                     cni_config=local_cni_config(
                         meta.session_id,
                         bridge=await self._bridge(meta.session_id),
-                        subnet=await self._subnet(meta.session_id),
-                        static_ip=str(static_ip) if static_ip else None,
+                        subnet=subnet,
+                        static_ip=static_ip,
+                    ),
+                    cni_capability_args=(
+                        local_ip_capability_args(subnet, static_ip) if static_ip else None
                     ),
                 ),
             ]

@@ -37,7 +37,7 @@ from ai.backend.agent.errors.network import (
 from ai.backend.agent.network.cni import CniRunner
 from ai.backend.agent.network.coordinator import SessionClusterNames, SessionNetworkCoordinator
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator, LocalSubnetLayout
-from ai.backend.agent.network.native_attacher import CLUSTER_DNS_REDIRECT_PORT, HostLocalIpam
+from ai.backend.agent.network.native_attacher import HostLocalIpam
 from ai.backend.agent.network.privnet.resolver import (
     ClusterDNSServer,
     ClusterResolver,
@@ -99,7 +99,10 @@ class ContainerdSessionNetwork:
     _make_provisioner: Callable[[AbstractNetworkAgentPluginV2[Any], str], Any]
     _coordinators: dict[str, SessionNetworkCoordinator]
     _orchestrators: dict[str, ContainerdKernelOrchestrator]
-    # Per-session cluster DNS server, bound to the session's LOCAL gateway. Answers the session's
+    # The resolved backend per session (privnet proxy or an in-process plugin), so the cluster-DNS
+    # path can ask it to install/remove the :53 redirect without re-resolving from meta.
+    _session_backends: dict[str, AbstractNetworkAgentPluginV2[Any]]
+    # Per-session cluster DNS server, bound to an ephemeral loopback port. Answers the session's
     # cluster hostnames from its coordinator (session-scoped, so identical main1/sub1 across sessions
     # never collide) and forwards everything else upstream. See cluster-name-resolution.md.
     _dns_servers: dict[str, ClusterDNSServer]
@@ -165,6 +168,7 @@ class ContainerdSessionNetwork:
         )
         self._coordinators = {}
         self._orchestrators = {}
+        self._session_backends = {}
         self._dns_servers = {}
         self._configured_dns = tuple(configured_dns)
         self._tracker = SessionContainerTracker()
@@ -334,9 +338,17 @@ class ContainerdSessionNetwork:
         await coordinator.resume(meta, self._self_member(meta))
         self._coordinators[session_id] = coordinator
         self._orchestrators[session_id] = orchestrator
+        self._session_backends[session_id] = backend
         # The devices (and so the LOCAL gateway) already exist on a resume, so the resolver can come
         # up right away — unlike a fresh session, whose block is not allocated until the first attach.
-        await self.ensure_cluster_dns(session_id)
+        # Best-effort here, unlike the fail-loud create path: recovery must re-adopt the session's
+        # already-running containers even if the resolver stumbles (aborting would leave them with no
+        # detach path and leak their host resources — the recover() contract). A create instead
+        # fails its kernel, since a broken resolver means the new session cannot rendezvous.
+        try:
+            await self.ensure_cluster_dns(session_id)
+        except ClusterDNSStartError:
+            log.exception("could not start cluster DNS while resuming session {}", session_id)
 
     async def _recover_attachment(
         self, container_id: str, session_id: str, meta: SessionNetMeta
@@ -587,6 +599,7 @@ class ContainerdSessionNetwork:
             # then skip on retry — a retry must re-run the full setup cleanly.
             self._coordinators[session_id] = coordinator
             self._orchestrators[session_id] = orchestrator
+            self._session_backends[session_id] = backend
             # NB: the resolver is NOT started here. A fresh session has no LOCAL block yet (privnet
             # allocates it at the first attach), so its gateway is unknown until then — the DNS
             # server comes up post-attach via ensure_cluster_dns. Adopted survivors already have
@@ -704,37 +717,40 @@ class ContainerdSessionNetwork:
 
         Idempotent, and deliberately called **after a container attaches**: in privnet mode the
         session's LOCAL block (and thus its gateway) is not allocated until the first attach, so the
-        gateway is unknown at ``ensure_session`` time. The attach also installs the ``:53 -> high
-        port`` redirect (``native_attacher``), so the resolver binds the **high port** unprivileged;
-        the container still points its ``/etc/resolv.conf`` at ``gateway:53``.
+        gateway is unknown at ``ensure_session`` time. The resolver binds an **ephemeral loopback
+        port** (``127.0.0.1:0`` — always available, can never collide) and then asks the privileged
+        layer (the privnet, or the in-process backend) to redirect the session gateway's ``:53`` to
+        that port. The container still points its ``/etc/resolv.conf`` at ``gateway:53``.
 
-        **Fail-loud on a bind failure** (not best-effort): phase 5 removed the ``/etc/hosts`` peer
-        map, so a resolver that does not start leaves cluster names unresolvable and the session
-        would hang at rendezvous with no visible cause. A genuinely absent session (no coordinator)
-        is still a silent no-op."""
+        Bind-then-redirect (in this order) is what makes an ephemeral port recovery-safe: a restart
+        re-binds a *new* port and re-installs the redirect to it, replacing the stale rule.
+
+        **Fail-loud**: phase 5 removed the ``/etc/hosts`` peer map, so a resolver that does not come
+        up leaves cluster names unresolvable and the session would hang at rendezvous with no visible
+        cause — a bind failure, a missing post-attach gateway, or a failed redirect all raise. A
+        genuinely absent session (no coordinator) is still a silent no-op."""
         if session_id in self._dns_servers:
             return
         coordinator = self._coordinators.get(session_id)
-        if coordinator is None:
+        backend = self._session_backends.get(session_id)
+        if coordinator is None or backend is None:
             return  # session not set up on this node; nothing to serve
-        gateway = await self.local_gateway_of(session_id)
-        if gateway is None:
-            # After an attach the LOCAL block exists, so a missing gateway is a real fault, not the
-            # pre-attach "not ready yet" state — cluster names would be unresolvable. Fail loudly.
+        if await self.local_subnet_of(session_id) is None:
+            # After an attach the LOCAL block exists; its absence means the gateway is unknown and
+            # the :53 redirect would be a silent no-op (resolver up but unreachable). Fail loudly.
             raise ClusterDNSStartError(
-                f"no LOCAL gateway for session {session_id}; cannot start the cluster resolver"
+                f"no LOCAL block for session {session_id}; cannot redirect the cluster resolver"
             )
         upstreams = resolve_container_dns(self._configured_dns).nameservers
         resolver = ClusterResolver(
             SessionClusterNames(coordinator, session_id), make_upstream_forwarder(upstreams)
         )
-        server = ClusterDNSServer(resolver, gateway, port=CLUSTER_DNS_REDIRECT_PORT)
+        server = ClusterDNSServer(resolver, "127.0.0.1", port=0)  # ephemeral, guaranteed-free
         try:
             await server.start()
         except OSError as e:
             raise ClusterDNSStartError(
-                f"could not bind the cluster resolver for session {session_id} on"
-                f" {gateway}:{CLUSTER_DNS_REDIRECT_PORT}: {e}"
+                f"could not bind the cluster resolver for session {session_id}: {e}"
             ) from e
         # Another kernel of this session may have started the server across the awaits above; if so,
         # keep the first and drop this one so its socket does not leak.
@@ -742,11 +758,20 @@ class ContainerdSessionNetwork:
             await server.stop()
             return
         self._dns_servers[session_id] = server
+        # Redirect :53 -> the loopback port only AFTER the resolver is live, so it never points at a
+        # dead socket. A failure here means cluster names are unresolvable — unwind and fail loudly.
+        try:
+            await backend.setup_dns_redirect(session_id, server.port)
+        except Exception as e:
+            self._dns_servers.pop(session_id, None)
+            await server.stop()
+            raise ClusterDNSStartError(
+                f"could not redirect :53 to the cluster resolver for session {session_id}: {e}"
+            ) from e
         log.info(
-            "cluster DNS for session {} listening on {}:{} (:53 redirected by native_attacher)",
+            "cluster DNS for session {} listening on 127.0.0.1:{} (:53 redirected by the privnet)",
             session_id,
-            gateway,
-            CLUSTER_DNS_REDIRECT_PORT,
+            server.port,
         )
 
     async def _stop_cluster_dns(self, session_id: str) -> None:
@@ -761,8 +786,9 @@ class ContainerdSessionNetwork:
         async with self._session_locked(session_id):
             coordinator = self._coordinators.pop(session_id, None)
             self._orchestrators.pop(session_id, None)
+            backend = self._session_backends.pop(session_id, None)
             # Stop our resolver whenever we stop serving the session on this node — on both the
-            # withdraw and the full-teardown exit below — so its bound gateway socket never leaks.
+            # withdraw and the full-teardown exit below — so its loopback socket never leaks.
             await self._stop_cluster_dns(session_id)
             if coordinator is None:
                 return
@@ -770,7 +796,8 @@ class ContainerdSessionNetwork:
             # NODE's, keyed on the shared journal's block index, so a kernel of this session
             # belonging to another agent on this host is still running on them. Withdraw from the
             # session (stop watching, drop our membership) without pulling the floor out from under
-            # it; the agent whose kernel outlives ours tears the data plane down when it goes.
+            # it; the agent whose kernel outlives ours tears the data plane down when it goes. Leave
+            # the :53 redirect in place — the surviving agent's kernels still need it.
             running, _ours = await self._running_containers_of(session_id)
             if running:
                 log.info(
@@ -781,6 +808,10 @@ class ContainerdSessionNetwork:
                 )
                 await coordinator.stop(session_id, teardown_data_plane=False)
                 return
+            # Full teardown: remove the :53 redirect too (the resolver it pointed at is stopped).
+            if backend is not None:
+                with contextlib.suppress(Exception):
+                    await backend.teardown_dns_redirect(session_id)
             # Before the block goes back, not after: once released, the same CIDR can be handed to
             # the next session, and purging it then would wipe *that* session's claims.
             await self._purge_local_addresses(session_id)
