@@ -193,7 +193,15 @@ class Context(metaclass=ABCMeta):
 
     async def _configure_mock_accelerator(self, accelerator: Accelerator) -> None:
         """
-        cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
+        Copy the matching mock-accelerator config template into the install
+        directory as ``mock-accelerator.toml``.
+
+        NOTE: these templates live only in the source tree
+        (``configs/accelerator/`` at the repository root) — they are NOT
+        bundled into the ``ai.backend.install.configs`` package resources.
+        The copy therefore only succeeds when running from a source checkout
+        (DEVELOP mode) or when the operator has placed the file at the same
+        path relative to the installer's working directory.
         """
         mapping = {
             Accelerator.CUDA_MOCK: "configs/accelerator/mock-accelerator.toml",
@@ -201,11 +209,19 @@ class Context(metaclass=ABCMeta):
             Accelerator.ROCM_MOCK: "configs/accelerator/rocm-mock.toml",
         }
 
-        src = mapping.get(accelerator)
-        if not src:
+        relpath = mapping.get(accelerator)
+        if not relpath:
             return
 
-        dst = Path("mock-accelerator.toml")
+        src = self.cwd / relpath
+        if not src.exists():
+            raise RuntimeError(
+                f"Mock accelerator config template not found: {src} — these "
+                "templates ship only in the source tree; place the file at "
+                "that path relative to the installer's working directory and "
+                "retry."
+            )
+        dst = self.install_info.base_path / "mock-accelerator.toml"
         self.log_header(f"Copying accelerator config: {src} -> {dst}")
         shutil.copy(src, dst)
 
@@ -297,7 +313,17 @@ class Context(metaclass=ABCMeta):
         return await self.run_exec(["sh", "-c", script], **kwargs)
 
     def copy_config(self, template_name: str) -> Path:
-        raise NotImplementedError
+        """Copy a bundled config template into the install directory
+        (``install_info.base_path``: the source checkout in DEVELOP mode, the
+        target path in PACKAGE/DOCKER modes), preserving sub-paths."""
+        with self.resource_path("ai.backend.install.configs", template_name) as src_path:
+            dst_path = self.install_info.base_path / template_name
+            dst_path.parent.mkdir(parents=True, exist_ok=True)
+            if src_path.is_dir():
+                shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
+            else:
+                shutil.copy(src_path, dst_path)
+        return dst_path
 
     @staticmethod
     def sed_in_place(path: Path, pattern: str | re.Pattern[str], replacement: str) -> None:
@@ -551,6 +577,9 @@ class Context(metaclass=ABCMeta):
 
             # Construct URL for the release version. Release tags carry no "v"
             # prefix (e.g. "26.4.4rc9"), matching _fetch_package's download URL.
+            # NOTE: this uses the installer's own __version__, whereas the
+            # DOCKER-mode service images pin dist_info.version — the two only
+            # diverge when a DIST-INFO file overrides the version.
             version_tag = __version__
             url = (
                 f"https://raw.githubusercontent.com/lablup/backend.ai/{version_tag}/"
@@ -2000,17 +2029,6 @@ class DevContext(Context):
         )
 
     @override
-    def copy_config(self, template_name: str) -> Path:
-        with self.resource_path("ai.backend.install.configs", template_name) as src_path:
-            dst_path = Path.cwd() / template_name
-            dst_path.parent.mkdir(parents=True, exist_ok=True)
-            if src_path.is_dir():
-                shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
-            else:
-                shutil.copy(src_path, dst_path)
-        return dst_path
-
-    @override
     async def check_prerequisites(self) -> None:
         await super().check_prerequisites()
         await install_git_lfs(self)
@@ -2078,17 +2096,6 @@ class PackageContext(Context):
             local_proxy_port=15050,
             loopback_aliases=("127.0.0.1", "0.0.0.0"),
         )
-
-    @override
-    def copy_config(self, template_name: str) -> Path:
-        with self.resource_path("ai.backend.install.configs", template_name) as src_path:
-            dst_path = self.dist_info.target_path / template_name
-            dst_path.parent.mkdir(parents=True, exist_ok=True)
-            if src_path.is_dir():
-                shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
-            else:
-                shutil.copy(src_path, dst_path)
-        return dst_path
 
     @override
     async def check_prerequisites(self) -> None:
@@ -2310,7 +2317,10 @@ class DockerContext(Context):
     """
 
     SERVICES_COMPOSE_FILENAME = "docker-compose.services.yml"
-    KRUNNER_SHARED_PATH = Path("/tmp/backend-ai-krunner")
+    # Must match the agent image entrypoint's krunner share location
+    # (env-overridable there via BACKENDAI_KRUNNER_SHARED; the entrypoint
+    # fails fast when the share is not mounted).
+    KRUNNER_SHARED_PATH = Path("/var/lib/backend.ai/krunner")
 
     @override
     def hydrate_install_info(self) -> InstallInfo:
@@ -2330,19 +2340,15 @@ class DockerContext(Context):
         return info
 
     @override
-    def copy_config(self, template_name: str) -> Path:
-        with self.resource_path("ai.backend.install.configs", template_name) as src_path:
-            dst_path = self.install_info.base_path / template_name
-            dst_path.parent.mkdir(parents=True, exist_ok=True)
-            if src_path.is_dir():
-                shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
-            else:
-                shutil.copy(src_path, dst_path)
-        return dst_path
-
-    @override
     async def check_prerequisites(self) -> None:
         await super().check_prerequisites()
+        if self.os_info.distro == "Darwin":
+            raise PrerequisiteError(
+                "DOCKER install mode requires a Linux host: the service containers "
+                "rely on host-network, host-PID, and host-cgroup semantics that "
+                "Docker Desktop on macOS cannot provide.",
+                instruction="Use a Linux host, or the PACKAGE install mode on macOS.",
+            )
         if self.install_variable.with_harbor:
             raise PrerequisiteError(
                 "--with-harbor is supported only in DEVELOP/SOURCE install modes; "
@@ -2351,6 +2357,16 @@ class DockerContext(Context):
         if self.install_variable.with_sftp_agent:
             raise PrerequisiteError(
                 "--with-sftp-agent is not yet supported in DOCKER install mode."
+            )
+        if self.install_variable.accelerator is not None:
+            raise PrerequisiteError(
+                "The published lablup/backend.ai-* service images do not yet "
+                "bundle the accelerator plugins, so --accelerator would produce "
+                "a broken DOCKER-mode deployment.",
+                instruction=(
+                    "Install without --accelerator, or use the PACKAGE/DEVELOP "
+                    "install modes for accelerator support."
+                ),
             )
 
     def _services_compose_args(self) -> list[str]:
@@ -2390,7 +2406,11 @@ class DockerContext(Context):
 
     @override
     async def run_manager_cli(self, cmdargs: Sequence[str]) -> None:
-        exit_code = await self._run_service_cli("manager", ["backend.ai", *cmdargs])
+        # Use the dedicated non-privileged "manager-cli" service (no docker
+        # socket, no restart policy; its "cli" profile keeps `up -d` from
+        # starting it, while `docker compose run` ignores profile gating for
+        # the explicitly named service).
+        exit_code = await self._run_service_cli("manager-cli", ["backend.ai", *cmdargs])
         if exit_code != 0:
             raise RuntimeError(
                 f"Manager CLI command failed (exit {exit_code}): {' '.join(cmdargs)}"
@@ -2422,7 +2442,9 @@ class DockerContext(Context):
         """
         rendered = template.replace("{{BASE_PATH}}", str(base_path)).replace("{{VERSION}}", version)
         if enable_gpu:
-            rendered = rendered.replace("#gpu#", "")
+            # Line-anchored so only the marker prefixes are stripped, never an
+            # occurrence of the token inside a line (e.g. in a comment).
+            rendered = re.sub(r"^#gpu#", "", rendered, flags=re.MULTILINE)
         return rendered
 
     async def generate_services_compose(self) -> Path:
@@ -2451,6 +2473,12 @@ class DockerContext(Context):
             base_path / service.vfolder_relpath,
         ):
             subdir.mkdir(parents=True, exist_ok=True)
+        if self.KRUNNER_SHARED_PATH.is_symlink():
+            raise RuntimeError(
+                f"Refusing to use the krunner share at {self.KRUNNER_SHARED_PATH}: "
+                "the path is a symlink. Remove it (or point it back to a real "
+                "directory) and retry."
+            )
         self.KRUNNER_SHARED_PATH.mkdir(parents=True, exist_ok=True)
 
         self.log_header("Installing databases (halfstack)...")
@@ -2461,9 +2489,11 @@ class DockerContext(Context):
         self.log.write(Text.from_markup(f"generated [bold]{compose_path}[/]"))
 
         self.log_header(f"Pulling service images (version {self.dist_info.version})...")
-        sudo = " ".join(self.docker_sudo)
-        compose_args = " ".join(self._services_compose_args()[1:])
-        exit_code = await self.run_shell(f"{sudo} docker {compose_args} pull")
+        exit_code = await self.run_exec([
+            *self.docker_sudo,
+            *self._services_compose_args(),
+            "pull",
+        ])
         if exit_code != 0:
             raise RuntimeError(
                 f"Failed to pull the service images (exit {exit_code}). "
@@ -2531,11 +2561,61 @@ class DockerContext(Context):
 
     async def start_services(self) -> None:
         self.log_header("Starting the Backend.AI services...")
-        sudo = " ".join(self.docker_sudo)
-        compose_args = " ".join(self._services_compose_args()[1:])
-        exit_code = await self.run_shell(
-            f"{sudo} docker {compose_args} up -d && {sudo} docker {compose_args} ps"
-        )
+        compose_cmd = [*self.docker_sudo, *self._services_compose_args()]
+        exit_code = await self.run_exec([*compose_cmd, "up", "-d"])
         if exit_code != 0:
             raise RuntimeError(f"Failed to start the service containers (exit {exit_code}).")
+        await self.run_exec([*compose_cmd, "ps"])
+        # Post-start health verification: warn (but do not fail the install)
+        # when some services are not in the running state.
+        non_running = await self._collect_non_running_services()
+        if non_running:
+            self.log.write(
+                Text.from_markup(
+                    "[yellow bold]:warning: Some service containers are not "
+                    f"running: {', '.join(sorted(non_running))}.[/]\n"
+                    "[yellow]Inspect them with "
+                    f"[bold]docker compose -f {self.SERVICES_COMPOSE_FILENAME} "
+                    "ps / logs <service>[/] before using the deployment.[/]"
+                )
+            )
         # TODO: install as systemd services?
+
+    async def _collect_non_running_services(self) -> list[str]:
+        """
+        Return the compose service names whose containers are not in the
+        ``running`` state, parsed from ``docker compose ps --format json``.
+        Output is captured directly (not streamed to the TUI log), so this
+        uses a raw subprocess with the same space-safe argument list.
+        """
+        proc = await asyncio.create_subprocess_exec(
+            *self.docker_sudo,
+            *self._services_compose_args(),
+            "ps",
+            "--format",
+            "json",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        if proc.returncode != 0:
+            return []
+        entries: list[Any] = []
+        for line in stdout.decode().splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                parsed = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            # docker compose emits one JSON object per line (v2.21+) or a
+            # single JSON array (older releases).
+            entries.extend(parsed if isinstance(parsed, list) else [parsed])
+        non_running: list[str] = []
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            if str(entry.get("State", "")).lower() != "running":
+                non_running.append(str(entry.get("Service") or entry.get("Name") or "<unknown>"))
+        return non_running

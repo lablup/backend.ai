@@ -196,13 +196,15 @@ class PackageSetup(Static):
 
 
 class DockerInstallReport(Static):
-    def __init__(self, ctx: DockerContext, **kwargs: Any) -> None:
+    _install_info: InstallInfo
+
+    def __init__(self, install_info: InstallInfo, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self._ctx = ctx
+        self._install_info = install_info
 
     @override
     def compose(self) -> ComposeResult:
-        install_info = self._ctx.install_info
+        install_info = self._install_info
         service = install_info.service_config
         base_path = install_info.base_path
         yield Markdown(
@@ -237,10 +239,11 @@ class DockerInstallReport(Static):
 
 
 class DockerSetup(Static):
+    _non_interactive: bool
+
     def __init__(self, *, non_interactive: bool = False, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._non_interactive = non_interactive
-        self._task = None
 
     @override
     def compose(self) -> ComposeResult:
@@ -295,7 +298,7 @@ class DockerSetup(Static):
             await ctx.populate_images()
             await ctx.start_services()
             await ctx.dump_install_info()
-            install_report = DockerInstallReport(ctx, id="install-report")
+            install_report = DockerInstallReport(ctx.install_info, id="install-report")
             self.query_one("TabPane#tab-docker-report Label").remove()
             self.query_one("TabPane#tab-docker-report").mount(install_report)
             self.query_one("TabbedContent", TabbedContent).active = "tab-docker-report"
