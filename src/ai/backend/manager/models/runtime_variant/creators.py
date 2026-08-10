@@ -5,19 +5,21 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.config import DefaultModelDefinition
+from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import RuntimeVariantConflict
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.specs.creator import GlobalEntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
-from ai.backend.manager.repositories.base.creator import CreatorSpec
 
 
 @dataclass
-class RuntimeVariantCreatorSpec(CreatorSpec[RuntimeVariantRow]):
+class RuntimeVariantCreator(GlobalEntityCreator[RuntimeVariantRow, RuntimeVariantData]):
+    """Creator for a runtime variant — a name in the global runtime catalog."""
+
     name: str
     description: str | None
 
-    @property
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
         return (
@@ -29,8 +31,12 @@ class RuntimeVariantCreatorSpec(CreatorSpec[RuntimeVariantRow]):
 
     @override
     def build_row(self) -> RuntimeVariantRow:
-        row = RuntimeVariantRow()
-        row.name = self.name
-        row.description = self.description
-        row.default_model_definition = DefaultModelDefinition()
-        return row
+        return RuntimeVariantRow(
+            name=self.name,
+            description=self.description,
+            default_model_definition=DefaultModelDefinition(),
+        )
+
+    @override
+    def to_data(self, row: RuntimeVariantRow) -> RuntimeVariantData:
+        return row.to_data()

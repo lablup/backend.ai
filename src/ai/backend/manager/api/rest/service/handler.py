@@ -83,7 +83,7 @@ from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.resource import RuntimeVariantNotFound
 from ai.backend.manager.models.runtime_variant.conditions import RuntimeVariantConditions
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.runtime_variant.searchers import RuntimeVariantSearcher
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     ResolveAccessKeyScopeAction,
 )
@@ -236,12 +236,12 @@ class ServiceHandler:
         field, so the handler re-resolves the name at this single
         boundary via the runtime_variant search action.
         """
-        querier = BatchQuerier(
+        searcher = RuntimeVariantSearcher(
             pagination=OffsetPagination(limit=1),
             conditions=[RuntimeVariantConditions.by_ids([runtime_variant_id])],
         )
-        result = await self._runtime_variant.search.wait_for_complete(
-            SearchRuntimeVariantsAction(querier=querier)
+        result = await self._runtime_variant.search.run(
+            SearchRuntimeVariantsAction(searcher=searcher)
         )
         if not result.items:
             raise RuntimeVariantNotFound()
@@ -743,10 +743,10 @@ class ServiceHandler:
         Uses the dedicated ``resolve_by_name`` processor added for the
         legacy → id migration; v2 surface callers skip this step.
         """
-        result = await self._runtime_variant.resolve_by_name.wait_for_complete(
+        result = await self._runtime_variant.resolve_by_name.run(
             ResolveRuntimeVariantByNameAction(name=str(name))
         )
-        return result.runtime_variant_id
+        return result.data.id
 
     @staticmethod
     def _to_start_action(

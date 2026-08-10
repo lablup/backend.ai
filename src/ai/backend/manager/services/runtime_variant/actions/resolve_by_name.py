@@ -1,39 +1,58 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
 
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.runtime_variant.actions.base import RuntimeVariantAction
+from ai.backend.common.data.entity.runtime_variant import RUNTIME_VARIANT_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.lookup.base import LookupKey
+from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
+from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
+from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.repositories.runtime_variant.lookups import RuntimeVariantByName
+
+
+@dataclass(frozen=True)
+class RuntimeVariantNameKey(LookupKey):
+    """The catalog name a caller passes instead of the variant's id."""
+
+    name: str
+
+    @override
+    def kind(self) -> str:
+        return "runtime_variant_name"
+
+    @override
+    def to_dict(self) -> dict[str, Any]:
+        return {"name": self.name}
 
 
 @dataclass
-class ResolveRuntimeVariantByNameAction(RuntimeVariantAction):
-    """Resolve a runtime variant name into its ``RuntimeVariantID``.
+class ResolveRuntimeVariantByNameAction(
+    LookupEntityOpsAction[RuntimeVariantRow, RuntimeVariantData]
+):
+    """Resolve a runtime variant name into the variant it names.
 
-    Used at the legacy API boundary (REST v1, gql_legacy) where clients
-    still submit the variant by name; internal layers
-    (adapter / service / sokovan) consume ``RuntimeVariantID`` only.
+    Legacy API handlers call this before invoking id-typed internal adapters, so
+    the adapter / service / sokovan chain never has to touch a name string.
     """
 
     name: str
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.GET
+    def entity_type(cls) -> EntityType:
+        return RUNTIME_VARIANT_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return self.name
-
-
-@dataclass
-class ResolveRuntimeVariantByNameActionResult(BaseActionResult):
-    runtime_variant_id: RuntimeVariantID
+    @classmethod
+    def action_name(cls) -> str:
+        return "resolve_runtime_variant_by_name"
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.runtime_variant_id)
+    def lookup_key(self) -> RuntimeVariantNameKey:
+        return RuntimeVariantNameKey(name=self.name)
+
+    @override
+    def to_lookup(self) -> RuntimeVariantByName:
+        return RuntimeVariantByName(name=self.name)

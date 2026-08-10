@@ -2,13 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import override
 
 from ai.backend.common.config import DefaultModelDefinition
+from ai.backend.common.data.entity.types import EntityData
+from ai.backend.common.identifier.entity import EntityID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 
 
 @dataclass(frozen=True)
-class RuntimeVariantData:
+class RuntimeVariantData(EntityData):
     id: RuntimeVariantID
     name: str
     description: str | None
@@ -16,3 +19,7 @@ class RuntimeVariantData:
     default_model_definition: DefaultModelDefinition
     created_at: datetime
     updated_at: datetime | None
+
+    @override
+    def entity_id(self) -> EntityID:
+        return self.id

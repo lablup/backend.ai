@@ -257,9 +257,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.runtime_variant.processors import (
         RuntimeVariantProcessors,
     )
-    from ai.backend.manager.services.runtime_variant.service import (
-        RuntimeVariantService,
-    )
     from ai.backend.manager.services.runtime_variant_preset.processors import (
         RuntimeVariantPresetProcessors,
     )
@@ -408,7 +405,6 @@ class Services:
     prometheus_query_preset_category: PrometheusQueryPresetCategoryService
     resource_preset: ResourcePresetService
     resource_slot: ResourceSlotService
-    runtime_variant: RuntimeVariantService
     runtime_variant_preset: RuntimeVariantPresetService
     deployment_revision_preset: DeploymentRevisionPresetService
     model_card: ModelCardService
