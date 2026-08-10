@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, cast, override
+from typing import Any, cast, override
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
@@ -39,7 +39,6 @@ from ai.backend.manager.models.base import (
     EnumType,
     ResourceSlotColumn,
 )
-from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
@@ -54,9 +53,6 @@ from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.types import QueryCondition
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.scaling_group import ScalingGroupRow
 
 __all__: Sequence[str] = (
     "AgentRow",
@@ -136,13 +132,7 @@ class AgentRow(Base):
         default=False,
     )
 
-    kernels: Mapped[list[KernelRow]] = relationship("KernelRow", back_populates="agent_row")
     agent_resource_rows: Mapped[list[AgentResourceRow]] = relationship("AgentResourceRow")
-    scaling_group_row: Mapped[ScalingGroupRow] = relationship(
-        "ScalingGroupRow",
-        back_populates="agents",
-        foreign_keys="[AgentRow.scaling_group]",
-    )
 
     def actual_occupied_slots(self) -> ResourceSlot:
         occupied = ResourceSlot()

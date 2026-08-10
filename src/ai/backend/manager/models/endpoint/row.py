@@ -83,9 +83,6 @@ from ai.backend.manager.models.routing import RouteStatus
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.deployment.creator import DeploymentCreator
-    from ai.backend.manager.models.deployment_auto_scaling_policy import (
-        DeploymentAutoScalingPolicyRow,
-    )
     from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
     from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
     from ai.backend.manager.models.replica_group import ReplicaGroupRow
@@ -107,12 +104,6 @@ def _get_endpoint_tokens_join_condition() -> Any:
     from ai.backend.manager.models.endpoint import EndpointTokenRow
 
     return foreign(EndpointTokenRow.endpoint) == EndpointRow.id
-
-
-def _get_endpoint_revisions_join_condition() -> Any:
-    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-
-    return EndpointRow.id == foreign(DeploymentRevisionRow.endpoint)
 
 
 def _get_primary_replica_group_join_condition() -> sa.ColumnElement[bool]:
@@ -138,14 +129,6 @@ def _get_deploying_revision_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 
     return foreign(EndpointRow.deploying_revision_id) == DeploymentRevisionRow.id
-
-
-def _get_endpoint_auto_scaling_policy_join_condition() -> Any:
-    from ai.backend.manager.models.deployment_auto_scaling_policy import (
-        DeploymentAutoScalingPolicyRow,
-    )
-
-    return EndpointRow.id == foreign(DeploymentAutoScalingPolicyRow.endpoint)
 
 
 def _get_deployment_policy_join_condition() -> Any:
@@ -291,9 +274,6 @@ class EndpointRow(Base):
         back_populates="endpoint_row",
         primaryjoin=_get_endpoint_tokens_join_condition,
     )
-    endpoint_auto_scaling_rules: Mapped[list[EndpointAutoScalingRuleRow]] = relationship(
-        "EndpointAutoScalingRuleRow", back_populates="endpoint_row"
-    )
     created_user_row: Mapped[UserRow | None] = relationship(
         "UserRow",
         foreign_keys=[created_user],
@@ -305,11 +285,6 @@ class EndpointRow(Base):
         primaryjoin=_get_session_owner_row_join_condition,
     )
 
-    revisions: Mapped[list[DeploymentRevisionRow]] = relationship(
-        "DeploymentRevisionRow",
-        primaryjoin=_get_endpoint_revisions_join_condition,
-        order_by="DeploymentRevisionRow.revision_number.desc()",
-    )
     primary_replica_group_row: Mapped[ReplicaGroupRow | None] = relationship(
         "ReplicaGroupRow",
         primaryjoin=_get_primary_replica_group_join_condition,
@@ -339,12 +314,6 @@ class EndpointRow(Base):
         "DeploymentRevisionRow",
         primaryjoin=_get_deploying_revision_join_condition,
         viewonly=True,
-        uselist=False,
-    )
-
-    auto_scaling_policy: Mapped[DeploymentAutoScalingPolicyRow | None] = relationship(
-        "DeploymentAutoScalingPolicyRow",
-        primaryjoin=_get_endpoint_auto_scaling_policy_join_condition,
         uselist=False,
     )
 
@@ -719,8 +688,9 @@ class EndpointRow(Base):
     def to_data(self) -> EndpointData:
         """Convert to EndpointData.
 
-        Requires revisions and revisions.image_row to be eagerly loaded
-        via selectinload for revision field population.
+        Requires ``current_revision_row`` / ``deploying_revision_row`` and
+        their ``image_row`` to be eagerly loaded via selectinload for
+        revision field population.
         ``_find_active_revision`` prefers ``current_revision`` and falls
         back to ``deploying_revision`` so the projection reflects the
         spec currently being deployed during the initial DEPLOYING
@@ -1080,9 +1050,7 @@ class EndpointAutoScalingRuleRow(Base):
         nullable=False,
     )
 
-    endpoint_row: Mapped[EndpointRow] = relationship(
-        "EndpointRow", back_populates="endpoint_auto_scaling_rules", lazy="joined"
-    )
+    endpoint_row: Mapped[EndpointRow] = relationship("EndpointRow", lazy="joined")
 
     @classmethod
     async def list(

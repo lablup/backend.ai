@@ -72,29 +72,11 @@ from ai.backend.manager.models.types import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.domain import DomainRow
-    from ai.backend.manager.models.kernel import KernelRow
-    from ai.backend.manager.models.network import NetworkRow
     from ai.backend.manager.models.rbac import ContainerRegistryScope
     from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
     from ai.backend.manager.models.scaling_group import ScalingGroupForProjectRow
-    from ai.backend.manager.models.session import SessionRow
-    from ai.backend.manager.models.user import UserRow
-    from ai.backend.manager.models.vfolder import VFolderRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-def _get_networks_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.network import NetworkRow
-
-    return GroupRow.id == foreign(NetworkRow.project)
-
-
-def _get_vfolder_rows_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.vfolder import VFolderRow
-
-    return GroupRow.id == foreign(VFolderRow.group)
 
 
 def _get_association_container_registries_groups_join_condition() -> sa.ColumnElement[bool]:
@@ -153,9 +135,6 @@ class AssocGroupUserRow(Base):
         sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
     )
-
-    user: Mapped[UserRow] = relationship("UserRow", back_populates="groups")
-    group: Mapped[GroupRow] = relationship("GroupRow", back_populates="users")
 
 
 # DEPRECATED: scheduled for sunset; project membership lives in
@@ -220,26 +199,11 @@ class GroupRow(LifecycleTimestampsMixin, Base):
     )
 
     # Relationships (defined with deferred join conditions to avoid circular imports)
-    sessions: Mapped[list[SessionRow]] = relationship("SessionRow", back_populates="group")
-    domain: Mapped[DomainRow] = relationship("DomainRow")
     sgroup_for_groups_rows: Mapped[list[ScalingGroupForProjectRow]] = relationship(
         "ScalingGroupForProjectRow"
     )
-    users: Mapped[list[AssocGroupUserRow]] = relationship(
-        "AssocGroupUserRow", back_populates="group"
-    )
+    users: Mapped[list[AssocGroupUserRow]] = relationship("AssocGroupUserRow")
     resource_policy_row: Mapped[ProjectResourcePolicyRow] = relationship("ProjectResourcePolicyRow")
-    kernels: Mapped[list[KernelRow]] = relationship("KernelRow", back_populates="group_row")
-    networks: Mapped[list[NetworkRow]] = relationship(
-        "NetworkRow",
-        back_populates="project_row",
-        primaryjoin=_get_networks_join_condition,
-    )
-    vfolder_rows: Mapped[list[VFolderRow]] = relationship(
-        "VFolderRow",
-        back_populates="group_row",
-        primaryjoin=_get_vfolder_rows_join_condition,
-    )
     association_container_registries_groups_rows: Mapped[
         list[AssociationContainerRegistriesGroupsRow]
     ] = relationship(

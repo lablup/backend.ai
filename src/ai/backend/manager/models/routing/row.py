@@ -156,7 +156,7 @@ class RoutingRow(Base):
 
     endpoint_row: Mapped[EndpointRow] = relationship("EndpointRow", back_populates="routings")
     session_row: Mapped[SessionRow | None] = relationship(
-        "SessionRow", back_populates="routing", foreign_keys="RoutingRow.session"
+        "SessionRow", foreign_keys="RoutingRow.session"
     )
 
     @classmethod
