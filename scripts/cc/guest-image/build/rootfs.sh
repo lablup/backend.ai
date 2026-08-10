@@ -197,7 +197,7 @@ stage_egress() {
 stage_overlay() {
 	mv "${stage}/usr/bin/kata-agent" "${stage}/usr/bin/kata-agent.real"
 	cp -a "${BAI_CC_ROOT}/overlay/." "${stage}/"
-	find "${stage}/opt/kernel" "${stage}/usr/local/bin" -name '__pycache__' -type d -prune -exec rm -rf {} +
+	find "${stage}/opt/kernel" "${stage}/usr/local/bin" "${stage}/usr/bin" -name '__pycache__' -type d -prune -exec rm -rf {} +
 	chmod 0755 "${stage}/usr/bin/kata-agent" \
 		"${stage}/opt/kernel/bai-cc-entrypoint" "${stage}/usr/local/bin/bai-guest-boot" \
 		"${stage}/opt/kernel/bai-guest-storage" "${stage}/usr/local/bin/bai-guest-egress" \
