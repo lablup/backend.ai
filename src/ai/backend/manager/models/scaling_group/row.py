@@ -411,6 +411,7 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
                         order=self.scheduler_opts.preemption.order,
                         mode=self.scheduler_opts.preemption.mode,
                         preemption_min_runtime=self.scheduler_opts.preemption.preemption_min_runtime,
+                        victim_scope=self.scheduler_opts.preemption.victim_scope,
                     ),
                 ),
             ),

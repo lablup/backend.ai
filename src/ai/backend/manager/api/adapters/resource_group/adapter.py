@@ -642,6 +642,7 @@ class ResourceGroupAdapter(BaseAdapter):
                     preemption_min_runtime=timedelta(
                         seconds=input.preemption.preemption_min_runtime
                     ),
+                    victim_scope=input.preemption.victim_scope,
                 )
             )
 
@@ -821,6 +822,7 @@ class ResourceGroupAdapter(BaseAdapter):
                     order=data.scheduler.options.preemption.order,
                     mode=PreemptionModeDTO(data.scheduler.options.preemption.mode.value),
                     preemption_min_runtime=data.scheduler.options.preemption.preemption_min_runtime.total_seconds(),
+                    victim_scope=data.scheduler.options.preemption.victim_scope,
                 ),
             ),
             default_deployment_options=deployment_options_to_info(data.default_deployment_options),

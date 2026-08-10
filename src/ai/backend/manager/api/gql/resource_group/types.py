@@ -81,7 +81,7 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     ReplaceResourceGroupDefaultSessionOptionsPayload as ReplaceResourceGroupDefaultSessionOptionsPayloadDTO,
 )
 from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.types import PreemptionOrder
+from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -115,6 +115,7 @@ __all__ = (
     "PreemptionConfigInput",
     "PreemptionModeGQL",
     "PreemptionOrderGQL",
+    "PreemptionVictimScopeGQL",
     "ResourceGroupFilterGQL",
     "ResourceGroupGQL",
     "ResourceGroupMetadataGQL",
@@ -176,6 +177,20 @@ PreemptionOrderGQL: type[PreemptionOrder] = gql_enum(
 )
 
 
+PreemptionVictimScopeGQL: type[PreemptionVictimScope] = gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.8.1",
+        description=(
+            "Scope preemption victims are drawn from. USER limits victims to the "
+            "pending session's owner; PROJECT/DOMAIN widen to sessions of the same "
+            "project/domain; RESOURCE_GROUP allows any session in the resource group."
+        ),
+    ),
+    PreemptionVictimScope,
+    name="PreemptionVictimScope",
+)
+
+
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0",
@@ -205,6 +220,14 @@ class PreemptionConfigGQL(PydanticOutputMixin[PreemptionConfigInfo]):
             added_version="26.8.0",
             description=(
                 "Minimum session runtime in seconds before it becomes preemptible (0 = disabled)."
+            ),
+        )
+    )
+    victim_scope: PreemptionVictimScopeGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.1",
+            description=(
+                "Scope preemption victims are drawn from (USER, PROJECT, DOMAIN, RESOURCE_GROUP)."
             ),
         )
     )
@@ -501,6 +524,16 @@ class PreemptionConfigInput(PydanticInputMixin[PreemptionConfigInputDTO]):
             ),
         ),
         default=0.0,
+    )
+    victim_scope: PreemptionVictimScopeGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.1",
+            description=(
+                "Scope preemption victims are drawn from (USER, PROJECT, DOMAIN, "
+                "RESOURCE_GROUP). Default is USER."
+            ),
+        ),
+        default=PreemptionVictimScopeGQL.USER,
     )
 
 
