@@ -20,6 +20,12 @@ set -e
 
 KRUNNER_SHARED="/tmp/backend-ai-krunner"
 
+if [ ! -d "$KRUNNER_SHARED" ]; then
+    echo "WARNING: $KRUNNER_SHARED is not mounted; skipping the krunner path-parity setup." >&2
+    echo "WARNING: kernel creation WILL fail with 'bind source path does not exist' unless" >&2
+    echo "WARNING: $KRUNNER_SHARED is bind-mounted from the host at the same path (see docker/README.md)." >&2
+fi
+
 if [ -d "$KRUNNER_SHARED" ]; then
     SITE_PKG=$(python3 -c "import site; print(site.getsitepackages()[0])")
     for pkg in runner kernel helpers krunner; do
