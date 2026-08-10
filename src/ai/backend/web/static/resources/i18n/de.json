@@ -196,6 +196,14 @@
     "VFolder": "VFolder",
     "VFolderRequired": "VFolder ist erforderlich."
   },
+  "adminRuntimeVariantPreset": {
+    "CreatePreset": "Voreinstellung erstellen",
+    "Name": "Name",
+    "PresetDeleted": "Die Voreinstellung für die Laufzeitvariante wurde gelöscht.",
+    "RuntimeVariantId": "Laufzeitvarianten-ID",
+    "RuntimeVariantPreset": "Laufzeitvarianten-Voreinstellung",
+    "TabTitle": "Laufzeitvarianten-Voreinstellungen"
+  },
   "adminSession": {
     "PendingSessions": "Ausstehende Sitzungen",
     "PendingSessionsScopedToResourceGroup": "Es werden nur ausstehende Sitzungen für die ausgewählte Ressourcengruppe angezeigt. Wechseln Sie die Ressourcengruppe, um Sitzungen in anderen Gruppen anzuzeigen."
@@ -1149,6 +1157,8 @@
     "SchedulingHistory": "Planungsverlauf",
     "SessionId": "Sitzungs-ID",
     "StartChatTest": "Im Chat testen",
+    "SwitchProjectConfirmContent": "Diese Bereitstellung gehört zum Projekt „{{projectName}}“. Sie werden zu diesem Projekt gewechselt, um sie anzuzeigen. Fortfahren?",
+    "SwitchProjectConfirmTitle": "Zu einem anderen Projekt wechseln?",
     "Tags": "Tags",
     "TagsPlaceholder": "Tags eingeben, durch Kommas getrennt",
     "TagsTooltip": "Optionale Labels zum Organisieren und Filtern von Bereitstellungen. Enter oder Komma drücken, um hinzuzufügen.",
@@ -1690,6 +1700,7 @@
     "CouldNotCopyText": "Text konnte nicht kopiert werden:",
     "CreateButtonCode": "Erstellen",
     "CreateNotebookButton": "Notizbuch-Schaltfläche erstellen",
+    "CreatedFolderIsReadOnly": "Der Ordner wurde mit schreibgeschützter Einbindeberechtigung erstellt und kann den Download nicht aufnehmen. Erstellen Sie einen Ordner mit Lese- und Schreibberechtigung.",
     "DownloadModelToFolder": "Modell in Ordner herunterladen",
     "Downloading": "Wird heruntergeladen...",
     "FailedToFetchRepositoryInformation": "Fehler beim Abrufen der Repository-Informationen.",
@@ -1706,6 +1717,12 @@
     "GitlabDefaultBranch": "GitLab-Zweigname",
     "GitlabRepoWillBeFolder": "Importierte GitLab-Repositories werden in Ordner umgewandelt und können beim Start der Sitzung gemountet werden.",
     "GitlabURL": "GitLab-URL",
+    "HuggingFaceModelInfoUnavailable": "Die Modellinformationen konnten nicht geladen werden. Der Import kann trotzdem gestartet werden.",
+    "HuggingFaceModelIsDisabled": "Dieses Modell ist auf Hugging Face deaktiviert und kann nicht heruntergeladen werden.",
+    "HuggingFaceModelIsGated": "Dieses Modell ist zugriffsbeschränkt. Akzeptieren Sie die Lizenz auf Hugging Face und geben Sie ein Zugriffstoken ein, sonst schlägt der Download fehl.",
+    "HuggingFaceModelNotFoundOrPrivate": "Modell nicht gefunden oder privat. Prüfen Sie die Modell-ID oder geben Sie ein Zugriffstoken ein.",
+    "HuggingFaceModelSize": "Größe",
+    "HuggingFaceModelSizeIncludesAllRevisions": "Gesamtgröße des Repositorys einschließlich aller Revisionen. Der tatsächliche Download kann kleiner sein.",
     "HuggingFaceModelUrlOrId": "Hugging Face Modell-URL oder -ID",
     "HuggingFaceModelWillBeDownloaded": "Das Hugging Face Modell wird per Batch-Sitzung in einen Unterordner des ausgewählten Modellordners heruntergeladen.",
     "HuggingFaceRevision": "Revision",
@@ -1727,6 +1744,7 @@
     "NotebookBadgeCodeMarkdown": "Notebook-Badge-Code (Abschlag)",
     "NotebookBadgeURL": "Notizbuch-URL",
     "NotebookURL": "Notizbuch-URL",
+    "OnlyWritableModelFoldersAreListed": "Es werden nur Modellordner im aktuellen Projekt angezeigt, die Sie mit Schreibrechten einbinden können.",
     "Preparing": "Vorbereitung...",
     "ReadyToImport": "Bereit zum Importieren",
     "RepoWillBeFolder": "Importierte GitHub-Repositorys werden in Ordner konvertiert und können beim Sitzungsstart gemountet werden.",

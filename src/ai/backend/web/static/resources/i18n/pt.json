@@ -196,6 +196,14 @@
     "VFolder": "VFolder",
     "VFolderRequired": "O VFolder é obrigatório."
   },
+  "adminRuntimeVariantPreset": {
+    "CreatePreset": "Criar Predefinição",
+    "Name": "Nome",
+    "PresetDeleted": "A predefinição de variante de runtime foi eliminada.",
+    "RuntimeVariantId": "ID da Variante de Runtime",
+    "RuntimeVariantPreset": "Predefinição de Variante de Runtime",
+    "TabTitle": "Predefinições de Variante de Runtime"
+  },
   "adminSession": {
     "PendingSessions": "Sessões pendentes",
     "PendingSessionsScopedToResourceGroup": "A exibir apenas as sessões pendentes do grupo de recursos selecionado. Mude de grupo de recursos para ver sessões noutros grupos."
@@ -1149,6 +1157,8 @@
     "SchedulingHistory": "Histórico de Agendamento",
     "SessionId": "ID da sessão",
     "StartChatTest": "Testar no Chat",
+    "SwitchProjectConfirmContent": "Esta implantação pertence ao projeto \"{{projectName}}\". Será mudado para esse projeto para a visualizar. Continuar?",
+    "SwitchProjectConfirmTitle": "Mudar para outro projeto?",
     "Tags": "Etiquetas",
     "TagsPlaceholder": "Introduza etiquetas, separadas por vírgulas",
     "TagsTooltip": "Etiquetas opcionais para organizar e filtrar implementações. Prima Enter ou vírgula para adicionar.",
@@ -1690,6 +1700,7 @@
     "CouldNotCopyText": "Não foi possível copiar o texto:",
     "CreateButtonCode": "Crio",
     "CreateNotebookButton": "Botão Criar Bloco de Notas",
+    "CreatedFolderIsReadOnly": "A pasta foi criada com permissão de montagem só de leitura, por isso não pode receber a transferência. Crie uma pasta com permissão de leitura e escrita.",
     "DownloadModelToFolder": "Baixar Modelo para a Pasta",
     "Downloading": "Baixando...",
     "FailedToFetchRepositoryInformation": "Falha ao obter informações do repositório.",
@@ -1706,6 +1717,12 @@
     "GitlabDefaultBranch": "Nome do ramo do GitLab",
     "GitlabRepoWillBeFolder": "Os repositórios GitLab importados são convertidos em pastas e podem ser montados quando a sessão é iniciada.",
     "GitlabURL": "URL do GitLab",
+    "HuggingFaceModelInfoUnavailable": "Não foi possível carregar as informações do modelo. Ainda assim é possível iniciar a importação.",
+    "HuggingFaceModelIsDisabled": "Este modelo está desativado no Hugging Face e não pode ser transferido.",
+    "HuggingFaceModelIsGated": "Este modelo tem acesso restrito. Aceite a respetiva licença no Hugging Face e introduza um token de acesso, caso contrário a transferência falhará.",
+    "HuggingFaceModelNotFoundOrPrivate": "Modelo não encontrado ou privado. Verifique o ID do modelo ou introduza um token de acesso.",
+    "HuggingFaceModelSize": "Tamanho",
+    "HuggingFaceModelSizeIncludesAllRevisions": "Tamanho total do repositório, incluindo todas as revisões. A transferência real pode ser menor.",
     "HuggingFaceModelUrlOrId": "URL ou ID do Modelo Hugging Face",
     "HuggingFaceModelWillBeDownloaded": "O modelo Hugging Face é baixado para uma subpasta da pasta de modelo selecionada por meio de uma sessão em lote.",
     "HuggingFaceRevision": "Revision",
@@ -1727,6 +1744,7 @@
     "NotebookBadgeCodeMarkdown": "Código do emblema do notebook (Markdown)",
     "NotebookBadgeURL": "URL do notebook",
     "NotebookURL": "URL do notebook",
+    "OnlyWritableModelFoldersAreListed": "Apenas as pastas de modelos do projeto atual que pode montar com permissão de escrita são listadas.",
     "Preparing": "Preparando...",
     "ReadyToImport": "Pronto para importar",
     "RepoWillBeFolder": "Os repositórios GitHub importados são convertidos em pastas e podem ser montados quando a sessão é iniciada.",

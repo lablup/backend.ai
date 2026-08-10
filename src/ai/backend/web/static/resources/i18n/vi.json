@@ -196,6 +196,14 @@
     "VFolder": "VFolder",
     "VFolderRequired": "VFolder là bắt buộc."
   },
+  "adminRuntimeVariantPreset": {
+    "CreatePreset": "Tạo cài đặt sẵn",
+    "Name": "Tên",
+    "PresetDeleted": "Cài đặt sẵn biến thể thời gian chạy đã được xóa.",
+    "RuntimeVariantId": "ID biến thể thời gian chạy",
+    "RuntimeVariantPreset": "Cài đặt sẵn biến thể thời gian chạy",
+    "TabTitle": "Cài đặt sẵn biến thể thời gian chạy"
+  },
   "adminSession": {
     "PendingSessions": "Phiên đang chờ",
     "PendingSessionsScopedToResourceGroup": "Đang hiển thị các phiên đang chờ chỉ cho nhóm tài nguyên đã chọn. Chuyển đổi nhóm tài nguyên để xem các phiên trong các nhóm khác."
@@ -1149,6 +1157,8 @@
     "SchedulingHistory": "Lịch sử lập lịch",
     "SessionId": "ID phiên",
     "StartChatTest": "Thử trong Trò chuyện",
+    "SwitchProjectConfirmContent": "Lượt triển khai này thuộc dự án \"{{projectName}}\". Bạn sẽ được chuyển sang dự án đó để xem. Tiếp tục?",
+    "SwitchProjectConfirmTitle": "Chuyển sang dự án khác?",
     "Tags": "Thẻ",
     "TagsPlaceholder": "Nhập thẻ, phân cách bằng dấu phẩy",
     "TagsTooltip": "Nhãn tùy chọn để tổ chức và lọc các triển khai. Nhấn Enter hoặc dấu phẩy để thêm.",
@@ -1690,6 +1700,7 @@
     "CouldNotCopyText": "Không thể sao chép văn bản:",
     "CreateButtonCode": "Tạo nên",
     "CreateNotebookButton": "Nút Tạo Notebook",
+    "CreatedFolderIsReadOnly": "Thư mục được tạo với quyền gắn kết chỉ đọc nên không thể nhận nội dung tải xuống. Hãy tạo thư mục với quyền gắn kết đọc và ghi.",
     "DownloadModelToFolder": "Tải mô hình xuống thư mục",
     "Downloading": "Đang tải xuống ...",
     "FailedToFetchRepositoryInformation": "Không thể lấy thông tin kho lưu trữ.",
@@ -1706,6 +1717,12 @@
     "GitlabDefaultBranch": "Tên chi nhánh GitLab",
     "GitlabRepoWillBeFolder": "Các kho lưu trữ GitLab đã nhập được chuyển đổi thành các thư mục và có thể được gắn kết khi phiên bắt đầu.",
     "GitlabURL": "URL GitLab",
+    "HuggingFaceModelInfoUnavailable": "Không thể tải thông tin mô hình. Bạn vẫn có thể bắt đầu nhập.",
+    "HuggingFaceModelIsDisabled": "Mô hình này đã bị vô hiệu hóa trên Hugging Face và không thể tải xuống.",
+    "HuggingFaceModelIsGated": "Mô hình này bị giới hạn truy cập. Hãy chấp nhận giấy phép trên Hugging Face và nhập mã truy cập, nếu không việc tải xuống sẽ thất bại.",
+    "HuggingFaceModelNotFoundOrPrivate": "Không tìm thấy mô hình hoặc mô hình ở chế độ riêng tư. Hãy kiểm tra ID mô hình hoặc nhập mã truy cập.",
+    "HuggingFaceModelSize": "Kích thước",
+    "HuggingFaceModelSizeIncludesAllRevisions": "Tổng dung lượng kho lưu trữ bao gồm mọi bản sửa đổi. Dung lượng tải xuống thực tế có thể nhỏ hơn.",
     "HuggingFaceModelUrlOrId": "URL hoặc ID mô hình Hugging Face",
     "HuggingFaceModelWillBeDownloaded": "Mô hình Hugging Face được tải xuống thư mục con của thư mục mô hình đã chọn thông qua một phiên xử lý theo lô (batch).",
     "HuggingFaceRevision": "Revision",
@@ -1727,6 +1744,7 @@
     "NotebookBadgeCodeMarkdown": "Mã huy hiệu sổ tay (Markdown)",
     "NotebookBadgeURL": "URL máy tính xách tay",
     "NotebookURL": "URL máy tính xách tay",
+    "OnlyWritableModelFoldersAreListed": "Chỉ hiển thị các thư mục mô hình trong dự án hiện tại mà bạn có thể gắn kết với quyền ghi.",
     "Preparing": "Đang chuẩn bị ...",
     "ReadyToImport": "Sẵn sàng nhập",
     "RepoWillBeFolder": "Các kho lưu trữ GitHub đã nhập được chuyển đổi thành các thư mục và có thể được gắn kết khi phiên bắt đầu.",

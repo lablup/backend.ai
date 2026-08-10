@@ -196,6 +196,14 @@
     "VFolder": "VFolder",
     "VFolderRequired": "VFolder jest wymagany."
   },
+  "adminRuntimeVariantPreset": {
+    "CreatePreset": "Utwórz ustawienie wstępne",
+    "Name": "Nazwa",
+    "PresetDeleted": "Ustawienie wstępne wariantu środowiska uruchomieniowego zostało usunięte.",
+    "RuntimeVariantId": "ID wariantu środowiska uruchomieniowego",
+    "RuntimeVariantPreset": "Ustawienie wstępne wariantu środowiska uruchomieniowego",
+    "TabTitle": "Ustawienia Wstępne Wariantów Środowiska Uruchomieniowego"
+  },
   "adminSession": {
     "PendingSessions": "Oczekujące sesje",
     "PendingSessionsScopedToResourceGroup": "Wyświetlane są tylko oczekujące sesje dla wybranej grupy zasobów. Przełącz grupy zasobów, aby wyświetlić sesje w innych grupach."
@@ -1149,6 +1157,8 @@
     "SchedulingHistory": "Historia planowania",
     "SessionId": "ID sesji",
     "StartChatTest": "Przetestuj w czacie",
+    "SwitchProjectConfirmContent": "To wdrożenie należy do projektu „{{projectName}}“. Zostaniesz przełączony na ten projekt, aby je wyświetlić. Kontynuować?",
+    "SwitchProjectConfirmTitle": "Przełączyć na inny projekt?",
     "Tags": "Tagi",
     "TagsPlaceholder": "Wprowadź tagi, oddzielone przecinkami",
     "TagsTooltip": "Opcjonalne etykiety do organizowania i filtrowania wdrożeń. Naciśnij Enter lub przecinek, aby dodać.",
@@ -1689,6 +1699,7 @@
     "CouldNotCopyText": "Nie udało się skopiować tekstu:",
     "CreateButtonCode": "Stwórz",
     "CreateNotebookButton": "Przycisk Utwórz notatnik",
+    "CreatedFolderIsReadOnly": "Folder został utworzony z prawem montowania tylko do odczytu, więc nie może przyjąć pobierania. Utwórz folder z prawem odczytu i zapisu.",
     "DownloadModelToFolder": "Pobierz model do folderu",
     "Downloading": "Ściąganie...",
     "FailedToFetchRepositoryInformation": "Nie udało się pobrać informacji o repozytorium.",
@@ -1705,6 +1716,12 @@
     "GitlabDefaultBranch": "Nazwa oddziału GitLab",
     "GitlabRepoWillBeFolder": "Zaimportowane repozytoria GitLab są konwertowane do folderów i mogą być montowane podczas uruchamiania sesji.",
     "GitlabURL": "Adres URL GitLab",
+    "HuggingFaceModelInfoUnavailable": "Nie udało się wczytać informacji o modelu. Import można mimo to rozpocząć.",
+    "HuggingFaceModelIsDisabled": "Ten model jest wyłączony w Hugging Face i nie może zostać pobrany.",
+    "HuggingFaceModelIsGated": "Ten model ma ograniczony dostęp. Zaakceptuj jego licencję w Hugging Face i podaj token dostępu, w przeciwnym razie pobieranie się nie powiedzie.",
+    "HuggingFaceModelNotFoundOrPrivate": "Nie znaleziono modelu lub jest prywatny. Sprawdź identyfikator modelu albo podaj token dostępu.",
+    "HuggingFaceModelSize": "Rozmiar",
+    "HuggingFaceModelSizeIncludesAllRevisions": "Łączny rozmiar repozytorium wraz ze wszystkimi rewizjami. Faktyczne pobranie może być mniejsze.",
     "HuggingFaceModelUrlOrId": "Adres URL lub ID modelu Hugging Face",
     "HuggingFaceModelWillBeDownloaded": "Model Hugging Face jest pobierany do podfolderu wybranego folderu modelu za pomocą sesji wsadowej (batch).",
     "HuggingFaceRevision": "Revision",
@@ -1726,6 +1743,7 @@
     "NotebookBadgeCodeMarkdown": "Kod plakietki notebooka (przecena)",
     "NotebookBadgeURL": "URL notatnika",
     "NotebookURL": "URL notatnika",
+    "OnlyWritableModelFoldersAreListed": "Wyświetlane są tylko foldery modeli w bieżącym projekcie, które możesz zamontować z prawem zapisu.",
     "Preparing": "Przygotowuję...",
     "ReadyToImport": "Gotowy do importu",
     "RepoWillBeFolder": "Zaimportowane repozytoria GitHub są konwertowane na foldery i można je zamontować po rozpoczęciu sesji.",
