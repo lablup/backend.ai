@@ -20797,10 +20797,26 @@
             "minimum": 0.0,
             "title": "Preemption Min Runtime",
             "type": "number"
+          },
+          "victim_scope": {
+            "$ref": "#/components/schemas/PreemptionVictimScope",
+            "default": "user",
+            "description": "Scope preemption victims are drawn from (user/project/domain/resource-group). Default is user."
           }
         },
         "title": "PreemptionConfigInputDTO",
         "type": "object"
+      },
+      "PreemptionVictimScope": {
+        "description": "Which sessions may become preemption victims for a pending session.\n\nUSER limits victims to the pending session's own sessions;\nPROJECT/DOMAIN widen to sessions of the same project/domain;\nRESOURCE_GROUP allows any session in the resource group.",
+        "enum": [
+          "user",
+          "project",
+          "domain",
+          "resource-group"
+        ],
+        "title": "PreemptionVictimScope",
+        "type": "string"
       },
       "UpdateResourceGroupConfigInput": {
         "description": "Input for updating resource group configuration via GQL (all fields optional).",

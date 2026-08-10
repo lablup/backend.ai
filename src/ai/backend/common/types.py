@@ -131,6 +131,7 @@ __all__ = (
     "MovingStatValue",
     "PreemptionMode",
     "PreemptionOrder",
+    "PreemptionVictimScope",
     "PromMetric",
     "PromMetricGroup",
     "PromMetricPrimitive",
@@ -2272,6 +2273,20 @@ class PreemptionOrder(enum.StrEnum):
     NEWEST = "newest"
     FEWEST_SESSIONS = "fewest-sessions"
     SMALLEST_RESOURCES = "smallest-resources"
+
+
+class PreemptionVictimScope(enum.StrEnum):
+    """Which sessions may become preemption victims for a pending session.
+
+    USER limits victims to the pending session's own sessions;
+    PROJECT/DOMAIN widen to sessions of the same project/domain;
+    RESOURCE_GROUP allows any session in the resource group.
+    """
+
+    USER = "user"
+    PROJECT = "project"
+    DOMAIN = "domain"
+    RESOURCE_GROUP = "resource-group"
 
 
 class SchedulerStatus(TypedDict):

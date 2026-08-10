@@ -147,6 +147,7 @@ class ScalingGroupSchedulerConfigUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
                 "order": preemption.order.value,
                 "mode": preemption.mode.value,
                 "preemption_min_runtime": preemption.preemption_min_runtime.total_seconds(),
+                "victim_scope": preemption.victim_scope.value,
             }
             to_update["scheduler_opts"] = func.jsonb_set(
                 sa.literal_column("scheduler_opts"),
