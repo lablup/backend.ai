@@ -1,10 +1,13 @@
 # Backend.AI service containers (DOCKER install mode).
 #
-# This file is a template: the installer replaces {{BASE_PATH}} with the
-# absolute install target directory and {{VERSION}} with the release version,
-# and strips the "#gpu#" prefixes when a CUDA accelerator is selected.
+# This file is a template: the installer substitutes the install-directory
+# and release-version placeholders, and uncomments the GPU device-reservation
+# lines of the agent service when a CUDA accelerator is selected (the marker
+# prefix keeps that block a comment otherwise).
 #
 # Design contract (see docker/README.md for the rationale):
+# - The compose project name is fixed so this file never shares a compose
+#   project with the halfstack file living in the same directory.
 # - Every service runs on the host network, so the generated configs use the
 #   same 127.0.0.1 addressing as the package-based install layout.
 # - The install directory is bind-mounted at the SAME absolute path (path
@@ -12,7 +15,13 @@
 #   daemon (scratch roots, IPC sockets, vfolder trees, plugin var state)
 #   resolves identically on the host and inside the containers.
 # - The agent additionally needs pid/cgroup host namespaces and the
-#   /tmp/backend-ai-krunner share for kernel-runner bind-mounts.
+#   /var/lib/backend.ai/krunner share for kernel-runner bind-mounts.
+# - No agent-watcher container ships in this mode; the watcher endpoint in
+#   the generated agent config is inert.
+# - The manager-cli service is a non-privileged twin of the manager used only
+#   for one-off management commands via `docker compose run`; its "cli"
+#   profile keeps `docker compose up -d` from ever starting it.
+name: backendai-services
 services:
   manager:
     image: lablup/backend.ai-manager:{{VERSION}}
@@ -25,6 +34,16 @@ services:
       - /etc/machine-id:/etc/machine-id:ro
       - {{BASE_PATH}}:{{BASE_PATH}}
     restart: unless-stopped
+
+  manager-cli:
+    image: lablup/backend.ai-manager:{{VERSION}}
+    network_mode: host
+    working_dir: {{BASE_PATH}}
+    profiles: ["cli"]
+    command: ["true"]
+    volumes:
+      - /etc/machine-id:/etc/machine-id:ro
+      - {{BASE_PATH}}:{{BASE_PATH}}
 
   agent:
     image: lablup/backend.ai-agent:{{VERSION}}
@@ -48,7 +67,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc/machine-id:/etc/machine-id:ro
       - {{BASE_PATH}}:{{BASE_PATH}}
-      - /tmp/backend-ai-krunner:/tmp/backend-ai-krunner
+      - /var/lib/backend.ai/krunner:/var/lib/backend.ai/krunner
     restart: unless-stopped
 
   webserver:
