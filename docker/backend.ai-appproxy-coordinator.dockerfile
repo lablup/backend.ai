@@ -14,7 +14,7 @@ FROM python:${PYTHON_VERSION}
 COPY --from=builder /wheels /wheels
 COPY ./dist /dist
 # Install all wheels and also look in /dist for backend.ai packages
-RUN pip install --no-cache-dir --find-links=/dist /wheels/*.whl
+RUN pip install --no-cache-dir --find-links=/dist /wheels/*.whl && rm -rf /wheels /dist
 
 # Create necessary directories
 RUN mkdir -p /var/log/backend.ai /etc/backend.ai

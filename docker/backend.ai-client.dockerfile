@@ -8,4 +8,4 @@ RUN pip wheel --wheel-dir=/wheels --no-cache-dir backend.ai-client==${PKGVER} --
 
 FROM python:${PYTHON_VERSION}
 COPY --from=builder /wheels /wheels
-RUN pip install --no-cache-dir /wheels/*.whl
+RUN pip install --no-cache-dir /wheels/*.whl && rm -rf /wheels /dist
