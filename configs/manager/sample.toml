@@ -522,9 +522,9 @@
   # Opt-in list: a read operation is recorded only if it is named here. The
   # default is an empty list, so successful reads are not recorded at all and
   # read volume stays off until an operator turns it on. A listed operation is
-  # recorded for every entity type. Must be 'get' or 'search': mutating
-  # operations are always recorded and listing them here is rejected. Failed and
-  # denied reads are recorded either way.
+  # recorded for every entity type. Must be 'get', 'search' or 'lookup':
+  # mutating operations are always recorded and listing them here is rejected.
+  # Failed and denied reads are recorded either way.
   # Added in 26.9.0
   record-read-operations = []
 
@@ -692,6 +692,14 @@
   # session start.
   # Added in 25.8.0
   checkers = {}
+  # Seconds before an idle checker reclaims a session to emit a 'session.idle-
+  # timeout.warning' notification event. The event fires once per session when
+  # its remaining time first drops below this threshold, and again if user
+  # activity resets the timer and it later drops below the threshold.
+  # Administrators subscribe to the event via notification rules. 0 disables the
+  # warning.
+  # Added in 26.9.0
+  warning_threshold = 600
 
 # Docker container runtime settings. Controls how Docker images are managed and
 # used for compute sessions. Includes image configuration and container runtime

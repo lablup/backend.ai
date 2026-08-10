@@ -58,6 +58,8 @@ _AGENT_LAST_SEEN_HASH: Final[str] = "agent.last_seen"
 _SESSION_LAST_ACCESS_EXPIRATION: Final[int] = 86400
 # Sentinel meaning the session has ongoing activity; the idle checker skips judgment for it.
 _SESSION_ACTIVE_SENTINEL: Final[str] = "0"
+# TTL reaps warned-markers left behind by terminated sessions.
+_SESSION_IDLE_WARNING_EXPIRATION: Final[int] = 86400
 
 
 class ValkeyLiveClient:
@@ -237,6 +239,34 @@ class ValkeyLiveClient:
     async def delete_session_last_access(self, session_id: SessionId) -> None:
         """Remove the session's last network access marker."""
         await self.delete_live_data(self._session_last_access_key(session_id))
+
+    def _session_idle_warning_key(self, session_id: SessionId) -> str:
+        return f"session.{session_id}.idle_warning_sent"
+
+    async def get_session_idle_warning_sent_batch(
+        self,
+        session_ids: Sequence[SessionId],
+    ) -> dict[SessionId, bool]:
+        """Get whether the idle termination warning was already sent, per session."""
+        values = await self.get_multiple_live_data([
+            self._session_idle_warning_key(session_id) for session_id in session_ids
+        ])
+        return {
+            session_id: value is not None
+            for session_id, value in zip(session_ids, values, strict=True)
+        }
+
+    async def mark_session_idle_warning_sent(self, session_id: SessionId) -> None:
+        """Mark that the idle termination warning was sent for the session."""
+        await self.store_live_data(
+            self._session_idle_warning_key(session_id),
+            b"1",
+            ex=_SESSION_IDLE_WARNING_EXPIRATION,
+        )
+
+    async def delete_session_idle_warning_sent(self, session_id: SessionId) -> None:
+        """Clear the warned marker so the session can be warned again."""
+        await self.delete_live_data(self._session_idle_warning_key(session_id))
 
     @valkey_live_resilience.apply()
     async def incr_live_data(

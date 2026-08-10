@@ -16,6 +16,7 @@ __all__ = (
     "ArtifactDownloadCompletedMessage",
     "EndpointLifecycleChangedMessage",
     "NotifiableMessage",
+    "SessionIdleTimeoutWarningMessage",
     "SessionStartedMessage",
     "SessionTerminatedMessage",
 )
@@ -144,6 +145,34 @@ class SessionTerminatedMessage(NotifiableMessage):
     termination_reason: str | None = Field(
         default=None,
         description="Reason for termination (e.g., 'user-requested', 'timeout', 'error')",
+    )
+
+
+class SessionIdleTimeoutWarningMessage(NotifiableMessage):
+    """Sent once when a session's remaining time before idle-based termination
+    drops below the configured warning threshold."""
+
+    @classmethod
+    @override
+    def rule_type(cls) -> NotificationRuleType:
+        """Return the notification rule type for this message class."""
+        return NotificationRuleType.SESSION_IDLE_TIMEOUT_WARNING
+
+    session_id: str = Field(description="Unique identifier of the compute session")
+    session_name: str | None = Field(
+        default=None, description="User-defined name for the session, if provided"
+    )
+    owner_uuid: str = Field(description="UUID of the user who owns the session")
+    owner_email: str = Field(description="Email address of the user who owns the session")
+    checker: str = Field(
+        description=(
+            "Name of the idle checker about to reclaim the session "
+            "(e.g., 'network_timeout', 'session_lifetime')"
+        )
+    )
+    remaining_seconds: int = Field(description="Seconds left until the session is reclaimed")
+    expected_termination_at: str = Field(
+        description="ISO format timestamp when the session is expected to be reclaimed"
     )
 
 

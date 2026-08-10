@@ -2243,6 +2243,27 @@ class IdleCheckerConfig(BaseConfigSchema):
             added_version="25.8.0",
         ),
     ]
+    warning_threshold: Annotated[
+        int,
+        Field(
+            default=300,
+            ge=0,
+            validation_alias=AliasChoices("warning_threshold", "warning-threshold"),
+            serialization_alias="warning_threshold",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Seconds before an idle checker reclaims a session to emit a "
+                "'session.idle-timeout.warning' notification event. The event fires once per "
+                "session when its remaining time first drops below this threshold, and again "
+                "if user activity resets the timer and it later drops below the threshold. "
+                "Administrators subscribe to the event via notification rules. "
+                "0 disables the warning."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="300", prod="600"),
+        ),
+    ]
 
 
 class VolumeTypeConfig(BaseConfigSchema):
