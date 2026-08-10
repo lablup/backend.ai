@@ -82,14 +82,24 @@ class TestResolveContainerDns:
         )
         assert result.nameservers == list(FALLBACK_NAMESERVERS)
 
-    def test_search_and_options_are_carried_over(self, tmp_path: Path) -> None:
+    def test_search_carried_over_but_ndots_forced_to_zero(self, tmp_path: Path) -> None:
+        # search is carried over; the inherited ndots:N is replaced with ndots:0 so bare cluster
+        # peer names (main1, sub1) resolve in ONE query instead of chasing every search suffix first
+        # (dockerd embedded-DNS parity).
         host = _write(
             tmp_path / "resolv.conf",
-            "nameserver 1.1.1.1\nsearch corp.example.com\noptions ndots:5\n",
+            "nameserver 1.1.1.1\nsearch corp.example.com\noptions ndots:5 edns0\n",
         )
         result = resolve_container_dns(host_resolv_conf=host, systemd_uplink=tmp_path / "absent")
         assert result.search == ["corp.example.com"]
-        assert result.options == ["ndots:5"]
+        assert "ndots:5" not in result.options
+        assert "ndots:0" in result.options
+        assert "edns0" in result.options  # other options are preserved
+
+    def test_ndots_forced_even_without_a_host_ndots(self, tmp_path: Path) -> None:
+        host = _write(tmp_path / "resolv.conf", "nameserver 1.1.1.1\n")
+        result = resolve_container_dns(host_resolv_conf=host, systemd_uplink=tmp_path / "absent")
+        assert result.options == ["ndots:0"]
 
     def test_search_survives_an_operator_override(self, tmp_path: Path) -> None:
         # Pinning a corporate resolver must not cost the user short-name lookups.
@@ -103,15 +113,16 @@ class TestResolveContainerDns:
 
 class TestRender:
     def test_renders_a_valid_resolv_conf(self, tmp_path: Path) -> None:
+        # ndots:0 is always appended (cluster peer names resolve in one query; dockerd parity).
         host = _write(tmp_path / "resolv.conf", "nameserver 1.1.1.1\nsearch a.example\n")
         rendered = resolve_container_dns(
             host_resolv_conf=host, systemd_uplink=tmp_path / "absent"
         ).render()
-        assert rendered == "nameserver 1.1.1.1\nsearch a.example\n"
+        assert rendered == "nameserver 1.1.1.1\nsearch a.example\noptions ndots:0\n"
 
     def test_nameserver_only(self, tmp_path: Path) -> None:
         host = _write(tmp_path / "resolv.conf", "nameserver 1.1.1.1\n")
         rendered = resolve_container_dns(
             host_resolv_conf=host, systemd_uplink=tmp_path / "absent"
         ).render()
-        assert rendered == "nameserver 1.1.1.1\n"
+        assert rendered == "nameserver 1.1.1.1\noptions ndots:0\n"

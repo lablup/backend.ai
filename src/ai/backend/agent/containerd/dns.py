@@ -96,12 +96,22 @@ def resolve_container_dns(
 
     ``search``/``options`` are carried over from the host's resolv.conf whenever we have one, so
     short-name lookups keep working; they are harmless even when the nameservers came from
-    elsewhere.
+    elsewhere. **``ndots`` is forced to 0** (see below), overriding any inherited value.
+
+    Every containerd kernel points its first nameserver at the session cluster resolver (see
+    ``ContainerdKernelCreationContext._point_resolv_conf_at_resolver``), and cluster peer names are
+    bare single labels (``main1``, ``sub1``). With the k8s pod's inherited ``ndots:5``, glibc would
+    append every search-domain suffix (``…svc.cluster.local``) and query those FIRST — three wasted
+    upstream round-trips per peer lookup — before the bare name ever reached our resolver.
+    ``ndots:0`` tries the bare name first, so a peer resolves in a single query. This is exactly
+    dockerd's embedded-DNS default, and its only cost — a short *non*-cluster name pays one extra
+    round-trip (bare miss, then search) — is the same tradeoff Docker accepts.
     """
     host = _read(host_resolv_conf)
+    inherited_options = list(host.options) if host else []
     result = ResolvConf(
         search=list(host.search) if host else [],
-        options=list(host.options) if host else [],
+        options=[o for o in inherited_options if not o.startswith("ndots:")] + ["ndots:0"],
     )
 
     if configured_nameservers:

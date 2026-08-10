@@ -867,8 +867,9 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         Deferred to here (not ``_prepare_resolv_conf``) because the LOCAL gateway the resolver binds
         does not exist until the container attaches (privnet allocates the session's LOCAL block
         then). The file is bind-mounted, so an in-place rewrite is picked up by the container's next
-        lookup (glibc re-reads resolv.conf). Best-effort: no gateway → leave the upstream-only file,
-        under which cluster names still resolve via /etc/hosts.
+        lookup (glibc re-reads resolv.conf). Best-effort: no gateway → leave the upstream-only file
+        (only self + localhost are in /etc/hosts now, so a clustered kernel then cannot resolve its
+        peers — ensure_cluster_dns is the fail-loud guard against that path).
         """
         resolv_file = self._resolv_conf_path()
         if resolv_file is None:
