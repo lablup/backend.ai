@@ -145,12 +145,14 @@ def create(name: str, domain_name: str, description: str | None, is_default: boo
 @click.argument("name", type=str)
 @click.option("--description", default=None, help="Human-readable description.")
 @click.option(
-    "--is-active/--no-is-active",
+    "--set-active/--unset-active",
+    "is_active",
     default=None,
     help="Whether the resource group accepts new sessions.",
 )
 @click.option(
-    "--is-public/--no-is-public",
+    "--set-public/--unset-public",
+    "is_public",
     default=None,
     help="Whether the resource group is visible to all users.",
 )
