@@ -375,25 +375,39 @@ def _peer_address(request: web.Request) -> str | None:
     return None
 
 
+def _trusted_proxy_networks(
+    request: web.Request,
+) -> list[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]]:
+    networks: list[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]] = (
+        request.config_dict.get(TRUSTED_PROXY_NETWORKS_KEY, [])
+    )
+    return networks
+
+
+def _is_trusted_address(
+    raw_address: str,
+    networks: list[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]],
+) -> bool:
+    try:
+        address = ipaddress.ip_address(raw_address)
+    except ValueError:
+        return False
+    return any(address in network.address for network in networks if network.address is not None)
+
+
 def is_from_trusted_proxy(request: web.Request) -> bool:
     """Tell whether the request arrived directly from a configured trusted proxy.
 
     The decision is made on the peer address of the connection, which a client
     cannot forge.  Returns ``False`` when no trusted proxy is configured.
     """
-    networks: list[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]] = (
-        request.config_dict.get(TRUSTED_PROXY_NETWORKS_KEY, [])
-    )
+    networks = _trusted_proxy_networks(request)
     if not networks:
         return False
     raw_peer = _peer_address(request)
     if raw_peer is None:
         return False
-    try:
-        peer = ipaddress.ip_address(raw_peer)
-    except ValueError:
-        return False
-    return any(peer in network.address for network in networks if network.address is not None)
+    return _is_trusted_address(raw_peer, networks)
 
 
 @functools.cache
@@ -492,15 +506,45 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
         raise AuthorizationFailed("Invalid signature") from e
 
 
+def _forwarded_for_chain(request: web.Request) -> list[str]:
+    raw = request.headers.get("X-Forwarded-For")
+    if not raw:
+        return []
+    return [entry.strip() for entry in raw.split(",") if entry.strip()]
+
+
+def _resolve_client_ip_via_trusted_proxies(
+    request: web.Request,
+    networks: list[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]],
+) -> str | None:
+    """Walk the forwarding chain inwards and return the first untrusted address.
+
+    The chain runs from the outermost claim in ``X-Forwarded-For`` to the peer of
+    this connection.  Every trailing hop that belongs to a trusted proxy is
+    skipped, so the first address that is not one of them is the real client:
+    a client that forges ``X-Forwarded-For`` while connecting directly is caught
+    by its own peer address ending the walk.
+    """
+    chain = _forwarded_for_chain(request)
+    peer = _peer_address(request)
+    if peer is not None:
+        chain.append(peer)
+    for raw_address in reversed(chain):
+        if not _is_trusted_address(raw_address, networks):
+            return raw_address
+    return chain[0] if chain else None
+
+
 def extract_client_ip(request: web.Request) -> str | None:
     """Extract the client IP from the request.
 
-    When XForwardedStrict middleware is active, request.remote is already
-    resolved to the real client IP, so use it directly.  Otherwise, fall back
-    to manual X-Forwarded-For parsing (first IP in the comma-separated list).
+    With trusted proxies configured, the address is resolved from the forwarding
+    chain.  Otherwise, fall back to manual X-Forwarded-For parsing (first IP in
+    the comma-separated list).
     """
-    if request.app.get("_trusted_proxies_enabled"):
-        return request.remote
+    networks = _trusted_proxy_networks(request)
+    if networks:
+        return _resolve_client_ip_via_trusted_proxies(request, networks)
     raw: str | None = request.headers.get("X-Forwarded-For") or request.remote
     if raw:
         return raw.split(",")[0].strip()

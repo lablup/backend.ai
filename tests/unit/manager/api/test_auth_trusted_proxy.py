@@ -13,6 +13,7 @@ from ai.backend.manager.api.rest.middleware import auth as auth_module
 from ai.backend.manager.api.rest.middleware.auth import (
     FORWARDED_URL_HEADER,
     TRUSTED_PROXY_NETWORKS_KEY,
+    extract_client_ip,
     is_from_trusted_proxy,
     parse_trusted_proxy_networks,
     sign_request,
@@ -32,6 +33,7 @@ def _make_request(
     host: str = DEFAULT_HOST,
     raw_path: str = DEFAULT_PATH,
     forwarded_url: str | None = None,
+    forwarded_for: str | None = None,
     peer: str | None = TRUSTED_PROXY,
     trusted_proxies: list[str] | None = None,
 ) -> web.Request:
@@ -40,10 +42,13 @@ def _make_request(
     headers = {"X-BackendAI-Version": "v8.20240915"}
     if forwarded_url is not None:
         headers[FORWARDED_URL_HEADER] = forwarded_url
+    if forwarded_for is not None:
+        headers["X-Forwarded-For"] = forwarded_for
 
     request = MagicMock(spec=web.Request)
     request.__getitem__.side_effect = state.__getitem__
     request.headers = headers
+    request.remote = peer
     request.method = "POST"
     request.host = host
     request.raw_path = raw_path
@@ -181,3 +186,71 @@ async def test_no_warning_when_forwarded_url_is_absent(
     assert not [
         record for record in caplog.records if "manager.trusted-proxies" in record.getMessage()
     ]
+
+
+class TestExtractClientIP:
+    """Client IP resolution over the X-Forwarded-For chain."""
+
+    def test_single_proxy_hop(self) -> None:
+        request = _make_request(
+            forwarded_for="203.0.113.9",
+            peer="10.0.0.1",
+            trusted_proxies=["10.0.0.0/8"],
+        )
+
+        assert extract_client_ip(request) == "203.0.113.9"
+
+    def test_multiple_trusted_hops(self) -> None:
+        request = _make_request(
+            forwarded_for="203.0.113.9, 10.0.0.5, 10.0.0.6",
+            peer="10.0.0.1",
+            trusted_proxies=["10.0.0.0/8"],
+        )
+
+        assert extract_client_ip(request) == "203.0.113.9"
+
+    def test_no_forwarded_for_falls_back_to_peer(self) -> None:
+        request = _make_request(peer="10.0.0.1", trusted_proxies=["10.0.0.0/8"])
+
+        assert extract_client_ip(request) == "10.0.0.1"
+
+    def test_forged_header_from_untrusted_peer_is_ignored(self) -> None:
+        request = _make_request(
+            forwarded_for="1.2.3.4",
+            peer=UNTRUSTED_PEER,
+            trusted_proxies=["10.0.0.0/8"],
+        )
+
+        assert extract_client_ip(request) == UNTRUSTED_PEER
+
+    def test_untrusted_hop_between_trusted_ones_wins(self) -> None:
+        request = _make_request(
+            forwarded_for="203.0.113.9, 198.51.100.4, 10.0.0.5",
+            peer="10.0.0.1",
+            trusted_proxies=["10.0.0.0/8"],
+        )
+
+        assert extract_client_ip(request) == "198.51.100.4"
+
+    def test_every_hop_trusted_returns_the_outermost(self) -> None:
+        request = _make_request(
+            forwarded_for="10.0.0.9, 10.0.0.5",
+            peer="10.0.0.1",
+            trusted_proxies=["10.0.0.0/8"],
+        )
+
+        assert extract_client_ip(request) == "10.0.0.9"
+
+    def test_without_trusted_proxies_takes_the_first_entry(self) -> None:
+        request = _make_request(
+            forwarded_for="203.0.113.9, 10.0.0.5",
+            peer="10.0.0.1",
+            trusted_proxies=[],
+        )
+
+        assert extract_client_ip(request) == "203.0.113.9"
+
+    def test_without_trusted_proxies_falls_back_to_remote(self) -> None:
+        request = _make_request(peer="10.0.0.1", trusted_proxies=[])
+
+        assert extract_client_ip(request) == "10.0.0.1"
