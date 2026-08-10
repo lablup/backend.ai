@@ -98,7 +98,21 @@ Both converge on dynamic DNS; the resolver brings containerd to parity **without
 5. **Remove the static peer map from `/etc/hosts` — done, live-validated.** `/etc/hosts` keeps only `localhost` + self (own name → its real overlay/LOCAL address); the peer map is no longer written. Peers resolve through the resolver — the Docker model (embedded DNS + `Aliases`, no static peer file). `_peer_host_map` still computes the map to register names / pin the single-node address / derive `own_ip`.
    - **Single-node name source (settled):** single-node sessions have no `endpoints/` table, so the agent registers the locally-computed `cluster_host_ips` with the coordinator (`register_static_names`) — the analog of Docker's `Aliases`. `resolve_cluster_name` checks the dynamic etcd map first, then these static names.
    - **Live-validated 2-node.** *Multi-node* (main1@node-A, sub1@node-B): the CinC's `/etc/hosts` held only `localhost`+`main1`, yet `getent hosts sub1` returned its cross-node overlay IP via the resolver. *Single-node cluster* (main1+sub1 co-located, bridge backend, no etcd endpoints): `/etc/hosts` held only self, and `getent hosts sub1` resolved via the resolver from the registered `cluster_host_ips`. Both use resolv.conf → the session gateway, resolver auto-started post-attach.
-   - **Known limitation (follow-up):** *node-level resolver ownership* — two agents on one node share one gateway, so only one can bind `:53`. Best-effort bind handles the conflict; making the resolver a node-level singleton (or re-owning it on withdraw) is future work. Unlike dockerd's always-on embedded DNS, this resolver is best-effort, but every containerd cluster session has a LOCAL gateway so it reliably starts (validated).
+### Privileged-port binding: the dockerd redirect model (settled)
+
+The resolver must answer on `gateway:53` (glibc always queries port 53), but binding a port `<1024` needs `CAP_NET_BIND_SERVICE`/root. Having the **agent** bind `:53` would force it to be privileged — defeating privnet's entire purpose (an unprivileged agent, privnet holding the caps). This is exactly the problem dockerd's embedded DNS solves, and we adopt its solution:
+
+- The resolver binds an **unprivileged high port** (`CLUSTER_DNS_REDIRECT_PORT`, 15353) on the gateway — no capability needed.
+- The **one privileged step**, an iptables `PREROUTING -d gateway -p udp --dport 53 -j DNAT --to-destination gateway:15353`, is installed by `native_attacher` alongside the LOCAL bridge's MASQUERADE. In privnet mode `native_attacher` runs **inside the privnet** (the agent's ATTACH RPC), which already holds `CAP_NET_ADMIN`; in in-process mode it runs in the privileged agent. Either way the **agent process needs no network privilege**.
+- The container's `/etc/resolv.conf` still points at `gateway:53` (unchanged); the redirect is transparent.
+
+This is dockerd's embedded-DNS mechanism precisely (127.0.0.11 on a high port + an iptables `:53` redirect). It also dissolves the "two agents share one gateway `:53`" concern: the rule is per-session-gateway (distinct addresses), installed by the single privileged owner.
+
+**Live-validated:** in a real 2-node session the resolver bound `172.30.0.1:15353` (nothing on `:53`), the `:53 → :15353` DNAT was present, and a container's `getent hosts sub1` resolved cross-node through the redirect while non-cluster names forwarded to CoreDNS.
+
+### Fail-loud (settled)
+
+Because phase 5 removed the `/etc/hosts` peer fallback, a resolver that fails to start leaves cluster names unresolvable and the session hangs at rendezvous with no visible cause. So `ensure_cluster_dns` **fails the kernel** (`ClusterDNSStartError`) on a bind failure or a missing post-attach gateway, rather than degrading silently. (A genuinely absent session — no coordinator on this node — is still a no-op.)
 
 **Costs / risks:**
 - The resolver must **forward** non-cluster names (a bare `NXDOMAIN` stops the client from trying the next nameserver), i.e. a small split-horizon forwarding resolver — the one genuinely new piece.
