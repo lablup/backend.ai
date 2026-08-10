@@ -9622,7 +9622,7 @@ type PresetModelConfig {
 }
 
 """
-Added in 26.4.4. Configuration for a single model within a preset model definition.
+Added in 26.9.0. Configuration for a single model within a preset model definition.
 """
 input PresetModelConfigInput {
   """
@@ -9759,9 +9759,7 @@ type PresetModelServiceConfig {
   healthCheck: ModelHealthCheck
 }
 
-"""
-Added in 26.4.4. Strict service configuration for a preset model entry.
-"""
+"""Added in 26.9.0. Service configuration for a preset model entry."""
 input PresetModelServiceConfigInput {
   """
   Pre-start actions to execute before starting the model service. Provide an empty list when no pre-start actions are needed.
@@ -15331,7 +15329,7 @@ input UpdateDeploymentRevisionPresetInput {
   """
   imageId: UUID
 
-  """Added in 26.4.4. Parsed model definition. Set to null to clear."""
+  """Added in 26.9.0. Parsed model definition. Set to null to clear."""
   modelDefinition: PresetModelDefinitionInput
 
   """Added in 26.4.4. Container startup command. Set to null to clear."""

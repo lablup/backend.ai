@@ -612,8 +612,8 @@ class PresetModelMetadataInputGQL(PydanticInputMixin[PresetModelMetadataInputDTO
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version="26.4.4",
-        description="Strict service configuration for a preset model entry.",
+        added_version=NEXT_RELEASE_VERSION,
+        description="Service configuration for a preset model entry.",
     ),
     name="PresetModelServiceConfigInput",
 )
@@ -657,7 +657,7 @@ class PresetModelServiceConfigInputGQL(PydanticInputMixin[PresetModelServiceConf
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version="26.4.4",
+        added_version=NEXT_RELEASE_VERSION,
         description="Configuration for a single model within a preset model definition.",
     ),
     name="PresetModelConfigInput",
@@ -843,7 +843,7 @@ class UpdateDeploymentRevisionPresetInputGQL(PydanticInputMixin[UpdateInputDTO])
     )
     model_definition: PresetModelDefinitionInputGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version="26.4.4",
+            added_version=NEXT_RELEASE_VERSION,
             description="Parsed model definition. Set to null to clear.",
         ),
         default=UNSET,
