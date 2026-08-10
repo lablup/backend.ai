@@ -506,25 +506,59 @@ class TestClusterDnsRedirect:
         assert "-d 172.30.1.1/32" in flat  # the subnet's first host = the gateway
         assert "--to-destination 127.0.0.1:40000" in flat
 
-    async def test_remove_deletes_the_tagged_rule(self, monkeypatch: Any) -> None:
+    def _recorder_with_rules(self, s_output: bytes) -> _RunRecorder:
+        """A recorder whose ``iptables -S PREROUTING`` returns ``s_output`` (quoted comments, as real
+        iptables does), so removal has rules to match against."""
+
         class _Rec(_RunRecorder):
             @override
             async def __call__(self, argv: Any, *, check: bool = True) -> tuple[int, bytes, bytes]:
                 argv = list(argv)
                 if argv[:4] == ["iptables", "-t", "nat", "-S"]:
                     self.calls.append(argv)
-                    return (
-                        0,
-                        b"-A PREROUTING -d 172.30.1.1/32 -p udp -m udp --dport 53 "
-                        b"-m comment --comment bai-dns:sid-3 -j DNAT "
-                        b"--to-destination 127.0.0.1:40000\n",
-                        b"",
-                    )
+                    return 0, s_output, b""
                 return await super().__call__(argv, check=check)
 
-        rec = _Rec()
+        return _Rec()
+
+    # iptables -S quotes the comment value — the format removal must cope with.
+    _RULE = (
+        b"-A PREROUTING -d 172.30.1.1/32 -p udp -m udp --dport 53 "
+        b'-m comment --comment "bai-dns:sid-3" -j DNAT --to-destination 127.0.0.1:40000\n'
+    )
+
+    async def test_remove_strips_the_quoted_comment(self, monkeypatch: Any) -> None:
+        rec = self._recorder_with_rules(self._RULE)
         monkeypatch.setattr(na, "_run", rec)
         await na.remove_dns_redirect("sid-3")
-        # the -A rule tagged for this session is converted to -D and deleted
+        # The -A rule is converted to -D with the comment UNQUOTED (quoted, iptables -D never
+        # matches → the rule would silently leak).
         assert "iptables -t nat -D PREROUTING" in rec.flat()
-        assert "bai-dns:sid-3" in rec.flat()
+        assert "--comment bai-dns:sid-3" in rec.flat()
+        assert '"bai-dns:sid-3"' not in rec.flat()
+
+    async def test_install_clears_a_stale_rule_on_the_same_gateway(self, monkeypatch: Any) -> None:
+        # A rule a DIFFERENT (dead) session left on this gateway must be removed on install, else it
+        # sits first in PREROUTING and shadows the new session's resolver with a dead port.
+        stale = (
+            b"-A PREROUTING -d 172.30.1.1/32 -p udp -m udp --dport 53 "
+            b'-m comment --comment "bai-dns:dead-session" -j DNAT --to-destination 127.0.0.1:49510\n'
+        )
+        rec = self._recorder_with_rules(stale)
+        monkeypatch.setattr(na, "_run", rec)
+        await na.install_dns_redirect("172.30.1.1", 50012, "new-session")
+        flat = rec.flat()
+        assert "-D PREROUTING -d 172.30.1.1/32" in flat  # stale rule deleted
+        assert "bai-dns:dead-session" in flat
+        assert "--to-destination 127.0.0.1:50012" in flat  # new rule added
+
+    async def test_install_leaves_a_rule_on_a_different_gateway(self, monkeypatch: Any) -> None:
+        other = (
+            b"-A PREROUTING -d 172.30.2.1/32 -p udp -m udp --dport 53 "
+            b'-m comment --comment "bai-dns:other-session" -j DNAT --to-destination 127.0.0.1:51000\n'
+        )
+        rec = self._recorder_with_rules(other)
+        monkeypatch.setattr(na, "_run", rec)
+        await na.install_dns_redirect("172.30.1.1", 50012, "new-session")
+        # A different gateway's rule (a co-located session) must NOT be touched.
+        assert "-D PREROUTING" not in rec.flat()

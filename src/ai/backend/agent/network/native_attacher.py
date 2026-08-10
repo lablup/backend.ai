@@ -55,34 +55,43 @@ def _dns_redirect_add_args(gateway: str, loopback_port: int, session_id: str) ->
     ]  # fmt: skip
 
 
-async def _remove_dns_redirects(session_id: str) -> None:
-    """Delete every DNS-redirect rule tagged for this session (there is normally one). Comment-based
-    so it works without knowing the ephemeral port — used both to replace on re-install and to tear
-    down."""
+async def _delete_dns_rules(match: str) -> None:
+    """Delete every bai-dns PREROUTING rule whose ``iptables -S`` line also contains ``match`` — a
+    ``bai-dns:<session>`` tag (teardown: only this session's rule) or a ``-d <gateway>/32`` (install:
+    every DNS rule on this gateway, whatever session tagged it).
+
+    Two subtleties this gets right, both learned the hard way:
+    - ``iptables -S`` prints the comment value **quoted** (``--comment "bai-dns:x"``); replaying that
+      token verbatim as ``-D`` never matches, so the rule silently leaks. Strip the quotes.
+    - Matching by gateway (not just this session's tag) is what clears a rule a session that died
+      **without a clean teardown** left behind: when the LOCAL block is later reused, that stale
+      rule sits first in PREROUTING and DNATs ``:53`` to a now-dead loopback port, shadowing the new
+      session's resolver. Comment-based, so it needs neither the old port nor the old session id.
+    """
     _, out, _ = await _run(["iptables", "-t", "nat", "-S", "PREROUTING"], check=False)
-    tag = f"{_DNS_COMMENT_PREFIX}{session_id}"
     for line in out.decode(errors="replace").splitlines():
-        if tag not in line:
+        if _DNS_COMMENT_PREFIX not in line or match not in line:
             continue
-        args = line.split()
+        args = [tok.strip('"') for tok in line.split()]
         if args and args[0] == "-A":
             args[0] = "-D"
             await _run(["iptables", "-t", "nat", *args], check=False)
 
 
 async def install_dns_redirect(gateway: str, loopback_port: int, session_id: str) -> None:
-    """Redirect ``gateway:53`` to ``127.0.0.1:<loopback_port>`` for this session, replacing any prior
-    rule. DNAT-to-loopback for traffic arriving on a bridge needs ``route_localnet`` (Linux drops
-    martian packets routed to 127/8 otherwise) — the same knob dockerd sets. ``conf.all`` is used
-    (the kernel ORs it with the per-device flag) so no per-bridge name is needed; the redirect
-    itself is confined to ``gateway:53``, so nothing else routes to loopback."""
+    """Redirect ``gateway:53`` to ``127.0.0.1:<loopback_port>``, replacing **any** prior DNS rule on
+    this gateway (this session's own from a restart, or a stale one a dead session leaked — see
+    ``_delete_dns_rules``). DNAT-to-loopback for traffic arriving on a bridge needs ``route_localnet``
+    (Linux drops martian packets routed to 127/8 otherwise) — the same knob dockerd sets. ``conf.all``
+    is used (the kernel ORs it with the per-device flag) so no per-bridge name is needed; the
+    redirect itself is confined to ``gateway:53``, so nothing else routes to loopback."""
     await _run(["sysctl", "-w", "net.ipv4.conf.all.route_localnet=1"], check=False)
-    await _remove_dns_redirects(session_id)
+    await _delete_dns_rules(f"-d {gateway}/32")
     await _run(_dns_redirect_add_args(gateway, loopback_port, session_id), check=False)
 
 
 async def remove_dns_redirect(session_id: str) -> None:
-    await _remove_dns_redirects(session_id)
+    await _delete_dns_rules(f"{_DNS_COMMENT_PREFIX}{session_id}")
 
 
 async def redirect_session_dns(subnet: str, loopback_port: int, session_id: str) -> None:
