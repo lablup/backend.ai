@@ -16,6 +16,22 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.8.1 (2026-08-10)
+
+### Features
+* Add a configurable preemption victim scope (`user`, `project`, `domain`, or `resource-group`) to the resource group preemption config, so admins decide how widely victims may be drawn; the default `user` keeps the existing behavior of preempting only the pending session owner's own sessions. ([#13654](https://github.com/lablup/backend.ai/issues/13654))
+
+### Fixes
+* Report attached GPU information for containers using the open-source CUDA plugin, which was always empty because the plugin looked up the wrong resource slot name (`cuda.devices` instead of `cuda.device`) ([#13372](https://github.com/lablup/backend.ai/issues/13372))
+* Fix user/group purge silently skipping trash-bin (`DELETE_PENDING`) and stalled (`DELETE_ONGOING`, `DELETE_ERROR`) vfolders, which left permanently orphaned folder records and leaked storage ([#13399](https://github.com/lablup/backend.ai/issues/13399))
+* Fix utilization idle checkers getting stuck in `ready_to_check` when evaluating session metrics. ([#13400](https://github.com/lablup/backend.ai/issues/13400))
+* Render set-typed config examples (e.g. `allow-compute-plugins`) as TOML arrays instead of quoted JSON strings in the generated sample.toml files. ([#13498](https://github.com/lablup/backend.ai/issues/13498))
+* Restore the idle-check host unit tests, which stopped running when the mapper registry lost the endpoint rows their session relationships resolve against. ([#13553](https://github.com/lablup/backend.ai/issues/13553))
+* Fix the legacy GraphQL `group_node.user_nodes` field always failing with an internal error by constructing the connection items as `UserNode` instead of `GroupNode` ([#13570](https://github.com/lablup/backend.ai/issues/13570))
+* Add structured per-field error details (`extensions.errors`) and a 400-class error code to GraphQL v2 input validation failures, replacing the generic internal error ([#13576](https://github.com/lablup/backend.ai/issues/13576))
+* Attach CORS headers to AppProxy coordinator error responses so browsers can read the status and error code instead of an opaque `Failed to fetch` ([#13635](https://github.com/lablup/backend.ai/issues/13635))
+
+
 ## 26.8.0 (2026-07-31)
 
 ### Breaking Changes
