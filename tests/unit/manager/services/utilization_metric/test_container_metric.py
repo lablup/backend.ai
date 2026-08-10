@@ -681,7 +681,7 @@ class TestBuiltinQueryProvider:
                 timewindow="5m",
                 expected_query=(
                     "sum by (value_type)(backendai_container_utilization"
-                    '{container_metric_name="mem",value_type="current"})'
+                    '{ container_metric_name="mem",value_type="current" })'
                 ),
             ),
             BuiltinQueryTestCase(
@@ -694,8 +694,8 @@ class TestBuiltinQueryProvider:
                 timewindow="5m",
                 expected_query=(
                     "sum by (user_id,value_type)(backendai_container_utilization"
-                    '{container_metric_name="mem",value_type="capacity",'
-                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"})'
+                    '{ container_metric_name="mem",value_type="capacity",'
+                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4" })'
                 ),
             ),
             BuiltinQueryTestCase(
@@ -708,8 +708,8 @@ class TestBuiltinQueryProvider:
                 timewindow="5m",
                 expected_query=(
                     "sum by (user_id,value_type)(backendai_container_utilization"
-                    '{container_metric_name="cuda_util",value_type="current",'
-                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"})'
+                    '{ container_metric_name="cuda_util",value_type="current",'
+                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4" })'
                 ),
             ),
             BuiltinQueryTestCase(
@@ -722,8 +722,8 @@ class TestBuiltinQueryProvider:
                 timewindow="5m",
                 expected_query=(
                     "sum by (user_id,value_type)(backendai_container_utilization"
-                    '{container_metric_name="io_read",value_type="current",'
-                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"})'
+                    '{ container_metric_name="io_read",value_type="current",'
+                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4" })'
                 ),
             ),
             # RATE - rate() already returns per-second values.
@@ -734,7 +734,7 @@ class TestBuiltinQueryProvider:
                 timewindow="5m",
                 expected_query=(
                     "sum by (value_type)(rate(backendai_container_utilization"
-                    '{container_metric_name="net_rx",value_type="current"}[5m]))'
+                    '{ container_metric_name="net_rx",value_type="current" }[5m]))'
                 ),
             ),
             BuiltinQueryTestCase(
@@ -747,8 +747,8 @@ class TestBuiltinQueryProvider:
                 timewindow="5m",
                 expected_query=(
                     "sum by (user_id,value_type)(rate(backendai_container_utilization"
-                    '{container_metric_name="net_tx",value_type="current",'
-                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"}[5m]))'
+                    '{ container_metric_name="net_tx",value_type="current",'
+                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4" }[5m]))'
                 ),
             ),
             BuiltinQueryTestCase(
@@ -761,8 +761,8 @@ class TestBuiltinQueryProvider:
                 timewindow="5m",
                 expected_query=(
                     "sum by (user_id,value_type)(rate(backendai_container_utilization"
-                    '{container_metric_name="net_rx",value_type="capacity",'
-                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"}[5m]))'
+                    '{ container_metric_name="net_rx",value_type="capacity",'
+                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4" }[5m]))'
                 ),
             ),
             # DIFF - uses window but no interval divisor
@@ -773,7 +773,7 @@ class TestBuiltinQueryProvider:
                 timewindow="5m",
                 expected_query=(
                     "sum by (value_type)(rate(backendai_container_utilization"
-                    '{container_metric_name="cpu_util",value_type="current"}[5m]))'
+                    '{ container_metric_name="cpu_util",value_type="current" }[5m]))'
                 ),
             ),
             BuiltinQueryTestCase(
@@ -786,8 +786,8 @@ class TestBuiltinQueryProvider:
                 timewindow="5m",
                 expected_query=(
                     "sum by (user_id,value_type)(rate(backendai_container_utilization"
-                    '{container_metric_name="cpu_util",value_type="current",'
-                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"}[5m]))'
+                    '{ container_metric_name="cpu_util",value_type="current",'
+                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4" }[5m]))'
                 ),
             ),
             # GAUGE for cpu_util with capacity (not DIFF since value_type != current)
@@ -801,8 +801,8 @@ class TestBuiltinQueryProvider:
                 timewindow="5m",
                 expected_query=(
                     "sum by (user_id,value_type)(backendai_container_utilization"
-                    '{container_metric_name="cpu_util",value_type="capacity",'
-                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"})'
+                    '{ container_metric_name="cpu_util",value_type="capacity",'
+                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4" })'
                 ),
             ),
         ],

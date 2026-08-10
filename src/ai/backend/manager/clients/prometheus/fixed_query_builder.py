@@ -19,20 +19,22 @@ from ai.backend.manager.clients.prometheus.querier import ContainerMetricQuerier
 from ai.backend.manager.clients.prometheus.types import ValueType
 
 _GAUGE_TEMPLATE: Final[str] = (
-    f"sum by ({{group_by}})({CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}})"
+    "sum by ({{ group_by }})(" + CONTAINER_UTILIZATION_METRIC_NAME + "{ {{ labels }} })"
 )
 _RATE_TEMPLATE: Final[str] = (
-    "sum by ({group_by})(rate("
-    f"{CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}}[{{window}}]))"
+    "sum by ({{ group_by }})(rate("
+    + CONTAINER_UTILIZATION_METRIC_NAME
+    + "{ {{ labels }} }[{{ window }}]))"
 )
 _DIFF_TEMPLATE: Final[str] = (
-    "sum by ({group_by})(rate("
-    f"{CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}}[{{window}}]))"
+    "sum by ({{ group_by }})(rate("
+    + CONTAINER_UTILIZATION_METRIC_NAME
+    + "{ {{ labels }} }[{{ window }}]))"
 )
-_LIVE_STAT_MAX_TEMPLATE: Final[str] = f"max_over_time(({_GAUGE_TEMPLATE})[{{window}}:])"
-_LIVE_STAT_AVG_TEMPLATE: Final[str] = f"avg_over_time(({_GAUGE_TEMPLATE})[{{window}}:])"
-_LIVE_STAT_RATE_MAX_TEMPLATE: Final[str] = f"max_over_time(({_RATE_TEMPLATE})[{{window}}:])"
-_LIVE_STAT_RATE_AVG_TEMPLATE: Final[str] = f"avg_over_time(({_RATE_TEMPLATE})[{{window}}:])"
+_LIVE_STAT_MAX_TEMPLATE: Final[str] = "max_over_time((" + _GAUGE_TEMPLATE + ")[{{ window }}:])"
+_LIVE_STAT_AVG_TEMPLATE: Final[str] = "avg_over_time((" + _GAUGE_TEMPLATE + ")[{{ window }}:])"
+_LIVE_STAT_RATE_MAX_TEMPLATE: Final[str] = "max_over_time((" + _RATE_TEMPLATE + ")[{{ window }}:])"
+_LIVE_STAT_RATE_AVG_TEMPLATE: Final[str] = "avg_over_time((" + _RATE_TEMPLATE + ")[{{ window }}:])"
 _INSTANT_GROUP_BY: Final[frozenset[str]] = frozenset({
     "kernel_id",
     "container_metric_name",

@@ -175,12 +175,21 @@ class TestCreateQueryDefinitionInput:
                 options=_make_create_options(),
             )
 
-    def test_malformed_query_template_raises(self) -> None:
+    def test_disallowed_jinja_construct_raises(self) -> None:
         with pytest.raises(InvalidMetricPresetTemplate):
             CreateQueryDefinitionInput(
                 name="test",
                 metric_name="metric",
-                query_template="metric{",
+                query_template="{% if labels %}metric{% endif %}",
+                options=_make_create_options(),
+            )
+
+    def test_legacy_template_syntax_raises(self) -> None:
+        with pytest.raises(InvalidMetricPresetTemplate, match="Legacy"):
+            CreateQueryDefinitionInput(
+                name="test",
+                metric_name="metric",
+                query_template="sum by ({group_by})(metric{{{labels}}})",
                 options=_make_create_options(),
             )
 
@@ -268,9 +277,9 @@ class TestModifyQueryDefinitionInput:
                 query_template='rate(metric{mode!="idle"}[$__rate_interval])',
             )
 
-    def test_malformed_query_template_raises(self) -> None:
+    def test_disallowed_jinja_construct_raises(self) -> None:
         with pytest.raises(InvalidMetricPresetTemplate):
-            ModifyQueryDefinitionInput(query_template="metric{")
+            ModifyQueryDefinitionInput(query_template="metric{ {{ unknown_var }} }")
 
     def test_round_trip_serialization(self) -> None:
         inp = ModifyQueryDefinitionInput(

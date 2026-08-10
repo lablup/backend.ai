@@ -2,10 +2,13 @@ import re
 from collections.abc import Mapping, Sequence, Set
 from dataclasses import dataclass, field
 from enum import StrEnum
+from functools import lru_cache
 from typing import Self
 
+from jinja2 import Template, TemplateError
+
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.validators import (
-    escape_non_placeholders,
+    PROMQL_TEMPLATE_ENV,
 )
 from ai.backend.common.exception import InvalidMetricPresetTemplate
 
@@ -42,20 +45,25 @@ def _escape_label_value(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace("\r", "\\r")
 
 
+@lru_cache(maxsize=256)
+def _compiled_template(template: str) -> Template:
+    return PROMQL_TEMPLATE_ENV.from_string(template)
+
+
 @dataclass(frozen=True)
 class MetricPreset:
-    """PromQL query preset with template (placeholders: {labels}, {window}, {group_by})."""
+    """PromQL query preset with a Jinja template
+    (placeholders: ``{{ labels }}``, ``{{ window }}``, ``{{ group_by }}``)."""
 
-    # PromQL template (placeholders: {labels}, {window}, {group_by})
     template: str
 
-    # Query labels (injected into {labels} placeholder)
+    # Injected into {{ labels }}
     labels: Mapping[str, LabelMatcher] = field(default_factory=dict)
 
-    # Group by labels (injected into {group_by} placeholder)
+    # Injected into {{ group_by }}
     group_by: Set[str] = field(default_factory=frozenset)
 
-    # Window (injected into {window} placeholder)
+    # Injected into {{ window }}
     window: str = ""
 
     def render(self) -> str:
@@ -65,12 +73,12 @@ class MetricPreset:
             for key, value in self.labels.items()
         )
         try:
-            return escape_non_placeholders(self.template).format(
+            return _compiled_template(self.template).render(
                 labels=label_str,
                 window=self.window,
                 group_by=",".join(sorted(self.group_by)),
             )
-        except (ValueError, KeyError, IndexError) as e:
+        except TemplateError as e:
             raise InvalidMetricPresetTemplate(
                 f"Failed to render PromQL template ({type(e).__name__}: {e}): {self.template!r}"
             ) from e

@@ -60,7 +60,7 @@ class TestPrometheusQueryPresetService:
             rank=0,
             category_id=None,
             metric_name="backendai_container_cpu_util",
-            query_template="rate(container_cpu_usage_seconds_total{{{labels}}}[{window}])",
+            query_template="rate(container_cpu_usage_seconds_total{ {{ labels }} }[{{ window }}])",
             time_window="5m",
             filter_labels=["kernel_id", "session_id"],
             group_labels=["kernel_id"],
@@ -494,10 +494,10 @@ class TestPrometheusQueryPresetService:
         )
 
         await service.preview_preset(
-            PreviewPresetAction(query_template="sum(rate(metric{{{labels}}}[{window}]))")
+            PreviewPresetAction(query_template="sum(rate(metric{ {{ labels }} }[{{ window }}]))")
         )
 
         mock_repository.preview_template.assert_called_once_with(
-            query_template="sum(rate(metric{{{labels}}}[{window}]))",
+            query_template="sum(rate(metric{ {{ labels }} }[{{ window }}]))",
             default_window="1m",
         )

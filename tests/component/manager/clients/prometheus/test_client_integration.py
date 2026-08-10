@@ -44,7 +44,7 @@ async def prometheus_client(
 @pytest.fixture
 def up_metric_preset() -> MetricPreset:
     return MetricPreset(
-        template="up{{{labels}}}",
+        template="up{ {{ labels }} }",
         labels={"job": LabelMatcher.exact("prometheus")},
         group_by=frozenset(),
     )

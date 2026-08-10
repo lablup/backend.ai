@@ -37,7 +37,7 @@ class PresetSeed:
 
     name: str
     metric_name: str = "backendai_metric"
-    query_template: str = "{metric_name}{{{labels}}}"
+    query_template: str = "{metric_name}{ {{ labels }} }"
     time_window: str | None = "5m"
     filter_labels: tuple[str, ...] = ()
     group_labels: tuple[str, ...] = ()

@@ -65,7 +65,11 @@ class CreateQueryDefinitionInput(BaseRequestModel):
     rank: int = Field(default=0, ge=0, description="Sort rank (lower = higher priority)")
     category_id: UUID | None = Field(default=None, description="Category ID")
     metric_name: str = Field(description="Prometheus metric name")
-    query_template: str = Field(description="PromQL template with placeholders")
+    query_template: str = Field(
+        description=(
+            "PromQL template with Jinja placeholders ({{ labels }}, {{ window }}, {{ group_by }})"
+        )
+    )
     time_window: str | None = Field(
         default=None,
         pattern=PROMETHEUS_DURATION_PATTERN,
@@ -122,7 +126,11 @@ class ModifyQueryDefinitionInput(BaseRequestModel):
     )
     metric_name: str | None = Field(default=None, description="Updated Prometheus metric name")
     query_template: str | None = Field(
-        default=None, description="Updated PromQL template with placeholders"
+        default=None,
+        description=(
+            "Updated PromQL template with Jinja placeholders"
+            " ({{ labels }}, {{ window }}, {{ group_by }})"
+        ),
     )
     time_window: str | Sentinel | None = Field(
         default=SENTINEL,

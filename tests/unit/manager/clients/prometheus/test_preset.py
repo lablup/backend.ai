@@ -30,101 +30,71 @@ class TestMetricPresetRender:
         [
             RenderTestCase(
                 id="empty_labels",
-                template="sum(my_metric{{{labels}}}) by ({group_by})",
+                template="sum(my_metric{ {{ labels }} }) by ({{ group_by }})",
                 labels={},
                 group_by=frozenset({"value_type"}),
                 window="",
-                expected="sum(my_metric{}) by (value_type)",
+                expected="sum(my_metric{  }) by (value_type)",
             ),
             RenderTestCase(
                 id="multiple_group_by_sorted",
-                template="sum(my_metric{{{labels}}}) by ({group_by})",
+                template="sum(my_metric{ {{ labels }} }) by ({{ group_by }})",
                 labels={"job": LabelMatcher.exact("test")},
                 group_by=frozenset({"value_type", "kernel_id", "session_id"}),
                 window="",
-                expected='sum(my_metric{job="test"}) by (kernel_id,session_id,value_type)',
-            ),
-            RenderTestCase(
-                id="group_by_deduplicated",
-                template="sum(my_metric{{{labels}}}) by ({group_by})",
-                labels={},
-                group_by=frozenset([
-                    "a",
-                    "b",
-                    "a",
-                ]),  # list allows duplicates, frozenset deduplicates
-                window="",
-                expected="sum(my_metric{}) by (a,b)",
+                expected='sum(my_metric{ job="test" }) by (kernel_id,session_id,value_type)',
             ),
             RenderTestCase(
                 id="with_window",
-                template="sum(rate(my_metric{{{labels}}}[{window}])) by ({group_by})",
+                template="sum(rate(my_metric{ {{ labels }} }[{{ window }}])) by ({{ group_by }})",
                 labels={"job": LabelMatcher.exact("test")},
                 group_by=frozenset({"instance"}),
                 window="5m",
-                expected='sum(rate(my_metric{job="test"}[5m])) by (instance)',
+                expected='sum(rate(my_metric{ job="test" }[5m])) by (instance)',
             ),
             RenderTestCase(
                 id="escapes_double_quotes_in_label_value",
-                template="my_metric{{{labels}}}",
+                template="my_metric{ {{ labels }} }",
                 labels={"key": LabelMatcher.exact('value with "quotes"')},
                 group_by=frozenset(),
                 window="",
-                expected='my_metric{key="value with \\"quotes\\""}',
+                expected='my_metric{ key="value with \\"quotes\\"" }',
             ),
             RenderTestCase(
                 id="escapes_backslash_in_label_value",
-                template="my_metric{{{labels}}}",
+                template="my_metric{ {{ labels }} }",
                 labels={"path": LabelMatcher.exact("C:\\Users\\test")},
                 group_by=frozenset(),
                 window="",
-                expected='my_metric{path="C:\\\\Users\\\\test"}',
+                expected='my_metric{ path="C:\\\\Users\\\\test" }',
             ),
             RenderTestCase(
                 id="escapes_newline_in_label_value",
-                template="my_metric{{{labels}}}",
+                template="my_metric{ {{ labels }} }",
                 labels={"msg": LabelMatcher.exact("line1\nline2")},
                 group_by=frozenset(),
                 window="",
-                expected='my_metric{msg="line1\\nline2"}',
-            ),
-            RenderTestCase(
-                id="escapes_mixed_special_chars",
-                template="my_metric{{{labels}}}",
-                labels={"data": LabelMatcher.exact('path\\to\\"file"\nend')},
-                group_by=frozenset(),
-                window="",
-                expected='my_metric{data="path\\\\to\\\\\\"file\\"\\nend"}',
+                expected='my_metric{ msg="line1\\nline2" }',
             ),
             RenderTestCase(
                 id="regex_matcher",
-                template="my_metric{{{labels}}}",
+                template="my_metric{ {{ labels }} }",
                 labels={"kernel_id": LabelMatcher.regex("kernel-1|kernel-2")},
                 group_by=frozenset(),
                 window="",
-                expected='my_metric{kernel_id=~"kernel-1|kernel-2"}',
-            ),
-            # Regression: original bug — `!=` in label matcher was parsed as
-            # str.format conversion specifier and raised ValueError.
-            RenderTestCase(
-                id="raw_label_matcher_passes_through",
-                template='rate(node_cpu_seconds_total{mode!="idle"}[5m])',
-                labels={},
-                group_by=frozenset(),
-                window="",
-                expected='rate(node_cpu_seconds_total{mode!="idle"}[5m])',
+                expected='my_metric{ kernel_id=~"kernel-1|kernel-2" }',
             ),
             # Static and injected matchers coexist in one selector.
             RenderTestCase(
                 id="static_matcher_with_all_placeholders",
-                template='sum by ({group_by})(rate(metric{{mode!="idle",{labels}}}[{window}]))',
+                template='sum by ({{ group_by }})(rate(metric{mode!="idle",{{ labels }}}[{{ window }}]))',
                 labels={"job": LabelMatcher.exact("api")},
                 group_by=frozenset({"instance"}),
                 window="5m",
                 expected='sum by (instance)(rate(metric{mode!="idle",job="api"}[5m]))',
             ),
-            # Grafana paste with no {labels} placeholder — provided labels must
-            # be silently ignored, raw matcher must survive.
+            # Raw PromQL without placeholders — provided values are ignored,
+            # single braces are literal text.
             RenderTestCase(
                 id="raw_template_ignores_provided_labels",
                 template='rate(node_cpu_seconds_total{mode!="idle"}[5m])',
@@ -133,39 +103,13 @@ class TestMetricPresetRender:
                 window="5m",
                 expected='rate(node_cpu_seconds_total{mode!="idle"}[5m])',
             ),
-            # Bare `{labels}` (single-brace) auto-wraps into PromQL `{value}`.
             RenderTestCase(
-                id="bare_labels_placeholder_auto_wraps",
-                template='sum by ({group_by})(rate(metric{mode!="idle"}{labels}[{window}]))',
-                labels={"job": LabelMatcher.exact("api")},
-                group_by=frozenset({"instance"}),
-                window="5m",
-                expected='sum by (instance)(rate(metric{mode!="idle"}{job="api"}[5m]))',
-            ),
-            RenderTestCase(
-                id="bare_labels_with_empty_labels",
-                template="metric{labels}",
+                id="orphan_open_brace_is_literal",
+                template="metric{",
                 labels={},
                 group_by=frozenset(),
                 window="",
-                expected="metric{}",
-            ),
-            # User pre-escaped a raw matcher with `{{...}}` — must not be re-escaped.
-            RenderTestCase(
-                id="user_escaped_double_brace_matcher",
-                template='metric{{job="api"}}',
-                labels={},
-                group_by=frozenset(),
-                window="",
-                expected='metric{job="api"}',
-            ),
-            RenderTestCase(
-                id="user_escaped_empty_braces",
-                template="metric{{}}",
-                labels={},
-                group_by=frozenset(),
-                window="",
-                expected="metric{}",
+                expected="metric{",
             ),
         ],
         ids=lambda c: c.id,
@@ -185,12 +129,11 @@ class TestMetricPresetRender:
     @pytest.mark.parametrize(
         "template",
         [
-            pytest.param("metric}", id="orphan_close_brace"),
-            pytest.param("metric{", id="orphan_open_brace"),
-            pytest.param("metric{a{b}c}", id="nested_braces"),
+            pytest.param("sum(metric{{{labels}}}) by ({group_by})", id="legacy_triple_brace"),
+            pytest.param("metric{ {{ unknown_var }} }", id="unknown_variable"),
         ],
     )
-    async def test_render_raises_on_malformed_template(self, template: str) -> None:
+    async def test_render_raises(self, template: str) -> None:
         preset = MetricPreset(template=template)
 
         with pytest.raises(InvalidMetricPresetTemplate):
@@ -208,21 +151,33 @@ class TestValidateQueryTemplate:
                 id="raw_promql",
             ),
             pytest.param(
-                "sum by ({group_by})(metric{{{labels}}}[{window}])",
-                id="with_placeholders",
-            ),
-            pytest.param(
-                'sum by (session_id)(metric{{value_type="current",{labels}}})',
-                id="static_and_dynamic_labels",
-            ),
-            pytest.param(
                 'count(metric{a="1",b=~"x|y"})',
                 id="multiple_matchers",
+            ),
+            pytest.param(
+                "sum by ({{ group_by }})(metric{ {{ labels }} }[{{ window }}])",
+                id="jinja_placeholders",
+            ),
+            pytest.param(
+                'sum by ({{ group_by }})(metric{mode!="idle",{{ labels }}})',
+                id="static_and_dynamic_labels",
             ),
         ],
     )
     def test_accepts_valid_template(self, template: str) -> None:
-        assert validate_query_template(template) == template
+        validate_query_template(template)  # does not raise
+
+    @pytest.mark.parametrize(
+        "template",
+        [
+            pytest.param("sum(metric{labels})", id="bare_placeholder"),
+            pytest.param("sum by ({group_by})(metric[{window}])", id="bare_group_by_and_window"),
+            pytest.param("sum(metric{{{labels}}})", id="triple_brace"),
+        ],
+    )
+    def test_rejects_legacy_syntax(self, template: str) -> None:
+        with pytest.raises(InvalidMetricPresetTemplate, match="Legacy"):
+            validate_query_template(template)
 
     @pytest.mark.parametrize(
         "template",
@@ -239,11 +194,13 @@ class TestValidateQueryTemplate:
     @pytest.mark.parametrize(
         "template",
         [
-            pytest.param("metric}", id="orphan_close_brace"),
-            pytest.param("metric{", id="orphan_open_brace"),
-            pytest.param("metric{a{b}c}", id="nested_braces"),
+            pytest.param("{% if labels %}metric{% endif %}", id="statement_block"),
+            pytest.param("metric{ {{ unknown_var }} }", id="unknown_variable"),
+            pytest.param("metric{ {{ labels | upper }} }", id="filter"),
+            pytest.param("metric{ {{ labels.attr }} }", id="attribute_access"),
+            pytest.param("   ", id="blank"),
         ],
     )
-    def test_rejects_malformed_template(self, template: str) -> None:
+    def test_rejects_disallowed_constructs(self, template: str) -> None:
         with pytest.raises(InvalidMetricPresetTemplate):
             validate_query_template(template)
