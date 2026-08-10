@@ -4605,6 +4605,11 @@ input CreateResourceGroupInput
 
   """Optional description."""
   description: String = null
+
+  """
+  Added in 26.9.0. Make this the default resource group. At most one resource group may hold the flag, so this is rejected while another one holds it; clear that one first.
+  """
+  isDefault: Boolean! = false
 }
 
 """Added in 26.4.2. Payload for resource group creation."""
@@ -21831,6 +21836,11 @@ input UpdateResourceGroupInput
   Whether the resource group is public. Leave null to keep existing value.
   """
   isPublic: Boolean = null
+
+  """
+  Added in 26.9.0. Whether this is the default resource group. At most one resource group may hold the flag, so setting it to true is rejected while another one holds it; clear that one first. Leave null to keep existing value.
+  """
+  isDefault: Boolean = null
 
   """Human-readable description. Leave null to keep existing value."""
   description: String = null
