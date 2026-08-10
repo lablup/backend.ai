@@ -1,6 +1,6 @@
 .\" Manpage for bssh
 .\" Contact the maintainers to correct errors or typos.
-.TH BSSH 1 "July 2026" "v2.3.1" "bssh Manual"
+.TH BSSH 1 "August 2026" "v2.4.1" "bssh Manual"
 
 .SH NAME
 bssh \- Broadcast SSH - SSH-compatible client with parallel execution capabilities
@@ -79,12 +79,30 @@ Example: -J jump1@proxy1,jump2@proxy2
 Query SSH configuration options (cipher, kex, mac, key, protocol-version, help)
 
 .TP
-.BR \-4
-Force use of IPv4 addresses only
+.BR \-4 ", " \-\-ipv4
+Force use of IPv4 addresses only. Equivalent to
+.I AddressFamily inet
+in the SSH configuration, and overrides it when both are present.
+Mutually exclusive with
+.BR \-6 .
+See
+.B ADDRESS FAMILY SELECTION
+below for exactly which connections this affects.
 
 .TP
-.BR \-6
-Force use of IPv6 addresses only
+.BR \-6 ", " \-\-ipv6
+Force use of IPv6 addresses only. Equivalent to
+.I AddressFamily inet6
+in the SSH configuration, and overrides it when both are present.
+Mutually exclusive with
+.BR \-4 .
+Also changes the default listen address of
+.B \-L
+and
+.B \-D
+forwards from 127.0.0.1 to ::1. See
+.B ADDRESS FAMILY SELECTION
+below.
 
 .TP
 .BR \-x
@@ -106,6 +124,7 @@ Example: -R 8080:localhost:80 (remote:8080 → localhost:80)
 .BR \-D " " \fI[bind_address:]port[/socks_version]\fR
 Dynamic port forwarding (SOCKS proxy). Creates a local SOCKS proxy that dynamically forwards connections via SSH.
 Supports SOCKS4 and SOCKS5 protocols. Default is SOCKS5.
+SOCKS5 accepts IPv4 literals, domain names, and IPv6 literals.
 Multiple -D options can be specified for multiple SOCKS proxies.
 Example: -D 1080 (SOCKS5 proxy on localhost:1080), -D *:1080/4 (SOCKS4 on all interfaces)
 
@@ -134,7 +153,13 @@ Hostlist expressions (range expansion):
 .IP \[bu] 2
 -H "admin@web[1-3]:22" \[->] expands with user and port preserved
 .IP \[bu] 2
+-H "[2001:db8::1]:2222" \[->] one IPv6 host with an explicit port
+.IP \[bu] 2
+-H "user@[::1]" \[->] the IPv6 loopback address with an explicit user
+.IP \[bu] 2
 -H "^/path/to/hostfile" \[->] read hosts from file
+.PP
+IPv6 address literals must be enclosed in brackets. A bracket group is interpreted as IPv6 only when its complete contents are a syntactically valid IPv6 address; numeric groups such as [1] and [1-3] remain hostlist ranges. Bare forms such as ::1 are rejected with guidance to use [::1], because a trailing numeric IPv6 segment cannot otherwise be distinguished from a port.
 .RE
 
 .TP
@@ -328,11 +353,11 @@ Print help information
 .BR \-V ", " \-\-version
 Print version information
 
-.SS Exit Code Strategy Options (v1.2.0+)
+.SS Exit Code Strategy Options
 .TP
 .BR \-\-require\-all\-success
-Require all nodes to succeed (v1.0-v1.1 behavior).
-By default (v1.2+), bssh returns the main rank's exit code, matching
+Require all nodes to succeed.
+By default, bssh returns the main rank's exit code, matching
 standard MPI tools like mpirun and srun. When this flag is specified,
 bssh returns exit code 0 only if ALL nodes succeed, and exit code 1
 if ANY node fails. This is useful for health checks and monitoring
@@ -518,6 +543,28 @@ flag or default SSH config files (~/.ssh/config, /etc/ssh/ssh_config).
 
 In addition to standard SSH configuration directives, bssh supports advanced options for
 certificate-based authentication and port forwarding control:
+
+.SS Connection Options
+.TP
+.B AddressFamily
+Restricts the IP address family used for connections. Accepted values are
+.IR any ", " inet " (IPv4 only), and " inet6 " (IPv6 only),"
+matched case-insensitively. The default is
+.IR any .
+An unrecognized value logs a warning and is treated as
+.IR any ,
+rather than failing, so a configuration file OpenSSH would tolerate keeps working.
+.br
+The
+.B \-4
+and
+.B \-6
+command line flags override this keyword. See
+.B ADDRESS FAMILY SELECTION
+for the scope of the constraint.
+.br
+Example:
+.I AddressFamily inet6
 
 .SS Certificate Authentication Options
 .TP
@@ -1092,6 +1139,101 @@ Host legacy.example.com
     RequiredRSASize 1024
 .fi
 
+.SH ADDRESS FAMILY SELECTION
+.B \-4
+and
+.B \-6
+(and the equivalent
+.I AddressFamily
+configuration keyword) restrict which resolved addresses bssh will use.
+Precedence is the OpenSSH one: the command line flag wins over the configuration
+keyword, which wins over the
+.I any
+default. With no constraint, every resolved address is tried in resolver order,
+which is the historical behavior.
+
+.SS What the constraint covers
+.IP \[bu] 2
+Direct SSH connections for
+.BR exec ,
+interactive sessions,
+.BR ping ,
+and SFTP
+.RB ( upload / download ).
+Addresses of the other family are removed from the candidate list before any
+connection is attempted.
+.IP \[bu] 2
+The first hop of a
+.B \-J
+jump host chain, which uses the same connect path.
+.IP \[bu] 2
+The local listener created by
+.B \-L
+and
+.BR \-D .
+With
+.BR \-6 ,
+a specification that does not name a bind address listens on ::1 instead of
+127.0.0.1, and the
+.I *:port
+wildcard form listens on :: instead of 0.0.0.0. A specification that names a
+bind address explicitly always overrides the flag.
+
+.SS Forwarding target resolution
+.IP \[bu] 2
+Forwarding targets and tunneled jump-chain targets. Without
+.B \-4
+or
+.BR \-6 ,
+bssh sends the target hostname from a
+.B \-L
+forward, SOCKS5
+.B \-D
+domain request, later jump-chain hop, or final destination behind a jump chain
+as written in the
+.I direct-tcpip
+channel request. The remote SSH server resolves that name and performs the
+actual connection, matching OpenSSH and allowing names that exist only from the
+server's network position.
+.IP \[bu] 2
+When a family is forced with
+.B \-4
+or
+.BR \-6 ,
+bssh resolves the forwarding target locally, filters the candidate list to the
+requested family, and sends the matching numeric address in the
+.I direct-tcpip
+request. This gives the family request a concrete effect on the server-side
+connection, but it necessarily uses the client's resolver view for that forced
+path. SOCKS4 requests carry a literal IPv4 destination by protocol definition, so
+they still work under
+.B any
+and
+.BR \-4 ,
+but are rejected under
+.B \-6
+or
+.I AddressFamily inet6
+with the usual forced-family error instead of silently tunneling IPv4. SOCKS5
+literal IPv4 and IPv6 requests likewise already carry numeric destinations; when
+a forced family excludes that literal, the request fails with the same
+no-address-for-family error instead of silently falling back to the other family.
+
+.SS What the constraint does not cover
+The remote listener created by
+.BR \-R ,
+which the server binds. Its default stays IPv4 loopback.
+.IP \[bu] 2
+.BR bssh\-server ,
+which has its own command line and does not accept these flags.
+
+.SS Failure behavior
+When a family is forced and name resolution produces no address of that family,
+bssh fails with
+.I no IPv6 address found for <host>
+(or the IPv4 equivalent) and exits non-zero. There is no fallback to the other
+family, matching OpenSSH.
+
 .SH PDSH COMPATIBILITY MODE
 .B bssh
 supports pdsh compatibility mode, enabling it to act as a drop-in replacement for pdsh.
@@ -1222,6 +1364,10 @@ expands to web1.example.com, web2.example.com, web3.example.com
 .B With user and port
 .B admin@server[1-3]:2222
 expands to admin@server1:2222, admin@server2:2222, admin@server3:2222
+.TP
+.B IPv6 literal
+.B user@[2001:db8::1]:2222
+selects one IPv6 host. Brackets are required and are distinct from range brackets because their contents parse as a complete IPv6 address.
 
 .SS File Input
 .TP
@@ -1595,7 +1741,7 @@ Configure SSH keepalive settings to prevent idle disconnection in long-running s
 The keepalive settings apply to both the destination host and any jump hosts in the connection chain.
 .RE
 
-.SS Exit Code Handling Examples (v1.2.0+)
+.SS Exit Code Handling Examples
 
 .TP
 MPI job with intelligent error handling:
@@ -1613,7 +1759,7 @@ MPI job with intelligent error handling:
 .fi
 
 .TP
-Health check requiring all nodes (legacy behavior):
+Health check requiring all nodes:
 .nf
 .B bssh --require-all-success -C production "disk-check"
 .B if [ $? -ne 0 ]; then
@@ -1670,7 +1816,7 @@ Note: The special command prefix can be customized in the configuration file.
 .B bssh
 uses different exit code strategies depending on command-line flags.
 
-.SS Default Behavior (v1.2.0+)
+.SS Default Behavior
 Returns the exit code from the main rank (rank 0 or first node).
 This matches standard MPI tool behavior (mpirun, srun, mpiexec).
 
@@ -1713,10 +1859,10 @@ Common exit codes:
 \- Terminated by SIGTERM
 .RE
 
-.SS Legacy Behavior (--require-all-success)
+.SS All-Nodes Mode (--require-all-success)
 When using the
 .B --require-all-success
-flag, bssh uses the v1.0-v1.1 behavior:
+flag, bssh requires every node to succeed:
 
 .TP
 .B 0
@@ -1742,6 +1888,34 @@ Main rank succeeded but other nodes failed
 .TP
 .B 2-255
 Main rank failed with this exit code
+
+.SS ping Subcommand
+The
+.B ping
+subcommand runs no remote command, so there is no remote exit status to
+forward and the main rank strategy does not apply. Its 0/1 boundary follows
+.B --require-all-success
+(a health check is green only when every host is green), and total failure is
+reported as 255 following OpenSSH's convention that 255 means ssh itself
+encountered an error:
+
+.TP
+.B 0
+Every targeted host connected and authenticated
+
+.TP
+.B 1
+At least one host was reachable and at least one failed
+
+.TP
+.B 255
+No host was reachable, or bssh failed before it could attempt any connection
+(configuration file could not be loaded, no host resolved, and similar)
+
+.PP
+Command-line usage errors are rejected by the argument parser before this
+contract applies and keep the parser's own exit code 2, as they do for every
+subcommand.
 
 .SH OUTPUT FILES
 When using the
@@ -1868,42 +2042,7 @@ SSH agent socket path. When set, bssh can automatically detect and use
 the SSH agent for authentication without specifying the -A flag
 
 .SH NOTES
-.SS Breaking Changes (v0.5.3+)
-.TP
-.B Cluster option changed:
-The cluster option has changed from lowercase -c to uppercase -C to avoid conflicts 
-with SSH's -c (cipher) option. Update your scripts accordingly.
-.TP
-.B Parallel option changed:
-The -p option now specifies port (SSH compatibility). For parallel connections,
-use --parallel instead.
-
-.SS Breaking Changes (v1.2.0)
-.TP
-.B Exit code behavior changed:
-The default exit code behavior has changed to match standard MPI tools.
-.RS
-.IP \(bu 2
-.B Old behavior (v1.0-v1.1):
-Returns 0 if all nodes succeeded, 1 if any node failed
-.IP \(bu 2
-.B New behavior (v1.2+):
-Returns main rank's actual exit code (matches mpirun/srun/mpiexec)
-.IP \(bu 2
-.B Migration:
-Use
-.I --require-all-success
-flag to preserve old behavior
-.IP \(bu 2
-.B Why this change?
-This change aligns bssh with industry-standard MPI tools, preserves actual exit codes
-for better error diagnosis (139=segfault, 137=OOM, etc.), enables exit-code-based
-automation in CI/CD pipelines, and improves integration with shell scripts and
-monitoring systems.
-.RE
-
-.TP
-.B Main Rank Detection:
+.SS Main Rank Detection
 The main rank is automatically identified using the following priority order:
 .RS
 .IP 1. 4
