@@ -7,8 +7,11 @@
 #   tokens with the subject claim
 #   `repo:lablup/backend.ai:environment:deploy-to-dockerhub`.
 # - The `deploy-to-dockerhub` GitHub environment carries the env-scoped variable
-#   DOCKERHUB_OIDC_CONNECTION_ID (the connection UUID) consumed by
-#   docker/login-action; `id-token: write` lets the job mint the OIDC token.
+#   DOCKERHUB_OIDC_CONNECTION_ID (the connection UUID); `id-token: write` lets
+#   the job mint the OIDC token.  Note the deliberate name difference: the
+#   repository/environment variable is DOCKERHUB_OIDC_CONNECTION_ID, while the
+#   env var consumed by docker/login-action is DOCKERHUB_OIDC_CONNECTIONID
+#   (no underscore before ID) — the login step maps one to the other.
 # - To rotate or re-create the connection: update the connection in the Docker
 #   Hub org settings and set the new UUID in the environment variable — no
 #   workflow change needed.
@@ -16,11 +19,21 @@
 # The build-push job installs the wheels staged in dist/, so a run needs the
 # `wheels` artifact: produced in the same run when called from ci.yml, or taken
 # from a previous ci.yml run on the same tag via the wheels-run-id input when
-# dispatched manually.
+# dispatched manually.  A manual dispatch only works while that artifact is
+# still within its retention window — once it expires, re-run the ci.yml
+# release job first to regenerate it.
 name: Build and push service images
 
 on:
   workflow_call:
+    inputs:
+      wheels-run-id:
+        description: >-
+          ID of the workflow run that uploaded the `wheels` artifact.
+          Empty means the current run.
+        required: false
+        type: string
+        default: ''
   workflow_dispatch:
     inputs:
       wheels-run-id:
@@ -30,10 +43,19 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-images-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   prepare:
     name: Prepare build matrix
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
       python-version: ${{ steps.pyver.outputs.version }}
@@ -51,6 +73,10 @@ jobs:
         MATRIX_JSON=$(scripts/list-dockerfiles.sh --service)
         echo "Found service image matrix:"
         echo "$MATRIX_JSON" | jq .
+        if [ "$(echo "$MATRIX_JSON" | jq '.include | length')" -eq 0 ]; then
+          echo "::error::scripts/list-dockerfiles.sh --service returned an empty matrix — no service images would be built. This is always a bug on a release."
+          exit 1
+        fi
         echo "matrix=$MATRIX_JSON" >> "$GITHUB_OUTPUT"
 
     - name: Resolve project Python version
@@ -68,8 +94,20 @@ jobs:
       id: pkgver
       run: |
         pip install -U 'packaging>=21.3'
-        PKGVER=$(python3 -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
+        PKGVER=$(python3 scripts/normalize-version.py "$(cat VERSION)")
         echo "version=$PKGVER" >> "$GITHUB_OUTPUT"
+
+    - name: Assert the tag matches the VERSION file
+      if: github.ref_type == 'tag'
+      env:
+        REF_NAME: ${{ github.ref_name }}
+        PKGVER: ${{ steps.pkgver.outputs.version }}
+      run: |
+        TAGVER=$(python3 scripts/normalize-version.py "$REF_NAME")
+        if [ "$TAGVER" != "$PKGVER" ]; then
+          echo "::error::The tag '$REF_NAME' (normalized: $TAGVER) does not match the VERSION file (normalized: $PKGVER). Refusing to push image tags that would overwrite another release or re-point 'latest' backwards."
+          exit 1
+        fi
 
     - name: Determine the release type
       id: release-type
@@ -82,15 +120,27 @@ jobs:
   build-push:
     name: Build and push ${{ matrix.name }}
     needs: prepare
+    if: needs.prepare.outputs.matrix != '{"include":[]}'
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     environment: deploy-to-dockerhub
     permissions:
       contents: read
+      actions: read  # let download-artifact's REST path read the wheels artifact
       id-token: write  # mint the OIDC token exchanged for the Docker Hub login
     strategy:
       matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
       fail-fast: false
     steps:
+    - name: Check the OIDC connection variable
+      env:
+        OIDC_CONNECTION_ID: ${{ vars.DOCKERHUB_OIDC_CONNECTION_ID }}
+      run: |
+        if [ -z "$OIDC_CONNECTION_ID" ]; then
+          echo "::error::The DOCKERHUB_OIDC_CONNECTION_ID variable of the deploy-to-dockerhub environment is empty — set it to the Docker Hub OIDC connection UUID before pushing images."
+          exit 1
+        fi
+
     - name: Checkout the revision
       uses: actions/checkout@v6
       with:
@@ -139,6 +189,8 @@ jobs:
         labels: ${{ steps.meta.outputs.labels }}
         provenance: mode=max
         sbom: true
+        cache-from: type=gha,scope=${{ matrix.name }}
+        cache-to: type=gha,mode=max,scope=${{ matrix.name }}
         build-args: |
           PYTHON_VERSION=${{ needs.prepare.outputs.python-version }}
           PKGVER=${{ needs.prepare.outputs.pkgver }}

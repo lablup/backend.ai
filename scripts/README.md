@@ -76,6 +76,7 @@ current, see `AGENTS.md` in this directory.
 | `extract-release-changelog.py` | Extracts the tagged version's block for the GitHub release body | auto — `ci.yml` (release job) |
 | `list-dockerfiles.sh` | Prints the `docker/` dockerfile build matrix (`--service` / `--infra`) as JSON; a new `backend.ai-*` dockerfile must be registered in its allowlist | auto — `sbom.yml`; `docker-images.yml`; `osv-scanner.yml` (also scheduled: weekly cron + push to `main`) |
 | `determine-release-type.py` | Sets `IS_PRERELEASE` from the `VERSION` file | auto — `ci.yml` (release job) |
+| `normalize-version.py` | Prints the PEP 440-normalized version used for docker image tags, rejecting local segments (`+` is not a legal docker tag character) | auto — `docker-images.yml` |
 | `build-wheels.sh` | Builds the platform-specific and generic wheels | auto — `ci.yml` (release job) |
 | `build-scies.sh` | Builds the scie executables locally (CI runs the equivalent pants commands inline) | person |
 | `diff-release.py` | Lists the commits between two refs with their original / backport PR numbers | person |
