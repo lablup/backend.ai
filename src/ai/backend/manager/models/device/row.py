@@ -23,7 +23,7 @@ __all__ = (
 )
 
 
-class DeviceRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class DeviceRow(CreatedAtMixin, Base):
     """A physical device on an agent.
 
     ``designator`` is the plugin-assigned handle for the device (e.g. cpu core
@@ -61,7 +61,7 @@ class DeviceRow(CreatedAtMixin, Base):  # type: ignore[misc]
     )
 
 
-class DeviceAllocationRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class DeviceAllocationRow(CreatedAtMixin, Base):
     """Per-kernel, per-capacity-entry device allocation.
 
     ``quantity`` is the amount allocated to the kernel, not the device's physical
