@@ -58,31 +58,34 @@ class ProtocolError(RuntimeError):
     contract. Never carries privileged detail back to the caller."""
 
 
-def _decode_ports(raw: Any) -> tuple[tuple[int, int, str | None], ...] | None:
+def _decode_ports(raw: Any) -> tuple[tuple[int, int, str | None, str], ...] | None:
     """Shape-check only; the *values* are the policy layer's business.
 
-    Each entry is ``[host_port, container_port]`` or ``[host_port, container_port, host_ip]``, where
-    ``host_ip`` (the interface the service is published on) is a string or null. The 2-element form
-    is accepted for compatibility and means "every local address"."""
+    Each entry is ``[host_port, container_port]``, ``[host_port, container_port, host_ip]`` or
+    ``[host_port, container_port, host_ip, protocol]``, where ``host_ip`` (the interface the service
+    is published on) is a string or null and ``protocol`` is ``"tcp"``/``"udp"``. The shorter forms
+    are accepted for compatibility and default to every-local-address / tcp."""
     if raw is None:
         return None
     if not isinstance(raw, list):
         raise ProtocolError("ports must be an array")
-    triples: list[tuple[int, int, str | None]] = []
+    entries: list[tuple[int, int, str | None, str]] = []
     for entry in raw:
-        if not isinstance(entry, list) or len(entry) not in (2, 3):
+        if not isinstance(entry, list) or len(entry) not in (2, 3, 4):
             raise ProtocolError(
-                "each port entry must be [host_port, container_port] or"
-                " [host_port, container_port, host_ip]"
+                "each port entry must be [host_port, container_port(, host_ip(, protocol))]"
             )
         host_port, container_port = entry[0], entry[1]
-        host_ip = entry[2] if len(entry) == 3 else None
+        host_ip = entry[2] if len(entry) >= 3 else None
+        protocol = entry[3] if len(entry) == 4 else "tcp"
         if not isinstance(host_port, int) or not isinstance(container_port, int):
             raise ProtocolError("ports must be integers")
         if host_ip is not None and not isinstance(host_ip, str):
             raise ProtocolError("host_ip must be a string or null")
-        triples.append((host_port, container_port, host_ip))
-    return tuple(triples)
+        if not isinstance(protocol, str):
+            raise ProtocolError("protocol must be a string")
+        entries.append((host_port, container_port, host_ip, protocol))
+    return tuple(entries)
 
 
 def _decode_forwards(raw: Any) -> tuple[tuple[str, int, str, int], ...] | None:
@@ -129,12 +132,12 @@ class PrivNetRequest:
     # address); a single-node session has no overlay. Opaque — the privnet validates it is within the
     # session's own LOCAL subnet before pinning.
     local_ip: str | None = None
-    # PUBLISH_PORTS only: the (host_port, container_port, host_ip) pairing the agent's port pool
-    # produced. host_ip is the interface the service is published on (None = every local address);
-    # the DNAT *destination* is never sent — the privnet uses its own assigned LOCAL address (see
-    # PrivNetOp.PUBLISH_PORTS), so a compromised agent can pick the publish interface but not the
-    # redirect target.
-    ports: tuple[tuple[int, int, str | None], ...] | None = None
+    # PUBLISH_PORTS only: the (host_port, container_port, host_ip, protocol) pairing the agent's port
+    # pool produced. host_ip is the interface the service is published on (None = every local
+    # address); protocol is "tcp"/"udp"; the DNAT *destination* is never sent — the privnet uses its
+    # own assigned LOCAL address (see PrivNetOp.PUBLISH_PORTS), so a compromised agent can pick the
+    # publish interface/protocol but not the redirect target.
+    ports: tuple[tuple[int, int, str | None, str], ...] | None = None
     # SETUP_DNS_REDIRECT only: the ephemeral loopback port the agent's resolver bound. The redirect
     # destination is fixed to 127.0.0.1:<this> — the agent picks only its own local port, never the
     # host or address.

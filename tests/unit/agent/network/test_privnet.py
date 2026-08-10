@@ -664,7 +664,10 @@ class TestSessionLock:
         ) as restarted:
             await restarted.client().call(
                 PrivNetRequest(
-                    PrivNetOp.PUBLISH_PORTS, "s1", container_id="c1", ports=((30001, 8070, None),)
+                    PrivNetOp.PUBLISH_PORTS,
+                    "s1",
+                    container_id="c1",
+                    ports=((30001, 8070, None, "tcp"),),
                 )
             )
             assert [f.container_ip for f in restarted.forwarder.installed] == [assigned]
@@ -782,7 +785,7 @@ _NC = {"backend": "bridge", "subnet": "172.30.0.0/24"}
 _LOCAL_IP = "172.30.0.5"
 
 
-async def _publish(h: _Harness, ports: tuple[tuple[int, int, str | None], ...]) -> None:
+async def _publish(h: _Harness, ports: tuple[tuple[int, int, str | None, str], ...]) -> None:
     await h.client().call(
         PrivNetRequest(op=PrivNetOp.PUBLISH_PORTS, session_id="s1", container_id="c1", ports=ports)
     )
@@ -804,18 +807,26 @@ class TestPublishPorts:
     async def test_publishes_to_the_address_the_privnet_assigned(self) -> None:
         async with _Harness() as h:
             await self._setup(h)
-            await _publish(h, ((30001, 8070, None),))
+            await _publish(h, ((30001, 8070, None, "tcp"),))
             assert [(f.host_port, f.container_port) for f in h.forwarder.installed] == [
                 (30001, 8070)
             ]
             # the destination is the privnet's own attach record, never anything the agent sent
             assert {f.container_ip for f in h.forwarder.installed} == {_LOCAL_IP}
 
+    async def test_a_udp_port_publishes_as_udp(self) -> None:
+        # The protocol survives the wire (encode -> decode -> validate) and reaches the installed
+        # PortForward, so the privnet emits a -p udp DNAT.
+        async with _Harness() as h:
+            await self._setup(h)
+            await _publish(h, ((30001, 8070, None, "udp"),))
+            assert [f.protocol for f in h.forwarder.installed] == ["udp"]
+
     async def test_publish_before_attach_is_refused(self) -> None:
         async with _Harness() as h:
             await self._setup(h, attached=False)
             with pytest.raises(PrivNetClientError):
-                await _publish(h, ((30001, 8070, None),))
+                await _publish(h, ((30001, 8070, None, "tcp"),))
             assert h.forwarder.installed == []
 
     async def test_a_privileged_host_port_is_refused(self) -> None:
@@ -823,20 +834,20 @@ class TestPublishPorts:
         async with _Harness() as h:
             await self._setup(h)
             with pytest.raises(PrivNetClientError):
-                await _publish(h, ((22, 22, None),))
+                await _publish(h, ((22, 22, None, "tcp"),))
             assert h.forwarder.installed == []
 
     async def test_a_duplicate_host_port_is_refused(self) -> None:
         async with _Harness() as h:
             await self._setup(h)
             with pytest.raises(PrivNetClientError):
-                await _publish(h, ((30001, 8070, None), (30001, 7681, None)))
+                await _publish(h, ((30001, 8070, None, "tcp"), (30001, 7681, None, "tcp")))
             assert h.forwarder.installed == []
 
     async def test_unpublish_returns_the_host_ports_and_needs_no_session(self) -> None:
         async with _Harness() as h:
             await self._setup(h)
-            await _publish(h, ((30001, 8070, None), (30002, 7681, None)))
+            await _publish(h, ((30001, 8070, None, "tcp"), (30002, 7681, None, "tcp")))
             # a session the privnet never heard of: the rules still name their own container
             resp = await h.client().call(
                 PrivNetRequest(op=PrivNetOp.UNPUBLISH_PORTS, session_id="c1", container_id="c1")
@@ -849,7 +860,7 @@ class TestPublishPorts:
         # an address that is gone
         async with _Harness() as h:
             await self._setup(h)
-            await _publish(h, ((30001, 8070, None),))
+            await _publish(h, ((30001, 8070, None, "tcp"),))
             await h.client().call(
                 PrivNetRequest(op=PrivNetOp.DETACH_CONTAINER, session_id="s1", container_id="c1")
             )
@@ -858,7 +869,7 @@ class TestPublishPorts:
     async def test_list_ports_reports_every_published_rule(self) -> None:
         async with _Harness() as h:
             await self._setup(h)
-            await _publish(h, ((30001, 8070, None),))
+            await _publish(h, ((30001, 8070, None, "tcp"),))
             resp = await h.client().call(
                 PrivNetRequest(op=PrivNetOp.LIST_PORTS, session_id="list-ports")
             )

@@ -143,6 +143,7 @@ from ai.backend.common.types import (
     ResourceSlot,
     Sentinel,
     ServicePort,
+    ServicePortProtocols,
     SessionId,
     SlotName,
     current_resource_slots,
@@ -365,7 +366,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     # 127.0.0.1 for a protected service, the configured bind-host for an ordinary one — so a
     # protected service (e.g. a storage node's ttyd) is not exposed on every interface. None means
     # every local address (the pre-S1/S2 behaviour, kept only for the empty-bind-host default).
-    _host_port_map: list[tuple[int, int, str | None]]
+    _host_port_map: list[tuple[int, int, str | None, str]]
     _repl_host_ports: tuple[int, ...]
 
     def __init__(
@@ -1227,14 +1228,16 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         try:
             for sport in service_ports:
                 host_ip = "127.0.0.1" if sport["name"] in protected else bind_host
+                # Only UDP service ports publish as udp; http/tcp/vnc/rdp all ride TCP.
+                protocol = "udp" if sport.get("protocol") == ServicePortProtocols.UDP else "tcp"
                 host_ports: list[int] = []
                 for container_port in sport["container_ports"]:
                     host_port = self._port_pool.acquire()
                     host_ports.append(host_port)
-                    self._host_port_map.append((host_port, container_port, host_ip))
+                    self._host_port_map.append((host_port, container_port, host_ip, protocol))
                 sport["host_ports"] = tuple(host_ports)
         except Exception:
-            self._port_pool.release_many([hp for hp, _, _ in self._host_port_map])
+            self._port_pool.release_many([hp for hp, *_ in self._host_port_map])
             self._host_port_map = []
             raise
 
@@ -1339,7 +1342,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 oci_spec, service_ports, environ, extra_caps, resource_spec
             )
         except Exception:
-            self._port_pool.release_many([hp for hp, _, _ in self._host_port_map])
+            self._port_pool.release_many([hp for hp, *_ in self._host_port_map])
             raise
 
     def _build_prepared_kernel(
@@ -1490,7 +1493,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             await self._provision_sudo_session()
         except Exception:
             if not published:
-                self._port_pool.release_many([hp for hp, _, _ in self._host_port_map])
+                self._port_pool.release_many([hp for hp, *_ in self._host_port_map])
             raise
         kernel_host = str(
             self.local_config.container.advertised_host or self.local_config.container.bind_host
@@ -1508,7 +1511,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             "repl_out_port": repl_out_port,
             "stdin_port": 0,  # legacy
             "stdout_port": 0,  # legacy
-            "host_ports": [host_port for host_port, _, _ in self._host_port_map],
+            "host_ports": [host_port for host_port, *_ in self._host_port_map],
             "domain_socket_proxies": self.domain_socket_proxies,
             "block_service_ports": self.internal_data.get("block_service_ports", False),
         }

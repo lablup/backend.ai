@@ -7,6 +7,7 @@ import pytest
 from ai.backend.agent.network.port_forward import (
     PortForward,
     PortForwarder,
+    dnat_rule,
     forwards_for,
     host_ports_of,
     install_args,
@@ -85,15 +86,23 @@ class TestRuleBuilders:
             assert add[3] == "-A" and delete[3] == "-D"
             assert add[4:] == delete[4:]
 
-    def test_forwards_for_pairs_host_container_ports_and_bind_ip(self) -> None:
+    def test_forwards_for_pairs_host_container_ports_bind_ip_and_protocol(self) -> None:
         forwards = forwards_for(
-            _CID, "172.30.1.7", [(30001, 8070, "127.0.0.1"), (30002, 7681, None)]
+            _CID,
+            "172.30.1.7",
+            [(30001, 8070, "127.0.0.1", "tcp"), (30002, 7681, None, "udp")],
         )
-        assert [(f.host_port, f.container_port, f.host_ip) for f in forwards] == [
-            (30001, 8070, "127.0.0.1"),
-            (30002, 7681, None),
+        assert [(f.host_port, f.container_port, f.host_ip, f.protocol) for f in forwards] == [
+            (30001, 8070, "127.0.0.1", "tcp"),
+            (30002, 7681, None, "udp"),
         ]
         assert host_ports_of(forwards) == [30001, 30002]
+
+    def test_a_udp_port_emits_a_udp_dnat(self) -> None:
+        forward = forwards_for(_CID, "172.30.1.7", [(30001, 8070, None, "udp")])[0]
+        flat = " ".join(dnat_rule("PREROUTING", forward))
+        assert "-p udp" in flat and "-p tcp" not in flat
+        assert "--dport 30001" in flat
 
 
 class TestParseFromIptables:
@@ -121,7 +130,9 @@ class TestPortForwarder:
     async def test_install_applies_every_chain_for_every_port(self) -> None:
         runner = _Runner()
         await PortForwarder(runner).install(
-            forwards_for(_CID, "172.30.1.7", [(30001, 8070, None), (30002, 7681, None)])
+            forwards_for(
+                _CID, "172.30.1.7", [(30001, 8070, None, "tcp"), (30002, 7681, None, "tcp")]
+            )
         )
         assert len(runner.calls) == 4  # 2 ports x 2 chains
         assert "PREROUTING" in runner.flat() and "OUTPUT" in runner.flat()
@@ -134,7 +145,9 @@ class TestPortForwarder:
         forwarder = PortForwarder(runner)
         with pytest.raises(RuntimeError):
             await forwarder.install(
-                forwards_for(_CID, "172.30.1.7", [(30001, 8070, None), (30002, 7681, None)])
+                forwards_for(
+                    _CID, "172.30.1.7", [(30001, 8070, None, "tcp"), (30002, 7681, None, "tcp")]
+                )
             )
         deletes = [c for c in runner.calls if "-D" in c]
         assert sorted(c[c.index("--dport") + 1] for c in deletes) == [
@@ -160,7 +173,7 @@ class TestPortForwarder:
         runner = _FailOnChain()
         with pytest.raises(RuntimeError):
             await PortForwarder(runner).install(
-                forwards_for(_CID, "172.30.1.7", [(30001, 8070, None)])
+                forwards_for(_CID, "172.30.1.7", [(30001, 8070, None, "tcp")])
             )
         # the PREROUTING rule that did get inserted must be deleted on rollback
         deletes = [c for c in runner.calls if "-D" in c and "PREROUTING" in c]

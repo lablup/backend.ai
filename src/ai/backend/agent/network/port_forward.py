@@ -42,6 +42,10 @@ class PortForward:
     # or the operator's configured bind-host to keep service ports off the public interface. Docker
     # applies exactly the same per-port host-IP binding.
     host_ip: str | None = None
+    # Transport of the published port: ``"tcp"`` (default — http/tcp/vnc/rdp service ports all ride
+    # TCP) or ``"udp"``. It is part of the rule's identity: iptables ``--dport`` needs a matching
+    # ``-p``, and a ``-D`` must name the same protocol as the ``-A`` or the removal misses.
+    protocol: str = "tcp"
 
 
 # Host addresses that mean "bind to every local interface" rather than one specific address. Docker
@@ -78,7 +82,7 @@ def dnat_rule(chain: str, forward: PortForward) -> list[str]:
     )
     return [
         chain,
-        "-p", "tcp",
+        "-p", forward.protocol,
         *dst_match,
         "--dport", str(forward.host_port),
         *_comment(forward.container_id),
@@ -138,12 +142,17 @@ def _parse_line(line: str) -> PortForward | None:
     host_ip: str | None = None
     if raw_d := value_after("-d"):
         host_ip = raw_d.split("/", 1)[0]
+    # Read the protocol back so the parsed rule regenerates byte-for-byte (a -D that named the wrong
+    # protocol would fail to delete a udp rule and leak it). iptables -S always shows -p for a
+    # --dport rule; default to tcp defensively.
+    protocol = value_after("-p") or "tcp"
     return PortForward(
         container_id=comment.strip('"')[len(_COMMENT_PREFIX) :],
         host_port=int(dport),
         container_ip=ip,
         container_port=int(container_port),
         host_ip=host_ip,
+        protocol=protocol,
     )
 
 
@@ -167,10 +176,11 @@ def parse_forwards(
 
 
 def forwards_for(
-    container_id: str, container_ip: str, ports: Iterable[tuple[int, int, str | None]]
+    container_id: str, container_ip: str, ports: Iterable[tuple[int, int, str | None, str]]
 ) -> list[PortForward]:
-    """``ports`` is the (host_port, container_port, host_ip) pairing the agent allocated. ``host_ip``
-    is the address the service is published on (None = every local address)."""
+    """``ports`` is the (host_port, container_port, host_ip, protocol) pairing the agent allocated.
+    ``host_ip`` is the address the service is published on (None = every local address); ``protocol``
+    is ``"tcp"``/``"udp"``."""
     return [
         PortForward(
             container_id=container_id,
@@ -178,8 +188,9 @@ def forwards_for(
             container_ip=container_ip,
             container_port=container_port,
             host_ip=host_ip,
+            protocol=protocol,
         )
-        for host_port, container_port, host_ip in ports
+        for host_port, container_port, host_ip, protocol in ports
     ]
 
 

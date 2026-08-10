@@ -148,7 +148,7 @@ def _context(
     ctx.main_gid = None
     ctx._port_forwarder = cast(Any, port_forwarder)
     # what _reserve_host_ports would have produced: one service port, no REPL port
-    ctx._host_port_map = [(30003, 8070, None)]
+    ctx._host_port_map = [(30003, 8070, None, "tcp")]
     ctx._port_pool = PortPool((30000, 30010), 0.0)
     ctx._port_pool.discard(30003)  # _reserve_host_ports had acquired it
     ctx.local_config = cast(
@@ -1050,7 +1050,9 @@ class TestReserveHostPortsBinding:
     def _reserve(self, ctx: Any, service_ports: list[Any]) -> dict[int, str | None]:
         ctx._reserve_host_ports(service_ports)
         # container_port -> host_ip, so a test can assert per service without depending on ordering
-        return {container_port: host_ip for _hp, container_port, host_ip in ctx._host_port_map}
+        return {
+            container_port: host_ip for _hp, container_port, host_ip, _proto in ctx._host_port_map
+        }
 
     def test_a_mid_reserve_failure_gives_back_what_it_took(self) -> None:
         # The count check passes (2 ports free) but the second acquire trips the cooldown, so the

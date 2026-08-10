@@ -574,6 +574,7 @@ class AutoPullBehavior(enum.StrEnum):
 class ServicePortProtocols(enum.StrEnum):
     HTTP = "http"
     TCP = "tcp"
+    UDP = "udp"
     PREOPEN = "preopen"
     INTERNAL = "internal"
     VNC = "vnc"

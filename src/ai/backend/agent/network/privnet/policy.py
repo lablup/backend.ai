@@ -86,32 +86,35 @@ def validate_dns_port(value: int | None) -> int:
 
 
 def validate_port_pairs(
-    value: tuple[tuple[int, int, str | None], ...] | None,
-) -> tuple[tuple[int, int, str | None], ...]:
-    """Bound the agent-supplied (host_port, container_port, host_ip) pairing.
+    value: tuple[tuple[int, int, str | None, str], ...] | None,
+) -> tuple[tuple[int, int, str | None, str], ...]:
+    """Bound the agent-supplied (host_port, container_port, host_ip, protocol) pairing.
 
     This is the trust boundary for host-port ingress. The DNAT *destination* is never taken from the
     agent (the privnet uses the LOCAL address it assigned at attach), so the agent can influence only
-    *which* host port is redirected and *which local interface* it is published on — hence the
-    unprivileged-port floor, the duplicate check, and validating host_ip as a real IPv4 (or None for
-    every local address). The worst a lying agent achieves is publishing its own container on some
-    other unprivileged port, or a different local interface, of the node.
+    *which* host port is redirected, *which local interface* it is published on, and the *transport*
+    — hence the unprivileged-port floor, the duplicate check, validating host_ip as a real IPv4 (or
+    None), and constraining protocol to tcp/udp (it becomes iptables ``-p``). The worst a lying agent
+    achieves is publishing its own container on some other unprivileged port/interface/transport.
+    Duplicate is keyed on (port, protocol): tcp/udp can share a number, as they do on any host.
     """
     if not value:
         raise PolicyViolation("missing ports")
     if len(value) > _MAX_PUBLISHED_PORTS:
         raise PolicyViolation("too many ports")
-    seen: set[int] = set()
-    for host_port, container_port, host_ip in value:
+    seen: set[tuple[int, str]] = set()
+    for host_port, container_port, host_ip, protocol in value:
         if not (_MIN_HOST_PORT <= host_port <= _MAX_PORT):
             raise PolicyViolation("host port out of range")
         if not (1 <= container_port <= _MAX_PORT):
             raise PolicyViolation("container port out of range")
-        if host_port in seen:
+        if protocol not in ("tcp", "udp"):
+            raise PolicyViolation("protocol must be tcp or udp")
+        if (host_port, protocol) in seen:
             raise PolicyViolation("duplicate host port")
         if host_ip is not None:
             validate_ipv4(host_ip, what="host_ip")
-        seen.add(host_port)
+        seen.add((host_port, protocol))
     return value
 
 
