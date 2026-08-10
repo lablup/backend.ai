@@ -196,6 +196,14 @@
     "VFolder": "VFolder",
     "VFolderRequired": "VFolder 为必填项。"
   },
+  "adminRuntimeVariantPreset": {
+    "CreatePreset": "创建预设",
+    "Name": "名称",
+    "PresetDeleted": "运行时变体预设已删除。",
+    "RuntimeVariantId": "运行时变体 ID",
+    "RuntimeVariantPreset": "运行时变体预设",
+    "TabTitle": "运行时变体预设"
+  },
   "adminSession": {
     "PendingSessions": "待处理会话",
     "PendingSessionsScopedToResourceGroup": "仅显示所选资源组的待处理会话。切换资源组以查看其他组中的会话。"
@@ -1149,6 +1157,8 @@
     "SchedulingHistory": "调度历史",
     "SessionId": "会话 ID",
     "StartChatTest": "在聊天中测试",
+    "SwitchProjectConfirmContent": "此部署属于「{{projectName}}」项目。系统将切换到该项目以便查看。是否继续？",
+    "SwitchProjectConfirmTitle": "是否切换到其他项目？",
     "Tags": "标签",
     "TagsPlaceholder": "输入标签，以逗号分隔",
     "TagsTooltip": "用于组织和筛选部署的可选标签。按 Enter 或逗号添加。",
@@ -1690,6 +1700,7 @@
     "CouldNotCopyText": "无法复制文本：",
     "CreateButtonCode": "创造",
     "CreateNotebookButton": "创建笔记本按钮",
+    "CreatedFolderIsReadOnly": "该文件夹以只读挂载权限创建，无法用于下载。请以读写挂载权限创建文件夹。",
     "DownloadModelToFolder": "下载模型到文件夹",
     "Downloading": "正在下载...",
     "FailedToFetchRepositoryInformation": "获取仓库信息失败。",
@@ -1706,6 +1717,12 @@
     "GitlabDefaultBranch": "GitLab 分支名称",
     "GitlabRepoWillBeFolder": "导入的 GitLab 资源库会转换为文件夹，并可在会话启动时挂载。",
     "GitlabURL": "GitLab URL",
+    "HuggingFaceModelInfoUnavailable": "无法加载模型信息。您仍然可以开始导入。",
+    "HuggingFaceModelIsDisabled": "该模型已在 Hugging Face 上被禁用，无法下载。",
+    "HuggingFaceModelIsGated": "该模型受访问限制。请在 Hugging Face 上接受其许可协议并输入访问令牌，否则下载将失败。",
+    "HuggingFaceModelNotFoundOrPrivate": "未找到模型，或该模型为私有。请检查模型 ID，或输入访问令牌。",
+    "HuggingFaceModelSize": "大小",
+    "HuggingFaceModelSizeIncludesAllRevisions": "包含所有修订版本的仓库总大小。实际下载量可能更小。",
     "HuggingFaceModelUrlOrId": "Hugging Face 模型 URL 或 ID",
     "HuggingFaceModelWillBeDownloaded": "Hugging Face 模型将通过批处理会话下载到所选模型文件夹的子文件夹中。",
     "HuggingFaceRevision": "Revision",
@@ -1727,6 +1744,7 @@
     "NotebookBadgeCodeMarkdown": "笔记本徽章代码 (Markdown)",
     "NotebookBadgeURL": "笔记本网址",
     "NotebookURL": "笔记本网址",
+    "OnlyWritableModelFoldersAreListed": "仅显示当前项目中您可以以写入权限挂载的模型文件夹。",
     "Preparing": "正在准备...",
     "ReadyToImport": "准备进口",
     "RepoWillBeFolder": "导入的 GitHub 存储库转换为文件夹，并且可以在会话开始时挂载。",

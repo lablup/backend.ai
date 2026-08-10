@@ -196,6 +196,14 @@
     "VFolder": "VFolder",
     "VFolderRequired": "VFolder zorunludur."
   },
+  "adminRuntimeVariantPreset": {
+    "CreatePreset": "Ön Ayar Oluştur",
+    "Name": "Ad",
+    "PresetDeleted": "Çalışma zamanı varyantı ön ayarı silindi.",
+    "RuntimeVariantId": "Çalışma Zamanı Varyantı ID",
+    "RuntimeVariantPreset": "Çalışma Zamanı Varyantı Ön Ayarı",
+    "TabTitle": "Çalışma Zamanı Varyantı Ön Ayarları"
+  },
   "adminSession": {
     "PendingSessions": "Bekleyen Oturumlar",
     "PendingSessionsScopedToResourceGroup": "Yalnızca seçili kaynak grubuna ait bekleyen oturumlar gösterilmektedir. Diğer gruplardaki oturumları görüntülemek için kaynak gruplarını değiştirin."
@@ -1149,6 +1157,8 @@
     "SchedulingHistory": "Zamanlama Geçmişi",
     "SessionId": "Oturum Kimliği",
     "StartChatTest": "Sohbette test et",
+    "SwitchProjectConfirmContent": "Bu dağıtım \"{{projectName}}\" projesine ait. Görüntülemek için o projeye geçirileceksiniz. Devam edilsin mi?",
+    "SwitchProjectConfirmTitle": "Başka bir projeye geçilsin mi?",
     "Tags": "Etiketler",
     "TagsPlaceholder": "Etiketleri virgülle ayırarak girin",
     "TagsTooltip": "Dağıtımları düzenlemek ve filtrelemek için isteğe bağlı etiketler. Eklemek için Enter veya virgüle basın.",
@@ -1688,6 +1698,7 @@
     "CouldNotCopyText": "Metin kopyalanamadı:",
     "CreateButtonCode": "Oluşturmak",
     "CreateNotebookButton": "Defter Düğmesi Oluştur",
+    "CreatedFolderIsReadOnly": "Klasör salt okunur bağlama iznine sahip olarak oluşturuldu, bu nedenle indirme yapılamaz. Okuma ve yazma bağlama izniyle bir klasör oluşturun.",
     "DownloadModelToFolder": "Modeli Klasöre İndir",
     "Downloading": "İndiriliyor...",
     "FailedToFetchRepositoryInformation": "Depo bilgileri alınamadı.",
@@ -1704,6 +1715,12 @@
     "GitlabDefaultBranch": "Gitlab Şube Adı",
     "GitlabRepoWillBeFolder": "İçe aktarılan Gitlab depoları klasörlere dönüştürülür ve oturum başladığında bağlanabilir.",
     "GitlabURL": "Gitlab URL'si",
+    "HuggingFaceModelInfoUnavailable": "Model bilgileri yüklenemedi. İçe aktarma yine de başlatılabilir.",
+    "HuggingFaceModelIsDisabled": "Bu model Hugging Face üzerinde devre dışı bırakılmış ve indirilemez.",
+    "HuggingFaceModelIsGated": "Bu model erişim kısıtlamalıdır. Hugging Face üzerinde lisansını kabul edin ve bir erişim belirteci girin, aksi hâlde indirme başarısız olur.",
+    "HuggingFaceModelNotFoundOrPrivate": "Model bulunamadı veya özel. Model kimliğini kontrol edin ya da bir erişim belirteci girin.",
+    "HuggingFaceModelSize": "Boyut",
+    "HuggingFaceModelSizeIncludesAllRevisions": "Tüm revizyonlar dâhil deponun toplam boyutu. Gerçek indirme daha küçük olabilir.",
     "HuggingFaceModelUrlOrId": "Hugging Face Model URL'si veya ID'si",
     "HuggingFaceModelWillBeDownloaded": "Hugging Face modeli, seçilen model klasörünün bir alt klasörüne toplu iş oturumu aracılığıyla indirilir.",
     "HuggingFaceRevision": "Revision",
@@ -1725,6 +1742,7 @@
     "NotebookBadgeCodeMarkdown": "Defter Rozeti Kodu (Markdown)",
     "NotebookBadgeURL": "Not Defteri URL'si",
     "NotebookURL": "Not Defteri URL'si",
+    "OnlyWritableModelFoldersAreListed": "Yalnızca geçerli projede yazma izniyle bağlayabileceğiniz model klasörleri listelenir.",
     "Preparing": "hazırlanıyor...",
     "ReadyToImport": "İçe Aktarmaya Hazır",
     "RepoWillBeFolder": "İçe aktarılan GitHub depoları klasörlere dönüştürülür ve oturum başladığında eklenebilir.",

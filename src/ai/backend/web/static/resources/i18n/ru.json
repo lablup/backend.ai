@@ -196,6 +196,14 @@
     "VFolder": "VFolder",
     "VFolderRequired": "VFolder обязателен."
   },
+  "adminRuntimeVariantPreset": {
+    "CreatePreset": "Создать пресет",
+    "Name": "Имя",
+    "PresetDeleted": "Пресет варианта среды выполнения удалён.",
+    "RuntimeVariantId": "ID варианта среды выполнения",
+    "RuntimeVariantPreset": "Пресет варианта среды выполнения",
+    "TabTitle": "Пресеты вариантов среды выполнения"
+  },
   "adminSession": {
     "PendingSessions": "Ожидающие сессии",
     "PendingSessionsScopedToResourceGroup": "Отображаются только ожидающие сессии для выбранной группы ресурсов. Переключайтесь между группами ресурсов для просмотра сессий в других группах."
@@ -1149,6 +1157,8 @@
     "SchedulingHistory": "История планирования",
     "SessionId": "ID сессии",
     "StartChatTest": "Проверить в чате",
+    "SwitchProjectConfirmContent": "Это развертывание принадлежит проекту «{{projectName}}». Вы будете переключены на этот проект для его просмотра. Продолжить?",
+    "SwitchProjectConfirmTitle": "Переключиться на другой проект?",
     "Tags": "Теги",
     "TagsPlaceholder": "Введите теги, разделённые запятыми",
     "TagsTooltip": "Необязательные метки для организации и фильтрации развёртываний. Нажмите Enter или запятую для добавления.",
@@ -1688,6 +1698,7 @@
     "CouldNotCopyText": "Не удалось скопировать текст:",
     "CreateButtonCode": "Создавать",
     "CreateNotebookButton": "Создать кнопку блокнота",
+    "CreatedFolderIsReadOnly": "Папка создана с правом подключения только для чтения, поэтому загрузка в неё невозможна. Создайте папку с правом чтения и записи.",
     "DownloadModelToFolder": "Скачать модель в папку",
     "Downloading": "Скачивание ...",
     "FailedToFetchRepositoryInformation": "Не удалось получить информацию о репозитории.",
@@ -1704,6 +1715,12 @@
     "GitlabDefaultBranch": "Имя филиала GitLab",
     "GitlabRepoWillBeFolder": "Импортированные репозитории GitLab преобразуются в папки и могут быть смонтированы при запуске сессии.",
     "GitlabURL": "URL-адрес GitLab",
+    "HuggingFaceModelInfoUnavailable": "Не удалось загрузить информацию о модели. Импорт всё равно можно запустить.",
+    "HuggingFaceModelIsDisabled": "Эта модель отключена на Hugging Face и не может быть загружена.",
+    "HuggingFaceModelIsGated": "Доступ к этой модели ограничен. Примите её лицензию на Hugging Face и укажите токен доступа, иначе загрузка завершится ошибкой.",
+    "HuggingFaceModelNotFoundOrPrivate": "Модель не найдена или является приватной. Проверьте идентификатор модели или укажите токен доступа.",
+    "HuggingFaceModelSize": "Размер",
+    "HuggingFaceModelSizeIncludesAllRevisions": "Общий размер репозитория со всеми ревизиями. Фактический объём загрузки может быть меньше.",
     "HuggingFaceModelUrlOrId": "URL или ID модели Hugging Face",
     "HuggingFaceModelWillBeDownloaded": "Модель Hugging Face загружается в подпапку выбранной папки модели с помощью пакетной сессии.",
     "HuggingFaceRevision": "Revision",
@@ -1725,6 +1742,7 @@
     "NotebookBadgeCodeMarkdown": "Код значка блокнота (маркдаун)",
     "NotebookBadgeURL": "URL блокнота",
     "NotebookURL": "URL блокнота",
+    "OnlyWritableModelFoldersAreListed": "Показаны только папки моделей текущего проекта, которые вы можете подключить с правом записи.",
     "Preparing": "Подготовка ...",
     "ReadyToImport": "Готовы к импорту",
     "RepoWillBeFolder": "Импортированные репозитории GitHub преобразуются в папки и могут быть подключены при запуске сеанса.",
