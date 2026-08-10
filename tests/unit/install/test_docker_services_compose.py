@@ -9,6 +9,7 @@ from ai.backend.install.context import DockerContext
 
 EXPECTED_SERVICES = {
     "manager",
+    "manager-cli",
     "agent",
     "webserver",
     "storage-proxy",
@@ -17,8 +18,13 @@ EXPECTED_SERVICES = {
     "appproxy-worker-tcp",
 }
 
+# One-off helper service: started only via `docker compose run`, never `up -d`.
+CLI_ONLY_SERVICES = {"manager-cli"}
+
 BASE_PATH = Path("/home/bai/backendai")
 VERSION = "26.9.0"
+
+KRUNNER_SHARED_PATH = "/var/lib/backend.ai/krunner"
 
 
 @pytest.fixture
@@ -43,6 +49,13 @@ def render(template: str, *, enable_gpu: bool) -> dict[str, Any]:
     return doc
 
 
+def test_rendered_compose_has_dedicated_project_name(template: str) -> None:
+    # The fixed project name keeps this file from sharing a compose project
+    # with the halfstack compose file living in the same directory.
+    doc = render(template, enable_gpu=False)
+    assert doc["name"] == "backendai-services"
+
+
 def test_rendered_compose_has_all_services_with_parity_mounts(template: str) -> None:
     doc = render(template, enable_gpu=False)
     services = doc["services"]
@@ -54,7 +67,10 @@ def test_rendered_compose_has_all_services_with_parity_mounts(template: str) -> 
         assert service["network_mode"] == "host"
         assert service["working_dir"] == str(BASE_PATH)
         assert parity_mount in service["volumes"], f"{name} lacks the base_path parity mount"
-        assert service["restart"] == "unless-stopped"
+        if name in CLI_ONLY_SERVICES:
+            assert "restart" not in service, f"{name} must not auto-restart"
+        else:
+            assert service["restart"] == "unless-stopped"
 
 
 def test_rendered_compose_elevated_services(template: str) -> None:
@@ -67,10 +83,26 @@ def test_rendered_compose_elevated_services(template: str) -> None:
     agent = services["agent"]
     assert agent["pid"] == "host"
     assert agent["cgroup"] == "host"
-    krunner_mount = "/tmp/backend-ai-krunner:/tmp/backend-ai-krunner"
+    krunner_mount = f"{KRUNNER_SHARED_PATH}:{KRUNNER_SHARED_PATH}"
     assert krunner_mount in agent["volumes"]
+    assert str(DockerContext.KRUNNER_SHARED_PATH) == KRUNNER_SHARED_PATH
     # the GPU reservation stays commented out without a CUDA accelerator
     assert "deploy" not in agent
+
+
+def test_rendered_compose_manager_cli_is_unprivileged_one_off(template: str) -> None:
+    doc = render(template, enable_gpu=False)
+    services = doc["services"]
+    manager_cli = services["manager-cli"]
+    # Same image as the manager, but no privileges and no docker socket.
+    assert manager_cli["image"] == services["manager"]["image"]
+    assert "privileged" not in manager_cli
+    assert not any("docker.sock" in volume for volume in manager_cli["volumes"])
+    # The "cli" profile keeps `docker compose up -d` from starting it, while
+    # `docker compose run manager-cli ...` still works (run ignores profile
+    # gating for the explicitly named service).
+    assert manager_cli["profiles"] == ["cli"]
+    assert manager_cli["command"] == ["true"]
 
 
 def test_rendered_compose_gpu_enabled(template: str) -> None:
@@ -82,3 +114,14 @@ def test_rendered_compose_gpu_enabled(template: str) -> None:
     for name, service in doc["services"].items():
         if name != "agent":
             assert "deploy" not in service
+
+
+def test_gpu_marker_strip_is_line_anchored() -> None:
+    synthetic = "# prose mentioning the #gpu# marker stays intact\n#gpu#    deploy: {}\n"
+    rendered = DockerContext.render_services_compose(
+        synthetic,
+        base_path=BASE_PATH,
+        version=VERSION,
+        enable_gpu=True,
+    )
+    assert rendered == "# prose mentioning the #gpu# marker stays intact\n    deploy: {}\n"
