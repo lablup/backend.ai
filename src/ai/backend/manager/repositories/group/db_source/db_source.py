@@ -111,7 +111,12 @@ from ai.backend.manager.repositories.ops.rbac.provider import (
     RBACWriteOps,
     ScopeCreation,
     ScopeDeletion,
+<<<<<<< HEAD
     ScopeMember,
+=======
+    ScopeEntityMember,
+    ScopeUserMember,
+>>>>>>> 0e3eb507 (fix(BA-7262): grant a project's auto_assign roles on every membership write (#13579))
 )
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.role_manager import (
@@ -127,6 +132,7 @@ _USER_ENTITY_TYPE = VirtualScopeEntityType(RBACElementType.USER.value)
 
 
 @dataclass
+<<<<<<< HEAD
 class ProjectUserMember(ScopeMember):
     """A user joining or leaving a project scope; ``manage_roles`` controls whether the
     membership change also grants/revokes the user's roles at the project scope."""
@@ -144,6 +150,8 @@ class ProjectUserMember(ScopeMember):
 
 
 @dataclass
+=======
+>>>>>>> 0e3eb507 (fix(BA-7262): grant a project's auto_assign roles on every membership write (#13579))
 class ProjectScopeCreation(ScopeCreation[GroupRow]):
     """Creates a project row under its domain, and the scope the project becomes."""
 
@@ -269,8 +277,13 @@ class GroupDBSource:
             return
         await w.add_entity_members(
             EntityMembersAddition(
+<<<<<<< HEAD
                 scope=ScopeRef(scope_type=_PROJECT_SCOPE_TYPE, scope_id=project_id),
                 members=[ProjectUserMember(user_id=UserID(row.uuid)) for row in new_user_rows],
+=======
+                scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
+                members=[ScopeUserMember(user_id=UserID(row.uuid)) for row in new_user_rows],
+>>>>>>> 0e3eb507 (fix(BA-7262): grant a project's auto_assign roles on every membership write (#13579))
             )
         )
 
@@ -625,7 +638,8 @@ class GroupDBSource:
         Validates that the role exists, filters to users in the project's domain
         that are not already assigned, writes each new member's virtual-scope
         membership and scope association, and creates user-role mappings for the
-        specified role.
+        specified role. Membership grants the project's ``auto_assign`` roles on
+        top of that role.
 
         Returns the list of newly assigned users.
         """
@@ -644,11 +658,16 @@ class GroupDBSource:
 
             await w.add_entity_members(
                 EntityMembersAddition(
+<<<<<<< HEAD
                     scope=ScopeRef(scope_type=_PROJECT_SCOPE_TYPE, scope_id=project_id),
                     members=[
                         ProjectUserMember(user_id=UserID(row.uuid), manage_roles=False)
                         for row in new_user_rows
                     ],
+=======
+                    scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
+                    members=[ScopeUserMember(user_id=UserID(row.uuid)) for row in new_user_rows],
+>>>>>>> 0e3eb507 (fix(BA-7262): grant a project's auto_assign roles on every membership write (#13579))
                 )
             )
             user_role_specs = [
@@ -726,8 +745,13 @@ class GroupDBSource:
         async with self._rbac_ops_provider.write_ops() as w:
             await w.add_entity_members(
                 EntityMembersAddition(
+<<<<<<< HEAD
                     scope=ScopeRef(scope_type=_PROJECT_SCOPE_TYPE, scope_id=project_id),
                     members=[ProjectUserMember(user_id=user_id, manage_roles=False)],
+=======
+                    scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
+                    members=[ScopeUserMember(user_id=user_id)],
+>>>>>>> 0e3eb507 (fix(BA-7262): grant a project's auto_assign roles on every membership write (#13579))
                 )
             )
 
