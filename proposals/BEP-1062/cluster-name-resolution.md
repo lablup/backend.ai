@@ -125,4 +125,6 @@ Because phase 5 removed the `/etc/hosts` peer fallback, a resolver that fails to
 - TTL vs query-load tradeoff; an etcd-watch cache mitigates.
 - Requires the network layer to bind UDP/TCP 53 on the gateway it owns.
 
-**Non-goals:** replacing Docker/Swarm's embedded DNS (already dynamic); a cluster-wide DNS zone / service-discovery records beyond flat `hostname → A`.
+**Forward + reverse.** The resolver answers `A` (hostname → IP) and `PTR` (IP → hostname, for a cluster IP's `in-addr.arpa`) — the coordinator exposes the reverse `resolve_cluster_ip` over the same session-scoped maps. PTR is for collectives (OpenMPI) that verify a peer by reverse-resolving the address they connected to. `AAAA` and other record types of a known name return authoritative NODATA; anything not ours forwards.
+
+**Non-goals:** replacing Docker/Swarm's embedded DNS (already dynamic); a cluster-wide DNS zone / service-discovery records beyond flat `hostname ↔ IP` (A/PTR).
