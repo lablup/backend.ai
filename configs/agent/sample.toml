@@ -826,6 +826,15 @@
   # for containers with heavy startup processes.
   # Added in 25.12.0
   init-timeout-sec = 120.0
+  # Time budget in seconds for a service app (jupyter, vscode, ...) to open its
+  # port after the kernel runner spawns it. The kernel runner terminates the app
+  # process once this expires, and the agent waits this long plus a fixed margin
+  # for the runner's reply, so the two sides cannot disagree on the budget.
+  # Raise it for images whose apps bind slowly under CPU or IO contention; the
+  # effective ceiling is the calling client's own request timeout. Applies to
+  # containers created after the change.
+  # Added in 26.8.0
+  service-launch-timeout-sec = 30.0
 
 # Configuration overrides for running multiple agents from a single
 # configuration file. Use this field only when defining 2 or more agents;

@@ -334,7 +334,12 @@ class DummyFakeCodeRunner(AbstractCodeRunner):
         return {"status": "failed", "error": "not-implemented"}
 
     @override
-    async def feed_start_service(self, service_info: Mapping[str, Any]) -> dict[str, Any]:
+    async def feed_start_service(
+        self,
+        service_info: Mapping[str, Any],
+        *,
+        reply_timeout: float,
+    ) -> dict[str, Any]:
         return {"status": "failed", "error": "not-implemented"}
 
     @override
