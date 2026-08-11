@@ -579,12 +579,10 @@ class DeleteKeyPair(graphene.Mutation):  # type: ignore[misc]
     ) -> DeleteKeyPair:
         ctx: GraphQueryContext = info.context
         async with ctx.db.begin_readonly_session() as db_session:
-            main_keypair_query = (
-                sa.select(sa.func.count())
-                .select_from(KeyPairRow)
-                .where((KeyPairRow.access_key == access_key) & KeyPairRow.is_default)
+            is_default = await db_session.scalar(
+                sa.select(KeyPairRow.is_default).where(KeyPairRow.access_key == access_key)
             )
-            if (await db_session.scalar(main_keypair_query) or 0) > 0:
+            if is_default:
                 return DeleteKeyPair(False, "the keypair is used as main access key by any user")
         delete_query = sa.delete(keypairs).where(keypairs.c.access_key == access_key)
         return await simple_db_mutate(cls, ctx, delete_query)

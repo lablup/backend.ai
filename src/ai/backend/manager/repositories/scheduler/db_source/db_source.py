@@ -903,7 +903,7 @@ class ScheduleDBSource:
     ) -> dict[UserID, UserResourceLimit]:
         """Fetch per-user limits for users in pending sessions.
 
-        All limits are sourced from the user's main keypair policy until
+        All limits are sourced from the user's default keypair policy until
         user-level policy columns exist.
         """
         user_limits: dict[UserID, UserResourceLimit] = {}
@@ -913,20 +913,19 @@ class ScheduleDBSource:
 
         user_policy_result = await db_sess.execute(
             sa.select(
-                UserRow.uuid,
+                KeyPairRow.user,
                 KeyPairResourcePolicyRow.name,
                 KeyPairResourcePolicyRow.total_resource_slots,
                 KeyPairResourcePolicyRow.default_for_unspecified,
                 KeyPairResourcePolicyRow.max_concurrent_sessions,
                 KeyPairResourcePolicyRow.max_concurrent_sftp_sessions,
             )
-            .select_from(UserRow)
-            .join(UserRow.default_keypair)
+            .select_from(KeyPairRow)
             .join(
                 KeyPairResourcePolicyRow,
                 KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
             )
-            .where(UserRow.uuid.in_(pending_sessions.user_uuids))
+            .where(KeyPairRow.user.in_(pending_sessions.user_uuids) & KeyPairRow.is_default)
         )
 
         for row in user_policy_result:
@@ -936,7 +935,7 @@ class ScheduleDBSource:
                     row.default_for_unspecified,
                     known_slot_types,
                 )
-                user_limits[UserID(row.uuid)] = UserResourceLimit(
+                user_limits[UserID(row.user)] = UserResourceLimit(
                     slots=_to_slot_quota(slot_quota),
                     max_session_count=row.max_concurrent_sessions
                     if row.max_concurrent_sessions and row.max_concurrent_sessions > 0
@@ -2129,7 +2128,7 @@ class ScheduleDBSource:
         )
 
         # Enqueue gates are user-scoped; the policy values are sourced
-        # from the user's main keypair policy (no user-level columns yet).
+        # from the user's default keypair policy (no user-level columns yet).
         user_enqueue_policy = None
         if user_uuid is not None:
             policy_row = (
@@ -2141,13 +2140,12 @@ class ScheduleDBSource:
                         KeyPairResourcePolicyRow.max_priority,
                         KeyPairResourcePolicyRow.allowed_vfolder_hosts,
                     )
-                    .select_from(UserRow)
-                    .join(UserRow.default_keypair)
+                    .select_from(KeyPairRow)
                     .join(
                         KeyPairResourcePolicyRow,
                         KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
                     )
-                    .where(UserRow.uuid == user_uuid)
+                    .where((KeyPairRow.user == user_uuid) & KeyPairRow.is_default)
                 )
             ).one_or_none()
             if policy_row is not None:
