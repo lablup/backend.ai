@@ -54,8 +54,8 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     SearchKeypairsByResourcePolicyActionResult,
     SearchMyKeypairsAction,
     SearchMyKeypairsActionResult,
-    SwitchMyMainAccessKeyAction,
-    SwitchMyMainAccessKeyActionResult,
+    SwitchMyDefaultAccessKeyAction,
+    SwitchMyDefaultAccessKeyActionResult,
     UpdateMyKeypairAction,
     UpdateMyKeypairActionResult,
 )
@@ -130,7 +130,7 @@ class UserProcessors:
     issue_my_keypair: ActionProcessor[IssueMyKeypairAction, IssueMyKeypairActionResult]
     revoke_my_keypair: ActionProcessor[RevokeMyKeypairAction, RevokeMyKeypairActionResult]
     switch_my_main_access_key: ActionProcessor[
-        SwitchMyMainAccessKeyAction, SwitchMyMainAccessKeyActionResult
+        SwitchMyDefaultAccessKeyAction, SwitchMyDefaultAccessKeyActionResult
     ]
     update_my_keypair: ActionProcessor[UpdateMyKeypairAction, UpdateMyKeypairActionResult]
     search_my_keypairs: ActionProcessor[SearchMyKeypairsAction, SearchMyKeypairsActionResult]

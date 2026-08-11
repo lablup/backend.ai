@@ -146,7 +146,7 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     RevokeMyKeypairAction,
     SearchKeypairsByResourcePolicyAction,
     SearchMyKeypairsAction,
-    SwitchMyMainAccessKeyAction,
+    SwitchMyDefaultAccessKeyAction,
     UpdateMyKeypairAction,
 )
 from ai.backend.manager.services.user.actions.modify_user import (
@@ -702,7 +702,7 @@ class UserAdapter(BaseAdapter):
     ) -> SwitchMyMainAccessKeyPayload:
         """Switch the main access key for the current user."""
         result = await self._processors.user.switch_my_main_access_key.wait_for_complete(
-            SwitchMyMainAccessKeyAction(user_uuid=user_id, access_key=access_key)
+            SwitchMyDefaultAccessKeyAction(user_uuid=user_id, access_key=access_key)
         )
         return SwitchMyMainAccessKeyPayload(success=result.success)
 

@@ -60,8 +60,8 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     SearchKeypairsByResourcePolicyActionResult,
     SearchMyKeypairsAction,
     SearchMyKeypairsActionResult,
-    SwitchMyMainAccessKeyAction,
-    SwitchMyMainAccessKeyActionResult,
+    SwitchMyDefaultAccessKeyAction,
+    SwitchMyDefaultAccessKeyActionResult,
     UpdateMyKeypairAction,
     UpdateMyKeypairActionResult,
 )
@@ -439,12 +439,12 @@ class UserService:
         return UpdateMyKeypairActionResult(keypair=keypair_data)
 
     async def switch_my_main_access_key(
-        self, action: SwitchMyMainAccessKeyAction
-    ) -> SwitchMyMainAccessKeyActionResult:
+        self, action: SwitchMyDefaultAccessKeyAction
+    ) -> SwitchMyDefaultAccessKeyActionResult:
         await self._user_repository.switch_my_main_access_key(
             user_uuid=action.user_uuid, access_key=action.access_key
         )
-        return SwitchMyMainAccessKeyActionResult(success=True)
+        return SwitchMyDefaultAccessKeyActionResult(success=True)
 
     async def search_my_keypairs(
         self, action: SearchMyKeypairsAction
