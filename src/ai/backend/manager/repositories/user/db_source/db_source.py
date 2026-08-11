@@ -80,7 +80,6 @@ from ai.backend.manager.models.session import (
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.types import join_by_related_field
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
-from ai.backend.manager.models.user.row import default_access_key_expr
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
     VFolderDeletionInfo,
@@ -141,6 +140,16 @@ from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec, UserU
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+def _default_access_key() -> sa.ScalarSelect[str]:
+    """The owner's default keypair access key, correlated to the enclosing ``users`` row."""
+    return (
+        sa.select(KeyPairRow.access_key)
+        .where((KeyPairRow.user == UserRow.uuid) & KeyPairRow.is_default)
+        .correlate(UserRow)
+        .scalar_subquery()
+    )
 
 
 class UserDBSource:
@@ -319,7 +328,7 @@ class UserDBSource:
                 sa.update(users)
                 .where(users.c.email == email)
                 .values(to_update)
-                .returning(users, default_access_key_expr().label("main_access_key"))
+                .returning(users, _default_access_key().label("main_access_key"))
             )
             result = await session.execute(update_query)
             updated_user = result.first()
@@ -432,7 +441,7 @@ class UserDBSource:
             sa.update(users)
             .where(users.c.uuid == user_id)
             .values(to_update)
-            .returning(users, default_access_key_expr().label("main_access_key"))
+            .returning(users, _default_access_key().label("main_access_key"))
         )
         result = await session.execute(update_query)
         updated_user = result.first()

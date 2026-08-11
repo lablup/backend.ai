@@ -363,22 +363,6 @@ class UserRow(LifecycleTimestampsMixin, Base):
 users = UserRow.__table__
 
 
-def default_access_key_expr() -> sa.ScalarSelect[str]:
-    """The owner's default keypair access key, correlated to ``users``.
-
-    A join would replace the enclosing statement's FROM, which minilang resolves its field
-    specs against, and ``RETURNING`` takes no join at all.
-    """
-    from ai.backend.manager.models.keypair import keypairs
-
-    return (
-        sa.select(keypairs.c.access_key)
-        .where((keypairs.c.user == users.c.uuid) & keypairs.c.is_default)
-        .correlate(users)
-        .scalar_subquery()
-    )
-
-
 def by_user_uuid(
     user_uuid: UUID,
 ) -> QueryCondition:
