@@ -1157,11 +1157,15 @@ class ModifyUser(graphene.Mutation):  # type: ignore[misc]
         res: ModifyUserActionResult = await graph_ctx.processors.user.modify_user.wait_for_complete(
             action
         )
-        if props.main_access_key is not Undefined and props.main_access_key is not None:
+        if props.main_access_key is not Undefined:
             await graph_ctx.processors.user.switch_default_access_key.wait_for_complete(
                 SwitchDefaultAccessKeyAction(
                     user_id=UserID(user_data.id),
-                    access_key=AccessKey(props.main_access_key),
+                    access_key=(
+                        AccessKey(props.main_access_key)
+                        if props.main_access_key is not None
+                        else None
+                    ),
                 )
             )
 

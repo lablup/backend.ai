@@ -249,7 +249,7 @@ async def admin_bulk_update_users_v2(
     auth_config = ctx.config_provider.config.auth
 
     items: list[UserUpdateSpec] = []
-    default_key_switches: dict[UserID, AccessKey] = {}
+    default_key_switches: dict[UserID, AccessKey | None] = {}
     for user_item in input.users:
         dto = user_item.input.to_pydantic()
 
@@ -342,8 +342,10 @@ async def admin_bulk_update_users_v2(
             ),
         )
 
-        if not isinstance(dto.main_access_key, Sentinel) and dto.main_access_key is not None:
-            default_key_switches[UserID(user_item.user_id)] = AccessKey(dto.main_access_key)
+        if not isinstance(dto.main_access_key, Sentinel):
+            default_key_switches[UserID(user_item.user_id)] = (
+                AccessKey(dto.main_access_key) if dto.main_access_key is not None else None
+            )
         items.append(UserUpdateSpec(user_id=UserID(user_item.user_id), updater_spec=updater_spec))
 
     action = BulkModifyUserAction(items=items)

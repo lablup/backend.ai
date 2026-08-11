@@ -107,7 +107,7 @@ class SwitchDefaultAccessKeyAction(UserAction):
     """Move the ``is_default`` marker among the user's keypairs onto ``access_key``."""
 
     user_id: UserID
-    access_key: AccessKey
+    access_key: AccessKey | None
 
     @override
     def entity_id(self) -> str | None:

@@ -7,6 +7,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declarative_base
 
+from ai.backend.manager.models.minilang import ORMFieldItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.utils import agg_to_array
 
@@ -169,4 +170,31 @@ async def test_aggregated_foreign_fields(virtual_grid_db: tuple[Any, Any, Any]) 
     )
     actual_ret = list(await conn.execute(sa_query))
     test_ret = [(2, ["a"]), (1, ["b", "c"])]
+    assert test_ret == actual_ret
+
+
+async def test_orm_field_ordering(virtual_grid_db: tuple[Any, Any, Any]) -> None:
+    conn, grid, foreign_grid = virtual_grid_db
+    first_dog_name = (
+        sa.select(foreign_grid.c.name)
+        .where(foreign_grid.c.user_id == grid.c.id)
+        .order_by(foreign_grid.c.name)
+        .limit(1)
+        .correlate(grid)
+        .scalar_subquery()
+    )
+    parser = QueryOrderParser({
+        "dog_name": (ORMFieldItem(first_dog_name), None),
+    })
+    # Users 3 and 4 own no dog, so they would sort on a NULL with no defined order.
+    orig_query = sa.select(grid.c.id).select_from(grid).where(grid.c.id.in_([1, 2]))
+
+    sa_query = parser.append_ordering(orig_query, "+dog_name")
+    actual_ret = list(await conn.execute(sa_query))
+    test_ret = [(2,), (1,)]
+    assert test_ret == actual_ret
+
+    sa_query = parser.append_ordering(orig_query, "-dog_name")
+    actual_ret = list(await conn.execute(sa_query))
+    test_ret = [(1,), (2,)]
     assert test_ret == actual_ret
