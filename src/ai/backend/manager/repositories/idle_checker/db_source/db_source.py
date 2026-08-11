@@ -456,8 +456,9 @@ class IdleCheckerDBSource:
         self,
         checker_id: IdleCheckerID,
         session_ids: Sequence[SessionID],
-    ) -> set[SessionID]:
-        """Exclude the existing sessions' pairs, returning the session ids acted upon.
+    ) -> Sequence[SessionID]:
+        """Exclude the existing sessions' pairs, returning the session ids acted upon
+        in request order, deduplicated.
 
         Unknown session ids are skipped rather than failing the batch; the caller
         reports them per entity.
@@ -481,21 +482,24 @@ class IdleCheckerDBSource:
                     ),
                     index_elements=["session_id", "idle_checker_id"],
                 )
-            return existing
+            return targets
 
     async def batch_include_session_idle_checks(
         self,
         checker_id: IdleCheckerID,
         session_ids: Sequence[SessionID],
-    ) -> set[SessionID]:
-        """Re-include the existing sessions' pairs, returning the session ids acted upon.
+    ) -> Sequence[SessionID]:
+        """Re-include the existing sessions' pairs, returning the session ids acted upon
+        in request order, deduplicated.
 
         Unknown session ids are skipped rather than failing the batch; the caller
         reports them per entity.
         """
         async with self._ops.write_ops() as w:
             existing = await self._resolve_existing_sessions(w, checker_id, session_ids)
-            targets = [session_id for session_id in session_ids if session_id in existing]
+            targets = [
+                session_id for session_id in dict.fromkeys(session_ids) if session_id in existing
+            ]
             # Only rows exclusion wrote are reset, so re-including twice is a
             # no-op, pairs without a row stay absent, and other phases are untouched.
             for id_batch in batched(targets, _IDLE_CHECK_UPDATE_BATCH_SIZE):
@@ -509,7 +513,7 @@ class IdleCheckerDBSource:
                         ],
                     )
                 )
-            return existing
+            return targets
 
     async def _resolve_existing_sessions(
         self,

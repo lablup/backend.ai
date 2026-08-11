@@ -129,14 +129,14 @@ class IdleCheckerRepository:
         self,
         checker_id: IdleCheckerID,
         session_ids: Sequence[SessionID],
-    ) -> set[SessionID]:
+    ) -> Sequence[SessionID]:
         return await self._db_source.batch_exclude_session_idle_checks(checker_id, session_ids)
 
     async def batch_include_session_idle_checks(
         self,
         checker_id: IdleCheckerID,
         session_ids: Sequence[SessionID],
-    ) -> set[SessionID]:
+    ) -> Sequence[SessionID]:
         return await self._db_source.batch_include_session_idle_checks(checker_id, session_ids)
 
     async def batch_apply_session_idle_check_judgments(

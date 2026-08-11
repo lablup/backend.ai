@@ -1242,7 +1242,7 @@ class TestSessionIdleCheckExclusion:
             ],
         )
 
-        assert acted_upon == {SessionID(exclusion_rows.active_session_id)}
+        assert acted_upon == [SessionID(exclusion_rows.active_session_id)]
         async with database.begin_readonly_session() as db_sess:
             valid_row = await db_sess.get(
                 SessionIdleCheckRow,
@@ -1272,7 +1272,7 @@ class TestSessionIdleCheckExclusion:
             ],
         )
 
-        assert acted_upon == {SessionID(exclusion_rows.excluded_session_id)}
+        assert acted_upon == [SessionID(exclusion_rows.excluded_session_id)]
         async with database.begin_readonly_session() as db_sess:
             reset_row = await db_sess.get(
                 SessionIdleCheckRow,
