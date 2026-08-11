@@ -42,6 +42,10 @@ down_revision = "de1032a11cca"
 branch_labels = None
 depends_on = None
 
+# Metadata local to this revision so that the table snapshots below cannot be
+# altered by definitions living in other revisions.
+_local_metadata = sa.MetaData()
+
 
 class UserRole(enum.StrEnum):
     """
@@ -74,12 +78,49 @@ class Tables:
             extend_existing=True,
         )
 
+    @staticmethod
+    def get_roles_table() -> sa.Table:
+        """Snapshot of the ``roles`` schema at this revision: ``state`` was renamed to
+        ``status`` by 643deb439458 and ``source`` was added by 42feff246198."""
+        return sa.Table(
+            "roles",
+            _local_metadata,
+            IDColumn(),
+            sa.Column("name", sa.String(64), nullable=False),
+            sa.Column("description", sa.Text, nullable=True),
+            sa.Column("status", sa.VARCHAR(16), nullable=False, server_default="active"),
+            sa.Column("source", sa.VARCHAR(16), nullable=False, server_default="system"),
+            extend_existing=True,
+        )
+
+
+def _get_or_create_role(db_conn: Connection, name: str, source: str, status: str) -> uuid.UUID:
+    roles_table = Tables.get_roles_table()
+    role_id: uuid.UUID | None = db_conn.scalar(
+        sa.select(roles_table.c.id).where(
+            sa.and_(
+                roles_table.c.name == name,
+                roles_table.c.source == source,
+            )
+        )
+    )
+    if role_id is not None:
+        return role_id
+    created_id: uuid.UUID = db_conn.execute(
+        sa.insert(roles_table)
+        .values({"name": name, "source": source, "status": status})
+        .returning(roles_table.c.id)
+    ).scalar_one()
+    return created_id
+
 
 class RoleCreator:
     @classmethod
     def _create_superadmin_role(cls, db_conn: Connection) -> uuid.UUID:
         role_input = get_superadmin_role_creation_input()
-        role_id = PermissionUpdateUtil.get_or_create_role(db_conn, role_input)
+        role_id = _get_or_create_role(
+            db_conn, role_input.name, role_input.source, role_input.status
+        )
         permission_group_id, exist = PermissionUpdateUtil.get_or_create_global_permission_group(
             db_conn, role_id
         )
@@ -92,7 +133,9 @@ class RoleCreator:
     @classmethod
     def _create_monitor_role(cls, db_conn: Connection) -> uuid.UUID:
         role_input = get_monitor_role_creation_input()
-        role_id = PermissionUpdateUtil.get_or_create_role(db_conn, role_input)
+        role_id = _get_or_create_role(
+            db_conn, role_input.name, role_input.source, role_input.status
+        )
         permission_group_id, exist = PermissionUpdateUtil.get_or_create_global_permission_group(
             db_conn, role_id
         )
