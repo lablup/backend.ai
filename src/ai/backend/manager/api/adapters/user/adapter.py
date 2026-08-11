@@ -545,11 +545,8 @@ class UserAdapter(BaseAdapter):
         result = await self._processors.user.modify_user_by_id.wait_for_complete(
             ModifyUserByIdAction(user_id=user_id, updater=updater)
         )
-        if not isinstance(input.main_access_key, Sentinel):
-            await self.switch_default_access_key(
-                UserID(user_id),
-                AccessKey(input.main_access_key) if input.main_access_key is not None else None,
-            )
+        if not isinstance(input.main_access_key, Sentinel) and input.main_access_key is not None:
+            await self.switch_default_access_key(UserID(user_id), AccessKey(input.main_access_key))
         return UpdateUserPayload(user=self._user_data_to_node(result.data))
 
     async def delete_user_by_id(self, input: DeleteUserInput) -> DeleteUserPayload:
@@ -635,7 +632,7 @@ class UserAdapter(BaseAdapter):
     async def bulk_modify_users(
         self,
         action: BulkModifyUserAction,
-        default_key_switches: Mapping[UserID, AccessKey | None],
+        default_key_switches: Mapping[UserID, AccessKey],
     ) -> BulkUpdateUsersPayload:
         """Bulk-modify users. Each item's transformation is the caller's responsibility.
 
@@ -652,10 +649,10 @@ class UserAdapter(BaseAdapter):
         ]
         updated_users = []
         for user in result.data.successes:
-            user_id = UserID(user.id)
-            if user_id in default_key_switches:
+            access_key = default_key_switches.get(UserID(user.id))
+            if access_key is not None:
                 try:
-                    await self.switch_default_access_key(user_id, default_key_switches[user_id])
+                    await self.switch_default_access_key(UserID(user.id), access_key)
                 except Exception as e:
                     failed.append(BulkUpdateUserV2Error(user_id=user.id, message=str(e)))
                     continue
@@ -717,7 +714,7 @@ class UserAdapter(BaseAdapter):
         return UpdateMyKeypairPayload(keypair=self._keypair_data_to_node(result.keypair))
 
     async def switch_default_access_key(
-        self, user_id: UserID, access_key: AccessKey | None
+        self, user_id: UserID, access_key: AccessKey
     ) -> SwitchMyMainAccessKeyPayload:
         """Move the ``is_default`` marker among the user's keypairs onto ``access_key``."""
         result = await self._processors.user.switch_default_access_key.wait_for_complete(

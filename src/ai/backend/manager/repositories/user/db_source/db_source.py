@@ -748,9 +748,9 @@ class UserDBSource:
         return cast(UserRow, res)
 
     async def _switch_default_keypair(
-        self, session: SASession, user_id: UserID, access_key: AccessKey | None
+        self, session: SASession, user_id: UserID, access_key: str
     ) -> None:
-        """Move the default marker onto ``access_key``, or drop it when it is None.
+        """Move the default marker onto ``access_key``.
 
         Clearing the previous marker needs its own statement: a partial unique index
         allows a user only one marked keypair.
@@ -760,8 +760,6 @@ class UserDBSource:
             .where((KeyPairRow.user == user_id) & KeyPairRow.is_default)
             .values(is_default=False)
         )
-        if access_key is None:
-            return
         await session.execute(
             sa.update(KeyPairRow)
             .where((KeyPairRow.user == user_id) & (KeyPairRow.access_key == access_key))
@@ -1210,17 +1208,8 @@ class UserDBSource:
 
             await session.execute(sa.delete(keypairs).where(keypairs.c.access_key == access_key))
 
-    async def switch_default_access_key(
-        self, user_id: UserID, access_key: AccessKey | None
-    ) -> None:
-        """Move the ``is_default`` marker among the user's keypairs onto ``access_key``.
-
-        A None ``access_key`` leaves the user with no default keypair.
-        """
-        if access_key is None:
-            async with self._db.begin_session() as session:
-                await self._switch_default_keypair(session, user_id, None)
-            return
+    async def switch_default_access_key(self, user_id: UserID, access_key: AccessKey) -> None:
+        """Move the ``is_default`` marker among the user's keypairs onto ``access_key``."""
         async with self._db.begin_session() as session:
             kp_row = (
                 await session.scalars(

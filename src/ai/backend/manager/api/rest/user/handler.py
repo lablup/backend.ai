@@ -12,7 +12,7 @@ import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
-from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, Sentinel
+from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.user import (
     CreateUserRequest,
     CreateUserResponse,
@@ -205,15 +205,11 @@ class UserHandler:
             ModifyUserAction(user_uuid=path.parsed.user_id, email=email, updater=updater)
         )
 
-        if not isinstance(body.parsed.main_access_key, Sentinel):
+        if body.parsed.main_access_key is not None:
             await self._user.switch_default_access_key.wait_for_complete(
                 SwitchDefaultAccessKeyAction(
                     user_id=UserID(path.parsed.user_id),
-                    access_key=(
-                        AccessKey(body.parsed.main_access_key)
-                        if body.parsed.main_access_key is not None
-                        else None
-                    ),
+                    access_key=AccessKey(body.parsed.main_access_key),
                 )
             )
 
