@@ -307,7 +307,7 @@ class UserRow(LifecycleTimestampsMixin, Base):
             raise ObjectNotFound(f"User with id {user_uuid} not found")
         return rows[0]
 
-    def get_main_keypair_row(self) -> KeyPairRow | None:
+    def get_default_keypair_row(self) -> KeyPairRow | None:
         keypair_candidate: KeyPairRow | None = None
         default_keypair_row = self.default_keypair
         if default_keypair_row is None:
