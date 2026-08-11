@@ -40,7 +40,7 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.repositories.runtime_variant.searchers import RuntimeVariantSearcher
 from ai.backend.manager.repositories.runtime_variant.updaters import RuntimeVariantUpdater
 from ai.backend.manager.services.runtime_variant.actions.create import CreateRuntimeVariantAction
-from ai.backend.manager.services.runtime_variant.actions.delete import DeleteRuntimeVariantAction
+from ai.backend.manager.services.runtime_variant.actions.purge import PurgeRuntimeVariantAction
 from ai.backend.manager.services.runtime_variant.actions.resolve_by_name import (
     ResolveRuntimeVariantByNameAction,
 )
@@ -157,16 +157,16 @@ class RuntimeVariantAdapter(BaseAdapter):
         )
 
     async def delete(self, variant_id: UUID) -> DeleteRuntimeVariantPayload:
-        result = await self._processors.runtime_variant.delete.run(
-            DeleteRuntimeVariantAction(id=RuntimeVariantID(variant_id))
+        result = await self._processors.runtime_variant.purge.run(
+            PurgeRuntimeVariantAction(id=RuntimeVariantID(variant_id))
         )
         return DeleteRuntimeVariantPayload(id=result.data.id)
 
     async def bulk_delete(self, input: DeleteRuntimeVariantsInput) -> DeleteRuntimeVariantsPayload:
         """Delete multiple runtime variants by ID."""
         for variant_id in input.ids:
-            await self._processors.runtime_variant.delete.run(
-                DeleteRuntimeVariantAction(id=RuntimeVariantID(variant_id))
+            await self._processors.runtime_variant.purge.run(
+                PurgeRuntimeVariantAction(id=RuntimeVariantID(variant_id))
             )
         return DeleteRuntimeVariantsPayload(deleted_count=len(input.ids))
 

@@ -118,9 +118,6 @@ from ai.backend.manager.repositories.user_resource_policy.updaters import (
 from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
     CreateKeyPairResourcePolicyAction,
 )
-from ai.backend.manager.services.keypair_resource_policy.actions.delete_keypair_resource_policy import (
-    DeleteKeyPairResourcePolicyAction,
-)
 from ai.backend.manager.services.keypair_resource_policy.actions.get_keypair_resource_policy import (
     GetKeypairResourcePolicyAction,
 )
@@ -130,14 +127,14 @@ from ai.backend.manager.services.keypair_resource_policy.actions.get_my_keypair_
 from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
     ModifyKeyPairResourcePolicyAction,
 )
+from ai.backend.manager.services.keypair_resource_policy.actions.purge_keypair_resource_policy import (
+    PurgeKeyPairResourcePolicyAction,
+)
 from ai.backend.manager.services.keypair_resource_policy.actions.search_keypair_resource_policies import (
     SearchKeypairResourcePoliciesAction,
 )
 from ai.backend.manager.services.project_resource_policy.actions.create_project_resource_policy import (
     CreateProjectResourcePolicyAction,
-)
-from ai.backend.manager.services.project_resource_policy.actions.delete_project_resource_policy import (
-    DeleteProjectResourcePolicyAction,
 )
 from ai.backend.manager.services.project_resource_policy.actions.get_project_resource_policy import (
     GetProjectResourcePolicyAction,
@@ -145,14 +142,14 @@ from ai.backend.manager.services.project_resource_policy.actions.get_project_res
 from ai.backend.manager.services.project_resource_policy.actions.modify_project_resource_policy import (
     ModifyProjectResourcePolicyAction,
 )
+from ai.backend.manager.services.project_resource_policy.actions.purge_project_resource_policy import (
+    PurgeProjectResourcePolicyAction,
+)
 from ai.backend.manager.services.project_resource_policy.actions.search_project_resource_policies import (
     SearchProjectResourcePoliciesAction,
 )
 from ai.backend.manager.services.user_resource_policy.actions.create_user_resource_policy import (
     CreateUserResourcePolicyAction,
-)
-from ai.backend.manager.services.user_resource_policy.actions.delete_user_resource_policy import (
-    DeleteUserResourcePolicyAction,
 )
 from ai.backend.manager.services.user_resource_policy.actions.get_my_user_resource_policy import (
     GetMyUserResourcePolicyAction,
@@ -162,6 +159,9 @@ from ai.backend.manager.services.user_resource_policy.actions.get_user_resource_
 )
 from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
     ModifyUserResourcePolicyAction,
+)
+from ai.backend.manager.services.user_resource_policy.actions.purge_user_resource_policy import (
+    PurgeUserResourcePolicyAction,
 )
 from ai.backend.manager.services.user_resource_policy.actions.search_user_resource_policies import (
     SearchUserResourcePoliciesAction,
@@ -345,8 +345,8 @@ class ResourcePolicyAdapter(BaseAdapter):
     async def admin_delete_keypair_resource_policy(
         self, input: DeleteKeypairResourcePolicyInput
     ) -> DeleteKeypairResourcePolicyPayload:
-        await self._processors.keypair_resource_policy.delete_keypair_resource_policy.run(
-            DeleteKeyPairResourcePolicyAction(name=input.name)
+        await self._processors.keypair_resource_policy.purge_keypair_resource_policy.run(
+            PurgeKeyPairResourcePolicyAction(name=input.name)
         )
         return DeleteKeypairResourcePolicyPayload(name=input.name)
 
@@ -456,8 +456,8 @@ class ResourcePolicyAdapter(BaseAdapter):
     async def admin_delete_user_resource_policy(
         self, input: DeleteUserResourcePolicyInput
     ) -> DeleteUserResourcePolicyPayload:
-        await self._processors.user_resource_policy.delete_user_resource_policy.run(
-            DeleteUserResourcePolicyAction(name=input.name)
+        await self._processors.user_resource_policy.purge_user_resource_policy.run(
+            PurgeUserResourcePolicyAction(name=input.name)
         )
         return DeleteUserResourcePolicyPayload(name=input.name)
 
@@ -555,8 +555,8 @@ class ResourcePolicyAdapter(BaseAdapter):
     async def admin_delete_project_resource_policy(
         self, input: DeleteProjectResourcePolicyInput
     ) -> DeleteProjectResourcePolicyPayload:
-        await self._processors.project_resource_policy.delete_project_resource_policy.run(
-            DeleteProjectResourcePolicyAction(name=input.name)
+        await self._processors.project_resource_policy.purge_project_resource_policy.run(
+            PurgeProjectResourcePolicyAction(name=input.name)
         )
         return DeleteProjectResourcePolicyPayload(name=input.name)
 

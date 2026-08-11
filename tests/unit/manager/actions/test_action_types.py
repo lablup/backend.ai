@@ -12,6 +12,7 @@ from ai.backend.manager.services.model_card.actions.delete import DeleteModelCar
 from ai.backend.manager.services.model_card.actions.update import UpdateModelCardAction
 from ai.backend.manager.services.session.actions.search import SearchSessionsAction
 from ai.backend.manager.services.user.actions.purge_user import PurgeUserAction
+from ai.backend.manager.services.vfolder.actions.base import RestoreVFolderFromTrashAction
 
 # Legacy-family actions only. The v2 families answer with
 # ``ai.backend.common.data.entity.types.EntityType``, a distinct NewType, so mixing
@@ -23,6 +24,7 @@ _REPRESENTATIVE_ACTION_CLASSES: list[type[BaseAction]] = [
     UpdateModelCardAction,
     DeleteModelCardAction,
     PurgeUserAction,
+    RestoreVFolderFromTrashAction,
 ]
 
 
@@ -148,12 +150,11 @@ class TestAllActionClassesUseEnums:
         """Ensure the representative classes cover every declarable operation.
 
         ``UPSERT`` is excluded: the upsert actions declare ``CREATE`` today, so
-        nothing can stand for it. ``RESTORE`` and ``LOOKUP`` are excluded because
-        no legacy-family action declares either, and every class here is a legacy one.
+        nothing can stand for it. ``LOOKUP`` is excluded because only the v2 lookup
+        base declares it, and every class here is a legacy one.
         """
         expected = set(ActionOperationType) - {
             ActionOperationType.UPSERT,
-            ActionOperationType.RESTORE,
             ActionOperationType.LOOKUP,
         }
         covered = {cls.operation_type() for cls in _REPRESENTATIVE_ACTION_CLASSES}

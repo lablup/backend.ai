@@ -13,8 +13,8 @@ from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.services.runtime_variant.actions.create import (
     CreateRuntimeVariantAction,
 )
-from ai.backend.manager.services.runtime_variant.actions.delete import (
-    DeleteRuntimeVariantAction,
+from ai.backend.manager.services.runtime_variant.actions.purge import (
+    PurgeRuntimeVariantAction,
 )
 from ai.backend.manager.services.runtime_variant.actions.resolve_by_name import (
     ResolveRuntimeVariantByNameAction,
@@ -34,7 +34,7 @@ class RuntimeVariantProcessors:
         CreateRuntimeVariantAction, CreatedEntityOpsResult[RuntimeVariantData]
     ]
     update: GlobalActionProcessor[UpdateRuntimeVariantAction, EntityOpsResult[RuntimeVariantData]]
-    delete: GlobalActionProcessor[DeleteRuntimeVariantAction, EntityOpsResult[RuntimeVariantData]]
+    purge: GlobalActionProcessor[PurgeRuntimeVariantAction, EntityOpsResult[RuntimeVariantData]]
     search: GlobalActionProcessor[SearchRuntimeVariantsAction, BatchOpsResult[RuntimeVariantData]]
     resolve_by_name: LookupActionProcessor[
         ResolveRuntimeVariantByNameAction, LookupOpsResult[RuntimeVariantData]
@@ -43,6 +43,6 @@ class RuntimeVariantProcessors:
     def __init__(self, group: ProcessorGroup[RuntimeVariantData]) -> None:
         self.create = group.global_create_ops(CreateRuntimeVariantAction)
         self.update = group.global_update_ops(UpdateRuntimeVariantAction)
-        self.delete = group.global_purge_ops(DeleteRuntimeVariantAction)
+        self.purge = group.global_purge_ops(PurgeRuntimeVariantAction)
         self.search = group.global_search_ops(SearchRuntimeVariantsAction)
         self.resolve_by_name = group.lookup_ops(ResolveRuntimeVariantByNameAction)

@@ -39,11 +39,11 @@ from ai.backend.manager.repositories.login_client_type.updaters import LoginClie
 from ai.backend.manager.services.login_client_type.actions.create import (
     CreateLoginClientTypeAction,
 )
-from ai.backend.manager.services.login_client_type.actions.delete import (
-    DeleteLoginClientTypeAction,
-)
 from ai.backend.manager.services.login_client_type.actions.get import (
     GetLoginClientTypeAction,
+)
+from ai.backend.manager.services.login_client_type.actions.purge import (
+    PurgeLoginClientTypeAction,
 )
 from ai.backend.manager.services.login_client_type.actions.search import (
     SearchLoginClientTypesAction,
@@ -146,8 +146,8 @@ class LoginClientTypeAdapter(BaseAdapter):
         )
 
     async def admin_delete(self, type_id: UUID) -> DeleteLoginClientTypePayload:
-        action_result = await self._processors.login_client_type_admin.delete.run(
-            DeleteLoginClientTypeAction(id=type_id)
+        action_result = await self._processors.login_client_type_admin.purge.run(
+            PurgeLoginClientTypeAction(id=type_id)
         )
         return DeleteLoginClientTypePayload(id=action_result.data.id)
 

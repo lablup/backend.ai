@@ -13,9 +13,6 @@ from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
     CreateKeyPairResourcePolicyAction,
 )
-from ai.backend.manager.services.keypair_resource_policy.actions.delete_keypair_resource_policy import (
-    DeleteKeyPairResourcePolicyAction,
-)
 from ai.backend.manager.services.keypair_resource_policy.actions.get_keypair_resource_policy import (
     GetKeypairResourcePolicyAction,
 )
@@ -25,6 +22,9 @@ from ai.backend.manager.services.keypair_resource_policy.actions.get_my_keypair_
 )
 from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
     ModifyKeyPairResourcePolicyAction,
+)
+from ai.backend.manager.services.keypair_resource_policy.actions.purge_keypair_resource_policy import (
+    PurgeKeyPairResourcePolicyAction,
 )
 from ai.backend.manager.services.keypair_resource_policy.actions.search_keypair_resource_policies import (
     SearchKeypairResourcePoliciesAction,
@@ -50,8 +50,8 @@ class KeypairResourcePolicyProcessors:
     modify_keypair_resource_policy: GlobalActionProcessor[
         ModifyKeyPairResourcePolicyAction, EntityOpsResult[KeyPairResourcePolicyData]
     ]
-    delete_keypair_resource_policy: GlobalActionProcessor[
-        DeleteKeyPairResourcePolicyAction, EntityOpsResult[KeyPairResourcePolicyData]
+    purge_keypair_resource_policy: GlobalActionProcessor[
+        PurgeKeyPairResourcePolicyAction, EntityOpsResult[KeyPairResourcePolicyData]
     ]
 
     def __init__(
@@ -73,6 +73,6 @@ class KeypairResourcePolicyProcessors:
         self.modify_keypair_resource_policy = group.global_update_ops(
             ModifyKeyPairResourcePolicyAction
         )
-        self.delete_keypair_resource_policy = group.global_purge_ops(
-            DeleteKeyPairResourcePolicyAction
+        self.purge_keypair_resource_policy = group.global_purge_ops(
+            PurgeKeyPairResourcePolicyAction
         )

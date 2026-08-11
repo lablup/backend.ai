@@ -44,9 +44,9 @@ When resource limits need to be adjusted:
 
 When a policy is no longer needed:
 
-1. Execute `DeleteUserResourcePolicyAction` with the policy name
+1. Execute `PurgeUserResourcePolicyAction` with the policy name
 2. The service removes the policy from the database
-3. Returns `DeleteUserResourcePolicyActionResult` with the deleted policy data
+3. Returns `PurgeUserResourcePolicyActionResult` with the deleted policy data
 
 ## API Usage Examples
 
@@ -97,11 +97,11 @@ result = await user_resource_policy_service.modify_user_resource_policy(action)
 ### Delete User Resource Policy
 
 ```python
-from ai.backend.manager.services.user_resource_policy.actions.delete_user_resource_policy import (
-    DeleteUserResourcePolicyAction,
+from ai.backend.manager.services.user_resource_policy.actions.purge_user_resource_policy import (
+    PurgeUserResourcePolicyAction,
 )
 
-action = DeleteUserResourcePolicyAction(name="obsolete-policy")
+action = PurgeUserResourcePolicyAction(name="obsolete-policy")
 result = await user_resource_policy_service.delete_user_resource_policy(action)
 ```
 

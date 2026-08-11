@@ -13,7 +13,7 @@ from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 
 
 @dataclass
-class DeleteRuntimeVariantAction(PurgeGlobalOpsAction[RuntimeVariantRow, RuntimeVariantData]):
+class PurgeRuntimeVariantAction(PurgeGlobalOpsAction[RuntimeVariantRow, RuntimeVariantData]):
     """Remove a runtime variant from the catalog.
 
     Purge-shaped: the table carries no lifecycle column, so deleting one has
@@ -30,7 +30,7 @@ class DeleteRuntimeVariantAction(PurgeGlobalOpsAction[RuntimeVariantRow, Runtime
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "delete_runtime_variant"
+        return "purge_runtime_variant"
 
     @override
     def to_purger(self) -> RuntimeVariantPurger:

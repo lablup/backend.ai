@@ -13,7 +13,7 @@ from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 
 
 @dataclass
-class DeleteLoginClientTypeAction(PurgeGlobalOpsAction[LoginClientTypeRow, LoginClientTypeData]):
+class PurgeLoginClientTypeAction(PurgeGlobalOpsAction[LoginClientTypeRow, LoginClientTypeData]):
     """Remove a login client type from the catalog.
 
     Purge-shaped: the table carries no lifecycle column, so deleting one has always
@@ -30,7 +30,7 @@ class DeleteLoginClientTypeAction(PurgeGlobalOpsAction[LoginClientTypeRow, Login
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "delete_login_client_type"
+        return "purge_login_client_type"
 
     @override
     def to_purger(self) -> LoginClientTypePurger:

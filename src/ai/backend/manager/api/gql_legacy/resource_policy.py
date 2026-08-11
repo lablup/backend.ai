@@ -425,13 +425,13 @@ class DeleteKeyPairResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         info: graphene.ResolveInfo,
         name: str,
     ) -> DeleteKeyPairResourcePolicy:
-        from ai.backend.manager.services.keypair_resource_policy.actions.delete_keypair_resource_policy import (
-            DeleteKeyPairResourcePolicyAction,
+        from ai.backend.manager.services.keypair_resource_policy.actions.purge_keypair_resource_policy import (
+            PurgeKeyPairResourcePolicyAction,
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.keypair_resource_policy.delete_keypair_resource_policy.run(
-            DeleteKeyPairResourcePolicyAction(name)
+        await graph_ctx.processors.keypair_resource_policy.purge_keypair_resource_policy.run(
+            PurgeKeyPairResourcePolicyAction(name)
         )
         return DeleteKeyPairResourcePolicy(
             ok=True,
@@ -675,13 +675,13 @@ class DeleteUserResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         info: graphene.ResolveInfo,
         name: str,
     ) -> DeleteUserResourcePolicy:
-        from ai.backend.manager.services.user_resource_policy.actions.delete_user_resource_policy import (
-            DeleteUserResourcePolicyAction,
+        from ai.backend.manager.services.user_resource_policy.actions.purge_user_resource_policy import (
+            PurgeUserResourcePolicyAction,
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.user_resource_policy.delete_user_resource_policy.run(
-            DeleteUserResourcePolicyAction(name)
+        await graph_ctx.processors.user_resource_policy.purge_user_resource_policy.run(
+            PurgeUserResourcePolicyAction(name)
         )
 
         return DeleteUserResourcePolicy(
@@ -918,13 +918,13 @@ class DeleteProjectResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         info: graphene.ResolveInfo,
         name: str,
     ) -> DeleteProjectResourcePolicy:
-        from ai.backend.manager.services.project_resource_policy.actions.delete_project_resource_policy import (
-            DeleteProjectResourcePolicyAction,
+        from ai.backend.manager.services.project_resource_policy.actions.purge_project_resource_policy import (
+            PurgeProjectResourcePolicyAction,
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.project_resource_policy.delete_project_resource_policy.run(
-            DeleteProjectResourcePolicyAction(name)
+        await graph_ctx.processors.project_resource_policy.purge_project_resource_policy.run(
+            PurgeProjectResourcePolicyAction(name)
         )
 
         return DeleteProjectResourcePolicy(

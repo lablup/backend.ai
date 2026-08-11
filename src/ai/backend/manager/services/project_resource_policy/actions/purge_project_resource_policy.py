@@ -16,7 +16,7 @@ from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyR
 
 
 @dataclass
-class DeleteProjectResourcePolicyAction(
+class PurgeProjectResourcePolicyAction(
     PurgeGlobalOpsAction[ProjectResourcePolicyRow, ProjectResourcePolicyData]
 ):
     """Remove a project resource policy.
@@ -34,7 +34,7 @@ class DeleteProjectResourcePolicyAction(
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "admin_delete_project_resource_policy"
+        return "admin_purge_project_resource_policy"
 
     @override
     def to_purger(self) -> ProjectResourcePolicyPurger:

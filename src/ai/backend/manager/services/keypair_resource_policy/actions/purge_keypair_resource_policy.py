@@ -16,7 +16,7 @@ from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyR
 
 
 @dataclass
-class DeleteKeyPairResourcePolicyAction(
+class PurgeKeyPairResourcePolicyAction(
     PurgeGlobalOpsAction[KeyPairResourcePolicyRow, KeyPairResourcePolicyData]
 ):
     """Remove a keypair resource policy.
@@ -34,7 +34,7 @@ class DeleteKeyPairResourcePolicyAction(
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "admin_delete_keypair_resource_policy"
+        return "admin_purge_keypair_resource_policy"
 
     @override
     def to_purger(self) -> KeyPairResourcePolicyPurger:

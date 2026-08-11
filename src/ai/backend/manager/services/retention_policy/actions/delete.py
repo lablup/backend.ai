@@ -17,8 +17,13 @@ class DeleteRetentionPolicyAction(PurgeGlobalOpsAction[RetentionPolicyRow, Reten
     """Drop one category's policy, falling the category back to its built-in default.
 
     Purge-shaped: a retention policy carries no lifecycle column, so removing one has
-    always been the row leaving the table. The separate ``purge`` path stays because
-    both are exposed; the two differ only in the name they record.
+    always been the row leaving the table.
+
+    Alone among the hard deletes it keeps the ``Delete`` name, because
+    :class:`PurgeRetentionPolicyAction` already holds the other one and the two are
+    separately exposed. They perform the same removal and differ only in what they
+    accept — an id here, a purger there — so collapsing them is an API change, not a
+    rename. Until that is decided the audit name stays with the endpoint it serves.
     """
 
     id: RetentionPolicyID

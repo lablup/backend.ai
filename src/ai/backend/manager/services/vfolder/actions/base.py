@@ -338,6 +338,14 @@ class MoveToTrashVFolderActionResult(VFolderSingleEntityActionResult):
 
 @dataclass
 class RestoreVFolderFromTrashAction(VFolderSingleEntityAction):
+    """Bring a folder back out of the trash.
+
+    ``RESTORE`` rather than ``UPDATE``: the write flips the same status flag the delete
+    set, in the opposite direction, and reaches nothing else. Declaring it as an update
+    would have the audit trail record a restore as an ordinary field write, and would
+    gate it on ``UPDATE`` while the delete it undoes needs ``SOFT_DELETE``.
+    """
+
     user_uuid: uuid.UUID
 
     vfolder_uuid: uuid.UUID
@@ -349,7 +357,7 @@ class RestoreVFolderFromTrashAction(VFolderSingleEntityAction):
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
+        return ActionOperationType.RESTORE
 
     @override
     def target_entity_id(self) -> str:

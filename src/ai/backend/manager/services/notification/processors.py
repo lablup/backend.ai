@@ -13,8 +13,6 @@ from ai.backend.manager.data.notification.types import (
 )
 from ai.backend.manager.services.notification.actions.create_channel import CreateChannelAction
 from ai.backend.manager.services.notification.actions.create_rule import CreateRuleAction
-from ai.backend.manager.services.notification.actions.delete_channel import PurgeChannelAction
-from ai.backend.manager.services.notification.actions.delete_rule import PurgeRuleAction
 from ai.backend.manager.services.notification.actions.get_channel import GetChannelAction
 from ai.backend.manager.services.notification.actions.get_rule import GetRuleAction
 from ai.backend.manager.services.notification.actions.list_channels import SearchChannelsAction
@@ -23,6 +21,8 @@ from ai.backend.manager.services.notification.actions.process_notification impor
     ProcessNotificationAction,
     ProcessNotificationActionResult,
 )
+from ai.backend.manager.services.notification.actions.purge_channel import PurgeChannelAction
+from ai.backend.manager.services.notification.actions.purge_rule import PurgeRuleAction
 from ai.backend.manager.services.notification.actions.update_channel import UpdateChannelAction
 from ai.backend.manager.services.notification.actions.update_rule import UpdateRuleAction
 from ai.backend.manager.services.notification.actions.validate_channel import (

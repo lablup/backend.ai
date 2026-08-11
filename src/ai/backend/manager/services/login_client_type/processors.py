@@ -14,11 +14,11 @@ from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 from ai.backend.manager.services.login_client_type.actions.create import (
     CreateLoginClientTypeAction,
 )
-from ai.backend.manager.services.login_client_type.actions.delete import (
-    DeleteLoginClientTypeAction,
-)
 from ai.backend.manager.services.login_client_type.actions.get import (
     GetLoginClientTypeAction,
+)
+from ai.backend.manager.services.login_client_type.actions.purge import (
+    PurgeLoginClientTypeAction,
 )
 from ai.backend.manager.services.login_client_type.actions.search import (
     SearchLoginClientTypesAction,
@@ -46,9 +46,9 @@ class LoginClientTypeAdminProcessors:
         CreateLoginClientTypeAction, CreatedEntityOpsResult[LoginClientTypeData]
     ]
     update: GlobalActionProcessor[UpdateLoginClientTypeAction, EntityOpsResult[LoginClientTypeData]]
-    delete: GlobalActionProcessor[DeleteLoginClientTypeAction, EntityOpsResult[LoginClientTypeData]]
+    purge: GlobalActionProcessor[PurgeLoginClientTypeAction, EntityOpsResult[LoginClientTypeData]]
 
     def __init__(self, group: ProcessorGroup[LoginClientTypeData]) -> None:
         self.create = group.global_create_ops(CreateLoginClientTypeAction)
         self.update = group.global_update_ops(UpdateLoginClientTypeAction)
-        self.delete = group.global_purge_ops(DeleteLoginClientTypeAction)
+        self.purge = group.global_purge_ops(PurgeLoginClientTypeAction)
