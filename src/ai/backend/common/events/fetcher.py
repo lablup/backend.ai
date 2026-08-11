@@ -1,3 +1,5 @@
+from typing import Any
+
 from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 
@@ -11,7 +13,7 @@ class EventFetcher:
     async def fetch_cached_event(
         self,
         cache_id: str,
-    ) -> AbstractBroadcastEvent | None:
+    ) -> AbstractBroadcastEvent[Any] | None:
         """
         Fetch a cached event from the message queue.
         Returns None if no cached event is found.

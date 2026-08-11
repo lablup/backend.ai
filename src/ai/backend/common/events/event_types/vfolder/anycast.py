@@ -1,13 +1,34 @@
 from dataclasses import dataclass
 from typing import Any, Self, override
 
+from ai.backend.common.events.payload import AnycastEventPayload
 from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.types import VFolderID
 
 
+class VFolderDeletionSuccessEventPayload(AnycastEventPayload):
+    vfid: VFolderID
+
+
+class VFolderDeletionFailureEventPayload(AnycastEventPayload):
+    vfid: VFolderID
+    message: str
+
+
+class VFolderCloneSuccessEventPayload(AnycastEventPayload):
+    vfid: VFolderID
+    dst_vfid: VFolderID
+
+
+class VFolderCloneFailureEventPayload(AnycastEventPayload):
+    vfid: VFolderID
+    dst_vfid: VFolderID
+    message: str
+
+
 @dataclass
-class VFolderEvent(AbstractAnycastEvent):
+class VFolderEvent[TPayload: AnycastEventPayload](AbstractAnycastEvent[TPayload]):
     vfid: VFolderID
 
     @classmethod
@@ -25,7 +46,20 @@ class VFolderEvent(AbstractAnycastEvent):
 
 
 @dataclass
-class VFolderDeletionSuccessEvent(VFolderEvent):
+class VFolderDeletionSuccessEvent(VFolderEvent[VFolderDeletionSuccessEventPayload]):
+    @override
+    def to_payload(self) -> VFolderDeletionSuccessEventPayload:
+        return VFolderDeletionSuccessEventPayload(
+            vfid=self.vfid,
+        )
+
+    @classmethod
+    @override
+    def from_payload(cls, payload: VFolderDeletionSuccessEventPayload) -> Self:
+        return cls(
+            vfid=payload.vfid,
+        )
+
     @override
     def serialize(self) -> tuple[Any, ...]:
         return (str(self.vfid),)
@@ -44,8 +78,23 @@ class VFolderDeletionSuccessEvent(VFolderEvent):
 
 
 @dataclass
-class VFolderDeletionFailureEvent(VFolderEvent):
+class VFolderDeletionFailureEvent(VFolderEvent[VFolderDeletionFailureEventPayload]):
     message: str
+
+    @override
+    def to_payload(self) -> VFolderDeletionFailureEventPayload:
+        return VFolderDeletionFailureEventPayload(
+            vfid=self.vfid,
+            message=self.message,
+        )
+
+    @classmethod
+    @override
+    def from_payload(cls, payload: VFolderDeletionFailureEventPayload) -> Self:
+        return cls(
+            vfid=payload.vfid,
+            message=payload.message,
+        )
 
     @override
     def serialize(self) -> tuple[Any, ...]:
@@ -69,8 +118,23 @@ class VFolderDeletionFailureEvent(VFolderEvent):
 
 
 @dataclass
-class VFolderCloneSuccessEvent(VFolderEvent):
+class VFolderCloneSuccessEvent(VFolderEvent[VFolderCloneSuccessEventPayload]):
     dst_vfid: VFolderID
+
+    @override
+    def to_payload(self) -> VFolderCloneSuccessEventPayload:
+        return VFolderCloneSuccessEventPayload(
+            vfid=self.vfid,
+            dst_vfid=self.dst_vfid,
+        )
+
+    @classmethod
+    @override
+    def from_payload(cls, payload: VFolderCloneSuccessEventPayload) -> Self:
+        return cls(
+            vfid=payload.vfid,
+            dst_vfid=payload.dst_vfid,
+        )
 
     @override
     def serialize(self) -> tuple[Any, ...]:
@@ -94,9 +158,26 @@ class VFolderCloneSuccessEvent(VFolderEvent):
 
 
 @dataclass
-class VFolderCloneFailureEvent(VFolderEvent):
+class VFolderCloneFailureEvent(VFolderEvent[VFolderCloneFailureEventPayload]):
     dst_vfid: VFolderID
     message: str
+
+    @override
+    def to_payload(self) -> VFolderCloneFailureEventPayload:
+        return VFolderCloneFailureEventPayload(
+            vfid=self.vfid,
+            dst_vfid=self.dst_vfid,
+            message=self.message,
+        )
+
+    @classmethod
+    @override
+    def from_payload(cls, payload: VFolderCloneFailureEventPayload) -> Self:
+        return cls(
+            vfid=payload.vfid,
+            dst_vfid=payload.dst_vfid,
+            message=payload.message,
+        )
 
     @override
     def serialize(self) -> tuple[Any, ...]:

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
 from pathlib import Path
-from typing import Any, Literal, override
+from typing import Any, Literal, Self, override
 
 import aiotools
 import pytest
@@ -24,6 +24,7 @@ from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventProducer,
 )
+from ai.backend.common.events.payload import AnycastEventPayload
 from ai.backend.common.events.types import (
     AbstractAnycastEvent,
     EventDomain,
@@ -71,9 +72,22 @@ def dslice(start: Decimal, stop: Decimal, num: int) -> Iterable[Decimal]:
     yield from (start + step * Decimal(tick) for tick in range(num))
 
 
-@dataclass
-class NoopAnycastEvent(AbstractAnycastEvent):
+class NoopAnycastEventPayload(AnycastEventPayload):
     test_case_ns: str
+
+
+@dataclass
+class NoopAnycastEvent(AbstractAnycastEvent[NoopAnycastEventPayload]):
+    test_case_ns: str
+
+    @override
+    def to_payload(self) -> NoopAnycastEventPayload:
+        return NoopAnycastEventPayload(test_case_ns=self.test_case_ns)
+
+    @classmethod
+    @override
+    def from_payload(cls, payload: NoopAnycastEventPayload) -> Self:
+        return cls(test_case_ns=payload.test_case_ns)
 
     @override
     def serialize(self) -> tuple[Any, ...]:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Final, override
+from typing import Any, Final, override
 
 from ai.backend.common.cron.base import PeriodicTask
 from ai.backend.common.events.dispatcher import EventProducer
@@ -20,7 +20,7 @@ class EventTaskSpec:
     """Specification for an event-based periodic task."""
 
     name: str
-    event_factory: Callable[[], AbstractAnycastEvent]
+    event_factory: Callable[[], AbstractAnycastEvent[Any]]
     interval: float
     initial_delay: float = 0.0
 

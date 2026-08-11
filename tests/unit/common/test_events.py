@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from types import TracebackType
-from typing import Any, override
+from typing import Any, Self, override
 
 import aiotools
 
@@ -13,6 +13,7 @@ from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventProducer,
 )
+from ai.backend.common.events.payload import BroadcastEventPayload
 from ai.backend.common.events.types import (
     AbstractBroadcastEvent,
     EventDomain,
@@ -22,9 +23,22 @@ from ai.backend.common.message_queue.redis_queue import RedisQueue
 from ai.backend.common.types import AgentId
 
 
-@dataclass
-class DummyBroadcastEvent(AbstractBroadcastEvent):
+class DummyBroadcastEventPayload(BroadcastEventPayload):
     value: int
+
+
+@dataclass
+class DummyBroadcastEvent(AbstractBroadcastEvent[DummyBroadcastEventPayload]):
+    value: int
+
+    @override
+    def to_payload(self) -> DummyBroadcastEventPayload:
+        return DummyBroadcastEventPayload(value=self.value)
+
+    @classmethod
+    @override
+    def from_payload(cls, payload: DummyBroadcastEventPayload) -> Self:
+        return cls(value=payload.value)
 
     @override
     def serialize(self) -> tuple[Any, ...]:

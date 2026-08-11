@@ -162,7 +162,7 @@ class SessionEventPropagator(EventPropagator):
                 return None
 
     async def _fetch_kernel_data(
-        self, event: BaseKernelEvent
+        self, event: BaseKernelEvent[Any]
     ) -> tuple[str, Mapping[str, Any]] | None:
         """Fetch kernel data from database."""
         try:
@@ -197,7 +197,7 @@ class SessionEventPropagator(EventPropagator):
             return None
 
     async def _fetch_session_data(
-        self, event: BaseSessionEvent | SchedulingBroadcastEvent
+        self, event: BaseSessionEvent[Any] | SchedulingBroadcastEvent
     ) -> tuple[str, Mapping[str, Any]] | None:
         """Fetch session data from database."""
         event_name = event.event_name()

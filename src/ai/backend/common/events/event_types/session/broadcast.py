@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Self, override
 
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.events.payload import BroadcastEventPayload
 from ai.backend.common.events.types import (
     AbstractBroadcastEvent,
     EventCacheDomain,
@@ -14,8 +15,38 @@ from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.types import SessionId
 
 
+class SessionLifecycleEventPayload(BroadcastEventPayload):
+    """A bare session lifecycle trigger carries no arguments."""
+
+
+class SessionEventPayload(BroadcastEventPayload):
+    session_id: SessionId
+
+
+class TerminateSessionEventPayload(BroadcastEventPayload):
+    session_id: SessionId
+    reason: KernelLifecycleEventReason
+
+
+class SessionCreationEventPayload(BroadcastEventPayload):
+    session_id: SessionId
+    creation_id: str
+    reason: KernelLifecycleEventReason = KernelLifecycleEventReason.UNKNOWN
+
+
+class SessionTerminationEventPayload(BroadcastEventPayload):
+    session_id: SessionId
+    reason: str = ""
+
+
+class SessionResultEventPayload(BroadcastEventPayload):
+    session_id: SessionId
+    reason: KernelLifecycleEventReason = KernelLifecycleEventReason.UNKNOWN
+    exit_code: int = -1
+
+
 @dataclass
-class BaseSessionEvent(AbstractBroadcastEvent):
+class BaseSessionEvent[TPayload: BroadcastEventPayload](AbstractBroadcastEvent[TPayload]):
     session_id: SessionId
 
     @classmethod
@@ -33,8 +64,23 @@ class BaseSessionEvent(AbstractBroadcastEvent):
 
 
 @dataclass
-class DoTerminateSessionEvent(BaseSessionEvent):
+class DoTerminateSessionEvent(BaseSessionEvent[TerminateSessionEventPayload]):
     reason: KernelLifecycleEventReason
+
+    @override
+    def to_payload(self) -> TerminateSessionEventPayload:
+        return TerminateSessionEventPayload(
+            session_id=self.session_id,
+            reason=self.reason,
+        )
+
+    @classmethod
+    @override
+    def from_payload(cls, payload: TerminateSessionEventPayload) -> Self:
+        return cls(
+            session_id=payload.session_id,
+            reason=payload.reason,
+        )
 
     @override
     def serialize(self) -> tuple[Any, ...]:
@@ -58,9 +104,26 @@ class DoTerminateSessionEvent(BaseSessionEvent):
 
 
 @dataclass
-class SessionCreationEvent(BaseSessionEvent):
+class SessionCreationEvent(BaseSessionEvent[SessionCreationEventPayload]):
     creation_id: str
     reason: KernelLifecycleEventReason = KernelLifecycleEventReason.UNKNOWN
+
+    @override
+    def to_payload(self) -> SessionCreationEventPayload:
+        return SessionCreationEventPayload(
+            session_id=self.session_id,
+            creation_id=self.creation_id,
+            reason=self.reason,
+        )
+
+    @classmethod
+    @override
+    def from_payload(cls, payload: SessionCreationEventPayload) -> Self:
+        return cls(
+            session_id=payload.session_id,
+            creation_id=payload.creation_id,
+            reason=payload.reason,
+        )
 
     @override
     def serialize(self) -> tuple[Any, ...]:
@@ -109,8 +172,23 @@ class SessionCancelledBroadcastEvent(SessionCreationEvent):
 
 
 @dataclass
-class SessionTerminationEvent(BaseSessionEvent):
+class SessionTerminationEvent(BaseSessionEvent[SessionTerminationEventPayload]):
     reason: str = ""
+
+    @override
+    def to_payload(self) -> SessionTerminationEventPayload:
+        return SessionTerminationEventPayload(
+            session_id=self.session_id,
+            reason=self.reason,
+        )
+
+    @classmethod
+    @override
+    def from_payload(cls, payload: SessionTerminationEventPayload) -> Self:
+        return cls(
+            session_id=payload.session_id,
+            reason=payload.reason,
+        )
 
     @override
     def serialize(self) -> tuple[Any, ...]:
@@ -149,9 +227,26 @@ class SessionTerminatedBroadcastEvent(SessionTerminationEvent):
 
 
 @dataclass
-class SessionResultEvent(BaseSessionEvent):
+class SessionResultEvent(BaseSessionEvent[SessionResultEventPayload]):
     reason: KernelLifecycleEventReason = KernelLifecycleEventReason.UNKNOWN
     exit_code: int = -1
+
+    @override
+    def to_payload(self) -> SessionResultEventPayload:
+        return SessionResultEventPayload(
+            session_id=self.session_id,
+            reason=self.reason,
+            exit_code=self.exit_code,
+        )
+
+    @classmethod
+    @override
+    def from_payload(cls, payload: SessionResultEventPayload) -> Self:
+        return cls(
+            session_id=payload.session_id,
+            reason=payload.reason,
+            exit_code=payload.exit_code,
+        )
 
     @override
     def serialize(self) -> tuple[Any, ...]:
@@ -191,6 +286,13 @@ class SessionFailureBroadcastEvent(SessionResultEvent):
         return "session_failure"
 
 
+class SchedulingBroadcastEventPayload(BroadcastEventPayload):
+    session_id: SessionId
+    creation_id: str
+    status_transition: str
+    reason: str
+
+
 @dataclass
 class SessionSchedulingEventData:
     """Data for each session in batch scheduling event."""
@@ -200,7 +302,7 @@ class SessionSchedulingEventData:
 
 
 @dataclass
-class SchedulingBroadcastEvent(AbstractBroadcastEvent):
+class SchedulingBroadcastEvent(AbstractBroadcastEvent[SchedulingBroadcastEventPayload]):
     """Individual scheduling event for a session status transition."""
 
     session_id: SessionId
@@ -216,6 +318,25 @@ class SchedulingBroadcastEvent(AbstractBroadcastEvent):
     @override
     def domain_id(self) -> str | None:
         return str(self.session_id)
+
+    @override
+    def to_payload(self) -> SchedulingBroadcastEventPayload:
+        return SchedulingBroadcastEventPayload(
+            session_id=self.session_id,
+            creation_id=self.creation_id,
+            status_transition=self.status_transition,
+            reason=self.reason,
+        )
+
+    @classmethod
+    @override
+    def from_payload(cls, payload: SchedulingBroadcastEventPayload) -> Self:
+        return cls(
+            session_id=payload.session_id,
+            creation_id=payload.creation_id,
+            status_transition=payload.status_transition,
+            reason=payload.reason,
+        )
 
     @override
     def serialize(self) -> tuple[Any, ...]:

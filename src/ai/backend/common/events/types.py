@@ -1,9 +1,10 @@
 import enum
 from abc import ABC, abstractmethod
-from typing import Self, final, override
+from typing import Any, Self, final, override
 
 from ai.backend.common.message_queue.payload import BroadcastMessagePayload
 
+from .payload import AnycastEventPayload, BroadcastEventPayload
 from .user_event.user_event import UserEvent
 
 __all__ = (
@@ -114,10 +115,29 @@ class AbstractEvent(ABC):
         raise NotImplementedError
 
 
-class AbstractAnycastEvent(AbstractEvent):
+class AbstractAnycastEvent[TPayload: AnycastEventPayload](AbstractEvent):
     """
     An event that should be sent to a single recipient.
+
+    The type parameter is the event's own payload model. It has no default, so every
+    event is forced to declare the payload it carries. Code that handles events
+    whatever their payload annotates this class as `[Any]`.
     """
+
+    @abstractmethod
+    def to_payload(self) -> TPayload:
+        """
+        Return this event's arguments as its payload model.
+        """
+        raise NotImplementedError
+
+    @classmethod
+    @abstractmethod
+    def from_payload(cls, payload: TPayload) -> Self:
+        """
+        Reconstruct the event from its payload model.
+        """
+        raise NotImplementedError
 
     @classmethod
     @override
@@ -125,12 +145,33 @@ class AbstractAnycastEvent(AbstractEvent):
         return DeliveryPattern.ANYCAST
 
 
-class AbstractBroadcastEvent(AbstractEvent):
+class AbstractBroadcastEvent[TPayload: BroadcastEventPayload](AbstractEvent):
     """
     An event that should be broadcasted to all subscribers.
+
+    The type parameter is the event's own payload model. It has no default, so every
+    event is forced to declare the payload it carries. Code that handles events
+    whatever their payload annotates this class as `[Any]`.
     """
 
-    _register_dict: dict[str, type["AbstractBroadcastEvent"]] = {}
+    # The registry and the propagation helpers below hold events regardless of their
+    # payload type, so they are deliberately annotated with Any.
+    _register_dict: dict[str, type["AbstractBroadcastEvent[Any]"]] = {}
+
+    @abstractmethod
+    def to_payload(self) -> TPayload:
+        """
+        Return this event's arguments as its payload model.
+        """
+        raise NotImplementedError
+
+    @classmethod
+    @abstractmethod
+    def from_payload(cls, payload: TPayload) -> Self:
+        """
+        Reconstruct the event from its payload model.
+        """
+        raise NotImplementedError
 
     @override
     def __init_subclass__(cls) -> None:
@@ -144,7 +185,9 @@ class AbstractBroadcastEvent(AbstractEvent):
             return
 
     @classmethod
-    def deserialize_from_wrapper(cls, payload: BroadcastMessagePayload) -> "AbstractBroadcastEvent":
+    def deserialize_from_wrapper(
+        cls, payload: BroadcastMessagePayload
+    ) -> "AbstractBroadcastEvent[Any]":
         """
         Deserialize the event from its broadcast payload.
         """
@@ -158,7 +201,7 @@ class AbstractBroadcastEvent(AbstractEvent):
     def delivery_pattern(cls) -> DeliveryPattern:
         return DeliveryPattern.BROADCAST
 
-    def generate_events(self) -> list["AbstractBroadcastEvent"]:
+    def generate_events(self) -> list["AbstractBroadcastEvent[Any]"]:
         """
         Generate events to be propagated through EventHub.
         Default implementation returns just this event itself.
@@ -189,7 +232,7 @@ class AbstractBroadcastEvent(AbstractEvent):
         return cache_domain.cache_id(domain_id)
 
 
-class BatchBroadcastEvent(AbstractBroadcastEvent):
+class BatchBroadcastEvent[TPayload: BroadcastEventPayload](AbstractBroadcastEvent[TPayload]):
     """
     An event that generates multiple individual events for propagation.
     Subclasses should override generate_events() to create individual events.
@@ -197,7 +240,7 @@ class BatchBroadcastEvent(AbstractBroadcastEvent):
 
     @override
     @abstractmethod
-    def generate_events(self) -> list[AbstractBroadcastEvent]:
+    def generate_events(self) -> list[AbstractBroadcastEvent[Any]]:
         """
         Generate individual events to be propagated through EventHub.
         Each generated event will be broadcast separately.

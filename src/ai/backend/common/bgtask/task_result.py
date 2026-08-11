@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TypeVar, override
+from typing import Any, TypeVar, override
 
 from ai.backend.common.bgtask.task.base import BaseBackgroundTaskResult
 from ai.backend.common.events.event_types.bgtask.broadcast import (
@@ -29,7 +29,7 @@ class TaskResult(ABC):
     """Abstract base class for task execution results."""
 
     @abstractmethod
-    def to_broadcast_event(self, task_id: uuid.UUID) -> BaseBgtaskDoneEvent:
+    def to_broadcast_event(self, task_id: uuid.UUID) -> BaseBgtaskDoneEvent[Any]:
         """Convert the task result to a broadcast event."""
         raise NotImplementedError
 
@@ -56,7 +56,7 @@ class TaskSuccessResult[R: BaseBackgroundTaskResult | None](TaskResult):
     result: R
 
     @override
-    def to_broadcast_event(self, task_id: uuid.UUID) -> BaseBgtaskDoneEvent:
+    def to_broadcast_event(self, task_id: uuid.UUID) -> BaseBgtaskDoneEvent[Any]:
         # For now, convert the result to string for the message
         # This assumes the result has a meaningful string representation
         message = (
@@ -86,7 +86,7 @@ class TaskCancelledResult(TaskResult):
     message: str = "Task cancelled"
 
     @override
-    def to_broadcast_event(self, task_id: uuid.UUID) -> BaseBgtaskDoneEvent:
+    def to_broadcast_event(self, task_id: uuid.UUID) -> BaseBgtaskDoneEvent[Any]:
         return BgtaskCancelledEvent(task_id, self.message)
 
     @override
@@ -113,7 +113,7 @@ class TaskFailedResult(TaskResult):
     exception: BaseException
 
     @override
-    def to_broadcast_event(self, task_id: uuid.UUID) -> BaseBgtaskDoneEvent:
+    def to_broadcast_event(self, task_id: uuid.UUID) -> BaseBgtaskDoneEvent[Any]:
         return BgtaskFailedEvent(task_id, repr(self.exception))
 
     @override

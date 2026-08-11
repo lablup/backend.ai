@@ -1194,7 +1194,7 @@ class AbstractAgent[
         if isinstance(event, (KernelStartedAnycastEvent, KernelTerminatedAnycastEvent)):
             await self.save_last_registry()
 
-    async def anycast_event(self, event: AbstractAnycastEvent) -> None:
+    async def anycast_event(self, event: AbstractAnycastEvent[Any]) -> None:
         """
         Send an event to the manager(s).
         """
@@ -1212,8 +1212,8 @@ class AbstractAgent[
 
     async def anycast_and_broadcast_event(
         self,
-        anycast_event: AbstractAnycastEvent,
-        broadcast_event: AbstractBroadcastEvent,
+        anycast_event: AbstractAnycastEvent[Any],
+        broadcast_event: AbstractBroadcastEvent[Any],
     ) -> None:
         await self._pre_anycast_event(anycast_event)
         await self.event_producer.anycast_and_broadcast_event(anycast_event, broadcast_event)

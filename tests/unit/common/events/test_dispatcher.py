@@ -3,12 +3,13 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import Any, override
+from typing import Any, Self, override
 
 import msgpack
 import pytest
 
 from ai.backend.common.events.dispatcher import EventDispatcher
+from ai.backend.common.events.payload import AnycastEventPayload, BroadcastEventPayload
 from ai.backend.common.events.types import (
     AbstractAnycastEvent,
     AbstractBroadcastEvent,
@@ -21,9 +22,22 @@ from ai.backend.common.message_queue.types import MessageName
 from ai.backend.common.types import AgentId
 
 
-@dataclass
-class DummyAnycastEvent(AbstractAnycastEvent):
+class DummyAnycastEventPayload(AnycastEventPayload):
     value: int
+
+
+@dataclass
+class DummyAnycastEvent(AbstractAnycastEvent[DummyAnycastEventPayload]):
+    value: int
+
+    @override
+    def to_payload(self) -> DummyAnycastEventPayload:
+        return DummyAnycastEventPayload(value=self.value)
+
+    @classmethod
+    @override
+    def from_payload(cls, payload: DummyAnycastEventPayload) -> Self:
+        return cls(value=payload.value)
 
     @override
     def serialize(self) -> tuple[Any, ...]:
@@ -53,9 +67,22 @@ class DummyAnycastEvent(AbstractAnycastEvent):
         return "test_anycast"
 
 
-@dataclass
-class DummyBroadcastEvent(AbstractBroadcastEvent):
+class DummyBroadcastEventPayload(BroadcastEventPayload):
     value: int
+
+
+@dataclass
+class DummyBroadcastEvent(AbstractBroadcastEvent[DummyBroadcastEventPayload]):
+    value: int
+
+    @override
+    def to_payload(self) -> DummyBroadcastEventPayload:
+        return DummyBroadcastEventPayload(value=self.value)
+
+    @classmethod
+    @override
+    def from_payload(cls, payload: DummyBroadcastEventPayload) -> Self:
+        return cls(value=payload.value)
 
     @override
     def serialize(self) -> tuple[Any, ...]:
@@ -85,7 +112,7 @@ class DummyBroadcastEvent(AbstractBroadcastEvent):
         return "test_broadcast"
 
 
-def _make_anycast_mq_message(event: AbstractAnycastEvent) -> MQMessage:
+def _make_anycast_mq_message(event: AbstractAnycastEvent[Any]) -> MQMessage:
     return MQMessage(
         msg_id=b"test-msg-id",
         payload=AnycastMessagePayload(
@@ -96,7 +123,7 @@ def _make_anycast_mq_message(event: AbstractAnycastEvent) -> MQMessage:
     )
 
 
-def _make_broadcast_payload(event: AbstractBroadcastEvent) -> BroadcastMessagePayload:
+def _make_broadcast_payload(event: AbstractBroadcastEvent[Any]) -> BroadcastMessagePayload:
     return BroadcastMessagePayload(
         name=MessageName(event.event_name()),
         source="i-test",

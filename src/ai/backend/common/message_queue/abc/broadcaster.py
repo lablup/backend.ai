@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from ai.backend.common.message_queue.payload import BroadcastMessagePayload, CachedBroadcastMessagePayload
+from ai.backend.common.message_queue.payload import (
+    BroadcastMessagePayload,
+    CachedBroadcastMessagePayload,
+)
 
 
 class AbstractBroadcaster(ABC):

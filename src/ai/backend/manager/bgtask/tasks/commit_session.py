@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING, cast, override
+from typing import TYPE_CHECKING, Any, cast, override
 
 from pydantic import Field
 
@@ -275,7 +275,7 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
                         log.info("{} completed", operation_name)
                         return
                     case BgtaskStatus.FAILED:
-                        error_msg = cast(BaseBgtaskDoneEvent, event).message
+                        error_msg = cast(BaseBgtaskDoneEvent[Any], event).message
                         log.error("{} failed: {}", operation_name, error_msg)
                         raise BgtaskFailedError(extra_msg=error_msg)
                     case BgtaskStatus.CANCELLED:

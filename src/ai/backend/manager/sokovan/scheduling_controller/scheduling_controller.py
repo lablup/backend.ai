@@ -3,6 +3,7 @@
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 from uuid import uuid4
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
@@ -522,7 +523,7 @@ class SchedulingController:
             )
 
             # Broadcast status events for cancelled, terminating, and force-terminated sessions
-            broadcast_events: list[AbstractBroadcastEvent] = [
+            broadcast_events: list[AbstractBroadcastEvent[Any]] = [
                 SchedulingBroadcastEvent(
                     session_id=session_id,
                     creation_id="",

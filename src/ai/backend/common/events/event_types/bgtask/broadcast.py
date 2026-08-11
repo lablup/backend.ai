@@ -6,7 +6,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Never, Self, override
 
+from pydantic import Field as PydanticField
+
 from ai.backend.common.bgtask.types import BgtaskStatus
+from ai.backend.common.events.payload import BroadcastEventPayload
 from ai.backend.common.events.types import AbstractBroadcastEvent, EventDomain
 from ai.backend.common.events.user_event.user_bgtask_event import (
     UserBgtaskCancelledEvent,
@@ -21,8 +24,39 @@ from ai.backend.logging import BraceStyleAdapter
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
+class BgtaskUpdatedEventPayload(BroadcastEventPayload):
+    task_id: uuid.UUID
+    current_progress: float
+    total_progress: float
+    message: str | None = None
+
+
+class BgtaskDoneEventPayload(BroadcastEventPayload):
+    task_id: uuid.UUID
+    message: str | None = None
+
+
+class BgtaskPartialSuccessEventPayload(BroadcastEventPayload):
+    task_id: uuid.UUID
+    message: str | None = None
+    errors: list[str] = PydanticField(default_factory=list)
+
+
+class BgtaskAlreadyDoneEventPayload(BroadcastEventPayload):
+    """
+    Declared for completeness only. This event is reconstructed locally from the last
+    known task status and never crosses the message queue.
+    """
+
+    task_id: uuid.UUID
+    task_status: BgtaskStatus
+    message: str | None = None
+    current: str = "0"
+    total: str = "0"
+
+
 @dataclass
-class BaseBgtaskEvent(AbstractBroadcastEvent, ABC):
+class BaseBgtaskEvent[TPayload: BroadcastEventPayload](AbstractBroadcastEvent[TPayload], ABC):
     task_id: uuid.UUID
 
     @classmethod
@@ -40,10 +74,29 @@ class BaseBgtaskEvent(AbstractBroadcastEvent, ABC):
 
 
 @dataclass
-class BgtaskUpdatedEvent(BaseBgtaskEvent):
+class BgtaskUpdatedEvent(BaseBgtaskEvent[BgtaskUpdatedEventPayload]):
     current_progress: float
     total_progress: float
     message: str | None = None
+
+    @override
+    def to_payload(self) -> BgtaskUpdatedEventPayload:
+        return BgtaskUpdatedEventPayload(
+            task_id=self.task_id,
+            current_progress=self.current_progress,
+            total_progress=self.total_progress,
+            message=self.message,
+        )
+
+    @classmethod
+    @override
+    def from_payload(cls, payload: BgtaskUpdatedEventPayload) -> Self:
+        return cls(
+            task_id=payload.task_id,
+            current_progress=payload.current_progress,
+            total_progress=payload.total_progress,
+            message=payload.message,
+        )
 
     @override
     def serialize(self) -> tuple[Any, ...]:
@@ -84,7 +137,7 @@ class BgtaskUpdatedEvent(BaseBgtaskEvent):
 
 
 @dataclass
-class BaseBgtaskDoneEvent(BaseBgtaskEvent):
+class BaseBgtaskDoneEvent[TPayload: BroadcastEventPayload](BaseBgtaskEvent[TPayload]):
     """
     Arguments for events that are triggered when the Bgtask is completed.
     """
@@ -108,10 +161,19 @@ class BaseBgtaskDoneEvent(BaseBgtaskEvent):
 
 
 @dataclass
-class BgtaskDoneEvent(BaseBgtaskDoneEvent):
+class BgtaskDoneEvent(BaseBgtaskDoneEvent[BgtaskDoneEventPayload]):
     """
     Event triggered when the Bgtask is successfully completed.
     """
+
+    @override
+    def to_payload(self) -> BgtaskDoneEventPayload:
+        return BgtaskDoneEventPayload(task_id=self.task_id, message=self.message)
+
+    @classmethod
+    @override
+    def from_payload(cls, payload: BgtaskDoneEventPayload) -> Self:
+        return cls(task_id=payload.task_id, message=payload.message)
 
     @classmethod
     @override
@@ -131,7 +193,7 @@ class BgtaskDoneEvent(BaseBgtaskDoneEvent):
 
 
 @dataclass
-class BgtaskAlreadyDoneEvent(BaseBgtaskEvent):
+class BgtaskAlreadyDoneEvent(BaseBgtaskEvent[BgtaskAlreadyDoneEventPayload]):
     """
     Event triggered when the Bgtask is already completed.
     An event recreated based on the last status of the Bgtask.
@@ -141,6 +203,15 @@ class BgtaskAlreadyDoneEvent(BaseBgtaskEvent):
     message: str | None = None
     current: str = "0"
     total: str = "0"
+
+    @override
+    def to_payload(self) -> Never:
+        raise UnreachableError("BgtaskAlreadyDoneEvent should not be serialized.")
+
+    @classmethod
+    @override
+    def from_payload(cls, payload: BgtaskAlreadyDoneEventPayload) -> Never:
+        raise UnreachableError("BgtaskAlreadyDoneEvent should not be deserialized.")
 
     @override
     def serialize(self) -> tuple[Any, ...]:
@@ -189,7 +260,16 @@ class BgtaskAlreadyDoneEvent(BaseBgtaskEvent):
 
 
 @dataclass
-class BgtaskCancelledEvent(BaseBgtaskDoneEvent):
+class BgtaskCancelledEvent(BaseBgtaskDoneEvent[BgtaskDoneEventPayload]):
+    @override
+    def to_payload(self) -> BgtaskDoneEventPayload:
+        return BgtaskDoneEventPayload(task_id=self.task_id, message=self.message)
+
+    @classmethod
+    @override
+    def from_payload(cls, payload: BgtaskDoneEventPayload) -> Self:
+        return cls(task_id=payload.task_id, message=payload.message)
+
     @classmethod
     @override
     def event_name(cls) -> str:
@@ -208,7 +288,16 @@ class BgtaskCancelledEvent(BaseBgtaskDoneEvent):
 
 
 @dataclass
-class BgtaskFailedEvent(BaseBgtaskDoneEvent):
+class BgtaskFailedEvent(BaseBgtaskDoneEvent[BgtaskDoneEventPayload]):
+    @override
+    def to_payload(self) -> BgtaskDoneEventPayload:
+        return BgtaskDoneEventPayload(task_id=self.task_id, message=self.message)
+
+    @classmethod
+    @override
+    def from_payload(cls, payload: BgtaskDoneEventPayload) -> Self:
+        return cls(task_id=payload.task_id, message=payload.message)
+
     @classmethod
     @override
     def event_name(cls) -> str:
@@ -227,8 +316,25 @@ class BgtaskFailedEvent(BaseBgtaskDoneEvent):
 
 
 @dataclass
-class BgtaskPartialSuccessEvent(BaseBgtaskDoneEvent):
+class BgtaskPartialSuccessEvent(BaseBgtaskDoneEvent[BgtaskPartialSuccessEventPayload]):
     errors: list[str] = field(default_factory=list)
+
+    @override
+    def to_payload(self) -> BgtaskPartialSuccessEventPayload:
+        return BgtaskPartialSuccessEventPayload(
+            task_id=self.task_id,
+            message=self.message,
+            errors=self.errors,
+        )
+
+    @classmethod
+    @override
+    def from_payload(cls, payload: BgtaskPartialSuccessEventPayload) -> Self:
+        return cls(
+            task_id=payload.task_id,
+            message=payload.message,
+            errors=payload.errors,
+        )
 
     @override
     def serialize(self) -> tuple[Any, ...]:

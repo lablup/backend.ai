@@ -7,7 +7,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
-from typing import override
+from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.events.types import AbstractAnycastEvent
@@ -292,16 +292,16 @@ class ReconcilerTaskSpec:
     """Short/long tick spec for one reconcile type with injected event factories."""
 
     reconcile_type: str
-    if_needed_event_factory: Callable[[str], AbstractAnycastEvent]
-    process_event_factory: Callable[[str], AbstractAnycastEvent]
+    if_needed_event_factory: Callable[[str], AbstractAnycastEvent[Any]]
+    process_event_factory: Callable[[str], AbstractAnycastEvent[Any]]
     short_interval: float | None = None
     long_interval: float = 60.0
     initial_delay: float = 30.0
 
-    def create_if_needed_event(self) -> AbstractAnycastEvent:
+    def create_if_needed_event(self) -> AbstractAnycastEvent[Any]:
         return self.if_needed_event_factory(self.reconcile_type)
 
-    def create_process_event(self) -> AbstractAnycastEvent:
+    def create_process_event(self) -> AbstractAnycastEvent[Any]:
         return self.process_event_factory(self.reconcile_type)
 
     @property

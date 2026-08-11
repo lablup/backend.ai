@@ -1073,7 +1073,7 @@ class ScheduleCoordinator:
         if not sessions:
             return
 
-        events: list[AbstractBroadcastEvent] = []
+        events: list[AbstractBroadcastEvent[Any]] = []
         for session_info in sessions:
             if session_info.creation_id is None:
                 log.warning(

@@ -3,12 +3,42 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Self, override
 
+from ai.backend.common.events.payload import BroadcastEventPayload
 from ai.backend.common.events.types import AbstractBroadcastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.types import QuotaScopeID, VolumeMountableNodeType
 
 
-class BaseVolumeEvent(AbstractBroadcastEvent):
+class DoVolumeMountEventPayload(BroadcastEventPayload):
+    dir_name: str
+    volume_backend_name: str
+    quota_scope_id: QuotaScopeID
+    fs_location: str
+    fs_type: str = "nfs"
+    cmd_options: str | None = None
+    scaling_group: str | None = None
+    edit_fstab: bool = False
+    fstab_path: str = "/etc/fstab"
+
+
+class DoVolumeUnmountEventPayload(BroadcastEventPayload):
+    dir_name: str
+    volume_backend_name: str
+    quota_scope_id: QuotaScopeID
+    scaling_group: str | None = None
+    edit_fstab: bool = False
+    fstab_path: str | None = None
+
+
+class AgentVolumeMountEventPayload(BroadcastEventPayload):
+    node_id: str
+    node_type: VolumeMountableNodeType
+    mount_path: str
+    quota_scope_id: QuotaScopeID
+    err_msg: str | None = None
+
+
+class BaseVolumeEvent[TPayload: BroadcastEventPayload](AbstractBroadcastEvent[TPayload]):
     @classmethod
     @override
     def event_domain(cls) -> EventDomain:
@@ -24,7 +54,7 @@ class BaseVolumeEvent(AbstractBroadcastEvent):
 
 
 @dataclass
-class DoVolumeMountEvent(BaseVolumeEvent):
+class DoVolumeMountEvent(BaseVolumeEvent[DoVolumeMountEventPayload]):
     # Let storage proxies and agents find the real path of volume
     # with their mount_path or mount_prefix.
     dir_name: str
@@ -40,6 +70,35 @@ class DoVolumeMountEvent(BaseVolumeEvent):
     # if `edit_fstab` is True, `fstab_path` or "/etc/fstab" is used to edit fstab
     edit_fstab: bool = False
     fstab_path: str = "/etc/fstab"
+
+    @override
+    def to_payload(self) -> DoVolumeMountEventPayload:
+        return DoVolumeMountEventPayload(
+            dir_name=self.dir_name,
+            volume_backend_name=self.volume_backend_name,
+            quota_scope_id=self.quota_scope_id,
+            fs_location=self.fs_location,
+            fs_type=self.fs_type,
+            cmd_options=self.cmd_options,
+            scaling_group=self.scaling_group,
+            edit_fstab=self.edit_fstab,
+            fstab_path=self.fstab_path,
+        )
+
+    @classmethod
+    @override
+    def from_payload(cls, payload: DoVolumeMountEventPayload) -> Self:
+        return cls(
+            dir_name=payload.dir_name,
+            volume_backend_name=payload.volume_backend_name,
+            quota_scope_id=payload.quota_scope_id,
+            fs_location=payload.fs_location,
+            fs_type=payload.fs_type,
+            cmd_options=payload.cmd_options,
+            scaling_group=payload.scaling_group,
+            edit_fstab=payload.edit_fstab,
+            fstab_path=payload.fstab_path,
+        )
 
     @override
     def serialize(self) -> tuple[Any, ...]:
@@ -77,7 +136,7 @@ class DoVolumeMountEvent(BaseVolumeEvent):
 
 
 @dataclass
-class DoVolumeUnmountEvent(BaseVolumeEvent):
+class DoVolumeUnmountEvent(BaseVolumeEvent[DoVolumeUnmountEventPayload]):
     # Let storage proxies and agents find the real path of volume
     # with their mount_path or mount_prefix.
     dir_name: str
@@ -89,6 +148,29 @@ class DoVolumeUnmountEvent(BaseVolumeEvent):
     # if `edit_fstab` is True, `fstab_path` or "/etc/fstab" is used to edit fstab
     edit_fstab: bool = False
     fstab_path: str | None = None
+
+    @override
+    def to_payload(self) -> DoVolumeUnmountEventPayload:
+        return DoVolumeUnmountEventPayload(
+            dir_name=self.dir_name,
+            volume_backend_name=self.volume_backend_name,
+            quota_scope_id=self.quota_scope_id,
+            scaling_group=self.scaling_group,
+            edit_fstab=self.edit_fstab,
+            fstab_path=self.fstab_path,
+        )
+
+    @classmethod
+    @override
+    def from_payload(cls, payload: DoVolumeUnmountEventPayload) -> Self:
+        return cls(
+            dir_name=payload.dir_name,
+            volume_backend_name=payload.volume_backend_name,
+            quota_scope_id=payload.quota_scope_id,
+            scaling_group=payload.scaling_group,
+            edit_fstab=payload.edit_fstab,
+            fstab_path=payload.fstab_path,
+        )
 
     @override
     def serialize(self) -> tuple[Any, ...]:
@@ -120,12 +202,33 @@ class DoVolumeUnmountEvent(BaseVolumeEvent):
 
 
 @dataclass
-class BaseAgentVolumeMountEvent(BaseVolumeEvent):
+class BaseAgentVolumeMountEvent(BaseVolumeEvent[AgentVolumeMountEventPayload]):
     node_id: str
     node_type: VolumeMountableNodeType
     mount_path: str
     quota_scope_id: QuotaScopeID
     err_msg: str | None = None
+
+    @override
+    def to_payload(self) -> AgentVolumeMountEventPayload:
+        return AgentVolumeMountEventPayload(
+            node_id=self.node_id,
+            node_type=self.node_type,
+            mount_path=self.mount_path,
+            quota_scope_id=self.quota_scope_id,
+            err_msg=self.err_msg,
+        )
+
+    @classmethod
+    @override
+    def from_payload(cls, payload: AgentVolumeMountEventPayload) -> Self:
+        return cls(
+            node_id=payload.node_id,
+            node_type=payload.node_type,
+            mount_path=payload.mount_path,
+            quota_scope_id=payload.quota_scope_id,
+            err_msg=payload.err_msg,
+        )
 
     @override
     def serialize(self) -> tuple[Any, ...]:

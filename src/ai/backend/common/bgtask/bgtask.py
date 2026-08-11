@@ -351,7 +351,7 @@ class BackgroundTaskManager:
 
     def _convert_bgtask_to_event(
         self, task_id: uuid.UUID, bgtask_result: DispatchResult[Any] | str | None
-    ) -> BaseBgtaskDoneEvent:
+    ) -> BaseBgtaskDoneEvent[Any]:
         # legacy
         if bgtask_result is None or isinstance(bgtask_result, str):
             return BgtaskDoneEvent(task_id, bgtask_result)
@@ -368,7 +368,7 @@ class BackgroundTaskManager:
         func: BackgroundTask,
         task_id: uuid.UUID,
         **kwargs: Any,
-    ) -> BaseBgtaskDoneEvent:
+    ) -> BaseBgtaskDoneEvent[Any]:
         reporter = ProgressReporter(self._event_producer, task_id)
         bgtask_result = await func(reporter, **kwargs)
         return self._convert_bgtask_to_event(task_id, bgtask_result)
@@ -379,7 +379,7 @@ class BackgroundTaskManager:
         task_id: uuid.UUID,
         task_name: str | None,
         **kwargs: Any,
-    ) -> BaseBgtaskDoneEvent:
+    ) -> BaseBgtaskDoneEvent[Any]:
         self._metric_observer.observe_bgtask_started(task_name=task_name or func.__name__)
         start_time = time.perf_counter()
         task_name = task_name or func.__name__
