@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from ai.backend.manager.actions.registry import ProcessorGroup
-from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import (
+    GlobalActionProcessor,
+    PublicActionProcessor,
+)
 from ai.backend.manager.actions.v2.ops.result import BatchOpsResult, EntityOpsResult
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
 from ai.backend.manager.services.runtime_variant_preset.actions.create import (
@@ -35,7 +38,7 @@ class RuntimeVariantPresetProcessors:
     purge: GlobalActionProcessor[
         PurgeRuntimeVariantPresetAction, EntityOpsResult[RuntimeVariantPresetData]
     ]
-    search: GlobalActionProcessor[
+    search: PublicActionProcessor[
         SearchRuntimeVariantPresetsAction, BatchOpsResult[RuntimeVariantPresetData]
     ]
 
@@ -47,4 +50,4 @@ class RuntimeVariantPresetProcessors:
         self.create = group.global_scope(CreateRuntimeVariantPresetAction, service.create)
         self.update = group.global_scope(UpdateRuntimeVariantPresetAction, service.update)
         self.purge = group.global_purge_ops(PurgeRuntimeVariantPresetAction)
-        self.search = group.global_search_ops(SearchRuntimeVariantPresetsAction)
+        self.search = group.public_search_ops(SearchRuntimeVariantPresetsAction)

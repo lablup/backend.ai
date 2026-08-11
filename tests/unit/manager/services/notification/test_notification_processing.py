@@ -15,12 +15,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.notification import SessionStartedMessage
 from ai.backend.common.data.notification.types import (
     NotificationChannelType,
     NotificationRuleType,
     WebhookSpec,
 )
+from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.notification import (
     NotificationChannelID,
     NotificationRuleID,
@@ -29,6 +32,7 @@ from ai.backend.manager.data.notification import (
     NotificationChannelData,
     NotificationRuleData,
 )
+from ai.backend.manager.data.notification.types import MatchingNotificationRuleData
 from ai.backend.manager.notification.notification_center import NotificationCenter
 from ai.backend.manager.notification.types import SendResult
 from ai.backend.manager.repositories.notification.repository import NotificationRepository
@@ -51,6 +55,20 @@ async def notification_center() -> AsyncGenerator[NotificationCenter, None]:
 @pytest.fixture()
 def mock_repository() -> MagicMock:
     return MagicMock(spec=NotificationRepository)
+
+
+@pytest.fixture()
+def superadmin() -> UserData:
+    """Dispatch runs behind the global processor's SUPERADMIN gate, so give it a caller."""
+    return UserData(
+        user_id=uuid.uuid4(),
+        is_authorized=True,
+        is_admin=True,
+        is_superadmin=True,
+        role=UserRole.SUPERADMIN,
+        domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
+    )
 
 
 @pytest.fixture()
@@ -106,13 +124,19 @@ class TestNotificationProcessing:
     async def test_event_triggers_matching_rule(
         self,
         notification_processors: NotificationProcessors,
+        superadmin: UserData,
         notification_center: NotificationCenter,
         mock_repository: MagicMock,
         sample_rule_data: NotificationRuleData,
+        sample_channel_data: NotificationChannelData,
     ) -> None:
         """A matching rule is found and the channel is called exactly once."""
         send_result = SendResult(message="Notification delivered")
-        mock_repository.get_matching_rules = AsyncMock(return_value=[sample_rule_data])
+        mock_repository.get_matching_rules = AsyncMock(
+            return_value=[
+                MatchingNotificationRuleData(rule=sample_rule_data, channel=sample_channel_data)
+            ]
+        )
 
         with patch.object(
             notification_center,
@@ -130,7 +154,8 @@ class TestNotificationProcessing:
                     status="RUNNING",
                 ),
             )
-            result = await notification_processors.process_notification.run(action)
+            with with_user(superadmin):
+                result = await notification_processors.process_notification.run(action)
 
         assert isinstance(result, ProcessNotificationActionResult)
         assert result.rules_matched >= 1
@@ -140,6 +165,7 @@ class TestNotificationProcessing:
     async def test_partial_channel_failure_tolerance(
         self,
         notification_processors: NotificationProcessors,
+        superadmin: UserData,
         notification_center: NotificationCenter,
         mock_repository: MagicMock,
         sample_channel_data: NotificationChannelData,
@@ -181,7 +207,12 @@ class TestNotificationProcessing:
             created_at=now,
             updated_at=now,
         )
-        mock_repository.get_matching_rules = AsyncMock(return_value=[rule1_data, rule2_data])
+        mock_repository.get_matching_rules = AsyncMock(
+            return_value=[
+                MatchingNotificationRuleData(rule=rule1_data, channel=sample_channel_data),
+                MatchingNotificationRuleData(rule=rule2_data, channel=sample_channel_data),
+            ]
+        )
 
         call_count = 0
         send_result = SendResult(message="ok")
@@ -209,7 +240,8 @@ class TestNotificationProcessing:
                     status="RUNNING",
                 ),
             )
-            result = await notification_processors.process_notification.run(action)
+            with with_user(superadmin):
+                result = await notification_processors.process_notification.run(action)
 
         assert isinstance(result, ProcessNotificationActionResult)
         assert result.rules_matched >= 2

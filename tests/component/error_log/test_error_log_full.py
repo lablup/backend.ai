@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 
 from ai.backend.client.exceptions import BackendAPIError
+from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.error_log import (
     AppendErrorLogRequest,
@@ -54,22 +55,19 @@ class TestAppendErrorLogFull:
 
 
 class TestListErrorLogsFull:
-    async def test_admin_sees_all_users_logs(
+    async def test_admin_sees_every_recorded_log(
         self,
         admin_registry: BackendAIClientRegistry,
-        user_registry: BackendAIClientRegistry,
     ) -> None:
         await admin_registry.error_log.append(
-            _make_append_request(message="admin log for visibility"),
+            _make_append_request(message="first log for visibility"),
         )
-        await user_registry.error_log.append(
-            _make_append_request(message="user log for visibility"),
+        await admin_registry.error_log.append(
+            _make_append_request(message="second log for visibility"),
         )
         admin_result = await admin_registry.error_log.list_logs()
-        user_result = await user_registry.error_log.list_logs()
         assert isinstance(admin_result, ListErrorLogsResponse)
-        assert isinstance(user_result, ListErrorLogsResponse)
-        assert admin_result.count >= user_result.count
+        assert admin_result.count >= 2
 
 
 class TestMarkClearedFull:
@@ -94,6 +92,5 @@ class TestMarkClearedFull:
         assert admin_list.count >= 1
         admin_log_id = uuid.UUID(admin_list.logs[0].log_id)
 
-        with pytest.raises(BackendAPIError) as exc_info:
+        with pytest.raises(PermissionDeniedError):
             await user_registry.error_log.mark_cleared(admin_log_id)
-        assert exc_info.value.status == 500

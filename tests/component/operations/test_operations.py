@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.operations import (
     AppendErrorLogRequest,
@@ -41,21 +43,20 @@ class TestAppendErrorLog:
         assert isinstance(result, AppendErrorLogResponse)
         assert result.success is True
 
-    async def test_user_appends_error_log(
+    async def test_user_cannot_append_error_log(
         self,
         user_registry: BackendAIClientRegistry,
     ) -> None:
-        result = await user_registry.operations.append_error_log(
-            AppendErrorLogRequest(
-                severity=ErrorLogSeverity.WARNING,
-                source="test-user",
-                message="Test warning from user",
-                context_lang="python",
-                context_env="{}",
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.operations.append_error_log(
+                AppendErrorLogRequest(
+                    severity=ErrorLogSeverity.WARNING,
+                    source="test-user",
+                    message="Test warning from user",
+                    context_lang="python",
+                    context_env="{}",
+                )
             )
-        )
-        assert isinstance(result, AppendErrorLogResponse)
-        assert result.success is True
 
 
 class TestListErrorLogs:
@@ -86,23 +87,12 @@ class TestListErrorLogs:
         )
         assert isinstance(result, ListErrorLogsResponse)
 
-    async def test_user_lists_own_error_logs(
+    async def test_user_cannot_list_error_logs(
         self,
         user_registry: BackendAIClientRegistry,
     ) -> None:
-        await user_registry.operations.append_error_log(
-            AppendErrorLogRequest(
-                severity=ErrorLogSeverity.ERROR,
-                source="test-user",
-                message="User-visible error",
-                context_lang="python",
-                context_env="{}",
-            )
-        )
-        result = await user_registry.operations.list_error_logs()
-        assert isinstance(result, ListErrorLogsResponse)
-        assert result.count >= 1
-        assert len(result.logs) >= 1
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.operations.list_error_logs()
 
 
 class TestClearErrorLog:

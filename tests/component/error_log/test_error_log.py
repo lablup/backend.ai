@@ -3,6 +3,9 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+import pytest
+
+from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.error_log import (
     AppendErrorLogRequest,
@@ -70,19 +73,18 @@ class TestAppendErrorLog:
         assert isinstance(result, AppendErrorLogResponse)
         assert result.success is True
 
-    async def test_user_appends_error_log(
+    async def test_user_cannot_append_error_log(
         self,
         user_registry: BackendAIClientRegistry,
     ) -> None:
-        result = await user_registry.error_log.append(
-            _make_append_request(
-                severity="critical",
-                source="user-test",
-                message="error from regular user",
-            ),
-        )
-        assert isinstance(result, AppendErrorLogResponse)
-        assert result.success is True
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.error_log.append(
+                _make_append_request(
+                    severity="critical",
+                    source="user-test",
+                    message="error from regular user",
+                ),
+            )
 
 
 class TestListErrorLogs:
@@ -103,25 +105,16 @@ class TestListErrorLogs:
         assert log_entry.severity
         assert log_entry.is_cleared is not None  # admin sees is_cleared
 
-    async def test_user_lists_own_error_logs(
+    async def test_user_cannot_list_error_logs(
         self,
         admin_registry: BackendAIClientRegistry,
         user_registry: BackendAIClientRegistry,
     ) -> None:
-        # Admin creates a log
         await admin_registry.error_log.append(
             _make_append_request(message="admin log"),
         )
-        # User creates a log
-        await user_registry.error_log.append(
-            _make_append_request(message="user log"),
-        )
-        result = await user_registry.error_log.list_logs()
-        assert isinstance(result, ListErrorLogsResponse)
-        # User should only see their own logs
-        assert result.count >= 1
-        for log_entry in result.logs:
-            assert log_entry.is_cleared is None  # non-admin does not see is_cleared
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.error_log.list_logs()
 
     async def test_list_logs_with_query_params(
         self,
@@ -175,19 +168,16 @@ class TestMarkCleared:
         assert cleared_log is not None
         assert cleared_log.is_cleared is True
 
-    async def test_user_marks_own_log_cleared(
+    async def test_user_cannot_mark_log_cleared(
         self,
+        admin_registry: BackendAIClientRegistry,
         user_registry: BackendAIClientRegistry,
     ) -> None:
-        # User creates a log entry
-        await user_registry.error_log.append(
+        await admin_registry.error_log.append(
             _make_append_request(message="user-clearable log"),
         )
-        # List to get the log_id (user only sees own, non-cleared logs)
-        list_result = await user_registry.error_log.list_logs()
-        assert list_result.count >= 1
+        list_result = await admin_registry.error_log.list_logs()
         log_id = uuid.UUID(list_result.logs[0].log_id)
 
-        result = await user_registry.error_log.mark_cleared(log_id)
-        assert isinstance(result, MarkClearedResponse)
-        assert result.success is True
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.error_log.mark_cleared(log_id)

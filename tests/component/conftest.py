@@ -44,8 +44,9 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
+from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.permission.types import EntityType, ScopeType
-from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.defs import (
     REDIS_BGTASK_DB,
     REDIS_CONTAINER_LOG,
@@ -58,6 +59,7 @@ from ai.backend.common.defs import (
 )
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.message_queue.redis_queue.queue import RedisMQArgs, RedisQueue
@@ -1563,3 +1565,26 @@ async def user_registry(
         yield registry
     finally:
         await registry.close()
+
+
+@pytest.fixture()
+def acting_superadmin() -> Iterator[None]:
+    """Run the test body as a superadmin.
+
+    A test that drives processors directly skips the HTTP layer, so nothing has set
+    the caller — and the gates the action layer imposes read it. Production always has
+    one; this supplies the equivalent so the test exercises the gate rather than
+    tripping over its absence.
+    """
+    with with_user(
+        UserData(
+            user_id=uuid.uuid4(),
+            is_authorized=True,
+            is_admin=True,
+            is_superadmin=True,
+            role=UserRole.SUPERADMIN,
+            domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
+        )
+    ):
+        yield

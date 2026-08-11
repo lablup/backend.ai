@@ -93,3 +93,8 @@ async def target_vfs_storage(
 ) -> VFSStorageFixtureData:
     """Pre-created VFS storage for tests that need an existing storage."""
     return await vfs_storage_factory()
+
+
+@pytest.fixture(autouse=True)
+def _act_as_superadmin(acting_superadmin: None) -> None:
+    """These tests drive processors directly, so they supply the caller the gates read."""

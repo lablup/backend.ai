@@ -290,7 +290,7 @@ class TestNotificationRuleNodeSerialization:
         assert restored.id == rule_node.id
         assert restored.channel_id == channel_node.id
 
-    def test_nested_channel_spec_preserved_in_json(self) -> None:
+    def test_channel_id_survives_json(self) -> None:
         channel_node = _make_channel_node()
         now = datetime.now(tz=UTC)
         rule_node = NotificationRuleNode(
@@ -305,9 +305,9 @@ class TestNotificationRuleNodeSerialization:
             updated_at=now,
         )
         data = json.loads(rule_node.model_dump_json())
-        assert "channel" in data
-        assert "spec" in data["channel"]
-        assert "url" in data["channel"]["spec"]
+        # The rule names its channel; the channel itself is fetched by whoever needs it.
+        assert data["channel_id"] == str(channel_node.id)
+        assert "channel" not in data
 
 
 class TestCreateNotificationChannelPayload:

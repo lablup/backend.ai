@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from ai.backend.manager.actions.registry import ProcessorGroup
-from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import (
+    GlobalActionProcessor,
+    PublicActionProcessor,
+)
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
@@ -35,7 +38,7 @@ class RuntimeVariantProcessors:
     ]
     update: GlobalActionProcessor[UpdateRuntimeVariantAction, EntityOpsResult[RuntimeVariantData]]
     purge: GlobalActionProcessor[PurgeRuntimeVariantAction, EntityOpsResult[RuntimeVariantData]]
-    search: GlobalActionProcessor[SearchRuntimeVariantsAction, BatchOpsResult[RuntimeVariantData]]
+    search: PublicActionProcessor[SearchRuntimeVariantsAction, BatchOpsResult[RuntimeVariantData]]
     resolve_by_name: LookupActionProcessor[
         ResolveRuntimeVariantByNameAction, LookupOpsResult[RuntimeVariantData]
     ]
@@ -44,5 +47,5 @@ class RuntimeVariantProcessors:
         self.create = group.global_create_ops(CreateRuntimeVariantAction)
         self.update = group.global_update_ops(UpdateRuntimeVariantAction)
         self.purge = group.global_purge_ops(PurgeRuntimeVariantAction)
-        self.search = group.global_search_ops(SearchRuntimeVariantsAction)
+        self.search = group.public_search_ops(SearchRuntimeVariantsAction)
         self.resolve_by_name = group.lookup_ops(ResolveRuntimeVariantByNameAction)

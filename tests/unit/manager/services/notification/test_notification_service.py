@@ -27,6 +27,7 @@ from ai.backend.manager.data.notification import (
     NotificationChannelData,
     NotificationRuleData,
 )
+from ai.backend.manager.data.notification.types import MatchingNotificationRuleData
 from ai.backend.manager.errors.notification import (
     NotificationChannelNotFound,
     NotificationRuleNotFound,
@@ -121,6 +122,15 @@ class TestNotificationService:
         )
 
     @pytest.fixture
+    def sample_match(
+        self,
+        sample_rule: NotificationRuleData,
+        sample_webhook_channel: NotificationChannelData,
+    ) -> MatchingNotificationRuleData:
+        """What the dispatch read returns: a rule beside the channel it dispatches through."""
+        return MatchingNotificationRuleData(rule=sample_rule, channel=sample_webhook_channel)
+
+    @pytest.fixture
     def sample_event(self) -> NotificationTriggeredEvent:
         """Create sample notification event"""
         return NotificationTriggeredEvent(
@@ -139,14 +149,14 @@ class TestNotificationService:
         self,
         notification_service: NotificationService,
         mock_repository: MagicMock,
-        sample_rule: NotificationRuleData,
+        sample_match: MatchingNotificationRuleData,
         sample_event: NotificationTriggeredEvent,
     ) -> None:
         """Test processing notification with matching rules"""
         # Mock HTTP session to avoid actual webhook calls
         self._mock_http_session_success(notification_service)
 
-        mock_repository.get_matching_rules = AsyncMock(return_value=[sample_rule])
+        mock_repository.get_matching_rules = AsyncMock(return_value=[sample_match])
 
         action = ProcessNotificationAction(
             rule_type=NotificationRuleType.SESSION_STARTED,
@@ -186,14 +196,14 @@ class TestNotificationService:
         self,
         notification_service: NotificationService,
         mock_repository: MagicMock,
-        sample_rule: NotificationRuleData,
+        sample_match: MatchingNotificationRuleData,
         sample_event: NotificationTriggeredEvent,
     ) -> None:
         """Test that template rendering correctly uses notification data fields"""
         # Mock HTTP session to avoid actual webhook calls
         self._mock_http_session_success(notification_service)
 
-        mock_repository.get_matching_rules = AsyncMock(return_value=[sample_rule])
+        mock_repository.get_matching_rules = AsyncMock(return_value=[sample_match])
 
         action = ProcessNotificationAction(
             rule_type=NotificationRuleType.SESSION_STARTED,
@@ -244,7 +254,12 @@ class TestNotificationService:
             updated_at=now,
         )
 
-        mock_repository.get_matching_rules = AsyncMock(return_value=[rule1, rule2])
+        mock_repository.get_matching_rules = AsyncMock(
+            return_value=[
+                MatchingNotificationRuleData(rule=rule1, channel=sample_webhook_channel),
+                MatchingNotificationRuleData(rule=rule2, channel=sample_webhook_channel),
+            ]
+        )
 
         action = ProcessNotificationAction(
             rule_type=NotificationRuleType.SESSION_STARTED,
@@ -279,7 +294,11 @@ class TestNotificationService:
             updated_at=now,
         )
 
-        mock_repository.get_matching_rules = AsyncMock(return_value=[invalid_rule])
+        mock_repository.get_matching_rules = AsyncMock(
+            return_value=[
+                MatchingNotificationRuleData(rule=invalid_rule, channel=sample_webhook_channel)
+            ]
+        )
 
         action = ProcessNotificationAction(
             rule_type=NotificationRuleType.SESSION_STARTED,
@@ -329,7 +348,9 @@ class TestNotificationService:
             ).model_dump(),
         )
 
-        mock_repository.get_matching_rules = AsyncMock(return_value=[rule])
+        mock_repository.get_matching_rules = AsyncMock(
+            return_value=[MatchingNotificationRuleData(rule=rule, channel=sample_webhook_channel)]
+        )
 
         action = ProcessNotificationAction(
             rule_type=NotificationRuleType.SESSION_STARTED,
@@ -377,7 +398,9 @@ class TestNotificationService:
             ).model_dump(),
         )
 
-        mock_repository.get_matching_rules = AsyncMock(return_value=[rule])
+        mock_repository.get_matching_rules = AsyncMock(
+            return_value=[MatchingNotificationRuleData(rule=rule, channel=sample_webhook_channel)]
+        )
 
         action = ProcessNotificationAction(
             rule_type=NotificationRuleType.SESSION_TERMINATED,
@@ -473,9 +496,12 @@ class TestNotificationService:
         notification_service: NotificationService,
         mock_repository: MagicMock,
         sample_rule: NotificationRuleData,
+        sample_webhook_channel: NotificationChannelData,
     ) -> None:
         """Test validating a notification rule successfully"""
         mock_repository.get_rule_by_id = AsyncMock(return_value=sample_rule)
+        # The rule names its channel by id, so validation reads the channel separately.
+        mock_repository.get_channel_by_id = AsyncMock(return_value=sample_webhook_channel)
         notification_data = {
             "session_id": "sess-123",
             "session_name": "test-session",

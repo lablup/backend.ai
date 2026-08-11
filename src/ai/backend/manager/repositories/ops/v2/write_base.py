@@ -195,15 +195,16 @@ class V2WriteOpsBase(V2OpsBase):
                 f"Purger only supports single-column primary keys (table: {table.name})",
             )
         stmt = sa.delete(table).where(pk_columns[0] == pk_value).returning(*table.columns)
+        # from_statement lets SQLAlchemy map the RETURNING columns onto the ORM class.
+        # Calling the row class instead would go through its __init__, which many rows
+        # narrow to the caller-supplied columns — a server-generated one then arrives as
+        # an unexpected keyword and the purge fails on rows it can read back perfectly.
+        select_stmt = sa.select(row_class).from_statement(stmt)
         try:
-            result = await self._sess.execute(stmt)
+            result = await self._sess.execute(select_stmt)
         except sa.exc.IntegrityError as e:
             raise self._parse_integrity_error(e) from e
-        row_data = result.fetchone()
-        if row_data is None:
-            return None
-        row: TRow = row_class(**dict(row_data._mapping))
-        return row
+        return result.scalar_one_or_none()
 
     async def _upsert_row_returning[TRow: Base](
         self,

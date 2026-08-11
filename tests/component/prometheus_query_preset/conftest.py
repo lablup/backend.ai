@@ -122,6 +122,25 @@ async def admin_v2_registry(
 
 
 @pytest.fixture()
+async def user_v2_registry(
+    server: ServerInfo,
+    regular_user_fixture: UserFixtureData,
+) -> AsyncIterator[V2ClientRegistry]:
+    """V2 client registry authenticated as a regular (non-admin) user."""
+    registry = await V2ClientRegistry.create(
+        ClientConfig(endpoint=yarl.URL(server.url)),
+        HMACAuth(
+            access_key=regular_user_fixture.keypair.access_key,
+            secret_key=regular_user_fixture.keypair.secret_key,
+        ),
+    )
+    try:
+        yield registry
+    finally:
+        await registry.close()
+
+
+@pytest.fixture()
 async def preset_filter_dataset(
     db_engine: SAEngine,
 ) -> AsyncIterator[PresetFilterDataset]:
