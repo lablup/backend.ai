@@ -65,26 +65,29 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):
         "is_admin", sa.Boolean, index=True, default=False, server_default=false()
     )
     is_default: Mapped[bool] = mapped_column(
-        "is_default", sa.Boolean, default=False, server_default=false()
+        "is_default", sa.Boolean, nullable=False, default=False, server_default=false()
     )
-    last_used: Mapped[datetime | None] = mapped_column("last_used", sa.DateTime(timezone=True))
+    last_used: Mapped[datetime | None] = mapped_column(
+        "last_used", sa.DateTime(timezone=True), nullable=True
+    )
     rate_limit: Mapped[int | None] = mapped_column("rate_limit", sa.Integer)
     num_queries: Mapped[int] = mapped_column("num_queries", sa.Integer, server_default="0")
     # SSH Keypairs.
-    ssh_public_key: Mapped[str | None] = mapped_column("ssh_public_key", sa.Text)
-    ssh_private_key: Mapped[str | None] = mapped_column("ssh_private_key", sa.Text)
-    user: Mapped[UserID] = mapped_column("user", GUID, sa.ForeignKey("users.uuid"))
+    ssh_public_key: Mapped[str | None] = mapped_column("ssh_public_key", sa.Text, nullable=True)
+    ssh_private_key: Mapped[str | None] = mapped_column("ssh_private_key", sa.Text, nullable=True)
+    user: Mapped[UserID] = mapped_column("user", GUID, sa.ForeignKey("users.uuid"), nullable=False)
     resource_policy: Mapped[str] = mapped_column(
         "resource_policy",
         sa.String(length=256),
         sa.ForeignKey("keypair_resource_policies.name"),
+        nullable=False,
     )
     # dotfiles column, \x90 means empty list in msgpack
     dotfiles: Mapped[bytes] = mapped_column(
-        "dotfiles", sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), default=b"\x90"
+        "dotfiles", sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b"\x90"
     )
     bootstrap_script: Mapped[str] = mapped_column(
-        "bootstrap_script", sa.String(length=MAXIMUM_DOTFILE_SIZE), default=""
+        "bootstrap_script", sa.String(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=""
     )
 
     # Relationships
