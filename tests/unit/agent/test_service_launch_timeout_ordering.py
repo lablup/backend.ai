@@ -13,9 +13,9 @@ from ai.backend.agent.kernel import SERVICE_REPLY_TIMEOUT_MARGIN_SEC, AbstractCo
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.kernel.base import BaseRunner
 
-# The budget the kernel runner grants a service port. Its package cannot be imported the other
-# way round -- it ships inside the container -- so the ordering is only ever checked here.
-KRUNNER_LAUNCH_BUDGET_SEC: float = (
+# How long the kernel runner waits for a service port. Its package cannot be imported the
+# other way round -- it ships inside the container -- so the ordering is only checked here.
+KRUNNER_LAUNCH_TIMEOUT_SEC: float = (
     inspect.signature(BaseRunner._start_service).parameters["launch_timeout"].default
 )
 _REPLY_BUDGET_SEC = KRUNNER_LAUNCH_BUDGET_SEC + SERVICE_REPLY_TIMEOUT_MARGIN_SEC
@@ -40,8 +40,8 @@ def code_runner() -> _SocketlessCodeRunner:
 
 
 @pytest.fixture
-def installed_budgets(monkeypatch: pytest.MonkeyPatch) -> list[float]:
-    """Records the budget the call installs, leaving it otherwise in force."""
+def recorded_timeouts(monkeypatch: pytest.MonkeyPatch) -> list[float]:
+    """Records each timeout the call sets, leaving it otherwise in force."""
     recorded: list[float] = []
     real_timeout = agent_kernel.timeout
 
@@ -53,13 +53,13 @@ def installed_budgets(monkeypatch: pytest.MonkeyPatch) -> list[float]:
     return recorded
 
 
-async def test_the_reply_budget_outlasts_the_kernel_runner(
+async def test_the_reply_timeout_outlasts_the_kernel_runner(
     code_runner: _SocketlessCodeRunner,
-    installed_budgets: list[float],
+    recorded_timeouts: list[float],
 ) -> None:
     result = await code_runner.feed_start_service(
         {"name": "jupyter"}, reply_timeout=_REPLY_BUDGET_SEC
     )
 
     assert result == {"status": "started"}
-    assert installed_budgets[0] > KRUNNER_LAUNCH_BUDGET_SEC
+    assert recorded_timeouts[0] > KRUNNER_LAUNCH_TIMEOUT_SEC
