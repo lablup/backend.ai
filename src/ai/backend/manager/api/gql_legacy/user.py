@@ -22,6 +22,7 @@ from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.exception import UserNotFound
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.user.types import (
     UserData,
     UserInfoContext,
@@ -1152,17 +1153,17 @@ class ModifyUser(graphene.Mutation):  # type: ignore[misc]
         action: ModifyUserAction = props.to_action(email, graph_ctx)
         user_data = await graph_ctx.user_repository.get_by_email_validated(email)
         action.user_uuid = user_data.id
+        res: ModifyUserActionResult = await graph_ctx.processors.user.modify_user.wait_for_complete(
+            action
+        )
         if props.main_access_key is not Undefined and props.main_access_key is not None:
             await graph_ctx.processors.user.switch_default_access_key.wait_for_complete(
                 SwitchDefaultAccessKeyAction(
                     user_uuid=user_data.id,
-                    access_key=props.main_access_key,
+                    access_key=AccessKey(props.main_access_key),
                     require_active=False,
                 )
             )
-        res: ModifyUserActionResult = await graph_ctx.processors.user.modify_user.wait_for_complete(
-            action
-        )
 
         return cls(
             ok=True,

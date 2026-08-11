@@ -23,7 +23,7 @@ from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.user import UserID
-from ai.backend.common.types import VFolderID
+from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
@@ -1208,7 +1208,7 @@ class UserDBSource:
             await session.execute(sa.delete(keypairs).where(keypairs.c.access_key == access_key))
 
     async def switch_default_access_key(
-        self, user_uuid: UUID, access_key: str, *, require_active: bool
+        self, user_uuid: UUID, access_key: AccessKey, *, require_active: bool
     ) -> None:
         """Move a user's default keypair marker onto ``access_key``.
 

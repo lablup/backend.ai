@@ -27,6 +27,7 @@ from ai.backend.common.dto.manager.user import (
     UpdateUserRequest,
     UpdateUserResponse,
 )
+from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.user.types import UserInfoContext
 from ai.backend.manager.data.user.types import UserStatus as ManagerUserStatus
@@ -199,18 +200,18 @@ class UserHandler:
 
         updater = self._adapter.build_updater(body.parsed, email, password_info)
 
+        action_result = await self._user.modify_user.wait_for_complete(
+            ModifyUserAction(user_uuid=path.parsed.user_id, email=email, updater=updater)
+        )
+
         if body.parsed.main_access_key is not None:
             await self._user.switch_default_access_key.wait_for_complete(
                 SwitchDefaultAccessKeyAction(
                     user_uuid=path.parsed.user_id,
-                    access_key=body.parsed.main_access_key,
+                    access_key=AccessKey(body.parsed.main_access_key),
                     require_active=False,
                 )
             )
-
-        action_result = await self._user.modify_user.wait_for_complete(
-            ModifyUserAction(user_uuid=path.parsed.user_id, email=email, updater=updater)
-        )
 
         resp = UpdateUserResponse(user=self._adapter.convert_to_dto(action_result.data))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)

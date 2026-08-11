@@ -16,7 +16,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import SlotName
+from ai.backend.common.types import AccessKey, SlotName
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -306,7 +306,7 @@ class UserRepository:
 
     @user_repository_resilience.apply()
     async def switch_default_access_key(
-        self, user_uuid: UUID, access_key: str, *, require_active: bool
+        self, user_uuid: UUID, access_key: AccessKey, *, require_active: bool
     ) -> None:
         """Move a user's default keypair marker onto ``access_key``."""
         await self._db_source.switch_default_access_key(

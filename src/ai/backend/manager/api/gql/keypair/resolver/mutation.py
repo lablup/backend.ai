@@ -9,6 +9,7 @@ from strawberry import Info
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.identifier.user import UserID
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -100,7 +101,7 @@ async def switch_my_default_access_key(
 ) -> SwitchMyMainAccessKeyPayloadGQL | None:
     user_id = _get_current_user_id()
     payload = await info.context.adapters.user.switch_default_access_key(
-        UserID(user_id), input.access_key, require_active=True
+        UserID(user_id), AccessKey(input.access_key), require_active=True
     )
     return SwitchMyMainAccessKeyPayloadGQL.from_pydantic(payload)
 
