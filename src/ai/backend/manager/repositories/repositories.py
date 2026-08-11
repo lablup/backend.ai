@@ -2,9 +2,6 @@ from dataclasses import dataclass
 from typing import Self
 
 from ai.backend.manager.repositories.agent.repositories import AgentRepositories
-from ai.backend.manager.repositories.app_config_definition.repositories import (
-    AppConfigDefinitionRepositories,
-)
 from ai.backend.manager.repositories.app_config_fragment.repositories import (
     AppConfigFragmentRepositories,
 )
@@ -90,7 +87,6 @@ class Repositories:
     agent: AgentRepositories
     ops_provider: DBOpsProvider
     v2_ops_provider: V2DBOpsProvider
-    app_config_definition: AppConfigDefinitionRepositories
     app_config_fragment: AppConfigFragmentRepositories
     auth: AuthRepositories
     container_registry: ContainerRegistryRepositories
@@ -142,7 +138,6 @@ class Repositories:
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
         agent_repositories = AgentRepositories.create(args)
-        app_config_definition_repositories = AppConfigDefinitionRepositories.create(args)
         app_config_fragment_repositories = AppConfigFragmentRepositories.create(args)
         auth_repositories = AuthRepositories.create(args)
         container_registry_repositories = ContainerRegistryRepositories.create(args)
@@ -195,7 +190,6 @@ class Repositories:
             agent=agent_repositories,
             ops_provider=args.ops_provider,
             v2_ops_provider=args.v2_ops_provider,
-            app_config_definition=app_config_definition_repositories,
             app_config_fragment=app_config_fragment_repositories,
             auth=auth_repositories,
             container_registry=container_registry_repositories,

@@ -23,9 +23,6 @@ from ai.backend.manager.services.app_config_allow_list.processors import (
 from ai.backend.manager.services.app_config_definition.processors import (
     AppConfigDefinitionProcessors,
 )
-from ai.backend.manager.services.app_config_definition.service import (
-    AppConfigDefinitionService,
-)
 from ai.backend.manager.services.app_config_fragment.processors import (
     AppConfigFragmentProcessors,
 )
@@ -356,9 +353,6 @@ def create_services(args: ServiceArgs) -> Services:
             group_repository=repositories.group.repository,
             ssh_key_validator=args.ssh_key_validator,
         ),
-        app_config_definition=AppConfigDefinitionService(
-            repository=repositories.app_config_definition.repository,
-        ),
         notification=NotificationService(
             repository=repositories.notification.repository,
             notification_center=args.notification_center,
@@ -535,9 +529,7 @@ def create_processors(
             services.model_serving_auto_scaling, action_monitors, validators
         ),
         auth=AuthProcessors(services.auth, action_monitors, validators),
-        app_config_definition=AppConfigDefinitionProcessors(
-            services.app_config_definition, action_monitors
-        ),
+        app_config_definition=AppConfigDefinitionProcessors(registry.group()),
         login_client_type=LoginClientTypeProcessors(registry.group()),
         login_client_type_admin=LoginClientTypeAdminProcessors(registry.group()),
         notification=NotificationProcessors(

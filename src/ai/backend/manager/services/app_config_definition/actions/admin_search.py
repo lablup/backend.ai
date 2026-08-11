@@ -3,38 +3,36 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.app_config_definition import (
+    APP_CONFIG_DEFINITION_ENTITY_TYPE,
+)
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.app_config_definition.types import AppConfigDefinitionData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.app_config_definition.actions.base import (
-    AppConfigDefinitionGlobalAction,
+from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
+from ai.backend.manager.repositories.app_config_definition.searchers import (
+    AppConfigDefinitionSearcher,
 )
 
 
 @dataclass
-class AdminSearchAppConfigDefinitionsAction(AppConfigDefinitionGlobalAction):
+class AdminSearchAppConfigDefinitionsAction(
+    SearchGlobalOpsAction[AppConfigDefinitionRow, AppConfigDefinitionData]
+):
     """Super-admin path: search every registered config definition."""
 
-    querier: BatchQuerier
+    searcher: AppConfigDefinitionSearcher
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+    def entity_type(cls) -> EntityType:
+        return APP_CONFIG_DEFINITION_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return None
-
-
-@dataclass
-class SearchAppConfigDefinitionsActionResult(BaseActionResult):
-    items: list[AppConfigDefinitionData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    @classmethod
+    def action_name(cls) -> str:
+        return "admin_search_app_config_definitions"
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def to_searcher(self) -> AppConfigDefinitionSearcher:
+        return self.searcher

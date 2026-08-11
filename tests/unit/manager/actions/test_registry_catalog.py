@@ -32,6 +32,9 @@ from ai.backend.manager.services.app_config_allow_list.processors import (
     AppConfigAllowListProcessors,
 )
 from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
+from ai.backend.manager.services.app_config_definition.processors import (
+    AppConfigDefinitionProcessors,
+)
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.keypair_resource_policy.processors import (
@@ -125,6 +128,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     RuntimeVariantPresetProcessors(MagicMock(), registry.group())
     ErrorLogProcessors(MagicMock(), registry.group())
     AuditLogProcessors(MagicMock(), MagicMock(), registry.group())
+    AppConfigDefinitionProcessors(registry.group())
 
     wired = sorted(spec.type() for spec in registry.wired_specs())
     defined = sorted(cls.spec().type() for cls in _concrete_v2_action_classes())

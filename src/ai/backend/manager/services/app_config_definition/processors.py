@@ -1,50 +1,46 @@
 from __future__ import annotations
 
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor.global_action import GlobalActionProcessor
-from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
-from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
+from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    CreatedEntityOpsResult,
+    EntityOpsResult,
+)
+from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
+from ai.backend.manager.data.app_config_definition.types import AppConfigDefinitionData
 from ai.backend.manager.services.app_config_definition.actions.admin_search import (
     AdminSearchAppConfigDefinitionsAction,
-    SearchAppConfigDefinitionsActionResult,
 )
 from ai.backend.manager.services.app_config_definition.actions.create import (
     CreateAppConfigDefinitionAction,
-    CreateAppConfigDefinitionActionResult,
 )
 from ai.backend.manager.services.app_config_definition.actions.get import (
     GetAppConfigDefinitionAction,
-    GetAppConfigDefinitionActionResult,
 )
 from ai.backend.manager.services.app_config_definition.actions.purge import (
     PurgeAppConfigDefinitionAction,
-    PurgeAppConfigDefinitionActionResult,
-)
-from ai.backend.manager.services.app_config_definition.service import (
-    AppConfigDefinitionService,
 )
 
 
 class AppConfigDefinitionProcessors:
-    create: ScopeActionProcessor[
-        CreateAppConfigDefinitionAction, CreateAppConfigDefinitionActionResult
+    """Every operation runs straight against ops, so this domain has no service."""
+
+    create: GlobalActionProcessor[
+        CreateAppConfigDefinitionAction, CreatedEntityOpsResult[AppConfigDefinitionData]
     ]
     get: SingleEntityActionProcessor[
-        GetAppConfigDefinitionAction, GetAppConfigDefinitionActionResult
+        GetAppConfigDefinitionAction, EntityOpsResult[AppConfigDefinitionData]
+    ]
+    purge: GlobalActionProcessor[
+        PurgeAppConfigDefinitionAction, EntityOpsResult[AppConfigDefinitionData]
     ]
     admin_search: GlobalActionProcessor[
-        AdminSearchAppConfigDefinitionsAction, SearchAppConfigDefinitionsActionResult
-    ]
-    purge: SingleEntityActionProcessor[
-        PurgeAppConfigDefinitionAction, PurgeAppConfigDefinitionActionResult
+        AdminSearchAppConfigDefinitionsAction, BatchOpsResult[AppConfigDefinitionData]
     ]
 
-    def __init__(
-        self,
-        service: AppConfigDefinitionService,
-        action_monitors: list[ActionMonitor],
-    ) -> None:
-        self.create = ScopeActionProcessor(service.create, action_monitors)
-        self.get = SingleEntityActionProcessor(service.get, action_monitors)
-        self.admin_search = GlobalActionProcessor(service.admin_search, action_monitors)
-        self.purge = SingleEntityActionProcessor(service.purge, action_monitors)
+    def __init__(self, group: ProcessorGroup[AppConfigDefinitionData]) -> None:
+        self.create = group.global_create_ops(CreateAppConfigDefinitionAction)
+        self.get = group.single_get_ops(GetAppConfigDefinitionAction)
+        self.purge = group.global_purge_ops(PurgeAppConfigDefinitionAction)
+        self.admin_search = group.global_search_ops(AdminSearchAppConfigDefinitionsAction)

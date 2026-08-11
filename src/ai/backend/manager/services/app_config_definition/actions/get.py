@@ -3,39 +3,41 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.entity.app_config_definition import (
+    APP_CONFIG_DEFINITION_ENTITY_TYPE,
+)
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.ops.base import GetSingleEntityOpsAction
 from ai.backend.manager.data.app_config_definition.types import AppConfigDefinitionData
-from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.services.app_config_definition.actions.base import (
-    AppConfigDefinitionSingleEntityAction,
-    AppConfigDefinitionSingleEntityActionResult,
+from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
+from ai.backend.manager.repositories.app_config_definition.queriers import (
+    AppConfigDefinitionQuerier,
 )
 
 
 @dataclass
-class GetAppConfigDefinitionAction(AppConfigDefinitionSingleEntityAction):
+class GetAppConfigDefinitionAction(
+    GetSingleEntityOpsAction[AppConfigDefinitionRow, AppConfigDefinitionData]
+):
+    """Read one registered config name."""
+
     definition_id: AppConfigDefinitionID
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.GET
+    def entity_type(cls) -> EntityType:
+        return APP_CONFIG_DEFINITION_ENTITY_TYPE
 
     @override
-    def target_entity_id(self) -> str:
-        return str(self.definition_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_app_config_definition"
 
     @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.APP_CONFIG_DEFINITION, str(self.definition_id))
-
-
-@dataclass
-class GetAppConfigDefinitionActionResult(AppConfigDefinitionSingleEntityActionResult):
-    definition: AppConfigDefinitionData
+    def entity_id(self) -> AppConfigDefinitionID:
+        return self.definition_id
 
     @override
-    def target_entity_id(self) -> str:
-        return str(self.definition.id)
+    def to_querier(self) -> AppConfigDefinitionQuerier:
+        return AppConfigDefinitionQuerier(definition_id=self.definition_id)

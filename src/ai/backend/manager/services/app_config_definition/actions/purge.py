@@ -3,42 +3,35 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.app_config_definition.types import AppConfigDefinitionData
-from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
-from ai.backend.manager.repositories.base import Purger
-from ai.backend.manager.services.app_config_definition.actions.base import (
-    AppConfigDefinitionSingleEntityAction,
-    AppConfigDefinitionSingleEntityActionResult,
+from ai.backend.common.data.entity.app_config_definition import (
+    APP_CONFIG_DEFINITION_ENTITY_TYPE,
 )
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
+from ai.backend.manager.actions.v2.ops.base import PurgeGlobalOpsAction
+from ai.backend.manager.data.app_config_definition.types import AppConfigDefinitionData
+from ai.backend.manager.models.app_config_definition.purgers import AppConfigDefinitionPurger
+from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 
 
 @dataclass
-class PurgeAppConfigDefinitionAction(AppConfigDefinitionSingleEntityAction):
-    purger: Purger[AppConfigDefinitionRow]
+class PurgeAppConfigDefinitionAction(
+    PurgeGlobalOpsAction[AppConfigDefinitionRow, AppConfigDefinitionData]
+):
+    """Unregister a config name."""
+
+    definition_id: AppConfigDefinitionID
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.PURGE
+    def entity_type(cls) -> EntityType:
+        return APP_CONFIG_DEFINITION_ENTITY_TYPE
 
     @override
-    def target_entity_id(self) -> str:
-        return str(self.purger.spec.pk_value())
+    @classmethod
+    def action_name(cls) -> str:
+        return "purge_app_config_definition"
 
     @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(
-            RBACElementType.APP_CONFIG_DEFINITION, str(self.purger.spec.pk_value())
-        )
-
-
-@dataclass
-class PurgeAppConfigDefinitionActionResult(AppConfigDefinitionSingleEntityActionResult):
-    definition: AppConfigDefinitionData
-
-    @override
-    def target_entity_id(self) -> str:
-        return str(self.definition.id)
+    def to_purger(self) -> AppConfigDefinitionPurger:
+        return AppConfigDefinitionPurger(definition_id=self.definition_id)

@@ -41,9 +41,6 @@ from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowLi
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.app_config_definition.repository import (
-    AppConfigDefinitionRepository,
-)
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
@@ -58,7 +55,7 @@ from ai.backend.manager.services.app_config_allow_list.processors import (
 from ai.backend.manager.services.app_config_definition.processors import (
     AppConfigDefinitionProcessors,
 )
-from ai.backend.manager.services.app_config_definition.service import AppConfigDefinitionService
+from ai.backend.testutils.processors import ops_processor_group
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
@@ -86,10 +83,9 @@ def app_config_adapter(app_config_processors: AppConfigProcessors) -> AppConfigA
 def app_config_definition_adapter(
     database_engine: ExtendedAsyncSAEngine,
 ) -> AppConfigDefinitionAdapter:
-    repository = AppConfigDefinitionRepository(RBACOpsProvider(database_engine))
     processors = MagicMock()
     processors.app_config_definition = AppConfigDefinitionProcessors(
-        AppConfigDefinitionService(repository), []
+        ops_processor_group(database_engine)
     )
     return AppConfigDefinitionAdapter(processors)
 

@@ -2,18 +2,25 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import override
 
+from ai.backend.common.data.entity.types import EntityData
 from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
+from ai.backend.common.identifier.entity import EntityID
 
 
 @dataclass(frozen=True)
-class AppConfigDefinitionData:
+class AppConfigDefinitionData(EntityData):
     """Domain data for an app config definition — one registered ``config_name``."""
 
     id: AppConfigDefinitionID
     config_name: str
     created_at: datetime
     updated_at: datetime
+
+    @override
+    def entity_id(self) -> EntityID:
+        return self.id
 
 
 @dataclass(frozen=True)
