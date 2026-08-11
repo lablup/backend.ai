@@ -38,14 +38,19 @@ _TIGHTENED = (*_REQUIRED, *_BACKFILLED)
 
 
 def _delete_keypairs_missing_a_required_value(bind: Connection) -> None:
-    any_missing = " OR ".join(f"k.{column} IS NULL" for column in _REQUIRED)
-    which_missing = ", ".join(f"CASE WHEN k.{c} IS NULL THEN '{c}' END" for c in _REQUIRED)
+    any_missing = " OR ".join(f"keypairs.{column} IS NULL" for column in _REQUIRED)
+    which_missing = ", ".join(
+        f"CASE WHEN keypairs.{column} IS NULL THEN '{column}' END" for column in _REQUIRED
+    )
     doomed = bind.execute(
         sa.text(f"""
-            SELECT k.access_key, u.email, array_remove(ARRAY[{which_missing}], NULL) AS missing
-            FROM keypairs k LEFT JOIN users u ON u."uuid" = k."user"
+            SELECT
+                keypairs.access_key,
+                users.email,
+                array_remove(ARRAY[{which_missing}], NULL) AS missing
+            FROM keypairs LEFT JOIN users ON users."uuid" = keypairs."user"
             WHERE {any_missing}
-            ORDER BY k.access_key
+            ORDER BY keypairs.access_key
         """)
     ).all()
     if not doomed:
