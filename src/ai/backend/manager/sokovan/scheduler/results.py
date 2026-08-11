@@ -28,6 +28,19 @@ class PreemptionPlanEntry:
 
 
 @dataclass
+class SchedulingSkip:
+    """A session that was not attempted this pass.
+
+    Distinct from a :class:`SchedulingFailure`: nothing was tried, so no
+    retry pressure (and no eventual deprioritization) may be charged to it.
+    """
+
+    session_id: SessionId
+    # Human-readable skip reason (transition reason / pending queue)
+    msg: str
+
+
+@dataclass
 class ScheduleResult:
     """Result of a scheduling operation."""
 
@@ -40,6 +53,9 @@ class ScheduleResult:
     reserved_session_ids: list[SessionId]
     # The preemption plans backing those reservations.
     preemption_plan: list[PreemptionPlanEntry]
+    # Sessions left unattempted because an earlier session exhausted the
+    # group's resources, in sequencing order.
+    scheduling_skips: list[SchedulingSkip] = field(default_factory=list)
 
     def success_count(self) -> int:
         """Get the count of successfully scheduled sessions."""
