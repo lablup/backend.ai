@@ -26,12 +26,12 @@ from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user, triggered_user
 from ai.backend.common.message_queue.message import MessageId, MQMessage
 from ai.backend.common.message_queue.payload import (
-    AnycastPayload,
-    BroadcastPayload,
-    CachedBroadcastPayload,
+    AnycastMessagePayload,
+    BroadcastMessagePayload,
+    CachedBroadcastMessagePayload,
 )
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
-from ai.backend.common.message_queue.types import MessageMetadata
+from ai.backend.common.message_queue.types import MessageMetadata, MessageName
 from ai.backend.common.types import (
     AgentId,
 )
@@ -593,7 +593,7 @@ class EventDispatcher(EventDispatcherGroup):
             self._consumer_taskgroup.create_task(
                 self._handle(
                     consumer,
-                    AgentId(payload.source),
+                    AgentId(payload.legacy_source),
                     args,
                     [post_callback],
                     payload.metadata,
@@ -603,7 +603,7 @@ class EventDispatcher(EventDispatcherGroup):
 
     async def _dispatch_subscribers(
         self,
-        payload: BroadcastPayload,
+        payload: BroadcastMessagePayload,
     ) -> None:
         event_name = payload.name
         subscriber_handlers = self._subscribers.get(event_name)
@@ -616,7 +616,7 @@ class EventDispatcher(EventDispatcherGroup):
             self._subscriber_taskgroup.create_task(
                 self._handle(
                     subscriber,
-                    AgentId(payload.source),
+                    AgentId(payload.legacy_source),
                     args,
                     tuple(),
                     payload.metadata,
@@ -645,7 +645,7 @@ class EventDispatcher(EventDispatcherGroup):
             if self._closed:
                 return
             try:
-                await self._dispatch_subscribers(cast(BroadcastPayload, msg))
+                await self._dispatch_subscribers(cast(BroadcastMessagePayload, msg))
             except Exception as e:
                 log.exception(
                     "EventDispatcher._subscribe_loop: unexpected-error, {}",
@@ -697,8 +697,8 @@ class EventProducer:
             user=user,
             triggered_user=triggered,
         )
-        payload = AnycastPayload.from_event_args(
-            name=event.event_name(),
+        payload = AnycastMessagePayload.from_event_args(
+            name=MessageName(event.event_name()),
             source=source,
             args=event.serialize(),
             metadata=metadata,
@@ -724,8 +724,8 @@ class EventProducer:
             user=user,
             triggered_user=triggered,
         )
-        payload = BroadcastPayload.from_event_args(
-            name=event.event_name(),
+        payload = BroadcastMessagePayload.from_event_args(
+            name=MessageName(event.event_name()),
             source=source,
             args=event.serialize(),
             metadata=metadata,
@@ -750,8 +750,8 @@ class EventProducer:
             user=user,
             triggered_user=triggered,
         )
-        payload = BroadcastPayload.from_event_args(
-            name=event.event_name(),
+        payload = BroadcastMessagePayload.from_event_args(
+            name=MessageName(event.event_name()),
             source=str(self._source),
             args=event.serialize(),
             metadata=metadata,
@@ -784,16 +784,16 @@ class EventProducer:
             triggered_user=triggered,
         )
 
-        broadcast_payloads: list[CachedBroadcastPayload] = []
+        broadcast_payloads: list[CachedBroadcastMessagePayload] = []
         for event in events:
-            payload = BroadcastPayload.from_event_args(
-                name=event.event_name(),
+            payload = BroadcastMessagePayload.from_event_args(
+                name=MessageName(event.event_name()),
                 source=str(self._source),
                 args=event.serialize(),
                 metadata=metadata,
             )
             broadcast_payloads.append(
-                CachedBroadcastPayload(
+                CachedBroadcastMessagePayload(
                     payload=payload,
                     cache_id=event.cache_id(),  # Get cache_id from event
                 )

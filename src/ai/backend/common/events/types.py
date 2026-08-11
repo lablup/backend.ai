@@ -2,7 +2,7 @@ import enum
 from abc import ABC, abstractmethod
 from typing import Self, final, override
 
-from ai.backend.common.message_queue.payload import BroadcastPayload
+from ai.backend.common.message_queue.payload import BroadcastMessagePayload
 
 from .user_event.user_event import UserEvent
 
@@ -144,7 +144,7 @@ class AbstractBroadcastEvent(AbstractEvent):
             return
 
     @classmethod
-    def deserialize_from_wrapper(cls, payload: BroadcastPayload) -> "AbstractBroadcastEvent":
+    def deserialize_from_wrapper(cls, payload: BroadcastMessagePayload) -> "AbstractBroadcastEvent":
         """
         Deserialize the event from its broadcast payload.
         """

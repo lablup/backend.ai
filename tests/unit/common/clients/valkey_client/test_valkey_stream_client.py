@@ -6,15 +6,16 @@ import random
 from ai.backend.common.clients.valkey_client.valkey_stream.client import (
     ValkeyStreamClient,
 )
-from ai.backend.common.message_queue.payload import AnycastPayload, BroadcastPayload
+from ai.backend.common.message_queue.payload import AnycastMessagePayload, BroadcastMessagePayload
+from ai.backend.common.message_queue.types import MessageName
 
 
-def _anycast_payload() -> AnycastPayload:
-    return AnycastPayload(name="test-event", source="i-test", body=b"body")
+def _anycast_payload() -> AnycastMessagePayload:
+    return AnycastMessagePayload(name=MessageName("test-event"), source="i-test", body=b"body")
 
 
-def _broadcast_payload() -> BroadcastPayload:
-    return BroadcastPayload(name="test-event", source="i-test", body=b"body")
+def _broadcast_payload() -> BroadcastMessagePayload:
+    return BroadcastMessagePayload(name=MessageName("test-event"), source="i-test", body=b"body")
 
 
 async def test_valkey_stream_anycast(test_valkey_stream: ValkeyStreamClient) -> None:
@@ -26,7 +27,7 @@ async def test_valkey_stream_anycast(test_valkey_stream: ValkeyStreamClient) -> 
     values = await test_valkey_stream.read_consumer_group(test_stream, test_group, "test-consumer")
     assert values is not None
     assert len(values) == 1
-    assert AnycastPayload.from_stream_fields(values[0].payload) == payload
+    assert AnycastMessagePayload.from_stream_fields(values[0].payload) == payload
     await test_valkey_stream.done_stream_message("test-stream", "test-group", values[0].msg_id)
 
 
@@ -68,7 +69,7 @@ async def test_valkey_stream_auto_claim(test_valkey_stream: ValkeyStreamClient) 
     )
     assert auto_claimed is not None, "Auto claim should return a result"
     assert len(auto_claimed.messages) == 1, "One message should be available for auto claim"
-    assert AnycastPayload.from_stream_fields(auto_claimed.messages[0].payload) == payload
+    assert AnycastMessagePayload.from_stream_fields(auto_claimed.messages[0].payload) == payload
     # Acknowledge the auto claimed message
     await test_valkey_stream.done_stream_message(
         test_stream, test_group, auto_claimed.messages[0].msg_id

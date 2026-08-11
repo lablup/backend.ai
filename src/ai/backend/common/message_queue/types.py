@@ -1,17 +1,25 @@
 from collections.abc import Iterator
 from contextlib import ExitStack, contextmanager
-from dataclasses import dataclass
-from typing import Self
+from typing import NewType, Self
+
+from pydantic import BaseModel, ConfigDict
 
 from ai.backend.common.contexts.request_id import with_request_id
 from ai.backend.common.contexts.user import with_triggered_user, with_user
 from ai.backend.common.data.user.types import UserData
-from ai.backend.common.json import dump_json, load_json
 from ai.backend.logging.utils import with_log_context_fields
 
+# What a message is routed by: consumers and subscribers are registered under it.
+# It carries the name of the event the message was built from.
+MessageName = NewType("MessageName", str)
 
-@dataclass
-class MessageMetadata:
+
+class MessageMetadata(BaseModel):
+    """
+    The ambient context captured by the producer so the consumer can restore it."""
+
+    model_config = ConfigDict(frozen=True)
+
     request_id: str | None = None
     user: UserData | None = None
     triggered_user: UserData | None = None
@@ -20,24 +28,14 @@ class MessageMetadata:
         """
         Serialize the metadata to bytes.
         """
-        return dump_json(self)
+        return self.model_dump_json().encode("utf-8")
 
     @classmethod
     def deserialize(cls, data: str | bytes) -> Self:
         """
         Deserialize the metadata from bytes.
         """
-        result = load_json(data)
-        if "user_id" in result:
-            del result["user_id"]
-        for key in ("user", "triggered_user"):
-            if key in result:
-                user_data = result[key]
-                if isinstance(user_data, dict):
-                    result[key] = UserData.from_dict(user_data)
-                else:
-                    result[key] = None
-        return cls(**result)
+        return cls.model_validate_json(data)
 
     @contextmanager
     def apply_context(self) -> Iterator[None]:
