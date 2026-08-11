@@ -92,6 +92,7 @@ from ai.backend.common.dto.manager.v2.user.types import (
 )
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import UserData, UserStatus
@@ -542,7 +543,7 @@ class UserAdapter(BaseAdapter):
         updater: Updater[UserRow] = Updater(spec=updater_spec, pk_value=user_id)
         if not isinstance(input.main_access_key, Sentinel) and input.main_access_key is not None:
             await self.switch_default_access_key(
-                user_id, input.main_access_key, require_active=False
+                UserID(user_id), input.main_access_key, require_active=False
             )
         result = await self._processors.user.modify_user_by_id.wait_for_complete(
             ModifyUserByIdAction(user_id=user_id, updater=updater)
@@ -697,7 +698,7 @@ class UserAdapter(BaseAdapter):
         return UpdateMyKeypairPayload(keypair=self._keypair_data_to_node(result.keypair))
 
     async def switch_default_access_key(
-        self, user_id: UUID, access_key: str, *, require_active: bool = True
+        self, user_id: UserID, access_key: str, *, require_active: bool
     ) -> SwitchMyMainAccessKeyPayload:
         """Move a user's default keypair marker onto ``access_key``.
 

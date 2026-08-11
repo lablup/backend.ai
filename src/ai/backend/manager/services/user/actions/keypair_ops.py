@@ -106,7 +106,7 @@ class SwitchDefaultAccessKeyAction(UserAction):
 
     user_uuid: UUID
     access_key: str
-    require_active: bool = True
+    require_active: bool
 
     @override
     def entity_id(self) -> str | None:
