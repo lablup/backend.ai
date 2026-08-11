@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, cast
 
 from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.notification.types import MatchingNotificationRuleData
 from ai.backend.manager.notification.types import ProcessRuleParams
 from ai.backend.manager.repositories.notification.creators import NotificationRuleCreatorSpec
 from ai.backend.manager.repositories.notification.updaters import NotificationRuleUpdaterSpec
@@ -44,7 +45,6 @@ from .actions import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.data.notification.types import NotificationRuleData
     from ai.backend.manager.notification import NotificationCenter
     from ai.backend.manager.repositories.notification import NotificationRepository
 
@@ -206,8 +206,11 @@ class NotificationService:
             NotificationTemplateRenderingFailure: If template rendering fails
             ValidationError: If notification_data doesn't match the rule type's schema
         """
-        # Fetch the rule to know its rule_type
+        # Fetch the rule to know its rule_type, then the channel it names. The rule
+        # carries the channel's id, not the channel — reading both is this method's
+        # job rather than the row conversion's.
         rule = await self._repository.get_rule_by_id(action.rule_id)
+        channel = await self._repository.get_channel_by_id(rule.channel_id)
 
         # Validate notification_data against the rule type's schema
         validated_data = NotifiableMessage.validate_notification_data(
@@ -220,7 +223,7 @@ class NotificationService:
             ProcessRuleParams(
                 message_template=rule.message_template,
                 rule_type=rule.rule_type,
-                channel=rule.channel,
+                channel=channel,
                 timestamp=datetime.now(UTC),
                 notification_data=validated_data,
             )
@@ -314,11 +317,11 @@ class NotificationService:
             Processed notification result
         """
         # Query matching rules
-        rules = await self._repository.get_matching_rules(
+        matches = await self._repository.get_matching_rules(
             rule_type,
             enabled_only=True,
         )
-        if not rules:
+        if not matches:
             return _ProcessedNotificationResult(
                 rules_matched=0,
                 successes=[],
@@ -326,19 +329,19 @@ class NotificationService:
             )
         # Process rules
         result = await self._process_rules(
-            rules=rules,
+            matches=matches,
             timestamp=timestamp,
             notification_data=notification_data,
         )
         return _ProcessedNotificationResult(
-            rules_matched=len(rules),
+            rules_matched=len(matches),
             successes=result.successes,
             errors=result.errors,
         )
 
     async def _process_rules(
         self,
-        rules: Sequence[NotificationRuleData],
+        matches: Sequence[MatchingNotificationRuleData],
         timestamp: datetime,
         notification_data: NotifiableMessage,
     ) -> _ProcessedRulesResult:
@@ -346,7 +349,7 @@ class NotificationService:
         Process notification rules concurrently.
 
         Args:
-            rules: List of notification rules to process
+            matches: Rules paired with the channel each dispatches through
             rule_type: Type of notification rule
             timestamp: Timestamp of the notification
             notification_data: Data for template rendering
@@ -359,14 +362,14 @@ class NotificationService:
             *[
                 self._notification_center.process_rule(
                     ProcessRuleParams(
-                        message_template=rule.message_template,
-                        rule_type=rule.rule_type,
-                        channel=rule.channel,
+                        message_template=match.rule.message_template,
+                        rule_type=match.rule.rule_type,
+                        channel=match.channel,
                         timestamp=timestamp,
                         notification_data=notification_data,
                     )
                 )
-                for rule in rules
+                for match in matches
             ],
             return_exceptions=True,
         )
@@ -375,27 +378,27 @@ class NotificationService:
         successes: list[ProcessedRuleSuccess] = []
         errors: list[BaseException] = []
 
-        for rule, result in zip(rules, results, strict=True):
+        for match, result in zip(matches, results, strict=True):
             if isinstance(result, BaseException):
                 errors.append(result)
                 log.error(
                     "Failed to process notification for rule '{}': {}",
-                    rule.name,
+                    match.rule.name,
                     str(result),
                 )
                 continue
             successes.append(
                 ProcessedRuleSuccess(
-                    rule_id=rule.id,
-                    rule_name=rule.name,
-                    channel_name=rule.channel.name,
+                    rule_id=match.rule.id,
+                    rule_name=match.rule.name,
+                    channel_name=match.channel.name,
                 )
             )
             log.debug(
                 "Notification sent successfully for rule '{}' (channel: '{}')",
-                rule.name,
-                rule.channel.name,
-                rule_id=rule.id,
+                match.rule.name,
+                match.channel.name,
+                rule_id=match.rule.id,
             )
 
         return _ProcessedRulesResult(

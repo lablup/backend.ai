@@ -11,14 +11,18 @@ from ai.backend.common.data.notification import (
     NotificationRuleType,
     WebhookSpec,
 )
+from ai.backend.common.identifier.notification import (
+    NotificationChannelID,
+    NotificationRuleID,
+)
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
 
-@dataclass
+@dataclass(frozen=True)
 class NotificationChannelData:
     """Domain model data for notification channel."""
 
-    id: UUID
+    id: NotificationChannelID
     name: str
     description: str | None
     channel_type: NotificationChannelType
@@ -29,20 +33,37 @@ class NotificationChannelData:
     updated_at: datetime = field(compare=False)
 
 
-@dataclass
+@dataclass(frozen=True)
 class NotificationRuleData:
-    """Domain model data for notification rule."""
+    """Domain model data for notification rule.
 
-    id: UUID
+    Names its channel by id rather than carrying the channel itself: a row
+    projection mirrors one table, and composing the two here is what forced the
+    ORM relationship and an eager load on every read.
+    """
+
+    id: NotificationRuleID
     name: str
     description: str | None
     rule_type: NotificationRuleType
-    channel: NotificationChannelData
+    channel_id: NotificationChannelID
     message_template: str
     enabled: bool
     created_by: UUID
     created_at: datetime = field(compare=False)
     updated_at: datetime = field(compare=False)
+
+
+@dataclass(frozen=True)
+class MatchingNotificationRuleData:
+    """A rule paired with the channel it dispatches through.
+
+    Assembled by the repository for the dispatch read, not projected from a row —
+    which is why it may carry another entity where a row projection may not.
+    """
+
+    rule: NotificationRuleData
+    channel: NotificationChannelData
 
 
 @dataclass

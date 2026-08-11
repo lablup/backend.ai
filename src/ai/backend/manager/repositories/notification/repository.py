@@ -19,6 +19,7 @@ from ai.backend.manager.data.notification import (
     NotificationRuleData,
     NotificationRuleListResult,
 )
+from ai.backend.manager.data.notification.types import MatchingNotificationRuleData
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
@@ -61,7 +62,7 @@ class NotificationRepository:
         self,
         rule_type: NotificationRuleType,
         enabled_only: bool = True,
-    ) -> list[NotificationRuleData]:
+    ) -> list[MatchingNotificationRuleData]:
         """
         Retrieves all notification rules that match the given rule type.
         """

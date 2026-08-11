@@ -203,7 +203,7 @@ class NotificationRuleAdapter(BaseFilterAdapter):
             name=data.name,
             description=data.description,
             rule_type=data.rule_type,
-            channel=self._channel_adapter.convert_to_dto(data.channel),
+            channel_id=data.channel_id,
             message_template=data.message_template,
             enabled=data.enabled,
             created_at=data.created_at,

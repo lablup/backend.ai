@@ -63,6 +63,10 @@ from ai.backend.common.dto.manager.v2.notification.types import (
     SMTPConnectionInfo,
     WebhookSpecInfo,
 )
+from ai.backend.common.identifier.notification import (
+    NotificationChannelID,
+    NotificationRuleID,
+)
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
@@ -178,7 +182,7 @@ class NotificationAdapter(BaseAdapter):
             SearchChannelsAction(querier=querier)
         )
         channel_map = {ch.id: self._channel_data_to_dto(ch) for ch in action_result.channels}
-        return [channel_map.get(channel_id) for channel_id in ids]
+        return [channel_map.get(NotificationChannelID(channel_id)) for channel_id in ids]
 
     async def batch_load_rules_by_ids(
         self, ids: Sequence[UUID]
@@ -197,7 +201,7 @@ class NotificationAdapter(BaseAdapter):
             SearchRulesAction(querier=querier)
         )
         rule_map = {rule.id: self._rule_data_to_dto(rule) for rule in action_result.rules}
-        return [rule_map.get(rule_id) for rule_id in ids]
+        return [rule_map.get(NotificationRuleID(rule_id)) for rule_id in ids]
 
     # ------------------------------------------------------------------ channels
 
@@ -468,7 +472,7 @@ class NotificationAdapter(BaseAdapter):
             name=data.name,
             description=data.description,
             rule_type=NotificationRuleTypeDTO(data.rule_type.value),
-            channel=cls._channel_data_to_dto(data.channel),
+            channel_id=data.channel_id,
             message_template=data.message_template,
             enabled=data.enabled,
             created_at=data.created_at,

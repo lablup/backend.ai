@@ -7,7 +7,6 @@ from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
-from sqlalchemy.orm import selectinload
 
 from ai.backend.common.data.notification import NotificationRuleType
 from ai.backend.manager.data.notification import (
@@ -16,6 +15,7 @@ from ai.backend.manager.data.notification import (
     NotificationRuleData,
     NotificationRuleListResult,
 )
+from ai.backend.manager.data.notification.types import MatchingNotificationRuleData
 from ai.backend.manager.errors.notification import (
     NotificationChannelNotFound,
     NotificationRuleNotFound,
@@ -62,36 +62,40 @@ class NotificationDBSource:
         self,
         rule_type: NotificationRuleType,
         enabled_only: bool = True,
-    ) -> list[NotificationRuleData]:
+    ) -> list[MatchingNotificationRuleData]:
         """Retrieves all notification rules that match the given rule type."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            rows = await self._fetch_matching_rules(db_sess, rule_type, enabled_only)
-            return [row.to_data() for row in rows]
+            pairs = await self._fetch_matching_rules(db_sess, rule_type, enabled_only)
+            return [
+                MatchingNotificationRuleData(rule=rule.to_data(), channel=channel.to_data())
+                for rule, channel in pairs
+            ]
 
     async def _fetch_matching_rules(
         self,
         db_sess: SASession,
         rule_type: NotificationRuleType,
         enabled_only: bool,
-    ) -> list[NotificationRuleRow]:
-        """Private method to fetch matching rules with channel loaded."""
-        query = (
-            sa.select(NotificationRuleRow)
-            .where(NotificationRuleRow.rule_type == str(rule_type))
-            .options(selectinload(NotificationRuleRow.channel))
+    ) -> list[tuple[NotificationRuleRow, NotificationChannelRow]]:
+        """Fetch the rules of one type together with the channel each dispatches through.
+
+        The channel is reached by an explicit join rather than an ORM
+        relationship: dispatch both filters on the channel's ``enabled`` flag and
+        needs its spec, and a join says so in the statement.
+        """
+        query = sa.select(NotificationRuleRow, NotificationChannelRow).join(
+            NotificationChannelRow,
+            NotificationChannelRow.id == NotificationRuleRow.channel_id,
         )
+        query = query.where(NotificationRuleRow.rule_type == str(rule_type))
 
         if enabled_only:
-            query = query.where(NotificationRuleRow.enabled == sa.true())
+            query = query.where(NotificationRuleRow.enabled == sa.true()).where(
+                NotificationChannelRow.enabled == sa.true()
+            )
 
         result = await db_sess.execute(query)
-        rows = list(result.scalars().all())
-
-        # Filter by channel enabled status if needed
-        if enabled_only:
-            rows = [row for row in rows if row.channel.enabled]
-
-        return rows
+        return [(row.NotificationRuleRow, row.NotificationChannelRow) for row in result.all()]
 
     async def create_channel(
         self,
@@ -129,15 +133,7 @@ class NotificationDBSource:
         """Creates a new notification rule."""
         async with self._db.begin_session() as db_sess:
             result = await execute_rbac_entity_creator(db_sess, creator)
-            # Explicitly load the channel relationship for to_data()
-            stmt = (
-                sa.select(NotificationRuleRow)
-                .where(NotificationRuleRow.id == result.row.id)
-                .options(selectinload(NotificationRuleRow.channel))
-            )
-            query_result = await db_sess.execute(stmt)
-            row = query_result.scalar_one()
-            return row.to_data()
+            return result.row.to_data()
 
     async def update_rule(
         self,
@@ -149,15 +145,7 @@ class NotificationDBSource:
             if result is None:
                 raise NotificationRuleNotFound(f"Notification rule {updater.pk_value} not found")
 
-            # Fetch the updated row with channel relationship loaded
-            select_stmt = (
-                sa.select(NotificationRuleRow)
-                .where(NotificationRuleRow.id == updater.pk_value)
-                .options(selectinload(NotificationRuleRow.channel))
-            )
-            fetch_result = await db_sess.execute(select_stmt)
-            row = fetch_result.scalar_one()
-            return row.to_data()
+            return result.row.to_data()
 
     async def delete_rule(self, rule_id: UUID) -> bool:
         """Deletes a notification rule."""
@@ -177,11 +165,7 @@ class NotificationDBSource:
     async def get_rule_by_id(self, rule_id: UUID) -> NotificationRuleData:
         """Retrieves a notification rule by ID."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            stmt = (
-                sa.select(NotificationRuleRow)
-                .where(NotificationRuleRow.id == rule_id)
-                .options(selectinload(NotificationRuleRow.channel))
-            )
+            stmt = sa.select(NotificationRuleRow).where(NotificationRuleRow.id == rule_id)
             result = await db_sess.execute(stmt)
             row = result.scalar_one_or_none()
             if not row:
@@ -217,9 +201,7 @@ class NotificationDBSource:
     ) -> NotificationRuleListResult:
         """Searches notification rules with total count."""
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(NotificationRuleRow).options(
-                selectinload(NotificationRuleRow.channel)
-            )
+            query = sa.select(NotificationRuleRow)
 
             result = await execute_batch_querier(
                 db_sess,

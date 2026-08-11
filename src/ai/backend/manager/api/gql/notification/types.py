@@ -234,10 +234,20 @@ class NotificationRule(PydanticNodeMixin[NotificationRuleNode]):
     name: str
     description: str | None
     rule_type: NotificationRuleTypeGQL
-    channel: NotificationChannel
+    channel_id: UUID
     message_template: str
     enabled: bool
     created_at: datetime
+
+    @gql_field(description="The channel this rule dispatches through.")  # type: ignore[misc]
+    async def channel(self, info: Info[StrawberryGQLContext]) -> NotificationChannel | None:
+        """Loaded on demand rather than carried by the rule.
+
+        The rule names its channel by id; a client that does not ask for the
+        channel does not pay for the read, and one that asks across a page gets
+        them batched.
+        """
+        return await info.context.data_loaders.notification_channel_loader.load(self.channel_id)
 
     @classmethod
     @override
