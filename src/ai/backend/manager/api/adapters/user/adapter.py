@@ -1583,7 +1583,7 @@ class UserAdapter(BaseAdapter):
                 domain_name=data.domain_name,
                 role=UserRoleDTO(data.role.value) if data.role is not None else None,
                 resource_policy=data.resource_policy,
-                main_access_key=data.main_access_key,
+                main_access_key=data.default_access_key,
             ),
             security=UserSecurityInfo(
                 allowed_client_ip=data.allowed_client_ip,

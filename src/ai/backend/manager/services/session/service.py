@@ -1594,7 +1594,7 @@ class SessionService:
         domain_name = action.domain_name
         if action.owner_id is not None:
             owner = await self._user_repository.get_user_by_uuid(action.owner_id)
-            if owner.main_access_key is None:
+            if owner.default_access_key is None:
                 raise InternalServerError(
                     f"Delegated owner {action.owner_id} has no main access key configured"
                 )
@@ -1607,7 +1607,7 @@ class SessionService:
                     f"Delegated owner {action.owner_id} has no domain configured"
                 )
             user_id = owner.id
-            access_key = AccessKey(owner.main_access_key)
+            access_key = AccessKey(owner.default_access_key)
             domain_name = owner.domain_name
 
         # Keep the image resolve so callers passing a stale UUID get a

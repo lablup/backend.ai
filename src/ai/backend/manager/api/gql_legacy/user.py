@@ -614,7 +614,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
             totp_activated=dto.totp_activated,
             totp_activated_at=dto.totp_activated_at,
             sudo_session_enabled=dto.sudo_session_enabled,
-            main_access_key=dto.main_access_key,
+            main_access_key=dto.default_access_key,
             container_uid=dto.container_uid,
             container_main_gid=dto.container_main_gid,
             container_gids=dto.container_gids,
@@ -646,7 +646,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
             totp_activated=row.totp_activated,
             totp_activated_at=row.totp_activated_at,
             sudo_session_enabled=row.sudo_session_enabled,
-            main_access_key=row.main_access_key,
+            main_access_key=row.default_access_key,
             container_uid=row.container_uid,
             container_main_gid=row.container_main_gid,
             container_gids=row.container_gids,
@@ -666,7 +666,9 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         """
         Load user's information. Group names associated with the user are also returned.
         """
-        query = sa.select(users, _default_access_key().label("main_access_key")).select_from(users)
+        query = sa.select(users, _default_access_key().label("default_access_key")).select_from(
+            users
+        )
         if group_id is not None:
             query = query.where(
                 user_scope_membership_exists(PROJECT_SCOPE_TYPE, group_id, users.c.uuid)
@@ -772,7 +774,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         order: str | None = None,
     ) -> Sequence[User]:
         query = (
-            sa.select(users, _default_access_key().label("main_access_key"))
+            sa.select(users, _default_access_key().label("default_access_key"))
             .select_from(users)
             .limit(limit)
             .offset(offset)
@@ -814,7 +816,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         if not emails:
             return []
         query = (
-            sa.select(users, _default_access_key().label("main_access_key"))
+            sa.select(users, _default_access_key().label("default_access_key"))
             .select_from(users)
             .where(users.c.email.in_(emails))
         )
@@ -848,7 +850,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         if not user_ids:
             return []
         query = (
-            sa.select(users, _default_access_key().label("main_access_key"))
+            sa.select(users, _default_access_key().label("default_access_key"))
             .select_from(users)
             .where(users.c.uuid.in_(user_ids))
         )
