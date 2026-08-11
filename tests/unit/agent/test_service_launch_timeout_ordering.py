@@ -13,8 +13,8 @@ from ai.backend.agent.kernel import SERVICE_REPLY_TIMEOUT_MARGIN_SEC, AbstractCo
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.kernel.base import BaseRunner
 
-# How long the kernel runner waits for a service port. Its package cannot be imported the
-# other way round -- it ships inside the container -- so the ordering is only checked here.
+# How long the kernel runner waits for a service port. There is no constant to import for it:
+# it is the default of `_start_service(launch_timeout=...)`.
 KRUNNER_LAUNCH_TIMEOUT_SEC: float = (
     inspect.signature(BaseRunner._start_service).parameters["launch_timeout"].default
 )
