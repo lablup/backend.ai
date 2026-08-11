@@ -921,7 +921,7 @@ class ScheduleDBSource:
                 KeyPairResourcePolicyRow.max_concurrent_sftp_sessions,
             )
             .select_from(UserRow)
-            .join(UserRow.main_keypair)
+            .join(UserRow.default_keypair)
             .join(
                 KeyPairResourcePolicyRow,
                 KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
@@ -2142,7 +2142,7 @@ class ScheduleDBSource:
                         KeyPairResourcePolicyRow.allowed_vfolder_hosts,
                     )
                     .select_from(UserRow)
-                    .join(UserRow.main_keypair)
+                    .join(UserRow.default_keypair)
                     .join(
                         KeyPairResourcePolicyRow,
                         KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
