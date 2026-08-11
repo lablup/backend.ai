@@ -1,12 +1,16 @@
 # Manager Models layer — Guardrails
 
-> This layer defines only the ORM schema. For query patterns see `/repository-guide`; for data type conventions see
-> `manager/data/AGENTS.md`.
+> This layer defines the ORM schema and the declarative write specs. For background, see `KNOWLEDGE.md`
+> in the same directory; for query patterns see `/repository-guide`; for
+> data type conventions see `manager/data/AGENTS.md`.
 
 ## Directory structure (per domain)
 
 Every domain follows `models/{domain}/__init__.py` + `row.py` (ORM classes).
 The single-file shorthand (`models/{domain}.py`) is legacy — do not add new ones.
+
+Domains migrated to the v2 write specs add `creators.py` / `purgers.py` / `upserters.py`
+next to `row.py`. The spec bases live in `models/specs/` — read `models/specs/AGENTS.md` before touching them.
 
 ## Row class rules
 
@@ -20,6 +24,13 @@ The single-file shorthand (`models/{domain}.py`) is legacy — do not add new on
 - Do NOT add query-builder methods to Row classes — that belongs to `repositories/db_source/`.
 - Do NOT add business-logic methods — that belongs to `services/`.
 - `session/row.py` has legacy query methods, but do not follow that pattern.
+
+## How Rows are handled
+
+- Handle create/delete/upsert through `models/specs/` spec declarations where possible —
+  preferred over direct db-object manipulation because the RBAC side effects are enforced
+  by the spec's type (rationale: `KNOWLEDGE.md`).
+- Do NOT open a db session to manipulate Rows directly — the implementation belongs in a repository.
 
 ## Custom column types
 

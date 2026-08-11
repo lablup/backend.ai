@@ -7,12 +7,9 @@ from datetime import datetime
 from typing import Any, Self, override
 from uuid import UUID
 
-from sqlalchemy.engine import Row
-
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.permission.id import ScopeId
@@ -57,7 +54,6 @@ class UserStatus(enum.StrEnum):
 class UserInfoContext:
     uuid: UUID
     email: str
-    main_access_key: AccessKey
 
 
 @dataclass(frozen=True)
@@ -116,7 +112,7 @@ class UserData:
         return {RBACElementType.USER: user_permissions, **resource_entity_permissions}
 
     @classmethod
-    def from_row(cls, row: Row[Any]) -> Self:
+    def from_row(cls, row: Any) -> Self:
         """
         Deprecated: Use `UserRow.to_data()` method instead.
         """

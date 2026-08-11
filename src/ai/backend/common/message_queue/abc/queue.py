@@ -4,14 +4,13 @@ Use `ai.backend.common.message_queue.abc.{anycaster,broadcaster,consumer,subscri
 """
 
 from abc import ABC, abstractmethod
-from collections.abc import AsyncGenerator, Mapping
-from typing import Any
+from collections.abc import AsyncGenerator
 
-from ai.backend.common.message_queue.types import (
-    BroadcastMessage,
+from ai.backend.common.message_queue.message import MessageId, MQMessage
+from ai.backend.common.message_queue.payload import (
+    AnycastPayload,
     BroadcastPayload,
-    MessageId,
-    MQMessage,
+    CachedBroadcastPayload,
 )
 
 
@@ -19,7 +18,7 @@ class AbstractMessageQueue(ABC):
     @abstractmethod
     async def send(
         self,
-        payload: dict[bytes, bytes],
+        payload: AnycastPayload,
     ) -> None:
         """
         Send a message to the queue.
@@ -33,7 +32,7 @@ class AbstractMessageQueue(ABC):
     @abstractmethod
     async def broadcast(
         self,
-        payload: Mapping[str, Any],
+        payload: BroadcastPayload,
     ) -> None:
         """
         Broadcast a message to all subscribers of the channel.
@@ -47,7 +46,7 @@ class AbstractMessageQueue(ABC):
     async def broadcast_with_cache(
         self,
         cache_id: str,
-        payload: Mapping[str, str],
+        payload: BroadcastPayload,
     ) -> None:
         """
         Broadcast a message to all subscribers of the channel with cache.
@@ -59,7 +58,7 @@ class AbstractMessageQueue(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def fetch_cached_broadcast_message(self, cache_id: str) -> Mapping[str, str] | None:
+    async def fetch_cached_broadcast_message(self, cache_id: str) -> BroadcastPayload | None:
         """
         Fetch a cached broadcast message by cache_id.
         This method retrieves the cached message from the broadcast channel.
@@ -70,7 +69,7 @@ class AbstractMessageQueue(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def broadcast_batch(self, events: list[BroadcastPayload]) -> None:
+    async def broadcast_batch(self, events: list[CachedBroadcastPayload]) -> None:
         """
         Broadcast multiple messages in a batch with optional caching.
         This method broadcasts multiple messages to all subscribers.
@@ -95,7 +94,7 @@ class AbstractMessageQueue(ABC):
     @abstractmethod
     async def subscribe_queue(
         self,
-    ) -> AsyncGenerator[BroadcastMessage, None]:
+    ) -> AsyncGenerator[BroadcastPayload, None]:
         """
         Subscribe to messages from the queue.
         This method will block until a message is available.

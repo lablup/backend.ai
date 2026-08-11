@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from functools import cached_property
+from typing import NewType
+from uuid import UUID
 
 from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.domain import DomainID
@@ -20,6 +22,7 @@ from ai.backend.common.types import (
     AgentId,
     ClusterMode,
     KernelId,
+    PreemptionVictimScope,
     SessionId,
     SessionResult,
     SessionTypes,
@@ -84,6 +87,12 @@ class WorkloadOwner:
     domain_id: DomainID
 
 
+PreemptionScopeKey = NewType("PreemptionScopeKey", UUID)
+"""Id of the scope entity one victim-candidate group belongs to: the user /
+project / domain id, or the resource group's own id for the RESOURCE_GROUP
+scope (one key for the whole snapshot, since scheduling runs per group)."""
+
+
 @dataclass(frozen=True)
 class WorkloadMeta:
     """Identity of one schedulable workload."""
@@ -91,6 +100,21 @@ class WorkloadMeta:
     session_id: SessionId
     resource_group_id: ResourceGroupID
     owner: WorkloadOwner
+
+    def preemption_scope_key(self, scope: PreemptionVictimScope) -> PreemptionScopeKey:
+        """Key of the scope entity this workload belongs to under the scope.
+
+        The single derivation shared by the candidate loader's grouping and
+        the snapshot's lookup."""
+        match scope:
+            case PreemptionVictimScope.USER:
+                return PreemptionScopeKey(self.owner.user_uuid)
+            case PreemptionVictimScope.PROJECT:
+                return PreemptionScopeKey(self.owner.project_id)
+            case PreemptionVictimScope.DOMAIN:
+                return PreemptionScopeKey(self.owner.domain_id)
+            case PreemptionVictimScope.RESOURCE_GROUP:
+                return PreemptionScopeKey(self.resource_group_id)
 
 
 @dataclass(frozen=True)

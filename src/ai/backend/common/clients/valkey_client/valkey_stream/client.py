@@ -1,7 +1,7 @@
 import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Self, cast
+from typing import Self, cast
 
 from glide import (
     Batch,
@@ -19,8 +19,11 @@ from ai.backend.common.clients.valkey_client.client import (
     create_valkey_client,
 )
 from ai.backend.common.exception import BackendAIError
-from ai.backend.common.json import dump_json, load_json
-from ai.backend.common.message_queue.types import BroadcastPayload
+from ai.backend.common.message_queue.payload import (
+    AnycastPayload,
+    BroadcastPayload,
+    CachedBroadcastPayload,
+)
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
     BackoffStrategy,
@@ -211,7 +214,7 @@ class ValkeyStreamClient:
     async def enqueue_stream_message(
         self,
         stream_key: str,
-        payload: Mapping[bytes, bytes],
+        payload: AnycastPayload,
     ) -> None:
         """
         Enqueue a message to the Valkey stream.
@@ -220,7 +223,7 @@ class ValkeyStreamClient:
         :param payload: The message payload to add to the stream.
         :raises: GlideClientError if the message cannot be added.
         """
-        values = [(k, v) for k, v in payload.items()]
+        values = [(k, v) for k, v in payload.to_stream_fields().items()]
         async with self._client.client() as conn:
             await conn.xadd(
                 stream_key,
@@ -236,7 +239,7 @@ class ValkeyStreamClient:
         stream_key: str,
         group_name: str,
         message_id: bytes,
-        payload: Mapping[bytes, bytes],
+        payload: AnycastPayload,
     ) -> None:
         """
         Requeue a message in the consumer group.
@@ -249,7 +252,7 @@ class ValkeyStreamClient:
         """
         tx = self._create_batch()
         tx.xack(stream_key, group_name, [message_id])
-        values = [(k, v) for k, v in payload.items()]
+        values = [(k, v) for k, v in payload.to_stream_fields().items()]
         tx.xadd(
             stream_key,
             cast(list[tuple[str | bytes, str | bytes]], values),
@@ -307,25 +310,24 @@ class ValkeyStreamClient:
     async def broadcast(
         self,
         channel: str,
-        payload: Mapping[str, Any],
+        payload: BroadcastPayload,
     ) -> None:
         """
         Broadcast a message to a channel.
 
         :param channel: The channel to broadcast the message to.
-        :param payload: The payload of the message.
+        :param payload: The message payload to publish.
         :raises: GlideClientError if the message cannot be broadcasted.
         """
-        message = dump_json(payload)
         async with self._client.client() as conn:
-            await conn.publish(message=message, channel=channel)
+            await conn.publish(message=payload.to_json(), channel=channel)
 
     @valkey_stream_resilience.apply()
     async def broadcast_with_cache(
         self,
         channel: str,
         cache_id: str,
-        payload: Mapping[str, str],
+        payload: BroadcastPayload,
         expiry_seconds: int = _DEFAULT_CACHE_EXPIRATION,
     ) -> None:
         """
@@ -333,11 +335,11 @@ class ValkeyStreamClient:
 
         :param channel: The channel to broadcast the message to.
         :param cache_id: The ID for caching the message.
-        :param payload: The payload of the message.
+        :param payload: The message payload to publish.
         :param expiry_seconds: The expiration time for the cached message in seconds.
         :raises: GlideClientError if the message cannot be broadcasted or cached.
         """
-        message = dump_json(payload)
+        message = payload.to_json()
         tx = self._create_batch()
         tx.set(key=cache_id, value=message, expiry=ExpirySet(ExpiryType.SEC, expiry_seconds))
         tx.publish(
@@ -351,32 +353,32 @@ class ValkeyStreamClient:
     async def fetch_cached_broadcast_message(
         self,
         cache_id: str,
-    ) -> Mapping[str, str] | None:
+    ) -> BroadcastPayload | None:
         """
         Fetch a cached broadcast message by its ID.
 
         :param cache_id: The ID of the cached message.
         :return: The cached message payload or None if not found.
+        :raises: InvalidMessagePayloadError if the cached message is malformed.
         """
         async with self._client.client() as conn:
             result = await conn.get(cache_id)
         if not result:
             return None
-        payload = load_json(result)
-        return cast(Mapping[str, str], payload)
+        return BroadcastPayload.from_json(result)
 
     @valkey_stream_resilience.apply()
     async def broadcast_batch(
         self,
         channel: str,
-        events: list[BroadcastPayload],
+        events: list[CachedBroadcastPayload],
         expiry_seconds: int = _DEFAULT_CACHE_EXPIRATION,
     ) -> None:
         """
         Broadcast multiple messages to a channel in a batch with optional caching.
 
         :param channel: The channel to broadcast the messages to.
-        :param events: List of BroadcastPayload objects containing payload and optional cache_id.
+        :param events: List of payloads to publish, each with an optional cache_id.
         :param expiry_seconds: The expiration time for the cached messages in seconds.
         :raises: GlideClientError if the messages cannot be broadcasted or cached.
         """
@@ -385,7 +387,7 @@ class ValkeyStreamClient:
 
         tx = self._create_batch()
         for event in events:
-            message = dump_json(event.payload)
+            message = event.payload.to_json()
             # Only set cache if cache_id is provided
             if event.cache_id:
                 tx.set(
@@ -403,16 +405,17 @@ class ValkeyStreamClient:
     @valkey_stream_resilience.apply()
     async def receive_broadcast_message(
         self,
-    ) -> Mapping[str, str]:
+    ) -> BroadcastPayload:
         """
         Receive a broadcast message from a channel.
         This method blocks until a message is received.
 
         :return: The payload of the received message.
+        :raises: InvalidMessagePayloadError if the received message is malformed.
         """
         async with self._client.client() as conn:
             message = await conn.get_pubsub_message()
-        return cast(Mapping[str, str], load_json(message.message))
+        return BroadcastPayload.from_json(cast(bytes | str, message.message))
 
     def _create_batch(self, is_atomic: bool = False) -> Batch:
         """

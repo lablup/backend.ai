@@ -23,7 +23,8 @@ from ai.backend.manager.data.image.types import ImageData, ImageDataWithDetails
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.image.conditions import ImageConditions
 from ai.backend.manager.models.image.orders import ImageOrders
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 

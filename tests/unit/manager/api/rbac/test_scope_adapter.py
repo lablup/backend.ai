@@ -19,7 +19,7 @@ from ai.backend.common.dto.manager.rbac.types import OrderDirection, ScopeOrderF
 from ai.backend.manager.api.rest.rbac.scope_adapter import ScopeAdapter
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import ScopeData
-from ai.backend.manager.repositories.base import OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 
 
 class TestScopeAdapterBuildQuerier:

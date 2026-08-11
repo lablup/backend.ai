@@ -13,8 +13,7 @@ Each client class inherits from `BaseDomainClient` and uses `self._client.typed_
 
 - admin methods: `admin_search()`, `admin_create()`, `admin_update()`, `admin_delete()`, `admin_purge()`
 - scoped search methods: currently `{scope}_search()` — e.g. `project_search(project_id, request)`, `domain_search(domain_name, request)`.
-  **Forward direction (under consideration):** unify to `scoped_search(request)` following the server `scopedFoosV2` convention, and take the scope
-  as a field of the request DTO. (The URL pattern and CLI surface must be decided together.)
+  The unification direction under consideration lives in `KNOWLEDGE.md`.
 - self-service methods: `my_search()`, `my_issue()` — mapped to `/v2/{entity}/my/{operation}`
 - user-facing methods: `get()`, `enqueue()`
 

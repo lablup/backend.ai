@@ -25,7 +25,7 @@ class PresetOptions(BackendAISchema):
     model_config = ConfigDict(frozen=True)
 
 
-class PrometheusQueryPresetRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class PrometheusQueryPresetRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "prometheus_query_presets"
 
     id: Mapped[uuid.UUID] = mapped_column(

@@ -1,24 +1,27 @@
 from __future__ import annotations
 
 import enum
+import uuid
 from collections.abc import Mapping, Sequence
+from datetime import datetime
 from typing import Any, cast
 
 import sqlalchemy as sa
 import trafaret as t
 from sqlalchemy.dialects import postgresql as pgsql
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common import validators as tx
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.exceptions import InvalidArgument
 
-from .base import GUID, EnumType, IDColumn, metadata
+from .base import GUID, Base, EnumType
 from .vfolder import verify_vfolder_name
 
 __all__: Sequence[str] = (
     "TemplateType",
-    "session_templates",
+    "SessionTemplateRow",
 )
 
 
@@ -27,25 +30,34 @@ class TemplateType(enum.StrEnum):
     CLUSTER = "cluster"
 
 
-session_templates = sa.Table(
-    "session_templates",
-    metadata,
-    IDColumn("id"),
-    sa.Column(
+class SessionTemplateRow(Base):
+    __tablename__ = "session_templates"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    created_at: Mapped[datetime] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
         server_default=sa.func.now(),
         index=True,
         nullable=False,
-    ),
-    sa.Column("is_active", sa.Boolean, default=True),
-    sa.Column("domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), nullable=False),
-    sa.Column("group_id", GUID, sa.ForeignKey("groups.id"), nullable=True),
-    sa.Column("user_uuid", GUID, sa.ForeignKey("users.uuid"), index=True, nullable=False),
-    sa.Column("type", EnumType(TemplateType), nullable=False, server_default="TASK", index=True),
-    sa.Column("name", sa.String(length=128), nullable=True),
-    sa.Column("template", pgsql.JSONB(), nullable=False),
-)
+    )
+    is_active: Mapped[bool | None] = mapped_column("is_active", sa.Boolean, default=True)
+    domain_name: Mapped[str] = mapped_column(
+        "domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), nullable=False
+    )
+    group_id: Mapped[uuid.UUID | None] = mapped_column(
+        "group_id", GUID, sa.ForeignKey("groups.id"), nullable=True
+    )
+    user_uuid: Mapped[uuid.UUID] = mapped_column(
+        "user_uuid", GUID, sa.ForeignKey("users.uuid"), index=True, nullable=False
+    )
+    type: Mapped[TemplateType] = mapped_column(
+        "type", EnumType(TemplateType), nullable=False, server_default="TASK", index=True
+    )
+    name: Mapped[str | None] = mapped_column("name", sa.String(length=128), nullable=True)
+    template: Mapped[dict[str, Any]] = mapped_column("template", pgsql.JSONB(), nullable=False)
 
 
 task_template_v1 = t.Dict({

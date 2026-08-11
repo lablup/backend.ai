@@ -82,7 +82,7 @@ async def create_tables(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[None, None]:
     """Create RBAC granter test tables."""
-    async with with_tables(database_connection, GRANTER_TABLES):  # type: ignore[arg-type]
+    async with with_tables(database_connection, GRANTER_TABLES):
         yield
 
 

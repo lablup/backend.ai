@@ -31,7 +31,7 @@ __all__ = (
 # ========== ORM Models ==========
 
 
-class NotificationChannelRow(Base):  # type: ignore[misc]
+class NotificationChannelRow(Base):
     __tablename__ = "notification_channels"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -99,7 +99,7 @@ def _get_notification_rule_channel_join_condition() -> sa.ColumnElement[bool]:
     return foreign(NotificationRuleRow.channel_id) == NotificationChannelRow.id
 
 
-class NotificationRuleRow(Base):  # type: ignore[misc]
+class NotificationRuleRow(Base):
     __tablename__ = "notification_rules"
 
     id: Mapped[uuid.UUID] = mapped_column(

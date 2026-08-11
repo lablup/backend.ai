@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.repositories.base.purger import PurgerSpec
-from ai.backend.manager.repositories.base.types import ConflictCheck
 
 
 @dataclass

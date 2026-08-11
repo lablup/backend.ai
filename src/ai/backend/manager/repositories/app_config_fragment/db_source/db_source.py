@@ -20,6 +20,7 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentBulkResult,
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
+    AppConfigFragmentUpsertBulkResult,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.app_config import (
@@ -28,7 +29,8 @@ from ai.backend.manager.errors.app_config import (
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
-from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
     AppConfigFragmentPurgerSpec,
 )
@@ -37,7 +39,6 @@ from ai.backend.manager.repositories.app_config_fragment.upserters import (
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    NoPagination,
     Querier,
 )
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
@@ -80,7 +81,7 @@ class AppConfigFragmentDBSource:
     @app_config_fragment_db_source_resilience.apply()
     async def bulk_upsert(
         self, specs: Sequence[AppConfigFragmentUpserterSpec]
-    ) -> list[AppConfigFragmentData]:
+    ) -> AppConfigFragmentUpsertBulkResult:
         """Upsert each fragment at its scope in one transaction (all-or-nothing).
 
         Each item inserts-or-updates; a newly inserted row binds to its scope, an updated one
@@ -106,7 +107,7 @@ class AppConfigFragmentDBSource:
                     ),
                 )
                 results.append((await w.upsert_scoped(upserter)).row.to_data())
-            return results
+            return AppConfigFragmentUpsertBulkResult(items=results, failed=[])
 
     @app_config_fragment_db_source_resilience.apply()
     async def get_by_id(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentData:
@@ -168,7 +169,7 @@ class AppConfigFragmentDBSource:
     async def scoped_search(
         self,
         querier: BatchQuerier,
-        scopes: Sequence[SearchScope],
+        scopes: Sequence[OperationScope],
     ) -> AppConfigFragmentSearchResult:
         """Scoped path: query the fragments written at ``scopes`` (combined with OR)."""
         async with self._rbac_ops_provider.read_ops() as r:

@@ -24,7 +24,8 @@ from ai.backend.manager.data.deployment.types import ModelDeploymentAutoScalingR
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.endpoint.conditions import AutoScalingRuleConditions
 from ai.backend.manager.models.endpoint.orders import AutoScalingRuleOrders
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 from ai.backend.manager.types import OptionalState, TriState
 

@@ -30,9 +30,9 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.group.db_source import GroupDBSource
 from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
 from ai.backend.manager.repositories.group.types import (
-    DomainProjectSearchScope,
+    DomainProjectOperationScope,
     GroupSearchResult,
-    UserProjectSearchScope,
+    UserProjectOperationScope,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -206,13 +206,13 @@ class GroupRepository:
     @group_repository_resilience.apply()
     async def search_projects_by_domain(
         self,
-        scope: DomainProjectSearchScope,
+        scope: DomainProjectOperationScope,
         querier: BatchQuerier,
     ) -> GroupSearchResult:
         """Search projects within a domain.
 
         Args:
-            scope: DomainProjectSearchScope defining the domain to search within.
+            scope: DomainProjectOperationScope defining the domain to search within.
             querier: BatchQuerier containing conditions, orders, and pagination.
 
         Returns:
@@ -223,13 +223,13 @@ class GroupRepository:
     @group_repository_resilience.apply()
     async def search_projects_by_user(
         self,
-        scope: UserProjectSearchScope,
+        scope: UserProjectOperationScope,
         querier: BatchQuerier,
     ) -> GroupSearchResult:
         """Search projects a user is member of.
 
         Args:
-            scope: UserProjectSearchScope defining the user to search for.
+            scope: UserProjectOperationScope defining the user to search for.
             querier: BatchQuerier containing conditions, orders, and pagination.
 
         Returns:

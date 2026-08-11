@@ -47,6 +47,7 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.group.db_source import GroupDBSource
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
@@ -100,6 +101,7 @@ class TestRoleAssignment:
                 ResourcePresetRow,
                 VirtualScopeRow,
                 EntityMembershipRow,
+                ScopeBindingRow,
             ],
         ):
             yield database_connection
@@ -202,6 +204,7 @@ class TestRoleAssignment:
                     resource_policy=policy_name,
                 )
             )
+            session.add(VirtualScopeRow(scope_type=ScopeType.USER.value, scope_id=user_uuid))
             await session.commit()
         return user_uuid
 

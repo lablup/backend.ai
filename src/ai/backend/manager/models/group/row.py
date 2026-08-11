@@ -72,29 +72,11 @@ from ai.backend.manager.models.types import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.domain import DomainRow
-    from ai.backend.manager.models.kernel import KernelRow
-    from ai.backend.manager.models.network import NetworkRow
     from ai.backend.manager.models.rbac import ContainerRegistryScope
     from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
     from ai.backend.manager.models.scaling_group import ScalingGroupForProjectRow
-    from ai.backend.manager.models.session import SessionRow
-    from ai.backend.manager.models.user import UserRow
-    from ai.backend.manager.models.vfolder import VFolderRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-def _get_networks_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.network import NetworkRow
-
-    return GroupRow.id == foreign(NetworkRow.project)
-
-
-def _get_vfolder_rows_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.vfolder import VFolderRow
-
-    return GroupRow.id == foreign(VFolderRow.group)
 
 
 def _get_association_container_registries_groups_join_condition() -> sa.ColumnElement[bool]:
@@ -124,7 +106,7 @@ container_registry_iv = t.Dict({}) | t.Dict({
 })
 
 
-class AssocGroupUserRow(Base):  # type: ignore[misc]
+class AssocGroupUserRow(Base):
     """DEPRECATED -- scheduled for sunset.
 
     Project membership is moving to ``association_scopes_entities`` (ASE) with
@@ -154,16 +136,13 @@ class AssocGroupUserRow(Base):  # type: ignore[misc]
         nullable=False,
     )
 
-    user: Mapped[UserRow] = relationship("UserRow", back_populates="groups")
-    group: Mapped[GroupRow] = relationship("GroupRow", back_populates="users")
-
 
 # DEPRECATED: scheduled for sunset; project membership lives in
 # `association_scopes_entities`. Do not use in new code.
 association_groups_users = AssocGroupUserRow.__table__
 
 
-class GroupRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class GroupRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "groups"
     __table_args__ = (
         sa.UniqueConstraint("name", "domain_name", name="uq_groups_name_domain_name"),
@@ -220,33 +199,15 @@ class GroupRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     )
 
     # Relationships (defined with deferred join conditions to avoid circular imports)
-    sessions: Mapped[list[SessionRow]] = relationship("SessionRow", back_populates="group")
-    domain: Mapped[DomainRow] = relationship("DomainRow")
     sgroup_for_groups_rows: Mapped[list[ScalingGroupForProjectRow]] = relationship(
         "ScalingGroupForProjectRow"
     )
-    users: Mapped[list[AssocGroupUserRow]] = relationship(
-        "AssocGroupUserRow", back_populates="group"
-    )
-    resource_policy_row: Mapped[ProjectResourcePolicyRow] = relationship(
-        "ProjectResourcePolicyRow", back_populates="projects"
-    )
-    kernels: Mapped[list[KernelRow]] = relationship("KernelRow", back_populates="group_row")
-    networks: Mapped[list[NetworkRow]] = relationship(
-        "NetworkRow",
-        back_populates="project_row",
-        primaryjoin=_get_networks_join_condition,
-    )
-    vfolder_rows: Mapped[list[VFolderRow]] = relationship(
-        "VFolderRow",
-        back_populates="group_row",
-        primaryjoin=_get_vfolder_rows_join_condition,
-    )
+    users: Mapped[list[AssocGroupUserRow]] = relationship("AssocGroupUserRow")
+    resource_policy_row: Mapped[ProjectResourcePolicyRow] = relationship("ProjectResourcePolicyRow")
     association_container_registries_groups_rows: Mapped[
         list[AssociationContainerRegistriesGroupsRow]
     ] = relationship(
         "AssociationContainerRegistriesGroupsRow",
-        back_populates="group_row",
         primaryjoin=_get_association_container_registries_groups_join_condition,
     )
 
@@ -337,7 +298,7 @@ class GroupRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         project_id: uuid.UUID,
         *,
         db: ExtendedAsyncSAEngine,
-    ) -> Self:
+    ) -> GroupRow:
         """
         Query a project by its ID with related resource policies.
         Args:
@@ -449,7 +410,7 @@ class ProjectModel(RBACModel[ProjectPermission]):
 
 
 def _build_group_query(
-    cond: sa.sql.expression.BinaryExpression[Any], domain_name: str
+    cond: sa.sql.expression.ColumnElement[bool], domain_name: str
 ) -> sa.sql.Select[Any]:
     return (
         sa.select(groups.c.id)

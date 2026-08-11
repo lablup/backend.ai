@@ -71,14 +71,14 @@ from ai.backend.manager.repositories.permission_controller.creators import (
     UserRoleCreatorSpec,
 )
 from ai.backend.manager.repositories.permission_controller.types import (
-    PermissionSearchScope,
-    ScopedRoleSearchScope,
+    PermissionOperationScope,
+    ScopedRoleOperationScope,
 )
 from ai.backend.manager.repositories.role_invitation.types import (
-    InviteeSearchScope,
-    InviterSearchScope,
+    InviteeOperationScope,
+    InviterOperationScope,
+    RoleInvitationOperationScope,
     RoleInvitationSearchResult,
-    RoleInvitationSearchScope,
 )
 
 from .db_source.db_source import CreateRoleInput, PermissionDBSource
@@ -330,7 +330,7 @@ class PermissionControllerRepository:
     async def search_roles_in_scope(
         self,
         querier: BatchQuerier,
-        scope: ScopedRoleSearchScope,
+        scope: ScopedRoleOperationScope,
     ) -> RoleListResult:
         """Search roles registered in a project scope."""
         return await self._db_source.search_roles_in_scope(querier=querier, scope=scope)
@@ -339,7 +339,7 @@ class PermissionControllerRepository:
     async def search_permissions(
         self,
         querier: BatchQuerier,
-        scope: PermissionSearchScope | None = None,
+        scope: PermissionOperationScope | None = None,
     ) -> PermissionListResult:
         """Searches permissions with pagination and filtering."""
         return await self._db_source.search_permissions(querier=querier, scope=scope)
@@ -521,7 +521,7 @@ class PermissionControllerRepository:
     async def search_invitations_by_invitee(
         self,
         querier: BatchQuerier,
-        scope: InviteeSearchScope,
+        scope: InviteeOperationScope,
     ) -> RoleInvitationSearchResult:
         return await self._db_source.search_invitations_by_invitee(querier, scope)
 
@@ -529,7 +529,7 @@ class PermissionControllerRepository:
     async def search_invitations_by_inviter(
         self,
         querier: BatchQuerier,
-        scope: InviterSearchScope,
+        scope: InviterOperationScope,
     ) -> RoleInvitationSearchResult:
         return await self._db_source.search_invitations_by_inviter(querier, scope)
 
@@ -537,7 +537,7 @@ class PermissionControllerRepository:
     async def search_invitations_by_role(
         self,
         querier: BatchQuerier,
-        scope: RoleInvitationSearchScope,
+        scope: RoleInvitationOperationScope,
     ) -> RoleInvitationSearchResult:
         return await self._db_source.search_invitations_by_role(querier, scope)
 

@@ -7,5 +7,5 @@ __all__ = (
 
 
 # Raw strings mirroring the RBAC-managed RBACElementType.USER value.
-USER_SCOPE_TYPE = ScopeType("user")
 USER_ENTITY_TYPE = EntityType("user")
+USER_SCOPE_TYPE = ScopeType(USER_ENTITY_TYPE)

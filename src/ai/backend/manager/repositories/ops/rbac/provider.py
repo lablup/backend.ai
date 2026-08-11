@@ -25,7 +25,7 @@ from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_SCOPE_TYPE
-from ai.backend.common.data.entity.types import EntityRef, ScopeRef, ScopeType
+from ai.backend.common.data.entity.types import EntityRef, EntityType, ScopeRef, ScopeType
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE
 from ai.backend.common.data.permission.types import (
     Permission,
@@ -327,7 +327,7 @@ class RBACWriteOps(WriteOps):
             result = await self._sess.execute(sa.union_all(*selects))
             for scope_type_value, scope_id, scope_name in result.tuples():
                 ref = ScopeRef(
-                    scope_type=ScopeType(scope_type_value),
+                    scope_type=ScopeType(EntityType(scope_type_value)),
                     scope_id=scope_id,
                 )
                 names[ref] = scope_name
@@ -434,7 +434,9 @@ class RBACWriteOps(WriteOps):
             ])
         )
         return {
-            ScopeRef(scope_type=ScopeType(row.scope_type), scope_id=row.scope_id): row.id
+            ScopeRef(
+                scope_type=ScopeType(EntityType(row.scope_type)), scope_id=row.scope_id
+            ): row.id
             for row in (await self._sess.execute(stmt)).all()
         }
 

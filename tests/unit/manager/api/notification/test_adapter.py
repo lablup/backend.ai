@@ -41,7 +41,7 @@ from ai.backend.manager.data.notification import (
     NotificationChannelData,
     NotificationRuleData,
 )
-from ai.backend.manager.repositories.base import OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.notification.updaters import (
     NotificationChannelUpdaterSpec,
     NotificationRuleUpdaterSpec,

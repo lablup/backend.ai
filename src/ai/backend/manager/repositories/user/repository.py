@@ -16,7 +16,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import AccessKey, SlotName
+from ai.backend.common.types import SlotName
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -37,15 +37,15 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.keypair.types import (
-    KeypairResourcePolicyKeypairSearchScope,
-    UserKeypairSearchScope,
+    KeypairResourcePolicyKeypairOperationScope,
+    UserKeypairOperationScope,
 )
 from ai.backend.manager.repositories.user.creators import UserCreateSpec
 from ai.backend.manager.repositories.user.db_source import UserDBSource
 from ai.backend.manager.repositories.user.types import (
-    DomainUserSearchScope,
-    ProjectUserSearchScope,
-    RoleUserSearchScope,
+    DomainUserOperationScope,
+    ProjectUserOperationScope,
+    RoleUserOperationScope,
 )
 from ai.backend.manager.repositories.user.updaters import UserUpdateSpec
 
@@ -190,12 +190,9 @@ class UserRepository:
         self,
         user_uuid: UUID,
         target_user_uuid: UUID,
-        target_main_access_key: AccessKey,
     ) -> None:
         """Delegate endpoint ownership to another user."""
-        await self._db_source.delegate_endpoint_ownership(
-            user_uuid, target_user_uuid, target_main_access_key
-        )
+        await self._db_source.delegate_endpoint_ownership(user_uuid, target_user_uuid)
 
     @user_repository_resilience.apply()
     async def delete_endpoints(
@@ -257,12 +254,12 @@ class UserRepository:
 
     @user_repository_resilience.apply()
     async def search_users_by_domain(
-        self, scope: DomainUserSearchScope, querier: BatchQuerier
+        self, scope: DomainUserOperationScope, querier: BatchQuerier
     ) -> UserSearchResult:
         """Search users within a domain.
 
         Args:
-            scope: DomainUserSearchScope defining the domain to search within.
+            scope: DomainUserOperationScope defining the domain to search within.
             querier: BatchQuerier containing conditions, orders, and pagination.
 
         Returns:
@@ -272,12 +269,12 @@ class UserRepository:
 
     @user_repository_resilience.apply()
     async def search_users_by_project(
-        self, scope: ProjectUserSearchScope, querier: BatchQuerier
+        self, scope: ProjectUserOperationScope, querier: BatchQuerier
     ) -> UserSearchResult:
         """Search users within a project.
 
         Args:
-            scope: ProjectUserSearchScope defining the project to search within.
+            scope: ProjectUserOperationScope defining the project to search within.
             querier: BatchQuerier containing conditions, orders, and pagination.
 
         Returns:
@@ -287,7 +284,7 @@ class UserRepository:
 
     @user_repository_resilience.apply()
     async def search_users_by_role(
-        self, scope: RoleUserSearchScope, querier: BatchQuerier
+        self, scope: RoleUserOperationScope, querier: BatchQuerier
     ) -> UserSearchResult:
         """Search users assigned to a role."""
         return await self._db_source.search_users_by_role(scope, querier)
@@ -315,7 +312,7 @@ class UserRepository:
     @user_repository_resilience.apply()
     async def search_my_keypairs(
         self,
-        scope: UserKeypairSearchScope,
+        scope: UserKeypairOperationScope,
         querier: BatchQuerier,
     ) -> SearchResult[KeyPairData]:
         """Search keypairs owned by the scoped user.
@@ -332,7 +329,7 @@ class UserRepository:
     @user_repository_resilience.apply()
     async def search_keypairs_by_resource_policy(
         self,
-        scope: KeypairResourcePolicyKeypairSearchScope,
+        scope: KeypairResourcePolicyKeypairOperationScope,
         querier: BatchQuerier,
     ) -> SearchResult[KeyPairData]:
         """Search keypairs assigned to a keypair resource policy.

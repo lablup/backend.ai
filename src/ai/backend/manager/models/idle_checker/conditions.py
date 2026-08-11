@@ -334,3 +334,10 @@ class SessionIdleCheckConditions:
             return SessionIdleCheckRow.last_status != status
 
         return inner
+
+    @staticmethod
+    def by_statuses(statuses: Collection[IdleCheckPhase]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionIdleCheckRow.last_status.in_(statuses)
+
+        return inner

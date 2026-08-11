@@ -64,11 +64,11 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.fair_share.types import (
     DomainFairShareEntitySearchResult,
-    DomainFairShareSearchScope,
+    DomainFairShareOperationScope,
     ProjectFairShareEntitySearchResult,
-    ProjectFairShareSearchScope,
+    ProjectFairShareOperationScope,
     UserFairShareEntitySearchResult,
-    UserFairShareSearchScope,
+    UserFairShareOperationScope,
 )
 
 if TYPE_CHECKING:
@@ -218,7 +218,7 @@ class FairShareDBSource:
 
     async def search_rg_domain_fair_shares(
         self,
-        scope: DomainFairShareSearchScope,
+        scope: DomainFairShareOperationScope,
         querier: BatchQuerier,
     ) -> DomainFairShareEntitySearchResult:
         """Search domain fair shares within a resource group.
@@ -438,7 +438,7 @@ class FairShareDBSource:
 
     async def search_rg_project_fair_shares(
         self,
-        scope: ProjectFairShareSearchScope,
+        scope: ProjectFairShareOperationScope,
         querier: BatchQuerier,
     ) -> ProjectFairShareEntitySearchResult:
         """Search project fair shares within a resource group.
@@ -800,7 +800,7 @@ class FairShareDBSource:
 
     async def search_rg_user_fair_shares(
         self,
-        scope: UserFairShareSearchScope,
+        scope: UserFairShareOperationScope,
         querier: BatchQuerier,
     ) -> UserFairShareEntitySearchResult:
         """Search user fair shares within a resource group.

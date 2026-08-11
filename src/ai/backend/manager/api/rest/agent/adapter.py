@@ -16,8 +16,9 @@ from ai.backend.common.dto.manager.agent import (
 )
 from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 __all__ = ("AgentAdapter",)
