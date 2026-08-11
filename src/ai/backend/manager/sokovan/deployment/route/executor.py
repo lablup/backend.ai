@@ -46,7 +46,8 @@ from ai.backend.manager.errors.deployment import (
     RouteSessionTerminated,
 )
 from ai.backend.manager.models.routing.conditions import RouteConditions
-from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.types import (
     RouteData,

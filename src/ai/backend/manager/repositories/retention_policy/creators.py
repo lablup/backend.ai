@@ -9,8 +9,8 @@ from ai.backend.common.data.retention.types import RetentionCategory
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.retention import RetentionPolicyConflict
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.base.creator import CreatorSpec
-from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 
 @dataclass

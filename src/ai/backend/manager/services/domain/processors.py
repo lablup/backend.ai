@@ -1,8 +1,5 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.domain.actions.create_domain import (
     CreateDomainAction,
@@ -48,7 +45,7 @@ from ai.backend.manager.services.domain.actions.search_rg_domains import (
 from .service import DomainService
 
 
-class DomainProcessors(AbstractProcessorPackage):
+class DomainProcessors:
     create_domain_node: ActionProcessor[CreateDomainNodeAction, CreateDomainNodeActionResult]
     modify_domain_node: ActionProcessor[ModifyDomainNodeAction, ModifyDomainNodeActionResult]
     create_domain: ActionProcessor[CreateDomainAction, CreateDomainActionResult]
@@ -80,18 +77,3 @@ class DomainProcessors(AbstractProcessorPackage):
         self.resolve_domain_id_by_name = ActionProcessor(
             service.resolve_domain_id_by_name, action_monitors
         )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateDomainNodeAction.spec(),
-            ModifyDomainNodeAction.spec(),
-            CreateDomainAction.spec(),
-            ModifyDomainAction.spec(),
-            DeleteDomainAction.spec(),
-            PurgeDomainAction.spec(),
-            GetDomainAction.spec(),
-            SearchDomainsAction.spec(),
-            SearchRGDomainsAction.spec(),
-            ResolveDomainIDByNameAction.spec(),
-        ]

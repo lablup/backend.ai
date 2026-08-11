@@ -14,7 +14,8 @@ from ai.backend.manager.data.storage_namespace.types import (
     StorageNamespaceData,
     StorageNamespaceListResult,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.storage_namespace.repository import (
     StorageNamespaceRepository,
 )

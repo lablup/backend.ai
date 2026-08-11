@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable, Container, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -21,7 +21,6 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import (
     Mapped,
-    foreign,
     joinedload,
     load_only,
     mapped_column,
@@ -50,6 +49,7 @@ from ai.backend.manager.models.base import (
     PydanticColumn,
 )
 from ai.backend.manager.models.group import resolve_group_name_or_id, resolve_groups
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -67,11 +67,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.agent import AgentRow
-    from ai.backend.manager.models.domain import DomainRow
-    from ai.backend.manager.models.group import GroupRow
-    from ai.backend.manager.models.keypair import KeyPairRow
-    from ai.backend.manager.models.resource_preset import ResourcePresetRow
-    from ai.backend.manager.models.session import SessionRow
 
 __all__: Sequence[str] = (
     # table defs
@@ -140,7 +135,7 @@ class ScalingGroupOpts(BackendAISchema):
 # each domain, group, and keypair.
 
 
-class ScalingGroupForDomainRow(Base):  # type: ignore[misc]
+class ScalingGroupForDomainRow(Base):
     __tablename__ = "sgroups_for_domains"
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
@@ -163,11 +158,6 @@ class ScalingGroupForDomainRow(Base):  # type: ignore[misc]
     )
     sgroup_row: Mapped[ScalingGroupRow] = relationship(
         "ScalingGroupRow",
-        back_populates="sgroup_for_domains_rows",
-    )
-    domain_row: Mapped[DomainRow] = relationship(
-        "DomainRow",
-        back_populates="sgroup_for_domains_rows",
     )
 
 
@@ -175,7 +165,7 @@ class ScalingGroupForDomainRow(Base):  # type: ignore[misc]
 sgroups_for_domains = ScalingGroupForDomainRow.__table__
 
 
-class ScalingGroupForProjectRow(Base):  # type: ignore[misc]
+class ScalingGroupForProjectRow(Base):
     __tablename__ = "sgroups_for_groups"
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
@@ -199,11 +189,6 @@ class ScalingGroupForProjectRow(Base):  # type: ignore[misc]
     )
     sgroup_row: Mapped[ScalingGroupRow] = relationship(
         "ScalingGroupRow",
-        back_populates="sgroup_for_groups_rows",
-    )
-    project_row: Mapped[GroupRow] = relationship(
-        "GroupRow",
-        back_populates="sgroup_for_groups_rows",
     )
 
 
@@ -211,7 +196,7 @@ class ScalingGroupForProjectRow(Base):  # type: ignore[misc]
 sgroups_for_groups = ScalingGroupForProjectRow.__table__
 
 
-class ScalingGroupForKeypairsRow(Base):  # type: ignore[misc]
+class ScalingGroupForKeypairsRow(Base):
     __tablename__ = "sgroups_for_keypairs"
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
@@ -234,11 +219,6 @@ class ScalingGroupForKeypairsRow(Base):  # type: ignore[misc]
     )
     sgroup_row: Mapped[ScalingGroupRow] = relationship(
         "ScalingGroupRow",
-        back_populates="sgroup_for_keypairs_rows",
-    )
-    keypair_row: Mapped[KeyPairRow] = relationship(
-        "KeyPairRow",
-        back_populates="sgroup_for_keypairs_rows",
     )
 
 
@@ -246,13 +226,7 @@ class ScalingGroupForKeypairsRow(Base):  # type: ignore[misc]
 sgroups_for_keypairs = ScalingGroupForKeypairsRow.__table__
 
 
-def _get_resource_preset_join_condition() -> Any:
-    from ai.backend.manager.models.resource_preset import ResourcePresetRow
-
-    return ScalingGroupRow.name == foreign(ResourcePresetRow.scaling_group_name)
-
-
-class ScalingGroupRow(Base):  # type: ignore[misc]
+class ScalingGroupRow(CreatedAtMixin, Base):
     __tablename__ = "scaling_groups"
     __table_args__ = (
         # Partial unique index: at most one row may have is_default = true.
@@ -284,9 +258,6 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
     # setting the new one within the same transaction.
     is_default: Mapped[bool] = mapped_column(
         "is_default", sa.Boolean, default=False, server_default=false(), nullable=False
-    )
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
     )
     wsproxy_addr: Mapped[str | None] = mapped_column(
         "wsproxy_addr", sa.String(length=1024), nullable=True
@@ -332,33 +303,9 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
         default=DefaultSessionOptions,
     )
 
-    sessions: Mapped[list[SessionRow]] = relationship(
-        "SessionRow",
-        back_populates="scaling_group",
-        foreign_keys="[SessionRow.scaling_group_name]",
-    )
     agents: Mapped[list[AgentRow]] = relationship(
         "AgentRow",
-        back_populates="scaling_group_row",
         foreign_keys="[AgentRow.scaling_group]",
-    )
-
-    sgroup_for_domains_rows: Mapped[list[ScalingGroupForDomainRow]] = relationship(
-        "ScalingGroupForDomainRow",
-        back_populates="sgroup_row",
-    )
-    sgroup_for_groups_rows: Mapped[list[ScalingGroupForProjectRow]] = relationship(
-        "ScalingGroupForProjectRow",
-        back_populates="sgroup_row",
-    )
-    sgroup_for_keypairs_rows: Mapped[list[ScalingGroupForKeypairsRow]] = relationship(
-        "ScalingGroupForKeypairsRow",
-        back_populates="sgroup_row",
-    )
-    resource_preset_rows: Mapped[list[ResourcePresetRow]] = relationship(
-        "ResourcePresetRow",
-        back_populates="scaling_group_row",
-        primaryjoin=_get_resource_preset_join_condition,
     )
 
     @classmethod
@@ -394,7 +341,7 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
             ),
             metadata=ScalingGroupMetadata(
                 description=self.description or "",
-                created_at=self.created_at or datetime.now(UTC),
+                created_at=self.created_at,
             ),
             network=ScalingGroupNetworkConfig(
                 wsproxy_addr=self.wsproxy_addr or "",
@@ -421,6 +368,7 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
                         order=self.scheduler_opts.preemption.order,
                         mode=self.scheduler_opts.preemption.mode,
                         preemption_min_runtime=self.scheduler_opts.preemption.preemption_min_runtime,
+                        victim_scope=self.scheduler_opts.preemption.victim_scope,
                     ),
                 ),
             ),
@@ -435,7 +383,7 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
         conditions: Iterable[QueryCondition],
         *,
         db: ExtendedAsyncSAEngine,
-    ) -> list[Self]:
+    ) -> list[ScalingGroupRow]:
         stmt = sa.select(ScalingGroupRow)
         for cond in conditions:
             stmt = cond(stmt)
@@ -484,7 +432,7 @@ class ScalingGroupModel(RBACModel[ScalingGroupPermission]):
             description=row.description,
             is_active=row.is_active if row.is_active is not None else True,
             is_public=row.is_public,
-            created_at=row.created_at or datetime.now(UTC),
+            created_at=row.created_at,
             wsproxy_addr=row.wsproxy_addr,
             wsproxy_api_token=row.wsproxy_api_token,
             driver=row.driver,
@@ -864,6 +812,6 @@ async def get_scaling_groups(
     if sgroup_ids is not None:
         _stmt = _stmt.where(ScalingGroupRow.id.in_(sgroup_ids))
     async for row in await db_session.stream_scalars(_stmt):
-        permissions = await permission_ctx.calculate_final_permission(row)
+        permissions = await permission_ctx.calculate_final_permission(row.name)
         ret.append(ScalingGroupModel.from_row(row, permissions))
     return ret

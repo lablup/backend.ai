@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions.fetch_status import FetchManagerStatusAction, FetchManagerStatusActionResult
@@ -21,7 +18,7 @@ from .service import ManagerAdminService
 __all__ = ("ManagerAdminProcessors",)
 
 
-class ManagerAdminProcessors(AbstractProcessorPackage):
+class ManagerAdminProcessors:
     """Processor package for manager admin operations."""
 
     fetch_status: ActionProcessor[FetchManagerStatusAction, FetchManagerStatusActionResult]
@@ -45,14 +42,3 @@ class ManagerAdminProcessors(AbstractProcessorPackage):
         self.update_announcement = ActionProcessor(service.update_announcement, action_monitors)
         self.perform_scheduler_ops = ActionProcessor(service.perform_scheduler_ops, action_monitors)
         self.get_db_cxn_status = ActionProcessor(service.get_db_cxn_status, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            FetchManagerStatusAction.spec(),
-            UpdateManagerStatusAction.spec(),
-            GetAnnouncementAction.spec(),
-            UpdateAnnouncementAction.spec(),
-            PerformSchedulerOpsAction.spec(),
-            GetDbCxnStatusAction.spec(),
-        ]

@@ -17,14 +17,17 @@ from ai.backend.common.types import (
     AgentId,
     AgentSelectionStrategy,
     PreemptionOrder,
+    PreemptionVictimScope,
     SessionId,
 )
 
 from .agent import AgentLimit, ResourceGroupResource
 from .workload import (
+    PreemptionScopeKey,
     ResourceRequest,
     SessionDependencyInfo,
     SessionResourceRequest,
+    WorkloadMeta,
 )
 
 
@@ -239,8 +242,8 @@ class AgentVictimCandidates:
 
 
 @dataclass(frozen=True)
-class UserVictimCandidates:
-    """One owner's victim candidates with the per-agent decomposition derived.
+class ScopeVictimCandidates:
+    """One scope key's victim candidates with the per-agent decomposition derived.
 
     ``candidates`` is the stored form (one entry per session — the
     preemption unit); the per-agent grouping and reclaimable totals are
@@ -265,13 +268,18 @@ class UserVictimCandidates:
 
 @dataclass(frozen=True)
 class PreemptionCandidateSnapshot:
-    """Preemption victim candidates of the resource group, grouped per owner."""
+    """Preemption victim candidates of the resource group, grouped by the
+    scope key the group's victim scope derives."""
 
-    by_user: Mapping[UserID, UserVictimCandidates]
+    scope: PreemptionVictimScope
+    by_key: Mapping[PreemptionScopeKey, ScopeVictimCandidates]
 
     @classmethod
     def empty(cls) -> PreemptionCandidateSnapshot:
-        return PreemptionCandidateSnapshot(by_user={})
+        return PreemptionCandidateSnapshot(scope=PreemptionVictimScope.USER, by_key={})
+
+    def candidates_for(self, meta: WorkloadMeta) -> ScopeVictimCandidates | None:
+        return self.by_key.get(meta.preemption_scope_key(self.scope))
 
 
 @dataclass

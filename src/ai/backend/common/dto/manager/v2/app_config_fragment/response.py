@@ -15,6 +15,7 @@ from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 __all__ = (
     "AppConfigFragmentBulkErrorInfo",
     "AppConfigFragmentNode",
+    "AppConfigFragmentUpsertErrorInfo",
     "AppConfigFragmentsByNamesPayload",
     "BulkPurgeAppConfigFragmentPayload",
     "PurgeAppConfigFragmentPayload",
@@ -41,10 +42,27 @@ class AppConfigFragmentsByNamesPayload(BaseRootResponseModel[list[AppConfigFragm
     """One entry per requested config name, null where the scope holds no fragment for it."""
 
 
+class AppConfigFragmentUpsertErrorInfo(BaseResponseModel):
+    """One failed item of a partial-success bulk upsert.
+
+    A rejected insert never had a fragment id, so the item is named by its config name —
+    the batch shares one scope, and a scope holds at most one fragment per name.
+    """
+
+    config_name: str = Field(description="Config name of the item that failed.")
+    message: str = Field(description="Reason the item failed.")
+
+
 class UpsertAppConfigFragmentsPayload(BaseResponseModel):
-    """Payload for a scoped upsert of many fragments (all-or-nothing)."""
+    """Partial-success payload for a scoped upsert of many fragments.
+
+    Not in effect yet: the upsert is still all-or-nothing.
+    """
 
     items: list[AppConfigFragmentNode] = Field(description="The upserted app config fragments.")
+    failed: list[AppConfigFragmentUpsertErrorInfo] = Field(
+        description="Per-item failures, each naming the config name it targeted."
+    )
 
 
 class PurgeAppConfigFragmentPayload(BaseResponseModel):

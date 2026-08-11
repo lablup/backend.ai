@@ -219,11 +219,12 @@ class TestUserRepository:
         sample_domain: DomainFixtureData,
         user_resource_policy: str,
     ) -> str:
-        """Create a test user and return the email."""
+        """Create a test user (with its own virtual scope) and return the email."""
         email = f"test-{uuid.uuid4().hex[:8]}@example.com"
+        user_uuid = uuid.uuid4()
         async with db_with_cleanup.begin_session() as session:
             user = UserRow(
-                uuid=uuid.uuid4(),
+                uuid=user_uuid,
                 username=f"testuser-{uuid.uuid4().hex[:8]}",
                 email=email,
                 password=create_test_password_info("test_password"),
@@ -237,6 +238,7 @@ class TestUserRepository:
                 resource_policy=user_resource_policy,
             )
             session.add(user)
+            session.add(VirtualScopeRow(scope_type=ScopeType.USER.value, scope_id=user_uuid))
             await session.commit()
         return email
 
@@ -1378,13 +1380,12 @@ class TestUserDataConversion:
             totp_activated=False,
             totp_activated_at=None,
             sudo_session_enabled=False,
-            main_access_key="test_access_key",
             container_uid=None,
             container_main_gid=None,
             container_gids=None,
         )
 
-        user_data = UserData.from_row(user_row)
+        user_data = user_row.to_data()
 
         assert user_data.uuid == user_row.uuid
         assert user_data.username == user_row.username
@@ -1395,7 +1396,7 @@ class TestUserDataConversion:
         assert user_data.domain_name == user_row.domain_name
 
     def test_user_data_from_row_converts_readable_cidr_to_str(self) -> None:
-        """Test that UserData.from_row() converts ReadableCIDR objects to str for allowed_client_ip."""
+        """Test that UserRow.to_data() converts ReadableCIDR objects to str for allowed_client_ip."""
         user_row = UserRow(
             uuid=uuid.uuid4(),
             username="testuser",
@@ -1416,13 +1417,12 @@ class TestUserDataConversion:
             totp_activated=False,
             totp_activated_at=None,
             sudo_session_enabled=False,
-            main_access_key="test_access_key",
             container_uid=None,
             container_main_gid=None,
             container_gids=None,
         )
 
-        user_data = UserData.from_row(user_row)
+        user_data = user_row.to_data()
 
         assert user_data.allowed_client_ip is not None
         assert user_data.allowed_client_ip == ["192.168.1.0/24", "10.0.0.0/8"]
@@ -1430,7 +1430,7 @@ class TestUserDataConversion:
             assert isinstance(ip, str)
 
     def test_user_data_from_row_with_none_allowed_client_ip(self) -> None:
-        """Test that UserData.from_row() passes through None for allowed_client_ip."""
+        """Test that UserRow.to_data() passes through None for allowed_client_ip."""
         user_row = UserRow(
             uuid=uuid.uuid4(),
             username="testuser",
@@ -1448,13 +1448,12 @@ class TestUserDataConversion:
             totp_activated=False,
             totp_activated_at=None,
             sudo_session_enabled=False,
-            main_access_key="test_access_key",
             container_uid=None,
             container_main_gid=None,
             container_gids=None,
         )
 
-        user_data = UserData.from_row(user_row)
+        user_data = user_row.to_data()
 
         assert user_data.allowed_client_ip is None
 

@@ -18,11 +18,11 @@ import sqlalchemy as sa
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.errors.repository import (
     AmbiguousEntityKeyError,
-    EmptySearchScopeError,
+    EmptyOperationScopeError,
     EntityNotFoundError,
 )
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchPurger,
@@ -37,12 +37,16 @@ from ai.backend.manager.repositories.base import (
     BulkPurgerResultWithFailures,
     BulkResultWithFailures,
     BulkUpdaterResult,
+    BulkUpserter,
+    BulkUpserterError,
+    BulkUpserterResult,
+    BulkUpserterResultWithFailures,
     Creator,
     CreatorResult,
     DataBatchPurger,
     DataBatchUpdater,
     DataCreator,
-    DataFinder,
+    DataLookup,
     DataPurger,
     DataQuerier,
     DataUpdater,
@@ -67,6 +71,7 @@ from ai.backend.manager.repositories.base import (
     execute_bulk_dependent_creator,
     execute_bulk_purger_partial,
     execute_bulk_updater_partial,
+    execute_bulk_upserter,
     execute_creator,
     execute_dependent_creator,
     execute_next_value_creator,
@@ -133,7 +138,7 @@ class ReadOps:
             return None
         return querier.to_data(result.row)
 
-    async def find_data[TRow: Base, TData](self, finder: DataFinder[TRow, TData]) -> TData | None:
+    async def lookup_data[TRow: Base, TData](self, lookup: DataLookup[TRow, TData]) -> TData | None:
         """Fetch one row by a key that is not its primary key, as its ``data/`` type.
 
         Reads at most two rows and rejects the second: a lookup key is expected to be
@@ -141,9 +146,9 @@ class ReadOps:
         that should enforce it is missing. Answering with an arbitrary one would hide
         both. No count is computed, unlike the search path.
         """
-        row_class = finder.row_class()
+        row_class = lookup.row_class()
         query = sa.select(row_class)
-        for condition in finder.conditions():
+        for condition in lookup.conditions():
             query = query.where(condition())
         result = await self._sess.execute(query.limit(2))
         rows = result.scalars().all()
@@ -153,7 +158,7 @@ class ReadOps:
             raise AmbiguousEntityKeyError(
                 f"The given key matches more than one {row_class.__name__}"
             )
-        return finder.to_data(rows[0])
+        return lookup.to_data(rows[0])
 
     async def batch_query_in_global(
         self,
@@ -175,7 +180,7 @@ class ReadOps:
         self,
         query: sa.sql.Select[Any],
         querier: BatchQuerier,
-        scopes: Sequence[SearchScope],
+        scopes: Sequence[OperationScope],
     ) -> BatchQuerierResult[Row[Any]]:
         """Run a filtered/ordered/paginated query restricted to the given scopes.
 
@@ -183,7 +188,7 @@ class ReadOps:
         unscoped global scan. Use :meth:`batch_query_in_global` for that, explicitly.
         """
         if not scopes:
-            raise EmptySearchScopeError(
+            raise EmptyOperationScopeError(
                 "batch_query_with_scopes requires at least one scope; "
                 "use batch_query_in_global for an explicit unscoped global query."
             )
@@ -191,7 +196,7 @@ class ReadOps:
 
     async def search_with_scopes[TRow: Base, TData](
         self,
-        scopes: Sequence[SearchScope],
+        scopes: Sequence[OperationScope],
         searcher: Searcher[TRow, TData],
     ) -> SearcherResult[TData]:
         """Run a searcher restricted to the given scopes and return converted data.
@@ -200,7 +205,7 @@ class ReadOps:
         own SELECT and row conversion, so no ORM row is returned to the caller.
         """
         if not scopes:
-            raise EmptySearchScopeError(
+            raise EmptyOperationScopeError(
                 "search_with_scopes requires at least one scope; "
                 "use search_in_global for an explicit unscoped global search."
             )
@@ -222,11 +227,12 @@ class ReadOps:
     async def _search[TRow: Base, TData](
         self,
         searcher: Searcher[TRow, TData],
-        scopes: Sequence[SearchScope],
+        scopes: Sequence[OperationScope],
     ) -> SearcherResult[TData]:
         result = await execute_batch_querier(self._sess, searcher.build_select(), searcher, scopes)
         return SearcherResult(
-            items=[searcher.to_data(row) for row in result.rows],
+            # build_select selects a single entity, so the row's first element is TRow.
+            items=[searcher.to_data(row[0]) for row in result.rows],
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
@@ -460,6 +466,43 @@ class WriteOps(ReadOps):
     ) -> UpserterResult[TRow]:
         """Insert or update a single row on conflict."""
         return await execute_upserter(self._sess, upserter, index_elements=index_elements)
+
+    async def bulk_upsert[TRow: Base](
+        self,
+        bulk_upserter: BulkUpserter[TRow],
+        index_elements: list[str],
+    ) -> BulkUpserterResult:
+        """Insert or update multiple rows on conflict in a single statement."""
+        return await execute_bulk_upserter(self._sess, bulk_upserter, index_elements=index_elements)
+
+    async def bulk_upsert_partial[TRow: Base](
+        self,
+        bulk_upserter: BulkUpserter[TRow],
+        index_elements: list[str],
+    ) -> BulkUpserterResultWithFailures[TRow]:
+        """Insert or update each row independently; one row's failure leaves the rest applied.
+
+        Each spec runs in its own savepoint (begin_nested), so a failing row rolls
+        back alone while the rest go through. Order is preserved in successes.
+        """
+        successes: list[TRow] = []
+        errors: list[BulkUpserterError[TRow]] = []
+        for index, spec in enumerate(bulk_upserter.specs):
+            try:
+                async with self._sess.begin_nested():
+                    result = await execute_upserter(
+                        self._sess, Upserter(spec=spec), index_elements=index_elements
+                    )
+                    successes.append(result.row)
+            except sa.exc.IntegrityError as e:
+                parsed = parse_integrity_error(e)
+                try:
+                    match_integrity_error(parsed, spec.integrity_error_checks)
+                except Exception as mapped:
+                    errors.append(BulkUpserterError(spec=spec, exception=mapped, index=index))
+            except Exception as e:
+                errors.append(BulkUpserterError(spec=spec, exception=e, index=index))
+        return BulkUpserterResultWithFailures(successes=successes, errors=errors)
 
     async def upsert_data[TRow: Base, TData](self, upserter: DataUpserter[TRow, TData]) -> TData:
         """Insert or update a single row on conflict, returning its ``data/`` type."""

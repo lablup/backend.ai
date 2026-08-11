@@ -14,7 +14,7 @@ from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 __all__ = ("PrometheusQueryPresetCategoryRow",)
 
 
-class PrometheusQueryPresetCategoryRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class PrometheusQueryPresetCategoryRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "prometheus_query_preset_categories"
 
     id: Mapped[uuid.UUID] = mapped_column(

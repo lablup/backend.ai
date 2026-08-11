@@ -47,24 +47,9 @@ jobs:
     - name: Find Dockerfiles to scan
       id: set-matrix
       run: |
-        echo "Scanning all Dockerfiles"
-        DOCKERFILES=$(find docker -type f -name "*.dockerfile" ! -name "backend.ai-*.dockerfile")
-
-        # Build JSON matrix
-        MATRIX_JSON=$(echo "$DOCKERFILES" | jq -R -s -c '
-          split("\n") |
-          map(select(length > 0)) |
-          map({
-            name: (split("/")[-1] | split(".dockerfile")[0]),
-            dockerfile: .,
-            context: "docker"
-          }) |
-          {include: .}
-        ')
-
+        MATRIX_JSON=$(scripts/list-dockerfiles.sh --infra)
         echo "Found Dockerfiles matrix:"
         echo "$MATRIX_JSON" | jq .
-
         echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
 
   scan-containers:

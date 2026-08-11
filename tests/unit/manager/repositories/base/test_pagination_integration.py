@@ -10,12 +10,14 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
+from ai.backend.manager.models.specs.pagination import (
     CursorBackwardPagination,
     CursorForwardPagination,
     NoPagination,
     OffsetPagination,
+)
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
     execute_batch_querier,
 )
 

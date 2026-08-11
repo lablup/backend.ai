@@ -20,6 +20,14 @@ class BaseSingleEntityAction(ABC):
         """Return the operation that this action performs on the entity."""
         raise NotImplementedError
 
+    @classmethod
+    @abstractmethod
+    def action_name(cls) -> str:
+        """Return the name recorded on audit rows: a lowercase snake_case verb phrase,
+        declared rather than derived so a class rename cannot split the recorded
+        history. Naming rule: services/AGENTS.md."""
+        raise NotImplementedError
+
     @abstractmethod
     def entity_id(self) -> EntityID:
         """Return the ID of the entity that this action applies to."""

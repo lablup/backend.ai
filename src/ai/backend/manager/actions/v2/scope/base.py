@@ -26,6 +26,14 @@ class BaseScopeAction(ABC):
         raise NotImplementedError
 
     @classmethod
+    @abstractmethod
+    def action_name(cls) -> str:
+        """Return the name recorded on audit rows: a lowercase snake_case verb phrase,
+        declared rather than derived so a class rename cannot split the recorded
+        history. Naming rule: services/AGENTS.md."""
+        raise NotImplementedError
+
+    @classmethod
     def spec(cls) -> ActionSpec:
         """Return the "entity:operation" spec keying reporter subscriptions and audit records."""
         return ActionSpec(

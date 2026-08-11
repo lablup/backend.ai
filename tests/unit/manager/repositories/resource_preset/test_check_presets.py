@@ -83,6 +83,9 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.resource_preset.repository import (
     ResourcePresetRepository,
 )
@@ -90,6 +93,7 @@ from ai.backend.manager.repositories.resource_preset.types import (
     CheckPresetsResult,
 )
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
 
 
 def _qty(slots: list[SlotQuantity], name: str) -> Decimal:
@@ -148,6 +152,9 @@ class TestCheckPresetsOccupiedSlots:
                 sgroups_for_keypairs,  # association table
                 sgroups_for_groups,  # association table
                 AssociationScopesEntitiesRow,  # RBAC project membership
+                VirtualScopeRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
             ],
         ):
             # Seed default resource slot types (FK target for normalized tables)
@@ -320,6 +327,7 @@ class TestCheckPresetsOccupiedSlots:
                     entity_id=str(test_user_uuid),
                 )
             )
+            await VirtualScopeSeeder().enroll_user_in_project(db_sess, group_id, test_user_uuid)
             await db_sess.flush()
 
         try:
@@ -1272,6 +1280,9 @@ class TestCheckPresetsZeroValues:
                 sgroups_for_keypairs,  # association table
                 sgroups_for_groups,  # association table
                 AssociationScopesEntitiesRow,  # RBAC project membership
+                VirtualScopeRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
             ],
         ):
             # Seed default resource slot types (FK target for normalized tables)
@@ -1476,6 +1487,7 @@ class TestCheckPresetsZeroValues:
                     entity_id=str(test_user_uuid),
                 )
             )
+            await VirtualScopeSeeder().enroll_user_in_project(db_sess, group_id, test_user_uuid)
             await db_sess.flush()
 
         try:

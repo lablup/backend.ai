@@ -9,7 +9,7 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import DeploymentHistoryData
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.scheduling_history.types import (
-    DeploymentHistorySearchScope,
+    DeploymentHistoryOperationScope,
 )
 
 from .base import SchedulingHistoryAction
@@ -23,7 +23,7 @@ class SearchDeploymentScopedHistoryAction(SchedulingHistoryAction):
     Scope is required and specifies which deployment to query history for.
     """
 
-    scope: DeploymentHistorySearchScope
+    scope: DeploymentHistoryOperationScope
     querier: BatchQuerier
 
     @override

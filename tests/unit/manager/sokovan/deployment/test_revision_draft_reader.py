@@ -14,6 +14,7 @@ import pytest
 
 from ai.backend.common.config import (
     DEFAULT_SHELL,
+    DefaultModelDefinition,
     ModelConfigDraft,
     ModelDefinitionDraft,
     ModelServiceConfigDraft,
@@ -46,14 +47,14 @@ def _mounts(model_mount_destination: str = "/models") -> MountMetadata:
 
 def _variant(
     reads_vfolder_config_files: bool = False,
-    default_model_definition: ModelDefinitionDraft | None = None,
+    default_model_definition: DefaultModelDefinition | None = None,
 ) -> RuntimeVariantData:
     return RuntimeVariantData(
         id=RuntimeVariantID(uuid4()),
         name="custom",
         description=None,
         reads_vfolder_config_files=reads_vfolder_config_files,
-        default_model_definition=default_model_definition or ModelDefinitionDraft(),
+        default_model_definition=default_model_definition or DefaultModelDefinition(),
         created_at=datetime(2026, 5, 15, tzinfo=UTC),
         updated_at=None,
     )
@@ -161,7 +162,7 @@ async def _merge_chain(
     """
     variant = _variant(
         reads_vfolder_config_files=reads_files,
-        default_model_definition=ModelDefinitionDraft.model_validate(variant_default),
+        default_model_definition=DefaultModelDefinition.model_validate(variant_default),
     )
     reader = RevisionDraftReader(deployment_repository=_repository(variant, yaml_payload))
     request = ModelDefinitionDraft.model_validate(request_payload) if request_payload else None

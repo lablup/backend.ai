@@ -20,6 +20,7 @@ class AuditLogData:
     id: uuid.UUID
     action_id: ActionID
     action_kind: ActionKind | None
+    action_name: str
     entity_type: str
     operation: str
     created_at: datetime

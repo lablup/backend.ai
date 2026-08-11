@@ -14,7 +14,7 @@ generic path — and lands the answer in the shared result.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
 from unittest.mock import AsyncMock, MagicMock
@@ -27,6 +27,7 @@ from ai.backend.common.data.entity.types import EntityData, EntityType, ScopeRef
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
@@ -35,17 +36,26 @@ from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.base import (
     BatchPurgeOpsAction,
     BatchUpdateOpsAction,
-    BulkCreateOpsAction,
-    BulkPurgeOpsAction,
     BulkUpdateOpsAction,
-    CreateOpsAction,
+    EntityBulkCreateOpsAction,
+    EntityBulkPurgeOpsAction,
+    EntityCreateOpsAction,
+    EntityPurgeOpsAction,
+    EntityUpsertOpsAction,
+    FieldEntityBulkCreateOpsAction,
+    FieldEntityBulkPurgeOpsAction,
+    FieldEntityUpsertOpsAction,
     GetOpsAction,
+    GlobalEntityBulkCreateOpsAction,
+    GlobalEntityBulkPurgeOpsAction,
+    GlobalEntityUpsertOpsAction,
     GlobalSearchOpsAction,
     LookupOpsAction,
-    PurgeOpsAction,
+    RoleManagedEntityBulkCreateOpsAction,
+    RoleManagedEntityCreateOpsAction,
+    RoleManagedEntityUpsertOpsAction,
     SearchOpsAction,
     UpdateOpsAction,
-    UpsertOpsAction,
 )
 from ai.backend.manager.actions.v2.ops.result import (
     CreatedEntityOpsResult,
@@ -58,37 +68,68 @@ from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
+from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
-from ai.backend.manager.repositories.base.creator import DataCreator
-from ai.backend.manager.repositories.base.pagination import OffsetPagination
-from ai.backend.manager.repositories.base.purger import DataBatchPurger, DataPurger
-from ai.backend.manager.repositories.base.querier import DataFinder, DataQuerier
-from ai.backend.manager.repositories.base.searcher import Searcher, SearcherResult
-from ai.backend.manager.repositories.base.types import BulkResultWithFailures, ConflictCheck
-from ai.backend.manager.repositories.base.updater import DataBatchUpdater, DataUpdater
-from ai.backend.manager.repositories.base.upserter import DataUpserter
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.specs.creator import (
+    EntityCreator,
+    FieldEntityCreator,
+    GlobalEntityCreator,
+    RoleManagedEntityCreator,
+)
+from ai.backend.manager.models.specs.lookup import DataLookup
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.purger import (
+    DataBatchPurger,
+    EntityPurger,
+    FieldEntityPurger,
+    GlobalEntityPurger,
+)
+from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.specs.searcher import Searcher, SearcherResult
+from ai.backend.manager.models.specs.types import (
+    BulkResultWithFailures,
+    ConflictCheck,
+    IntegrityErrorCheck,
+)
+from ai.backend.manager.models.specs.updater import DataBatchUpdater, DataUpdater
+from ai.backend.manager.models.specs.upserter import (
+    EntityUpserter,
+    FieldEntityUpserter,
+    GlobalEntityUpserter,
+    RoleManagedEntityUpserter,
+)
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.ops.service import (
     BatchPurgeService,
     BatchUpdateService,
-    BulkCreateService,
     BulkDeleteService,
-    BulkPurgeService,
     BulkUpdateService,
-    CreateService,
     DeleteService,
+    EntityBulkCreateService,
+    EntityBulkPurgeService,
+    EntityCreateService,
+    EntityPurgeService,
+    EntityUpsertService,
+    FieldBulkCreateService,
+    FieldBulkPurgeService,
+    FieldUpsertService,
     GetService,
+    GlobalBulkCreateService,
+    GlobalBulkPurgeService,
     GlobalSearchService,
+    GlobalUpsertService,
     LookupService,
-    PurgeService,
+    RoleManagedEntityBulkCreateService,
+    RoleManagedEntityCreateService,
+    RoleManagedEntityUpsertService,
     SearchService,
     UpdateService,
-    UpsertService,
 )
 
 _ENTITY_TYPE = EntityType("role_preset")
+_SCOPE_TYPE = ScopeType(_ENTITY_TYPE)
 
 
 # =============================================================================
@@ -125,7 +166,53 @@ class _PresetQuerier(DataQuerier[RolePresetRow, _PresetData]):
         return _PresetData(id=row.id, name=row.name)
 
 
-class _PresetCreator(DataCreator[RolePresetRow, _PresetData]):
+class _PresetCreator(EntityCreator[RolePresetRow, _PresetData]):
+    @override
+    def scope_type(self) -> ScopeType:
+        return _SCOPE_TYPE
+
+    @override
+    def scope_id(self, row: RolePresetRow) -> ScopeID:
+        return row.id
+
+    @override
+    def member_of(self, row: RolePresetRow) -> Collection[ScopeRef]:
+        return ()
+
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_row(self) -> RolePresetRow:
+        return RolePresetRow()
+
+    @override
+    def to_data(self, row: RolePresetRow) -> _PresetData:
+        return _PresetData(id=row.id, name=row.name)
+
+
+class _PresetRoleManagedCreator(RoleManagedEntityCreator[RolePresetRow, _PresetData]):
+    @override
+    def scope_type(self) -> ScopeType:
+        return _SCOPE_TYPE
+
+    @override
+    def scope_id(self, row: RolePresetRow) -> ScopeID:
+        return row.id
+
+    @override
+    def member_of(self, row: RolePresetRow) -> Collection[ScopeRef]:
+        return ()
+
+    @override
+    def template_value(self, row: RolePresetRow) -> ScopeTemplateValue:
+        return ScopeTemplateValue(id=row.id, name=row.name, type="role_preset")
+
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
     @override
     def build_row(self) -> RolePresetRow:
         return RolePresetRow()
@@ -149,6 +236,11 @@ class _PresetUpdater(DataUpdater[RolePresetRow, _PresetData]):
     def pk_value(self) -> uuid.UUID:
         return self.target
 
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
     @override
     def build_values(self) -> dict[str, Any]:
         return self.values
@@ -159,8 +251,12 @@ class _PresetUpdater(DataUpdater[RolePresetRow, _PresetData]):
 
 
 @dataclass
-class _PresetPurger(DataPurger[RolePresetRow, _PresetData]):
+class _PresetPurger(EntityPurger[RolePresetRow, _PresetData]):
     target: uuid.UUID
+
+    @override
+    def scope_of(self) -> ScopeRef:
+        return ScopeRef(scope_type=_SCOPE_TYPE, scope_id=self.target)
 
     @override
     def row_class(self) -> type[RolePresetRow]:
@@ -180,7 +276,7 @@ class _PresetPurger(DataPurger[RolePresetRow, _PresetData]):
 
 
 @dataclass
-class _PresetByName(DataFinder[RolePresetRow, _PresetData]):
+class _PresetByName(DataLookup[RolePresetRow, _PresetData]):
     name: str
 
     @override
@@ -207,6 +303,11 @@ class _PresetBatchUpdater(DataBatchUpdater[RolePresetRow, _PresetData]):
     def conditions(self) -> list[QueryCondition]:
         return [lambda: sa.true()]
 
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
     @override
     def build_values(self) -> dict[str, Any]:
         return {"deleted": True}
@@ -232,10 +333,21 @@ class _PresetBatchPurger(DataBatchPurger[RolePresetRow, _PresetData]):
 
 
 @dataclass
-class _PresetUpserter(DataUpserter[RolePresetRow, _PresetData]):
+class _PresetUpserter(EntityUpserter[RolePresetRow, _PresetData]):
     target: uuid.UUID
 
-    @property
+    @override
+    def scope_type(self) -> ScopeType:
+        return _SCOPE_TYPE
+
+    @override
+    def scope_id(self, row: RolePresetRow) -> ScopeID:
+        return row.id
+
+    @override
+    def member_of(self, row: RolePresetRow) -> Collection[ScopeRef]:
+        return ()
+
     @override
     def row_class(self) -> type[RolePresetRow]:
         return RolePresetRow
@@ -243,6 +355,183 @@ class _PresetUpserter(DataUpserter[RolePresetRow, _PresetData]):
     @override
     def index_elements(self) -> list[str]:
         return ["id"]
+
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_insert_values(self) -> dict[str, Any]:
+        return {"id": self.target, "name": "default"}
+
+    @override
+    def build_update_values(self) -> dict[str, Any]:
+        return {"name": "default"}
+
+    @override
+    def to_data(self, row: RolePresetRow) -> _PresetData:
+        return _PresetData(id=row.id, name=row.name)
+
+
+class _PresetGlobalCreator(GlobalEntityCreator[RolePresetRow, _PresetData]):
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_row(self) -> RolePresetRow:
+        return RolePresetRow()
+
+    @override
+    def to_data(self, row: RolePresetRow) -> _PresetData:
+        return _PresetData(id=row.id, name=row.name)
+
+
+class _PresetFieldCreator(FieldEntityCreator[uuid.UUID, RolePresetRow, _PresetData]):
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_row(self, owner_id: uuid.UUID) -> RolePresetRow:
+        return RolePresetRow()
+
+    @override
+    def to_data(self, row: RolePresetRow) -> _PresetData:
+        return _PresetData(id=row.id, name=row.name)
+
+
+@dataclass
+class _PresetGlobalPurger(GlobalEntityPurger[RolePresetRow, _PresetData]):
+    target: uuid.UUID
+
+    @override
+    def row_class(self) -> type[RolePresetRow]:
+        return RolePresetRow
+
+    @override
+    def pk_value(self) -> uuid.UUID:
+        return self.target
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
+    @override
+    def to_data(self, row: RolePresetRow) -> _PresetData:
+        return _PresetData(id=row.id, name=row.name)
+
+
+@dataclass
+class _PresetFieldPurger(FieldEntityPurger[RolePresetRow, _PresetData]):
+    target: uuid.UUID
+
+    @override
+    def row_class(self) -> type[RolePresetRow]:
+        return RolePresetRow
+
+    @override
+    def pk_value(self) -> uuid.UUID:
+        return self.target
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
+    @override
+    def to_data(self, row: RolePresetRow) -> _PresetData:
+        return _PresetData(id=row.id, name=row.name)
+
+
+@dataclass
+class _PresetGlobalUpserter(GlobalEntityUpserter[RolePresetRow, _PresetData]):
+    target: uuid.UUID
+
+    @override
+    def row_class(self) -> type[RolePresetRow]:
+        return RolePresetRow
+
+    @override
+    def index_elements(self) -> list[str]:
+        return ["id"]
+
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_insert_values(self) -> dict[str, Any]:
+        return {"id": self.target, "name": "default"}
+
+    @override
+    def build_update_values(self) -> dict[str, Any]:
+        return {"name": "default"}
+
+    @override
+    def to_data(self, row: RolePresetRow) -> _PresetData:
+        return _PresetData(id=row.id, name=row.name)
+
+
+@dataclass
+class _PresetFieldUpserter(FieldEntityUpserter[uuid.UUID, RolePresetRow, _PresetData]):
+    target: uuid.UUID
+
+    @override
+    def row_class(self) -> type[RolePresetRow]:
+        return RolePresetRow
+
+    @override
+    def index_elements(self) -> list[str]:
+        return ["id"]
+
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def build_insert_values(self, owner_id: uuid.UUID) -> dict[str, Any]:
+        return {"id": self.target, "name": "default"}
+
+    @override
+    def build_update_values(self) -> dict[str, Any]:
+        return {"name": "default"}
+
+    @override
+    def to_data(self, row: RolePresetRow) -> _PresetData:
+        return _PresetData(id=row.id, name=row.name)
+
+
+@dataclass
+class _PresetRoleManagedUpserter(RoleManagedEntityUpserter[RolePresetRow, _PresetData]):
+    target: uuid.UUID
+
+    @override
+    def scope_type(self) -> ScopeType:
+        return _SCOPE_TYPE
+
+    @override
+    def scope_id(self, row: RolePresetRow) -> ScopeID:
+        return row.id
+
+    @override
+    def member_of(self, row: RolePresetRow) -> Collection[ScopeRef]:
+        return ()
+
+    @override
+    def template_value(self, row: RolePresetRow) -> ScopeTemplateValue:
+        return ScopeTemplateValue(id=row.id, name=row.name, type="role_preset")
+
+    @override
+    def row_class(self) -> type[RolePresetRow]:
+        return RolePresetRow
+
+    @override
+    def index_elements(self) -> list[str]:
+        return ["id"]
+
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
 
     @override
     def build_insert_values(self) -> dict[str, Any]:
@@ -264,13 +553,12 @@ class _PresetSearcher(Searcher[RolePresetRow, _PresetData]):
         return sa.select(RolePresetRow)
 
     @override
-    def to_data(self, row: Any) -> _PresetData:
-        preset_row: RolePresetRow = row.RolePresetRow
-        return _PresetData(id=preset_row.id, name=preset_row.name)
+    def to_data(self, row: RolePresetRow) -> _PresetData:
+        return _PresetData(id=row.id, name=row.name)
 
 
 @dataclass(frozen=True)
-class _ProjectScope(SearchScope):
+class _ProjectScope(OperationScope):
     project_id: uuid.UUID
 
     @override
@@ -311,6 +599,11 @@ class _GetAction(BaseSingleEntityAction, GetOpsAction[RolePresetRow, _PresetData
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.GET
 
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "get_role_preset"
+
 
 @dataclass
 class _DeleteAction(BaseSingleEntityAction, UpdateOpsAction[RolePresetRow, _PresetData]):
@@ -337,14 +630,19 @@ class _DeleteAction(BaseSingleEntityAction, UpdateOpsAction[RolePresetRow, _Pres
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.DELETE
 
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "delete_role_preset"
+
 
 @dataclass
-class _CreateAction(BaseScopeAction, CreateOpsAction[RolePresetRow, _PresetData]):
+class _CreateAction(BaseScopeAction, EntityCreateOpsAction[RolePresetRow, _PresetData]):
     scope: ScopeRef
     creator: _PresetCreator
 
     @override
-    def to_creator(self) -> DataCreator[RolePresetRow, _PresetData]:
+    def to_creator(self) -> EntityCreator[RolePresetRow, _PresetData]:
         return self.creator
 
     @override
@@ -360,6 +658,11 @@ class _CreateAction(BaseScopeAction, CreateOpsAction[RolePresetRow, _PresetData]
     @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "create_role_preset"
 
 
 @dataclass
@@ -385,14 +688,19 @@ class _UpdateAction(BaseSingleEntityAction, UpdateOpsAction[RolePresetRow, _Pres
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "update_role_preset"
+
 
 @dataclass
-class _PurgeAction(BaseSingleEntityAction, PurgeOpsAction[RolePresetRow, _PresetData]):
+class _PurgeAction(BaseSingleEntityAction, EntityPurgeOpsAction[RolePresetRow, _PresetData]):
     target: EntityID
     purger: _PresetPurger
 
     @override
-    def to_purger(self) -> DataPurger[RolePresetRow, _PresetData]:
+    def to_purger(self) -> EntityPurger[RolePresetRow, _PresetData]:
         return self.purger
 
     @override
@@ -409,16 +717,21 @@ class _PurgeAction(BaseSingleEntityAction, PurgeOpsAction[RolePresetRow, _Preset
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.PURGE
 
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "purge_role_preset"
+
 
 @dataclass
-class _UpsertAction(BaseSingleEntityAction, UpsertOpsAction[RolePresetRow, _PresetData]):
+class _UpsertAction(BaseSingleEntityAction, EntityUpsertOpsAction[RolePresetRow, _PresetData]):
     """Declares itself an UPDATE: ``ActionOperationType`` has no upsert."""
 
     target: EntityID
     upserter: _PresetUpserter
 
     @override
-    def to_upserter(self) -> DataUpserter[RolePresetRow, _PresetData]:
+    def to_upserter(self) -> EntityUpserter[RolePresetRow, _PresetData]:
         return self.upserter
 
     @override
@@ -434,6 +747,11 @@ class _UpsertAction(BaseSingleEntityAction, UpsertOpsAction[RolePresetRow, _Pres
     @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "upsert_role_preset"
 
 
 @dataclass(frozen=True)
@@ -453,20 +771,25 @@ class _NameKey(LookupKey):
 class _LookupAction(BaseLookupAction, LookupOpsAction[RolePresetRow, _PresetData]):
     """Declares no target: producing one is the whole point of the run."""
 
-    finder: _PresetByName
+    lookup: _PresetByName
 
     @override
-    def to_finder(self) -> DataFinder[RolePresetRow, _PresetData]:
-        return self.finder
+    def to_lookup(self) -> DataLookup[RolePresetRow, _PresetData]:
+        return self.lookup
 
     @override
     def lookup_key(self) -> LookupKey:
-        return _NameKey(name=self.finder.name)
+        return _NameKey(name=self.lookup.name)
 
     @classmethod
     @override
     def entity_type(cls) -> EntityType:
         return _ENTITY_TYPE
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "lookup_role_preset"
 
 
 @dataclass
@@ -492,13 +815,18 @@ class _BulkUpdateAction(BaseBulkAction, BulkUpdateOpsAction[RolePresetRow, _Pres
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "update_role_presets"
+
 
 @dataclass
-class _BulkPurgeAction(BaseBulkAction, BulkPurgeOpsAction[RolePresetRow, _PresetData]):
+class _BulkPurgeAction(BaseBulkAction, EntityBulkPurgeOpsAction[RolePresetRow, _PresetData]):
     purgers: dict[EntityID, _PresetPurger]
 
     @override
-    def to_purgers(self) -> Mapping[EntityID, DataPurger[RolePresetRow, _PresetData]]:
+    def to_purgers(self) -> Mapping[EntityID, EntityPurger[RolePresetRow, _PresetData]]:
         return self.purgers
 
     @override
@@ -515,14 +843,19 @@ class _BulkPurgeAction(BaseBulkAction, BulkPurgeOpsAction[RolePresetRow, _Preset
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.PURGE
 
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "purge_role_presets"
+
 
 @dataclass
-class _BulkCreateAction(BaseScopeAction, BulkCreateOpsAction[RolePresetRow, _PresetData]):
+class _BulkCreateAction(BaseScopeAction, EntityBulkCreateOpsAction[RolePresetRow, _PresetData]):
     scope: ScopeRef
     creators: list[_PresetCreator]
 
     @override
-    def to_creators(self) -> Sequence[DataCreator[RolePresetRow, _PresetData]]:
+    def to_creators(self) -> Sequence[EntityCreator[RolePresetRow, _PresetData]]:
         return self.creators
 
     @override
@@ -539,15 +872,300 @@ class _BulkCreateAction(BaseScopeAction, BulkCreateOpsAction[RolePresetRow, _Pre
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
 
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "create_role_presets"
+
+
+@dataclass
+class _GlobalUpsertAction(
+    BaseGlobalAction, GlobalEntityUpsertOpsAction[RolePresetRow, _PresetData]
+):
+    upserter: _PresetGlobalUpserter
+
+    @override
+    def to_upserter(self) -> GlobalEntityUpserter[RolePresetRow, _PresetData]:
+        return self.upserter
+
+    @classmethod
+    @override
+    def entity_type(cls) -> EntityType:
+        return _ENTITY_TYPE
+
+    @classmethod
+    @override
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPSERT
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "upsert_global_role_preset"
+
+
+@dataclass
+class _BulkCreateGlobalAction(
+    BaseGlobalAction, GlobalEntityBulkCreateOpsAction[RolePresetRow, _PresetData]
+):
+    creators: list[_PresetGlobalCreator]
+
+    @override
+    def to_creators(self) -> Sequence[GlobalEntityCreator[RolePresetRow, _PresetData]]:
+        return self.creators
+
+    @classmethod
+    @override
+    def entity_type(cls) -> EntityType:
+        return _ENTITY_TYPE
+
+    @classmethod
+    @override
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "create_global_role_presets"
+
+
+@dataclass
+class _BulkPurgeGlobalAction(
+    BaseBulkAction, GlobalEntityBulkPurgeOpsAction[RolePresetRow, _PresetData]
+):
+    purgers: dict[EntityID, _PresetGlobalPurger]
+
+    @override
+    def to_purgers(self) -> Mapping[EntityID, GlobalEntityPurger[RolePresetRow, _PresetData]]:
+        return self.purgers
+
+    @override
+    def entity_ids(self) -> Sequence[EntityID]:
+        return tuple(self.purgers)
+
+    @classmethod
+    @override
+    def entity_type(cls) -> EntityType:
+        return _ENTITY_TYPE
+
+    @classmethod
+    @override
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.PURGE
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "purge_global_role_presets"
+
+
+@dataclass
+class _BulkCreateFieldAction(
+    BaseSingleEntityAction, FieldEntityBulkCreateOpsAction[uuid.UUID, RolePresetRow, _PresetData]
+):
+    owner: uuid.UUID
+    creators: list[_PresetFieldCreator]
+
+    @override
+    def to_creators(self) -> Sequence[FieldEntityCreator[uuid.UUID, RolePresetRow, _PresetData]]:
+        return self.creators
+
+    @override
+    def owner_id(self) -> uuid.UUID:
+        return self.owner
+
+    @override
+    def entity_id(self) -> EntityID:
+        return self.owner
+
+    @classmethod
+    @override
+    def entity_type(cls) -> EntityType:
+        return _ENTITY_TYPE
+
+    @classmethod
+    @override
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "create_field_role_presets"
+
+
+@dataclass
+class _BulkPurgeFieldAction(
+    BaseBulkAction, FieldEntityBulkPurgeOpsAction[RolePresetRow, _PresetData]
+):
+    purgers: dict[EntityID, _PresetFieldPurger]
+
+    @override
+    def to_purgers(self) -> Mapping[EntityID, FieldEntityPurger[RolePresetRow, _PresetData]]:
+        return self.purgers
+
+    @override
+    def entity_ids(self) -> Sequence[EntityID]:
+        return tuple(self.purgers)
+
+    @classmethod
+    @override
+    def entity_type(cls) -> EntityType:
+        return _ENTITY_TYPE
+
+    @classmethod
+    @override
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.PURGE
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "purge_field_role_presets"
+
+
+@dataclass
+class _FieldUpsertAction(
+    BaseSingleEntityAction, FieldEntityUpsertOpsAction[uuid.UUID, RolePresetRow, _PresetData]
+):
+    owner: uuid.UUID
+    upserter: _PresetFieldUpserter
+
+    @override
+    def to_upserter(self) -> FieldEntityUpserter[uuid.UUID, RolePresetRow, _PresetData]:
+        return self.upserter
+
+    @override
+    def owner_id(self) -> uuid.UUID:
+        return self.owner
+
+    @override
+    def entity_id(self) -> EntityID:
+        return self.owner
+
+    @classmethod
+    @override
+    def entity_type(cls) -> EntityType:
+        return _ENTITY_TYPE
+
+    @classmethod
+    @override
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPSERT
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "upsert_field_role_preset"
+
+
+@dataclass
+class _RoleManagedCreateAction(
+    BaseScopeAction, RoleManagedEntityCreateOpsAction[RolePresetRow, _PresetData]
+):
+    scope: ScopeRef
+    creator: _PresetRoleManagedCreator
+
+    @override
+    def to_creator(self) -> RoleManagedEntityCreator[RolePresetRow, _PresetData]:
+        return self.creator
+
+    @override
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (self.scope,)
+
+    @classmethod
+    @override
+    def entity_type(cls) -> EntityType:
+        return _ENTITY_TYPE
+
+    @classmethod
+    @override
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "create_role_managed_role_preset"
+
+
+@dataclass
+class _RoleManagedBulkCreateAction(
+    BaseScopeAction, RoleManagedEntityBulkCreateOpsAction[RolePresetRow, _PresetData]
+):
+    scope: ScopeRef
+    creators: list[_PresetRoleManagedCreator]
+
+    @override
+    def to_creators(self) -> Sequence[RoleManagedEntityCreator[RolePresetRow, _PresetData]]:
+        return self.creators
+
+    @override
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (self.scope,)
+
+    @classmethod
+    @override
+    def entity_type(cls) -> EntityType:
+        return _ENTITY_TYPE
+
+    @classmethod
+    @override
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "create_role_managed_role_presets"
+
+
+@dataclass
+class _RoleManagedUpsertAction(
+    BaseSingleEntityAction, RoleManagedEntityUpsertOpsAction[RolePresetRow, _PresetData]
+):
+    target: EntityID
+    upserter: _PresetRoleManagedUpserter
+
+    @override
+    def to_upserter(self) -> RoleManagedEntityUpserter[RolePresetRow, _PresetData]:
+        return self.upserter
+
+    @override
+    def entity_id(self) -> EntityID:
+        return self.target
+
+    @classmethod
+    @override
+    def entity_type(cls) -> EntityType:
+        return _ENTITY_TYPE
+
+    @classmethod
+    @override
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "upsert_role_managed_role_preset"
+
 
 @dataclass
 class _BatchUpdateAction(BaseScopeAction, BatchUpdateOpsAction[RolePresetRow, _PresetData]):
     scope: ScopeRef
     updater: _PresetBatchUpdater
+    scopes: list[OperationScope] = field(default_factory=list)
 
     @override
     def to_batch_updater(self) -> DataBatchUpdater[RolePresetRow, _PresetData]:
         return self.updater
+
+    @override
+    def operation_scopes(self) -> Sequence[OperationScope]:
+        return self.scopes
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
@@ -563,15 +1181,25 @@ class _BatchUpdateAction(BaseScopeAction, BatchUpdateOpsAction[RolePresetRow, _P
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "batch_update_role_presets"
+
 
 @dataclass
 class _BatchPurgeAction(BaseScopeAction, BatchPurgeOpsAction[RolePresetRow, _PresetData]):
     scope: ScopeRef
     purger: _PresetBatchPurger
+    scopes: list[OperationScope] = field(default_factory=list)
 
     @override
     def to_batch_purger(self) -> DataBatchPurger[RolePresetRow, _PresetData]:
         return self.purger
+
+    @override
+    def operation_scopes(self) -> Sequence[OperationScope]:
+        return self.scopes
 
     @override
     def scope_targets(self) -> Sequence[ScopeRef]:
@@ -586,6 +1214,11 @@ class _BatchPurgeAction(BaseScopeAction, BatchPurgeOpsAction[RolePresetRow, _Pre
     @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.PURGE
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "batch_purge_role_presets"
 
 
 @dataclass
@@ -608,19 +1241,24 @@ class _GlobalSearchAction(BaseGlobalAction, GlobalSearchOpsAction[RolePresetRow,
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
 
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "admin_search_role_presets"
+
 
 @dataclass
 class _SearchAction(BaseScopeAction, SearchOpsAction[RolePresetRow, _PresetData]):
     scope: ScopeRef
     searcher: _PresetSearcher
-    scopes: list[SearchScope] = field(default_factory=list)
+    scopes: list[OperationScope] = field(default_factory=list)
 
     @override
     def to_searcher(self) -> Searcher[RolePresetRow, _PresetData]:
         return self.searcher
 
     @override
-    def search_scopes(self) -> Sequence[SearchScope]:
+    def operation_scopes(self) -> Sequence[OperationScope]:
         return self.scopes
 
     @override
@@ -637,6 +1275,11 @@ class _SearchAction(BaseScopeAction, SearchOpsAction[RolePresetRow, _PresetData]
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
 
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "search_role_presets"
+
 
 # =============================================================================
 # Fixtures
@@ -651,11 +1294,36 @@ def stored() -> _PresetData:
 @pytest.fixture
 def repository(stored: _PresetData) -> MagicMock:
     mock = MagicMock(spec=OpsRepository)
-    for operation in ("get", "find", "create", "update", "upsert", "purge"):
+    for operation in (
+        "get",
+        "lookup",
+        "create_entity",
+        "create_role_managed_entity",
+        "upsert_field_entity",
+        "upsert_global_entity",
+        "update",
+        "upsert_entity",
+        "upsert_role_managed_entity",
+        "purge_entity",
+    ):
         setattr(mock, operation, AsyncMock(return_value=stored))
-    for operation in ("bulk_create", "batch_update", "batch_purge"):
+    for operation in (
+        "bulk_create_entities",
+        "bulk_create_role_managed_entities",
+        "bulk_create_global_entities",
+        "bulk_create_field_entities",
+        "batch_update_in_scopes",
+        "batch_update_in_global",
+        "batch_purge_in_scopes",
+        "batch_purge_in_global",
+    ):
         setattr(mock, operation, AsyncMock(return_value=[stored]))
-    for operation in ("bulk_update", "bulk_purge"):
+    for operation in (
+        "bulk_update",
+        "bulk_purge_entities",
+        "bulk_purge_global_entities",
+        "bulk_purge_field_entities",
+    ):
         setattr(
             mock,
             operation,
@@ -691,7 +1359,7 @@ def authenticated_user() -> UserData:
 
 @pytest.fixture
 def scope() -> ScopeRef:
-    return ScopeRef(scope_type=ScopeType("project"), scope_id=uuid.uuid4())
+    return ScopeRef(scope_type=ScopeType(EntityType("project")), scope_id=uuid.uuid4())
 
 
 @pytest.fixture
@@ -734,13 +1402,13 @@ async def test_delete_applies_the_action_s_updater(
 async def test_create_forwards_the_action_s_creator(
     repository: MagicMock, stored: _PresetData, scope: ScopeRef
 ) -> None:
-    service: CreateService[_PresetData] = CreateService(repository)
+    service: EntityCreateService[_PresetData] = EntityCreateService(repository)
     creator = _PresetCreator()
 
     result = await service.execute(_CreateAction(scope=scope, creator=creator))
 
     assert result.data == stored
-    repository.create.assert_awaited_once_with(creator)
+    repository.create_entity.assert_awaited_once_with(creator)
 
 
 async def test_update_forwards_the_action_s_updater(
@@ -758,38 +1426,38 @@ async def test_update_forwards_the_action_s_updater(
 async def test_upsert_forwards_the_action_s_upserter(
     repository: MagicMock, stored: _PresetData
 ) -> None:
-    service: UpsertService[_PresetData] = UpsertService(repository)
+    service: EntityUpsertService[_PresetData] = EntityUpsertService(repository)
     upserter = _PresetUpserter(target=stored.id)
 
     result = await service.execute(_UpsertAction(target=stored.id, upserter=upserter))
 
     assert result.data == stored
-    repository.upsert.assert_awaited_once_with(upserter)
+    repository.upsert_entity.assert_awaited_once_with(upserter)
 
 
 async def test_purge_forwards_the_action_s_purger(
     repository: MagicMock, stored: _PresetData
 ) -> None:
-    service: PurgeService[_PresetData] = PurgeService(repository)
+    service: EntityPurgeService[_PresetData] = EntityPurgeService(repository)
     purger = _PresetPurger(target=stored.id)
 
     result = await service.execute(_PurgeAction(target=stored.id, purger=purger))
 
     assert result.data == stored
-    repository.purge.assert_awaited_once_with(purger)
+    repository.purge_entity.assert_awaited_once_with(purger)
 
 
-async def test_lookup_forwards_the_action_s_finder(
+async def test_lookup_forwards_the_action_s_lookup_spec(
     repository: MagicMock, stored: _PresetData
 ) -> None:
     service: LookupService[_PresetData] = LookupService(repository)
-    finder = _PresetByName(name="default")
+    lookup = _PresetByName(name="default")
 
-    result = await service.execute(_LookupAction(finder=finder))
+    result = await service.execute(_LookupAction(lookup=lookup))
 
     assert result.data == stored
     assert result.resolved_entity_id() == stored.id
-    repository.find.assert_awaited_once_with(finder)
+    repository.lookup.assert_awaited_once_with(lookup)
 
 
 async def test_lookup_runs_under_the_lookup_processor(
@@ -803,7 +1471,7 @@ async def test_lookup_runs_under_the_lookup_processor(
     )
 
     with with_user(authenticated_user):
-        result = await processor.run(_LookupAction(finder=_PresetByName(name="default")))
+        result = await processor.run(_LookupAction(lookup=_PresetByName(name="default")))
 
     # The id the key resolved to is what reaches the audit trail.
     assert result.resolved_entity_id() == stored.id
@@ -812,13 +1480,13 @@ async def test_lookup_runs_under_the_lookup_processor(
 async def test_bulk_create_forwards_every_creator(
     repository: MagicMock, stored: _PresetData, scope: ScopeRef
 ) -> None:
-    service: BulkCreateService[_PresetData] = BulkCreateService(repository)
+    service: EntityBulkCreateService[_PresetData] = EntityBulkCreateService(repository)
     creators = [_PresetCreator(), _PresetCreator()]
 
     result = await service.execute(_BulkCreateAction(scope=scope, creators=creators))
 
     assert result.items == [stored]
-    repository.bulk_create.assert_awaited_once_with(creators)
+    repository.bulk_create_entities.assert_awaited_once_with(creators)
 
 
 async def test_bulk_update_answers_for_every_named_entity(
@@ -848,13 +1516,129 @@ async def test_bulk_delete_writes_through_the_update_path(
 async def test_bulk_purge_answers_for_every_named_entity(
     repository: MagicMock, stored: _PresetData
 ) -> None:
-    service: BulkPurgeService[_PresetData] = BulkPurgeService(repository)
+    service: EntityBulkPurgeService[_PresetData] = EntityBulkPurgeService(repository)
     purgers = {stored.id: _PresetPurger(target=stored.id)}
 
     result = await service.execute(_BulkPurgeAction(purgers=purgers))
 
     assert [r.entity_id for r in result.entity_results()] == [stored.id]
-    repository.bulk_purge.assert_awaited_once_with(purgers)
+    repository.bulk_purge_entities.assert_awaited_once_with(purgers)
+
+
+async def test_role_managed_create_forwards_the_action_s_creator(
+    repository: MagicMock, stored: _PresetData, scope: ScopeRef
+) -> None:
+    service: RoleManagedEntityCreateService[_PresetData] = RoleManagedEntityCreateService(
+        repository
+    )
+    creator = _PresetRoleManagedCreator()
+
+    result = await service.execute(_RoleManagedCreateAction(scope=scope, creator=creator))
+
+    assert result.data == stored
+    repository.create_role_managed_entity.assert_awaited_once_with(creator)
+
+
+async def test_role_managed_bulk_create_forwards_every_creator(
+    repository: MagicMock, stored: _PresetData, scope: ScopeRef
+) -> None:
+    service: RoleManagedEntityBulkCreateService[_PresetData] = RoleManagedEntityBulkCreateService(
+        repository
+    )
+    creators = [_PresetRoleManagedCreator(), _PresetRoleManagedCreator()]
+
+    result = await service.execute(_RoleManagedBulkCreateAction(scope=scope, creators=creators))
+
+    assert result.items == [stored]
+    repository.bulk_create_role_managed_entities.assert_awaited_once_with(creators)
+
+
+async def test_role_managed_upsert_forwards_the_action_s_upserter(
+    repository: MagicMock, stored: _PresetData
+) -> None:
+    service: RoleManagedEntityUpsertService[_PresetData] = RoleManagedEntityUpsertService(
+        repository
+    )
+    upserter = _PresetRoleManagedUpserter(target=stored.id)
+
+    result = await service.execute(_RoleManagedUpsertAction(target=stored.id, upserter=upserter))
+
+    assert result.data == stored
+    repository.upsert_role_managed_entity.assert_awaited_once_with(upserter)
+
+
+async def test_global_upsert_forwards_the_action_s_upserter(
+    repository: MagicMock, stored: _PresetData
+) -> None:
+    service: GlobalUpsertService[_PresetData] = GlobalUpsertService(repository)
+    upserter = _PresetGlobalUpserter(target=stored.id)
+
+    result = await service.execute(_GlobalUpsertAction(upserter=upserter))
+
+    assert result.data == stored
+    repository.upsert_global_entity.assert_awaited_once_with(upserter)
+
+
+async def test_global_bulk_create_forwards_every_creator(
+    repository: MagicMock, stored: _PresetData
+) -> None:
+    service: GlobalBulkCreateService[_PresetData] = GlobalBulkCreateService(repository)
+    creators = [_PresetGlobalCreator(), _PresetGlobalCreator()]
+
+    result = await service.execute(_BulkCreateGlobalAction(creators=creators))
+
+    assert result.items == [stored]
+    repository.bulk_create_global_entities.assert_awaited_once_with(creators)
+
+
+async def test_field_bulk_create_forwards_owner_and_creators(
+    repository: MagicMock, stored: _PresetData
+) -> None:
+    service: FieldBulkCreateService[_PresetData] = FieldBulkCreateService(repository)
+    owner = uuid.uuid4()
+    creators = [_PresetFieldCreator(), _PresetFieldCreator()]
+
+    result = await service.execute(_BulkCreateFieldAction(owner=owner, creators=creators))
+
+    assert result.items == [stored]
+    repository.bulk_create_field_entities.assert_awaited_once_with(owner, creators)
+
+
+async def test_global_bulk_purge_answers_for_every_named_entity(
+    repository: MagicMock, stored: _PresetData
+) -> None:
+    service: GlobalBulkPurgeService[_PresetData] = GlobalBulkPurgeService(repository)
+    purgers = {stored.id: _PresetGlobalPurger(target=stored.id)}
+
+    result = await service.execute(_BulkPurgeGlobalAction(purgers=purgers))
+
+    assert [r.entity_id for r in result.entity_results()] == [stored.id]
+    repository.bulk_purge_global_entities.assert_awaited_once_with(purgers)
+
+
+async def test_field_bulk_purge_answers_for_every_named_entity(
+    repository: MagicMock, stored: _PresetData
+) -> None:
+    service: FieldBulkPurgeService[_PresetData] = FieldBulkPurgeService(repository)
+    purgers = {stored.id: _PresetFieldPurger(target=stored.id)}
+
+    result = await service.execute(_BulkPurgeFieldAction(purgers=purgers))
+
+    assert [r.entity_id for r in result.entity_results()] == [stored.id]
+    repository.bulk_purge_field_entities.assert_awaited_once_with(purgers)
+
+
+async def test_field_upsert_forwards_owner_and_upserter(
+    repository: MagicMock, stored: _PresetData
+) -> None:
+    service: FieldUpsertService[_PresetData] = FieldUpsertService(repository)
+    owner = uuid.uuid4()
+    upserter = _PresetFieldUpserter(target=stored.id)
+
+    result = await service.execute(_FieldUpsertAction(owner=owner, upserter=upserter))
+
+    assert result.data == stored
+    repository.upsert_field_entity.assert_awaited_once_with(owner, upserter)
 
 
 async def test_batch_update_names_what_it_wrote(
@@ -862,11 +1646,14 @@ async def test_batch_update_names_what_it_wrote(
 ) -> None:
     service: BatchUpdateService[_PresetData] = BatchUpdateService(repository)
     updater = _PresetBatchUpdater()
+    search_scope = _ProjectScope(project_id=uuid.uuid4())
 
-    result = await service.execute(_BatchUpdateAction(scope=scope, updater=updater))
+    result = await service.execute(
+        _BatchUpdateAction(scope=scope, updater=updater, scopes=[search_scope])
+    )
 
     assert result.entity_ids() == (stored.id,)
-    repository.batch_update.assert_awaited_once_with(updater)
+    repository.batch_update_in_scopes.assert_awaited_once_with([search_scope], updater)
 
 
 async def test_batch_purge_names_what_it_removed(
@@ -874,11 +1661,14 @@ async def test_batch_purge_names_what_it_removed(
 ) -> None:
     service: BatchPurgeService[_PresetData] = BatchPurgeService(repository)
     purger = _PresetBatchPurger()
+    search_scope = _ProjectScope(project_id=uuid.uuid4())
 
-    result = await service.execute(_BatchPurgeAction(scope=scope, purger=purger))
+    result = await service.execute(
+        _BatchPurgeAction(scope=scope, purger=purger, scopes=[search_scope])
+    )
 
     assert result.entity_ids() == (stored.id,)
-    repository.batch_purge.assert_awaited_once_with(purger)
+    repository.batch_purge_in_scopes.assert_awaited_once_with([search_scope], purger)
 
 
 async def test_search_forwards_the_searcher_and_its_scopes(
@@ -927,7 +1717,7 @@ async def test_global_search_takes_no_scopes_at_all(
 async def test_create_runs_under_the_scope_processor(
     repository: MagicMock, stored: _PresetData, scope: ScopeRef
 ) -> None:
-    service: CreateService[_PresetData] = CreateService(repository)
+    service: EntityCreateService[_PresetData] = EntityCreateService(repository)
     processor: ScopeActionProcessor[_CreateAction, CreatedEntityOpsResult[_PresetData]] = (
         ScopeActionProcessor(service.execute)
     )
@@ -959,7 +1749,13 @@ async def test_batch_purge_runs_under_the_scope_processor(
         ScopeActionProcessor(service.execute)
     )
 
-    result = await processor.run(_BatchPurgeAction(scope=scope, purger=_PresetBatchPurger()))
+    result = await processor.run(
+        _BatchPurgeAction(
+            scope=scope,
+            purger=_PresetBatchPurger(),
+            scopes=[_ProjectScope(project_id=uuid.uuid4())],
+        )
+    )
 
     # Every entity the run removed reaches the audit trail.
     assert result.entity_ids() == (stored.id,)

@@ -6,6 +6,7 @@ import json
 from decimal import Decimal
 from typing import Any
 
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.models.group.row import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
@@ -65,7 +66,7 @@ PROJECT_JOINS = (ASSOC_GROUP_USER_JOIN, PROJECT_JOIN)
 # Main Keypair JOIN (N:1, no duplication)
 MAIN_KEYPAIR_JOIN = JoinDef(
     table=KeyPairRow.__table__,
-    condition=UserRow.main_access_key == KeyPairRow.access_key,
+    condition=(KeyPairRow.user == UserRow.uuid) & KeyPairRow.is_default,
 )
 
 # Field definitions for user export
@@ -134,7 +135,7 @@ USER_FIELDS: list[ExportFieldDef] = [
         name="Modified At",
         description="Last modification time",
         field_type=ExportFieldType.DATETIME,
-        column=UserRow.modified_at,
+        column=UserRow.updated_at,
         formatter=lambda v: v.isoformat() if v else "",
     ),
     # =========================================================================
@@ -247,9 +248,13 @@ USER_FIELDS: list[ExportFieldDef] = [
     ExportFieldDef(
         key="main_access_key",
         name="Main Access Key",
-        description="Main keypair access key",
+        description=(
+            f"Main keypair access key. Deprecated since {NEXT_RELEASE_VERSION}."
+            " Use the keypair report's is_default field."
+        ),
         field_type=ExportFieldType.STRING,
-        column=UserRow.main_access_key,
+        column=KeyPairRow.access_key,
+        joins=frozenset({MAIN_KEYPAIR_JOIN}),
     ),
     ExportFieldDef(
         key="main_keypair_is_active",

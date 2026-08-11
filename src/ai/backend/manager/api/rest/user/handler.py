@@ -27,6 +27,7 @@ from ai.backend.common.dto.manager.user import (
     UpdateUserRequest,
     UpdateUserResponse,
 )
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.user.types import UserInfoContext
@@ -40,6 +41,7 @@ from ai.backend.manager.services.domain.actions.get_domain import GetDomainActio
 from ai.backend.manager.services.user.actions.create_user import CreateUserAction
 from ai.backend.manager.services.user.actions.delete_user import DeleteUserAction
 from ai.backend.manager.services.user.actions.get_user import GetUserAction
+from ai.backend.manager.services.user.actions.keypair_ops import SwitchDefaultAccessKeyAction
 from ai.backend.manager.services.user.actions.modify_user import ModifyUserAction
 from ai.backend.manager.services.user.actions.purge_user import PurgeUserAction
 from ai.backend.manager.services.user.actions.search_users import SearchUsersAction
@@ -203,6 +205,14 @@ class UserHandler:
             ModifyUserAction(user_uuid=path.parsed.user_id, email=email, updater=updater)
         )
 
+        if body.parsed.main_access_key is not None:
+            await self._user.switch_default_access_key.wait_for_complete(
+                SwitchDefaultAccessKeyAction(
+                    user_id=UserID(path.parsed.user_id),
+                    access_key=AccessKey(body.parsed.main_access_key),
+                )
+            )
+
         resp = UpdateUserResponse(user=self._adapter.convert_to_dto(action_result.data))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
@@ -253,9 +263,6 @@ class UserHandler:
         user_info_ctx = UserInfoContext(
             uuid=caller_result.user.uuid,
             email=caller_result.user.email,
-            main_access_key=AccessKey(caller_result.user.main_access_key)
-            if caller_result.user.main_access_key
-            else None,
         )
 
         purge_shared = OptionalState[bool].nop()

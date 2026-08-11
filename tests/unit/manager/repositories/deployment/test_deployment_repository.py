@@ -14,7 +14,7 @@ import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 
-from ai.backend.common.config import ModelDefinitionDraft
+from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
@@ -99,14 +99,14 @@ from ai.backend.manager.models.session import (
     SessionTypes,
 )
 from ai.backend.manager.models.session_group.row import SessionGroupRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.purger import Purger, PurgerSpec
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.repositories.base.types import ConflictCheck
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.base.upserter import Upserter
 from ai.backend.manager.repositories.deployment import DeploymentRepository
@@ -702,7 +702,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                     id=runtime_variant_id,
                     name=f"vllm-{runtime_variant_id.hex[:8]}",
                     description="test variant",
-                    default_model_definition=ModelDefinitionDraft(),
+                    default_model_definition=DefaultModelDefinition(),
                 )
             )
             await db_sess.flush()
@@ -938,7 +938,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                     id=runtime_variant_id,
                     name=f"vllm-{runtime_variant_id.hex[:8]}",
                     description="test variant",
-                    default_model_definition=ModelDefinitionDraft(),
+                    default_model_definition=DefaultModelDefinition(),
                 )
             )
             await db_sess.flush()
@@ -1718,7 +1718,7 @@ class TestDeploymentRevisionOperations:
                     id=variant_id,
                     name=f"test-variant-{variant_id.hex[:8]}",
                     description="test",
-                    default_model_definition=ModelDefinitionDraft(),
+                    default_model_definition=DefaultModelDefinition(),
                 )
             )
             await db_sess.commit()

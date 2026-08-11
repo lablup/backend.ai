@@ -16,6 +16,14 @@ from ai.backend.manager.services.idle_checker.actions.create import (
     CreateIdleCheckerAction,
     CreateIdleCheckerActionResult,
 )
+from ai.backend.manager.services.idle_checker.actions.exclude_sessions import (
+    ExcludeSessionIdleChecksAction,
+    ExcludeSessionIdleChecksActionResult,
+)
+from ai.backend.manager.services.idle_checker.actions.include_sessions import (
+    IncludeSessionIdleChecksAction,
+    IncludeSessionIdleChecksActionResult,
+)
 from ai.backend.manager.services.idle_checker.actions.purge import (
     PurgeIdleCheckerAction,
     PurgeIdleCheckerActionResult,
@@ -88,3 +96,27 @@ class IdleCheckerService:
     async def purge(self, action: PurgeIdleCheckerAction) -> PurgeIdleCheckerActionResult:
         data = await self._repository.purge(action.purger)
         return PurgeIdleCheckerActionResult(idle_checker=data)
+
+    async def exclude_sessions(
+        self, action: ExcludeSessionIdleChecksAction
+    ) -> ExcludeSessionIdleChecksActionResult:
+        batch_result = await self._repository.batch_exclude_session_idle_checks(
+            action.checker_id, action.session_ids
+        )
+        return ExcludeSessionIdleChecksActionResult(
+            checker_id=action.checker_id,
+            success=batch_result.success,
+            errors=batch_result.errors,
+        )
+
+    async def include_sessions(
+        self, action: IncludeSessionIdleChecksAction
+    ) -> IncludeSessionIdleChecksActionResult:
+        batch_result = await self._repository.batch_include_session_idle_checks(
+            action.checker_id, action.session_ids
+        )
+        return IncludeSessionIdleChecksActionResult(
+            checker_id=action.checker_id,
+            success=batch_result.success,
+            errors=batch_result.errors,
+        )

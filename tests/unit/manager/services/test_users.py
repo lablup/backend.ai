@@ -96,7 +96,7 @@ class TestCreateUser:
             totp_activated=False,
             totp_activated_at=None,
             sudo_session_enabled=False,
-            main_access_key="TESTKEY1234567890",
+            default_access_key="TESTKEY1234567890",
             container_uid=None,
             container_main_gid=None,
             container_gids=None,
@@ -110,6 +110,7 @@ class TestCreateUser:
             secret_key=SecretKey("test-secret-key"),
             is_active=True,
             is_admin=False,
+            is_default=True,
             created_at=datetime.now(tz=UTC),
             modified_at=datetime.now(tz=UTC),
             resource_policy_name="default",
@@ -280,7 +281,7 @@ class TestModifyUser:
             totp_activated=False,
             totp_activated_at=None,
             sudo_session_enabled=False,
-            main_access_key="TESTKEY1234567890",
+            default_access_key="TESTKEY1234567890",
             container_uid=None,
             container_main_gid=None,
             container_gids=None,
@@ -444,7 +445,7 @@ class TestPurgeUser:
             totp_activated=False,
             totp_activated_at=None,
             sudo_session_enabled=False,
-            main_access_key="TESTKEY1234567890",
+            default_access_key="TESTKEY1234567890",
             container_uid=None,
             container_main_gid=None,
             container_gids=None,
@@ -455,7 +456,6 @@ class TestPurgeUser:
         return UserInfoContext(
             uuid=uuid.uuid4(),
             email="admin@example.com",
-            main_access_key=AccessKey("ADMINKEY123456789"),
         )
 
     async def test_purge_user_succeeds_without_active_vfolders(
@@ -571,7 +571,6 @@ class TestPurgeUser:
         mock_user_repository.delegate_endpoint_ownership.assert_called_once_with(
             user_uuid=purge_user_uuid,
             target_user_uuid=admin_user_info_ctx.uuid,
-            target_main_access_key=admin_user_info_ctx.main_access_key,
         )
         # When delegating, delete_endpoints should be called with delete_destroyed_only=True
         mock_user_repository.delete_endpoints.assert_called_once_with(
@@ -579,14 +578,15 @@ class TestPurgeUser:
             delete_destroyed_only=True,
         )
 
-    async def test_purge_user_rejects_delegation_without_a_main_access_key(
+    async def test_purge_user_rejects_delegation_without_a_default_keypair(
         self,
         service: UserService,
         mock_user_repository: MagicMock,
         purge_user_data: UserData,
         admin_user_info_ctx: UserInfoContext,
     ) -> None:
-        """The requester's key is checked before the purge mutates anything (BA-7190)."""
+        """The delegation target is checked before the purge mutates anything (BA-7190)."""
+        mock_user_repository.default_access_key = AsyncMock(return_value=None)
         mock_user_repository.get_by_email_validated = AsyncMock(return_value=purge_user_data)
         mock_user_repository.check_user_vfolder_mounted_to_active_kernels = AsyncMock(
             return_value=False
@@ -597,11 +597,7 @@ class TestPurgeUser:
         mock_user_repository.purge_user = AsyncMock(return_value=None)
 
         action = PurgeUserAction(
-            user_info_ctx=UserInfoContext(
-                uuid=admin_user_info_ctx.uuid,
-                email=admin_user_info_ctx.email,
-                main_access_key=None,
-            ),
+            user_info_ctx=admin_user_info_ctx,
             email=purge_user_data.email,
             purge_shared_vfolders=OptionalState.update(True),
             delegate_endpoint_ownership=OptionalState.update(True),
@@ -699,7 +695,7 @@ class TestBulkPurgeUsers:
         admin_user = MagicMock()
         admin_user.uuid = uuid.uuid4()
         admin_user.email = "admin@example.com"
-        admin_user.main_access_key = "ADMINKEY123456789"
+        admin_user.default_access_key = "ADMINKEY123456789"
         mock_user_repository.get_user_by_uuid = AsyncMock(return_value=admin_user)
         return admin_user
 

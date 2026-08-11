@@ -1,8 +1,35 @@
+schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@shareable"]) {
+  query: Query
+}
+
+"""
+Added in 26.9.0. The merged config for one config name: every fragment visible to the caller, deep-merged in ascending allow-list rank order.
+"""
+type AppConfig @shareable {
+  """Config name this view is for."""
+  configName: String!
+
+  """
+  Every fragment visible to the caller, deep-merged in ascending allow-list rank order. Empty when nothing visible contributes, or when everything that did was empty. Read the fragment API for the per-scope values behind it.
+  """
+  config: JSON!
+}
+
+"""
+The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
+"""
+scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
+
 type Query {
   _service: _Service!
 
   """Added in 26.9.0. Returns 'pong'"""
   ping: String!
+
+  """
+  Added in 26.9.0. Read the merged config for each of the given names from public fragments only. Served by the `public` subgraph without authentication, for pre-login clients that need config before they have credentials.
+  """
+  publicAppConfigs(configNames: [String!]!): [AppConfig!]!
 }
 
 scalar _Any

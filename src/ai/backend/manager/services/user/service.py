@@ -5,7 +5,7 @@ from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
-from ai.backend.common.types import AccessKey
+from ai.backend.common.identifier.user import UserID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.user.types import (
@@ -61,8 +61,8 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     SearchKeypairsByResourcePolicyActionResult,
     SearchMyKeypairsAction,
     SearchMyKeypairsActionResult,
-    SwitchMyMainAccessKeyAction,
-    SwitchMyMainAccessKeyActionResult,
+    SwitchDefaultAccessKeyAction,
+    SwitchDefaultAccessKeyActionResult,
     UpdateMyKeypairAction,
     UpdateMyKeypairActionResult,
 )
@@ -182,9 +182,6 @@ class UserService:
         user_info_ctx = UserInfoContext(
             uuid=admin_user.uuid,
             email=admin_user.email,
-            main_access_key=AccessKey(admin_user.main_access_key)
-            if admin_user.main_access_key
-            else None,
         )
         # Reuse the internal UUID-based purge logic shared with bulk_purge_users
         bulk_action = BulkPurgeUserAction(
@@ -221,20 +218,23 @@ class UserService:
         )
         user_uuid = user_data.uuid
 
+        if action.delegate_endpoint_ownership.optional_value():
+            # Validated before the shared vfolder migration below, which the purge cannot undo
+            # once the delegation turns out to be impossible.
+            if (
+                await self._user_repository.default_access_key(UserID(action.user_info_ctx.uuid))
+                is None
+            ):
+                raise UserPurgeFailure(
+                    "Cannot delegate endpoint ownership to a user without a default keypair "
+                    f"(user_id={action.user_info_ctx.uuid})."
+                )
+
         # Check for active vfolder mounts
         if await self._user_repository.check_user_vfolder_mounted_to_active_kernels(user_uuid):
             raise UserPurgeFailure(
                 "Some of user's virtual folders are mounted to active kernels. "
                 "Terminate those kernels first.",
-            )
-
-        # Nothing is mutated until the delegation target is known to be usable.
-        delegate_ownership = action.delegate_endpoint_ownership.optional_value()
-        target_main_access_key = action.user_info_ctx.main_access_key
-        if delegate_ownership and target_main_access_key is None:
-            raise UserPurgeFailure(
-                "The requesting user has no main access key to delegate endpoint ownership to "
-                f"(user_id={action.user_info_ctx.uuid}).",
             )
 
         # Handle shared vfolders migration
@@ -246,11 +246,10 @@ class UserService:
             )
 
         # Handle endpoint ownership delegation
-        if delegate_ownership and target_main_access_key is not None:
+        if action.delegate_endpoint_ownership.optional_value():
             await self._user_repository.delegate_endpoint_ownership(
                 user_uuid=user_uuid,
                 target_user_uuid=action.user_info_ctx.uuid,
-                target_main_access_key=target_main_access_key,
             )
             await self._user_repository.delete_endpoints(
                 user_uuid=user_uuid,
@@ -292,20 +291,20 @@ class UserService:
         This is the UUID-based internal implementation used by bulk_purge_users().
         The existing purge_user() method is email-based.
         """
+        if action.delegate_endpoint_ownership.optional_value():
+            # Validated before the shared vfolder migration below, which the purge cannot undo
+            # once the delegation turns out to be impossible.
+            if await self._user_repository.default_access_key(UserID(user_info_ctx.uuid)) is None:
+                raise UserPurgeFailure(
+                    "Cannot delegate endpoint ownership to a user without a default keypair "
+                    f"(user_id={user_info_ctx.uuid})."
+                )
+
         # Check for active vfolder mounts
         if await self._user_repository.check_user_vfolder_mounted_to_active_kernels(user_uuid):
             raise UserPurgeFailure(
                 "Some of user's virtual folders are mounted to active kernels. "
                 "Terminate those kernels first.",
-            )
-
-        # Nothing is mutated until the delegation target is known to be usable.
-        delegate_ownership = action.delegate_endpoint_ownership.optional_value()
-        target_main_access_key = user_info_ctx.main_access_key
-        if delegate_ownership and target_main_access_key is None:
-            raise UserPurgeFailure(
-                "The requesting user has no main access key to delegate endpoint ownership to "
-                f"(user_id={user_info_ctx.uuid}).",
             )
 
         # Handle shared vfolders migration
@@ -317,11 +316,10 @@ class UserService:
             )
 
         # Handle endpoint ownership delegation
-        if delegate_ownership and target_main_access_key is not None:
+        if action.delegate_endpoint_ownership.optional_value():
             await self._user_repository.delegate_endpoint_ownership(
                 user_uuid=user_uuid,
                 target_user_uuid=user_info_ctx.uuid,
-                target_main_access_key=target_main_access_key,
             )
             await self._user_repository.delete_endpoints(
                 user_uuid=user_uuid,
@@ -358,9 +356,6 @@ class UserService:
         user_info_ctx = UserInfoContext(
             uuid=admin_user.uuid,
             email=admin_user.email,
-            main_access_key=AccessKey(admin_user.main_access_key)
-            if admin_user.main_access_key
-            else None,
         )
 
         purged_user_ids: list[UUID] = []
@@ -465,13 +460,13 @@ class UserService:
         )
         return UpdateMyKeypairActionResult(keypair=keypair_data)
 
-    async def switch_my_main_access_key(
-        self, action: SwitchMyMainAccessKeyAction
-    ) -> SwitchMyMainAccessKeyActionResult:
-        await self._user_repository.switch_my_main_access_key(
-            user_uuid=action.user_uuid, access_key=action.access_key
+    async def switch_default_access_key(
+        self, action: SwitchDefaultAccessKeyAction
+    ) -> SwitchDefaultAccessKeyActionResult:
+        await self._user_repository.switch_default_access_key(
+            user_id=action.user_id, access_key=action.access_key
         )
-        return SwitchMyMainAccessKeyActionResult(success=True)
+        return SwitchDefaultAccessKeyActionResult(success=True)
 
     async def search_my_keypairs(
         self, action: SearchMyKeypairsAction

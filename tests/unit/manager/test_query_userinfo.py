@@ -49,11 +49,13 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.db.engine import create_async_engine
 from ai.backend.manager.utils import query_userinfo, query_userinfo_from_session
-from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.db import TableOrORM, with_tables
 
-ALL_ROWS = [
+ALL_ROWS: list[TableOrORM] = [
     DomainRow,
     ScalingGroupRow,
     UserResourcePolicyRow,
@@ -65,6 +67,8 @@ ALL_ROWS = [
     KeyPairRow,
     GroupRow,
     AssociationScopesEntitiesRow,
+    VirtualScopeRow,
+    EntityMembershipRow,
     ContainerRegistryRow,
     ImageRow,
     VFolderRow,
@@ -181,11 +185,12 @@ class TestQueryUserinfo:
                 )
             )
             await sess.flush()
+            user_email = f"test-{uuid.uuid4().hex[:8]}@test.io"
             sess.add(
                 UserRow(
                     uuid=user_uuid,
                     username=f"user-{uuid.uuid4().hex[:8]}",
-                    email=f"test-{uuid.uuid4().hex[:8]}@test.io",
+                    email=user_email,
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy,
@@ -194,6 +199,7 @@ class TestQueryUserinfo:
             await sess.flush()
             sess.add(
                 KeyPairRow(
+                    user_id=user_email,
                     access_key=access_key,
                     secret_key="secret",
                     user=user_uuid,
@@ -219,6 +225,24 @@ class TestQueryUserinfo:
                     entity_type=EntityType.USER,
                     entity_id=str(user_uuid),
                     relation_type=RelationType.AUTO,
+                )
+            )
+            # Membership read model: the project's virtual scope with the user
+            # enrolled in it.
+            project_vs_id = uuid.uuid4()
+            sess.add(
+                VirtualScopeRow(
+                    id=project_vs_id,
+                    scope_type=ScopeType.PROJECT.value,
+                    scope_id=group_id,
+                )
+            )
+            await sess.flush()
+            sess.add(
+                EntityMembershipRow(
+                    virtual_scope_id=project_vs_id,
+                    entity_type=EntityType.USER.value,
+                    entity_id=user_uuid,
                 )
             )
             await sess.commit()
@@ -284,11 +308,12 @@ class TestQueryUserinfo:
                 )
             )
             await sess.flush()
+            user_email = f"inactive-{uuid.uuid4().hex[:8]}@test.io"
             sess.add(
                 UserRow(
                     uuid=user_uuid,
                     username=f"inactive-{uuid.uuid4().hex[:8]}",
-                    email=f"inactive-{uuid.uuid4().hex[:8]}@test.io",
+                    email=user_email,
                     domain_name=domain,
                     role=UserRole.USER,
                     resource_policy=user_policy,
@@ -297,6 +322,7 @@ class TestQueryUserinfo:
             await sess.flush()
             sess.add(
                 KeyPairRow(
+                    user_id=user_email,
                     access_key=ak,
                     secret_key="secret",
                     user=user_uuid,
@@ -315,11 +341,12 @@ class TestQueryUserinfo:
         admin_uuid = uuid.uuid4()
         admin_ak = AccessKey(f"AK{uuid.uuid4().hex[:16]}")
         async with db.begin_session() as sess:
+            admin_email = f"admin-{uuid.uuid4().hex[:8]}@test.io"
             sess.add(
                 UserRow(
                     uuid=admin_uuid,
                     username=f"admin-{uuid.uuid4().hex[:8]}",
-                    email=f"admin-{uuid.uuid4().hex[:8]}@test.io",
+                    email=admin_email,
                     domain_name=seed.domain_name,
                     role=UserRole.SUPERADMIN,
                     resource_policy=seed.user_policy_name,
@@ -328,6 +355,7 @@ class TestQueryUserinfo:
             await sess.flush()
             sess.add(
                 KeyPairRow(
+                    user_id=admin_email,
                     access_key=admin_ak,
                     secret_key="secret",
                     user=admin_uuid,
@@ -551,11 +579,12 @@ class TestQueryUserinfoFromSession:
                 )
             )
             await sess.flush()
+            user_email = f"test-{uuid.uuid4().hex[:8]}@test.io"
             sess.add(
                 UserRow(
                     uuid=user_uuid,
                     username=f"user-{uuid.uuid4().hex[:8]}",
-                    email=f"test-{uuid.uuid4().hex[:8]}@test.io",
+                    email=user_email,
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy,
@@ -564,6 +593,7 @@ class TestQueryUserinfoFromSession:
             await sess.flush()
             sess.add(
                 KeyPairRow(
+                    user_id=user_email,
                     access_key=access_key,
                     secret_key="secret",
                     user=user_uuid,
@@ -589,6 +619,24 @@ class TestQueryUserinfoFromSession:
                     entity_type=EntityType.USER,
                     entity_id=str(user_uuid),
                     relation_type=RelationType.AUTO,
+                )
+            )
+            # Membership read model: the project's virtual scope with the user
+            # enrolled in it.
+            project_vs_id = uuid.uuid4()
+            sess.add(
+                VirtualScopeRow(
+                    id=project_vs_id,
+                    scope_type=ScopeType.PROJECT.value,
+                    scope_id=group_id,
+                )
+            )
+            await sess.flush()
+            sess.add(
+                EntityMembershipRow(
+                    virtual_scope_id=project_vs_id,
+                    entity_type=EntityType.USER.value,
+                    entity_id=user_uuid,
                 )
             )
             await sess.commit()

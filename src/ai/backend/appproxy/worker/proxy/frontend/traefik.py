@@ -5,7 +5,7 @@ import logging
 import time
 import uuid
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Final, override
+from typing import Any, Final, override
 
 from aiohttp import web
 
@@ -25,9 +25,6 @@ from ai.backend.common.cron import LocalCron, PeriodicTask
 from ai.backend.logging import BraceStyleAdapter
 
 from .base import BaseFrontend
-
-if TYPE_CHECKING:
-    pass
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 type MSetType = Mapping[str | bytes, bytes | float | int | str]

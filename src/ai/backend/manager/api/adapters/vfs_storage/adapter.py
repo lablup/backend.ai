@@ -20,8 +20,12 @@ from ai.backend.common.dto.manager.v2.vfs_storage.response import (
 )
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.vfs_storage.conditions import VFSStorageConditions
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination, Updater
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Updater,
+)
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.vfs_storage import VFSStorageCreatorSpec
 from ai.backend.manager.repositories.vfs_storage.updaters import VFSStorageUpdaterSpec

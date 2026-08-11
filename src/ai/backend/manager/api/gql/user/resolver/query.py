@@ -28,8 +28,8 @@ from ai.backend.manager.api.gql.user.types import (
 )
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.repositories.user.types import (
-    DomainUserSearchScope,
-    ProjectUserSearchScope,
+    DomainUserOperationScope,
+    ProjectUserOperationScope,
 )
 
 
@@ -111,7 +111,7 @@ async def domain_users_v2(
     offset: int | None = None,
 ) -> UserV2Connection | None:
     payload = await info.context.adapters.user.gql_search_by_domain(
-        scope=DomainUserSearchScope(domain_name=scope.domain_name),
+        scope=DomainUserOperationScope(domain_name=scope.domain_name),
         input=AdminSearchUsersInput(
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
@@ -156,7 +156,7 @@ async def project_users_v2(
     offset: int | None = None,
 ) -> UserV2Connection | None:
     payload = await info.context.adapters.user.gql_search_by_project(
-        scope=ProjectUserSearchScope(project_id=scope.project_id),
+        scope=ProjectUserOperationScope(project_id=scope.project_id),
         input=AdminSearchUsersInput(
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,

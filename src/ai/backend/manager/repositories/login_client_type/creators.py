@@ -9,8 +9,8 @@ from typing import override
 from ai.backend.manager.errors.auth import LoginClientTypeConflict
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.base import CreatorSpec
-from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 
 @dataclass

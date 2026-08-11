@@ -21,6 +21,7 @@ import sqlalchemy as sa
 import yarl
 from aiohttp import web
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.auth import HMACAuth
@@ -58,6 +59,7 @@ from ai.backend.common.defs import (
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.message_queue.redis_queue.queue import RedisMQArgs, RedisQueue
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
@@ -128,7 +130,7 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.scaling_group import scaling_groups, sgroups_for_domains
 from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.session_template import session_templates
+from ai.backend.manager.models.session_template import SessionTemplateRow
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
@@ -180,7 +182,7 @@ class KeypairFixtureData:
 
 @dataclass
 class UserFixtureData:
-    user_uuid: uuid.UUID
+    user_uuid: UserID
     keypair: KeypairFixtureData
     email: str = ""
 
@@ -809,18 +811,101 @@ async def group_fixture(
         await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
 
 
+class VirtualScopeSeeder:
+    """Seeds the RBAC virtual-scope chain rows for directly-inserted users,
+    mirroring the row shape the enrollment path and the backfill migration produce.
+
+    Exposed as the ``virtual_scope_seeder`` fixture so subdirectory conftests can
+    use it without importing this module.
+    """
+
+    async def insert_user_scope(self, conn: AsyncConnection, user_uuid: UserID) -> None:
+        """Give a directly-inserted user the RBAC rows ``create_full_user`` would
+        have made. Without them the member-binding paths cannot resolve the user's
+        virtual scope."""
+        virtual_scope_id = uuid.uuid4()
+        await conn.execute(
+            sa.insert(VirtualScopeRow.__table__).values(
+                id=virtual_scope_id,
+                scope_type=ScopeType.USER,
+                scope_id=str(user_uuid),
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                entity_type=EntityType.USER,
+                entity_id=str(user_uuid),
+                permission_cap=None,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                scope_type=ScopeType.USER,
+                scope_id=str(user_uuid),
+                permission_cap=None,
+            )
+        )
+
+    async def enroll_user_in_project(
+        self, conn: AsyncConnection, group_id: uuid.UUID, user_uuid: UserID
+    ) -> None:
+        """Write the virtual-scope chain rows the enrollment path creates for a
+        user-project membership: the user joins the project's virtual scope and the
+        project is bound into the user's own virtual scope."""
+        project_scope_id = (
+            await conn.execute(
+                sa.select(VirtualScopeRow.__table__.c.id).where(
+                    VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
+                    VirtualScopeRow.__table__.c.scope_id == group_id,
+                )
+            )
+        ).scalar_one()
+        user_scope_id = (
+            await conn.execute(
+                sa.select(VirtualScopeRow.__table__.c.id).where(
+                    VirtualScopeRow.__table__.c.scope_type == ScopeType.USER,
+                    VirtualScopeRow.__table__.c.scope_id == str(user_uuid),
+                )
+            )
+        ).scalar_one()
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_scope_id=project_scope_id,
+                entity_type=EntityType.USER,
+                entity_id=str(user_uuid),
+                permission_cap=None,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_scope_id=user_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=group_id,
+                permission_cap=None,
+            )
+        )
+
+
+@pytest.fixture()
+def virtual_scope_seeder() -> VirtualScopeSeeder:
+    return VirtualScopeSeeder()
+
+
 @pytest.fixture()
 async def admin_user_fixture(
     db_engine: SAEngine,
     group_fixture: uuid.UUID,
     domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
+    virtual_scope_seeder: VirtualScopeSeeder,
 ) -> AsyncIterator[UserFixtureData]:
     """Insert admin user, keypair, and group membership; yield identifiers."""
     unique_id = secrets.token_hex(4)
     email = f"admin-{unique_id}@test.local"
     data = UserFixtureData(
-        user_uuid=uuid.uuid4(),
+        user_uuid=UserID(uuid.uuid4()),
         keypair=KeypairFixtureData(
             access_key=f"AKTEST{secrets.token_hex(7).upper()}",
             secret_key=secrets.token_hex(20),
@@ -845,6 +930,7 @@ async def admin_user_fixture(
                 status=UserStatus.ACTIVE,
                 status_info="admin-requested",
                 domain_name=domain_fixture.domain_name,
+                domain_id=domain_fixture.domain_id,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.SUPERADMIN,
             )
@@ -859,14 +945,11 @@ async def admin_user_fixture(
                 rate_limit=30000,
                 num_queries=0,
                 is_admin=True,
+                is_default=True,
                 user=str(data.user_uuid),
             )
         )
-        await conn.execute(
-            users.update()
-            .where(users.c.uuid == str(data.user_uuid))
-            .values(main_access_key=data.keypair.access_key)
-        )
+        await virtual_scope_seeder.insert_user_scope(conn, data.user_uuid)
         await conn.execute(
             sa.insert(association_groups_users).values(
                 group_id=str(group_fixture),
@@ -881,13 +964,14 @@ async def admin_user_fixture(
                 entity_id=str(data.user_uuid),
             )
         )
+        await virtual_scope_seeder.enroll_user_in_project(conn, group_fixture, data.user_uuid)
     yield data
     async with db_engine.begin() as conn:
         # Clean side-effect tables that tests may populate via the running server
         await conn.execute(vfolders.delete())
         await conn.execute(kernels.delete())
         await conn.execute(SessionRow.__table__.delete())
-        await conn.execute(session_templates.delete())
+        await conn.execute(sa.delete(SessionTemplateRow))
         await conn.execute(ImageAliasRow.__table__.delete())
         await conn.execute(ImageRow.__table__.delete())
         # Clean fixture data
@@ -902,10 +986,20 @@ async def admin_user_fixture(
             )
         )
         await conn.execute(
-            users.update().where(users.c.uuid == str(data.user_uuid)).values(main_access_key=None)
+            EntityMembershipRow.__table__.delete().where(
+                EntityMembershipRow.__table__.c.entity_type == EntityType.USER,
+                EntityMembershipRow.__table__.c.entity_id == str(data.user_uuid),
+            )
         )
         await conn.execute(
             keypairs.delete().where(keypairs.c.access_key == data.keypair.access_key)
+        )
+        # The entity-membership and scope-binding rows cascade from the virtual scope.
+        await conn.execute(
+            VirtualScopeRow.__table__.delete().where(
+                VirtualScopeRow.__table__.c.scope_type == ScopeType.USER,
+                VirtualScopeRow.__table__.c.scope_id == str(data.user_uuid),
+            )
         )
         await conn.execute(users.delete().where(users.c.uuid == str(data.user_uuid)))
 
@@ -916,12 +1010,13 @@ async def regular_user_fixture(
     group_fixture: uuid.UUID,
     domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
+    virtual_scope_seeder: VirtualScopeSeeder,
 ) -> AsyncIterator[UserFixtureData]:
     """Insert regular user, keypair, and group membership; yield identifiers."""
     unique_id = secrets.token_hex(4)
     email = f"user-{unique_id}@test.local"
     data = UserFixtureData(
-        user_uuid=uuid.uuid4(),
+        user_uuid=UserID(uuid.uuid4()),
         keypair=KeypairFixtureData(
             access_key=f"AKTEST{secrets.token_hex(7).upper()}",
             secret_key=secrets.token_hex(20),
@@ -946,6 +1041,7 @@ async def regular_user_fixture(
                 status=UserStatus.ACTIVE,
                 status_info="admin-requested",
                 domain_name=domain_fixture.domain_name,
+                domain_id=domain_fixture.domain_id,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.USER,
             )
@@ -960,14 +1056,11 @@ async def regular_user_fixture(
                 rate_limit=30000,
                 num_queries=0,
                 is_admin=False,
+                is_default=True,
                 user=str(data.user_uuid),
             )
         )
-        await conn.execute(
-            users.update()
-            .where(users.c.uuid == str(data.user_uuid))
-            .values(main_access_key=data.keypair.access_key)
-        )
+        await virtual_scope_seeder.insert_user_scope(conn, data.user_uuid)
         await conn.execute(
             sa.insert(association_groups_users).values(
                 group_id=str(group_fixture),
@@ -982,11 +1075,12 @@ async def regular_user_fixture(
                 entity_id=str(data.user_uuid),
             )
         )
+        await virtual_scope_seeder.enroll_user_in_project(conn, group_fixture, data.user_uuid)
     yield data
     async with db_engine.begin() as conn:
         # Clean side-effect tables that tests may populate via the running server
         await conn.execute(
-            session_templates.delete().where(session_templates.c.user_uuid == str(data.user_uuid))
+            sa.delete(SessionTemplateRow).where(SessionTemplateRow.user_uuid == str(data.user_uuid))
         )
         # Clean fixture data
         await conn.execute(
@@ -1000,10 +1094,20 @@ async def regular_user_fixture(
             )
         )
         await conn.execute(
-            users.update().where(users.c.uuid == str(data.user_uuid)).values(main_access_key=None)
+            EntityMembershipRow.__table__.delete().where(
+                EntityMembershipRow.__table__.c.entity_type == EntityType.USER,
+                EntityMembershipRow.__table__.c.entity_id == str(data.user_uuid),
+            )
         )
         await conn.execute(
             keypairs.delete().where(keypairs.c.access_key == data.keypair.access_key)
+        )
+        # The entity-membership and scope-binding rows cascade from the virtual scope.
+        await conn.execute(
+            VirtualScopeRow.__table__.delete().where(
+                VirtualScopeRow.__table__.c.scope_type == ScopeType.USER,
+                VirtualScopeRow.__table__.c.scope_id == str(data.user_uuid),
+            )
         )
         await conn.execute(users.delete().where(users.c.uuid == str(data.user_uuid)))
 

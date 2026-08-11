@@ -33,6 +33,9 @@ class AuditLogMonitor(ActionMonitor):
                 action_id=result.meta.action_id,
                 entity_type=action.entity_type(),
                 operation=action.operation_type(),
+                # Legacy actions declare no name; record the spec type until each
+                # is replaced by a v2 action that declares one.
+                action_name=action.spec().type(),
                 created_at=result.meta.started_at,
                 description=result.meta.description,
                 status=result.meta.status,

@@ -238,7 +238,7 @@ class GroupConditions:
         """Filter by modified_at < datetime."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return GroupRow.modified_at < dt
+            return GroupRow.updated_at < dt
 
         return inner
 
@@ -247,7 +247,7 @@ class GroupConditions:
         """Filter by modified_at > datetime."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return GroupRow.modified_at > dt
+            return GroupRow.updated_at > dt
 
         return inner
 
@@ -256,7 +256,7 @@ class GroupConditions:
         """Filter by modified_at == datetime."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return GroupRow.modified_at == dt
+            return GroupRow.updated_at == dt
 
         return inner
 

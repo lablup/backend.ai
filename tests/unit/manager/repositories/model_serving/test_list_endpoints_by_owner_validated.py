@@ -21,7 +21,7 @@ from collections.abc import AsyncGenerator
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.config import ModelDefinition
+from ai.backend.common.config import DefaultModelDefinition, ModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.image import ImageID
@@ -175,12 +175,10 @@ async def test_user(
                 is_admin=True,
                 user=user_id,
                 resource_policy="default",
+                is_default=True,
             )
         )
         await sess.flush()
-        await sess.execute(
-            sa.update(UserRow).where(UserRow.uuid == user_id).values(main_access_key="TESTKEY")
-        )
         await sess.flush()
     return user_id, email
 
@@ -289,7 +287,7 @@ async def listed_endpoint(
                 id=runtime_variant_id,
                 name=f"variant-{runtime_variant_id.hex[:8]}",
                 description="test variant",
-                default_model_definition=ModelDefinition.model_validate({"models": []}),
+                default_model_definition=DefaultModelDefinition(models=[]),
             )
         )
         await sess.flush()

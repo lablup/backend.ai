@@ -28,7 +28,7 @@ from ai.backend.manager.api.rest.user.adapter import UserAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.repositories.base import OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 
 
@@ -401,7 +401,6 @@ class TestUserAdapterUpdater:
         assert spec.totp_activated.value() is True
         assert spec.resource_policy.value() == "default"
         assert spec.sudo_session_enabled.value() is True
-        assert spec.main_access_key.value() == "AKIAIOSFODNN7EXAMPLE"
         assert spec.container_uid.value() == 1000
         assert spec.container_main_gid.value() == 1000
         assert spec.container_gids.value() == [1000, 1001]
@@ -433,7 +432,6 @@ class TestUserAdapterUpdater:
         assert spec.totp_activated.optional_value() is None
         assert spec.resource_policy.optional_value() is None
         assert spec.sudo_session_enabled.optional_value() is None
-        assert spec.main_access_key.optional_value() is None
         assert spec.container_uid.optional_value() is None
         assert spec.container_main_gid.optional_value() is None
         assert spec.container_gids.optional_value() is None
@@ -490,7 +488,7 @@ class TestUserAdapterConversion:
             totp_activated=True,
             totp_activated_at=now,
             sudo_session_enabled=False,
-            main_access_key="AKIAIOSFODNN7EXAMPLE",
+            default_access_key="AKIAIOSFODNN7EXAMPLE",
             container_uid=1000,
             container_main_gid=1000,
             container_gids=[1000, 1001],
@@ -546,7 +544,7 @@ class TestUserAdapterConversion:
             totp_activated=None,
             totp_activated_at=None,
             sudo_session_enabled=False,
-            main_access_key=None,
+            default_access_key=None,
             container_uid=None,
             container_main_gid=None,
             container_gids=None,

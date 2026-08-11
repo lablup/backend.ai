@@ -24,7 +24,7 @@ from ai.backend.manager.models.resource_usage_history import (
     UserUsageBucketRow,
 )
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user import UserRow
 
 
@@ -210,11 +210,11 @@ class UserUsageBucketSearchResult:
     has_previous_page: bool
 
 
-# SearchScope classes for scoped usage bucket APIs
+# OperationScope classes for scoped usage bucket APIs
 
 
 @dataclass(frozen=True)
-class DomainUsageBucketSearchScope(SearchScope):
+class DomainUsageBucketOperationScope(OperationScope):
     """Scope for domain usage bucket queries."""
 
     resource_group: str
@@ -251,7 +251,7 @@ class DomainUsageBucketSearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class ProjectUsageBucketSearchScope(SearchScope):
+class ProjectUsageBucketOperationScope(OperationScope):
     """Scope for project usage bucket queries."""
 
     resource_group: str
@@ -296,7 +296,7 @@ class ProjectUsageBucketSearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class UserUsageBucketSearchScope(SearchScope):
+class UserUsageBucketOperationScope(OperationScope):
     """Scope for user usage bucket queries."""
 
     resource_group: str

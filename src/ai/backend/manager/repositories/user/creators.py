@@ -14,10 +14,10 @@ from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.user import UserCreationBadRequest
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.repositories.base.creator import Creator, CreatorSpec
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.ops.rbac.provider import ScopeCreation
 from ai.backend.manager.repositories.permission_controller.role_manager import (
     ScopeSystemRoleData,
@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 class UserScopeCreation(ScopeCreation[UserRow]):
     """Creates a user row and the scope the user becomes; the user is granted its own
     scope's roles. Domain/project scope associations are written by the enrollment
-    step (``add_entity_members``), not by this creator."""
+    step (``add_bulk_members``), not by this creator."""
 
     spec: CreatorSpec[UserRow]
 

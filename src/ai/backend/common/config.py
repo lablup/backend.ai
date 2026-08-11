@@ -558,7 +558,7 @@ class ModelServiceConfigDraft(BaseConfigModel):
     pre_start_actions: list[PreStartAction] | None = None
     start_command: str | None = None
     shell: str | None = None
-    port: int | None = None
+    port: int | None = Field(default=None, gt=1)
     health_check: ModelHealthCheckDraft | None = None
 
     @model_validator(mode="before")
@@ -744,6 +744,45 @@ class ModelDefinitionDraft(BaseConfigModel):
             if health_check.get("enable") is None:
                 health_check["enable"] = True
         return cls.model_validate(data)
+
+
+class DefaultModelServiceConfig(BaseConfigModel):
+    """Baseline model service config; ``port`` stays required so the baseline
+    guarantees every revision resolves a service port."""
+
+    pre_start_actions: list[PreStartAction] | None = None
+    start_command: str | None = None
+    shell: str | None = None
+    port: int = Field(gt=1)
+    health_check: ModelHealthCheckDraft | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _resolve_start_command(cls, data: Any) -> Any:
+        return resolve_model_service_start_command(data)
+
+
+class DefaultModelConfig(BaseConfigModel):
+    """Baseline model config stored on a runtime variant. ``name`` and
+    ``service.port`` are required so the always-present baseline layer
+    guarantees them to every revision; ``model_path`` keeps its dynamic
+    mount-destination default in the reader.
+    """
+
+    name: str
+    model_path: str | None = None
+    service: DefaultModelServiceConfig
+    metadata: ModelMetadata | None = None
+
+
+class DefaultModelDefinition(BaseConfigModel):
+    """Stored shape of ``runtime_variants.default_model_definition``."""
+
+    models: list[DefaultModelConfig] | None = None
+
+    def to_draft(self) -> ModelDefinitionDraft:
+        # exclude_unset keeps unset fields from clobbering lower-priority merge layers.
+        return ModelDefinitionDraft.model_validate(self.model_dump(exclude_unset=True))
 
 
 def find_config_file(daemon_name: str) -> Path:

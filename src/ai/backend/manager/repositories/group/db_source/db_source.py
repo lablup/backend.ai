@@ -14,10 +14,11 @@ import aiotools
 import msgpack
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
+from sqlalchemy.orm import joinedload
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE, PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.types import EntityRef, ScopeRef
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.data.permission.types import RBACElementType
@@ -37,11 +38,7 @@ from ai.backend.manager.data.group.types import (
     UnassignUsersResult,
 )
 from ai.backend.manager.data.permission.types import (
-    EntityType,
     RBACElementRef,
-)
-from ai.backend.manager.data.permission.types import (
-    ScopeType as LegacyScopeType,
 )
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import (
@@ -62,12 +59,10 @@ from ai.backend.manager.models.kernel import (
     KernelRow,
     kernels,
 )
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRow, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
@@ -76,8 +71,8 @@ from ai.backend.manager.models.vfolder import (
     VFolderStatusSet,
     vfolder_status_map,
 )
+from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
-from ai.backend.manager.repositories.base.pagination import NoPagination
 from ai.backend.manager.repositories.base.purger import BatchPurger
 from ai.backend.manager.repositories.base.querier import (
     BatchQuerier,
@@ -103,9 +98,9 @@ from ai.backend.manager.repositories.group.purgers import (
 )
 from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
 from ai.backend.manager.repositories.group.types import (
-    DomainProjectSearchScope,
+    DomainProjectOperationScope,
     GroupSearchResult,
-    UserProjectSearchScope,
+    UserProjectOperationScope,
 )
 from ai.backend.manager.repositories.ops.rbac.provider import (
     EntityMembersAddition,
@@ -113,7 +108,8 @@ from ai.backend.manager.repositories.ops.rbac.provider import (
     RBACWriteOps,
     ScopeCreation,
     ScopeDeletion,
-    ScopeMember,
+    ScopeEntityMember,
+    ScopeUserMember,
 )
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.role_manager import (
@@ -122,23 +118,6 @@ from ai.backend.manager.repositories.permission_controller.role_manager import (
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-@dataclass
-class ProjectUserMember(ScopeMember):
-    """A user joining or leaving a project scope; ``manage_roles`` controls whether the
-    membership change also grants/revokes the user's roles at the project scope."""
-
-    user_id: UserID
-    manage_roles: bool = True
-
-    @override
-    def entity_ref(self) -> EntityRef:
-        return EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=self.user_id)
-
-    @override
-    def assign_role_on(self) -> UserID | None:
-        return self.user_id if self.manage_roles else None
 
 
 @dataclass
@@ -183,15 +162,28 @@ class GroupDBSource:
 
         Domain/resource-policy existence and name-uniqueness are enforced by the group
         row's DB constraints, mapped to domain errors via the spec's
-        integrity_error_checks. The domain scope is bound to the new project's virtual
-        scope so domain-scoped permissions reach the project's entities.
+        integrity_error_checks. The new project joins its domain scope as a member.
         """
         spec = cast(GroupCreatorSpec, creator.spec)
         async with self._rbac_ops_provider.write_ops() as w:
             domain_id = await self._get_domain_id(w, spec.domain_name)
             creation = ProjectScopeCreation(spec=spec, domain_id=domain_id)
             domain_scope = ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=domain_id)
-            return (await w.create_scope(creation, bound_scope=domain_scope)).row.to_data()
+            data = (await w.create_scope(creation)).row.to_data()
+            await w.ensure_scope(domain_scope)
+            await w.add_bulk_members(
+                EntityMembersAddition(
+                    scope=domain_scope,
+                    members=[
+                        ScopeEntityMember(
+                            ref=EntityRef(
+                                entity_type=PROJECT_ENTITY_TYPE, entity_id=ProjectID(data.id)
+                            )
+                        )
+                    ],
+                )
+            )
+            return data
 
     async def _get_domain_id(self, w: RBACWriteOps, domain_name: str) -> DomainID:
         result = await w.batch_query_in_global(
@@ -221,7 +213,7 @@ class GroupDBSource:
                 if user_update_mode == "add":
                     await self._add_users_to_project(w, project_id, user_ids)
                 elif user_update_mode == "remove":
-                    await w.remove_entity_members(
+                    await w.remove_bulk_members(
                         ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
                         [
                             EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=uid)
@@ -250,20 +242,12 @@ class GroupDBSource:
         )
         query = (
             sa.select(UserRow)
-            .outerjoin(
-                AssociationScopesEntitiesRow,
-                sa.and_(
-                    sa.cast(UserRow.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
-                    AssociationScopesEntitiesRow.scope_type == LegacyScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.scope_id == str(project_id),
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                ),
-            )
             .where(
                 UserRow.uuid.in_(user_ids)
                 & (UserRow.domain_name == project_domain_subq)
-                & AssociationScopesEntitiesRow.entity_id.is_(None)
+                & ~user_scope_membership_exists(PROJECT_SCOPE_TYPE, project_id, UserRow.uuid)
             )
+            .options(joinedload(UserRow.default_keypair))
         )
         result = await w.batch_query_in_global(query, BatchQuerier(pagination=NoPagination()))
         return [row.UserRow for row in result.rows]
@@ -279,10 +263,10 @@ class GroupDBSource:
         new_user_rows = await self._users_addable_to_project(w, project_id, user_ids)
         if not new_user_rows:
             return
-        await w.add_entity_members(
+        await w.add_bulk_members(
             EntityMembersAddition(
                 scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
-                members=[ProjectUserMember(user_id=UserID(row.uuid)) for row in new_user_rows],
+                members=[ScopeUserMember(user_id=UserID(row.uuid)) for row in new_user_rows],
             )
         )
 
@@ -637,7 +621,8 @@ class GroupDBSource:
         Validates that the role exists, filters to users in the project's domain
         that are not already assigned, writes each new member's virtual-scope
         membership and scope association, and creates user-role mappings for the
-        specified role.
+        specified role. Membership grants the project's ``auto_assign`` roles on
+        top of that role.
 
         Returns the list of newly assigned users.
         """
@@ -654,13 +639,10 @@ class GroupDBSource:
             if not new_user_rows:
                 return []
 
-            await w.add_entity_members(
+            await w.add_bulk_members(
                 EntityMembersAddition(
                     scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
-                    members=[
-                        ProjectUserMember(user_id=UserID(row.uuid), manage_roles=False)
-                        for row in new_user_rows
-                    ],
+                    members=[ScopeUserMember(user_id=UserID(row.uuid)) for row in new_user_rows],
                 )
             )
             user_role_specs = [
@@ -681,7 +663,6 @@ class GroupDBSource:
         """
         async with self._rbac_ops_provider.write_ops() as w:
             requested_ids = set(unbinder.user_uuids)
-            target_entity_ids = [str(uid) for uid in unbinder.user_uuids]
 
             # Find which requested UUIDs actually exist in the system
             existing_query = sa.select(UserRow).where(UserRow.uuid.in_(unbinder.user_uuids))
@@ -690,16 +671,16 @@ class GroupDBSource:
             )
             existing_ids = {row.UserRow.uuid for row in existing_result.rows}
 
-            # Fetch users that are actually associated before removing
-            actual_assoc_query = sa.select(UserRow).where(
-                sa.cast(UserRow.uuid, sa.String).in_(
-                    sa.select(AssociationScopesEntitiesRow.entity_id).where(
-                        AssociationScopesEntitiesRow.scope_type == LegacyScopeType.PROJECT,
-                        AssociationScopesEntitiesRow.scope_id == str(unbinder.project_id),
-                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                        AssociationScopesEntitiesRow.entity_id.in_(target_entity_ids),
+            # Fetch users that are actually members before removing
+            actual_assoc_query = (
+                sa.select(UserRow)
+                .where(
+                    UserRow.uuid.in_(unbinder.user_uuids)
+                    & user_scope_membership_exists(
+                        PROJECT_SCOPE_TYPE, ProjectID(unbinder.project_id), UserRow.uuid
                     )
                 )
+                .options(joinedload(UserRow.default_keypair))
             )
             assoc_result = await w.batch_query_in_global(
                 actual_assoc_query, BatchQuerier(pagination=NoPagination())
@@ -708,7 +689,7 @@ class GroupDBSource:
             assigned_ids = {row.uuid for row in assigned_rows}
             unassigned_users = [row.to_data() for row in assigned_rows]
 
-            await w.remove_entity_members(
+            await w.remove_bulk_members(
                 ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ProjectID(unbinder.project_id)),
                 [
                     EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=UserID(uid))
@@ -737,17 +718,17 @@ class GroupDBSource:
         Idempotent: adding an existing member is a no-op.
         """
         async with self._rbac_ops_provider.write_ops() as w:
-            await w.add_entity_members(
+            await w.add_bulk_members(
                 EntityMembersAddition(
                     scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
-                    members=[ProjectUserMember(user_id=user_id, manage_roles=False)],
+                    members=[ScopeUserMember(user_id=user_id)],
                 )
             )
 
     async def unbind_user_from_project(self, user_id: UserID, project_id: ProjectID) -> None:
         """Remove a user from a project (membership writes only)."""
         async with self._rbac_ops_provider.write_ops() as w:
-            await w.remove_entity_members(
+            await w.remove_bulk_members(
                 ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
                 [EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=user_id)],
             )
@@ -824,13 +805,13 @@ class GroupDBSource:
 
     async def search_projects_by_domain(
         self,
-        scope: DomainProjectSearchScope,
+        scope: DomainProjectOperationScope,
         querier: BatchQuerier,
     ) -> GroupSearchResult:
         """Search projects within a domain.
 
         Args:
-            scope: DomainProjectSearchScope defining the domain to search within.
+            scope: DomainProjectOperationScope defining the domain to search within.
             querier: Contains conditions, orders, and pagination.
 
         Returns:
@@ -851,35 +832,23 @@ class GroupDBSource:
 
     async def search_projects_by_user(
         self,
-        scope: UserProjectSearchScope,
+        scope: UserProjectOperationScope,
         querier: BatchQuerier,
     ) -> GroupSearchResult:
         """Search projects a user is member of.
 
-        Joins with association_scopes_entities (PROJECT/USER) to find user's
-        projects. Casts GroupRow.id to String for the JOIN since ASE.scope_id
-        is a non-UUID String column.
+        Membership comes from the projects' virtual scopes; the scope supplies
+        the membership predicate.
 
         Args:
-            scope: UserProjectSearchScope defining the user to search for.
+            scope: UserProjectOperationScope defining the user to search for.
             querier: Contains conditions, orders, and pagination.
 
         Returns:
             GroupSearchResult with items, total_count, and pagination flags.
         """
         async with self._db.begin_readonly_session() as db_sess:
-            query = (
-                sa.select(GroupRow)
-                .select_from(GroupRow)
-                .join(
-                    AssociationScopesEntitiesRow,
-                    sa.and_(
-                        sa.cast(GroupRow.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
-                        AssociationScopesEntitiesRow.scope_type == LegacyScopeType.PROJECT,
-                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                    ),
-                )
-            )
+            query = sa.select(GroupRow).select_from(GroupRow)
             result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
             items = [row.GroupRow.to_data() for row in result.rows]

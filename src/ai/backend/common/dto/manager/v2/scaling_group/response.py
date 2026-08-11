@@ -9,7 +9,7 @@ from datetime import datetime
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.types import PreemptionOrder
+from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope
 
 from .types import PreemptionMode, SchedulerType
 
@@ -77,6 +77,12 @@ class PreemptionConfigInfo(BaseResponseModel):
     preemption_min_runtime: float = Field(
         description=(
             "Minimum session runtime in seconds before it becomes preemptible (0 = disabled)."
+        ),
+    )
+    victim_scope: PreemptionVictimScope = Field(
+        default=PreemptionVictimScope.USER,
+        description=(
+            "Scope preemption victims are drawn from (user/project/domain/resource-group)."
         ),
     )
 

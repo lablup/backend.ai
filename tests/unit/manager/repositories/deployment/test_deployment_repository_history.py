@@ -464,10 +464,10 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
             assert endpoint.lifecycle_stage == EndpointLifecycle.CREATED
 
             # Verify history record
-            stmt = sa.select(DeploymentHistoryRow).where(
+            history_stmt = sa.select(DeploymentHistoryRow).where(
                 DeploymentHistoryRow.deployment_id == test_pending_endpoint_id
             )
-            histories = (await db_sess.execute(stmt)).scalars().all()
+            histories = (await db_sess.execute(history_stmt)).scalars().all()
             assert len(histories) == 1
             assert histories[0].phase == "check_pending"
             assert histories[0].result == str(SchedulingResult.SUCCESS)
@@ -909,10 +909,10 @@ class TestUpdateRouteStatusBulkWithHistory:
             assert route.status == RouteStatus.RUNNING
 
             # Verify history record
-            stmt = sa.select(RouteHistoryRow).where(
+            history_stmt = sa.select(RouteHistoryRow).where(
                 RouteHistoryRow.route_id == test_provisioning_route_id
             )
-            histories = (await db_sess.execute(stmt)).scalars().all()
+            histories = (await db_sess.execute(history_stmt)).scalars().all()
             assert len(histories) == 1
             assert histories[0].phase == "provisioning"
             assert histories[0].result == str(SchedulingResult.SUCCESS)

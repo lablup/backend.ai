@@ -12,7 +12,7 @@ from ai.backend.manager.models.base import (
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
 
-class EntityFieldRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class EntityFieldRow(CreatedAtMixin, Base):
     """Deprecated: No longer actively used. The field-scoped entity concept
     (RBACFieldCreator/RBACFieldPurger) was removed by BEP-1048.
     Kept only for the existing database table; will be dropped in a future migration.

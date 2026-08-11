@@ -33,7 +33,7 @@ from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
-from ai.backend.manager.repositories.base import IntegrityErrorCheck
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.base.creator import CreatorSpec
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACBulkEntityCreator,
@@ -56,7 +56,7 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-class RBACEntityCreatorTestRow(Base):  # type: ignore[misc]
+class RBACEntityCreatorTestRow(Base):
     """ORM model for creator testing."""
 
     __tablename__ = "test_rbac_creator"
@@ -70,7 +70,7 @@ class RBACEntityCreatorTestRow(Base):  # type: ignore[misc]
     owner_scope_id: Mapped[str] = mapped_column(sa.String(64), nullable=False)
 
 
-class CompositePKTestRow(Base):  # type: ignore[misc]
+class CompositePKTestRow(Base):
     """ORM model with composite primary key for testing rejection."""
 
     __tablename__ = "test_rbac_creator_composite_pk"
@@ -150,7 +150,7 @@ async def create_tables(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[None, None]:
     """Create RBAC entity creator test tables."""
-    async with with_tables(database_connection, ENTITY_CREATOR_TABLES):  # type: ignore[arg-type]
+    async with with_tables(database_connection, ENTITY_CREATOR_TABLES):
         yield
 
 
@@ -883,7 +883,7 @@ class TestExecuteRBACEntityCreators:
 # =============================================================================
 
 
-class RBACCreatorUniqueTestRow(Base):  # type: ignore[misc]
+class RBACCreatorUniqueTestRow(Base):
     """ORM model with a unique constraint for integrity error testing."""
 
     __tablename__ = "test_rbac_creator_unique"
@@ -946,7 +946,7 @@ async def create_unique_tables(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[None, None]:
     """Create RBAC unique constraint test tables."""
-    async with with_tables(database_connection, INTEGRITY_TABLES):  # type: ignore[arg-type]
+    async with with_tables(database_connection, INTEGRITY_TABLES):
         yield
 
 

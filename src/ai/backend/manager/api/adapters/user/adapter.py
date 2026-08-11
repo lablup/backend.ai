@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
@@ -92,6 +92,8 @@ from ai.backend.common.dto.manager.v2.user.types import (
 )
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.user import UserID
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import UserData, UserStatus
@@ -102,29 +104,28 @@ from ai.backend.manager.models.group.conditions import GroupConditions
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.conditions import KeypairConditions, KeypairOrders
 from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.user.conditions import UserConditions
 from ai.backend.manager.models.user.orders import UserOrders
 from ai.backend.manager.models.user.row import UserRole as UserRoleModel
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    NoPagination,
-    OffsetPagination,
     combine_conditions_or,
     negate_conditions,
 )
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.keypair.types import (
-    KeypairResourcePolicyKeypairSearchScope,
-    UserKeypairSearchScope,
+    KeypairResourcePolicyKeypairOperationScope,
+    UserKeypairOperationScope,
 )
 from ai.backend.manager.repositories.keypair.updaters import KeyPairUpdaterSpec
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.types import (
-    DomainUserSearchScope,
-    ProjectUserSearchScope,
-    RoleUserSearchScope,
+    DomainUserOperationScope,
+    ProjectUserOperationScope,
+    RoleUserOperationScope,
 )
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
@@ -147,7 +148,7 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     RevokeMyKeypairAction,
     SearchKeypairsByResourcePolicyAction,
     SearchMyKeypairsAction,
-    SwitchMyMainAccessKeyAction,
+    SwitchDefaultAccessKeyAction,
     UpdateMyKeypairAction,
 )
 from ai.backend.manager.services.user.actions.modify_user import (
@@ -261,7 +262,7 @@ class UserAdapter(BaseAdapter):
 
     async def gql_search_by_domain(
         self,
-        scope: DomainUserSearchScope,
+        scope: DomainUserOperationScope,
         input: AdminSearchUsersInput,
     ) -> AdminSearchUsersPayload:
         """Search users within a domain, cursor-based pagination."""
@@ -290,7 +291,7 @@ class UserAdapter(BaseAdapter):
 
     async def gql_search_by_project(
         self,
-        scope: ProjectUserSearchScope,
+        scope: ProjectUserOperationScope,
         input: AdminSearchUsersInput,
     ) -> AdminSearchUsersPayload:
         """Search users within a project, cursor-based pagination."""
@@ -344,7 +345,7 @@ class UserAdapter(BaseAdapter):
     ) -> SearchUsersPayload:
         """Search users within a domain."""
         querier = self._build_search_querier(input)
-        scope = DomainUserSearchScope(domain_name=domain_name)
+        scope = DomainUserOperationScope(domain_name=domain_name)
         action_result = await self._processors.user.search_users_by_domain.wait_for_complete(
             SearchUsersByDomainAction(scope=scope, querier=querier)
         )
@@ -364,7 +365,7 @@ class UserAdapter(BaseAdapter):
     ) -> SearchUsersPayload:
         """Search users within a project."""
         querier = self._build_search_querier(input)
-        scope = ProjectUserSearchScope(project_id=project_id)
+        scope = ProjectUserOperationScope(project_id=project_id)
         action_result = await self._processors.user.search_users_by_project.wait_for_complete(
             SearchUsersByProjectAction(scope=scope, querier=querier)
         )
@@ -384,7 +385,7 @@ class UserAdapter(BaseAdapter):
     ) -> SearchUsersPayload:
         """Search users assigned to a role."""
         querier = self._build_search_querier(input)
-        scope = RoleUserSearchScope(role_id=role_id)
+        scope = RoleUserOperationScope(role_id=role_id)
         action_result = await self._processors.user.search_users_by_role.wait_for_complete(
             SearchUsersByRoleAction(scope=scope, querier=querier)
         )
@@ -514,11 +515,6 @@ class UserAdapter(BaseAdapter):
                 if input.sudo_session_enabled is not None
                 else OptionalState.nop()
             ),
-            main_access_key=(
-                TriState.nop()
-                if isinstance(input.main_access_key, Sentinel)
-                else TriState.from_graphql(input.main_access_key)
-            ),
             container_uid=(
                 TriState.nop()
                 if isinstance(input.container_uid, Sentinel)
@@ -549,6 +545,8 @@ class UserAdapter(BaseAdapter):
         result = await self._processors.user.modify_user_by_id.wait_for_complete(
             ModifyUserByIdAction(user_id=user_id, updater=updater)
         )
+        if not isinstance(input.main_access_key, Sentinel) and input.main_access_key is not None:
+            await self.switch_default_access_key(UserID(user_id), AccessKey(input.main_access_key))
         return UpdateUserPayload(user=self._user_data_to_node(result.data))
 
     async def delete_user_by_id(self, input: DeleteUserInput) -> DeleteUserPayload:
@@ -631,10 +629,17 @@ class UserAdapter(BaseAdapter):
         ]
         return BulkCreateUsersWithKeypairPayload(created=created, failed=failed)
 
-    async def bulk_modify_users(self, action: BulkModifyUserAction) -> BulkUpdateUsersPayload:
-        """Bulk-modify users. Each item's transformation is the caller's responsibility."""
+    async def bulk_modify_users(
+        self,
+        action: BulkModifyUserAction,
+        default_key_switches: Mapping[UserID, AccessKey],
+    ) -> BulkUpdateUsersPayload:
+        """Bulk-modify users. Each item's transformation is the caller's responsibility.
+
+        A switch runs only for a user whose own update went through, and a switch that
+        fails turns that user into a failure instead of aborting the whole batch.
+        """
         result = await self._processors.user.bulk_modify_users.wait_for_complete(action)
-        updated_users = [self._user_data_to_node(u) for u in result.data.successes]
         failed = [
             BulkUpdateUserV2Error(
                 user_id=action.items[error.index].user_id,
@@ -642,6 +647,16 @@ class UserAdapter(BaseAdapter):
             )
             for error in result.data.failures
         ]
+        updated_users = []
+        for user in result.data.successes:
+            access_key = default_key_switches.get(UserID(user.id))
+            if access_key is not None:
+                try:
+                    await self.switch_default_access_key(UserID(user.id), access_key)
+                except Exception as e:
+                    failed.append(BulkUpdateUserV2Error(user_id=user.id, message=str(e)))
+                    continue
+            updated_users.append(self._user_data_to_node(user))
         return BulkUpdateUsersPayload(updated_users=updated_users, failed=failed)
 
     async def bulk_purge_users(self, action: BulkPurgeUserAction) -> BulkPurgeUsersPayload:
@@ -698,12 +713,12 @@ class UserAdapter(BaseAdapter):
         )
         return UpdateMyKeypairPayload(keypair=self._keypair_data_to_node(result.keypair))
 
-    async def switch_my_main_access_key(
-        self, user_id: UUID, access_key: str
+    async def switch_default_access_key(
+        self, user_id: UserID, access_key: AccessKey
     ) -> SwitchMyMainAccessKeyPayload:
-        """Switch the main access key for the current user."""
-        result = await self._processors.user.switch_my_main_access_key.wait_for_complete(
-            SwitchMyMainAccessKeyAction(user_uuid=user_id, access_key=access_key)
+        """Move the ``is_default`` marker among the user's keypairs onto ``access_key``."""
+        result = await self._processors.user.switch_default_access_key.wait_for_complete(
+            SwitchDefaultAccessKeyAction(user_id=user_id, access_key=access_key)
         )
         return SwitchMyMainAccessKeyPayload(success=result.success)
 
@@ -720,7 +735,7 @@ class UserAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        scope = UserKeypairSearchScope(user_uuid=me.user_id)
+        scope = UserKeypairOperationScope(user_uuid=me.user_id)
         conditions = self._convert_keypair_filter(input.filter) if input.filter else []
         orders = self._convert_keypair_orders(input.order) if input.order else []
         querier = self._build_querier(
@@ -746,7 +761,7 @@ class UserAdapter(BaseAdapter):
 
     async def gql_search_keypairs_by_resource_policy(
         self,
-        scope: KeypairResourcePolicyKeypairSearchScope,
+        scope: KeypairResourcePolicyKeypairOperationScope,
         input: SearchKeypairsRequest,
     ) -> SearchResult[KeypairNode]:
         """Search keypairs assigned to a keypair resource policy (GQL connection).
@@ -790,6 +805,7 @@ class UserAdapter(BaseAdapter):
             access_key=str(data.access_key),
             is_active=data.is_active,
             is_admin=data.is_admin,
+            is_default=data.is_default,
             created_at=data.created_at,
             modified_at=data.modified_at,
             last_used=data.last_used,
@@ -973,6 +989,9 @@ class UserAdapter(BaseAdapter):
         if filter_req.is_admin is not None:
             conditions.append(KeypairConditions.by_is_admin(filter_req.is_admin))
 
+        if filter_req.is_default is not None:
+            conditions.append(KeypairConditions.by_is_default(filter_req.is_default))
+
         if filter_req.access_key is not None:
             condition = self.convert_string_filter(
                 filter_req.access_key,
@@ -1059,6 +1078,8 @@ class UserAdapter(BaseAdapter):
                 return KeypairOrders.access_key(ascending=ascending)
             case KeypairOrderField.IS_ACTIVE:
                 return KeypairOrders.is_active(ascending=ascending)
+            case KeypairOrderField.IS_DEFAULT:
+                return KeypairOrders.is_default(ascending=ascending)
             case KeypairOrderField.RESOURCE_POLICY:
                 return KeypairOrders.resource_policy(ascending=ascending)
 
@@ -1578,7 +1599,7 @@ class UserAdapter(BaseAdapter):
                 domain_name=data.domain_name,
                 role=UserRoleDTO(data.role.value) if data.role is not None else None,
                 resource_policy=data.resource_policy,
-                main_access_key=data.main_access_key,
+                main_access_key=data.default_access_key,
             ),
             security=UserSecurityInfo(
                 allowed_client_ip=data.allowed_client_ip,
