@@ -38,6 +38,7 @@ __all__ = (
     "UserInfo",
 )
 
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
@@ -103,6 +104,9 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
     secret_key = graphene.String()
     is_active = graphene.Boolean()
     is_admin = graphene.Boolean()
+    is_default = graphene.Boolean(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Whether this is the owner's default keypair."
+    )
     resource_policy = graphene.String()
     created_at = GQLDateTime()
     last_used = GQLDateTime()
@@ -145,6 +149,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
             secret_key=data.secret_key,
             is_active=data.is_active,
             is_admin=data.is_admin,
+            is_default=data.is_default,
             resource_policy=data.resource_policy_name,
             created_at=data.created_at,
             rate_limit=data.rate_limit,
@@ -166,6 +171,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
             secret_key=row.secret_key,
             is_active=row.is_active,
             is_admin=row.is_admin,
+            is_default=row.is_default,
             resource_policy=row.resource_policy,
             created_at=row.created_at,
             rate_limit=row.rate_limit,
