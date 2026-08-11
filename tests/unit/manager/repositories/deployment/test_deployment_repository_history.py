@@ -340,7 +340,6 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
                 user_id=user_email,
                 user=test_user_uuid,
                 is_active=True,
-                rate_limit=30000,
                 resource_policy=test_keypair_resource_policy_name,
             )
             db_sess.add(keypair)
@@ -756,7 +755,6 @@ class TestUpdateRouteStatusBulkWithHistory:
                 user_id=user_email,
                 user=test_user_uuid,
                 is_active=True,
-                rate_limit=30000,
                 resource_policy=test_keypair_resource_policy_name,
             )
             db_sess.add(keypair)
