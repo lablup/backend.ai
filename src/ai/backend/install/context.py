@@ -620,7 +620,9 @@ class Context(metaclass=ABCMeta):
                 ("8120:2379", f"{self.install_info.halfstack_config.etcd_addr[0].bind.port}:2379"),
             ],
         )
-        sudo = " ".join(self.docker_sudo)
+        await self._start_halfstack()
+
+    def _halfstack_profile_args(self) -> list[str]:
         profile_args_list: list[str] = []
         if self.install_variable.enable_observability:
             # observability profile is a superset of telemetry; no need to add both.
@@ -629,7 +631,16 @@ class Context(metaclass=ABCMeta):
             profile_args_list.append("--profile telemetry")
         if self.install_variable.enable_storage:
             profile_args_list.append("--profile storage")
-        profile_args = " ".join(profile_args_list)
+        return profile_args_list
+
+    async def _start_halfstack(self) -> None:
+        """
+        Pull and start the halfstack containers from the prepared compose
+        file. Overridden by install modes that run the halfstack as part of a
+        larger compose project (see DockerContext).
+        """
+        sudo = " ".join(self.docker_sudo)
+        profile_args = " ".join(self._halfstack_profile_args())
         compose_file_arg = "-f docker-compose.halfstack.current.yml"
         await self.run_shell(
             f"""
@@ -2316,8 +2327,11 @@ class DockerContext(Context):
       manager-cli, the installer's one-off tool); the other services run on
       the compose project's bridge network with published ports, and
       ``_fixup_bridge_service_addresses`` rewrites their generated configs:
-      outbound addresses (halfstack, manager API, coordinator API) point at
-      ``host.docker.internal`` while bind addresses become ``0.0.0.0``.
+      halfstack/coordinator addresses become compose service DNS names (the
+      services file ``include:``s the halfstack file, so everything is ONE
+      compose project on one network with depends_on health gating), the
+      manager API address becomes ``host.docker.internal``, and bind
+      addresses become ``0.0.0.0``.
     - The install target directory is bind-mounted at the identical absolute
       path (path parity) only where files must resolve on the host: the
       agent and storage-proxy (paths handed to the host Docker daemon) and
@@ -2334,13 +2348,22 @@ class DockerContext(Context):
     """
 
     SERVICES_COMPOSE_FILENAME = "docker-compose.services.yml"
+    HALFSTACK_COMPOSE_FILENAME = "docker-compose.halfstack.current.yml"
     # Must match the agent image entrypoint's krunner share location
     # (env-overridable there via BACKENDAI_KRUNNER_SHARED; the entrypoint
     # fails fast when the share is not mounted).
     KRUNNER_SHARED_PATH = Path("/var/lib/backend.ai/krunner")
     # Alias for the host as seen from the bridge-networked service containers
-    # (mapped to the host gateway via `extra_hosts` in the compose template).
+    # (mapped to the host gateway via `extra_hosts` on the webserver, the one
+    # bridge service that must reach a host-network process: the manager API).
     HOST_ALIAS = "host.docker.internal"
+    # Compose service DNS names of the halfstack members (same project via
+    # the include: in the services compose file); bridge services address
+    # them with the CONTAINER-side ports, not the host-published ones.
+    HALF_DB = "backendai-half-db"
+    HALF_REDIS = "backendai-half-redis"
+    HALF_ETCD = "backendai-half-etcd"
+    HALF_OTEL = "backendai-half-otel-collector"
 
     @override
     def hydrate_install_info(self) -> InstallInfo:
@@ -2394,12 +2417,63 @@ class DockerContext(Context):
             )
 
     def _services_compose_args(self) -> list[str]:
-        return [
+        # The services file `include:`s the halfstack file, so this single
+        # entry file addresses the WHOLE deployment as one compose project.
+        # The halfstack profile flags keep the merged model complete (no
+        # orphan warnings about running observability containers).
+        args = ["docker", "compose"]
+        for profile_arg in self._halfstack_profile_args():
+            args += profile_arg.split(" ")
+        args += ["-f", str(self.install_info.base_path / self.SERVICES_COMPOSE_FILENAME)]
+        return args
+
+    async def _list_halfstack_services(self) -> list[str]:
+        """
+        The compose service names defined by the (prepared) halfstack file
+        under the active profiles, captured from ``config --services``.
+        """
+        proc = await asyncio.create_subprocess_exec(
+            *self.docker_sudo,
             "docker",
             "compose",
+            *(part for arg in self._halfstack_profile_args() for part in arg.split(" ")),
             "-f",
-            str(self.install_info.base_path / self.SERVICES_COMPOSE_FILENAME),
+            str(self.install_info.base_path / self.HALFSTACK_COMPOSE_FILENAME),
+            "config",
+            "--services",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"Failed to enumerate the halfstack compose services "
+                f"(exit {proc.returncode}):\n{stderr.decode(errors='replace')}"
+            )
+        return [line.strip() for line in stdout.decode().splitlines() if line.strip()]
+
+    @override
+    async def _start_halfstack(self) -> None:
+        # The halfstack runs as part of the SAME compose project as the
+        # service containers (the services file include:s the halfstack
+        # file), so the bridge-networked services reach it by service DNS and
+        # can health-gate on it via depends_on. Start only the halfstack
+        # members here — the service containers start later, after their
+        # configs are generated.
+        halfstack_services = await self._list_halfstack_services()
+        compose_cmd = [*self.docker_sudo, *self._services_compose_args()]
+        steps: list[list[str]] = [
+            [*compose_cmd, "pull", *halfstack_services],
+            [*compose_cmd, "up", "-d", "--wait", "backendai-half-db"],
+            [*compose_cmd, "up", "-d", "--wait", *halfstack_services],
+            [*compose_cmd, "ps", *halfstack_services],
         ]
+        for step in steps:
+            exit_code = await self.run_exec(step)
+            if exit_code != 0:
+                raise RuntimeError(
+                    f"Failed to start the halfstack containers (exit {exit_code}): {' '.join(step)}"
+                )
 
     async def _run_service_cli(
         self,
@@ -2539,12 +2613,15 @@ class DockerContext(Context):
                 "directory) and retry."
             )
 
-        self.log_header("Installing databases (halfstack)...")
-        await self.install_halfstack()
-
+        # The service compose file must exist BEFORE the halfstack starts:
+        # it is the single entry file (it include:s the halfstack file), and
+        # the unified project keeps every container on one network.
         self.log_header("Generating the service compose file...")
         compose_path = await self.generate_services_compose()
         self.log.write(Text.from_markup(f"generated [bold]{compose_path}[/]"))
+
+        self.log_header("Installing databases (halfstack)...")
+        await self.install_halfstack()
 
         self.log_header(f"Pulling service images (version {self.dist_info.version})...")
         exit_code = await self.run_exec([
@@ -2627,9 +2704,10 @@ class DockerContext(Context):
     @override
     def _fixup_appproxy_alembic_ini(self, alembic_ini: Path) -> None:
         # The schema-oneshot one-off runs inside the bridge-networked
-        # coordinator container, where the host's published halfstack ports
-        # are reachable only via the host-gateway alias, not localhost.
-        self.sed_in_place(alembic_ini, "@localhost:", f"@{self.HOST_ALIAS}:")
+        # coordinator container, which shares the compose project (and
+        # network) with the halfstack — address the DB by service DNS and its
+        # container-side port instead of the host-published localhost port.
+        self.sed_in_place(alembic_ini, "@localhost:8100/", f"@{self.HALF_DB}:5432/")
 
     async def _fixup_bridge_service_addresses(self) -> None:
         """
@@ -2637,8 +2715,11 @@ class DockerContext(Context):
         (webserver, storage-proxy, app-proxy trio), which the package-layout
         generators wrote with host-loopback addressing:
 
-        - outbound addresses (halfstack, manager API, coordinator API, and
-          the default OTLP endpoint) become ``host.docker.internal``, and
+        - halfstack and coordinator addresses become compose service DNS
+          names with container-side ports (same project, same network),
+        - the manager API address (a host-network process) becomes
+          ``host.docker.internal`` — the webserver's ``extra_hosts`` entry
+          maps it to the host gateway, and
         - bind addresses become ``0.0.0.0`` so the published container ports
           actually receive traffic,
 
@@ -2650,11 +2731,7 @@ class DockerContext(Context):
         directory.
         """
         base_path = self.install_info.base_path
-        halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
-        if halfstack.redis_addr is None:
-            raise RuntimeError("redis_addr must be configured")
-        redis_hostport = f"{self.HOST_ALIAS}:{halfstack.redis_addr.face.port}"
 
         def rewrite(filename: str, mutate: Callable[[Any], None]) -> None:
             path = base_path / filename
@@ -2668,15 +2745,16 @@ class DockerContext(Context):
             # Only the untouched default — a custom --otel-endpoint given at
             # install time must stay as the operator wrote it.
             if data.get("otel", {}).get("endpoint") == "http://127.0.0.1:4317":
-                data["otel"]["endpoint"] = f"http://{self.HOST_ALIAS}:4317"
+                data["otel"]["endpoint"] = f"http://{self.HALF_OTEL}:4317"
 
         def fixup_webserver(data: Any) -> None:
             data["api"]["endpoint"] = f"http://{self.HOST_ALIAS}:{service.manager_addr.face.port}"
-            data["session"]["redis"]["addr"] = redis_hostport
+            data["session"]["redis"]["addr"] = f"{self.HALF_REDIS}:6379"
             fixup_otel(data)
 
         def fixup_storage_proxy(data: Any) -> None:
-            data["etcd"]["addr"]["host"] = self.HOST_ALIAS
+            data["etcd"]["addr"]["host"] = self.HALF_ETCD
+            data["etcd"]["addr"]["port"] = 2379
             data["api"]["client"]["service-addr"]["host"] = "0.0.0.0"
             data["api"]["manager"]["service-addr"]["host"] = "0.0.0.0"
             data["api"]["manager"]["ssl-cert"] = str(
@@ -2689,14 +2767,17 @@ class DockerContext(Context):
             fixup_otel(data)
 
         def fixup_coordinator(data: Any) -> None:
-            data["db"]["addr"]["host"] = self.HOST_ALIAS
-            data["redis"]["addr"]["host"] = self.HOST_ALIAS
+            data["db"]["addr"]["host"] = self.HALF_DB
+            data["db"]["addr"]["port"] = 5432
+            data["redis"]["addr"]["host"] = self.HALF_REDIS
+            data["redis"]["addr"]["port"] = 6379
             fixup_otel(data)
 
         def fixup_worker(data: Any) -> None:
-            data["redis"]["addr"]["host"] = self.HOST_ALIAS
+            data["redis"]["addr"]["host"] = self.HALF_REDIS
+            data["redis"]["addr"]["port"] = 6379
             data["proxy_worker"]["coordinator_endpoint"] = (
-                f"http://{self.HOST_ALIAS}:{service.appproxy_coordinator_addr.bind.port}"
+                f"http://appproxy-coordinator:{service.appproxy_coordinator_addr.bind.port}"
             )
             data["proxy_worker"]["api_bind_addr"]["host"] = "0.0.0.0"
             fixup_otel(data)

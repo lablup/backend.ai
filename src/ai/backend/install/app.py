@@ -218,14 +218,18 @@ class DockerInstallReport(Static):
         - Username: `admin@lablup.com`
         - Password: `wJalrXUt`
 
-        The deployment lives in `{base_path}`:
-        - `docker-compose.services.yml` — the service containers
-          (inspect with `docker compose -f docker-compose.services.yml ps`)
+        The deployment lives in `{base_path}` and runs as ONE compose
+        project (`backendai-services`):
+        - `docker-compose.services.yml` — the single entry file; it
+          `include:`s the halfstack file, so
+          `docker compose -f docker-compose.services.yml ps` shows the
+          whole deployment
         - `docker-compose.halfstack.current.yml` — PostgreSQL / Redis / etcd
+          (started as part of the same project)
         - `*.toml` / `webserver.conf` — the per-service configurations,
           bind-mounted into the containers
 
-        To stop or restart everything:
+        To stop or restart everything (halfstack included):
         ```console
         $ cd {base_path}
         $ docker compose -f docker-compose.services.yml down
