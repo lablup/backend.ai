@@ -589,6 +589,8 @@ class DeleteKeyPair(graphene.Mutation):  # type: ignore[misc]
                 sa.select(KeyPairRow.is_default).where(KeyPairRow.access_key == access_key)
             )
             if is_default:
-                return DeleteKeyPair(False, "the keypair is used as main access key by any user")
+                return DeleteKeyPair(
+                    False, "the keypair is used as the default access key by a user"
+                )
         delete_query = sa.delete(keypairs).where(keypairs.c.access_key == access_key)
         return await simple_db_mutate(cls, ctx, delete_query)

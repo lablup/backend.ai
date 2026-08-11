@@ -1203,7 +1203,7 @@ class UserDBSource:
                 raise KeyPairForbidden("Cannot revoke another user's keypair")
             if kp_row.is_default:
                 raise KeyPairForbidden(
-                    "Cannot revoke the main access key. Switch main access key first."
+                    "Cannot revoke the default access key. Switch the default access key first."
                 )
 
             await session.execute(sa.delete(keypairs).where(keypairs.c.access_key == access_key))
@@ -1226,13 +1226,15 @@ class UserDBSource:
                 )
             ).first()
             if not kp_row:
-                raise KeyPairNotFound("Cannot set non-existing access key as the main access key.")
+                raise KeyPairNotFound(
+                    "Cannot set a non-existing access key as the default access key."
+                )
             if kp_row.user != user_id:
                 raise KeyPairForbidden(
-                    "Cannot set another user's access key as the main access key."
+                    "Cannot set another user's access key as the default access key."
                 )
             if not kp_row.is_active:
-                raise KeyPairForbidden("Cannot set an inactive keypair as the main access key.")
+                raise KeyPairForbidden("Cannot set an inactive keypair as the default access key.")
 
             await self._switch_default_keypair(session, user_id, access_key)
 
@@ -1367,7 +1369,9 @@ class UserDBSource:
             if not kp_row:
                 raise KeyPairNotFound(f"Keypair {access_key} not found")
             if kp_row.is_default:
-                raise KeyPairForbidden("Cannot delete a keypair set as the user's main access key.")
+                raise KeyPairForbidden(
+                    "Cannot delete a keypair set as the user's default access key."
+                )
 
             await session.execute(sa.delete(keypairs).where(keypairs.c.access_key == access_key))
 
