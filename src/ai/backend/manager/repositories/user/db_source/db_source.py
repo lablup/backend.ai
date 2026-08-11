@@ -1141,7 +1141,7 @@ class UserDBSource:
             )
 
     async def issue_my_keypair(self, user_uuid: UUID) -> GeneratedKeyPairData:
-        """Issue a new keypair for the current user, inheriting settings from main keypair."""
+        """Issue a new keypair for the current user, inheriting settings from the default keypair."""
         async with self._db.begin_session() as session:
             user_row = (
                 await session.scalars(
@@ -1153,7 +1153,7 @@ class UserDBSource:
             if not user_row:
                 raise UserNotFound(f"User {user_uuid} not found")
 
-            main_kp_row = (
+            default_kp_row = (
                 await session.scalars(
                     sa.select(KeyPairRow)
                     .where((KeyPairRow.user == user_uuid) & KeyPairRow.is_default)
@@ -1161,12 +1161,12 @@ class UserDBSource:
                 )
             ).first()
 
-            if main_kp_row:
+            if default_kp_row:
                 keypair_creator = KeyPairCreator(
                     is_active=True,
-                    is_admin=main_kp_row.is_admin or False,
-                    resource_policy=main_kp_row.resource_policy,
-                    rate_limit=main_kp_row.rate_limit or DEFAULT_KEYPAIR_RATE_LIMIT,
+                    is_admin=default_kp_row.is_admin or False,
+                    resource_policy=default_kp_row.resource_policy,
+                    rate_limit=default_kp_row.rate_limit or DEFAULT_KEYPAIR_RATE_LIMIT,
                 )
             else:
                 keypair_creator = KeyPairCreator(
