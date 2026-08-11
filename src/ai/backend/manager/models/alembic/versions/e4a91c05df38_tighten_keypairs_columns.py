@@ -1,8 +1,8 @@
 """tighten the always-populated keypairs columns
 
-Backfills ``user_id``, ``is_active``, ``is_admin`` and ``num_queries``, then sets
-those and ``secret_key`` NOT NULL. A keypair with no ``secret_key`` cannot sign a
-request, so it is deleted rather than given a fabricated one.
+``is_admin`` and ``num_queries`` have a default, so a null there is backfilled.
+The others do not: a keypair missing ``user_id``, ``secret_key`` or ``is_active``
+is deleted rather than given an invented value.
 
 Revision ID: e4a91c05df38
 Revises: 37d711158a8c
@@ -25,21 +25,25 @@ down_revision = "37d711158a8c"
 branch_labels = None
 depends_on = None
 
-_TIGHTENED = (
+_BACKFILLED = {
+    "is_admin": "false",
+    "num_queries": "0",
+}
+_REQUIRED = (
     "user_id",
     "secret_key",
     "is_active",
-    "is_admin",
-    "num_queries",
 )
+_TIGHTENED = (*_REQUIRED, *_BACKFILLED)
 
 
-def _delete_keypairs_without_secret_key(bind: Connection) -> None:
+def _delete_incomplete_keypairs(bind: Connection) -> None:
+    missing = " OR ".join(f"k.{column} IS NULL" for column in _REQUIRED)
     doomed = bind.execute(
-        sa.text("""
-            SELECT k.access_key, k.user_id, u.email
+        sa.text(f"""
+            SELECT k.access_key, u.email
             FROM keypairs k LEFT JOIN users u ON u."uuid" = k."user"
-            WHERE k.secret_key IS NULL
+            WHERE {missing}
             ORDER BY k.access_key
         """)
     ).all()
@@ -47,12 +51,13 @@ def _delete_keypairs_without_secret_key(bind: Connection) -> None:
         return
 
     log.warning(
-        "Deleting %d keypair(s) with no secret key — they cannot sign a request, so nothing"
-        " can be authenticated or running under them:",
+        "Deleting %d keypair(s) missing one of %s — those have no default to fall back on,"
+        " and a keypair without them cannot authenticate anything:",
         len(doomed),
+        ", ".join(_REQUIRED),
     )
-    for access_key, user_id, email in doomed:
-        log.warning("  %s (owner: %s)", access_key, email or user_id or "<unknown>")
+    for access_key, email in doomed:
+        log.warning("  %s (owner: %s)", access_key, email or "<unknown>")
 
     keys = [row.access_key for row in doomed]
     bind.execute(
@@ -75,18 +80,9 @@ def _delete_keypairs_without_secret_key(bind: Connection) -> None:
 
 def upgrade() -> None:
     bind = op.get_bind()
-    _delete_keypairs_without_secret_key(bind)
-    bind.execute(
-        sa.text("""
-            UPDATE keypairs
-            SET user_id = users.email
-            FROM users
-            WHERE users.uuid = keypairs."user" AND keypairs.user_id IS NULL
-        """)
-    )
-    bind.execute(sa.text("UPDATE keypairs SET is_active = true WHERE is_active IS NULL"))
-    bind.execute(sa.text("UPDATE keypairs SET is_admin = false WHERE is_admin IS NULL"))
-    bind.execute(sa.text("UPDATE keypairs SET num_queries = 0 WHERE num_queries IS NULL"))
+    _delete_incomplete_keypairs(bind)
+    for column, default in _BACKFILLED.items():
+        bind.execute(sa.text(f"UPDATE keypairs SET {column} = {default} WHERE {column} IS NULL"))
 
     for column in _TIGHTENED:
         op.alter_column("keypairs", column, nullable=False)
