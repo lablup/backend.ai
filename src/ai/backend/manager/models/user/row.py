@@ -219,7 +219,7 @@ class UserRow(LifecycleTimestampsMixin, Base):
         primaryjoin=_get_main_keypair_join_condition,
         foreign_keys="KeyPairRow.user",
         viewonly=True,
-        lazy="joined",
+        lazy="selectin",
     )
 
     @classmethod
