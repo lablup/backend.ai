@@ -76,8 +76,8 @@ __all__ = ["KernelOwnershipData"]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-# Added to the launch budget the agent grants the kernel runner, so that a runner giving up
-# exactly at the budget still gets its reply delivered instead of racing the agent.
+# Added to the launch timeout the agent grants the kernel runner, so that a runner giving up
+# exactly on time still gets its reply delivered instead of racing the agent.
 SERVICE_REPLY_TIMEOUT_MARGIN_SEC = 5.0
 
 # msg types visible to the API client.

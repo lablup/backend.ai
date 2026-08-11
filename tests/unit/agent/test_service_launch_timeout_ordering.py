@@ -18,7 +18,7 @@ from ai.backend.kernel.base import BaseRunner
 KRUNNER_LAUNCH_TIMEOUT_SEC: float = (
     inspect.signature(BaseRunner._start_service).parameters["launch_timeout"].default
 )
-_REPLY_BUDGET_SEC = KRUNNER_LAUNCH_BUDGET_SEC + SERVICE_REPLY_TIMEOUT_MARGIN_SEC
+_REPLY_TIMEOUT_SEC = KRUNNER_LAUNCH_TIMEOUT_SEC + SERVICE_REPLY_TIMEOUT_MARGIN_SEC
 
 
 class _SocketlessCodeRunner(AbstractCodeRunner):
@@ -58,7 +58,7 @@ async def test_the_reply_timeout_outlasts_the_kernel_runner(
     recorded_timeouts: list[float],
 ) -> None:
     result = await code_runner.feed_start_service(
-        {"name": "jupyter"}, reply_timeout=_REPLY_BUDGET_SEC
+        {"name": "jupyter"}, reply_timeout=_REPLY_TIMEOUT_SEC
     )
 
     assert result == {"status": "started"}

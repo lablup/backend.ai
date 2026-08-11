@@ -22,7 +22,7 @@ _CONFIG_KEY = "service-launch-timeout-sec"
 
 
 @dataclass(frozen=True)
-class _BudgetCase:
+class _LaunchTimeoutCase:
     configured_sec: float
 
 
@@ -54,7 +54,7 @@ class _RunnerSpy:
 
 
 class _KernelRunnerSpy(BaseRunner):
-    """Records the budget the kernel runner derives from a start-service payload.
+    """Records the launch timeout the kernel runner derives from a start-service payload.
 
     ``BaseRunner.__init__`` is skipped on purpose: it reads ``/home/work`` and the container's
     environment, neither of which exists outside a kernel container.
@@ -100,7 +100,7 @@ class _KernelRunnerSpy(BaseRunner):
 
 @pytest.fixture
 def kernel(request: pytest.FixtureRequest) -> DockerKernel:
-    case: _BudgetCase = request.param
+    case: _LaunchTimeoutCase = request.param
     return DockerKernel(
         ownership_data=KernelOwnershipData(
             kernel_id=KernelId(uuid4()),
@@ -141,13 +141,13 @@ def kernel_runner() -> _KernelRunnerSpy:
     return _KernelRunnerSpy()
 
 
-class TestServiceLaunchBudget:
+class TestServiceLaunchTimeout:
     @pytest.mark.parametrize(
         "kernel",
         [
-            _BudgetCase(configured_sec=DEFAULT_SERVICE_LAUNCH_TIMEOUT_SEC),
-            _BudgetCase(configured_sec=5.0),
-            _BudgetCase(configured_sec=120.0),
+            _LaunchTimeoutCase(configured_sec=DEFAULT_SERVICE_LAUNCH_TIMEOUT_SEC),
+            _LaunchTimeoutCase(configured_sec=5.0),
+            _LaunchTimeoutCase(configured_sec=120.0),
         ],
         indirect=True,
         ids=lambda case: f"{case.configured_sec:g}s",
@@ -165,16 +165,16 @@ class TestServiceLaunchBudget:
     @pytest.mark.parametrize(
         "case",
         [
-            _BudgetCase(configured_sec=DEFAULT_SERVICE_LAUNCH_TIMEOUT_SEC),
-            _BudgetCase(configured_sec=5.0),
-            _BudgetCase(configured_sec=120.0),
+            _LaunchTimeoutCase(configured_sec=DEFAULT_SERVICE_LAUNCH_TIMEOUT_SEC),
+            _LaunchTimeoutCase(configured_sec=5.0),
+            _LaunchTimeoutCase(configured_sec=120.0),
         ],
         ids=lambda case: f"{case.configured_sec:g}s",
     )
-    async def test_kernel_runner_takes_the_budget_from_the_payload(
+    async def test_kernel_runner_takes_the_launch_timeout_from_the_payload(
         self,
         kernel_runner: _KernelRunnerSpy,
-        case: _BudgetCase,
+        case: _LaunchTimeoutCase,
     ) -> None:
         await kernel_runner._start_service_and_feed_result({
             "name": _SERVICE_NAME,
@@ -184,7 +184,7 @@ class TestServiceLaunchBudget:
 
         assert kernel_runner.launch_timeout == case.configured_sec
 
-    async def test_kernel_runner_falls_back_for_a_payload_without_the_budget(
+    async def test_kernel_runner_falls_back_for_a_payload_without_it(
         self,
         kernel_runner: _KernelRunnerSpy,
     ) -> None:

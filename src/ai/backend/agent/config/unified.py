@@ -2095,10 +2095,10 @@ class KernelLifecyclesConfig(BaseConfigSchema):
         ),
         BackendAIConfigMeta(
             description=(
-                "Time budget in seconds for a service app (jupyter, vscode, ...) to open its "
+                "How long in seconds a service app (jupyter, vscode, ...) may take to open its "
                 "port after the kernel runner spawns it. The kernel runner terminates the app "
                 "process once this expires, and the agent waits this long plus a fixed margin "
-                "for the runner's reply, so the two sides cannot disagree on the budget. "
+                "for the runner's reply, so the two sides cannot disagree on how long that is. "
                 "Raise it for images whose apps bind slowly under CPU or IO contention; the "
                 "effective ceiling is the calling client's own request timeout. "
                 "Applies to containers created after the change."
