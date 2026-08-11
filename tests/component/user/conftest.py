@@ -21,6 +21,15 @@ from ai.backend.common.dto.manager.user import (
     PurgeUserRequest,
     UserStatus,
 )
+from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.registry import (
+    ProcessorDependencies,
+    ProcessorGroup,
+    ProcessorRegistry,
+)
+from ai.backend.manager.actions.v2.validators import (
+    ActionValidators as V2ActionValidators,
+)
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
@@ -40,6 +49,7 @@ from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.domain.repository import DomainRepository
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
@@ -47,6 +57,18 @@ from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.testutils.fixtures import DomainFixtureData
+
+
+def _user_processor_group() -> ProcessorGroup[Any]:
+    """A real group so the v2-wired action behaves as it does in production."""
+    return ProcessorRegistry(
+        ProcessorDependencies(
+            monitors=ActionMonitors(),
+            validators=V2ActionValidators(),
+            repository=OpsRepository(MagicMock()),
+        )
+    ).group()
+
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
@@ -79,7 +101,10 @@ def user_processors(
         scheduling_controller=AsyncMock(),
     )
     return UserProcessors(
-        user_service=service, action_monitors=[], validators=_create_mock_validators()
+        user_service=service,
+        action_monitors=[],
+        validators=_create_mock_validators(),
+        group=_user_processor_group(),
     )
 
 

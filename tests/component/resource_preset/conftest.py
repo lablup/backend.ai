@@ -13,6 +13,15 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.registry import (
+    ProcessorDependencies,
+    ProcessorGroup,
+    ProcessorRegistry,
+)
+from ai.backend.manager.actions.v2.validators import (
+    ActionValidators as V2ActionValidators,
+)
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
@@ -31,6 +40,7 @@ from ai.backend.manager.repositories.container_registry.repository import (
 )
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
@@ -44,6 +54,18 @@ from ai.backend.manager.services.resource_preset.processors import ResourcePrese
 from ai.backend.manager.services.resource_preset.service import ResourcePresetService
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
+
+
+def _user_processor_group() -> ProcessorGroup[Any]:
+    """A real group so the v2-wired action behaves as it does in production."""
+    return ProcessorRegistry(
+        ProcessorDependencies(
+            monitors=ActionMonitors(),
+            validators=V2ActionValidators(),
+            repository=OpsRepository(MagicMock()),
+        )
+    ).group()
+
 
 # Statically imported so that Pants includes these modules in the test PEX.
 _RESOURCE_PRESET_SERVER_SUBAPP_MODULES = (_auth_api,)
@@ -150,7 +172,10 @@ def user_processors(
     user_repo = UserRepository(database_engine)
     service = UserService(storage_manager, valkey_clients.stat, AsyncMock(), user_repo, AsyncMock())
     return UserProcessors(
-        user_service=service, action_monitors=[], validators=_create_mock_validators()
+        user_service=service,
+        action_monitors=[],
+        validators=_create_mock_validators(),
+        group=_user_processor_group(),
     )
 
 

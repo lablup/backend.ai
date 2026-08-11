@@ -16,6 +16,17 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
+from typing import Any
+
+from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.registry import (
+    ProcessorDependencies,
+    ProcessorGroup,
+    ProcessorRegistry,
+)
+from ai.backend.manager.actions.v2.validators import (
+    ActionValidators as V2ActionValidators,
+)
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -23,10 +34,22 @@ from ai.backend.manager.api.rest.v2.keypair.handler import V2KeypairHandler
 from ai.backend.manager.api.rest.v2.keypair.registry import register_v2_keypair_routes
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
+
+
+def _user_processor_group() -> ProcessorGroup[Any]:
+    """A real group so the v2-wired action behaves as it does in production."""
+    return ProcessorRegistry(
+        ProcessorDependencies(
+            monitors=ActionMonitors(),
+            validators=V2ActionValidators(),
+            repository=OpsRepository(MagicMock()),
+        )
+    ).group()
 
 
 @pytest.fixture()
@@ -45,7 +68,8 @@ def user_processors(
     return UserProcessors(
         user_service=user_service,
         action_monitors=[],
-        validators=MagicMock(),  # Needs unrestricted mock for nested rbac.scope access
+        validators=MagicMock(),  # Needs unrestricted mock for nested rbac.scope access,
+        group=_user_processor_group(),
     )
 
 

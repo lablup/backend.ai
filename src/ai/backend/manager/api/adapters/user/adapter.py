@@ -38,6 +38,7 @@ from ai.backend.common.dto.manager.v2.keypair.response import (
     AdminUpdateKeypairPayload,
     IssueMyKeypairPayload,
     RevokeMyKeypairPayload,
+    SetMyDefaultKeypairPayload,
     SSHKeypairNode,
     SwitchMyMainAccessKeyPayload,
     UpdateMyKeypairPayload,
@@ -92,6 +93,8 @@ from ai.backend.common.dto.manager.v2.user.types import (
 )
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.user import UserID
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import UserData, UserStatus
@@ -167,6 +170,9 @@ from ai.backend.manager.services.user.actions.search_users_by_project import (
 )
 from ai.backend.manager.services.user.actions.search_users_by_role import (
     SearchUsersByRoleAction,
+)
+from ai.backend.manager.services.user.actions.set_default_keypair import (
+    SetMyDefaultKeypairAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -696,6 +702,15 @@ class UserAdapter(BaseAdapter):
             )
         )
         return UpdateMyKeypairPayload(keypair=self._keypair_data_to_node(result.keypair))
+
+    async def set_my_default_keypair(
+        self, user_id: UUID, access_key: str
+    ) -> SetMyDefaultKeypairPayload:
+        """Mark one of the current user's keypairs as their default."""
+        result = await self._processors.user.set_my_default_keypair.run(
+            SetMyDefaultKeypairAction(user_id=UserID(user_id), access_key=AccessKey(access_key))
+        )
+        return SetMyDefaultKeypairPayload(access_key=result.access_key)
 
     async def switch_my_main_access_key(
         self, user_id: UUID, access_key: str

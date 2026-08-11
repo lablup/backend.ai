@@ -12547,8 +12547,23 @@
         "title": "UpdateMyKeypairInput",
         "type": "object"
       },
+      "SetMyDefaultKeypairInput": {
+        "description": "Request to mark one of the current user's keypairs as their default.",
+        "properties": {
+          "access_key": {
+            "description": "Access key to mark as the default. Must be active and owned by you.",
+            "title": "Access Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "access_key"
+        ],
+        "title": "SetMyDefaultKeypairInput",
+        "type": "object"
+      },
       "SwitchMyMainAccessKeyInput": {
-        "description": "Request to switch the main access key for the current user.",
+        "description": "Request to switch the main access key for the current user.\n\nDeprecated since 26.9.0. Use ``SetMyDefaultKeypairInput``.",
         "properties": {
           "access_key": {
             "description": "Access key to set as the new main key.",
@@ -45759,6 +45774,35 @@
         },
         "parameters": [],
         "description": "Update a keypair owned by the current user.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/keypairs/my/default": {
+      "post": {
+        "operationId": "v2/keypairs.set_default",
+        "tags": [
+          "v2/keypairs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetMyDefaultKeypairInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Mark one of the current user's keypairs as their default.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/keypairs/my/switch-main": {

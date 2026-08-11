@@ -28,6 +28,7 @@ def register_v2_keypair_routes(
     reg.add("POST", "/my/issue", handler.issue, middlewares=[auth_required])
     reg.add("POST", "/my/revoke", handler.revoke, middlewares=[auth_required])
     reg.add("PATCH", "/my", handler.update, middlewares=[auth_required])
+    reg.add("POST", "/my/default", handler.set_default, middlewares=[auth_required])
     reg.add("POST", "/my/switch-main", handler.switch_main, middlewares=[auth_required])
     # Admin routes
     reg.add("POST", "/search", handler.admin_search, middlewares=[superadmin_required])

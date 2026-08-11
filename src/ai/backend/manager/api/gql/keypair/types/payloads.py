@@ -30,6 +30,9 @@ from ai.backend.common.dto.manager.v2.keypair.response import (
     RevokeMyKeypairPayload as RevokeMyKeypairPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.keypair.response import (
+    SetMyDefaultKeypairPayload as SetMyDefaultKeypairPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.keypair.response import (
     SSHKeypairNode as SSHKeypairNodeDTO,
 )
 from ai.backend.common.dto.manager.v2.keypair.response import (
@@ -38,6 +41,7 @@ from ai.backend.common.dto.manager.v2.keypair.response import (
 from ai.backend.common.dto.manager.v2.keypair.response import (
     UpdateMyKeypairPayload as UpdateMyKeypairPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -87,6 +91,19 @@ class IssueMyKeypairPayloadGQL(PydanticOutputMixin[IssueMyKeypairPayloadDTO]):
     name="RevokeMyKeypairPayload",
 )
 class RevokeMyKeypairPayloadGQL(PydanticOutputMixin[RevokeMyKeypairPayloadDTO]):
+    pass
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload returned after moving the default marker.",
+    ),
+    model=SetMyDefaultKeypairPayloadDTO,
+    all_fields=True,
+    name="SetMyDefaultKeypairPayload",
+)
+class SetMyDefaultKeypairPayloadGQL(PydanticOutputMixin[SetMyDefaultKeypairPayloadDTO]):
     pass
 
 

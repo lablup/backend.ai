@@ -27,6 +27,7 @@ __all__ = (
     "KeypairOrderBy",
     "RevokeMyKeypairInput",
     "SearchMyKeypairsRequest",
+    "SetMyDefaultKeypairInput",
     "SwitchMyMainAccessKeyInput",
     "UpdateMyKeypairInput",
 )
@@ -126,9 +127,20 @@ class UpdateMyKeypairInput(BaseRequestModel):
 
 
 class SwitchMyMainAccessKeyInput(BaseRequestModel):
-    """Request to switch the main access key for the current user."""
+    """Request to switch the main access key for the current user.
+
+    Deprecated since 26.9.0. Use ``SetMyDefaultKeypairInput``.
+    """
 
     access_key: str = Field(description="Access key to set as the new main key.")
+
+
+class SetMyDefaultKeypairInput(BaseRequestModel):
+    """Request to mark one of the current user's keypairs as their default."""
+
+    access_key: str = Field(
+        description="Access key to mark as the default. Must be active and owned by you."
+    )
 
 
 class AdminCreateKeypairInput(BaseRequestModel):

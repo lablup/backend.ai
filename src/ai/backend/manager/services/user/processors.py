@@ -1,9 +1,10 @@
-from typing import cast
+from typing import Any, cast
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
+from ai.backend.manager.actions.registry import ProcessorGroup
 from ai.backend.manager.actions.validator.base import ActionValidator
 from ai.backend.manager.actions.validator.scope import ScopeActionValidator
 from ai.backend.manager.actions.validator.single_entity import SingleEntityActionValidator
@@ -91,6 +92,9 @@ from ai.backend.manager.services.user.actions.search_users_by_role import (
     SearchUsersByRoleAction,
     SearchUsersByRoleActionResult,
 )
+from ai.backend.manager.services.user.actions.set_default_keypair import (
+    SetMyDefaultKeypairAction,
+)
 from ai.backend.manager.services.user.actions.user_month_stats import (
     UserMonthStatsAction,
     UserMonthStatsActionResult,
@@ -156,7 +160,11 @@ class UserProcessors:
         user_service: UserService,
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
+        group: ProcessorGroup[Any],
     ) -> None:
+        self.set_my_default_keypair = group.single_entity(
+            SetMyDefaultKeypairAction, user_service.set_my_default_keypair
+        )
         # Scope actions with RBAC — create_user is also invoked from gql_legacy,
         # so use the non-enforcing legacy validator to avoid breaking callers.
         # Mocked test fixtures do not provide a legacy_rbac, so isinstance

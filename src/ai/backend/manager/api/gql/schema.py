@@ -201,6 +201,7 @@ from .keypair import (
     issue_my_keypair,
     my_keypairs,
     revoke_my_keypair,
+    set_my_default_keypair,
     switch_my_main_access_key,
     update_my_keypair,
 )
@@ -911,6 +912,7 @@ class Mutation:
     # Keypair self-service mutations
     issue_my_keypair = issue_my_keypair
     revoke_my_keypair = revoke_my_keypair
+    set_my_default_keypair = set_my_default_keypair
     switch_my_main_access_key = switch_my_main_access_key
     update_my_keypair = update_my_keypair
     # Keypair admin mutations

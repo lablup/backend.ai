@@ -28,6 +28,7 @@ __all__ = (
     "RevokeMyKeypairPayload",
     "SearchMyKeypairsPayload",
     "SSHKeypairNode",
+    "SetMyDefaultKeypairPayload",
     "SwitchMyMainAccessKeyPayload",
     "UpdateMyKeypairPayload",
 )
@@ -99,9 +100,18 @@ class UpdateMyKeypairPayload(BaseResponseModel):
 
 
 class SwitchMyMainAccessKeyPayload(BaseResponseModel):
-    """Payload returned after switching the main access key."""
+    """Payload returned after switching the main access key.
+
+    Deprecated since 26.9.0. Use ``SetMyDefaultKeypairPayload``.
+    """
 
     success: bool = Field(description="Whether the switch was successful.")
+
+
+class SetMyDefaultKeypairPayload(BaseResponseModel):
+    """Payload returned after moving the default marker."""
+
+    access_key: str = Field(description="The access key now marked as the default.")
 
 
 class SearchMyKeypairsPayload(BaseResponseModel):

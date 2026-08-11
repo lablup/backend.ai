@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.keypair.request import (
     AdminUpdateKeypairInput,
     RevokeMyKeypairInput,
     SearchMyKeypairsRequest,
+    SetMyDefaultKeypairInput,
     SwitchMyMainAccessKeyInput,
     UpdateMyKeypairInput,
 )
@@ -79,6 +80,15 @@ class V2KeypairHandler:
         result = await self._adapter.update_my_keypair(
             ctx.user_uuid, body.parsed.access_key, body.parsed.is_active
         )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def set_default(
+        self,
+        body: BodyParam[SetMyDefaultKeypairInput],
+        ctx: UserContext,
+    ) -> APIResponse:
+        """Mark one of the current user's keypairs as their default."""
+        result = await self._adapter.set_my_default_keypair(ctx.user_uuid, body.parsed.access_key)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def switch_main(

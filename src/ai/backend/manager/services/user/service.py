@@ -97,6 +97,10 @@ from ai.backend.manager.services.user.actions.search_users_by_role import (
     SearchUsersByRoleAction,
     SearchUsersByRoleActionResult,
 )
+from ai.backend.manager.services.user.actions.set_default_keypair import (
+    SetMyDefaultKeypairAction,
+    SetMyDefaultKeypairActionResult,
+)
 from ai.backend.manager.services.user.actions.user_month_stats import (
     UserMonthStatsAction,
     UserMonthStatsActionResult,
@@ -445,6 +449,14 @@ class UserService:
             user_uuid=action.user_uuid, access_key=action.access_key
         )
         return SwitchMyMainAccessKeyActionResult(success=True)
+
+    async def set_my_default_keypair(
+        self, action: SetMyDefaultKeypairAction
+    ) -> SetMyDefaultKeypairActionResult:
+        await self._user_repository.switch_my_main_access_key(
+            user_uuid=action.user_id, access_key=action.access_key
+        )
+        return SetMyDefaultKeypairActionResult(access_key=action.access_key)
 
     async def search_my_keypairs(
         self, action: SearchMyKeypairsAction

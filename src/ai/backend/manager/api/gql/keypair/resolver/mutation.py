@@ -8,6 +8,7 @@ from strawberry import Info
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -24,6 +25,8 @@ from ai.backend.manager.api.gql.keypair.types import (
     IssueMyKeypairPayloadGQL,
     RevokeMyKeypairInputGQL,
     RevokeMyKeypairPayloadGQL,
+    SetMyDefaultKeypairInputGQL,
+    SetMyDefaultKeypairPayloadGQL,
     SwitchMyMainAccessKeyInputGQL,
     SwitchMyMainAccessKeyPayloadGQL,
     UpdateMyKeypairInputGQL,
@@ -88,8 +91,28 @@ async def update_my_keypair(
 
 @gql_mutation(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Mark one of the current user's keypairs as their default. The target keypair"
+            " must be active and owned by the user."
+        ),
+    )
+)
+async def set_my_default_keypair(
+    info: Info[StrawberryGQLContext],
+    input: SetMyDefaultKeypairInputGQL,
+) -> SetMyDefaultKeypairPayloadGQL | None:
+    user_id = _get_current_user_id()
+    payload = await info.context.adapters.user.set_my_default_keypair(user_id, input.access_key)
+    return SetMyDefaultKeypairPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
         added_version="26.4.2",
         description="Switch the main access key for the current user. The target keypair must be active and owned by the user.",
+        deprecated_version=NEXT_RELEASE_VERSION,
+        deprecation_hint="setMyDefaultKeypair",
     )
 )
 async def switch_my_main_access_key(

@@ -8631,7 +8631,12 @@ type Mutation {
   revokeMyKeypair(input: RevokeMyKeypairInput!): RevokeMyKeypairPayload
 
   """
-  Added in 26.4.2. Switch the main access key for the current user. The target keypair must be active and owned by the user.
+  Added in 26.9.0. Mark one of the current user's keypairs as their default. The target keypair must be active and owned by the user.
+  """
+  setMyDefaultKeypair(input: SetMyDefaultKeypairInput!): SetMyDefaultKeypairPayload
+
+  """
+  Added in 26.4.2. Switch the main access key for the current user. The target keypair must be active and owned by the user. Deprecated since 26.9.0. Use setMyDefaultKeypair.
   """
   switchMyMainAccessKey(input: SwitchMyMainAccessKeyInput!): SwitchMyMainAccessKeyPayload
 
@@ -14666,6 +14671,20 @@ enum SessionV2Type {
   BATCH
   INFERENCE
   SYSTEM
+}
+
+"""
+Added in 26.9.0. Input for marking one of the current user's keypairs as their default.
+"""
+input SetMyDefaultKeypairInput {
+  """Access key to mark as the default. Must be active and owned by you."""
+  accessKey: String!
+}
+
+"""Added in 26.9.0. Payload returned after moving the default marker."""
+type SetMyDefaultKeypairPayload {
+  """The access key now marked as the default."""
+  accessKey: String!
 }
 
 """Added in 26.4.2. Slider UI config."""

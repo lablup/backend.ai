@@ -6,6 +6,7 @@ from .inputs import (
     AdminRegisterSSHKeypairInputGQL,
     AdminUpdateKeypairInputGQL,
     RevokeMyKeypairInputGQL,
+    SetMyDefaultKeypairInputGQL,
     SwitchMyMainAccessKeyInputGQL,
     UpdateMyKeypairInputGQL,
 )
@@ -20,6 +21,7 @@ from .payloads import (
     CreateKeypairPayloadGQL,
     IssueMyKeypairPayloadGQL,
     RevokeMyKeypairPayloadGQL,
+    SetMyDefaultKeypairPayloadGQL,
     SSHKeypairNodeGQL,
     SwitchMyMainAccessKeyPayloadGQL,
     UpdateMyKeypairPayloadGQL,
@@ -44,10 +46,12 @@ __all__ = [
     "KeypairOrderFieldGQL",
     "RevokeMyKeypairInputGQL",
     "SSHKeypairNodeGQL",
+    "SetMyDefaultKeypairInputGQL",
     "SwitchMyMainAccessKeyInputGQL",
     "UpdateMyKeypairInputGQL",
     "IssueMyKeypairPayloadGQL",
     "RevokeMyKeypairPayloadGQL",
+    "SetMyDefaultKeypairPayloadGQL",
     "SwitchMyMainAccessKeyPayloadGQL",
     "UpdateMyKeypairPayloadGQL",
 ]

@@ -17,11 +17,15 @@ from ai.backend.common.dto.manager.v2.keypair.request import (
     RevokeMyKeypairInput as RevokeMyKeypairInputDTO,
 )
 from ai.backend.common.dto.manager.v2.keypair.request import (
+    SetMyDefaultKeypairInput as SetMyDefaultKeypairInputDTO,
+)
+from ai.backend.common.dto.manager.v2.keypair.request import (
     SwitchMyMainAccessKeyInput as SwitchMyMainAccessKeyInputDTO,
 )
 from ai.backend.common.dto.manager.v2.keypair.request import (
     UpdateMyKeypairInput as UpdateMyKeypairInputDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -40,6 +44,19 @@ from ai.backend.manager.api.gql.decorators import (
 class RevokeMyKeypairInputGQL(PydanticInputMixin[RevokeMyKeypairInputDTO]):
     access_key: str = gql_field(
         description="Access key of the keypair to revoke. Must not be the main access key."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=("Input for marking one of the current user's keypairs as their default."),
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="SetMyDefaultKeypairInput",
+)
+class SetMyDefaultKeypairInputGQL(PydanticInputMixin[SetMyDefaultKeypairInputDTO]):
+    access_key: str = gql_field(
+        description=("Access key to mark as the default. Must be active and owned by you.")
     )
 
 

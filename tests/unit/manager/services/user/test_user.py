@@ -4,7 +4,7 @@ Tests the core user service actions to verify compatibility with test scenarios.
 """
 
 import uuid
-from typing import cast
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
@@ -12,7 +12,16 @@ import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.identifier.domain import DomainID
+from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.registry import (
+    ProcessorDependencies,
+    ProcessorGroup,
+    ProcessorRegistry,
+)
+from ai.backend.manager.actions.v2.validators import (
+    ActionValidators as V2ActionValidators,
+)
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -21,6 +30,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
@@ -33,6 +43,17 @@ from ai.backend.manager.services.user.actions.user_month_stats import UserMonthS
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.manager.types import OptionalState, TriState
+
+
+def _user_processor_group() -> ProcessorGroup[Any]:
+    """A real group so the v2-wired action behaves as it does in production."""
+    return ProcessorRegistry(
+        ProcessorDependencies(
+            monitors=ActionMonitors(),
+            validators=V2ActionValidators(),
+            repository=OpsRepository(MagicMock()),
+        )
+    ).group()
 
 
 class TestUserServiceCompatibility:
@@ -77,6 +98,7 @@ class TestUserServiceCompatibility:
             user_service=user_service,
             action_monitors=[mock_dependencies["action_monitor"]],
             validators=MagicMock(spec=ActionValidators),
+            group=_user_processor_group(),
         )
 
     async def test_create_user_action_structure(

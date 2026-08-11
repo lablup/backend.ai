@@ -12,7 +12,7 @@ from __future__ import annotations
 import secrets
 import uuid
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -26,6 +26,15 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.permission.types import RelationType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.identifier.user import UserID
+from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.registry import (
+    ProcessorDependencies,
+    ProcessorGroup,
+    ProcessorRegistry,
+)
+from ai.backend.manager.actions.v2.validators import (
+    ActionValidators as V2ActionValidators,
+)
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
@@ -70,6 +79,7 @@ from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRo
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -85,6 +95,18 @@ from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
+
+
+def _user_processor_group() -> ProcessorGroup[Any]:
+    """A real group so the v2-wired action behaves as it does in production."""
+    return ProcessorRegistry(
+        ProcessorDependencies(
+            monitors=ActionMonitors(),
+            validators=V2ActionValidators(),
+            repository=OpsRepository(MagicMock()),
+        )
+    ).group()
+
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData, VirtualScopeSeeder
@@ -158,6 +180,7 @@ def user_processors(
         user_service=service,
         action_monitors=[],
         validators=_build_validators(database_engine, config_provider),
+        group=_user_processor_group(),
     )
 
 
