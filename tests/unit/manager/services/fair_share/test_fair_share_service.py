@@ -26,15 +26,16 @@ from ai.backend.manager.data.fair_share import (
 from ai.backend.manager.data.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.fair_share import FairShareRepository
 from ai.backend.manager.repositories.fair_share.types import (
     DomainFairShareEntitySearchResult,
-    DomainFairShareSearchScope,
+    DomainFairShareOperationScope,
     ProjectFairShareEntitySearchResult,
-    ProjectFairShareSearchScope,
+    ProjectFairShareOperationScope,
     UserFairShareEntitySearchResult,
-    UserFairShareSearchScope,
+    UserFairShareOperationScope,
 )
 from ai.backend.manager.services.fair_share import (
     FairShareService,
@@ -808,7 +809,7 @@ class TestSearchDomainFairShareEntities:
 
         mock_repository.search_rg_domain_fair_shares = AsyncMock(return_value=entity_result)
 
-        scope = DomainFairShareSearchScope(resource_group_id=RESOURCE_GROUP_ID)
+        scope = DomainFairShareOperationScope(resource_group_id=RESOURCE_GROUP_ID)
         querier = BatchQuerier(
             pagination=OffsetPagination(offset=0, limit=100),
             conditions=[],
@@ -860,7 +861,7 @@ class TestSearchDomainFairShareEntities:
 
         mock_repository.search_rg_domain_fair_shares = AsyncMock(return_value=entity_result)
 
-        scope = DomainFairShareSearchScope(resource_group_id=RESOURCE_GROUP_ID)
+        scope = DomainFairShareOperationScope(resource_group_id=RESOURCE_GROUP_ID)
         querier = BatchQuerier(
             pagination=OffsetPagination(offset=0, limit=100),
             conditions=[],
@@ -916,7 +917,7 @@ class TestSearchDomainFairShareEntities:
 
         mock_repository.search_rg_domain_fair_shares = AsyncMock(return_value=entity_result)
 
-        scope = DomainFairShareSearchScope(resource_group_id=RESOURCE_GROUP_ID)
+        scope = DomainFairShareOperationScope(resource_group_id=RESOURCE_GROUP_ID)
         querier = BatchQuerier(
             pagination=OffsetPagination(offset=0, limit=100),
             conditions=[],
@@ -998,7 +999,7 @@ class TestSearchProjectFairShareEntities:
 
         mock_repository.search_rg_project_fair_shares = AsyncMock(return_value=entity_result)
 
-        scope = ProjectFairShareSearchScope(
+        scope = ProjectFairShareOperationScope(
             domain_name="test-domain", resource_group_id=RESOURCE_GROUP_ID
         )
         querier = BatchQuerier(
@@ -1081,7 +1082,7 @@ class TestSearchUserFairShareEntities:
 
         mock_repository.search_rg_user_fair_shares = AsyncMock(return_value=entity_result)
 
-        scope = UserFairShareSearchScope(
+        scope = UserFairShareOperationScope(
             domain_name="test-domain",
             project_id=project_id,
             resource_group_id=RESOURCE_GROUP_ID,

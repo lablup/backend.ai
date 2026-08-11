@@ -12,6 +12,7 @@ from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
+    "NumberFormatInput",
     "AgentResourceOrderField",
     "AllocatedResourceSlotOrderField",
     "NumberFormatInfo",
@@ -66,6 +67,18 @@ class NumberFormatInfo(BaseResponseModel):
 
     binary: bool
     round_length: int
+
+
+class NumberFormatInput(BaseRequestModel):
+    """Number format configuration supplied when writing a resource slot type."""
+
+    binary: bool = Field(
+        default=False,
+        description="Whether to use binary (1024-based) or decimal (1000-based) prefixes.",
+    )
+    round_length: int = Field(
+        default=0, description="Number of decimal places to round to when displaying values."
+    )
 
 
 class ResourceOptsEntryDTO(BaseRequestModel):

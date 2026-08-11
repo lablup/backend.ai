@@ -18,11 +18,11 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
 from ai.backend.manager.repositories.base.rbac.entity_purger import (
     RBACEntityPurgerSpec,
 )
-from ai.backend.manager.repositories.base.types import ConflictCheck
 
 
 @dataclass

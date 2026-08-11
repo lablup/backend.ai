@@ -59,11 +59,11 @@ from ai.backend.manager.models.scheduling_history.row import (
 )
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.vfolder.row import VFolderInvitationRow
 from ai.backend.manager.repositories.base import (
     BatchPurger,
     BatchQuerier,
-    NoPagination,
     Updater,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider, ReadOps, WriteOps
@@ -183,7 +183,7 @@ class RetentionDBSource:
                 ),
                 RetentionPurgerSpec(
                     VFolderInvitationRow,
-                    VFolderInvitationRow.modified_at,
+                    VFolderInvitationRow.updated_at,
                     threshold,
                     conditions=(
                         VFolderInvitationRow.state.in_(VFolderInvitationState.declined_states()),

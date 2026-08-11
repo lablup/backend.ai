@@ -83,9 +83,6 @@ from ai.backend.manager.models.routing import RouteStatus
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.deployment.creator import DeploymentCreator
-    from ai.backend.manager.models.deployment_auto_scaling_policy import (
-        DeploymentAutoScalingPolicyRow,
-    )
     from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
     from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
     from ai.backend.manager.models.replica_group import ReplicaGroupRow
@@ -107,12 +104,6 @@ def _get_endpoint_tokens_join_condition() -> Any:
     from ai.backend.manager.models.endpoint import EndpointTokenRow
 
     return foreign(EndpointTokenRow.endpoint) == EndpointRow.id
-
-
-def _get_endpoint_revisions_join_condition() -> Any:
-    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-
-    return EndpointRow.id == foreign(DeploymentRevisionRow.endpoint)
 
 
 def _get_primary_replica_group_join_condition() -> sa.ColumnElement[bool]:
@@ -140,14 +131,6 @@ def _get_deploying_revision_join_condition() -> sa.ColumnElement[bool]:
     return foreign(EndpointRow.deploying_revision_id) == DeploymentRevisionRow.id
 
 
-def _get_endpoint_auto_scaling_policy_join_condition() -> Any:
-    from ai.backend.manager.models.deployment_auto_scaling_policy import (
-        DeploymentAutoScalingPolicyRow,
-    )
-
-    return EndpointRow.id == foreign(DeploymentAutoScalingPolicyRow.endpoint)
-
-
 def _get_deployment_policy_join_condition() -> Any:
     from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 
@@ -170,7 +153,7 @@ def _get_endpoint_token_endpoint_row_join_condition() -> Any:
     return foreign(EndpointTokenRow.endpoint) == EndpointRow.id
 
 
-class EndpointRow(Base):  # type: ignore[misc]
+class EndpointRow(Base):
     __tablename__ = "endpoints"
 
     __table_args__ = (
@@ -291,28 +274,17 @@ class EndpointRow(Base):  # type: ignore[misc]
         back_populates="endpoint_row",
         primaryjoin=_get_endpoint_tokens_join_condition,
     )
-    endpoint_auto_scaling_rules: Mapped[list[EndpointAutoScalingRuleRow]] = relationship(
-        "EndpointAutoScalingRuleRow", back_populates="endpoint_row"
-    )
     created_user_row: Mapped[UserRow | None] = relationship(
         "UserRow",
-        back_populates="created_endpoints",
         foreign_keys=[created_user],
         primaryjoin=_get_created_user_row_join_condition,
     )
     session_owner_row: Mapped[UserRow | None] = relationship(
         "UserRow",
-        back_populates="owned_endpoints",
         foreign_keys=[session_owner],
         primaryjoin=_get_session_owner_row_join_condition,
     )
 
-    revisions: Mapped[list[DeploymentRevisionRow]] = relationship(
-        "DeploymentRevisionRow",
-        back_populates="endpoint_row",
-        primaryjoin=_get_endpoint_revisions_join_condition,
-        order_by="DeploymentRevisionRow.revision_number.desc()",
-    )
     primary_replica_group_row: Mapped[ReplicaGroupRow | None] = relationship(
         "ReplicaGroupRow",
         primaryjoin=_get_primary_replica_group_join_condition,
@@ -345,16 +317,8 @@ class EndpointRow(Base):  # type: ignore[misc]
         uselist=False,
     )
 
-    auto_scaling_policy: Mapped[DeploymentAutoScalingPolicyRow | None] = relationship(
-        "DeploymentAutoScalingPolicyRow",
-        back_populates="endpoint_row",
-        primaryjoin=_get_endpoint_auto_scaling_policy_join_condition,
-        uselist=False,
-    )
-
     deployment_policy: Mapped[DeploymentPolicyRow | None] = relationship(
         "DeploymentPolicyRow",
-        back_populates="endpoint_row",
         primaryjoin=_get_deployment_policy_join_condition,
         uselist=False,
     )
@@ -372,7 +336,7 @@ class EndpointRow(Base):  # type: ignore[misc]
         load_created_user: bool = False,
         load_session_owner: bool = False,
         load_revisions: bool = False,
-    ) -> Self:
+    ) -> EndpointRow:
         """
         :raises: sqlalchemy.orm.exc.NoResultFound
         """
@@ -425,7 +389,7 @@ class EndpointRow(Base):  # type: ignore[misc]
         load_session_owner: bool = False,
         load_revisions: bool = False,
         status_filter: Iterable[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
-    ) -> list[Self]:
+    ) -> list[EndpointRow]:
         from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 
         query = (
@@ -477,7 +441,7 @@ class EndpointRow(Base):  # type: ignore[misc]
         load_session_owner: bool = False,
         load_revisions: bool = False,
         status_filter: Iterable[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
-    ) -> Sequence[Self]:
+    ) -> Sequence[EndpointRow]:
         from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 
         query = (
@@ -531,7 +495,7 @@ class EndpointRow(Base):  # type: ignore[misc]
         load_session_owner: bool = False,
         load_revisions: bool = False,
         status_filter: Iterable[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
-    ) -> Sequence[Self]:
+    ) -> Sequence[EndpointRow]:
         from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
         from ai.backend.manager.models.replica_group import ReplicaGroupRow
 
@@ -724,8 +688,9 @@ class EndpointRow(Base):  # type: ignore[misc]
     def to_data(self) -> EndpointData:
         """Convert to EndpointData.
 
-        Requires revisions and revisions.image_row to be eagerly loaded
-        via selectinload for revision field population.
+        Requires ``current_revision_row`` / ``deploying_revision_row`` and
+        their ``image_row`` to be eagerly loaded via selectinload for
+        revision field population.
         ``_find_active_revision`` prefers ``current_revision`` and falls
         back to ``deploying_revision`` so the projection reflects the
         spec currently being deployed during the initial DEPLOYING
@@ -914,7 +879,7 @@ class EndpointRow(Base):  # type: ignore[misc]
         )
 
 
-class EndpointTokenRow(Base):  # type: ignore[misc]
+class EndpointTokenRow(Base):
     __tablename__ = "endpoint_tokens"
 
     id: Mapped[UUID] = mapped_column(
@@ -977,14 +942,14 @@ class EndpointTokenRow(Base):  # type: ignore[misc]
         project: UUID | None = None,
         user_uuid: UUID | None = None,
         load_endpoint: bool = False,
-    ) -> Sequence[Self]:
+    ) -> Sequence[EndpointTokenRow]:
         query = (
             sa.select(EndpointTokenRow)
             .filter(EndpointTokenRow.endpoint == endpoint_id)
             .order_by(sa.desc(EndpointTokenRow.created_at))
         )
         if load_endpoint:
-            query = query.options(selectinload(EndpointTokenRow.tokens))
+            query = query.options(selectinload(EndpointTokenRow.endpoint_row))
         if project:
             query = query.filter(EndpointTokenRow.project == project)
         if domain:
@@ -1004,10 +969,10 @@ class EndpointTokenRow(Base):  # type: ignore[misc]
         project: UUID | None = None,
         user_uuid: UUID | None = None,
         load_endpoint: bool = False,
-    ) -> Self:
+    ) -> EndpointTokenRow:
         query = sa.select(EndpointTokenRow).filter(EndpointTokenRow.token == token)
         if load_endpoint:
-            query = query.options(selectinload(EndpointTokenRow.tokens))
+            query = query.options(selectinload(EndpointTokenRow.endpoint_row))
         if project:
             query = query.filter(EndpointTokenRow.project == project)
         if domain:
@@ -1035,7 +1000,7 @@ class EndpointTokenRow(Base):  # type: ignore[misc]
         )
 
 
-class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
+class EndpointAutoScalingRuleRow(Base):
     __tablename__ = "endpoint_auto_scaling_rules"
 
     id: Mapped[UUID] = mapped_column(
@@ -1085,9 +1050,7 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
         nullable=False,
     )
 
-    endpoint_row: Mapped[EndpointRow] = relationship(
-        "EndpointRow", back_populates="endpoint_auto_scaling_rules", lazy="joined"
-    )
+    endpoint_row: Mapped[EndpointRow] = relationship("EndpointRow", lazy="joined")
 
     @classmethod
     async def list(
@@ -1096,7 +1059,7 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
         endpoint_status_filter: Collection[EndpointLifecycle] = frozenset([
             EndpointLifecycle.CREATED
         ]),
-    ) -> Sequence[Self]:
+    ) -> Sequence[EndpointAutoScalingRuleRow]:
         query = sa.select(EndpointAutoScalingRuleRow)
         if endpoint_status_filter:
             query = (

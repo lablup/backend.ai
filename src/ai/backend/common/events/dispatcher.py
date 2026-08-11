@@ -24,17 +24,14 @@ from aiotools.taskgroup.types import AsyncExceptionHandler
 
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user, triggered_user
-from ai.backend.common.message_queue.queue import AbstractMessageQueue
-from ai.backend.common.message_queue.types import (
-    BroadcastMessage,
+from ai.backend.common.message_queue.message import MessageId, MQMessage
+from ai.backend.common.message_queue.payload import (
+    AnycastPayload,
     BroadcastPayload,
-    MessageId,
-    MessageMetadata,
-    MessagePayload,
-    MQMessage,
-    deserialize_event_name_for_anycast,
-    deserialize_event_name_for_broadcast,
+    CachedBroadcastPayload,
 )
+from ai.backend.common.message_queue.queue import AbstractMessageQueue
+from ai.backend.common.message_queue.types import MessageMetadata
 from ai.backend.common.types import (
     AgentId,
 )
@@ -578,7 +575,7 @@ class EventDispatcher(EventDispatcherGroup):
         self,
         mq_msg: MQMessage,
     ) -> None:
-        event_name = deserialize_event_name_for_anycast(mq_msg.payload)
+        event_name = mq_msg.payload.name
         consumer_handlers = self._consumers.get(event_name)
         post_callback = _ConsumerPostCallback(
             mq_msg.msg_id,
@@ -590,38 +587,39 @@ class EventDispatcher(EventDispatcherGroup):
             return
         if self._log_events:
             log.debug("DISPATCH_CONSUMERS(ev:{})", event_name)
-        msg_payload = MessagePayload.from_anycast(mq_msg.payload)
+        payload = mq_msg.payload
+        args = payload.decode_args()
         for consumer in consumer_handlers.copy():
             self._consumer_taskgroup.create_task(
                 self._handle(
                     consumer,
-                    AgentId(msg_payload.source),
-                    msg_payload.args,
+                    AgentId(payload.source),
+                    args,
                     [post_callback],
-                    msg_payload.metadata,
+                    payload.metadata,
                 ),
             )
             await asyncio.sleep(0)
 
     async def _dispatch_subscribers(
         self,
-        broadcast_msg: BroadcastMessage,
+        payload: BroadcastPayload,
     ) -> None:
-        event_name = deserialize_event_name_for_broadcast(broadcast_msg.payload)
+        event_name = payload.name
         subscriber_handlers = self._subscribers.get(event_name)
         if not subscriber_handlers:
             return
         if self._log_events:
             log.debug("DISPATCH_SUBSCRIBERS(ev:{})", event_name)
-        msg_payload = MessagePayload.from_broadcast(broadcast_msg.payload)
+        args = payload.decode_args()
         for subscriber in subscriber_handlers.copy():
             self._subscriber_taskgroup.create_task(
                 self._handle(
                     subscriber,
-                    AgentId(msg_payload.source),
-                    msg_payload.args,
+                    AgentId(payload.source),
+                    args,
                     tuple(),
-                    msg_payload.metadata,
+                    payload.metadata,
                 ),
             )
             await asyncio.sleep(0)
@@ -647,7 +645,7 @@ class EventDispatcher(EventDispatcherGroup):
             if self._closed:
                 return
             try:
-                await self._dispatch_subscribers(cast(BroadcastMessage, msg))
+                await self._dispatch_subscribers(cast(BroadcastPayload, msg))
             except Exception as e:
                 log.exception(
                     "EventDispatcher._subscribe_loop: unexpected-error, {}",
@@ -699,13 +697,13 @@ class EventProducer:
             user=user,
             triggered_user=triggered,
         )
-        raw_event = MessagePayload(
+        payload = AnycastPayload.from_event_args(
             name=event.event_name(),
             source=source,
             args=event.serialize(),
             metadata=metadata,
-        ).serialize_anycast()
-        await self._msg_queue.send(raw_event)
+        )
+        await self._msg_queue.send(payload)
 
     async def broadcast_event(
         self,
@@ -726,13 +724,13 @@ class EventProducer:
             user=user,
             triggered_user=triggered,
         )
-        raw_event = MessagePayload(
+        payload = BroadcastPayload.from_event_args(
             name=event.event_name(),
             source=source,
             args=event.serialize(),
             metadata=metadata,
-        ).serialize_broadcast()
-        await self._msg_queue.broadcast(raw_event)
+        )
+        await self._msg_queue.broadcast(payload)
 
     async def broadcast_event_with_cache(
         self,
@@ -752,16 +750,15 @@ class EventProducer:
             user=user,
             triggered_user=triggered,
         )
-        # I want to receive MessagePayload as an argument in anycast and broadcast, but changing it would require changes in other places, so I'll leave it as is for now.
-        raw_event = MessagePayload(
+        payload = BroadcastPayload.from_event_args(
             name=event.event_name(),
             source=str(self._source),
             args=event.serialize(),
             metadata=metadata,
-        ).serialize_broadcast()
+        )
         await self._msg_queue.broadcast_with_cache(
             cache_id,
-            raw_event,
+            payload,
         )
 
     async def broadcast_events_batch(
@@ -787,18 +784,17 @@ class EventProducer:
             triggered_user=triggered,
         )
 
-        # Convert events to BroadcastPayload objects
-        broadcast_payloads: list[BroadcastPayload] = []
+        broadcast_payloads: list[CachedBroadcastPayload] = []
         for event in events:
-            raw_event = MessagePayload(
+            payload = BroadcastPayload.from_event_args(
                 name=event.event_name(),
                 source=str(self._source),
                 args=event.serialize(),
                 metadata=metadata,
-            ).serialize_broadcast()
+            )
             broadcast_payloads.append(
-                BroadcastPayload(
-                    payload=raw_event,
+                CachedBroadcastPayload(
+                    payload=payload,
                     cache_id=event.cache_id(),  # Get cache_id from event
                 )
             )

@@ -190,7 +190,7 @@ from ai.backend.manager.repositories.deployment.creators import (
     DeploymentRevisionCreatorSpec,
 )
 from ai.backend.manager.repositories.deployment.types import (
-    ProjectDeploymentSearchScope,
+    ProjectDeploymentOperationScope,
     RouteData,
     RouteServiceDiscoveryInfo,
     RouteSessionInfo,
@@ -888,11 +888,11 @@ class DeploymentDBSource:
             endpoint = result.scalar_one_or_none()
             if not endpoint:
                 raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
-            query = sa.select(EndpointAutoScalingRuleRow).where(
+            rules_query = sa.select(EndpointAutoScalingRuleRow).where(
                 EndpointAutoScalingRuleRow.endpoint == endpoint_id
             )
-            result = await db_sess.execute(query)
-            rows = result.scalars().all()
+            rules_result = await db_sess.execute(rules_query)
+            rows = rules_result.scalars().all()
             return [row.to_autoscaling_rule() for row in rows]
 
     async def update_autoscaling_rule(
@@ -1232,7 +1232,7 @@ class DeploymentDBSource:
     async def search_deployments_in_project(
         self,
         querier: BatchQuerier,
-        scope: ProjectDeploymentSearchScope,
+        scope: ProjectDeploymentOperationScope,
     ) -> DeploymentSummarySearchResult:
         """Search endpoints within a project scope with pagination and filtering.
 
@@ -1428,7 +1428,7 @@ class DeploymentDBSource:
                 .where(EndpointRow.lifecycle_stage.in_(EndpointLifecycle.need_scaling_states()))
                 .join(
                     EndpointAutoScalingRuleRow,
-                    EndpointRow.id == EndpointAutoScalingRuleRow.endpoint_id,
+                    EndpointRow.id == EndpointAutoScalingRuleRow.endpoint,
                 )
                 .options(
                     selectinload(EndpointRow.current_revision_row),
@@ -1451,9 +1451,9 @@ class DeploymentDBSource:
             # Group rules by endpoint
             rules_by_endpoint: dict[uuid.UUID, list[AutoScalingRule]] = {}
             for rule_row in rule_rows:
-                if rule_row.endpoint_id not in rules_by_endpoint:
-                    rules_by_endpoint[rule_row.endpoint_id] = []
-                rules_by_endpoint[rule_row.endpoint_id].append(rule_row.to_autoscaling_rule())
+                if rule_row.endpoint not in rules_by_endpoint:
+                    rules_by_endpoint[rule_row.endpoint] = []
+                rules_by_endpoint[rule_row.endpoint].append(rule_row.to_autoscaling_rule())
 
             # Build result
             result = []
@@ -2086,19 +2086,15 @@ class DeploymentDBSource:
         user_uuid: uuid.UUID,
     ) -> _DeploymentUserResolution:
         # Pick a deterministic, currently-active keypair for the given user.
-        # Preference order: main_access_key match, then latest created_at,
+        # Preference order: the default keypair, then latest created_at,
         # then access_key lexicographic order as a final stable tie-break.
-        is_main_access_key = sa.case(
-            (UserRow.main_access_key == keypairs.c.access_key, 1),
-            else_=0,
-        )
         active_stmt = (
             sa.select(UserRow, keypairs.c.access_key)
             .select_from(sa.join(UserRow, keypairs, UserRow.uuid == keypairs.c.user))
             .where(UserRow.uuid == user_uuid)
             .where(keypairs.c.is_active.is_(True))
             .order_by(
-                is_main_access_key.desc(),
+                keypairs.c.is_default.desc(),
                 keypairs.c.created_at.desc(),
                 keypairs.c.access_key.asc(),
             )

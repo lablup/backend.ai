@@ -23,9 +23,10 @@ from ai.backend.manager.errors.resource import (
     DomainHasGroups,
     DomainHasUsers,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
-from ai.backend.manager.repositories.domain.types import DomainSearchResult, DomainSearchScope
+from ai.backend.manager.repositories.domain.types import DomainOperationScope, DomainSearchResult
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.create_domain_node import CreateDomainNodeAction
 from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
@@ -671,7 +672,7 @@ class TestSearchRGDomains:
             has_previous_page=False,
         )
 
-        scope = DomainSearchScope(resource_group="rg-1")
+        scope = DomainOperationScope(resource_group="rg-1")
         querier = _make_querier()
         action = SearchRGDomainsAction(scope=scope, querier=querier)
 
@@ -697,7 +698,7 @@ class TestSearchRGDomains:
             has_previous_page=False,
         )
 
-        scope = DomainSearchScope(resource_group="empty-rg")
+        scope = DomainOperationScope(resource_group="empty-rg")
         action = SearchRGDomainsAction(scope=scope, querier=_make_querier())
 
         result = await service.search_rg_domains(action)

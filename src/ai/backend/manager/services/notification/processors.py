@@ -1,10 +1,7 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions import (
@@ -38,7 +35,7 @@ from .actions import (
 from .service import NotificationService
 
 
-class NotificationProcessors(AbstractProcessorPackage):
+class NotificationProcessors:
     """Processor package for notification operations."""
 
     # Scope actions (operate on GLOBAL scope)
@@ -102,21 +99,3 @@ class NotificationProcessors(AbstractProcessorPackage):
         self.validate_rule = ActionProcessor(service.validate_rule, action_monitors)
 
         self.process_notification = ActionProcessor(service.process_notification, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateChannelAction.spec(),
-            SearchChannelsAction.spec(),
-            GetChannelAction.spec(),
-            UpdateChannelAction.spec(),
-            DeleteChannelAction.spec(),
-            ValidateChannelAction.spec(),
-            CreateRuleAction.spec(),
-            SearchRulesAction.spec(),
-            GetRuleAction.spec(),
-            UpdateRuleAction.spec(),
-            DeleteRuleAction.spec(),
-            ValidateRuleAction.spec(),
-            ProcessNotificationAction.spec(),
-        ]

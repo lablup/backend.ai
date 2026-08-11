@@ -36,6 +36,7 @@ class AuditLogCreatorSpec(CreatorSpec[AuditLogRow]):
     action_id: ActionID
     entity_type: str
     operation: str
+    action_name: str
     created_at: datetime
     description: str
     status: OperationStatus
@@ -59,6 +60,7 @@ class AuditLogCreatorSpec(CreatorSpec[AuditLogRow]):
         return AuditLogRow(
             action_id=self.action_id,
             action_kind=self.action_kind(),
+            action_name=self.action_name,
             entity_type=self.entity_type,
             operation=self.operation,
             created_at=self.created_at,

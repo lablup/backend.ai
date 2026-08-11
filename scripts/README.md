@@ -32,6 +32,7 @@ current, see `AGENTS.md` in this directory.
 | `alembic-rebase.py` | Rebases a migration branch when alembic heads have diverged | person (`src/ai/backend/README.md`) |
 | `generate-rbac-fixture-permissions.py` | Re-emits the managed permission rows of `fixtures/manager/example-roles.json` | person |
 | `download-webui-release.sh` | Downloads and unpacks a WebUI bundle into `src/ai/backend/web` | person; `release.sh` |
+| `knowledge/search.py` | Lists or searches `KNOWLEDGE.md` frontmatter across the repository | person; Claude Code (`/knowledge`) |
 
 ## Commit and push
 
@@ -51,6 +52,7 @@ current, see `AGENTS.md` in this directory.
 | `assign-pr-number.py` | Renames news fragments to the assigned PR number | auto — `assign-pr-number.yml` (via `timeline-check.yml`) |
 | `check-multiple-alembic-heads.py` | Fails the build when the migration graph has more than one head | auto — `ci.yml` |
 | `check-alembic-revision.py` | Rejects a migration whose `upgrade()` / `downgrade()` is empty | auto — `ci.yml` |
+| `knowledge/check.py` | Validates `KNOWLEDGE.md` frontmatter, paths, and body links | auto — `knowledge-check.yml`; person |
 | `get-platform-suffix.py` | Prints the `<os>-<arch>` suffix used in artifact names | auto — `ci.yml`, `build-test.yml` |
 | `.github/scripts/decide-backport-targets.sh` | Reads `.github/maintained-versions.yml` and the `Backport:` trailer to decide the target branches | auto — `backport.yml` |
 | `update-default-seccomp.sh` | Refreshes `default-seccomp.json` from the upstream moby profile | auto — `update-seccomp-profile.yml` (monthly); person |
@@ -72,6 +74,7 @@ current, see `AGENTS.md` in this directory.
 | `.github/scripts/create-version-branch.sh` | Tags the `X.Y.0rc1` a release commit made and cuts the `X.Y` branch at that same commit | auto — `create-version-branch.yml` |
 | `.github/scripts/sync-changelog-to-main.sh` | Opens the pull request carrying a final release's `CHANGELOG/X.Y.md` back to `main` | auto — `changelog-sync.yml` |
 | `extract-release-changelog.py` | Extracts the tagged version's block for the GitHub release body | auto — `ci.yml` (release job) |
+| `list-dockerfiles.sh` | Prints the `docker/` dockerfile build matrix (`--service` / `--infra`) as JSON; a new `backend.ai-*` dockerfile must be registered in its allowlist | auto — `sbom.yml`; `osv-scanner.yml` (also scheduled: weekly cron + push to `main`) |
 | `determine-release-type.py` | Sets `IS_PRERELEASE` from the `VERSION` file | auto — `ci.yml` (release job) |
 | `build-wheels.sh` | Builds the platform-specific and generic wheels | auto — `ci.yml` (release job) |
 | `build-scies.sh` | Builds the scie executables locally (CI runs the equivalent pants commands inline) | person |
@@ -101,3 +104,4 @@ current, see `AGENTS.md` in this directory.
 | `e2e-model-store/` | Numbered end-to-end model-store scenarios, run in order by `run-all.sh` against a live local stack |
 | `storage-proxy/` | `upgrade.sh` (storage migration entry point) and the Ceph test-cluster provisioning under `ceph/` |
 | `hooks/` | AI-agent hooks; see the "Commit and push" table |
+| `knowledge/` | `KNOWLEDGE.md` tooling — shared frontmatter parser, `search.py`, `check.py` |

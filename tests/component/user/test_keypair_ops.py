@@ -20,7 +20,8 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.user.handler import UserHandler
 from ai.backend.manager.api.rest.user.registry import register_user_routes
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.keypair import KeyPairRow, keypairs
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.user.processors import UserProcessors
 
@@ -302,5 +303,53 @@ class TestUpdateMyKeypair:
             )
         finally:
             # Clean up the extra keypair to keep DB consistent.
+            async with db_engine.begin() as conn:
+                await conn.execute(keypairs.delete().where(keypairs.c.access_key == new_access_key))
+
+    async def test_switch_main_moves_the_marker(
+        self,
+        user_registry: BackendAIClientRegistry,
+        regular_user_fixture: Any,
+        db_engine: SAEngine,
+    ) -> None:
+        """S-6: switchMyMainAccessKey moves keypairs.is_default and users.main_access_key together."""
+        original_access_key: str = regular_user_fixture.keypair.access_key
+        user_uuid = str(regular_user_fixture.user_uuid)
+        issue_payload = _assert_gql_success(
+            await _call_gql(user_registry, _ISSUE_MY_KEYPAIR), "issueMyKeypair"
+        )
+        new_access_key: str = issue_payload["keypair"]["accessKey"]
+
+        try:
+            switch_resp = await _call_gql(
+                user_registry,
+                _SWITCH_MY_MAIN_ACCESS_KEY,
+                {"accessKey": new_access_key},
+            )
+            _assert_gql_success(switch_resp, "switchMyMainAccessKey")
+
+            async with db_engine.begin() as conn:
+                marked = (
+                    await conn.execute(
+                        sa.select(KeyPairRow.access_key).where(
+                            (KeyPairRow.user == user_uuid) & KeyPairRow.is_default
+                        )
+                    )
+                ).scalars()
+                main_access_key = await conn.scalar(
+                    sa.select(UserRow.main_access_key).where(UserRow.uuid == user_uuid)
+                )
+            assert marked.all() == [new_access_key], "Exactly the new keypair should be marked main"
+            assert main_access_key == new_access_key
+        finally:
+            # Move the marker back before dropping the extra keypair.
+            _assert_gql_success(
+                await _call_gql(
+                    user_registry,
+                    _SWITCH_MY_MAIN_ACCESS_KEY,
+                    {"accessKey": original_access_key},
+                ),
+                "switchMyMainAccessKey",
+            )
             async with db_engine.begin() as conn:
                 await conn.execute(keypairs.delete().where(keypairs.c.access_key == new_access_key))

@@ -12,7 +12,7 @@ from pathlib import PurePosixPath
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.config import ModelDefinitionDraft
+from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.identifier.vfolder import VFolderUUID
@@ -1436,7 +1436,7 @@ class TestVfolderRepositoryDeleteForever:
             variant = RuntimeVariantRow(
                 name=f"test-variant-{uuid.uuid4().hex[:8]}",
                 description="Test runtime variant",
-                default_model_definition=ModelDefinitionDraft(),
+                default_model_definition=DefaultModelDefinition(),
             )
             db_sess.add(variant)
             await db_sess.flush()

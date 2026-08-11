@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.config import ModelDefinition, ModelDefinitionDraft
+from ai.backend.common.config import DefaultModelDefinition, ModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData
@@ -180,6 +180,7 @@ class TestModifyEndpointModelDefinitionRefresh:
                     is_admin=True,
                     user=user_id,
                     resource_policy="default",
+                    is_default=True,
                 )
             )
             await sess.flush()
@@ -289,7 +290,7 @@ class TestModifyEndpointModelDefinitionRefresh:
                     id=runtime_variant_id,
                     name=f"variant-{runtime_variant_id.hex[:8]}",
                     description="test variant",
-                    default_model_definition=ModelDefinitionDraft(),
+                    default_model_definition=DefaultModelDefinition(),
                 )
             )
             await sess.flush()

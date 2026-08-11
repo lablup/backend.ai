@@ -1,8 +1,5 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.prometheus_query_preset.actions import (
     CreatePresetAction,
@@ -25,7 +22,7 @@ from ai.backend.manager.services.prometheus_query_preset.service import (
 )
 
 
-class PrometheusQueryPresetProcessors(AbstractProcessorPackage):
+class PrometheusQueryPresetProcessors:
     create_preset: ActionProcessor[CreatePresetAction, CreatePresetActionResult]
     get_preset: ActionProcessor[GetPresetAction, GetPresetActionResult]
     search_presets: ActionProcessor[SearchPresetsAction, SearchPresetsActionResult]
@@ -47,15 +44,3 @@ class PrometheusQueryPresetProcessors(AbstractProcessorPackage):
         self.delete_preset = ActionProcessor(service.delete_preset, action_monitors)
         self.execute_preset = ActionProcessor(service.execute_preset, action_monitors)
         self.preview_preset = ActionProcessor(service.preview_preset, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreatePresetAction.spec(),
-            GetPresetAction.spec(),
-            SearchPresetsAction.spec(),
-            ModifyPresetAction.spec(),
-            DeletePresetAction.spec(),
-            ExecutePresetAction.spec(),
-            PreviewPresetAction.spec(),
-        ]

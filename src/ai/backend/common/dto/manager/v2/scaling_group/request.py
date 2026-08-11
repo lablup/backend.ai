@@ -7,7 +7,7 @@ from __future__ import annotations
 from pydantic import Field
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.types import PreemptionOrder
+from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope
 
 from .types import PreemptionMode, SchedulerType
 
@@ -44,6 +44,13 @@ class PreemptionConfigInput(BaseRequestModel):
         description=(
             "Minimum session runtime in seconds before it becomes preemptible "
             "(0 = disabled). Default is 0."
+        ),
+    )
+    victim_scope: PreemptionVictimScope = Field(
+        default=PreemptionVictimScope.USER,
+        description=(
+            "Scope preemption victims are drawn from (user/project/domain/resource-group). "
+            "Default is user."
         ),
     )
 

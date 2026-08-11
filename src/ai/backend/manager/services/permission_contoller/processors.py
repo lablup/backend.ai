@@ -1,10 +1,7 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions import (
@@ -24,7 +21,6 @@ from .actions import (
     DeleteRoleActionResult,
     GetRoleDetailAction,
     GetRoleDetailActionResult,
-    PurgeRoleAction,
     ReplaceRolePermissionsAction,
     ReplaceRolePermissionsActionResult,
     RevokeRoleAction,
@@ -103,7 +99,7 @@ from .actions.update_permission import (
 from .service import PermissionControllerService
 
 
-class PermissionControllerProcessors(AbstractProcessorPackage):
+class PermissionControllerProcessors:
     """Processor package for RBAC permission controller operations."""
 
     create_role: ActionProcessor[CreateRoleAction, CreateRoleActionResult]
@@ -251,42 +247,3 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
         self.admin_search_role_invitations = ActionProcessor(
             service.admin_search_role_invitations, action_monitors
         )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateRoleAction.spec(),
-            UpdateRoleAction.spec(),
-            DeleteRoleAction.spec(),
-            PurgeRoleAction.spec(),
-            AssignRoleAction.spec(),
-            RevokeRoleAction.spec(),
-            BulkAssignRoleAction.spec(),
-            BulkRevokeRoleAction.spec(),
-            GetRoleDetailAction.spec(),
-            SearchRolesAction.spec(),
-            SearchRolesInScopeAction.spec(),
-            SearchUsersAssignedToRoleAction.spec(),
-            UpdateRolePermissionsAction.spec(),
-            BulkAddRolePermissionsAction.spec(),
-            BulkRemoveRolePermissionsAction.spec(),
-            ReplaceRolePermissionsAction.spec(),
-            SearchScopesAction.spec(),
-            GetScopeTypesAction.spec(),
-            GetEntityTypesAction.spec(),
-            GetPermissionMatrixAction.spec(),
-            SearchEntitiesAction.spec(),
-            SearchElementAssociationsAction.spec(),
-            SearchPermissionsAction.spec(),
-            CreatePermissionAction.spec(),
-            UpdatePermissionAction.spec(),
-            DeletePermissionAction.spec(),
-            CreateRoleInvitationAction.spec(),
-            AcceptInvitationAction.spec(),
-            RejectInvitationAction.spec(),
-            CancelInvitationAction.spec(),
-            SearchMyRoleInvitationsAction.spec(),
-            SearchMySentRoleInvitationsAction.spec(),
-            SearchRoleInvitationsByRoleAction.spec(),
-            AdminSearchRoleInvitationsAction.spec(),
-        ]

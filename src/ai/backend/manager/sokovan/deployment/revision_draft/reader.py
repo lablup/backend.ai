@@ -114,7 +114,7 @@ class RevisionDraftReader:
 
     def _variant_baseline_to_draft(self, variant: RuntimeVariantData) -> RevisionDraft:
         """Project the variant's ``default_model_definition`` into a RevisionDraft."""
-        return RevisionDraft(model_definition=variant.default_model_definition)
+        return RevisionDraft(model_definition=variant.default_model_definition.to_draft())
 
     def _preset_to_draft(
         self,

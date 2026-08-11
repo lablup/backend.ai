@@ -1,8 +1,5 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.role_preset.actions.bulk_add_permissions import (
     BulkAddRolePermissionPresetsAction,
@@ -51,7 +48,7 @@ from ai.backend.manager.services.role_preset.actions.update import (
 from ai.backend.manager.services.role_preset.service import RolePresetService
 
 
-class RolePresetProcessors(AbstractProcessorPackage):
+class RolePresetProcessors:
     create: ActionProcessor[CreateRolePresetAction, CreateRolePresetActionResult]
     get: ActionProcessor[GetRolePresetAction, GetRolePresetActionResult]
     search: ActionProcessor[SearchRolePresetsAction, SearchRolePresetsActionResult]
@@ -91,19 +88,3 @@ class RolePresetProcessors(AbstractProcessorPackage):
         self.bulk_remove_permissions = ActionProcessor(
             service.bulk_remove_permissions, action_monitors
         )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateRolePresetAction.spec(),
-            GetRolePresetAction.spec(),
-            SearchRolePresetsAction.spec(),
-            SearchRolePermissionPresetsAction.spec(),
-            UpdateRolePresetAction.spec(),
-            BulkDeleteRolePresetsAction.spec(),
-            BulkRestoreRolePresetsAction.spec(),
-            PurgeRolePresetAction.spec(),
-            BulkPurgeRolePresetsAction.spec(),
-            BulkAddRolePermissionPresetsAction.spec(),
-            BulkRemoveRolePermissionPresetsAction.spec(),
-        ]

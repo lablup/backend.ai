@@ -26,12 +26,13 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 )
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     PermissionDBSource,
 )
-from ai.backend.manager.repositories.permission_controller.types import ScopedRoleSearchScope
+from ai.backend.manager.repositories.permission_controller.types import ScopedRoleOperationScope
 from ai.backend.testutils.db import with_tables
 
 _ORM_CLUSTER = (
@@ -108,7 +109,7 @@ class TestSearchRolesInScope:
         scoped_roles: ScopedRoleFixture,
     ) -> None:
         """Only roles registered in the given scope should be returned."""
-        scope = ScopedRoleSearchScope(
+        scope = ScopedRoleOperationScope(
             element_type=RBACElementType.PROJECT,
             scope_id=str(scoped_roles.project_id),
         )
@@ -130,7 +131,7 @@ class TestSearchRolesInScope:
         scoped_roles: ScopedRoleFixture,
     ) -> None:
         """Total count should reflect only roles in scope."""
-        scope = ScopedRoleSearchScope(
+        scope = ScopedRoleOperationScope(
             element_type=RBACElementType.PROJECT,
             scope_id=str(scoped_roles.project_id),
         )
@@ -151,7 +152,7 @@ class TestSearchRolesInScope:
     ) -> None:
         """A scope with no registered roles should return empty results."""
         empty_project_id = uuid.uuid4()
-        scope = ScopedRoleSearchScope(
+        scope = ScopedRoleOperationScope(
             element_type=RBACElementType.PROJECT,
             scope_id=str(empty_project_id),
         )
@@ -195,7 +196,7 @@ class TestSearchRolesInScope:
         )
 
         # Search with DOMAIN scope using the same scope_id
-        domain_scope = ScopedRoleSearchScope(
+        domain_scope = ScopedRoleOperationScope(
             element_type=RBACElementType.DOMAIN,
             scope_id=scope_id,
         )
@@ -203,7 +204,7 @@ class TestSearchRolesInScope:
         assert result.items == []
 
         # Search with PROJECT scope should find it
-        project_scope = ScopedRoleSearchScope(
+        project_scope = ScopedRoleOperationScope(
             element_type=RBACElementType.PROJECT,
             scope_id=scope_id,
         )

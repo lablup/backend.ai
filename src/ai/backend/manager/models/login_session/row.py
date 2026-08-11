@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 __all__ = ("LoginSessionRow", "LoginHistoryRow")
 
 
-class LoginSessionRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class LoginSessionRow(CreatedAtMixin, Base):
     __tablename__ = "login_sessions"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -82,7 +82,7 @@ class LoginSessionRow(CreatedAtMixin, Base):  # type: ignore[misc]
         )
 
 
-class LoginHistoryRow(Base):  # type: ignore[misc]
+class LoginHistoryRow(Base):
     __tablename__ = "login_history"
 
     id: Mapped[uuid.UUID] = mapped_column(

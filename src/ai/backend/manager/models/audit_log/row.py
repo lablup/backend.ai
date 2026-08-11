@@ -23,7 +23,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 __all__ = ("AuditLogRow",)
 
 
-class AuditLogRow(Base):  # type: ignore[misc]
+class AuditLogRow(Base):
     """One audit record. ``action_kind`` says which shape wrote it; the target columns
     carry what that shape has. NULL ``action_kind`` means the row predates the column.
     """
@@ -41,6 +41,9 @@ class AuditLogRow(Base):  # type: ignore[misc]
 
     entity_type: Mapped[str] = mapped_column("entity_type", sa.String, index=True, nullable=False)
     operation: Mapped[str] = mapped_column("operation", sa.String, index=True, nullable=False)
+
+    # Declared by v2 actions; legacy rows carry the "entity_type:operation" spec type.
+    action_name: Mapped[str] = mapped_column("action_name", sa.String, index=True, nullable=False)
 
     entity_id: Mapped[str | None] = mapped_column(
         "entity_id",
@@ -79,6 +82,7 @@ class AuditLogRow(Base):  # type: ignore[misc]
         self,
         entity_type: str,
         operation: str,
+        action_name: str,
         action_id: ActionID,
         description: str,
         created_at: datetime,
@@ -96,6 +100,7 @@ class AuditLogRow(Base):  # type: ignore[misc]
         self.operation = operation
         self.action_id = action_id
         self.action_kind = action_kind
+        self.action_name = action_name
         self.entity_id = str(entity_id) if isinstance(entity_id, uuid.UUID) else entity_id
         self.lookup_kind = lookup_kind
         self.lookup_key = lookup_key
@@ -115,6 +120,7 @@ class AuditLogRow(Base):  # type: ignore[misc]
             f"operation: {self.operation}, "
             f"created_at: {self.created_at}, "
             f"action_kind: {self.action_kind}, "
+            f"action_name: {self.action_name}, "
             f"entity_id: {self.entity_id}, "
             f"lookup_kind: {self.lookup_kind}, "
             f"lookup_key: {self.lookup_key}, "
@@ -137,6 +143,7 @@ class AuditLogRow(Base):  # type: ignore[misc]
             id=self.id,
             action_id=self.action_id,
             action_kind=self.action_kind,
+            action_name=self.action_name,
             entity_type=self.entity_type,
             operation=self.operation,
             created_at=self.created_at,

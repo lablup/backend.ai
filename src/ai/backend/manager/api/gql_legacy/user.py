@@ -18,14 +18,14 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.exception import UserNotFound
 from ai.backend.common.identifier.domain import DomainID
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.data.user.types import (
     UserData,
     UserInfoContext,
 )
-from ai.backend.manager.models.base import GUID
 from ai.backend.manager.models.group import GroupRow, groups
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.minilang import (
@@ -36,9 +36,6 @@ from ai.backend.manager.models.minilang import (
 )
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.user import (
     ACTIVE_USER_STATUSES,
     INACTIVE_USER_STATUSES,
@@ -46,6 +43,10 @@ from ai.backend.manager.models.user import (
     UserRow,
     UserStatus,
     users,
+)
+from ai.backend.manager.models.virtual_scope.queries import (
+    user_scope_membership_exists,
+    user_scope_membership_query,
 )
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
@@ -98,6 +99,19 @@ __all__ = (
     "UserList",
     "UserNode",
 )
+
+
+def _project_membership_join(base_table: sa.Table | sa.sql.Join) -> sa.sql.Join:
+    """Join the base users selectable to groups via the virtual-scope membership pairs."""
+    ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
+    return sa.join(
+        base_table,
+        ms,
+        base_table.c.uuid == ms.c.user_id,
+    ).join(
+        GroupRow,
+        GroupRow.id == ms.c.scope_id,
+    )
 
 
 @graphene_federation.key("id")
@@ -157,7 +171,7 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
             status=row.status,
             status_info=row.status_info,
             created_at=row.created_at,
-            modified_at=row.modified_at,
+            modified_at=row.updated_at,
             domain_name=row.domain_name,
             role=row.role,
             resource_policy=row.resource_policy,
@@ -219,7 +233,7 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         "status": ("status", UserStatus),
         "status_info": ("status_info", None),
         "created_at": ("created_at", dtparse),
-        "modified_at": ("modified_at", dtparse),
+        "modified_at": ("updated_at", dtparse),
         "domain_name": ("domain_name", None),
         "role": ("role", UserRole),
         "resource_policy": ("resource_policy", None),
@@ -235,20 +249,9 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
     _external_table_filters: Mapping[str, ExternalTableFilterSpec] = {
         "project_name": ExternalTableFilterSpec(
             field_name="project_name",
-            target_table=cast(sa.Table, GroupRow.__table__),
+            target_table=GroupRow.__table__,
             target_column="name",
-            join_builder=lambda base_table: sa.join(
-                base_table,
-                AssociationScopesEntitiesRow,
-                sa.and_(
-                    sa.cast(base_table.c.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                ),
-            ).join(
-                GroupRow,
-                sa.cast(GroupRow.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
-            ),
+            join_builder=_project_membership_join,
         ),
     }
 
@@ -262,7 +265,7 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         "status": ("status", None),
         "status_info": ("status_info", None),
         "created_at": ("created_at", None),
-        "modified_at": ("modified_at", None),
+        "modified_at": ("updated_at", None),
         "domain_name": ("domain_name", None),
         "role": ("role", None),
         "resource_policy": ("resource_policy", None),
@@ -388,7 +391,7 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         )
 
         if external_filters_to_apply and external_table_filter:
-            user_table = cast(sa.Table, UserRow.__table__)
+            user_table = UserRow.__table__
 
             join_clause: sa.Table | sa.sql.Join = user_table
             for spec in external_filters_to_apply.values():
@@ -465,21 +468,9 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
             before=before,
             last=last,
         )
-        j = sa.join(
-            GroupRow,
-            AssociationScopesEntitiesRow,
-            sa.and_(
-                sa.cast(GroupRow.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
-                AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-            ),
-        )
-        prj_query = query.select_from(j).where(
-            AssociationScopesEntitiesRow.entity_id == str(self.id)
-        )
-        cnt_query = cnt_query.select_from(j).where(
-            AssociationScopesEntitiesRow.entity_id == str(self.id)
-        )
+        membership_filter = user_scope_membership_exists(PROJECT_SCOPE_TYPE, GroupRow.id, self.id)
+        prj_query = query.where(membership_filter)
+        cnt_query = cnt_query.where(membership_filter)
         result: list[GroupNode] = []
         async with graph_ctx.db.begin_readonly_session() as db_session:
             total_cnt = await db_session.scalar(cnt_query)
@@ -516,23 +507,16 @@ class UserGroup(graphene.ObjectType):  # type: ignore[misc]
         cls, ctx: GraphQueryContext, user_ids: Sequence[UUID]
     ) -> Sequence[Sequence[UserGroup]]:
         async with ctx.db.begin() as conn:
-            user_id_strs = [str(uid) for uid in user_ids]
-            j = groups.join(
-                AssociationScopesEntitiesRow,
-                sa.cast(groups.c.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
-            )
+            ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
+            j = groups.join(ms, groups.c.id == ms.c.scope_id)
             query = (
                 sa.select(
-                    sa.cast(AssociationScopesEntitiesRow.entity_id, GUID).label("user_id"),
+                    ms.c.user_id,
                     groups.c.name,
                     groups.c.id,
                 )
                 .select_from(j)
-                .where(
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                    AssociationScopesEntitiesRow.entity_id.in_(user_id_strs),
-                )
+                .where(ms.c.user_id.in_(user_ids))
             )
             return await batch_multiresult(
                 ctx,
@@ -568,10 +552,12 @@ class User(graphene.ObjectType):  # type: ignore[misc]
     sudo_session_enabled = graphene.Boolean()
     main_access_key = graphene.String(
         description=(
-            "Added in 24.03.0. Used as the default authentication credential for password-based"
-            " logins and sets the user's total resource usage limit. User's main_access_key cannot"
-            " be deleted, and only super-admin can replace main_access_key."
-        )
+            f"Added in 24.03.0. Deprecated since {NEXT_RELEASE_VERSION}. Use the keypair's is_default field. Used as the default authentication credential for"
+            " password-based logins and sets the user's total resource usage limit. User's"
+            " main_access_key cannot be deleted, and only super-admin can replace"
+            " main_access_key."
+        ),
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use the keypair's is_default field.",
     )
     container_uid = graphene.Int(
         description="Added in 25.2.0. The user ID (UID) assigned to processes running inside the container."
@@ -641,7 +627,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
             status=row.status,
             status_info=row.status_info,
             created_at=row.created_at,
-            modified_at=row.modified_at,
+            modified_at=row.updated_at,
             domain_name=row.domain_name,
             role=row.role,
             resource_policy=row.resource_policy,
@@ -669,22 +655,11 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         """
         Load user's information. Group names associated with the user are also returned.
         """
+        query = sa.select(users).select_from(users)
         if group_id is not None:
-            j = users.join(
-                AssociationScopesEntitiesRow,
-                sa.and_(
-                    sa.cast(users.c.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                ),
+            query = query.where(
+                user_scope_membership_exists(PROJECT_SCOPE_TYPE, group_id, users.c.uuid)
             )
-            query = (
-                sa.select(users)
-                .select_from(j)
-                .where(AssociationScopesEntitiesRow.scope_id == str(group_id))
-            )
-        else:
-            query = sa.select(users).select_from(users)
         if ctx.user["role"] != UserRole.SUPERADMIN:
             query = query.where(users.c.domain_name == ctx.user["domain_name"])
         if domain_name is not None:
@@ -710,7 +685,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         "status": ("status", UserStatus),
         "status_info": ("status_info", None),
         "created_at": ("created_at", dtparse),
-        "modified_at": ("modified_at", dtparse),
+        "modified_at": ("updated_at", dtparse),
         "domain_name": ("domain_name", None),
         "role": ("role", UserRole),
         "resource_policy": ("resource_policy", None),
@@ -731,7 +706,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         "status": ("status", None),
         "status_info": ("status_info", None),
         "created_at": ("created_at", None),
-        "modified_at": ("modified_at", None),
+        "modified_at": ("updated_at", None),
         "domain_name": ("domain_name", None),
         "role": ("role", None),
         "resource_policy": ("resource_policy", None),
@@ -752,22 +727,11 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         status: str | None = None,
         filter: str | None = None,
     ) -> int:
+        query = sa.select(sa.func.count()).select_from(users)
         if group_id is not None:
-            j = users.join(
-                AssociationScopesEntitiesRow,
-                sa.and_(
-                    sa.cast(users.c.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                ),
+            query = query.where(
+                user_scope_membership_exists(PROJECT_SCOPE_TYPE, group_id, users.c.uuid)
             )
-            query = (
-                sa.select(sa.func.count())
-                .select_from(j)
-                .where(AssociationScopesEntitiesRow.scope_id == str(group_id))
-            )
-        else:
-            query = sa.select(sa.func.count()).select_from(users)
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if status is not None:
@@ -776,14 +740,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
             _statuses = ACTIVE_USER_STATUSES if is_active else INACTIVE_USER_STATUSES
             query = query.where(users.c.status.in_(_statuses))
         if filter is not None:
-            if group_id is not None:
-                qfparser = QueryFilterParser({
-                    k: ("users_" + v[0], v[1])
-                    for k, v in cls._queryfilter_fieldspec.items()
-                    if isinstance(v[0], str)
-                })
-            else:
-                qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
+            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
         async with ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
@@ -803,24 +760,11 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         filter: str | None = None,
         order: str | None = None,
     ) -> Sequence[User]:
+        query = sa.select(users).select_from(users).limit(limit).offset(offset)
         if group_id is not None:
-            j = users.join(
-                AssociationScopesEntitiesRow,
-                sa.and_(
-                    sa.cast(users.c.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                ),
+            query = query.where(
+                user_scope_membership_exists(PROJECT_SCOPE_TYPE, group_id, users.c.uuid)
             )
-            query = (
-                sa.select(users)
-                .select_from(j)
-                .where(AssociationScopesEntitiesRow.scope_id == str(group_id))
-                .limit(limit)
-                .offset(offset)
-            )
-        else:
-            query = sa.select(users).select_from(users).limit(limit).offset(offset)
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if status is not None:
@@ -829,24 +773,10 @@ class User(graphene.ObjectType):  # type: ignore[misc]
             _statuses = ACTIVE_USER_STATUSES if is_active else INACTIVE_USER_STATUSES
             query = query.where(users.c.status.in_(_statuses))
         if filter is not None:
-            if group_id is not None:
-                qfparser = QueryFilterParser({
-                    k: ("users_" + v[0], v[1])
-                    for k, v in cls._queryfilter_fieldspec.items()
-                    if isinstance(v[0], str)
-                })
-            else:
-                qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
+            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
         if order is not None:
-            if group_id is not None:
-                qoparser = QueryOrderParser({
-                    k: ("users_" + v[0], v[1])
-                    for k, v in cls._queryorder_colmap.items()
-                    if isinstance(v[0], str)
-                })
-            else:
-                qoparser = QueryOrderParser(cls._queryorder_colmap)
+            qoparser = QueryOrderParser(cls._queryorder_colmap)
             query = qoparser.append_ordering(query, order)
         else:
             query = query.order_by(
@@ -1275,7 +1205,6 @@ class PurgeUser(graphene.Mutation):  # type: ignore[misc]
         user_info_ctx = UserInfoContext(
             uuid=graph_ctx.user["uuid"],
             email=graph_ctx.user["email"],
-            main_access_key=graph_ctx.user["main_access_key"],
         )
         action = props.to_action(email, user_info_ctx)
         user_data = await graph_ctx.user_repository.get_by_email_validated(email)

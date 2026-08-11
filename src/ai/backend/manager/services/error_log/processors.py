@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions import CreateErrorLogAction, CreateErrorLogActionResult
@@ -16,7 +13,7 @@ from .service import ErrorLogService
 __all__ = ("ErrorLogProcessors",)
 
 
-class ErrorLogProcessors(AbstractProcessorPackage):
+class ErrorLogProcessors:
     """Processor package for error log operations."""
 
     create: ActionProcessor[CreateErrorLogAction, CreateErrorLogActionResult]
@@ -34,12 +31,3 @@ class ErrorLogProcessors(AbstractProcessorPackage):
         self.search = ActionProcessor(service.search, action_monitors)
         self.list_logs = ActionProcessor(service.list_logs, action_monitors)
         self.mark_cleared = ActionProcessor(service.mark_cleared, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateErrorLogAction.spec(),
-            SearchErrorLogsAction.spec(),
-            ListErrorLogsAction.spec(),
-            MarkClearedErrorLogAction.spec(),
-        ]

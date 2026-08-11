@@ -27,7 +27,6 @@ from ai.backend.common.dto.manager.user import (
     UpdateUserRequest,
     UpdateUserResponse,
 )
-from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.user.types import UserInfoContext
 from ai.backend.manager.data.user.types import UserStatus as ManagerUserStatus
@@ -253,7 +252,6 @@ class UserHandler:
         user_info_ctx = UserInfoContext(
             uuid=caller_result.user.uuid,
             email=caller_result.user.email,
-            main_access_key=AccessKey(caller_result.user.main_access_key or ""),
         )
 
         purge_shared = OptionalState[bool].nop()

@@ -11,12 +11,14 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 
 @dataclass
 class RepositoryArgs:
     db: ExtendedAsyncSAEngine
     ops_provider: DBOpsProvider
+    v2_ops_provider: V2DBOpsProvider
     storage_manager: StorageSessionManager
     config_provider: ManagerConfigProvider
     valkey_stat_client: ValkeyStatClient

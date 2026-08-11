@@ -1,6 +1,6 @@
 # Manager GraphQL layer — Guardrails
 
-> For background (federation collisions, pagination behavior), see `CONTEXTS.md` in the same directory; for implementation patterns, see the `/api-guide` skill (GraphQL Patterns).
+> For background (federation collisions, pagination behavior), see `KNOWLEDGE.md` in the same directory; for implementation patterns, see the `/api-guide` skill (GraphQL Patterns).
 
 ## Type naming
 
@@ -8,7 +8,7 @@
 - Applies to output, input, and connection types alike.
 - The **schema-exposed name** must NOT contain `GQL`. Always pass `name=` (the class name with `GQL` stripped) to the decorator
   (e.g. `CreateDomainInputGQL` → `name="CreateDomainInput"`). Omitting `name=` leaks `GQL` into the SDL.
-- If the name collides with a v1 Graphene type, use a `V2`-suffixed schema name (`name="KeyPairV2"`). See `CONTEXTS.md` for background.
+- If the name collides with a v1 Graphene type, use a `V2`-suffixed schema name (`name="KeyPairV2"`). See `KNOWLEDGE.md` for background.
 
 ## Decorators
 
@@ -80,7 +80,7 @@ Every search/list query provides **all** of the argument groups below — do not
 - `before/after: str | None`, `first/last: int | None` (cursor)
 - `limit/offset: int | None` (offset)
 
-The client must be free to choose cursor or offset. For per-mode behavior, see `CONTEXTS.md`.
+The client must be free to choose cursor or offset. For per-mode behavior, see `KNOWLEDGE.md`.
 
 ## Admin & scope
 

@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor.bulk import BulkActionProcessor
 from ai.backend.manager.actions.processor.global_action import GlobalActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
     AdminSearchAppConfigFragmentAction,
@@ -38,7 +35,7 @@ from ai.backend.manager.services.app_config_fragment.service import (
 )
 
 
-class AppConfigFragmentProcessors(AbstractProcessorPackage):
+class AppConfigFragmentProcessors:
     bulk_upsert: ScopeActionProcessor[
         BulkUpsertAppConfigFragmentsAction, BulkUpsertAppConfigFragmentsActionResult
     ]
@@ -82,14 +79,3 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
         self.bulk_purge = BulkActionProcessor(
             service.bulk_purge, monitors=action_monitors, validators=[validators.rbac.bulk]
         )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            BulkUpsertAppConfigFragmentsAction.spec(),
-            GetAppConfigFragmentAction.spec(),
-            AdminSearchAppConfigFragmentAction.spec(),
-            ScopedSearchAppConfigFragmentAction.spec(),
-            PurgeAppConfigFragmentAction.spec(),
-            BulkPurgeAppConfigFragmentAction.spec(),
-        ]

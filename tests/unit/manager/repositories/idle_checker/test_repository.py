@@ -71,6 +71,7 @@ class JudgmentRows:
     not_checked_session_id: SessionId
     ready_to_check_session_id: SessionId
     idle_expired_session_id: SessionId
+    excluded_session_id: SessionId
     session_without_row_id: SessionId
     terminated_session_id: SessionId
     second_terminated_session_id: SessionId
@@ -214,6 +215,7 @@ class TestFetchJudgmentBatch:
         not_checked_session_id = SessionId(uuid.uuid4())
         ready_to_check_session_id = SessionId(uuid.uuid4())
         idle_expired_session_id = SessionId(uuid.uuid4())
+        excluded_session_id = SessionId(uuid.uuid4())
         session_without_row_id = SessionId(uuid.uuid4())
         terminated_session_id = SessionId(uuid.uuid4())
         second_terminated_session_id = SessionId(uuid.uuid4())
@@ -224,6 +226,7 @@ class TestFetchJudgmentBatch:
             (not_checked_session_id, SessionStatus.RUNNING),
             (ready_to_check_session_id, SessionStatus.RUNNING),
             (idle_expired_session_id, SessionStatus.RUNNING),
+            (excluded_session_id, SessionStatus.RUNNING),
             (session_without_row_id, SessionStatus.RUNNING),
             (terminated_session_id, SessionStatus.TERMINATED),
             (second_terminated_session_id, SessionStatus.TERMINATED),
@@ -234,6 +237,7 @@ class TestFetchJudgmentBatch:
             (not_checked_session_id, IdleCheckPhase.NOT_CHECKED),
             (ready_to_check_session_id, IdleCheckPhase.READY_TO_CHECK),
             (idle_expired_session_id, IdleCheckPhase.IDLE_EXPIRED),
+            (excluded_session_id, IdleCheckPhase.EXCLUDED),
             (terminated_session_id, IdleCheckPhase.ACTIVE),
             (second_terminated_session_id, IdleCheckPhase.ACTIVE),
         )
@@ -272,6 +276,7 @@ class TestFetchJudgmentBatch:
             not_checked_session_id=not_checked_session_id,
             ready_to_check_session_id=ready_to_check_session_id,
             idle_expired_session_id=idle_expired_session_id,
+            excluded_session_id=excluded_session_id,
             session_without_row_id=session_without_row_id,
             terminated_session_id=terminated_session_id,
             second_terminated_session_id=second_terminated_session_id,
@@ -316,6 +321,7 @@ class TestFetchJudgmentBatch:
         session_ids = {assignment.session.session_id for assignment in batch.assignments}
         assert judgment_rows.not_checked_session_id not in session_ids
         assert judgment_rows.idle_expired_session_id not in session_ids
+        assert judgment_rows.excluded_session_id not in session_ids
 
     async def test_marks_not_checked_row_ready_to_check(
         self,
@@ -458,18 +464,11 @@ class TestFetchJudgmentBatch:
                 message="idle expired 1",
             ),
             IdleJudgmentData(
-                session_id=judgment_rows.not_checked_session_id,
-                checker_id=judgment_rows.checker_id,
-                status=IdleCheckPhase.IDLE_EXPIRED,
-                expire_at=expire_at,
-                message="idle expired 2",
-            ),
-            IdleJudgmentData(
                 session_id=judgment_rows.terminated_session_id,
                 checker_id=judgment_rows.checker_id,
                 status=IdleCheckPhase.IDLE_EXPIRED,
                 expire_at=expire_at,
-                message="idle expired 3",
+                message="idle expired 2",
             ),
         ]
         idle = [
@@ -544,6 +543,33 @@ class TestFetchJudgmentBatch:
         assert row.last_message == f"{IdleCheckPhase.IDLE_EXPIRED.value} judgment"
         assert row.expire_at == datetime(2026, 2, 1, tzinfo=UTC)
 
+    async def test_never_touches_excluded_row(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        """A pair excluded after the judgment batch was fetched keeps its exclusion."""
+        await repository.batch_apply_session_idle_check_judgments([
+            IdleJudgmentData(
+                session_id=judgment_rows.excluded_session_id,
+                checker_id=judgment_rows.checker_id,
+                status=IdleCheckPhase.ACTIVE,
+                expire_at=datetime(2026, 3, 1, tzinfo=UTC),
+                message="activity detected",
+            )
+        ])
+
+        async with database.begin_readonly_session() as db_sess:
+            row = await db_sess.get(
+                SessionIdleCheckRow,
+                (judgment_rows.excluded_session_id, judgment_rows.checker_id),
+            )
+        assert row is not None
+        assert row.last_status is IdleCheckPhase.EXCLUDED
+        assert row.last_message == f"{IdleCheckPhase.EXCLUDED.value} judgment"
+        assert row.expire_at == datetime(2026, 2, 1, tzinfo=UTC)
+
     async def test_ignores_missing_pair_without_insert(
         self,
         database: ExtendedAsyncSAEngine,
@@ -604,6 +630,7 @@ class TestFetchJudgmentBatch:
                 judgment_rows.not_checked_session_id,
                 judgment_rows.ready_to_check_session_id,
                 judgment_rows.idle_expired_session_id,
+                judgment_rows.excluded_session_id,
                 judgment_rows.session_without_row_id,
             )
         }
@@ -615,6 +642,7 @@ class TestFetchJudgmentBatch:
                 judgment_rows.not_checked_session_id,
                 judgment_rows.ready_to_check_session_id,
                 judgment_rows.idle_expired_session_id,
+                judgment_rows.excluded_session_id,
             )
         }
         assert assignments.now.tzinfo is not None

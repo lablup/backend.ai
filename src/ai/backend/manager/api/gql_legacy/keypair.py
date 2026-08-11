@@ -38,6 +38,7 @@ __all__ = (
     "UserInfo",
 )
 
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
@@ -103,6 +104,9 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
     secret_key = graphene.String()
     is_active = graphene.Boolean()
     is_admin = graphene.Boolean()
+    is_default = graphene.Boolean(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Whether this is the owner's default keypair."
+    )
     resource_policy = graphene.String()
     created_at = GQLDateTime()
     last_used = GQLDateTime()
@@ -145,6 +149,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
             secret_key=data.secret_key,
             is_active=data.is_active,
             is_admin=data.is_admin,
+            is_default=data.is_default,
             resource_policy=data.resource_policy_name,
             created_at=data.created_at,
             rate_limit=data.rate_limit,
@@ -166,6 +171,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
             secret_key=row.secret_key,
             is_active=row.is_active,
             is_admin=row.is_admin,
+            is_default=row.is_default,
             resource_policy=row.resource_policy,
             created_at=row.created_at,
             rate_limit=row.rate_limit,
@@ -297,27 +303,16 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         is_active: bool | None = None,
         filter: str | None = None,
     ) -> int:
-        from ai.backend.manager.data.permission.types import EntityType, ScopeType
+        from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
         from ai.backend.manager.models.group.row import groups
-        from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-            AssociationScopesEntitiesRow,
-        )
         from ai.backend.manager.models.user.row import users
+        from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
 
+        ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
-            .outerjoin(
-                AssociationScopesEntitiesRow,
-                sa.and_(
-                    sa.cast(users.c.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                ),
-            )
-            .outerjoin(
-                groups,
-                sa.cast(groups.c.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
-            )
+            .outerjoin(ms, users.c.uuid == ms.c.user_id)
+            .outerjoin(groups, groups.c.id == ms.c.scope_id)
         )
         query = sa.select(sa.func.count()).group_by(keypairs.c.access_key).select_from(j)
         if domain_name is not None:
@@ -346,27 +341,16 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         filter: str | None = None,
         order: str | None = None,
     ) -> Sequence[KeyPair]:
-        from ai.backend.manager.data.permission.types import EntityType, ScopeType
+        from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
         from ai.backend.manager.models.group.row import groups
-        from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-            AssociationScopesEntitiesRow,
-        )
         from ai.backend.manager.models.user.row import users
+        from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
 
+        ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
-            .outerjoin(
-                AssociationScopesEntitiesRow,
-                sa.and_(
-                    sa.cast(users.c.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                ),
-            )
-            .outerjoin(
-                groups,
-                sa.cast(groups.c.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
-            )
+            .outerjoin(ms, users.c.uuid == ms.c.user_id)
+            .outerjoin(groups, groups.c.id == ms.c.scope_id)
         )
         query = (
             sa.select(
@@ -376,7 +360,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
                 agg_to_array(groups.c.name).label("groups_name"),
             )
             .select_from(j)
-            .group_by(keypairs, users.c.email, users.c.full_name)
+            .group_by(*keypairs.c, users.c.email, users.c.full_name)
             .limit(limit)
             .offset(offset)
         )
@@ -410,27 +394,16 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         is_active: bool | None = None,
     ) -> Sequence[Sequence[KeyPair | None]]:
-        from ai.backend.manager.data.permission.types import EntityType, ScopeType
+        from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
         from ai.backend.manager.models.group.row import groups
-        from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-            AssociationScopesEntitiesRow,
-        )
         from ai.backend.manager.models.user.row import users
+        from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
 
+        ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
-            .join(
-                AssociationScopesEntitiesRow,
-                sa.and_(
-                    sa.cast(users.c.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                ),
-            )
-            .join(
-                groups,
-                sa.cast(groups.c.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
-            )
+            .join(ms, users.c.uuid == ms.c.user_id)
+            .join(groups, groups.c.id == ms.c.scope_id)
         )
         query = (
             sa.select(
@@ -441,7 +414,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
             )
             .select_from(j)
             .where(keypairs.c.user_id.in_(user_ids))
-            .group_by(keypairs, users.c.email, users.c.full_name)
+            .group_by(*keypairs.c, users.c.email, users.c.full_name)
         )
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
@@ -465,27 +438,16 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         *,
         domain_name: str | None = None,
     ) -> Sequence[KeyPair | None]:
-        from ai.backend.manager.data.permission.types import EntityType, ScopeType
+        from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
         from ai.backend.manager.models.group.row import groups
-        from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-            AssociationScopesEntitiesRow,
-        )
         from ai.backend.manager.models.user.row import users
+        from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
 
+        ms = user_scope_membership_query(PROJECT_SCOPE_TYPE).subquery()
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
-            .join(
-                AssociationScopesEntitiesRow,
-                sa.and_(
-                    sa.cast(users.c.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                ),
-            )
-            .join(
-                groups,
-                sa.cast(groups.c.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
-            )
+            .join(ms, users.c.uuid == ms.c.user_id)
+            .join(groups, groups.c.id == ms.c.scope_id)
         )
         query = (
             sa.select(
@@ -496,7 +458,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
             )
             .select_from(j)
             .where(keypairs.c.access_key.in_(access_keys))
-            .group_by(keypairs, users.c.email, users.c.full_name)
+            .group_by(*keypairs.c, users.c.email, users.c.full_name)
         )
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)

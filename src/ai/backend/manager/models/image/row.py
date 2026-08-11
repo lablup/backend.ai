@@ -31,6 +31,7 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.sql.expression import true
 
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
@@ -62,8 +63,6 @@ from ai.backend.manager.data.image.types import (
     Resources,
 )
 from ai.backend.manager.data.permission.permission_defs import ImagePermission
-from ai.backend.manager.data.permission.types import EntityType
-from ai.backend.manager.data.permission.types import ScopeType as PermissionScopeType
 from ai.backend.manager.defs import INTRINSIC_SLOTS, INTRINSIC_SLOTS_MIN
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.models.base import (
@@ -74,6 +73,7 @@ from ai.backend.manager.models.base import (
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -85,10 +85,8 @@ from ai.backend.manager.models.rbac import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.exceptions import InvalidScope
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -152,12 +150,13 @@ def _get_container_registry_join_condition() -> sa.sql.elements.ColumnElement[An
     return ContainerRegistryRow.id == foreign(ImageRow.registry_id)
 
 
-class ImageRow(Base):  # type: ignore[misc]
+class ImageRow(CreatedAtMixin, Base):
     __tablename__ = "images"
     __table_args__ = (
         sa.UniqueConstraint(
             "registry", "project", "name", "tag", "architecture", name="uq_image_identifier"
         ),
+        sa.Index("ix_images_created_at", "created_at"),
     )
 
     id: Mapped[ImageID] = mapped_column(
@@ -166,15 +165,12 @@ class ImageRow(Base):  # type: ignore[misc]
     name: Mapped[str] = mapped_column("name", sa.String, nullable=False, index=True)
     project: Mapped[str | None] = mapped_column("project", sa.String, nullable=True)
     image: Mapped[str] = mapped_column("image", sa.String, nullable=False, index=True)
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        index=True,
-        nullable=True,
-    )
     tag: Mapped[str | None] = mapped_column("tag", sa.TEXT, nullable=True)
-    registry: Mapped[str] = mapped_column("registry", sa.String, nullable=False, index=True)
+    # The column name shadows DeclarativeBase.registry; harmless at runtime since
+    # SQLAlchemy resolves the mapper registry at Base-class creation time.
+    registry: Mapped[str] = mapped_column(  # type: ignore[assignment,misc]
+        "registry", sa.String, nullable=False, index=True
+    )
     registry_id: Mapped[UUID] = mapped_column(
         "registry_id",
         GUID,
@@ -228,7 +224,6 @@ class ImageRow(Base):  # type: ignore[misc]
     # sessions = relationship("SessionRow", back_populates="image_row")
     registry_row = relationship(
         "ContainerRegistryRow",
-        back_populates="image_rows",
         primaryjoin=_get_container_registry_join_condition,
     )
 
@@ -298,7 +293,7 @@ class ImageRow(Base):  # type: ignore[misc]
         filter_by_statuses: list[ImageStatus] | None = None,
         *,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
-    ) -> Self:
+    ) -> ImageRow:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
         query = (
@@ -326,7 +321,7 @@ class ImageRow(Base):  # type: ignore[misc]
         filter_by_statuses: list[ImageStatus] | None = None,
         *,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
-    ) -> Self:
+    ) -> ImageRow:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
         query = sa.select(ImageRow).where(
@@ -359,7 +354,7 @@ class ImageRow(Base):  # type: ignore[misc]
         load_aliases: bool = False,
         filter_by_statuses: list[ImageStatus] | None = None,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
-    ) -> Self:
+    ) -> ImageRow:
         """
         Loads a image row that corresponds to the given ImageRef object.
 
@@ -391,7 +386,7 @@ class ImageRow(Base):  # type: ignore[misc]
 
     @classmethod
     def from_dataclass(cls, image_data: ImageData) -> Self:
-        image_row = ImageRow(
+        image_row = cls(
             name=image_data.name,
             project=image_data.project,
             image=image_data.image,
@@ -409,12 +404,13 @@ class ImageRow(Base):  # type: ignore[misc]
             status=image_data.status,
         )
         image_row.id = image_data.id
-        image_row.created_at = image_data.created_at
+        if image_data.created_at is not None:
+            image_row.created_at = image_data.created_at
         return image_row
 
     @classmethod
     def from_dataclass_with_details(cls, image_data: ImageDataWithDetails) -> Self:
-        image_row = ImageRow(
+        image_row = cls(
             name=image_data.name,
             project=image_data.project,
             image=image_data.name,
@@ -450,7 +446,7 @@ class ImageRow(Base):  # type: ignore[misc]
         filter_by_statuses: list[ImageStatus] | None = None,
         load_aliases: bool = True,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
-    ) -> Self:
+    ) -> ImageRow:
         """
         Resolves a matching row in the image table from image references and/or aliases.
         If candidate element is `ImageRef`, this method will try to resolve image with matching
@@ -506,7 +502,7 @@ class ImageRow(Base):  # type: ignore[misc]
                     filter_by_statuses=filter_by_statuses,
                     loading_options=loading_options,
                 ):
-                    result: Self = row
+                    result: ImageRow = row
                     return result
             except UnknownImageReference:
                 continue
@@ -517,7 +513,7 @@ class ImageRow(Base):  # type: ignore[misc]
         cls,
         session: AsyncSession,
         image_identifier: ImageIdentifier,
-    ) -> Self:
+    ) -> ImageRow:
         """
         Lookup ImageRow by ImageIdentifier, also trying canonical as alias.
 
@@ -545,7 +541,7 @@ class ImageRow(Base):  # type: ignore[misc]
         image_id: UUID,
         filter_by_statuses: list[ImageStatus] | None = None,
         load_aliases: bool = False,
-    ) -> Self | None:
+    ) -> ImageRow | None:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
         query = sa.select(ImageRow).where(ImageRow.id == image_id)
@@ -563,7 +559,7 @@ class ImageRow(Base):  # type: ignore[misc]
         session: AsyncSession,
         filter_by_statuses: list[ImageStatus] | None = None,
         load_aliases: bool = False,
-    ) -> list[Self]:
+    ) -> list[ImageRow]:
         if filter_by_statuses is None:
             filter_by_statuses = [ImageStatus.ALIVE]
         query = sa.select(ImageRow)
@@ -843,7 +839,7 @@ async def bulk_get_image_configs(
     return result
 
 
-class ImageAliasRow(Base):  # type: ignore[misc]
+class ImageAliasRow(Base):
     __tablename__ = "image_aliases"
     id: Mapped[UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
@@ -860,7 +856,7 @@ class ImageAliasRow(Base):  # type: ignore[misc]
         session: AsyncSession,
         alias: str,
         target: ImageRow,
-    ) -> Self:
+    ) -> ImageAliasRow:
         existing_alias: ImageRow | None = await session.scalar(
             sa.select(ImageAliasRow)
             .where(ImageAliasRow.alias == alias)
@@ -1178,17 +1174,8 @@ class ImagePermissionContextBuilder(
         _ctx: ClientContext,
         scope: UserScope,
     ) -> list[ProjectScope]:
-        project_ids_stmt = (
-            sa.select(GroupRow.id)
-            .join(
-                AssociationScopesEntitiesRow,
-                sa.cast(GroupRow.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
-            )
-            .where(
-                AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
-                AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                AssociationScopesEntitiesRow.entity_id == str(scope.user_id),
-            )
+        project_ids_stmt = sa.select(GroupRow.id).where(
+            user_scope_membership_exists(PROJECT_SCOPE_TYPE, GroupRow.id, scope.user_id)
         )
         project_ids = await self.db_session.scalars(project_ids_stmt)
 

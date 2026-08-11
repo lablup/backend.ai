@@ -17,7 +17,7 @@ from ai.backend.manager.models.base import (
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 
-class RolePresetRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class RolePresetRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "role_presets"
     __table_args__ = (
         sa.Index(

@@ -14,8 +14,9 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentBulkResult,
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
+    AppConfigFragmentUpsertBulkResult,
 )
-from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.repositories.app_config_fragment.db_source import (
     AppConfigFragmentDBSource,
 )
@@ -63,7 +64,7 @@ class AppConfigFragmentRepository:
     @app_config_fragment_repository_resilience.apply()
     async def bulk_upsert(
         self, specs: Sequence[AppConfigFragmentUpserterSpec]
-    ) -> list[AppConfigFragmentData]:
+    ) -> AppConfigFragmentUpsertBulkResult:
         return await self._db_source.bulk_upsert(specs)
 
     @app_config_fragment_repository_resilience.apply()
@@ -80,7 +81,7 @@ class AppConfigFragmentRepository:
 
     @app_config_fragment_repository_resilience.apply()
     async def scoped_search(
-        self, querier: BatchQuerier, scopes: Sequence[SearchScope]
+        self, querier: BatchQuerier, scopes: Sequence[OperationScope]
     ) -> AppConfigFragmentSearchResult:
         return await self._db_source.scoped_search(querier, scopes)
 

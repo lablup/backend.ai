@@ -19,10 +19,9 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
@@ -33,14 +32,6 @@ from ai.backend.manager.models.base import (
 )
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
-if TYPE_CHECKING:
-    from ai.backend.manager.models.domain import DomainRow
-    from ai.backend.manager.models.group import GroupRow
-    from ai.backend.manager.models.kernel import KernelRow
-    from ai.backend.manager.models.session import SessionRow
-    from ai.backend.manager.models.user import UserRow
-
-
 __all__ = (
     "KernelUsageRecordRow",
     "DomainUsageBucketRow",
@@ -50,37 +41,7 @@ __all__ = (
 )
 
 
-def _get_kernel_usage_record_kernel_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.kernel import KernelRow
-
-    return KernelUsageRecordRow.kernel_id == foreign(KernelRow.id)
-
-
-def _get_kernel_usage_record_session_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.session import SessionRow
-
-    return KernelUsageRecordRow.session_id == foreign(SessionRow.id)
-
-
-def _get_kernel_usage_record_user_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.user import UserRow
-
-    return KernelUsageRecordRow.user_uuid == foreign(UserRow.uuid)
-
-
-def _get_kernel_usage_record_project_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.group import GroupRow
-
-    return KernelUsageRecordRow.project_id == foreign(GroupRow.id)
-
-
-def _get_kernel_usage_record_domain_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.domain import DomainRow
-
-    return KernelUsageRecordRow.domain_name == foreign(DomainRow.name)
-
-
-class KernelUsageRecordRow(Base):  # type: ignore[misc]
+class KernelUsageRecordRow(Base):
     """Per-period kernel resource usage records (raw data).
 
     Each record represents kernel resource usage during a specific
@@ -126,43 +87,6 @@ class KernelUsageRecordRow(Base):  # type: ignore[misc]
         "resource_usage", ResourceSlotColumn(), nullable=False, default=ResourceSlot
     )
 
-    # Relationships (Optional since referenced entities can be deleted)
-    kernel: Mapped[KernelRow | None] = relationship(
-        "KernelRow",
-        primaryjoin=_get_kernel_usage_record_kernel_join_condition,
-        foreign_keys=[kernel_id],
-        uselist=False,
-        viewonly=True,
-    )
-    session: Mapped[SessionRow | None] = relationship(
-        "SessionRow",
-        primaryjoin=_get_kernel_usage_record_session_join_condition,
-        foreign_keys=[session_id],
-        uselist=False,
-        viewonly=True,
-    )
-    user: Mapped[UserRow | None] = relationship(
-        "UserRow",
-        primaryjoin=_get_kernel_usage_record_user_join_condition,
-        foreign_keys=[user_uuid],
-        uselist=False,
-        viewonly=True,
-    )
-    project: Mapped[GroupRow | None] = relationship(
-        "GroupRow",
-        primaryjoin=_get_kernel_usage_record_project_join_condition,
-        foreign_keys=[project_id],
-        uselist=False,
-        viewonly=True,
-    )
-    domain: Mapped[DomainRow | None] = relationship(
-        "DomainRow",
-        primaryjoin=_get_kernel_usage_record_domain_join_condition,
-        foreign_keys=[domain_name],
-        uselist=False,
-        viewonly=True,
-    )
-
     __table_args__ = (
         sa.Index("ix_kernel_usage_rg_period", "resource_group", "period_start"),
         sa.Index("ix_kernel_usage_rg_id_period", "resource_group_id", "period_start"),
@@ -170,13 +94,7 @@ class KernelUsageRecordRow(Base):  # type: ignore[misc]
     )
 
 
-def _get_domain_usage_bucket_domain_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.domain import DomainRow
-
-    return DomainUsageBucketRow.domain_name == foreign(DomainRow.name)
-
-
-class DomainUsageBucketRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class DomainUsageBucketRow(LifecycleTimestampsMixin, Base):
     """Per-domain period-based resource usage aggregation.
 
     Cache summing all Project/User usage within the domain.
@@ -222,15 +140,6 @@ class DomainUsageBucketRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc
         "Sum of agent.available_slots for calculating usage ratio.",
     )
 
-    # Relationships
-    domain: Mapped[DomainRow | None] = relationship(
-        "DomainRow",
-        primaryjoin=_get_domain_usage_bucket_domain_join_condition,
-        foreign_keys=[domain_name],
-        uselist=False,
-        viewonly=True,
-    )
-
     __table_args__ = (
         sa.UniqueConstraint(
             "domain_name",
@@ -242,19 +151,7 @@ class DomainUsageBucketRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc
     )
 
 
-def _get_project_usage_bucket_project_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.group import GroupRow
-
-    return ProjectUsageBucketRow.project_id == foreign(GroupRow.id)
-
-
-def _get_project_usage_bucket_domain_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.domain import DomainRow
-
-    return ProjectUsageBucketRow.domain_name == foreign(DomainRow.name)
-
-
-class ProjectUsageBucketRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class ProjectUsageBucketRow(LifecycleTimestampsMixin, Base):
     """Per-project period-based resource usage aggregation.
 
     Cache summing all User usage within the project.
@@ -301,22 +198,6 @@ class ProjectUsageBucketRow(LifecycleTimestampsMixin, Base):  # type: ignore[mis
         "Sum of agent.available_slots for calculating usage ratio.",
     )
 
-    # Relationships
-    project: Mapped[GroupRow | None] = relationship(
-        "GroupRow",
-        primaryjoin=_get_project_usage_bucket_project_join_condition,
-        foreign_keys=[project_id],
-        uselist=False,
-        viewonly=True,
-    )
-    domain: Mapped[DomainRow | None] = relationship(
-        "DomainRow",
-        primaryjoin=_get_project_usage_bucket_domain_join_condition,
-        foreign_keys=[domain_name],
-        uselist=False,
-        viewonly=True,
-    )
-
     __table_args__ = (
         sa.UniqueConstraint(
             "project_id",
@@ -328,25 +209,7 @@ class ProjectUsageBucketRow(LifecycleTimestampsMixin, Base):  # type: ignore[mis
     )
 
 
-def _get_user_usage_bucket_user_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.user import UserRow
-
-    return UserUsageBucketRow.user_uuid == foreign(UserRow.uuid)
-
-
-def _get_user_usage_bucket_project_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.group import GroupRow
-
-    return UserUsageBucketRow.project_id == foreign(GroupRow.id)
-
-
-def _get_user_usage_bucket_domain_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.domain import DomainRow
-
-    return UserUsageBucketRow.domain_name == foreign(DomainRow.name)
-
-
-class UserUsageBucketRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class UserUsageBucketRow(LifecycleTimestampsMixin, Base):
     """Per-user period-based resource usage aggregation (computation cache).
 
     Cache aggregating raw data from kernel_usage_records per decay_unit period.
@@ -399,29 +262,6 @@ class UserUsageBucketRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         "Sum of agent.available_slots for calculating usage ratio.",
     )
 
-    # Relationships
-    user: Mapped[UserRow | None] = relationship(
-        "UserRow",
-        primaryjoin=_get_user_usage_bucket_user_join_condition,
-        foreign_keys=[user_uuid],
-        uselist=False,
-        viewonly=True,
-    )
-    project: Mapped[GroupRow | None] = relationship(
-        "GroupRow",
-        primaryjoin=_get_user_usage_bucket_project_join_condition,
-        foreign_keys=[project_id],
-        uselist=False,
-        viewonly=True,
-    )
-    domain: Mapped[DomainRow | None] = relationship(
-        "DomainRow",
-        primaryjoin=_get_user_usage_bucket_domain_join_condition,
-        foreign_keys=[domain_name],
-        uselist=False,
-        viewonly=True,
-    )
-
     __table_args__ = (
         sa.UniqueConstraint(
             "user_uuid",
@@ -440,7 +280,7 @@ class UserUsageBucketRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     )
 
 
-class UsageBucketEntryRow(Base):  # type: ignore[misc]
+class UsageBucketEntryRow(Base):
     """Per-slot normalized entry for a usage bucket.
 
     ``resource_usage`` holds resource-seconds (occupied slots integrated over the

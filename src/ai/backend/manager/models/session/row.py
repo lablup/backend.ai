@@ -10,7 +10,6 @@ from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
-    Self,
     override,
 )
 from uuid import UUID
@@ -18,7 +17,6 @@ from uuid import UUID
 import aiotools
 import sqlalchemy as sa
 import yarl
-from dateutil.tz import tzutc
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -91,6 +89,7 @@ from ai.backend.manager.models.base import (
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryFilterParser
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 from ai.backend.manager.models.network import NetworkRow, NetworkType
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
@@ -105,7 +104,6 @@ from ai.backend.manager.models.rbac import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow
-from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.types import (
     QueryCondition,
     QueryOption,
@@ -117,9 +115,6 @@ from ai.backend.manager.models.utils import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.domain import DomainRow
-    from ai.backend.manager.models.keypair import KeyPairRow
-    from ai.backend.manager.models.scaling_group import ScalingGroupRow
     from ai.backend.manager.models.user import UserRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -354,19 +349,13 @@ ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE: Mapping[SessionTypes, tuple[str, ...]] = {
 
 
 # Defined for avoiding circular import
-def _get_keypair_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
-    from ai.backend.manager.models.keypair import KeyPairRow
-
-    return KeyPairRow.access_key == foreign(SessionRow.access_key)
-
-
 def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.user import UserRow
 
     return UserRow.uuid == foreign(SessionRow.user_uuid)
 
 
-class SessionRow(Base):  # type: ignore[misc]
+class SessionRow(CreatedAtMixin, Base):
     __tablename__ = "sessions"
     id: Mapped[SessionId] = mapped_column(
         "id", SessionIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
@@ -465,11 +454,6 @@ class SessionRow(Base):  # type: ignore[misc]
     scaling_group_name: Mapped[str] = mapped_column(
         "scaling_group_name", sa.ForeignKey("scaling_groups.name"), index=True, nullable=False
     )
-    scaling_group: Mapped[ScalingGroupRow] = relationship(
-        "ScalingGroupRow",
-        back_populates="sessions",
-        foreign_keys=[scaling_group_name],
-    )
     target_sgroup_names: Mapped[list[str] | None] = mapped_column(
         "target_sgroup_names",
         sa.ARRAY(sa.String(length=64)),
@@ -487,32 +471,20 @@ class SessionRow(Base):  # type: ignore[misc]
         index=True,
         nullable=False,
     )
-    domain: Mapped[DomainRow] = relationship(
-        "DomainRow",
-        back_populates="sessions",
-        foreign_keys=[domain_name],
-    )
     group_id: Mapped[UUID] = mapped_column(
         "group_id", GUID, sa.ForeignKey("groups.id"), nullable=False
     )
-    group: Mapped[GroupRow] = relationship("GroupRow", back_populates="sessions")
+    group: Mapped[GroupRow] = relationship("GroupRow")
     user_uuid: Mapped[UUID] = mapped_column(
         "user_uuid", GUID, server_default=sa.text("uuid_generate_v4()"), nullable=False
     )
     user: Mapped[UserRow] = relationship(
         "UserRow",
         primaryjoin=_get_user_row_join_condition,
-        back_populates="sessions",
         foreign_keys=[user_uuid],
     )
 
     access_key: Mapped[str | None] = mapped_column("access_key", sa.String(length=20))
-    access_key_row: Mapped[KeyPairRow | None] = relationship(
-        "KeyPairRow",
-        primaryjoin=_get_keypair_row_join_condition,
-        back_populates="sessions",
-        foreign_keys=[access_key],
-    )
 
     # `images` stores canonical image name strings for historical audit.
     images: Mapped[list[str] | None] = mapped_column("images", sa.ARRAY(sa.String), nullable=True)
@@ -550,9 +522,6 @@ class SessionRow(Base):  # type: ignore[misc]
     batch_timeout: Mapped[int | None] = mapped_column(
         "batch_timeout", sa.BigInteger(), nullable=True
     )  # Used to set timeout of batch sessions
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True
-    )
     terminated_at: Mapped[datetime | None] = mapped_column(
         "terminated_at", sa.DateTime(timezone=True), nullable=True, default=sa.null(), index=True
     )
@@ -668,12 +637,9 @@ class SessionRow(Base):  # type: ignore[misc]
         nullable=True,
     )
 
-    routing: Mapped[list[RoutingRow]] = relationship(
-        "RoutingRow", back_populates="session_row", foreign_keys="RoutingRow.session"
-    )
-
     __table_args__ = (
         # indexing
+        sa.Index("ix_sessions_created_at", "created_at"),
         sa.Index(
             "ix_sessions_updated_order",
             sa.func.greatest(
@@ -787,7 +753,7 @@ class SessionRow(Base):  # type: ignore[misc]
             use_host_network=self.use_host_network,
             timeout=self.timeout,
             batch_timeout=self.batch_timeout,
-            created_at=self.created_at or datetime.now(tzutc()),
+            created_at=self.created_at,
             terminated_at=self.terminated_at,
             starts_at=self.starts_at,
             status=self.status,
@@ -928,7 +894,7 @@ class SessionRow(Base):  # type: ignore[misc]
         options: Iterable[QueryOption] = tuple(),
         *,
         db: ExtendedAsyncSAEngine,
-    ) -> list[Self]:
+    ) -> list[SessionRow]:
         stmt = sa.select(SessionRow)
         for cond in conditions:
             stmt = cond(stmt)
@@ -1255,7 +1221,7 @@ def by_raw_filter(filter_spec: FieldSpecType, raw_filter: str) -> QueryCondition
     return _by_raw_filter
 
 
-class SessionDependencyRow(Base):  # type: ignore[misc]
+class SessionDependencyRow(Base):
     __tablename__ = "session_dependencies"
     session_id: Mapped[UUID] = mapped_column(
         "session_id",

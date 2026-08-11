@@ -63,6 +63,7 @@ from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRo
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
 
 
 @dataclass
@@ -287,7 +288,7 @@ class TestAuthRepository:
                 status=user.status,
                 status_info=user.status_info,
                 created_at=user.created_at,
-                modified_at=user.modified_at,
+                modified_at=user.updated_at,
                 password_changed_at=user.password_changed_at,
                 domain_name=user.domain_name,
                 role=user.role,
@@ -355,6 +356,9 @@ class TestAuthRepository:
                 )
             )
             await db_sess.flush()
+            await VirtualScopeSeeder().enroll_user_in_project(
+                db_sess, group_id, sample_user_data.uuid
+            )
             await db_sess.refresh(group)
 
             group_data = GroupData(
@@ -363,7 +367,7 @@ class TestAuthRepository:
                 description=group.description,
                 is_active=group.is_active,
                 created_at=group.created_at,
-                modified_at=group.modified_at,
+                modified_at=group.updated_at,
                 integration_name=group.integration_id,  # ORM column is integration_id
                 domain_name=group.domain_name,
                 total_resource_slots=group.total_resource_slots,

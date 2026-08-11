@@ -3,11 +3,8 @@ import uuid
 from collections.abc import Sequence
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from uuid import UUID
-
-if TYPE_CHECKING:
-    pass
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql

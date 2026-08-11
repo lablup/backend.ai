@@ -1,10 +1,11 @@
-"""Search-scope abstractions for the models (DB) layer.
+"""Operation-scope abstractions for the models (DB) layer.
 
-``SearchScope`` defines the parameters of an entity-based search query and
-converts to a :data:`~ai.backend.manager.models.clauses.QueryCondition`;
-``ExistenceCheck`` validates that required entities exist before the query runs.
-They live at the models layer so that repositories/services can build scoped
-queries without importing upward into the repositories layer.
+``OperationScope`` bounds the rows a DB operation may touch — searches and batch
+writes alike — and converts to a
+:data:`~ai.backend.manager.models.clauses.QueryCondition`; ``ExistenceCheck``
+validates that required entities exist before the operation runs. They live at
+the models layer so that repositories/services can build scoped operations
+without importing upward into the repositories layer.
 """
 
 from __future__ import annotations
@@ -38,12 +39,13 @@ class ExistenceCheck[T]:
     """The error to raise if the entity doesn't exist."""
 
 
-class SearchScope(ABC):
-    """Abstract base class for search scope.
+class OperationScope(ABC):
+    """Abstract base class for an operation's scope restriction.
 
-    Scope defines required parameters for entity-based search queries.
-    It converts to a QueryCondition that can be added to BatchQuerier conditions.
-    Optionally defines existence checks for validation.
+    Bounds the rows an operation may touch — a scoped search reads within it, a
+    scoped batch write cannot reach past it. It converts to a QueryCondition that
+    is merged into the operation's statement; existence checks are validated
+    first.
     """
 
     @abstractmethod
