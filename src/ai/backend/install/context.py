@@ -518,7 +518,10 @@ class Context(metaclass=ABCMeta):
 
     async def install_halfstack(self) -> None:
         self.log_header("Installing halfstack...")
+        await self._prepare_halfstack_files()
+        await self._start_halfstack()
 
+    async def _prepare_halfstack_files(self) -> None:
         base_path = self.install_info.base_path
 
         # Copy gateway config from package resources
@@ -620,7 +623,6 @@ class Context(metaclass=ABCMeta):
                 ("8120:2379", f"{self.install_info.halfstack_config.etcd_addr[0].bind.port}:2379"),
             ],
         )
-        await self._start_halfstack()
 
     def _halfstack_profile_args(self) -> list[str]:
         profile_args_list: list[str] = []
@@ -2328,8 +2330,8 @@ class DockerContext(Context):
       the compose project's bridge network with published ports, and
       ``_fixup_bridge_service_addresses`` rewrites their generated configs:
       halfstack/coordinator addresses become compose service DNS names (the
-      services file ``include:``s the halfstack file, so everything is ONE
-      compose project on one network with depends_on health gating), the
+      halfstack definition is MERGED into the single generated compose file,
+      sharing its "half" network, with depends_on health gating), the
       manager API address becomes ``host.docker.internal``, and bind
       addresses become ``0.0.0.0``.
     - The install target directory is bind-mounted at the identical absolute
@@ -2364,6 +2366,11 @@ class DockerContext(Context):
     HALF_REDIS = "backendai-half-redis"
     HALF_ETCD = "backendai-half-etcd"
     HALF_OTEL = "backendai-half-otel-collector"
+
+    # Halfstack service names active under the current profiles, recorded
+    # when the merged compose file is generated; consumed by
+    # _start_halfstack() to start only the halfstack members.
+    _halfstack_service_names: list[str] | None = None
 
     @override
     def hydrate_install_info(self) -> InstallInfo:
@@ -2417,50 +2424,38 @@ class DockerContext(Context):
             )
 
     def _services_compose_args(self) -> list[str]:
-        # The services file `include:`s the halfstack file, so this single
-        # entry file addresses the WHOLE deployment as one compose project.
-        # The halfstack profile flags keep the merged model complete (no
-        # orphan warnings about running observability containers).
+        # The single generated compose file carries the WHOLE deployment
+        # (the halfstack definition is merged in at generation time). The
+        # halfstack profile flags keep the active model complete (no orphan
+        # warnings about running observability containers).
         args = ["docker", "compose"]
         for profile_arg in self._halfstack_profile_args():
             args += profile_arg.split(" ")
         args += ["-f", str(self.install_info.base_path / self.SERVICES_COMPOSE_FILENAME)]
         return args
 
-    async def _list_halfstack_services(self) -> list[str]:
-        """
-        The compose service names defined by the (prepared) halfstack file
-        under the active profiles, captured from ``config --services``.
-        """
-        proc = await asyncio.create_subprocess_exec(
-            *self.docker_sudo,
-            "docker",
-            "compose",
-            *(part for arg in self._halfstack_profile_args() for part in arg.split(" ")),
-            "-f",
-            str(self.install_info.base_path / self.HALFSTACK_COMPOSE_FILENAME),
-            "config",
-            "--services",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await proc.communicate()
-        if proc.returncode != 0:
-            raise RuntimeError(
-                f"Failed to enumerate the halfstack compose services "
-                f"(exit {proc.returncode}):\n{stderr.decode(errors='replace')}"
-            )
-        return [line.strip() for line in stdout.decode().splitlines() if line.strip()]
+    @override
+    async def install_halfstack(self) -> None:
+        # The DOCKER mode generates ONE compose file: the halfstack
+        # definition the base prepare step produced is merged into the
+        # rendered services template (sharing the "half" network, so the
+        # bridge services reach halfstack by service DNS), and only then are
+        # the halfstack members started — the service containers start later,
+        # after their configs are generated.
+        self.log_header("Installing halfstack...")
+        await self._prepare_halfstack_files()
+        self.log_header("Generating the deployment compose file...")
+        compose_path = await self.generate_services_compose()
+        self.log.write(Text.from_markup(f"generated [bold]{compose_path}[/]"))
+        await self._start_halfstack()
 
     @override
     async def _start_halfstack(self) -> None:
-        # The halfstack runs as part of the SAME compose project as the
-        # service containers (the services file include:s the halfstack
-        # file), so the bridge-networked services reach it by service DNS and
-        # can health-gate on it via depends_on. Start only the halfstack
-        # members here — the service containers start later, after their
-        # configs are generated.
-        halfstack_services = await self._list_halfstack_services()
+        if self._halfstack_service_names is None:
+            raise RuntimeError("generate_services_compose() must run before starting the halfstack")
+        # Start only the halfstack members of the merged compose file; the
+        # backend services follow in start_services() once configured.
+        halfstack_services = self._halfstack_service_names
         compose_cmd = [*self.docker_sudo, *self._services_compose_args()]
         steps: list[list[str]] = [
             [*compose_cmd, "pull", *halfstack_services],
@@ -2572,18 +2567,57 @@ class DockerContext(Context):
             rendered = re.sub(r"^#gpu#", "", rendered, flags=re.MULTILINE)
         return rendered
 
+    @staticmethod
+    def merge_halfstack_into_services(services_doc: Any, halfstack_doc: Any) -> None:
+        """
+        Merge the prepared halfstack compose document into the rendered
+        services document in place (services, networks, volumes, configs), so
+        the whole deployment lives in ONE compose file. A service name
+        collision is a bug in the templates, not something to silently
+        overwrite.
+        """
+        for section in ("services", "networks", "volumes", "configs"):
+            addition = halfstack_doc.get(section)
+            if not addition:
+                continue
+            target = services_doc.setdefault(section, {})
+            for key, value in addition.items():
+                if key in target:
+                    raise RuntimeError(
+                        f"compose merge collision: {section}.{key} is defined by "
+                        "both the services template and the halfstack file"
+                    )
+                target[key] = value
+
     async def generate_services_compose(self) -> Path:
         compose_path = self.copy_config(self.SERVICES_COMPOSE_FILENAME)
-        compose_path.write_text(
-            self.render_services_compose(
-                compose_path.read_text(),
-                base_path=self.install_info.base_path,
-                version=self.dist_info.version,
-                enable_gpu=self.install_info.accelerator == Accelerator.CUDA,
-                uid=os.getuid(),
-                gid=os.getgid(),
-            )
+        rendered = self.render_services_compose(
+            compose_path.read_text(),
+            base_path=self.install_info.base_path,
+            version=self.dist_info.version,
+            enable_gpu=self.install_info.accelerator == Accelerator.CUDA,
+            uid=os.getuid(),
+            gid=os.getgid(),
         )
+        # Fold the prepared halfstack definition into the rendered document
+        # and drop the separate halfstack file: the deployment is ONE compose
+        # file, and the halfstack services join it verbatim (their "half"
+        # network is shared with the bridge-networked backend services).
+        halfstack_path = self.install_info.base_path / self.HALFSTACK_COMPOSE_FILENAME
+        yaml = YAML()
+        yaml.preserve_quotes = True
+        services_doc = yaml.load(rendered)
+        halfstack_doc = yaml.load(halfstack_path.read_text())
+        self.merge_halfstack_into_services(services_doc, halfstack_doc)
+        active_profiles = {arg.split(" ")[1] for arg in self._halfstack_profile_args()}
+        self._halfstack_service_names = [
+            name
+            for name, svc in halfstack_doc.get("services", {}).items()
+            if not svc.get("profiles") or set(svc["profiles"]) & active_profiles
+        ]
+        with compose_path.open("w") as fp:
+            yaml.dump(services_doc, fp)
+        halfstack_path.unlink()
         return compose_path
 
     async def install(self) -> None:
@@ -2613,14 +2647,9 @@ class DockerContext(Context):
                 "directory) and retry."
             )
 
-        # The service compose file must exist BEFORE the halfstack starts:
-        # it is the single entry file (it include:s the halfstack file), and
-        # the unified project keeps every container on one network.
-        self.log_header("Generating the service compose file...")
-        compose_path = await self.generate_services_compose()
-        self.log.write(Text.from_markup(f"generated [bold]{compose_path}[/]"))
-
-        self.log_header("Installing databases (halfstack)...")
+        # install_halfstack() prepares the halfstack files, merges them into
+        # the single deployment compose file, and starts the halfstack
+        # members (see the override above).
         await self.install_halfstack()
 
         self.log_header(f"Pulling service images (version {self.dist_info.version})...")

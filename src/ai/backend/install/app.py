@@ -219,13 +219,10 @@ class DockerInstallReport(Static):
         - Password: `wJalrXUt`
 
         The deployment lives in `{base_path}` and runs as ONE compose
-        project (`backendai-services`):
-        - `docker-compose.services.yml` — the single entry file; it
-          `include:`s the halfstack file, so
-          `docker compose -f docker-compose.services.yml ps` shows the
-          whole deployment
-        - `docker-compose.halfstack.current.yml` — PostgreSQL / Redis / etcd
-          (started as part of the same project)
+        project (`backendai-services`) from ONE compose file:
+        - `docker-compose.services.yml` — the whole deployment, halfstack
+          (PostgreSQL / Redis / etcd) included;
+          `docker compose -f docker-compose.services.yml ps` shows all of it
         - `*.toml` / `webserver.conf` — the per-service configurations,
           bind-mounted into the containers
 

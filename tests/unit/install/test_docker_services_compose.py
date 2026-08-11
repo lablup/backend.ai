@@ -129,11 +129,44 @@ def test_rendered_compose_networking_split(template: str) -> None:
             assert "extra_hosts" not in service, name
 
 
-def test_rendered_compose_includes_halfstack_as_one_project(template: str) -> None:
+def test_rendered_compose_bridge_services_join_halfstack_network(template: str) -> None:
     doc = render(template, enable_gpu=False)
-    # The halfstack file joins THIS compose project, putting every container
-    # on one network (service DNS) under one `docker compose` entry file.
-    assert doc["include"] == ["docker-compose.halfstack.current.yml"]
+    # No include: — the installer merges the halfstack definition INTO this
+    # file at generation time; the bridge services share its "half" network
+    # so halfstack is reachable by service DNS.
+    assert "include" not in doc
+    for name, service in doc["services"].items():
+        if name in HOST_NET_SERVICES:
+            assert "networks" not in service, name
+        else:
+            assert service["networks"] == ["half"], name
+
+
+def test_merge_halfstack_into_services() -> None:
+    services_doc: dict[str, Any] = {
+        "name": "backendai-services",
+        "services": {"manager": {"image": "lablup/backend.ai-manager:x"}},
+    }
+    halfstack_doc: dict[str, Any] = {
+        "services": {"backendai-half-db": {"image": "postgres"}},
+        "networks": {"half": None},
+        "volumes": {"half-grafana": None},
+        "configs": {"prometheus_config": {"file": "./prometheus.yaml"}},
+    }
+    DockerContext.merge_halfstack_into_services(services_doc, halfstack_doc)
+    assert set(services_doc["services"]) == {"manager", "backendai-half-db"}
+    assert services_doc["networks"] == {"half": None}
+    assert services_doc["volumes"] == {"half-grafana": None}
+    assert services_doc["configs"] == {"prometheus_config": {"file": "./prometheus.yaml"}}
+    # a name collision must fail loudly instead of silently overwriting
+    with pytest.raises(RuntimeError, match="collision"):
+        DockerContext.merge_halfstack_into_services(
+            services_doc, {"services": {"manager": {"image": "other"}}}
+        )
+
+
+def test_rendered_compose_health_gates_on_halfstack(template: str) -> None:
+    doc = render(template, enable_gpu=False)
     # Startup is health-gated on the halfstack members, as in the reference
     # hand-written deployment.
     depends = {
