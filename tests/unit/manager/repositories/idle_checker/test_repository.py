@@ -1135,6 +1135,29 @@ class TestSessionIdleCheckExclusion:
         assert row.expire_at is None
         assert row.last_message == "Excluded from idle checks."
 
+    async def test_exclude_deduplicates_repeated_session_ids(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        exclusion_rows: ExclusionRows,
+    ) -> None:
+        """A repeated session id must not break the single INSERT..ON CONFLICT statement."""
+        await repository.batch_exclude_session_idle_checks(
+            exclusion_rows.checker_id,
+            [
+                SessionID(exclusion_rows.unassigned_session_id),
+                SessionID(exclusion_rows.unassigned_session_id),
+            ],
+        )
+
+        async with database.begin_readonly_session() as db_sess:
+            row = await db_sess.get(
+                SessionIdleCheckRow,
+                (exclusion_rows.unassigned_session_id, exclusion_rows.checker_id),
+            )
+        assert row is not None
+        assert row.last_status is IdleCheckPhase.EXCLUDED
+
     async def test_include_resets_only_excluded_rows(
         self,
         database: ExtendedAsyncSAEngine,
