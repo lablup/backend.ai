@@ -142,21 +142,26 @@ the same absolute path on both sides. The paths are set by `agent.toml` —
 **every one of them must be an absolute path**, bind-mounted host↔container at
 the identical location:
 
-The values below are the defaults the DOCKER install mode writes
-(`<install-dir>` is the install target directory); a hand-rolled deployment
-may choose any absolute paths as long as the parity rule holds.
+The values below are the defaults the DOCKER install mode writes — all under
+fixed system paths, so the install directory itself is never mounted into a
+running service; a hand-rolled deployment may choose any absolute paths as
+long as the parity rule holds.
 
 | Config knob (`agent.toml`) | DOCKER-mode default | Used for |
 |---|---|---|
-| `[container] scratch-root` | `<install-dir>/scratches` | Scratch roots of kernel containers |
-| `[agent] mount-path` | `<install-dir>/vfolder/local` | Vfolder tree whose subdirectories become kernel bind-mount sources |
-| `[agent] ipc-base-path` | `<install-dir>/ipc/agent` | Agent↔kernel IPC sockets |
-| `[agent] var-base-path` | `<install-dir>/var/agent` | Plugin state bind-mounted into kernels (e.g. accelerator hook caches) |
-| `[agent] image-commit-path` | `<install-dir>/tmp/backend.ai/commit` | Session image-commit tarballs written by the host daemon |
-| env `BACKENDAI_KRUNNER_SHARED` | `/var/lib/backend.ai/krunner` | Kernel-runner files: the image entrypoint copies them here so the host daemon can mount them into kernels. Mounted as its **own** bind mount (the Docker daemon creates the host directory on first start); the entrypoint **refuses to start** without it |
+| `[container] scratch-root` | `/var/lib/backend.ai/scratches` | Scratch roots of kernel containers |
+| `[agent] mount-path` | `/vfroot/local` | Vfolder tree whose subdirectories become kernel bind-mount sources |
+| `[agent] ipc-base-path` | `/tmp/backend.ai/ipc/agent` | Agent↔kernel IPC sockets |
+| `[agent] var-base-path` | `/var/lib/backend.ai/agent` | Plugin state bind-mounted into kernels (e.g. accelerator hook caches) |
+| `[agent] image-commit-path` | `/var/lib/backend.ai/commit` | Session image-commit tarballs written by the host daemon |
+| env `BACKENDAI_KRUNNER_SHARED` | `/var/lib/backend.ai/krunner` | Kernel-runner files: the image entrypoint copies them here so the host daemon can mount them into kernels; the entrypoint **refuses to start** without the share being host-backed |
 
-With these defaults, two mounts cover everything: the `<install-dir>` parity
-mount and the fixed `/var/lib/backend.ai/krunner` krunner share.
+With these defaults, three parity mounts cover everything on the agent:
+`/var/lib/backend.ai` (which also backs the krunner share), `/tmp/backend.ai`,
+and `/vfroot/local`. The Docker daemon creates the missing host directories
+on first start; they stay root-owned, which is fine — the agent runs as
+root, and the storage-proxy's `/vfroot/local/volume1` is chowned to the
+installing user by the installer.
 
 Vfolder roots (e.g. `/vfroot/local/volume1`) follow the same rule on the
 **storage-proxy**: mount each volume at the identical absolute path on host and
@@ -193,21 +198,25 @@ the **DOCKER install mode** of `backend.ai-installer` generates at
   rewritten to `host.docker.internal` (mapped via `extra_hosts:
   host-gateway` on the webserver), and bind addresses forced to `0.0.0.0` —
   while announce/advertised addresses are untouched.
-- The install directory is bind-mounted at the identical absolute path (path
-  parity) only where files must resolve on the host: the agent and
-  storage-proxy (paths handed to the host Docker daemon) and `manager-cli`
-  (fixture files passed to one-off commands). The manager exchanges the RPC
-  keypair through `<install-dir>/fixtures` mounted at `/app/fixtures`.
+- **No running service mounts the install directory.** The daemon-visible
+  state lives under fixed system paths with host==container path parity:
+  `/var/lib/backend.ai` + `/tmp/backend.ai` (agent) and `/vfroot/local`
+  (agent + storage-proxy). Only `manager-cli`, the installer's one-off tool,
+  mounts the install directory (for fixture files). The manager exchanges
+  the RPC keypair through `<install-dir>/fixtures` mounted at
+  `/app/fixtures`, and the storage-proxy reads its TLS material from a
+  read-only mount of `<install-dir>/configs/storage-proxy`.
 - The storage-proxy runs as the **installing user** (compose `user:`),
-  matching PACKAGE-mode file ownership of the vfolder tree.
+  matching PACKAGE-mode file ownership; the installer chowns
+  `/vfroot/local/volume1` to that user via a root one-off container.
 - `/etc/machine-id` is passed through read-only to the manager and agent so
   anything deriving a stable host identity sees the host's, not the
   container's.
 - All images are pinned to the installer's own version (the event-bus
   version-skew rule above).
-- The compose project name is fixed (`backendai-services`) so the file never
-  shares a project with the halfstack file the installer places in the same
-  directory.
+- The compose project name is fixed (`backendai-services`) so reruns and
+  operator commands always address the same deployment regardless of the
+  install directory's name.
 - One-off management commands run via `docker compose run` on a dedicated
   non-privileged `manager-cli` twin of the manager (no Docker socket, no
   restart policy; its `cli` profile keeps `up -d` from starting it).
@@ -250,9 +259,12 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc/machine-id:/etc/machine-id:ro
       - <install-dir>/agent.toml:/etc/backend.ai/agent.toml:ro
-      # path-parity mounts: host path == container path
-      - <install-dir>:<install-dir>
-      - /var/lib/backend.ai/krunner:/var/lib/backend.ai/krunner   # created by the Docker daemon on first start
+      # path-parity mounts (host path == container path), created by the
+      # Docker daemon on first start; /var/lib/backend.ai also backs the
+      # krunner share the image entrypoint fills
+      - /var/lib/backend.ai:/var/lib/backend.ai
+      - /tmp/backend.ai:/tmp/backend.ai
+      - /vfroot/local:/vfroot/local
     restart: unless-stopped
 ```
 
