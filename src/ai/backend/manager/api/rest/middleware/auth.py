@@ -21,12 +21,7 @@ import hmac
 import ipaddress
 import logging
 import secrets
-<<<<<<< HEAD
-from collections.abc import Awaitable, Callable, Mapping
-=======
-import uuid
 from collections.abc import Awaitable, Callable, Iterable, Mapping
->>>>>>> efbf4d65 (fix(BA-7252): honor X-Forwarded-URL only from trusted proxies (#13663))
 from contextlib import ExitStack
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Final
