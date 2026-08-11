@@ -77,7 +77,6 @@ class AuthenticatedUser:
     domain_name: str
     domain_id: DomainID
     sudo_session_enabled: bool
-    main_access_key: AccessKey | None
     allowed_client_ip: list[ReadableCIDR[IPv4Network | IPv6Network]] | None
     resource_policy: UserResourcePolicyData
 
