@@ -25,7 +25,7 @@ class SearchServiceCatalogsAction(SearchGlobalOpsAction[ServiceCatalogRow, Servi
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "admin_search_service_catalogs"
+        return "search_service_catalogs"
 
     @override
     def to_searcher(self) -> ServiceCatalogSearcher:

@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING
 
 from ai.backend.manager.errors.resource import DBOperationFailed
 
-from .actions.list import ListErrorLogsAction, ListErrorLogsActionResult
 from .actions.mark_cleared import MarkClearedErrorLogAction, MarkClearedErrorLogActionResult
+from .actions.search import SearchErrorLogsAction, SearchErrorLogsActionResult
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.error_log import ErrorLogRepository
@@ -23,7 +23,7 @@ class ErrorLogService:
     def __init__(self, repository: ErrorLogRepository) -> None:
         self._repository = repository
 
-    async def list_logs(self, action: ListErrorLogsAction) -> ListErrorLogsActionResult:
+    async def list_logs(self, action: SearchErrorLogsAction) -> SearchErrorLogsActionResult:
         """List error logs with role-based visibility."""
         items, total_count = await self._repository.list_logs(
             user_uuid=action.user_uuid,
@@ -34,7 +34,7 @@ class ErrorLogService:
             page_size=action.page_size,
             mark_read=action.mark_read,
         )
-        return ListErrorLogsActionResult(logs=items, total_count=total_count)
+        return SearchErrorLogsActionResult(logs=items, total_count=total_count)
 
     async def mark_cleared(
         self, action: MarkClearedErrorLogAction

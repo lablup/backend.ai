@@ -25,8 +25,8 @@ from ai.backend.manager.data.error_log.types import ErrorLogSeverity
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.models.error_log.creators import ErrorLogCreator
 from ai.backend.manager.services.error_log.actions import CreateErrorLogAction
-from ai.backend.manager.services.error_log.actions.list import ListErrorLogsAction
 from ai.backend.manager.services.error_log.actions.mark_cleared import MarkClearedErrorLogAction
+from ai.backend.manager.services.error_log.actions.search import SearchErrorLogsAction
 from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -71,7 +71,7 @@ class ErrorLogHandler:
         params = query.parsed
         log.info("LIST (ak:{})", ctx.access_key)
 
-        action = ListErrorLogsAction(
+        action = SearchErrorLogsAction(
             user_uuid=ctx.user_uuid,
             user_domain=ctx.user_domain,
             is_superadmin=ctx.is_superadmin,

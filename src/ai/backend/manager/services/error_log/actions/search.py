@@ -1,26 +1,27 @@
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.error_log import ERROR_LOG_ENTITY_TYPE
-from ai.backend.common.data.entity.types import EntityType
-from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
+from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.error_log.types import ErrorLogData
-from ai.backend.manager.models.error_logs import ErrorLogRow
-from ai.backend.manager.repositories.error_log.searchers import ErrorLogSearcher
+
+from .base import ErrorLogGlobalAction
 
 
 @dataclass
-class SearchErrorLogsAction(SearchGlobalOpsAction[ErrorLogRow, ErrorLogData]):
-    """Page through every recorded error — the super-admin read."""
+class SearchErrorLogsAction(ErrorLogGlobalAction):
+    """Action to list error logs with role-based visibility."""
 
-    searcher: ErrorLogSearcher
-
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return ERROR_LOG_ENTITY_TYPE
+    user_uuid: uuid.UUID
+    user_domain: str
+    is_superadmin: bool
+    is_admin: bool
+    page_no: int
+    page_size: int
+    mark_read: bool
 
     @override
     @classmethod
@@ -28,5 +29,18 @@ class SearchErrorLogsAction(SearchGlobalOpsAction[ErrorLogRow, ErrorLogData]):
         return "search_error_logs"
 
     @override
-    def to_searcher(self) -> ErrorLogSearcher:
-        return self.searcher
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+
+@dataclass
+class SearchErrorLogsActionResult(BaseActionResult):
+    """Result of listing error logs."""
+
+    logs: list[ErrorLogData]
+    total_count: int
+
+    @override
+    def entity_id(self) -> str | None:
+        return None

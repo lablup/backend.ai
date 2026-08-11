@@ -1,13 +1,13 @@
+from .admin_search import AdminSearchErrorLogsAction
 from .create import CreateErrorLogAction
-from .list import ListErrorLogsAction, ListErrorLogsActionResult
 from .mark_cleared import MarkClearedErrorLogAction, MarkClearedErrorLogActionResult
-from .search import SearchErrorLogsAction
+from .search import SearchErrorLogsAction, SearchErrorLogsActionResult
 
 __all__ = [
     "CreateErrorLogAction",
-    "ListErrorLogsAction",
-    "ListErrorLogsActionResult",
+    "SearchErrorLogsAction",
+    "SearchErrorLogsActionResult",
     "MarkClearedErrorLogAction",
     "MarkClearedErrorLogActionResult",
-    "SearchErrorLogsAction",
+    "AdminSearchErrorLogsAction",
 ]
