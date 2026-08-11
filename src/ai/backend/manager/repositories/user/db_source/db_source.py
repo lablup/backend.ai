@@ -106,7 +106,6 @@ from ai.backend.manager.repositories.base.rbac.entity_purger import (
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.keypair.creators import KeyPairCreatorSpec
 from ai.backend.manager.repositories.keypair.types import (
-    KeypairResourcePolicyKeypairOperationScope,
     UserKeypairOperationScope,
 )
 from ai.backend.manager.repositories.ops.rbac.provider import (
@@ -1283,33 +1282,6 @@ class UserDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
-
-    async def search_keypairs_by_resource_policy(
-        self,
-        scope: KeypairResourcePolicyKeypairOperationScope,
-        querier: BatchQuerier,
-    ) -> SearchResult[KeyPairData]:
-        """Search keypairs assigned to a keypair resource policy.
-
-        Args:
-            scope: Search scope containing the resource policy name to filter by.
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            SearchResult with matching keypairs and pagination info.
-        """
-        async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(KeyPairRow)
-            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
-            items = [row.KeyPairRow.to_data() for row in result.rows]
-            return SearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    # ------------------------------------------------------------------ admin keypair operations
 
     async def admin_create_keypair(
         self, user_id: UUID, creator: KeyPairCreator

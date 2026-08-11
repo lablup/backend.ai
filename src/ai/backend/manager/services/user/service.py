@@ -56,8 +56,6 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     IssueMyKeypairActionResult,
     RevokeMyKeypairAction,
     RevokeMyKeypairActionResult,
-    SearchKeypairsByResourcePolicyAction,
-    SearchKeypairsByResourcePolicyActionResult,
     SearchMyKeypairsAction,
     SearchMyKeypairsActionResult,
     SwitchDefaultAccessKeyAction,
@@ -454,20 +452,6 @@ class UserService:
             scope=action.scope, querier=action.querier
         )
         return SearchMyKeypairsActionResult(result=result)
-
-    async def search_keypairs_by_resource_policy(
-        self, action: SearchKeypairsByResourcePolicyAction
-    ) -> SearchKeypairsByResourcePolicyActionResult:
-        """Search keypairs assigned to a keypair resource policy."""
-        result = await self._user_repository.search_keypairs_by_resource_policy(
-            scope=action.scope, querier=action.querier
-        )
-        return SearchKeypairsByResourcePolicyActionResult(
-            result=result,
-            resource_policy_name=action.scope.resource_policy_name,
-        )
-
-    # ------------------------------------------------------------------ admin keypair operations
 
     async def admin_create_keypair(
         self, action: AdminCreateKeypairAction

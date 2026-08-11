@@ -38,7 +38,6 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.keypair.types import (
-    KeypairResourcePolicyKeypairOperationScope,
     UserKeypairOperationScope,
 )
 from ai.backend.manager.repositories.user.creators import UserCreateSpec
@@ -326,25 +325,6 @@ class UserRepository:
             SearchResult with matching keypairs and pagination info.
         """
         return await self._db_source.search_my_keypairs(scope, querier)
-
-    @user_repository_resilience.apply()
-    async def search_keypairs_by_resource_policy(
-        self,
-        scope: KeypairResourcePolicyKeypairOperationScope,
-        querier: BatchQuerier,
-    ) -> SearchResult[KeyPairData]:
-        """Search keypairs assigned to a keypair resource policy.
-
-        Args:
-            scope: Search scope containing the resource policy name to filter by.
-            querier: BatchQuerier containing conditions, orders, and pagination.
-
-        Returns:
-            SearchResult with matching keypairs and pagination info.
-        """
-        return await self._db_source.search_keypairs_by_resource_policy(scope, querier)
-
-    # ------------------------------------------------------------------ admin keypair operations
 
     @user_repository_resilience.apply()
     async def admin_create_keypair(

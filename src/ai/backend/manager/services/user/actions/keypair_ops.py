@@ -6,20 +6,18 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
-from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.action.scope import BaseScopeAction, BaseScopeActionResult
+from ai.backend.manager.actions.action.global_action import BaseGlobalAction
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator, KeyPairData
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.keypair.types import (
-    KeypairResourcePolicyKeypairOperationScope,
     UserKeypairOperationScope,
 )
 from ai.backend.manager.services.user.actions.base import UserAction
@@ -243,10 +241,22 @@ class AdminDeleteKeypairActionResult(BaseActionResult):
 
 
 @dataclass
-class AdminSearchKeypairsAction(UserAction):
-    """Admin action to search all keypairs without user scope."""
+class AdminSearchKeypairsAction(BaseGlobalAction):
+    """Read keypairs across every user.
+
+    Global-shaped so the gate travels with the action: the global processor prepends
+    the SUPERADMIN check itself, which no caller can skip and no configuration can
+    turn off. That matters because the callers are not only the admin listing — the
+    resource policy node reaches keypairs through this action too, and a gate that
+    lived in one resolver would not cover the other.
+    """
 
     querier: BatchQuerier
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.KEYPAIR
 
     @override
     def entity_id(self) -> str | None:
@@ -265,60 +275,6 @@ class AdminSearchKeypairsActionResult(BaseActionResult):
     @override
     def entity_id(self) -> str | None:
         return None
-
-
-@dataclass
-class SearchKeypairsByResourcePolicyAction(BaseScopeAction):
-    """Action for searching keypairs assigned to a keypair resource policy.
-
-    RBAC validation checks if the user has READ permission on the keypair
-    resource policy scope. Superadmins bypass the check; other users must hold
-    a role granting read access, so a regular user cannot enumerate keypairs
-    owned by others through the resource policy node.
-    """
-
-    scope: KeypairResourcePolicyKeypairOperationScope
-    querier: BatchQuerier
-
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.KEYPAIR
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-    @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.KEYPAIR_RESOURCE_POLICY
-
-    @override
-    def scope_id(self) -> str:
-        return self.scope.resource_policy_name
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(
-            RBACElementType.KEYPAIR_RESOURCE_POLICY, self.scope.resource_policy_name
-        )
-
-
-@dataclass
-class SearchKeypairsByResourcePolicyActionResult(BaseScopeActionResult):
-    """Result of searching keypairs by resource policy."""
-
-    result: SearchResult[KeyPairData]
-    resource_policy_name: str
-
-    @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.KEYPAIR_RESOURCE_POLICY
-
-    @override
-    def scope_id(self) -> str:
-        return self.resource_policy_name
 
 
 @dataclass

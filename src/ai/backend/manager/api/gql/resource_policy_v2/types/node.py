@@ -123,26 +123,21 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
     ):
         from strawberry.relay import PageInfo
 
-        from ai.backend.common.dto.manager.v2.keypair.request import SearchKeypairsRequest
+        from ai.backend.common.dto.manager.v2.keypair.request import AdminSearchKeypairsInput
         from ai.backend.manager.api.gql.base import encode_cursor
         from ai.backend.manager.api.gql.keypair.types.node import (
             KeyPairConnection,
             KeyPairEdge,
             KeyPairGQL,
         )
-        from ai.backend.manager.api.gql.utils import check_admin_only
-        from ai.backend.manager.repositories.keypair.types import (
-            KeypairResourcePolicyKeypairOperationScope,
-        )
 
         # The node this field hangs off is also returned by `my_keypair_resource_policy_v2`,
-        # which any authenticated user may call. Without this gate that reach — from one's
-        # own policy to every keypair sharing it — enumerates other users.
-        check_admin_only()
-
-        result = await info.context.adapters.user.gql_search_keypairs_by_resource_policy(
-            scope=KeypairResourcePolicyKeypairOperationScope(resource_policy_name=self.name),
-            input=SearchKeypairsRequest(
+        # which any authenticated user may call. So this reads through the admin keypair
+        # action narrowed to one policy rather than a path of its own: the SUPERADMIN
+        # check sits on that action's processor, where no resolver can miss it.
+        result = await info.context.adapters.user.gql_admin_search_keypairs(
+            resource_policy_name=self.name,
+            input=AdminSearchKeypairsInput(
                 filter=filter.to_pydantic() if filter is not None else None,
                 order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
                 first=first,

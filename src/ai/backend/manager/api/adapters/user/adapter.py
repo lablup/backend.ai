@@ -9,7 +9,7 @@ from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.data.filter_specs import UUIDInMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDInMatchSpec
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.data.user.types import UserRole as DataUserRole
 from ai.backend.common.dto.manager.pagination import PaginationInfo
@@ -20,7 +20,6 @@ from ai.backend.common.dto.manager.v2.keypair import (
     KeypairNode,
     KeypairOrderBy,
     KeypairOrderField,
-    SearchKeypairsRequest,
     SearchMyKeypairsRequest,
 )
 from ai.backend.common.dto.manager.v2.keypair.request import (
@@ -117,7 +116,6 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.keypair.types import (
-    KeypairResourcePolicyKeypairOperationScope,
     UserKeypairOperationScope,
 )
 from ai.backend.manager.repositories.keypair.updaters import KeyPairUpdaterSpec
@@ -146,7 +144,6 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     AdminUpdateKeypairAction,
     IssueMyKeypairAction,
     RevokeMyKeypairAction,
-    SearchKeypairsByResourcePolicyAction,
     SearchMyKeypairsAction,
     SwitchDefaultAccessKeyAction,
     UpdateMyKeypairAction,
@@ -759,44 +756,6 @@ class UserAdapter(BaseAdapter):
             has_previous_page=action_result.result.has_previous_page,
         )
 
-    async def gql_search_keypairs_by_resource_policy(
-        self,
-        scope: KeypairResourcePolicyKeypairOperationScope,
-        input: SearchKeypairsRequest,
-    ) -> SearchResult[KeypairNode]:
-        """Search keypairs assigned to a keypair resource policy (GQL connection).
-
-        Used by the ``keypairs`` connection on the keypair resource policy node.
-        The connection field gates access with ``check_admin_only()`` because the
-        keypair resource policy entity itself is not RBAC-protected; this method
-        runs the RBAC-scoped action so superadmins receive all keypairs governed
-        by the policy.
-        """
-        conditions = self._convert_keypair_filter(input.filter) if input.filter else []
-        orders = self._convert_keypair_orders(input.order) if input.order else []
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
-            pagination_spec=_KEYPAIR_PAGINATION_SPEC,
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-        )
-        action_result = (
-            await self._processors.user.search_keypairs_by_resource_policy.wait_for_complete(
-                SearchKeypairsByResourcePolicyAction(scope=scope, querier=querier)
-            )
-        )
-        return SearchResult(
-            items=[self._keypair_data_to_node(item) for item in action_result.result.items],
-            total_count=action_result.result.total_count,
-            has_next_page=action_result.result.has_next_page,
-            has_previous_page=action_result.result.has_previous_page,
-        )
-
     @staticmethod
     def _keypair_data_to_node(data: KeyPairData) -> KeypairNode:
         """Convert KeyPairData to KeypairNode DTO."""
@@ -955,9 +914,23 @@ class UserAdapter(BaseAdapter):
     async def gql_admin_search_keypairs(
         self,
         input: AdminSearchKeypairsInput,
+        *,
+        resource_policy_name: str | None = None,
     ) -> SearchResult[KeypairNode]:
-        """Admin search all keypairs (GQL, returns SearchResult for connection)."""
+        """Admin search across every keypair (GQL, returns SearchResult for connection).
+
+        ``resource_policy_name`` narrows the same admin read to one policy, which is
+        what the resource policy node's ``keypairs`` connection needs. It is a filter,
+        not a second path: the action is the admin one either way, so a non-superadmin
+        is refused by the processor before any row is read.
+        """
         conditions = self._convert_keypair_filter(input.filter) if input.filter else []
+        if resource_policy_name is not None:
+            conditions.append(
+                KeypairConditions.by_resource_policy_equals(
+                    StringMatchSpec(resource_policy_name, case_insensitive=False, negated=False)
+                )
+            )
         orders = self._convert_keypair_orders(input.order) if input.order else []
         querier = self._build_querier(
             conditions=conditions,

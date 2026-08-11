@@ -2,6 +2,7 @@ from typing import cast
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.processor.global_action import GlobalActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.validator.base import ActionValidator
@@ -50,8 +51,6 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     IssueMyKeypairActionResult,
     RevokeMyKeypairAction,
     RevokeMyKeypairActionResult,
-    SearchKeypairsByResourcePolicyAction,
-    SearchKeypairsByResourcePolicyActionResult,
     SearchMyKeypairsAction,
     SearchMyKeypairsActionResult,
     SwitchDefaultAccessKeyAction,
@@ -108,9 +107,6 @@ class UserProcessors:
         SearchUsersByProjectAction, SearchUsersByProjectActionResult
     ]
     search_users_by_role: ActionProcessor[SearchUsersByRoleAction, SearchUsersByRoleActionResult]
-    search_keypairs_by_resource_policy: ScopeActionProcessor[
-        SearchKeypairsByResourcePolicyAction, SearchKeypairsByResourcePolicyActionResult
-    ]
     # Single entity actions with RBAC
     get_user: SingleEntityActionProcessor[GetUserAction, GetUserActionResult]
     update_user: SingleEntityActionProcessor[UpdateUserAction, UpdateUserActionResult]
@@ -138,7 +134,7 @@ class UserProcessors:
     admin_create_keypair: ActionProcessor[AdminCreateKeypairAction, AdminCreateKeypairActionResult]
     admin_update_keypair: ActionProcessor[AdminUpdateKeypairAction, AdminUpdateKeypairActionResult]
     admin_delete_keypair: ActionProcessor[AdminDeleteKeypairAction, AdminDeleteKeypairActionResult]
-    admin_search_keypairs: ActionProcessor[
+    admin_search_keypairs: GlobalActionProcessor[
         AdminSearchKeypairsAction, AdminSearchKeypairsActionResult
     ]
     admin_get_keypair: ActionProcessor[AdminGetKeypairAction, AdminGetKeypairActionResult]
@@ -183,11 +179,6 @@ class UserProcessors:
         )
         self.search_users_by_role = ActionProcessor(
             user_service.search_users_by_role, action_monitors
-        )
-        self.search_keypairs_by_resource_policy = ScopeActionProcessor(
-            user_service.search_keypairs_by_resource_policy,
-            action_monitors,
-            validators=[validators.rbac.scope],
         )
         # Single entity actions with RBAC
         self.get_user = SingleEntityActionProcessor(
@@ -246,7 +237,7 @@ class UserProcessors:
         self.admin_delete_keypair = ActionProcessor(
             user_service.admin_delete_keypair, action_monitors
         )
-        self.admin_search_keypairs = ActionProcessor(
+        self.admin_search_keypairs = GlobalActionProcessor(
             user_service.admin_search_keypairs, action_monitors
         )
         self.admin_get_keypair = ActionProcessor(user_service.admin_get_keypair, action_monitors)
