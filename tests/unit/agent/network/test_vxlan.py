@@ -18,11 +18,15 @@ from ai.backend.agent.network.backends.vxlan import (
     forward_accept_del_args,
     local_bridge_dev,
     local_cni_config,
+    local_ip_capability_args,
     neigh_del_args,
     neigh_replace_args,
     overlay_cni_config,
+    overlay_mac_capability_args,
     vxlan_dev,
     vxlan_link_add_args,
+    xfrm_add_args,
+    xfrm_del_args,
 )
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator
 from ai.backend.common.network.types import (
@@ -42,6 +46,15 @@ _META = SessionNetMeta(
 )
 _SELF = Member(agent_id="a1", host_ip="10.0.0.1", vtep_ip="10.0.0.1")
 _PEER = Member(agent_id="a2", host_ip="10.0.0.2", vtep_ip="10.0.0.2")
+_KEY = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
+_ENC_META = SessionNetMeta(
+    session_id="s1",
+    subnet="10.128.5.0/24",
+    backend=NetworkBackendKind.VXLAN,
+    mtu=1412,
+    vni=4097,
+    encryption_key=_KEY,
+)
 
 
 class Recorder:
@@ -152,8 +165,13 @@ class TestCNIConfig:
         # central endpoint IP -> static IPAM (disjoint across nodes)
         assert conf["ipam"]["type"] == "static"
         assert conf["ipam"]["addresses"] == [{"address": "10.128.5.7/24"}]
-        # deterministic MAC pinned so peers' FDB/ARP (programmed to the same mac_for_ip) match
-        assert conf["mac"] == "02:42:0a:80:05:07"
+        # deterministic MAC pinned via the STANDARD ``mac`` capability, not a non-standard top-level
+        # key a real CNI binary would drop. The value is supplied out-of-band as a capability arg.
+        assert conf["capabilities"] == {"mac": True}
+        assert "mac" not in conf
+
+    def test_overlay_mac_capability_arg_is_the_deterministic_mac(self) -> None:
+        assert overlay_mac_capability_args("10.128.5.7") == {"mac": "02:42:0a:80:05:07"}
 
     def test_overlay_config_requires_a_manager_assigned_ip(self) -> None:
         # the overlay subnet is stretched cluster-wide; a node cannot pick locally without
@@ -170,6 +188,23 @@ class TestCNIConfig:
         assert conf["bridge"] == "bailo4097"
         assert conf["ipam"]["subnet"] == "172.30.0.0/24"
         assert conf["name"] == "bai-local-s1"
+        # no pin requested -> no capability declared, and never the non-standard requested_ip key
+        assert "capabilities" not in conf
+        assert "requested_ip" not in conf["ipam"]
+
+    def test_local_config_declares_ips_capability_when_pinned(self) -> None:
+        conf = local_cni_config(
+            "s1", bridge="bailo4097", subnet="172.30.0.0/24", static_ip="172.30.0.42"
+        )
+        # pin expressed as the STANDARD ``ips`` capability, not ipam.requested_ip
+        assert conf["capabilities"] == {"ips": True}
+        assert "requested_ip" not in conf["ipam"]
+        assert conf["ipam"]["type"] == "host-local"  # keeps the pool + gateway + MASQ
+
+    def test_local_ip_capability_arg_is_a_cidr_in_the_subnet(self) -> None:
+        assert local_ip_capability_args("172.30.0.0/24", "172.30.0.42") == {
+            "ips": ["172.30.0.42/24"]
+        }
 
     def test_local_bridge_is_per_session_within_ifname_limit(self) -> None:
         assert local_bridge_dev(4097) == "bailo4097"
@@ -374,6 +409,81 @@ class TestPeers:
         assert rec.calls == [fdb_del_args(4097, "10.0.0.2")]
 
 
+class TestEncryptionBuilders:
+    def test_spi_is_directional_and_agrees_across_ends(self) -> None:
+        # A's out-SA (src=A,dst=B) and B's in-SA (both computed as src=A,dst=B) must be identical,
+        # and the reverse direction must differ — otherwise the two ends cannot match SAs.
+        out = xfrm_add_args("10.0.0.1", "10.0.0.2", 4097, _KEY)
+        # state[0] is the out SA src=self dst=peer; extract its spi
+        state_out = out[0]
+        spi_ab = state_out[state_out.index("spi") + 1]
+        rev = xfrm_add_args("10.0.0.2", "10.0.0.1", 4097, _KEY)
+        # rev's in-SA is state[1]: src=self(=.1) dst=peer... from .2's perspective the in SA is
+        # src=.1 dst=.2 — same directed pair as A's out SA, so same SPI.
+        state_in_from_b = rev[1]
+        spi_from_b = state_in_from_b[state_in_from_b.index("spi") + 1]
+        assert spi_ab == spi_from_b
+
+    def test_aead_key_appends_derived_salt(self) -> None:
+        # rfc4106 needs key(32B)+salt(4B); the key portion is the raw session key, salt is derived.
+        out = xfrm_add_args("10.0.0.1", "10.0.0.2", 4097, _KEY)
+        aead_key = out[0][out[0].index("aead") + 2]
+        assert aead_key.startswith("0x" + _KEY)
+        assert len(aead_key) == len("0x") + 64 + 8  # 32B key + 4B salt, hex
+
+    def test_add_builds_two_states_and_two_policies(self) -> None:
+        out = xfrm_add_args("10.0.0.1", "10.0.0.2", 4097, _KEY)
+        kinds = [(a[1], a[2]) for a in out]  # ("xfrm", "state"|"policy")
+        assert kinds == [
+            ("xfrm", "state"),
+            ("xfrm", "state"),
+            ("xfrm", "policy"),
+            ("xfrm", "policy"),
+        ]
+        # policies select the VXLAN UDP port
+        for policy in out[2:]:
+            assert "dport" in policy and "4789" in policy
+
+    def test_del_matches_add_spis(self) -> None:
+        add = xfrm_add_args("10.0.0.1", "10.0.0.2", 4097, _KEY)
+        dele = xfrm_del_args("10.0.0.1", "10.0.0.2", 4097)
+        add_out_spi = add[0][add[0].index("spi") + 1]
+        del_out_spi = dele[0][dele[0].index("spi") + 1]
+        assert add_out_spi == del_out_spi
+
+
+class TestEncryptedPeers:
+    async def test_add_peer_programs_xfrm_after_fdb_when_encrypted(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        rec.calls.clear()
+        await plugin.add_peer("s1", _PEER)
+        assert rec.calls == [
+            fdb_append_args(4097, "10.0.0.2"),
+            *xfrm_add_args("10.0.0.1", "10.0.0.2", 4097, _KEY),
+        ]
+
+    async def test_add_peer_no_xfrm_without_key(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_META, _SELF)  # plaintext meta
+        rec.calls.clear()
+        await plugin.add_peer("s1", _PEER)
+        assert rec.calls == [fdb_append_args(4097, "10.0.0.2")]
+
+    async def test_del_peer_withdraws_xfrm_before_fdb(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_ENC_META, _SELF)
+        rec.calls.clear()
+        await plugin.del_peer("s1", _PEER)
+        assert rec.calls == [
+            *xfrm_del_args("10.0.0.1", "10.0.0.2", 4097),
+            fdb_del_args(4097, "10.0.0.2"),
+        ]
+
+
 class TestEndpoints:
     async def test_add_endpoint_programs_unicast_fdb_and_arp(self) -> None:
         rec = Recorder()
@@ -447,3 +557,5 @@ class TestAttachEndpoint:
         # the manager-assigned IP becomes the container's static overlay address
         assert overlay.cni_config["ipam"]["type"] == "static"
         assert overlay.cni_config["ipam"]["addresses"] == [{"address": "10.128.5.7/24"}]
+        # and the deterministic MAC rides along as the standard ``mac`` capability arg
+        assert overlay.cni_capability_args == {"mac": "02:42:0a:80:05:07"}

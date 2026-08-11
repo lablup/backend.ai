@@ -300,6 +300,7 @@ class PrivNetServer:
             backend=cfg.backend,
             mtu=cfg.mtu,
             vni=cfg.vni,
+            encryption_key=cfg.encryption_key,
         )
 
     async def _readopt_session(
@@ -520,6 +521,7 @@ class PrivNetServer:
             backend=cfg.backend,
             mtu=cfg.mtu,
             vni=cfg.vni,
+            encryption_key=cfg.encryption_key,
         )
         backend = self._resolve_backend(cfg.backend)
         # Journal before the host is mutated: a record with no device is reconciled away on the

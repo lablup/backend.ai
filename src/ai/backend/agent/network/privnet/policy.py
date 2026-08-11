@@ -60,6 +60,7 @@ class ValidatedNetworkConfig:
     subnet: str | None
     vni: int | None
     mtu: int
+    encryption_key: str | None
 
 
 def validate_session_id(value: str) -> str:
@@ -205,4 +206,18 @@ def validate_network_config(raw: dict[str, Any]) -> ValidatedNetworkConfig:
         if not (_MTU_MIN <= mtu <= _MTU_MAX):
             raise PolicyViolation("mtu out of range")
 
-    return ValidatedNetworkConfig(backend=backend, subnet=subnet, vni=vni, mtu=mtu)
+    # A hex-encoded 256-bit symmetric key or absent. It becomes an XFRM key the privnet installs;
+    # the manager is its only source, but validate the shape (untrusted via the agent) — 64 hex
+    # chars, nothing else, so a lying agent cannot smuggle a shell metacharacter into `ip xfrm`.
+    key_raw = raw.get("encryption_key")
+    encryption_key: str | None = None
+    if key_raw is not None:
+        encryption_key = str(key_raw)
+        if len(encryption_key) != 64 or not all(
+            c in "0123456789abcdefABCDEF" for c in encryption_key
+        ):
+            raise PolicyViolation("invalid encryption_key")
+
+    return ValidatedNetworkConfig(
+        backend=backend, subnet=subnet, vni=vni, mtu=mtu, encryption_key=encryption_key
+    )

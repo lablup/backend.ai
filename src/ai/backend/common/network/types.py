@@ -78,6 +78,10 @@ class SessionNetMeta:
     mtu: int
     vni: int | None = None
     """VXLAN Network Identifier; set only when ``backend == VXLAN``."""
+    encryption_key: str | None = None
+    """Hex-encoded 256-bit symmetric key for kernel IPSec (ESP/AES-GCM) on the VXLAN tunnel, or
+    ``None`` for a plaintext overlay (the default). Distributed via the etcd meta like ``vni``; the
+    kernel does the crypto, the backend only programs XFRM. See overlay-encryption.md."""
 
 
 @dataclass(frozen=True)

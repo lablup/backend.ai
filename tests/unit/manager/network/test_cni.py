@@ -332,6 +332,52 @@ class TestCreateNetwork:
         assert info.options["mtu"] == 1450  # 1500 underlay - 50 VXLAN overhead
         assert json.loads(etcd.store["network/session/s1/meta"])["mtu"] == 1450
 
+    async def test_overlay_encryption_off_by_default(self) -> None:
+        # No opt-in: no key is generated and the meta carries a null encryption_key.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options={"forced_backend": "vxlan"})
+        assert info.options["encryption_key"] is None
+        assert json.loads(etcd.store["network/session/s1/meta"])["encryption_key"] is None
+
+    async def test_per_network_encryption_request_generates_key(self) -> None:
+        # The caller can opt a single session into encryption; a fresh 64-hex key lands in the meta,
+        # and the overlay MTU drops further to leave room for the ESP overhead.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(
+            identifier="s1", options={"forced_backend": "vxlan", "encryption": True}
+        )
+        key = info.options["encryption_key"]
+        assert isinstance(key, str) and len(key) == 64
+        assert all(c in "0123456789abcdef" for c in key)
+        assert info.options["mtu"] == 1500 - 50 - 38  # underlay - VXLAN - ESP overhead
+        assert json.loads(etcd.store["network/session/s1/meta"])["encryption_key"] == key
+
+    async def test_operator_default_enables_encryption(self) -> None:
+        # With the operator's overlay-encryption default on, every VXLAN session is encrypted.
+        etcd = FakeEtcd()
+        plugin = CNINetworkPlugin({"overlay-encryption": True}, {})
+        plugin._etcd = cast(AsyncEtcd, etcd)
+        plugin._subnet_allocator = SubnetAllocator(cast(AsyncEtcd, etcd))
+        plugin._vni_allocator = VNIAllocator(cast(AsyncEtcd, etcd))
+        plugin._endpoint_allocator = EndpointAllocator(cast(AsyncEtcd, etcd))
+        info = await plugin.create_network(identifier="s1", options={"forced_backend": "vxlan"})
+        assert info.options["encryption_key"] is not None
+
+    async def test_per_network_request_overrides_operator_default(self) -> None:
+        # An explicit per-network encryption=False wins over the operator default being on.
+        etcd = FakeEtcd()
+        plugin = CNINetworkPlugin({"overlay-encryption": True}, {})
+        plugin._etcd = cast(AsyncEtcd, etcd)
+        plugin._subnet_allocator = SubnetAllocator(cast(AsyncEtcd, etcd))
+        plugin._vni_allocator = VNIAllocator(cast(AsyncEtcd, etcd))
+        plugin._endpoint_allocator = EndpointAllocator(cast(AsyncEtcd, etcd))
+        info = await plugin.create_network(
+            identifier="s1", options={"forced_backend": "vxlan", "encryption": False}
+        )
+        assert info.options["encryption_key"] is None
+
     async def test_forced_bridge_backend_is_rejected_before_any_allocation(self) -> None:
         # bridge cannot serve a multi-node session (this control plane's only caller); the
         # request is refused up-front, so no subnet/VNI/meta is claimed and nothing leaks.

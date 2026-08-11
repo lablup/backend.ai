@@ -104,6 +104,7 @@ def _network_config_from_meta(meta: SessionNetMeta) -> dict[str, Any]:
         "subnet": meta.subnet or None,
         "vni": meta.vni,
         "mtu": meta.mtu,
+        "encryption_key": meta.encryption_key,
     }
 
 

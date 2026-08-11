@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import secrets
 import uuid
 from collections.abc import Mapping
 from typing import Any, override
@@ -48,6 +49,11 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 # bridging), i.e. a PMTUD black hole: handshakes pass, bulk transfers (NCCL/mpirun) hang.
 _DEFAULT_UNDERLAY_MTU = 1500
 _VXLAN_OVERHEAD = 50  # IPv4 VXLAN: 20 IP + 8 UDP + 8 VXLAN + 14 inner Ethernet
+# Transport-mode ESP/AES-GCM added on top of VXLAN when overlay encryption is on: 8 ESP header (SPI
+# + seq) + 8 IV + 16 ICV + up to 6 pad/trailer. Subtracted from the overlay MTU too, so an encrypted
+# inner frame still fits the underlay and does not reopen the PMTUD black hole `_VXLAN_OVERHEAD`
+# guards against. See overlay-encryption.md.
+_ESP_OVERHEAD = 38
 
 
 class CNINetworkPlugin(AbstractNetworkManagerPlugin):
@@ -130,23 +136,30 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         )
         vni: int | None = None
         try:
+            # Encrypt the overlay only for the encapsulating (VXLAN) backend, and only when the
+            # operator opted in. A fresh 256-bit key per session (hex, the shape the agent policy
+            # and `ip xfrm` accept) is the sole encryption secret; it is distributed via the etcd
+            # meta exactly like the VNI. See overlay-encryption.md.
+            encrypt = backend is NetworkBackendKind.VXLAN and self._encryption_enabled(options)
+            encryption_key = secrets.token_hex(32) if encrypt else None
             if backend is NetworkBackendKind.VXLAN:
                 vni = await self._vni_allocator.acquire(session_id)
             # `mtu` in plugin_config is the UNDERLAY MTU; the overlay MTU (what the kernel's NIC
             # gets) is that minus the tunnel overhead. Only the VXLAN backend encapsulates, so only
-            # it pays the overhead; a non-encapsulating backend would keep the underlay MTU.
+            # it pays the overhead; a non-encapsulating backend would keep the underlay MTU. When
+            # encryption is on, the ESP overhead comes off the overlay MTU as well.
             underlay_mtu = int(self.plugin_config.get("mtu") or _DEFAULT_UNDERLAY_MTU)
-            mtu = (
-                underlay_mtu - _VXLAN_OVERHEAD
-                if backend is NetworkBackendKind.VXLAN
-                else underlay_mtu
-            )
+            if backend is NetworkBackendKind.VXLAN:
+                mtu = underlay_mtu - _VXLAN_OVERHEAD - (_ESP_OVERHEAD if encrypt else 0)
+            else:
+                mtu = underlay_mtu
 
             meta: dict[str, Any] = {
                 "subnet": subnet,
                 "vni": vni,
                 "backend": str(backend),
                 "mtu": mtu,
+                "encryption_key": encryption_key,
             }
             await etcd.put(
                 session_meta_key(session_id), json.dumps(meta), scope=ConfigScopes.GLOBAL
@@ -252,3 +265,12 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 " multi-node cluster session; use 'vxlan' (the default) or leave forced-backend unset."
             )
         return forced_backend if forced_backend is not None else NetworkBackendKind.VXLAN
+
+    def _encryption_enabled(self, options: dict[str, Any]) -> bool:
+        """Whether to encrypt this session's overlay. A per-network request wins (so a caller can ask
+        for encryption explicitly); otherwise the operator's ``overlay-encryption`` plugin default
+        applies. Off unless opted in — encryption trades throughput for confidentiality."""
+        requested = options.get("encryption")
+        if requested is not None:
+            return bool(requested)
+        return bool(self.plugin_config.get("overlay-encryption", False))

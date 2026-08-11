@@ -73,12 +73,14 @@ def session_net_meta_from_network_config(
 ) -> SessionNetMeta:
     """Parse the manager-provided network_config into a SessionNetMeta."""
     vni_raw = network_config.get("vni")
+    key_raw = network_config.get("encryption_key")
     return SessionNetMeta(
         session_id=session_id,
         subnet=network_config["subnet"],
         backend=NetworkBackendKind(network_config["backend"]),
         mtu=int(network_config.get("mtu") or _DEFAULT_MTU),
         vni=int(vni_raw) if vni_raw is not None else None,
+        encryption_key=str(key_raw) if key_raw else None,
     )
 
 
@@ -307,6 +309,7 @@ class ContainerdSessionNetwork:
                 "vni": meta.vni,
                 "backend": str(meta.backend),
                 "mtu": meta.mtu,
+                "encryption_key": meta.encryption_key,
             }),
         )
 

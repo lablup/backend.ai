@@ -10,6 +10,7 @@ runner; the command builders and CNI-config assembly are pure and unit-tested.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import ipaddress
 import logging
 from collections.abc import Awaitable, Callable, Sequence
@@ -110,6 +111,65 @@ def fdb_del_args(vni: int, dst: str, *, mac: str = _BROADCAST_MAC) -> list[str]:
 def fdb_replace_args(vni: int, mac: str, dst: str) -> list[str]:
     """Program the exact unicast MAC→VTEP forwarding entry for a known remote endpoint."""
     return ["bridge", "fdb", "replace", mac, "dev", vxlan_dev(vni), "dst", dst]
+
+
+# --- overlay encryption: kernel IPSec (ESP/AES-GCM) on the VXLAN tunnel (overlay-encryption.md) ---
+# The crypto is the kernel's (XFRM/ESP + AES-NI); these only build the `ip xfrm` control-plane
+# commands the privnet runs beside the FDB entry. Transport-mode ESP between the two VTEPs encrypts
+# the VXLAN UDP (4789) — the L2 overlay is untouched.
+
+_ICV_BITS = 128  # AES-GCM authentication tag length
+
+
+def _esp_spi(vni: int, src: str, dst: str) -> int:
+    """A deterministic 32-bit SPI for the directed VTEP pair, so both ends agree without a handshake:
+    A's out-SA (src=A,dst=B) and B's in-SA (src=A,dst=B) compute the same value. The VNI is folded in
+    so concurrent sessions on one node do not collide. Kept above 255 (SPIs 0-255 are reserved)."""
+    digest = hashlib.sha256(f"{vni}:{src}:{dst}".encode()).digest()
+    return (int.from_bytes(digest[:4], "big") % (2**32 - 256)) + 256
+
+
+def _aead_key(key_hex: str) -> str:
+    """rfc4106(gcm(aes)) keys carry a 4-byte salt after the cipher key. Derive the salt from the key
+    (identical on both ends) and append it, so the 256-bit session key becomes a valid AEAD key."""
+    salt = hashlib.sha256(bytes.fromhex(key_hex)).digest()[:4]
+    return "0x" + key_hex + salt.hex()
+
+
+def xfrm_add_args(self_vtep: str, peer_vtep: str, vni: int, key_hex: str) -> list[list[str]]:
+    """The `ip xfrm` commands that encrypt this node↔peer VXLAN traffic: an out/in ESP SA pair plus
+    the out/in policy selecting the VXLAN UDP. Idempotent via `update`."""
+    key = _aead_key(key_hex)
+    spi_out = f"{_esp_spi(vni, self_vtep, peer_vtep):#x}"
+    spi_in = f"{_esp_spi(vni, peer_vtep, self_vtep):#x}"
+    aead = ["aead", "rfc4106(gcm(aes))", key, str(_ICV_BITS)]
+    return [
+        ["ip", "xfrm", "state", "update", "src", self_vtep, "dst", peer_vtep,
+         "proto", "esp", "spi", spi_out, "mode", "transport", *aead],
+        ["ip", "xfrm", "state", "update", "src", peer_vtep, "dst", self_vtep,
+         "proto", "esp", "spi", spi_in, "mode", "transport", *aead],
+        ["ip", "xfrm", "policy", "update", "src", self_vtep, "dst", peer_vtep,
+         "proto", "udp", "dport", str(VXLAN_DSTPORT), "dir", "out",
+         "tmpl", "src", self_vtep, "dst", peer_vtep, "proto", "esp", "mode", "transport"],
+        ["ip", "xfrm", "policy", "update", "src", peer_vtep, "dst", self_vtep,
+         "proto", "udp", "dport", str(VXLAN_DSTPORT), "dir", "in",
+         "tmpl", "src", peer_vtep, "dst", self_vtep, "proto", "esp", "mode", "transport"],
+    ]  # fmt: skip
+
+
+def xfrm_del_args(self_vtep: str, peer_vtep: str, vni: int) -> list[list[str]]:
+    spi_out = f"{_esp_spi(vni, self_vtep, peer_vtep):#x}"
+    spi_in = f"{_esp_spi(vni, peer_vtep, self_vtep):#x}"
+    return [
+        ["ip", "xfrm", "state", "del", "src", self_vtep, "dst", peer_vtep, "proto", "esp",
+         "spi", spi_out],
+        ["ip", "xfrm", "state", "del", "src", peer_vtep, "dst", self_vtep, "proto", "esp",
+         "spi", spi_in],
+        ["ip", "xfrm", "policy", "del", "src", self_vtep, "dst", peer_vtep,
+         "proto", "udp", "dport", str(VXLAN_DSTPORT), "dir", "out"],
+        ["ip", "xfrm", "policy", "del", "src", peer_vtep, "dst", self_vtep,
+         "proto", "udp", "dport", str(VXLAN_DSTPORT), "dir", "in"],
+    ]  # fmt: skip
 
 
 def neigh_replace_args(vni: int, ip: str, mac: str) -> list[str]:
@@ -274,6 +334,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     _runner: Runner
     _uplink: str
     _sessions: dict[str, SessionNetMeta]
+    _self_vteps: dict[str, str]
     _local_subnets: LocalSubnetAllocator
 
     def __init__(
@@ -289,6 +350,9 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         self._uplink = uplink
         self._runner = runner or _run_command
         self._sessions = {}
+        # This node's own VXLAN tunnel endpoint per session — the local `src` for every XFRM SA,
+        # captured from `self_member` at setup/adopt because add_peer/del_peer only receive the peer.
+        self._self_vteps = {}
         # Defaults to the store's single process-wide owner, which is also what the bridge backend
         # resolves: both carve their LOCAL block out of the same node-local pool, so one owner keeps
         # their indices from colliding on a subnet.
@@ -369,6 +433,8 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         await self._runner(link_up_args(bridge_dev(vni)))
         await self._ensure_forward_accept(vni)
         self._sessions[meta.session_id] = meta
+        if self_member.vtep_ip is not None:
+            self._self_vteps[meta.session_id] = self_member.vtep_ip
 
     @override
     async def adopt_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
@@ -376,12 +442,16 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             raise ValueError(f"VxlanNetworkPlugin requires a vxlan meta with a VNI: {meta}")
         # Devices are already up and carrying traffic; only the bookkeeping add_peer/add_endpoint
         # read is missing. The LOCAL subnet index is re-claimed from the journal by attach_endpoint,
-        # which is idempotent per session.
+        # which is idempotent per session. XFRM SAs survive in the kernel across an agent restart;
+        # re-adopting the self VTEP lets add_peer reprogram them idempotently (`ip xfrm ... update`).
         self._sessions[meta.session_id] = meta
+        if self_member.vtep_ip is not None:
+            self._self_vteps[meta.session_id] = self_member.vtep_ip
 
     @override
     async def teardown_session_network(self, session_id: str) -> None:
         meta = self._sessions.pop(session_id, None)
+        self._self_vteps.pop(session_id, None)
         await self._local_subnets.release(session_id)
         if meta is None or meta.vni is None:
             return
@@ -400,12 +470,39 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         if meta is None or meta.vni is None or peer.vtep_ip is None:
             return
         await self._runner(fdb_append_args(meta.vni, peer.vtep_ip))
+        # Encrypt this node↔peer VXLAN with kernel ESP (overlay-encryption.md). Program it beside the
+        # FDB so the SA pair exists before any tunnel frame flows; the crypto is the kernel's.
+        await self._program_encryption(meta, session_id, peer.vtep_ip)
+
+    async def _program_encryption(
+        self, meta: SessionNetMeta, session_id: str, peer_vtep: str
+    ) -> None:
+        if meta.encryption_key is None or meta.vni is None:
+            return
+        self_vtep = self._self_vteps.get(session_id)
+        if self_vtep is None:
+            log.warning(
+                "cannot encrypt overlay for session {}: this node's VTEP is unknown", session_id
+            )
+            return
+        for args in xfrm_add_args(self_vtep, peer_vtep, meta.vni, meta.encryption_key):
+            await self._runner(args)
 
     @override
     async def del_peer(self, session_id: str, peer: Member) -> None:
         meta = self._sessions.get(session_id)
         if meta is None or meta.vni is None or peer.vtep_ip is None:
             return
+        if meta.encryption_key is not None:
+            self_vtep = self._self_vteps.get(session_id)
+            if self_vtep is not None:
+                for args in xfrm_del_args(self_vtep, peer.vtep_ip, meta.vni):
+                    try:
+                        await self._runner(args)
+                    except RuntimeError:
+                        log.debug(
+                            "xfrm entry already gone for peer {} in {}", peer.vtep_ip, session_id
+                        )
         try:
             await self._runner(fdb_del_args(meta.vni, peer.vtep_ip))
         except RuntimeError:
