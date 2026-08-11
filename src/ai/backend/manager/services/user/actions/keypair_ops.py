@@ -104,7 +104,7 @@ class UpdateMyKeypairActionResult(BaseActionResult):
 
 @dataclass
 class SwitchDefaultAccessKeyAction(UserAction):
-    """Move a user's default keypair marker onto ``access_key``."""
+    """Move the ``is_default`` marker among the user's keypairs onto ``access_key``."""
 
     user_id: UserID
     access_key: AccessKey

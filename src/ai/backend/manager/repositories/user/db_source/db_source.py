@@ -1208,7 +1208,7 @@ class UserDBSource:
             await session.execute(sa.delete(keypairs).where(keypairs.c.access_key == access_key))
 
     async def switch_default_access_key(self, user_id: UserID, access_key: AccessKey) -> None:
-        """Move a user's default keypair marker onto ``access_key``."""
+        """Move the ``is_default`` marker among the user's keypairs onto ``access_key``."""
         async with self._db.begin_session() as session:
             kp_row = (
                 await session.scalars(

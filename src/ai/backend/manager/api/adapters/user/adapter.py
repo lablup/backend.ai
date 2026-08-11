@@ -699,7 +699,7 @@ class UserAdapter(BaseAdapter):
     async def switch_default_access_key(
         self, user_id: UserID, access_key: AccessKey
     ) -> SwitchMyMainAccessKeyPayload:
-        """Move a user's default keypair marker onto ``access_key``."""
+        """Move the ``is_default`` marker among the user's keypairs onto ``access_key``."""
         result = await self._processors.user.switch_default_access_key.wait_for_complete(
             SwitchDefaultAccessKeyAction(user_id=user_id, access_key=access_key)
         )
