@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, override
@@ -8,8 +9,10 @@ from uuid import uuid4
 
 import pytest
 
+import ai.backend.agent.kernel as agent_kernel
 from ai.backend.agent.config.unified import KernelLifecyclesConfig
 from ai.backend.agent.docker.kernel import DockerKernel
+from ai.backend.agent.kernel import SERVICE_REPLY_TIMEOUT_MARGIN_SEC, AbstractCodeRunner
 from ai.backend.agent.types import KernelOwnershipData
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import AgentId, KernelId, SessionId
@@ -19,6 +22,7 @@ _SERVICE_NAME = "jupyter"
 _SERVICE_PORT = 8081
 _CONFIG_SECTION = "kernel-lifecycles"
 _CONFIG_KEY = "service-launch-timeout-sec"
+_REPLY_TIMEOUT_SEC = DEFAULT_SERVICE_LAUNCH_TIMEOUT_SEC + SERVICE_REPLY_TIMEOUT_MARGIN_SEC
 
 
 @dataclass(frozen=True)
@@ -98,6 +102,18 @@ class _KernelRunnerSpy(BaseRunner):
         raise NotImplementedError
 
 
+class _SocketlessCodeRunner(AbstractCodeRunner):
+    """A real code runner whose REPL addresses are never dialled."""
+
+    @override
+    async def get_repl_in_addr(self) -> str:
+        return "inproc://test"
+
+    @override
+    async def get_repl_out_addr(self) -> str:
+        return "inproc://test"
+
+
 @pytest.fixture
 def kernel(request: pytest.FixtureRequest) -> DockerKernel:
     case: _LaunchTimeoutCase = request.param
@@ -139,6 +155,28 @@ def kernel(request: pytest.FixtureRequest) -> DockerKernel:
 @pytest.fixture
 def kernel_runner() -> _KernelRunnerSpy:
     return _KernelRunnerSpy()
+
+
+@pytest.fixture
+def code_runner() -> _SocketlessCodeRunner:
+    runner = _SocketlessCodeRunner(KernelId(uuid4()), SessionId(uuid4()), Mock())
+    runner._sockets = Mock(send_multipart=AsyncMock())
+    runner.service_queue.put_nowait(json.dumps({"status": "started"}).encode())
+    return runner
+
+
+@pytest.fixture
+def recorded_timeouts(monkeypatch: pytest.MonkeyPatch) -> list[float]:
+    """Records each timeout the call sets, leaving it otherwise in force."""
+    recorded: list[float] = []
+    real_timeout = agent_kernel.timeout
+
+    def record(delay: float) -> Any:
+        recorded.append(delay)
+        return real_timeout(delay)
+
+    monkeypatch.setattr(agent_kernel, "timeout", record)
+    return recorded
 
 
 class TestServiceLaunchTimeout:
@@ -194,3 +232,16 @@ class TestServiceLaunchTimeout:
         })
 
         assert kernel_runner.launch_timeout == DEFAULT_SERVICE_LAUNCH_TIMEOUT_SEC
+
+    async def test_the_code_runner_waits_for_the_timeout_it_was_given(
+        self,
+        code_runner: _SocketlessCodeRunner,
+        recorded_timeouts: list[float],
+    ) -> None:
+        result = await code_runner.feed_start_service(
+            {"name": _SERVICE_NAME}, reply_timeout=_REPLY_TIMEOUT_SEC
+        )
+
+        assert result == {"status": "started"}
+        assert recorded_timeouts == [_REPLY_TIMEOUT_SEC]
+        assert recorded_timeouts[0] > DEFAULT_SERVICE_LAUNCH_TIMEOUT_SEC
