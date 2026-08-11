@@ -247,7 +247,10 @@ USER_FIELDS: list[ExportFieldDef] = [
     ExportFieldDef(
         key="main_access_key",
         name="Main Access Key",
-        description="Main keypair access key",
+        description=(
+            "Main keypair access key. Deprecated since 26.9.0."
+            " Use the keypair report's is_default field."
+        ),
         field_type=ExportFieldType.STRING,
         column=KeyPairRow.access_key,
         joins=frozenset({MAIN_KEYPAIR_JOIN}),
