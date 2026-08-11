@@ -75,6 +75,23 @@ class SessionIdleCheckPhaseBatchUpdaterSpec(BatchUpdaterSpec[SessionIdleCheckRow
 
 
 @dataclass
+class SessionIdleCheckIncludeBatchUpdaterSpec(BatchUpdaterSpec[SessionIdleCheckRow]):
+    @property
+    @override
+    def row_class(self) -> type[SessionIdleCheckRow]:
+        return SessionIdleCheckRow
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        # Same values a fresh row gets, so a re-included pair restarts the grace period.
+        return {
+            "last_status": IdleCheckPhase.NOT_CHECKED,
+            "expire_at": None,
+            "last_message": "Not checked yet.",
+        }
+
+
+@dataclass
 class SessionIdleCheckJudgmentBatchUpdaterSpec(BatchUpdaterSpec[SessionIdleCheckRow]):
     judgments: Sequence[IdleJudgmentData]
 

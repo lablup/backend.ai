@@ -505,7 +505,9 @@ def create_processors(
         fair_share=FairShareProcessors(services.fair_share, action_monitors, validators),
         group=GroupProcessors(services.group, action_monitors, validators),
         user=UserProcessors(services.user, action_monitors, validators),
-        idle_checker=IdleCheckerProcessors(services.idle_checker, action_monitors),
+        idle_checker=IdleCheckerProcessors(
+            services.idle_checker, action_monitors, registry.group()
+        ),
         image=ImageProcessors(services.image, action_monitors, validators),
         container_registry=ContainerRegistryProcessors(
             services.container_registry, action_monitors, validators

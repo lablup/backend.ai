@@ -31,6 +31,7 @@ from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.app_config_allow_list.processors import (
     AppConfigAllowListProcessors,
 )
+from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
 from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
 
 _V2_ACTION_BASES: tuple[type[Any], ...] = (
@@ -79,6 +80,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     registry = _ops_registry()
     AppConfigAllowListProcessors(registry.group())
     ResourceSlotProcessors(MagicMock(), [], MagicMock(), registry.group())
+    IdleCheckerProcessors(MagicMock(), [], registry.group())
 
     wired = sorted(spec.type() for spec in registry.wired_specs())
     defined = sorted(cls.spec().type() for cls in _concrete_v2_action_classes())
