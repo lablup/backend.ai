@@ -2406,7 +2406,10 @@ class DockerContext(Context):
         # system mounts (NOT the install directory, which no service mounts
         # wholesale).
         service.agent_ipc_base_path = str(self.SYSTEM_TMP_PATH / "ipc" / "agent")
-        service.agent_var_base_path = str(self.SYSTEM_STATE_PATH / "agent")
+        # var-base-path is the mount root itself: plugin state dirs live as
+        # siblings of scratches/, commit/, and krunner/ under the single
+        # /var/lib/backend.ai mount of the agent container.
+        service.agent_var_base_path = str(self.SYSTEM_STATE_PATH)
         # The storage-proxy's IPC sockets are consumed by nothing outside its
         # own container, so an absolute container-local path suffices (its
         # non-root user can always write under the container's /tmp).
