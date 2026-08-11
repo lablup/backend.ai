@@ -10,7 +10,7 @@ from collections.abc import (
     Sequence,
 )
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
@@ -43,6 +43,8 @@ from ai.backend.common import typed_validators as tv
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import BaseConfigModel, config_key_to_snake_case
+from ai.backend.common.data.notification.messages import SessionIdleTimeoutWarningMessage
+from ai.backend.common.data.notification.types import NotificationRuleType
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events.dispatcher import (
@@ -53,6 +55,9 @@ from ai.backend.common.events.event_types.idle.anycast import (
     DoIdleCheckEvent,
 )
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.events.event_types.notification.anycast import (
+    NotificationTriggeredEvent,
+)
 from ai.backend.common.events.event_types.session.anycast import (
     DoTerminateSessionEvent,
 )
@@ -179,8 +184,16 @@ class ReportInfo(TypedDict):
     extra: dict[str, Any] | None
 
 
+@dataclass(frozen=True)
+class ImpendingTermination:
+    checker: str
+    remaining: float
+
+
 class IdleCheckerHost:
     check_interval: ClassVar[float] = DEFAULT_CHECK_INTERVAL
+    # seconds; 0 disables idle termination warnings
+    _warning_threshold: int
 
     def __init__(
         self,
@@ -193,6 +206,7 @@ class IdleCheckerHost:
     ) -> None:
         self._checkers: list[BaseIdleChecker] = []
         self._frozen = False
+        self._warning_threshold = 0
         self._db = db
         self._config_provider = config_provider
         self._event_producer = event_producer
@@ -217,6 +231,7 @@ class IdleCheckerHost:
         )
         for checker in self._checkers:
             await checker.populate_config(raw_config.get(checker.name) or {})
+        self._warning_threshold = self._config_provider.config.idle.warning_threshold
         self.timer = GlobalTimer(
             self._lock_factory(LockID.LOCKID_IDLE_CHECK_TIMER, self.check_interval),
             self._event_producer,
@@ -259,6 +274,7 @@ class IdleCheckerHost:
         # queried and warned about only once per cycle.
         policy_cache: dict[AccessKey | None, Row[Any] | None] = {}
         errors: list[BaseException] = []
+        warning_candidates: dict[SessionId, Row[Any]] = {}
         async with self._db.begin_readonly() as conn:
             j = sa.join(kernels, users, kernels.c.user_uuid == users.c.uuid)
             query = (
@@ -266,12 +282,15 @@ class IdleCheckerHost:
                     kernels.c.id,
                     kernels.c.access_key,
                     kernels.c.session_id,
+                    kernels.c.session_name,
                     kernels.c.session_type,
                     kernels.c.created_at,
                     kernels.c.starts_at,
                     kernels.c.occupied_slots,
                     kernels.c.requested_slots,
                     kernels.c.cluster_size,
+                    kernels.c.user_uuid,
+                    users.c.email.label("user_email"),
                     users.c.created_at.label("user_created_at"),
                     users.c.main_access_key,
                 )
@@ -330,8 +349,94 @@ class IdleCheckerHost:
                         if not terminated:
                             terminated = True
                             await checker.callback_idle_session(kernel.session_id)
+                if not terminated:
+                    warning_candidates[kernel.session_id] = kernel
+        if self._warning_threshold > 0 and warning_candidates:
+            try:
+                session_ids = list(warning_candidates.keys())
+                reports = await self.get_batch_idle_check_report(session_ids)
+                deadlines = {
+                    # There can be multiple reports per session, but we only care about the nearest firm deadline.
+                    # None deadline means no expire-after checkers are active for this session.
+                    session_id: self._find_nearest_deadline(reports.get(session_id, {}))
+                    for session_id in session_ids
+                }
+                await self._notify_termination_warning(warning_candidates, deadlines)
+            except Exception as e:
+                log.warning(
+                    "do_idle_check(): failed to process idle termination warnings ({})", repr(e)
+                )
         if errors:
             raise IdleCheckerError("idle checker(s) raise errors", errors)
+
+    def _find_nearest_deadline(
+        self, report: Mapping[str, ReportInfo]
+    ) -> ImpendingTermination | None:
+        """Nearest firm deadline among expire-after checkers, if any."""
+        nearest: ImpendingTermination | None = None
+        for checker_name, info in report.items():
+            # Grace-period remainings (e.g., utilization) carry no firm deadline.
+            if info["remaining_time_type"] != RemainingTimeType.EXPIRE_AFTER:
+                continue
+            remaining = info["remaining"]
+            if remaining is None or remaining <= 0:
+                continue
+            if nearest is None or remaining < nearest.remaining:
+                nearest = ImpendingTermination(checker=checker_name, remaining=remaining)
+        return nearest
+
+    async def _notify_termination_warning(
+        self,
+        candidates: Mapping[SessionId, Row[Any]],
+        deadlines: Mapping[SessionId, ImpendingTermination | None],
+    ) -> None:
+        """
+        Warn each session once when its deadline drops below the warning threshold;
+        the warned-marker is cleared on recovery so the session can be warned again.
+        """
+        session_ids = list(candidates.keys())
+        warned_map = await self._valkey_live.get_session_idle_warning_sent_batch(session_ids)
+        for session_id in session_ids:
+            deadline = deadlines.get(session_id)
+            warned = warned_map[session_id]
+            if deadline is None or deadline.remaining > self._warning_threshold:
+                if warned:
+                    await self._valkey_live.delete_session_idle_warning_sent(session_id)
+                continue
+            if warned:
+                continue
+            kernel = candidates[session_id]
+            now = datetime.now(UTC)
+            message = SessionIdleTimeoutWarningMessage(
+                session_id=str(session_id),
+                session_name=kernel.session_name,
+                owner_uuid=str(kernel.user_uuid),
+                owner_email=kernel.user_email,
+                checker=deadline.checker,
+                remaining_seconds=int(deadline.remaining),
+                expected_termination_at=(now + timedelta(seconds=deadline.remaining)).isoformat(),
+            )
+            try:
+                await self._event_producer.anycast_event(
+                    NotificationTriggeredEvent(
+                        rule_type=NotificationRuleType.SESSION_IDLE_TIMEOUT_WARNING.value,
+                        timestamp=now,
+                        notification_data=message.model_dump(),
+                    )
+                )
+            except Exception as e:
+                # Marker not set — retried on the next cycle.
+                log.warning(
+                    "Failed to emit idle termination warning of s:{} ({})", session_id, repr(e)
+                )
+                continue
+            log.info(
+                "Idle termination warning emitted for s:{} ({}: {:.0f}s remaining)",
+                session_id,
+                deadline.checker,
+                deadline.remaining,
+            )
+            await self._valkey_live.mark_session_idle_warning_sent(session_id)
 
     async def get_idle_check_report(
         self,

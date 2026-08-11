@@ -17,6 +17,7 @@ class NotificationRuleType(CIStrEnum):
 
     SESSION_STARTED = "session.started"
     SESSION_TERMINATED = "session.terminated"
+    SESSION_IDLE_TIMEOUT_WARNING = "session.idle-timeout.warning"
     ARTIFACT_DOWNLOAD_COMPLETED = "artifact.download.completed"
     ENDPOINT_LIFECYCLE_CHANGED = "endpoint.lifecycle.changed"
 

@@ -16,7 +16,7 @@ from collections.abc import AsyncGenerator, AsyncIterator, Mapping
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, ClassVar, override
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -24,9 +24,14 @@ from dateutil.tz import tzutc
 from sqlalchemy.engine import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
+from ai.backend.common import msgpack
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.data.notification.types import NotificationRuleType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.events.event_types.notification.anycast import (
+    NotificationTriggeredEvent,
+)
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
@@ -369,13 +374,14 @@ class TestDoIdleCheck:
         sg_id, sg_name = scaling_group
         session_id = SessionId(uuid.uuid4())
         kernel_id = KernelId(uuid.uuid4())
+        session_name = f"test-session-{uuid.uuid4().hex[:8]}"
         now = datetime.now(tzutc())
         slots = ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("2048")})
         async with db.begin_session() as db_sess:
             db_sess.add(
                 SessionRow(
                     id=session_id,
-                    name=f"test-session-{uuid.uuid4().hex[:8]}",
+                    name=session_name,
                     session_type=SessionTypes.INTERACTIVE,
                     domain_id=domain_id,
                     domain_name=domain_name,
@@ -401,6 +407,7 @@ class TestDoIdleCheck:
                 KernelRow(
                     id=kernel_id,
                     session_id=session_id,
+                    session_name=session_name,
                     scaling_group=sg_name,
                     resource_group_id=sg_id,
                     cluster_idx=0,
@@ -433,17 +440,39 @@ class TestDoIdleCheck:
             await db_sess.flush()
         return kernel_id
 
-    def _make_host(self, db: ExtendedAsyncSAEngine, checker: BaseIdleChecker) -> IdleCheckerHost:
+    def _make_host(
+        self,
+        db: ExtendedAsyncSAEngine,
+        checker: BaseIdleChecker,
+        *,
+        valkey_live: MagicMock | None = None,
+        event_producer: MagicMock | None = None,
+        warning_threshold: int = 0,
+    ) -> IdleCheckerHost:
         host = IdleCheckerHost(
             db,
             MagicMock(),
+            event_producer if event_producer is not None else MagicMock(),
             MagicMock(),
-            MagicMock(),
-            MagicMock(),
+            valkey_live if valkey_live is not None else MagicMock(),
             MagicMock(),
         )
+        host._warning_threshold = warning_threshold
         host.add_checker(checker)
         return host
+
+    def _make_warning_valkey(self, report: float | None, warned: bool) -> MagicMock:
+        """Valkey mock serving one session's checker report and warned-marker state."""
+        valkey_live = MagicMock()
+        valkey_live.get_multiple_live_data = AsyncMock(
+            return_value=[msgpack.packb(report) if report is not None else None]
+        )
+        valkey_live.get_session_idle_warning_sent_batch = AsyncMock(
+            side_effect=lambda session_ids: dict.fromkeys(session_ids, warned)
+        )
+        valkey_live.mark_session_idle_warning_sent = AsyncMock()
+        valkey_live.delete_session_idle_warning_sent = AsyncMock()
+        return valkey_live
 
     async def test_policy_resolved_via_main_access_key(
         self,
@@ -598,3 +627,141 @@ class TestDoIdleCheck:
             await self._make_host(db, checker).do_idle_check()
 
         assert sorted(checker.checked_kernel_ids) == sorted(kernel_ids)
+
+    @pytest.fixture
+    async def warning_session(
+        self,
+        db: ExtendedAsyncSAEngine,
+        domain: tuple[DomainID, str],
+        scaling_group: tuple[ResourceGroupID, str],
+        group_id: uuid.UUID,
+        user_resource_policy_name: str,
+    ) -> tuple[uuid.UUID, SessionId]:
+        """A running kernel and its owner, subject to idle termination warnings."""
+        user_uuid, access_key = await self._create_user(
+            db,
+            domain_name=domain[1],
+            user_resource_policy_name=user_resource_policy_name,
+            main_keypair_idle_timeout=600,
+        )
+        assert access_key is not None
+        kernel_id = await self._create_running_kernel(
+            db,
+            domain=domain,
+            scaling_group=scaling_group,
+            group_id=group_id,
+            user_uuid=user_uuid,
+            access_key=access_key,
+        )
+        async with db.begin_session() as db_sess:
+            session_id = await db_sess.scalar(
+                sa.select(KernelRow.session_id).where(KernelRow.id == kernel_id)
+            )
+        assert session_id is not None
+        return user_uuid, SessionId(session_id)
+
+    @pytest.fixture
+    def event_producer(self) -> MagicMock:
+        producer = MagicMock()
+        producer.anycast_event = AsyncMock()
+        return producer
+
+    async def test_warning_emitted_when_remaining_below_threshold(
+        self,
+        db: ExtendedAsyncSAEngine,
+        warning_session: tuple[uuid.UUID, SessionId],
+        event_producer: MagicMock,
+    ) -> None:
+        """Below the threshold: the event is fired and the warned-flag recorded."""
+        user_uuid, session_id = warning_session
+        valkey_live = self._make_warning_valkey(report=120.0, warned=False)
+        host = self._make_host(
+            db,
+            _RecordingChecker(),
+            valkey_live=valkey_live,
+            event_producer=event_producer,
+            warning_threshold=300,
+        )
+
+        await host.do_idle_check()
+
+        event_producer.anycast_event.assert_awaited_once()
+        event = event_producer.anycast_event.await_args.args[0]
+        assert isinstance(event, NotificationTriggeredEvent)
+        assert event.rule_type == NotificationRuleType.SESSION_IDLE_TIMEOUT_WARNING.value
+        data = event.notification_data
+        assert data["session_id"] == str(session_id)
+        assert data["session_name"] is not None
+        assert data["owner_uuid"] == str(user_uuid)
+        assert data["owner_email"].endswith("@test.com")
+        assert data["checker"] == _RecordingChecker.name
+        assert data["remaining_seconds"] == 120
+        valkey_live.mark_session_idle_warning_sent.assert_awaited_once_with(session_id)
+
+    async def test_warning_not_repeated_while_flag_is_set(
+        self,
+        db: ExtendedAsyncSAEngine,
+        warning_session: tuple[uuid.UUID, SessionId],
+        event_producer: MagicMock,
+    ) -> None:
+        """An already-warned session does not fire the event again on the next cycle."""
+        valkey_live = self._make_warning_valkey(report=120.0, warned=True)
+        host = self._make_host(
+            db,
+            _RecordingChecker(),
+            valkey_live=valkey_live,
+            event_producer=event_producer,
+            warning_threshold=300,
+        )
+
+        await host.do_idle_check()
+
+        event_producer.anycast_event.assert_not_awaited()
+        valkey_live.mark_session_idle_warning_sent.assert_not_awaited()
+        valkey_live.delete_session_idle_warning_sent.assert_not_awaited()
+
+    async def test_warning_flag_cleared_when_remaining_recovers(
+        self,
+        db: ExtendedAsyncSAEngine,
+        warning_session: tuple[uuid.UUID, SessionId],
+        event_producer: MagicMock,
+    ) -> None:
+        """Recovery above the threshold clears the warned-flag for re-warning."""
+        _, session_id = warning_session
+        valkey_live = self._make_warning_valkey(report=600.0, warned=True)
+        host = self._make_host(
+            db,
+            _RecordingChecker(),
+            valkey_live=valkey_live,
+            event_producer=event_producer,
+            warning_threshold=300,
+        )
+
+        await host.do_idle_check()
+
+        event_producer.anycast_event.assert_not_awaited()
+        valkey_live.delete_session_idle_warning_sent.assert_awaited_once_with(session_id)
+
+    async def test_grace_period_remaining_does_not_trigger_warning(
+        self,
+        db: ExtendedAsyncSAEngine,
+        warning_session: tuple[uuid.UUID, SessionId],
+        event_producer: MagicMock,
+    ) -> None:
+        """Grace-period remainings (e.g., utilization) carry no firm deadline and are ignored."""
+        checker = _RecordingChecker()
+        checker.remaining_time_type = RemainingTimeType.GRACE_PERIOD
+        valkey_live = self._make_warning_valkey(report=120.0, warned=False)
+        host = self._make_host(
+            db,
+            checker,
+            valkey_live=valkey_live,
+            event_producer=event_producer,
+            warning_threshold=300,
+        )
+
+        await host.do_idle_check()
+
+        event_producer.anycast_event.assert_not_awaited()
+        valkey_live.mark_session_idle_warning_sent.assert_not_awaited()
+        valkey_live.delete_session_idle_warning_sent.assert_not_awaited()

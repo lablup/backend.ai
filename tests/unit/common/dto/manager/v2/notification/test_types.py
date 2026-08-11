@@ -135,6 +135,12 @@ class TestNotificationRuleTypeDTO:
     def test_session_terminated_value(self) -> None:
         assert NotificationRuleTypeDTO.SESSION_TERMINATED.value == "session.terminated"
 
+    def test_session_idle_timeout_warning_value(self) -> None:
+        assert (
+            NotificationRuleTypeDTO.SESSION_IDLE_TIMEOUT_WARNING.value
+            == "session.idle-timeout.warning"
+        )
+
     def test_artifact_download_completed_value(self) -> None:
         assert (
             NotificationRuleTypeDTO.ARTIFACT_DOWNLOAD_COMPLETED.value
@@ -147,7 +153,7 @@ class TestNotificationRuleTypeDTO:
         )
 
     def test_enum_members_count(self) -> None:
-        assert len(list(NotificationRuleTypeDTO)) == 4
+        assert len(list(NotificationRuleTypeDTO)) == 5
 
     def test_matches_data_layer_values(self) -> None:
         # Verifies adapter can convert DTO values to data layer values directly.
