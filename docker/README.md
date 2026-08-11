@@ -182,17 +182,17 @@ the **DOCKER install mode** of `backend.ai-installer` generates at
   `/etc/backend.ai/*` path via a per-file read-only mount and runs the
   image's default command — the same convention as the deployment layout
   above.
-- The services file `include:`s the generated halfstack compose file, so the
-  WHOLE deployment (halfstack + services) is one compose project addressed
-  through one entry file (`include` requires Compose ≥ 2.20).
+- The installer merges the halfstack definition (PostgreSQL/Redis/etcd +
+  optional observability) INTO the generated file, so the WHOLE deployment
+  is ONE compose file and ONE compose project.
 - Host networking is granted only to the manager and the agent (and the
-  `manager-cli` one-off tool). The other services run on the project's
-  bridge network with published ports and `depends_on` health gating; their
-  generated configs get halfstack/coordinator addresses rewritten to compose
-  service DNS names (container-side ports), the manager API rewritten to
-  `host.docker.internal` (mapped via `extra_hosts: host-gateway` on the
-  webserver), and bind addresses forced to `0.0.0.0` — while
-  announce/advertised addresses are untouched.
+  `manager-cli` one-off tool). The other services join the halfstack's
+  `half` bridge network with published ports and `depends_on` health gating;
+  their generated configs get halfstack/coordinator addresses rewritten to
+  compose service DNS names (container-side ports), the manager API
+  rewritten to `host.docker.internal` (mapped via `extra_hosts:
+  host-gateway` on the webserver), and bind addresses forced to `0.0.0.0` —
+  while announce/advertised addresses are untouched.
 - The install directory is bind-mounted at the identical absolute path (path
   parity) only where files must resolve on the host: the agent and
   storage-proxy (paths handed to the host Docker daemon) and `manager-cli`

@@ -13,11 +13,12 @@
 # - Host networking is granted only where required: the manager and the agent
 #   (kernel/RPC ports advertised on host addresses) — plus manager-cli, the
 #   installer's own one-off tool, which must reach halfstack at 127.0.0.1.
-# - The other services run on the project's default bridge network with
+# - The other services join the halfstack's "half" bridge network with
 #   published ports matching the fixed ports of the installer's
-#   ServiceConfig; their generated configs have outbound addresses rewritten
-#   to host.docker.internal (mapped to the host gateway below), while bind
-#   addresses are forced to 0.0.0.0 so the published ports work.
+#   ServiceConfig; their generated configs address the halfstack and the
+#   coordinator by compose service DNS (container-side ports), the manager
+#   API via host.docker.internal (webserver only), and their bind addresses
+#   are forced to 0.0.0.0 so the published ports work.
 # - The install directory is bind-mounted at the SAME absolute path (path
 #   parity) only where files must resolve on the host: the agent and
 #   storage-proxy hand paths under it to the host Docker daemon (scratch
@@ -32,14 +33,11 @@
 #   /var/lib/backend.ai/krunner share for kernel-runner bind-mounts.
 # - No agent-watcher container ships in this mode; the watcher endpoint in
 #   the generated agent config is inert.
-# - The compose project name is fixed so this file never shares a compose
-#   project with the halfstack file living in the same directory.
+# - The installer merges the halfstack definition (PostgreSQL/Redis/etcd +
+#   optional observability) INTO this file at generation time, so the whole
+#   deployment is ONE compose file and ONE compose project, with depends_on
+#   health gating on the halfstack members.
 name: backendai-services
-# The halfstack (PostgreSQL/Redis/etcd + optional observability) runs as part
-# of THIS compose project: the bridge-networked services below reach it by
-# service DNS and health-gate on it via depends_on. Requires Compose >= 2.20.
-include:
-  - docker-compose.halfstack.current.yml
 services:
   manager:
     image: lablup/backend.ai-manager:{{VERSION}}
@@ -110,6 +108,8 @@ services:
 
   webserver:
     image: lablup/backend.ai-webserver:{{VERSION}}
+    networks:
+      - half
     depends_on:
       backendai-half-redis:
         condition: service_healthy
@@ -123,6 +123,8 @@ services:
 
   storage-proxy:
     image: lablup/backend.ai-storage-proxy:{{VERSION}}
+    networks:
+      - half
     depends_on:
       backendai-half-etcd:
         condition: service_healthy
@@ -141,6 +143,8 @@ services:
 
   appproxy-coordinator:
     image: lablup/backend.ai-appproxy-coordinator:{{VERSION}}
+    networks:
+      - half
     depends_on:
       backendai-half-db:
         condition: service_healthy
@@ -154,6 +158,8 @@ services:
 
   appproxy-worker:
     image: lablup/backend.ai-appproxy-worker:{{VERSION}}
+    networks:
+      - half
     depends_on:
       backendai-half-redis:
         condition: service_healthy
@@ -166,6 +172,8 @@ services:
 
   appproxy-worker-tcp:
     image: lablup/backend.ai-appproxy-worker:{{VERSION}}
+    networks:
+      - half
     depends_on:
       backendai-half-redis:
         condition: service_healthy
