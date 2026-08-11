@@ -5,17 +5,18 @@ from ai.backend.common.dto.clients.prometheus.response import PrometheusResponse
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.prometheus_query_preset.actions.base import (
-    PrometheusQueryPresetAction,
+    PrometheusQueryPresetGlobalAction,
 )
 
 
 @dataclass
-class PreviewPresetAction(PrometheusQueryPresetAction):
+class PreviewPresetAction(PrometheusQueryPresetGlobalAction):
     query_template: str
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "preview_prometheus_query_preset"
 
     @override
     @classmethod

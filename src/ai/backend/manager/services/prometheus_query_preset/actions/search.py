@@ -1,38 +1,38 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.prometheus_query_preset import (
-    PrometheusQueryPresetData,
+from ai.backend.common.data.entity.prometheus_query_preset import (
+    PROMETHEUS_QUERY_PRESET_ENTITY_TYPE,
 )
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.prometheus_query_preset.actions.base import (
-    PrometheusQueryPresetAction,
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
+from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
+from ai.backend.manager.models.prometheus_query_preset.row import PrometheusQueryPresetRow
+from ai.backend.manager.repositories.prometheus_query_preset.searchers import (
+    PrometheusQueryPresetSearcher,
 )
 
 
 @dataclass
-class SearchPresetsAction(PrometheusQueryPresetAction):
-    querier: BatchQuerier
+class SearchPresetsAction(
+    SearchGlobalOpsAction[PrometheusQueryPresetRow, PrometheusQueryPresetData]
+):
+    """Page through the query preset catalog."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    searcher: PrometheusQueryPresetSearcher
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass
-class SearchPresetsActionResult(BaseActionResult):
-    items: list[PrometheusQueryPresetData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    def entity_type(cls) -> EntityType:
+        return PROMETHEUS_QUERY_PRESET_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_prometheus_query_presets"
+
+    @override
+    def to_searcher(self) -> PrometheusQueryPresetSearcher:
+        return self.searcher

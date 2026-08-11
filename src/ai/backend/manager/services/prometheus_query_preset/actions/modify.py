@@ -8,18 +8,19 @@ from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPrese
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.services.prometheus_query_preset.actions.base import (
-    PrometheusQueryPresetAction,
+    PrometheusQueryPresetGlobalAction,
 )
 
 
 @dataclass
-class ModifyPresetAction(PrometheusQueryPresetAction):
+class ModifyPresetAction(PrometheusQueryPresetGlobalAction):
     preset_id: UUID
     updater: Updater[PrometheusQueryPresetRow]
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.preset_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "modify_prometheus_query_preset"
 
     @override
     @classmethod

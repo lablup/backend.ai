@@ -20,8 +20,8 @@ from ai.backend.common.dto.clients.prometheus.response import (
 from ai.backend.common.exception import (
     InvalidMetricPresetTemplate,
     PrometheusQueryPresetInvalidLabel,
-    PrometheusQueryPresetNotFound,
 )
+from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.clients.prometheus.preset import (
     LabelMatcher,
@@ -31,11 +31,7 @@ from ai.backend.manager.clients.prometheus.preset import (
 from ai.backend.manager.data.prometheus_query_preset import (
     ExecutePresetOptions,
     PrometheusQueryPresetData,
-    PrometheusQueryPresetListResult,
 )
-from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.prometheus_query_preset import (
     PrometheusQueryPresetRepository,
@@ -47,13 +43,9 @@ from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
     PrometheusQueryPresetUpdaterSpec,
 )
 from ai.backend.manager.services.prometheus_query_preset.actions import (
-    CreatePresetAction,
-    DeletePresetAction,
     ExecutePresetAction,
-    GetPresetAction,
     ModifyPresetAction,
     PreviewPresetAction,
-    SearchPresetsAction,
 )
 from ai.backend.manager.services.prometheus_query_preset.service import (
     PrometheusQueryPresetService,
@@ -66,7 +58,7 @@ class TestPrometheusQueryPresetService:
     def preset_data(self) -> PrometheusQueryPresetData:
         now = datetime.now(UTC)
         return PrometheusQueryPresetData(
-            id=uuid4(),
+            id=PrometheusQueryPresetID(uuid4()),
             name="cpu_usage",
             description=None,
             rank=0,
@@ -148,88 +140,6 @@ class TestPrometheusQueryPresetService:
             await service.create_preset(action)
         mock_repository.create.assert_not_called()
 
-    async def test_get_preset(
-        self,
-        service: PrometheusQueryPresetService,
-        mock_repository: MagicMock,
-        preset_data: PrometheusQueryPresetData,
-    ) -> None:
-        mock_repository.get_by_id = AsyncMock(return_value=preset_data)
-
-        action = GetPresetAction(preset_id=preset_data.id)
-        result = await service.get_preset(action)
-
-        assert result.preset == preset_data
-        mock_repository.get_by_id.assert_called_once_with(preset_data.id)
-
-    async def test_get_preset_not_found(
-        self,
-        service: PrometheusQueryPresetService,
-        mock_repository: MagicMock,
-    ) -> None:
-        preset_id = uuid4()
-        mock_repository.get_by_id = AsyncMock(
-            side_effect=PrometheusQueryPresetNotFound(f"Preset {preset_id} not found")
-        )
-
-        action = GetPresetAction(preset_id=preset_id)
-        with pytest.raises(PrometheusQueryPresetNotFound):
-            await service.get_preset(action)
-
-    async def test_search_presets(
-        self,
-        service: PrometheusQueryPresetService,
-        mock_repository: MagicMock,
-        preset_data: PrometheusQueryPresetData,
-    ) -> None:
-        mock_repository.search = AsyncMock(
-            return_value=PrometheusQueryPresetListResult(
-                items=[preset_data],
-                total_count=1,
-                has_next_page=False,
-                has_previous_page=False,
-            )
-        )
-
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        action = SearchPresetsAction(querier=querier)
-        result = await service.search_presets(action)
-
-        assert result.items == [preset_data]
-        assert result.total_count == 1
-        assert result.has_next_page is False
-        assert result.has_previous_page is False
-        mock_repository.search.assert_called_once_with(querier)
-
-    async def test_search_presets_empty(
-        self,
-        service: PrometheusQueryPresetService,
-        mock_repository: MagicMock,
-    ) -> None:
-        mock_repository.search = AsyncMock(
-            return_value=PrometheusQueryPresetListResult(
-                items=[],
-                total_count=0,
-                has_next_page=False,
-                has_previous_page=False,
-            )
-        )
-
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        action = SearchPresetsAction(querier=querier)
-        result = await service.search_presets(action)
-
-        assert result.items == []
-        assert result.total_count == 0
-
     async def test_modify_preset(
         self,
         service: PrometheusQueryPresetService,
@@ -268,34 +178,6 @@ class TestPrometheusQueryPresetService:
         with pytest.raises(InvalidMetricPresetTemplate):
             await service.modify_preset(action)
         mock_repository.update.assert_not_called()
-
-    async def test_delete_preset(
-        self,
-        service: PrometheusQueryPresetService,
-        mock_repository: MagicMock,
-    ) -> None:
-        preset_id = uuid4()
-        mock_repository.delete = AsyncMock(return_value=True)
-
-        action = DeletePresetAction(preset_id=preset_id)
-        result = await service.delete_preset(action)
-
-        assert result.preset_id == preset_id
-        mock_repository.delete.assert_called_once_with(preset_id)
-
-    async def test_delete_preset_not_found(
-        self,
-        service: PrometheusQueryPresetService,
-        mock_repository: MagicMock,
-    ) -> None:
-        preset_id = uuid4()
-        mock_repository.delete = AsyncMock(
-            side_effect=PrometheusQueryPresetNotFound(f"Preset {preset_id} not found")
-        )
-
-        action = DeletePresetAction(preset_id=preset_id)
-        with pytest.raises(PrometheusQueryPresetNotFound):
-            await service.delete_preset(action)
 
     async def test_execute_preset(
         self,

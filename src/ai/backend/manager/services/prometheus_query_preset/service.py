@@ -23,20 +23,12 @@ from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
     PrometheusQueryPresetUpdaterSpec,
 )
 from ai.backend.manager.services.prometheus_query_preset.actions import (
-    CreatePresetAction,
-    CreatePresetActionResult,
-    DeletePresetAction,
-    DeletePresetActionResult,
     ExecutePresetAction,
     ExecutePresetActionResult,
-    GetPresetAction,
-    GetPresetActionResult,
     ModifyPresetAction,
     ModifyPresetActionResult,
     PreviewPresetAction,
     PreviewPresetActionResult,
-    SearchPresetsAction,
-    SearchPresetsActionResult,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -66,19 +58,6 @@ class PrometheusQueryPresetService:
         preset_data = await self._repository.create(action.creator)
         return CreatePresetActionResult(preset=preset_data)
 
-    async def get_preset(self, action: GetPresetAction) -> GetPresetActionResult:
-        preset_data = await self._repository.get_by_id(action.preset_id)
-        return GetPresetActionResult(preset=preset_data)
-
-    async def search_presets(self, action: SearchPresetsAction) -> SearchPresetsActionResult:
-        result = await self._repository.search(action.querier)
-        return SearchPresetsActionResult(
-            items=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
     async def modify_preset(self, action: ModifyPresetAction) -> ModifyPresetActionResult:
         spec = cast(PrometheusQueryPresetUpdaterSpec, action.updater.spec)
         template = spec.query_template.optional_value()
@@ -86,10 +65,6 @@ class PrometheusQueryPresetService:
             self._template_renderer.validate(template)
         preset_data = await self._repository.update(action.updater)
         return ModifyPresetActionResult(preset=preset_data)
-
-    async def delete_preset(self, action: DeletePresetAction) -> DeletePresetActionResult:
-        await self._repository.delete(action.preset_id)
-        return DeletePresetActionResult(preset_id=action.preset_id)
 
     def _validate_labels(
         self,

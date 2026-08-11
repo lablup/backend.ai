@@ -49,6 +49,9 @@ from ai.backend.manager.services.object_storage.processors import ObjectStorageP
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
+from ai.backend.manager.services.prometheus_query_preset.processors import (
+    PrometheusQueryPresetProcessors,
+)
 from ai.backend.manager.services.prometheus_query_preset_category.processors import (
     PrometheusQueryPresetCategoryProcessors,
 )
@@ -129,6 +132,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     ErrorLogProcessors(MagicMock(), registry.group())
     AuditLogProcessors(MagicMock(), MagicMock(), registry.group())
     AppConfigDefinitionProcessors(registry.group())
+    PrometheusQueryPresetProcessors(MagicMock(), registry.group())
 
     wired = sorted(spec.type() for spec in registry.wired_specs())
     defined = sorted(cls.spec().type() for cls in _concrete_v2_action_classes())

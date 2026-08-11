@@ -8,20 +8,21 @@ from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.prometheus_query_preset import ExecutePresetOptions
 from ai.backend.manager.services.prometheus_query_preset.actions.base import (
-    PrometheusQueryPresetAction,
+    PrometheusQueryPresetGlobalAction,
 )
 
 
 @dataclass
-class ExecutePresetAction(PrometheusQueryPresetAction):
+class ExecutePresetAction(PrometheusQueryPresetGlobalAction):
     preset_id: UUID
     options: ExecutePresetOptions
     time_window: str | None
     time_range: QueryTimeRange | None
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.preset_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "execute_prometheus_query_preset"
 
     @override
     @classmethod

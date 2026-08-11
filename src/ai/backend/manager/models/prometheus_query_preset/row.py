@@ -6,6 +6,10 @@ import sqlalchemy as sa
 from pydantic import ConfigDict
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
+from ai.backend.common.identifier.prometheus_query_preset_category import (
+    PrometheusQueryPresetCategoryID,
+)
 from ai.backend.common.types import BackendAISchema
 from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
 from ai.backend.manager.models.base import (
@@ -57,11 +61,15 @@ class PrometheusQueryPresetRow(LifecycleTimestampsMixin, Base):
     def to_data(self) -> PrometheusQueryPresetData:
         """Convert Row to domain model data."""
         return PrometheusQueryPresetData(
-            id=self.id,
+            id=PrometheusQueryPresetID(self.id),
             name=self.name,
             description=self.description,
             rank=self.rank,
-            category_id=self.category_id,
+            category_id=(
+                PrometheusQueryPresetCategoryID(self.category_id)
+                if self.category_id is not None
+                else None
+            ),
             metric_name=self.metric_name,
             query_template=self.query_template,
             time_window=self.time_window,

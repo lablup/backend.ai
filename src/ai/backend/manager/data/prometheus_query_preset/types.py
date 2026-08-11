@@ -5,6 +5,12 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
+from ai.backend.common.data.entity.types import EntityData
+from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
+from ai.backend.common.identifier.prometheus_query_preset_category import (
+    PrometheusQueryPresetCategoryID,
+)
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
 
@@ -17,14 +23,14 @@ class ExecutePresetOptions:
 
 
 @dataclass(frozen=True)
-class PrometheusQueryPresetData:
+class PrometheusQueryPresetData(EntityData):
     """Domain model data for prometheus query preset."""
 
-    id: UUID
+    id: PrometheusQueryPresetID
     name: str
     description: str | None
     rank: int
-    category_id: UUID | None
+    category_id: PrometheusQueryPresetCategoryID | None
     metric_name: str
     query_template: str
     time_window: str | None
@@ -32,6 +38,10 @@ class PrometheusQueryPresetData:
     group_labels: list[str]
     created_at: datetime = field(compare=False)
     updated_at: datetime = field(compare=False)
+
+    @override
+    def entity_id(self) -> EntityID:
+        return self.id
 
 
 @dataclass

@@ -16,7 +16,6 @@ import yarl
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
     PrometheusQueryPresetAdapter,
 )
@@ -46,6 +45,7 @@ from ai.backend.manager.services.prometheus_query_preset.processors import (
 from ai.backend.manager.services.prometheus_query_preset.service import (
     PrometheusQueryPresetService,
 )
+from ai.backend.testutils.processors import ops_processor_group
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
@@ -85,9 +85,7 @@ def prometheus_query_preset_processors(
         template_renderer=PromQLTemplateRenderer(),
     )
     return PrometheusQueryPresetProcessors(
-        service=service,
-        action_monitors=[],
-        validators=MagicMock(spec=ActionValidators),
+        service=service, group=ops_processor_group(database_engine)
     )
 
 

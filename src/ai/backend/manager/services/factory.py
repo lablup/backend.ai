@@ -497,7 +497,7 @@ def create_processors(
         ),
         project_resource_policy=ProjectResourcePolicyProcessors(registry.group()),
         prometheus_query_preset=PrometheusQueryPresetProcessors(
-            services.prometheus_query_preset, action_monitors, validators
+            services.prometheus_query_preset, registry.group()
         ),
         prometheus_query_preset_category=PrometheusQueryPresetCategoryProcessors(registry.group()),
         resource_preset=ResourcePresetProcessors(

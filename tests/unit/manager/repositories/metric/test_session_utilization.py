@@ -76,7 +76,7 @@ class TestSessionUtilizationMetrics:
     def preset(self) -> PrometheusQueryPresetData:
         now = datetime.now(tz=UTC)
         return PrometheusQueryPresetData(
-            id=uuid4(),
+            id=PrometheusQueryPresetID(uuid4()),
             name="session-cpu-utilization",
             description=None,
             rank=0,
@@ -243,7 +243,7 @@ class TestSessionUtilizationMetrics:
     ) -> None:
         second_preset = replace(
             preset,
-            id=uuid4(),
+            id=PrometheusQueryPresetID(uuid4()),
             name="session-memory-utilization",
             metric_name="mem",
         )
