@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from datetime import datetime, timedelta
 from typing import Any, cast
 from uuid import UUID, uuid4
@@ -16,8 +16,9 @@ from sqlalchemy.orm import joinedload, load_only, noload
 from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.data.entity.types import ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.types import EntityRef, ScopeRef
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE, USER_SCOPE_TYPE
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
@@ -32,8 +33,7 @@ from ai.backend.manager.data.keypair.types import (
     KeyPairCreator,
     KeyPairData,
 )
-from ai.backend.manager.data.permission.id import ScopeId
-from ai.backend.manager.data.permission.types import EntityType, RBACElementRef, ScopeType
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
     BulkUserUpdateResultData,
@@ -67,9 +67,6 @@ from ai.backend.manager.models.keypair import (
     generate_keypair_data,
     keypairs,
 )
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.session import (
@@ -80,6 +77,7 @@ from ai.backend.manager.models.session import (
     by_status,
     by_user_id,
 )
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.types import join_by_related_field
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -92,10 +90,11 @@ from ai.backend.manager.models.vfolder import (
     vfolder_status_map,
     vfolders,
 )
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_query
 from ai.backend.manager.repositories.base.creator import (
     Creator,
 )
-from ai.backend.manager.repositories.base.pagination import NoPagination
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
@@ -104,29 +103,20 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
 from ai.backend.manager.repositories.base.rbac.entity_purger import (
     RBACEntityBatchPurger,
 )
-from ai.backend.manager.repositories.base.rbac.scope_binder import (
-    RBACScopeBinder,
-    RBACScopeBindingPair,
-    execute_rbac_scope_binder,
-)
-from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
-    execute_rbac_scope_entity_unbinder,
-)
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
-from ai.backend.manager.repositories.group.creators import ProjectUserMembershipCreatorSpec
-from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
 from ai.backend.manager.repositories.keypair.creators import KeyPairCreatorSpec
 from ai.backend.manager.repositories.keypair.types import (
-    KeypairResourcePolicyKeypairSearchScope,
-    UserKeypairSearchScope,
+    KeypairResourcePolicyKeypairOperationScope,
+    UserKeypairOperationScope,
 )
 from ai.backend.manager.repositories.ops.rbac.provider import (
+    EntityMembersAddition,
     FullUserCreation,
     RBACOpsProvider,
     RBACWriteOps,
     ScopeBatchDeletion,
+    ScopeUserMember,
 )
-from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 from ai.backend.manager.repositories.user.creators import (
     UserCreateSpec,
     UserCreatorSpec,
@@ -137,13 +127,14 @@ from ai.backend.manager.repositories.user.purgers import (
     create_user_error_log_purger,
     create_user_group_association_purger,
     create_user_keypair_purger,
+    create_user_project_role_purger,
     create_user_session_group_purger,
     create_user_vfolder_permission_purger,
 )
 from ai.backend.manager.repositories.user.types import (
-    DomainUserSearchScope,
-    ProjectUserSearchScope,
-    RoleUserSearchScope,
+    DomainUserOperationScope,
+    ProjectUserOperationScope,
+    RoleUserOperationScope,
 )
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec, UserUpdateSpec
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
@@ -151,17 +142,25 @@ from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_de
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
+def _default_access_key() -> sa.ScalarSelect[str]:
+    """The owner's default keypair access key, correlated to the enclosing ``users`` row."""
+    return (
+        sa.select(KeyPairRow.access_key)
+        .where((KeyPairRow.user == UserRow.uuid) & KeyPairRow.is_default)
+        .correlate(UserRow)
+        .scalar_subquery()
+    )
+
+
 class UserDBSource:
     """Database source for user-related operations."""
 
     _db: ExtendedAsyncSAEngine
     _rbac_ops_provider: RBACOpsProvider
-    _role_manager: RoleManager
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
         self._rbac_ops_provider = RBACOpsProvider(db)
-        self._role_manager = RoleManager()
 
     async def get_user_by_uuid(self, user_uuid: UUID) -> UserData:
         """
@@ -182,7 +181,7 @@ class UserDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             user_row = await self._get_user_by_email(session, email)
-            return UserData.from_row(user_row, user_row.main_keypair_access_key)
+            return user_row.to_data()
 
     async def create_user_validated(
         self, creator: Creator[UserRow], group_ids: list[str] | None
@@ -314,13 +313,6 @@ class UserDBSource:
                         f"Resource policy '{new_resource_policy}' does not exist."
                     )
 
-            # Handle default_access_key validation
-            default_access_key = updater_spec.default_access_key.optional_value()
-            if default_access_key:
-                await self._validate_and_update_default_access_key(
-                    session, email, default_access_key
-                )
-
             # Update user
             if updater_spec.password.optional_value():
                 to_update["password_changed_at"] = sa.func.now()
@@ -328,7 +320,10 @@ class UserDBSource:
             if status is not None and status != current_user.status:
                 to_update["status_info"] = "admin-requested"
             update_query = (
-                sa.update(users).where(users.c.email == email).values(to_update).returning(users)
+                sa.update(users)
+                .where(users.c.email == email)
+                .values(to_update)
+                .returning(users, _default_access_key().label("default_access_key"))
             )
             result = await session.execute(update_query)
             updated_user = result.first()
@@ -341,20 +336,13 @@ class UserDBSource:
             if role is not None and role != prev_role:
                 await self._sync_keypair_roles(session, updated_user.uuid, role)
 
-            # Handle group updates
-            group_ids = updater_spec.group_ids_value
-            if group_ids is not None:
-                await self._update_user_groups(
-                    session, updated_user.uuid, updated_user.domain_name, group_ids
-                )
-            return UserData.from_row(
-                updated_user,
-                await session.scalar(
-                    sa.select(KeyPairRow.access_key).where(
-                        (KeyPairRow.user == updated_user.uuid) & KeyPairRow.is_default
-                    )
-                ),
+        # Handle group updates through the RBAC member ops in its own transaction.
+        group_ids = updater_spec.group_ids_value
+        if group_ids is not None:
+            await self._sync_user_project_memberships(
+                updated_user.uuid, updated_user.domain_name, group_ids
             )
+        return UserData.from_row(updated_user)
 
     async def bulk_update_users_validated(
         self,
@@ -431,13 +419,6 @@ class UserDBSource:
                     f"Resource policy '{new_resource_policy}' does not exist."
                 )
 
-        # Handle default_access_key validation
-        default_access_key = updater_spec.default_access_key.optional_value()
-        if default_access_key:
-            await self._validate_and_update_default_access_key(
-                session, current_user.email, default_access_key
-            )
-
         # Update user
         if updater_spec.password.optional_value():
             to_update["password_changed_at"] = sa.func.now()
@@ -445,7 +426,10 @@ class UserDBSource:
         if status is not None and status != current_user.status:
             to_update["status_info"] = "admin-requested"
         update_query = (
-            sa.update(users).where(users.c.uuid == user_id).values(to_update).returning(users)
+            sa.update(users)
+            .where(users.c.uuid == user_id)
+            .values(to_update)
+            .returning(users, _default_access_key().label("default_access_key"))
         )
         result = await session.execute(update_query)
         updated_user = result.first()
@@ -458,20 +442,13 @@ class UserDBSource:
         if role is not None and role != prev_role:
             await self._sync_keypair_roles(session, updated_user.uuid, role)
 
-        # Handle group updates
+        # Handle group updates through the RBAC member ops in its own transaction.
         group_ids = updater_spec.group_ids_value
         if group_ids is not None:
-            await self._update_user_groups(
-                session, updated_user.uuid, updated_user.domain_name, group_ids
+            await self._sync_user_project_memberships(
+                updated_user.uuid, updated_user.domain_name, group_ids
             )
-        return UserData.from_row(
-            updated_user,
-            await session.scalar(
-                sa.select(KeyPairRow.access_key).where(
-                    (KeyPairRow.user == updated_user.uuid) & KeyPairRow.is_default
-                )
-            ),
-        )
+        return UserData.from_row(updated_user)
 
     async def update_user_by_uuid_validated(
         self,
@@ -593,12 +570,20 @@ class UserDBSource:
         self,
         user_uuid: UUID,
         target_user_uuid: UUID,
-        target_default_access_key: AccessKey,
     ) -> None:
         """Delegate endpoint ownership to another user."""
         async with self._db.begin_session() as session:
+            default_access_key = await session.scalar(
+                sa.select(KeyPairRow.access_key).where(
+                    (KeyPairRow.user == target_user_uuid) & KeyPairRow.is_default
+                )
+            )
+            if default_access_key is None:
+                raise KeyPairNotFound(
+                    f"User {target_user_uuid} has no default keypair to delegate endpoints to."
+                )
             await EndpointRow.delegate_endpoint_ownership(
-                session, user_uuid, target_user_uuid, target_default_access_key
+                session, user_uuid, target_user_uuid, default_access_key
             )
 
     async def delete_endpoints(
@@ -718,14 +703,22 @@ class UserDBSource:
 
     async def _get_user_by_email(self, session: SASession, email: str) -> UserRow:
         """Private method to get user by email."""
-        res = await session.scalar(sa.select(UserRow).where(UserRow.email == email))
+        res = await session.scalar(
+            sa.select(UserRow)
+            .where(UserRow.email == email)
+            .options(joinedload(UserRow.default_keypair))
+        )
         if res is None:
             raise UserNotFound(f"User with email {email} not found.")
         return res
 
     async def _get_user_by_uuid(self, session: SASession, user_uuid: UUID) -> UserRow:
         """Private method to get user by UUID."""
-        res = await session.scalar(sa.select(UserRow).where(UserRow.uuid == user_uuid))
+        res = await session.scalar(
+            sa.select(UserRow)
+            .where(UserRow.uuid == user_uuid)
+            .options(joinedload(UserRow.default_keypair))
+        )
         if res is None:
             raise UserNotFound(f"User with UUID {user_uuid} not found.")
         return res
@@ -754,28 +747,7 @@ class UserDBSource:
             raise UserNotFound(f"User with UUID {user_uuid} not found.")
         return cast(UserRow, res)
 
-    async def _get_project_scope_ids_for_user(
-        self, db_session: SASession, domain_name: str, project_ids: Iterable[UUID]
-    ) -> list[UUID]:
-        """Get project scope ids for user including model store project."""
-        # Check for model store project
-        rows = await db_session.scalars(
-            sa.select(GroupRow.id).where(
-                sa.or_(
-                    sa.and_(
-                        GroupRow.domain_name == domain_name,
-                        sa.or_(
-                            GroupRow.id.in_(project_ids),
-                            GroupRow.type == ProjectType.MODEL_STORE,
-                        ),
-                    ),
-                ),
-            )
-        )
-        gids_to_join = rows.all()
-        return list(gids_to_join)
-
-    async def _set_default_keypair(
+    async def _switch_default_keypair(
         self, session: SASession, user_id: UserID, access_key: str
     ) -> None:
         """Move the default marker onto ``access_key``.
@@ -789,28 +761,10 @@ class UserDBSource:
             .values(is_default=False)
         )
         await session.execute(
-            sa.update(KeyPairRow).where(KeyPairRow.access_key == access_key).values(is_default=True)
+            sa.update(KeyPairRow)
+            .where((KeyPairRow.user == user_id) & (KeyPairRow.access_key == access_key))
+            .values(is_default=True)
         )
-
-    async def _validate_and_update_default_access_key(
-        self, session: SASession, email: str, default_access_key: str
-    ) -> None:
-        """Private method to validate and update main access key."""
-        keypair_query = (
-            sa.select(KeyPairRow)
-            .where(KeyPairRow.access_key == default_access_key)
-            .options(
-                noload("*"),
-                joinedload(KeyPairRow.user_row).options(load_only(UserRow.email)),
-            )
-        )
-        keypair_row = (await session.scalars(keypair_query)).first()
-        if not keypair_row:
-            raise KeyPairNotFound("Cannot set non-existing access key as the main access key.")
-        if keypair_row.user_row.email != email:
-            raise KeyPairForbidden("Cannot set another user's access key as the main access key.")
-
-        await self._set_default_keypair(session, keypair_row.user, default_access_key)
 
     async def _sync_keypair_roles(
         self, session: SASession, user_uuid: UUID, new_role: UserRole
@@ -872,107 +826,61 @@ class UserDBSource:
                     kp_updates,
                 )
 
-    async def _update_user_groups(
+    async def _sync_user_project_memberships(
         self,
-        session: SASession,
         user_uuid: UUID,
         domain_name: str,
         group_ids: list[str],
     ) -> None:
-        """Sync the user's project memberships to match ``group_ids``.
+        """Sync the user's project memberships to match ``group_ids`` (the domain's
+        model-store projects always included) through the RBAC member ops, in its
+        own transaction.
 
-        Produces the same business association + RBAC scope binding + member
-        role mapping as the modifyGroup path (BA-5745) so that membership
-        changes made through modify_user stay consistent with RBAC state.
-        Uses a diff-based approach: only projects entering or leaving the
-        target set are touched, preserving existing rows for unchanged
-        memberships.
+        Diff-based: only projects entering or leaving the target set are touched,
+        preserving existing rows for unchanged memberships. Joining a project
+        grants its ``auto_assign`` roles; member ops leave role mappings untouched
+        on removal, so the user's project-scoped roles are revoked here when
+        leaving a project.
         """
-        # Expand target to include the domain's model-store project(s), matching
-        # the previous behavior of _get_project_scope_ids_for_user.
-        target_project_ids = set(
-            await self._get_project_scope_ids_for_user(
-                session, domain_name, [UUID(gid) for gid in group_ids]
+        member_ref = EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=UserID(user_uuid))
+        async with self._rbac_ops_provider.write_ops() as w:
+            target_result = await w.batch_query_in_global(
+                sa.select(GroupRow.id).where(
+                    GroupRow.domain_name == domain_name,
+                    sa.or_(
+                        GroupRow.id.in_([UUID(gid) for gid in group_ids]),
+                        GroupRow.type == ProjectType.MODEL_STORE,
+                    ),
+                ),
+                BatchQuerier(pagination=NoPagination()),
             )
-        )
+            target_project_ids = {row.id for row in target_result.rows}
 
-        current_entity_ids = (
-            await session.scalars(
-                sa.select(AssociationScopesEntitiesRow.scope_id).where(
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                    AssociationScopesEntitiesRow.entity_id == str(user_uuid),
+            current_result = await w.batch_query_in_global(
+                user_scope_membership_query(PROJECT_SCOPE_TYPE).where(
+                    EntityMembershipRow.entity_id == user_uuid
+                ),
+                BatchQuerier(pagination=NoPagination()),
+            )
+            current_project_ids = {row.scope_id for row in current_result.rows}
+
+            for project_id in current_project_ids - target_project_ids:
+                await w.remove_bulk_members(
+                    ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ProjectID(project_id)),
+                    [member_ref],
                 )
-            )
-        ).all()
-        current_project_ids = {UUID(sid) for sid in current_entity_ids}
-
-        to_remove = current_project_ids - target_project_ids
-        to_add = target_project_ids - current_project_ids
-
-        for project_id in to_remove:
-            await self._remove_user_from_project_in_session(session, user_uuid, project_id)
-        for project_id in to_add:
-            await self._add_user_to_project_in_session(session, user_uuid, project_id)
-
-    async def _add_user_to_project_in_session(
-        self,
-        session: SASession,
-        user_uuid: UUID,
-        project_id: UUID,
-    ) -> None:
-        """Add a user to a project within an existing session.
-
-        Mirrors GroupDBSource._add_users_to_project_in_session for the
-        single-user case: inserts the RBAC scope binding (ASE) via
-        ``RBACScopeBinder`` and maps the user to every active ``auto_assign``
-        role bound to the project scope.
-        """
-        project_scope_ref = RBACElementRef(RBACElementType.PROJECT, str(project_id))
-        pair = RBACScopeBindingPair(
-            spec=ProjectUserMembershipCreatorSpec(user_id=user_uuid, project_id=project_id),
-            entity_ref=RBACElementRef(RBACElementType.USER, str(user_uuid)),
-            scope_ref=project_scope_ref,
-        )
-        await execute_rbac_scope_binder(session, RBACScopeBinder(pairs=[pair]))
-
-        await self._role_manager.assign_auto_assign_roles(
-            session,
-            [user_uuid],
-            ScopeId(scope_type=ScopeType.PROJECT, scope_id=str(project_id)),
-        )
-
-    async def _remove_user_from_project_in_session(
-        self,
-        session: SASession,
-        user_uuid: UUID,
-        project_id: UUID,
-    ) -> None:
-        """Remove a user from a project within an existing session.
-
-        Mirrors GroupDBSource._remove_users_from_project_in_session for the
-        single-user case: deletes the RBAC scope binding (ASE) via the
-        unbinder API and unmaps the user from any project-scoped roles.
-        """
-        unbinder = UserProjectEntityUnbinder(
-            user_uuids=[user_uuid],
-            project_id=project_id,
-        )
-        await execute_rbac_scope_entity_unbinder(session, unbinder)
-
-        project_role_ids_subq = sa.select(
-            AssociationScopesEntitiesRow.entity_id,
-        ).where(
-            AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-            AssociationScopesEntitiesRow.scope_id == str(project_id),
-            AssociationScopesEntitiesRow.entity_type == EntityType.ROLE,
-        )
-        await session.execute(
-            sa.delete(UserRoleRow).where(
-                UserRoleRow.user_id == user_uuid,
-                sa.cast(UserRoleRow.role_id, sa.String).in_(project_role_ids_subq),
-            )
-        )
+                await w.batch_purge(create_user_project_role_purger(user_uuid, project_id))
+            for project_id in target_project_ids - current_project_ids:
+                project_scope = ScopeRef(
+                    scope_type=PROJECT_SCOPE_TYPE, scope_id=ProjectID(project_id)
+                )
+                await w.ensure_scope(project_scope)
+                await w.add_bulk_members(
+                    EntityMembersAddition(
+                        scope=project_scope,
+                        members=[ScopeUserMember(user_id=UserID(user_uuid))],
+                    )
+                )
 
     async def _get_user_uuid_by_email_with_conn(self, conn: AsyncConnection, email: str) -> UUID:
         """Get user UUID by email using an existing connection."""
@@ -1127,7 +1035,7 @@ class UserDBSource:
             UserSearchResult with matching users and pagination info.
         """
         async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(UserRow)
+            query = sa.select(UserRow).options(joinedload(UserRow.default_keypair))
             result = await execute_batch_querier(db_session, query, querier)
 
             items = [row.UserRow.to_data() for row in result.rows]
@@ -1140,20 +1048,20 @@ class UserDBSource:
 
     async def search_users_by_domain(
         self,
-        scope: DomainUserSearchScope,
+        scope: DomainUserOperationScope,
         querier: BatchQuerier,
     ) -> UserSearchResult:
         """Search users within a domain.
 
         Args:
-            scope: DomainUserSearchScope defining the domain to search within.
+            scope: DomainUserOperationScope defining the domain to search within.
             querier: BatchQuerier containing conditions, orders, and pagination.
 
         Returns:
             UserSearchResult with matching users and pagination info.
         """
         async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(UserRow)
+            query = sa.select(UserRow).options(joinedload(UserRow.default_keypair))
             result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
 
             items = [row.UserRow.to_data() for row in result.rows]
@@ -1166,16 +1074,16 @@ class UserDBSource:
 
     async def search_users_by_project(
         self,
-        scope: ProjectUserSearchScope,
+        scope: ProjectUserOperationScope,
         querier: BatchQuerier,
     ) -> UserSearchResult:
         """Search users within a project.
 
-        Joins with association_scopes_entities (PROJECT scope, USER entity)
-        to find project members.
+        Membership comes from the project's virtual scope; the scope supplies
+        the membership predicate.
 
         Args:
-            scope: ProjectUserSearchScope defining the project to search within.
+            scope: ProjectUserOperationScope defining the project to search within.
             querier: BatchQuerier containing conditions, orders, and pagination.
 
         Returns:
@@ -1183,16 +1091,7 @@ class UserDBSource:
         """
         async with self._db.begin_readonly_session() as db_session:
             query = (
-                sa.select(UserRow)
-                .select_from(UserRow)
-                .join(
-                    AssociationScopesEntitiesRow,
-                    sa.and_(
-                        sa.cast(UserRow.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
-                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                    ),
-                )
+                sa.select(UserRow).select_from(UserRow).options(joinedload(UserRow.default_keypair))
             )
             result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
 
@@ -1206,7 +1105,7 @@ class UserDBSource:
 
     async def search_users_by_role(
         self,
-        scope: RoleUserSearchScope,
+        scope: RoleUserOperationScope,
         querier: BatchQuerier,
     ) -> UserSearchResult:
         """Search users assigned to a role.
@@ -1221,6 +1120,7 @@ class UserDBSource:
                     UserRoleRow,
                     UserRow.uuid == UserRoleRow.user_id,
                 )
+                .options(joinedload(UserRow.default_keypair))
             )
             result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
 
@@ -1233,7 +1133,7 @@ class UserDBSource:
             )
 
     async def issue_my_keypair(self, user_uuid: UUID) -> GeneratedKeyPairData:
-        """Issue a new keypair for the current user, inheriting settings from main keypair."""
+        """Issue a new keypair for the current user, inheriting settings from the default keypair."""
         async with self._db.begin_session() as session:
             user_row = (
                 await session.scalars(
@@ -1245,7 +1145,7 @@ class UserDBSource:
             if not user_row:
                 raise UserNotFound(f"User {user_uuid} not found")
 
-            main_kp_row = (
+            default_kp_row = (
                 await session.scalars(
                     sa.select(KeyPairRow)
                     .where((KeyPairRow.user == user_uuid) & KeyPairRow.is_default)
@@ -1253,12 +1153,12 @@ class UserDBSource:
                 )
             ).first()
 
-            if main_kp_row:
+            if default_kp_row:
                 keypair_creator = KeyPairCreator(
                     is_active=True,
-                    is_admin=main_kp_row.is_admin or False,
-                    resource_policy=main_kp_row.resource_policy,
-                    rate_limit=main_kp_row.rate_limit or DEFAULT_KEYPAIR_RATE_LIMIT,
+                    is_admin=default_kp_row.is_admin,
+                    resource_policy=default_kp_row.resource_policy,
+                    rate_limit=default_kp_row.rate_limit or DEFAULT_KEYPAIR_RATE_LIMIT,
                 )
             else:
                 keypair_creator = KeyPairCreator(
@@ -1303,13 +1203,13 @@ class UserDBSource:
                 raise KeyPairForbidden("Cannot revoke another user's keypair")
             if kp_row.is_default:
                 raise KeyPairForbidden(
-                    "Cannot revoke the main access key. Switch main access key first."
+                    "Cannot revoke the default access key. Switch the default access key first."
                 )
 
             await session.execute(sa.delete(keypairs).where(keypairs.c.access_key == access_key))
 
-    async def switch_my_default_access_key(self, user_uuid: UUID, access_key: str) -> None:
-        """Switch the main access key for the current user."""
+    async def switch_default_access_key(self, user_id: UserID, access_key: AccessKey) -> None:
+        """Move the ``is_default`` marker among the user's keypairs onto ``access_key``."""
         async with self._db.begin_session() as session:
             kp_row = (
                 await session.scalars(
@@ -1326,15 +1226,17 @@ class UserDBSource:
                 )
             ).first()
             if not kp_row:
-                raise KeyPairNotFound("Cannot set non-existing access key as the main access key.")
-            if kp_row.user != user_uuid:
+                raise KeyPairNotFound(
+                    "Cannot set a non-existing access key as the default access key."
+                )
+            if kp_row.user != user_id:
                 raise KeyPairForbidden(
-                    "Cannot set another user's access key as the main access key."
+                    "Cannot set another user's access key as the default access key."
                 )
             if not kp_row.is_active:
-                raise KeyPairForbidden("Cannot set an inactive keypair as the main access key.")
+                raise KeyPairForbidden("Cannot set an inactive keypair as the default access key.")
 
-            await self._set_default_keypair(session, UserID(user_uuid), access_key)
+            await self._switch_default_keypair(session, user_id, access_key)
 
     async def update_my_keypair(self, user_uuid: UUID, updater: Updater[KeyPairRow]) -> KeyPairData:
         """Update a keypair owned by the current user."""
@@ -1359,7 +1261,7 @@ class UserDBSource:
 
     async def search_my_keypairs(
         self,
-        scope: UserKeypairSearchScope,
+        scope: UserKeypairOperationScope,
         querier: BatchQuerier,
     ) -> SearchResult[KeyPairData]:
         """Search keypairs owned by the scoped user.
@@ -1384,7 +1286,7 @@ class UserDBSource:
 
     async def search_keypairs_by_resource_policy(
         self,
-        scope: KeypairResourcePolicyKeypairSearchScope,
+        scope: KeypairResourcePolicyKeypairOperationScope,
         querier: BatchQuerier,
     ) -> SearchResult[KeyPairData]:
         """Search keypairs assigned to a keypair resource policy.
@@ -1467,7 +1369,9 @@ class UserDBSource:
             if not kp_row:
                 raise KeyPairNotFound(f"Keypair {access_key} not found")
             if kp_row.is_default:
-                raise KeyPairForbidden("Cannot delete a keypair set as the user's main access key.")
+                raise KeyPairForbidden(
+                    "Cannot delete a keypair set as the user's default access key."
+                )
 
             await session.execute(sa.delete(keypairs).where(keypairs.c.access_key == access_key))
 

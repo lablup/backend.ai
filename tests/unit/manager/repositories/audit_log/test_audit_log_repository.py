@@ -17,10 +17,14 @@ from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.models.audit_log import AuditLogRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.audit_log import AuditLogRepository
 from ai.backend.manager.repositories.audit_log.creators import GlobalAuditLogCreatorSpec
 from ai.backend.manager.repositories.audit_log.options import AuditLogConditions
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Creator,
+)
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
@@ -72,6 +76,7 @@ class TestAuditLogRepository:
                     action_id=uuid.uuid4(),
                     entity_type=entity_type,
                     operation=operation,
+                    action_name=f"{operation}_{entity_type}",
                     created_at=now,
                     description=f"{entity_type} {operation}",
                     status=status,
@@ -102,6 +107,7 @@ class TestAuditLogRepository:
                     action_id=uuid.uuid4(),
                     entity_type="session",
                     operation=operation,
+                    action_name=operation.replace("-", "_"),
                     created_at=now,
                     description=f"Operation {operation}",
                     status=OperationStatus.SUCCESS,
@@ -131,6 +137,7 @@ class TestAuditLogRepository:
                     action_id=uuid.uuid4(),
                     entity_type="session",
                     operation=f"operation_{i:02d}",
+                    action_name=f"operation_{i:02d}",
                     created_at=now,
                     description=f"Operation {i}",
                     status=OperationStatus.SUCCESS,
@@ -164,6 +171,7 @@ class TestAuditLogRepository:
                 action_id=uuid.uuid4(),
                 entity_type="agent",
                 operation=f"operation_{i}",
+                action_name=f"operation_{i}",
                 created_at=now,
                 description=f"Operation {i}",
                 status=status,
@@ -181,6 +189,7 @@ class TestAuditLogRepository:
                     action_id=data.action_id,
                     entity_type=data.entity_type,
                     operation=data.operation,
+                    action_name=f"operation_{i}",
                     created_at=data.created_at,
                     description=data.description,
                     status=data.status,
@@ -262,6 +271,7 @@ class TestAuditLogRepository:
                     action_id=uuid.uuid4(),
                     entity_type="session",
                     operation="update",
+                    action_name="update_session",
                     created_at=now,
                     description=f"acted by {acted_as}",
                     status=OperationStatus.SUCCESS,

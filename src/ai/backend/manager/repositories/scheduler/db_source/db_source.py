@@ -43,6 +43,7 @@ from ai.backend.common.types import (
     ClusterMode,
     KernelId,
     PreemptionMode,
+    PreemptionVictimScope,
     ResourceSlot,
     SessionId,
     SessionTypes,
@@ -173,14 +174,15 @@ from ai.backend.manager.views.sokovan.snapshot import (
     ResourceLimit,
     ResourceOccupancySnapshot,
     ResourcePolicySnapshot,
+    ScopeVictimCandidates,
     SessionDependencySnapshot,
     SlotAllocation,
     UserResourceAllocation,
     UserResourceLimit,
-    UserVictimCandidates,
 )
 from ai.backend.manager.views.sokovan.workload import (
     KernelWorkload,
+    PreemptionScopeKey,
     ResourceRequest,
     SessionDependencyInfo,
     SessionGroupPolicy,
@@ -234,6 +236,19 @@ class _PreemptionCandidateAccumulator:
 
     row: sa.Row[Any]
     slots_by_agent: dict[AgentId, dict[ResourceSlotName, Decimal]]
+
+
+@dataclass(frozen=True)
+class _PreemptionScopeMatch:
+    """The victim scope projected onto the candidate query: the labeled
+    select/group-by columns of the session column victims are matched on,
+    and the per-scope-key priority prefilter. A group-wide scope
+    (RESOURCE_GROUP) has no matching column — ``group_wide_key`` then
+    carries the single key every candidate row groups under."""
+
+    scope_value_columns: list[sa.Label[Any]]
+    candidate_filter: sa.ColumnElement[bool]
+    group_wide_key: PreemptionScopeKey | None
 
 
 class ScheduleDBSource:
@@ -464,9 +479,9 @@ class ScheduleDBSource:
                     ra.c.free_at.is_(None),
                 )
             )
-            for row in ra_result:
-                kernel_slots[KernelId(row.kernel_id)][ResourceSlotName(row.slot_name)] = (
-                    row.requested
+            for ra_row in ra_result:
+                kernel_slots[KernelId(ra_row.kernel_id)][ResourceSlotName(ra_row.slot_name)] = (
+                    ra_row.requested
                 )
 
         group_policies = await self._fetch_session_group_policies(
@@ -888,7 +903,7 @@ class ScheduleDBSource:
     ) -> dict[UserID, UserResourceLimit]:
         """Fetch per-user limits for users in pending sessions.
 
-        All limits are sourced from the user's main keypair policy until
+        All limits are sourced from the user's default keypair policy until
         user-level policy columns exist.
         """
         user_limits: dict[UserID, UserResourceLimit] = {}
@@ -898,20 +913,19 @@ class ScheduleDBSource:
 
         user_policy_result = await db_sess.execute(
             sa.select(
-                UserRow.uuid,
+                KeyPairRow.user,
                 KeyPairResourcePolicyRow.name,
                 KeyPairResourcePolicyRow.total_resource_slots,
                 KeyPairResourcePolicyRow.default_for_unspecified,
                 KeyPairResourcePolicyRow.max_concurrent_sessions,
                 KeyPairResourcePolicyRow.max_concurrent_sftp_sessions,
             )
-            .select_from(UserRow)
-            .join(KeyPairRow, (KeyPairRow.user == UserRow.uuid) & KeyPairRow.is_default)
+            .select_from(KeyPairRow)
             .join(
                 KeyPairResourcePolicyRow,
                 KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
             )
-            .where(UserRow.uuid.in_(pending_sessions.user_uuids))
+            .where(KeyPairRow.user.in_(pending_sessions.user_uuids) & KeyPairRow.is_default)
         )
 
         for row in user_policy_result:
@@ -921,7 +935,7 @@ class ScheduleDBSource:
                     row.default_for_unspecified,
                     known_slot_types,
                 )
-                user_limits[UserID(row.uuid)] = UserResourceLimit(
+                user_limits[UserID(row.user)] = UserResourceLimit(
                     slots=_to_slot_quota(slot_quota),
                     max_session_count=row.max_concurrent_sessions
                     if row.max_concurrent_sessions and row.max_concurrent_sessions > 0
@@ -973,15 +987,19 @@ class ScheduleDBSource:
         pending_sessions: PendingSessions,
         observed_at: datetime,
     ) -> PreemptionCandidateSnapshot:
-        """Load this resource group's preemption victim candidates per owner.
+        """Load this resource group's preemption victim candidates per scope key.
 
         A candidate is one whole session (the preemption unit): a
         preemptible, non-private session that holds unfreed agent
         allocations (SCHEDULED onward, terminatable — same hold definition
-        as the occupancy scan), owned by a pending owner, with
-        ``job_priority`` strictly below that owner's max pending
+        as the occupancy scan), within a pending owner's victim scope, with
+        ``job_priority`` strictly below that scope's max pending
         ``job_priority`` — a superset of every per-pending comparison, so
-        no valid victim is dropped. With a minimum runtime configured,
+        no valid victim is dropped. The group's ``victim_scope`` decides
+        the grouping: the pending owners' scope keys, the session column
+        victims are matched on, and the key candidate rows are grouped
+        under all derive from it (RESOURCE_GROUP degenerates to one key
+        with no matching column). With a minimum runtime configured,
         sessions below it are dropped too (NULL ``starts_at`` counts as
         zero runtime). Candidates are unordered — reclaim ordering is
         per-pending, so it stays in the selection layer. No query runs
@@ -989,29 +1007,25 @@ class ScheduleDBSource:
         """
         if not resource_group.preemption.enabled:
             return PreemptionCandidateSnapshot.empty()
-        max_pending_priority: dict[UserID, int] = {}
+        scope = resource_group.preemption.victim_scope
+        max_pending_priority: dict[PreemptionScopeKey, int] = {}
         for workload in pending_sessions.sessions:
             # Private (SFTP/system) sessions never initiate preemption,
             # just as they are never victims
             if workload.is_private:
                 continue
-            owner = workload.meta.owner.user_uuid
-            current = max_pending_priority.get(owner)
+            key = workload.meta.preemption_scope_key(scope)
+            current = max_pending_priority.get(key)
             if current is None or workload.job_priority > current:
-                max_pending_priority[owner] = workload.job_priority
+                max_pending_priority[key] = workload.job_priority
         if not max_pending_priority:
             return PreemptionCandidateSnapshot.empty()
 
         ra = ResourceAllocationRow.__table__
         k = KernelRow.__table__
         s = SessionRow.__table__
-        # Victim prefilter: owned by a pending owner AND strictly below
-        # that owner's own max pending job_priority
-        candidate_filter = sa.or_(
-            *(
-                sa.and_(s.c.user_uuid == user_uuid, s.c.job_priority < threshold)
-                for user_uuid, threshold in max_pending_priority.items()
-            )
+        scope_match = self._preemption_scope_match(
+            scope, resource_group.meta.id, max_pending_priority
         )
         # Per allocation row the agent holds ``used`` once reported, else
         # the ``requested`` reservation — the amount freed on preemption.
@@ -1019,12 +1033,12 @@ class ScheduleDBSource:
         stmt = (
             sa.select(
                 s.c.id,
-                s.c.user_uuid,
                 s.c.job_priority,
                 s.c.starts_at,
                 k.c.agent,
                 ra.c.slot_name,
                 allocated_sum,
+                *scope_match.scope_value_columns,
             )
             .select_from(ra.join(k, ra.c.kernel_id == k.c.id).join(s, k.c.session_id == s.c.id))
             .where(
@@ -1033,18 +1047,18 @@ class ScheduleDBSource:
                 s.c.is_preemptible == sa.true(),
                 # Private (SFTP/system) sessions are never preemption victims
                 s.c.session_type.not_in(SessionTypes.private_types()),
-                candidate_filter,
+                scope_match.candidate_filter,
                 k.c.status.in_(KernelStatus.resource_holding_statuses()),
                 k.c.agent.is_not(None),
                 ra.c.free_at.is_(None),
             )
             .group_by(
                 s.c.id,
-                s.c.user_uuid,
                 s.c.job_priority,
                 s.c.starts_at,
                 k.c.agent,
                 ra.c.slot_name,
+                *scope_match.scope_value_columns,
             )
         )
         min_runtime = resource_group.preemption.preemption_min_runtime
@@ -1065,9 +1079,14 @@ class ScheduleDBSource:
                 ResourceSlotName(row.slot_name)
             ] = row.allocated
 
-        by_user: dict[UserID, list[PreemptionCandidate]] = defaultdict(list)
+        # Group candidate rows by their scope value — the key itself; a
+        # group-wide scope groups every row under the single group key.
+        by_key: dict[PreemptionScopeKey, list[PreemptionCandidate]] = defaultdict(list)
         for session_id, accumulator in candidates.items():
-            by_user[UserID(accumulator.row.user_uuid)].append(
+            row_key = scope_match.group_wide_key
+            if row_key is None:
+                row_key = PreemptionScopeKey(accumulator.row.scope_value)
+            by_key[row_key].append(
                 PreemptionCandidate(
                     session_id=session_id,
                     job_priority=accumulator.row.job_priority,
@@ -1076,10 +1095,58 @@ class ScheduleDBSource:
                 )
             )
         return PreemptionCandidateSnapshot(
-            by_user={
-                user_uuid: UserVictimCandidates(candidates=user_candidates)
-                for user_uuid, user_candidates in by_user.items()
-            }
+            scope=scope,
+            by_key={
+                key: ScopeVictimCandidates(candidates=scope_candidates)
+                for key, scope_candidates in by_key.items()
+            },
+        )
+
+    def _preemption_scope_column(self, scope: PreemptionVictimScope) -> sa.Column[Any] | None:
+        """Session column victims are matched (and grouped) on under the
+        scope; its value is the scope key (``WorkloadMeta.preemption_scope_key``).
+        None for RESOURCE_GROUP — the query is already filtered to the
+        group, so no further matching applies."""
+        s = SessionRow.__table__
+        match scope:
+            case PreemptionVictimScope.USER:
+                return s.c.user_uuid
+            case PreemptionVictimScope.PROJECT:
+                return s.c.group_id
+            case PreemptionVictimScope.DOMAIN:
+                return s.c.domain_id
+            case PreemptionVictimScope.RESOURCE_GROUP:
+                return None
+
+    def _preemption_scope_match(
+        self,
+        scope: PreemptionVictimScope,
+        resource_group_id: ResourceGroupID,
+        max_pending_priority: Mapping[PreemptionScopeKey, int],
+    ) -> _PreemptionScopeMatch:
+        """Project the victim scope into the candidate query's scope
+        points: the matching column's select/group-by labels and the
+        per-scope-key priority prefilter (victims strictly below that
+        scope's own max pending ``job_priority``). A group-wide scope
+        yields no labels and the group's single key instead."""
+        s = SessionRow.__table__
+        scope_column = self._preemption_scope_column(scope)
+        if scope_column is None:
+            group_wide_key = PreemptionScopeKey(resource_group_id)
+            return _PreemptionScopeMatch(
+                scope_value_columns=[],
+                candidate_filter=s.c.job_priority < max_pending_priority[group_wide_key],
+                group_wide_key=group_wide_key,
+            )
+        return _PreemptionScopeMatch(
+            scope_value_columns=[scope_column.label("scope_value")],
+            candidate_filter=sa.or_(
+                *(
+                    sa.and_(scope_column == key, s.c.job_priority < threshold)
+                    for key, threshold in max_pending_priority.items()
+                )
+            ),
+            group_wide_key=None,
         )
 
     async def mark_sessions_terminating(
@@ -2061,7 +2128,7 @@ class ScheduleDBSource:
         )
 
         # Enqueue gates are user-scoped; the policy values are sourced
-        # from the user's main keypair policy (no user-level columns yet).
+        # from the user's default keypair policy (no user-level columns yet).
         user_enqueue_policy = None
         if user_uuid is not None:
             policy_row = (
@@ -2073,13 +2140,12 @@ class ScheduleDBSource:
                         KeyPairResourcePolicyRow.max_priority,
                         KeyPairResourcePolicyRow.allowed_vfolder_hosts,
                     )
-                    .select_from(UserRow)
-                    .join(KeyPairRow, (KeyPairRow.user == UserRow.uuid) & KeyPairRow.is_default)
+                    .select_from(KeyPairRow)
                     .join(
                         KeyPairResourcePolicyRow,
                         KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
                     )
-                    .where(UserRow.uuid == user_uuid)
+                    .where((KeyPairRow.user == user_uuid) & KeyPairRow.is_default)
                 )
             ).one_or_none()
             if policy_row is not None:

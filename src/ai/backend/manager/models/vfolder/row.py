@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship, selectinload
 
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.defs import (
     MODEL_VFOLDER_LENGTH_LIMIT,
     RESERVED_VFOLDER_PATTERNS,
@@ -43,12 +44,6 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.permission_defs import StorageHostPermission
 from ai.backend.manager.data.permission.permission_defs import (
     VFolderPermission as VFolderRBACPermission,
-)
-from ai.backend.manager.data.permission.types import (
-    EntityType as PermissionEntityType,
-)
-from ai.backend.manager.data.permission.types import (
-    ScopeType as PermissionScopeType,
 )
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
@@ -87,9 +82,6 @@ from ai.backend.manager.models.rbac import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.exceptions import NotEnoughPermission
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.session import DEAD_SESSION_STATUSES, SessionRow
 from ai.backend.manager.models.storage import PermissionContext as StorageHostPermissionContext
 from ai.backend.manager.models.storage import (
@@ -101,6 +93,11 @@ from ai.backend.manager.models.utils import (
     execute_with_retry,
     execute_with_txn_retry,
     sql_json_merge,
+)
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.queries import (
+    user_scope_membership_exists,
+    user_scope_membership_query,
 )
 
 __all__: Sequence[str] = (
@@ -295,7 +292,7 @@ class VFolderCloneInfo(NamedTuple):
     cloneable: bool
 
 
-class VFolderRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class VFolderRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "vfolders"
 
     id: Mapped[VFolderUUID] = mapped_column(
@@ -380,19 +377,11 @@ class VFolderRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     # Relationships
     user_row: Mapped[UserRow | None] = relationship(
         "UserRow",
-        back_populates="vfolder_rows",
         primaryjoin=_get_user_row_join_condition,
     )
     group_row: Mapped[GroupRow | None] = relationship(
         "GroupRow",
-        back_populates="vfolder_rows",
         primaryjoin=_get_group_row_join_condition,
-    )
-    permission_rows: Mapped[list[VFolderPermissionRow]] = relationship(
-        "VFolderPermissionRow", back_populates="vfolder_row"
-    )
-    invitation_rows: Mapped[list[VFolderInvitationRow]] = relationship(
-        "VFolderInvitationRow", back_populates="vfolder_row"
     )
 
     @classmethod
@@ -478,7 +467,7 @@ vfolder_attachment = sa.Table(
 )
 
 
-class VFolderInvitationRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class VFolderInvitationRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "vfolder_invitations"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -500,7 +489,7 @@ class VFolderInvitationRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc
     )
 
     # Relationships
-    vfolder_row: Mapped[VFolderRow] = relationship("VFolderRow", back_populates="invitation_rows")
+    vfolder_row: Mapped[VFolderRow] = relationship("VFolderRow")
 
 
 # NOTE: Deprecated legacy table reference for backward compatibility.
@@ -508,7 +497,7 @@ class VFolderInvitationRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc
 vfolder_invitations = VFolderInvitationRow.__table__
 
 
-class VFolderPermissionRow(Base):  # type: ignore[misc]
+class VFolderPermissionRow(Base):
     __tablename__ = "vfolder_permissions"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -526,9 +515,6 @@ class VFolderPermissionRow(Base):  # type: ignore[misc]
     user: Mapped[uuid.UUID] = mapped_column(
         "user", GUID, sa.ForeignKey("users.uuid"), nullable=False
     )
-
-    # Relationships
-    vfolder_row: Mapped[VFolderRow] = relationship("VFolderRow", back_populates="permission_rows")
 
 
 # NOTE: Deprecated legacy table reference for backward compatibility.
@@ -696,14 +682,12 @@ async def query_accessible_vfolders(
             grps = result.fetchall()
             group_ids = [g.id for g in grps]
         else:
-            query = sa.select(AssociationScopesEntitiesRow.scope_id).where(
-                AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
-                AssociationScopesEntitiesRow.entity_type == PermissionEntityType.USER,
-                AssociationScopesEntitiesRow.entity_id == str(user_uuid),
+            query = user_scope_membership_query(PROJECT_SCOPE_TYPE).where(
+                EntityMembershipRow.entity_id == user_uuid
             )
             result = await conn.execute(query)
             grps = result.fetchall()
-            group_ids = [uuid.UUID(g.scope_id) for g in grps]
+            group_ids = [g.scope_id for g in grps]
             # Include MODEL_STORE projects in the same domain for cross-project model access
             from ai.backend.manager.data.group.types import ProjectType
 
@@ -830,18 +814,11 @@ async def get_allowed_vfolder_hosts_by_user(
         result_hosts: VFolderHostPermissionMap = allowed_hosts | values
         allowed_hosts = result_hosts
     # User's Groups' allowed_vfolder_hosts.
-    join_cond = sa.and_(
-        sa.cast(groups.c.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
-        AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
-        AssociationScopesEntitiesRow.entity_type == PermissionEntityType.USER,
-        AssociationScopesEntitiesRow.entity_id == str(user_uuid),
-    )
+    membership_cond = user_scope_membership_exists(PROJECT_SCOPE_TYPE, groups.c.id, user_uuid)
     if group_id is not None:
-        join_cond = sa.and_(join_cond, groups.c.id == group_id)
-    query = (
-        sa.select(groups.c.allowed_vfolder_hosts)
-        .select_from(groups.join(AssociationScopesEntitiesRow, join_cond))
-        .where(groups.c.domain_name == domain_name, groups.c.is_active)
+        membership_cond = sa.and_(membership_cond, groups.c.id == group_id)
+    query = sa.select(groups.c.allowed_vfolder_hosts).where(
+        membership_cond, groups.c.domain_name == domain_name, groups.c.is_active
     )
     if rows := (await conn.execute(query)).fetchall():
         for row in rows:
@@ -885,7 +862,7 @@ async def update_vfolder_status(
     force: bool = False,
 ) -> None:
     vfolder_info_len = len(vfolder_ids)
-    cond = vfolders.c.id.in_(vfolder_ids)
+    cond: sa.ColumnElement[bool] = vfolders.c.id.in_(vfolder_ids)
     if vfolder_info_len == 0:
         return
     if vfolder_info_len == 1:
@@ -1026,8 +1003,8 @@ async def ensure_quota_scope_accessible_by_user(
     user: Mapping[str, Any],
 ) -> None:
     # Lookup user table to match if quota is scoped to the user
-    query = sa.select(UserRow).where(UserRow.uuid == quota_scope.scope_id)
-    quota_scope_user: UserRow | None = await conn.scalar(query)
+    user_query = sa.select(UserRow).where(UserRow.uuid == quota_scope.scope_id)
+    quota_scope_user: UserRow | None = await conn.scalar(user_query)
     if quota_scope_user:
         match user["role"]:
             case UserRole.SUPERADMIN:
@@ -1041,8 +1018,8 @@ async def ensure_quota_scope_accessible_by_user(
         raise InvalidAPIParameters
 
     # Lookup group table to match if quota is scoped to the group
-    query = sa.select(GroupRow).where(GroupRow.id == quota_scope.scope_id)
-    quota_scope_group: GroupRow | None = await conn.scalar(query)
+    group_query = sa.select(GroupRow).where(GroupRow.id == quota_scope.scope_id)
+    quota_scope_group: GroupRow | None = await conn.scalar(group_query)
     if quota_scope_group:
         match user["role"]:
             case UserRole.SUPERADMIN:
@@ -1051,14 +1028,12 @@ async def ensure_quota_scope_accessible_by_user(
                 if quota_scope_group.domain_name == user["domain_name"]:
                     return
             case _:
-                membership_query = sa.select(AssociationScopesEntitiesRow.scope_id).where(
-                    AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.entity_type == PermissionEntityType.USER,
-                    AssociationScopesEntitiesRow.scope_id == str(quota_scope.scope_id),
-                    AssociationScopesEntitiesRow.entity_id == str(user["uuid"]),
+                membership_query = sa.select(
+                    user_scope_membership_exists(
+                        PROJECT_SCOPE_TYPE, quota_scope_group.id, user["uuid"]
+                    )
                 )
-                matched_group_id = await conn.scalar(membership_query)
-                if matched_group_id:
+                if await conn.scalar(membership_query):
                     return
 
     raise InvalidAPIParameters
@@ -1351,20 +1326,12 @@ class VFolderPermissionContextBuilder(
     ) -> VFolderPermissionContext:
         result = VFolderPermissionContext()
 
-        j = sa.join(
-            GroupRow,
-            AssociationScopesEntitiesRow,
-            sa.and_(
-                sa.cast(GroupRow.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
-                AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
-                AssociationScopesEntitiesRow.entity_type == PermissionEntityType.USER,
-                AssociationScopesEntitiesRow.entity_id == str(ctx.user_id),
-            ),
-        )
         _project_stmt = (
             sa.select(GroupRow)
-            .select_from(j)
-            .where(GroupRow.domain_name == domain_name)
+            .where(
+                GroupRow.domain_name == domain_name,
+                user_scope_membership_exists(PROJECT_SCOPE_TYPE, GroupRow.id, ctx.user_id),
+            )
             .options(load_only(GroupRow.id))
         )
         for row in await self.db_session.scalars(_project_stmt):

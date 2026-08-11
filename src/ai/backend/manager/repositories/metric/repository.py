@@ -31,8 +31,9 @@ from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPrese
 from ai.backend.manager.models.prometheus_query_preset.conditions import (
     PrometheusQueryPresetConditions,
 )
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.prometheus_query_preset.db_source import (
     PrometheusQueryPresetDBSource,
 )

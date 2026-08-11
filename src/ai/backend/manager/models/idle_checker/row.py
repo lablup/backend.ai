@@ -15,7 +15,7 @@ from ai.backend.manager.models.base import GUID, Base, PydanticColumn, StrEnumTy
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin, UpdatedAtMixin
 
 
-class IdleCheckerRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class IdleCheckerRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "idle_checkers"
     __table_args__ = (
         sa.CheckConstraint(
@@ -64,7 +64,7 @@ class IdleCheckerRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         )
 
 
-class IdleCheckerBindingRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class IdleCheckerBindingRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "idle_checker_bindings"
     __table_args__ = (
         sa.ForeignKeyConstraint(
@@ -106,7 +106,7 @@ class IdleCheckerBindingRow(LifecycleTimestampsMixin, Base):  # type: ignore[mis
         )
 
 
-class SessionIdleCheckRow(UpdatedAtMixin, Base):  # type: ignore[misc]
+class SessionIdleCheckRow(UpdatedAtMixin, Base):
     __tablename__ = "session_idle_checks"
     __table_args__ = (
         sa.ForeignKeyConstraint(

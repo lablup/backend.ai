@@ -14,6 +14,7 @@ from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.keypair.response import CreateKeypairPayload
 from ai.backend.common.dto.manager.v2.user.types import UserRole, UserStatus
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import BackendAISchema
 
 __all__ = (
@@ -103,7 +104,7 @@ class UserOrganizationInfo(BackendAISchema):
     )
     main_access_key: str | None = Field(
         default=None,
-        description="Primary API access key for this user. Deprecated since 26.9.0. The default keypair is recorded on the keypair itself.",
+        description=f"Primary API access key for this user. Deprecated since {NEXT_RELEASE_VERSION}. Use the keypair's is_default field.",
         deprecated=True,
     )
 

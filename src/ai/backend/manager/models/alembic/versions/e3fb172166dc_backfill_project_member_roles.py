@@ -39,12 +39,10 @@ from ai.backend.manager.models.rbac_models.migration.enums import (
 )
 from ai.backend.manager.models.rbac_models.migration.models import (
     get_association_scopes_entities_table,
-    get_roles_table,
     mapper_registry,
 )
 from ai.backend.manager.models.rbac_models.migration.utils import (
     insert_skip_on_conflict,
-    query_role_rows_by_name,
 )
 
 # revision identifiers, used by Alembic.
@@ -53,6 +51,10 @@ down_revision = "d8e4f2a1b3c7"
 # Part of: 26.5.0
 branch_labels = None
 depends_on = None
+
+# Metadata local to this revision so that the table snapshots below cannot be
+# altered by definitions living in other revisions.
+_local_metadata = sa.MetaData()
 
 
 # Snapshot of MEMBER_ACCESSIBLE_ENTITY_TYPES_IN_PROJECT at the time of writing.
@@ -74,6 +76,19 @@ _MEMBER_ACCESSIBLE_ENTITY_TYPES: tuple[str, ...] = (
 
 # Snapshot of OperationType.member_operations() — member roles only grant READ.
 _MEMBER_OPERATIONS: tuple[str, ...] = ("read",)
+
+
+def _get_roles_table() -> sa.Table:
+    """Snapshot of the ``roles`` columns this revision touches."""
+    return sa.Table(
+        "roles",
+        _local_metadata,
+        IDColumn(),
+        sa.Column("name", sa.String(64), nullable=False),
+        sa.Column("status", sa.VARCHAR(16), nullable=False, server_default="active"),
+        sa.Column("source", sa.VARCHAR(16), nullable=False, server_default="system"),
+        extend_existing=True,
+    )
 
 
 def _get_groups_table() -> sa.Table:
@@ -122,7 +137,7 @@ def _query_projects_missing_member_role(db_conn: Connection) -> Sequence[Row[Any
     convention for that project id.
     """
     groups_table = _get_groups_table()
-    roles_table = get_roles_table()
+    roles_table = _get_roles_table()
     assoc_table = get_association_scopes_entities_table()
 
     runtime_pattern = (
@@ -167,7 +182,7 @@ def _create_member_roles_for_projects(
     if not project_ids:
         return {}
 
-    roles_table = get_roles_table()
+    roles_table = _get_roles_table()
     role_inputs: list[dict[str, Any]] = []
     name_to_project: dict[str, uuid.UUID] = {}
     for project_id in project_ids:
@@ -183,7 +198,11 @@ def _create_member_roles_for_projects(
     # would not help here. The outer filter query is what keeps us idempotent.
     db_conn.execute(sa.insert(roles_table), role_inputs)
 
-    role_rows = query_role_rows_by_name(db_conn, list(name_to_project.keys()))
+    role_rows = db_conn.execute(
+        sa.select(roles_table.c.id, roles_table.c.name).where(
+            roles_table.c.name.in_(list(name_to_project.keys()))
+        )
+    ).all()
     project_to_role: dict[uuid.UUID, uuid.UUID] = {}
     for row in role_rows:
         resolved = name_to_project.get(row.name)
@@ -241,7 +260,7 @@ def _promote_legacy_member_roles_to_system(db_conn: Connection) -> None:
     updated, to avoid touching any unrelated custom role. The filter is
     idempotent: roles that are already ``system`` simply match zero rows.
     """
-    roles_table = get_roles_table()
+    roles_table = _get_roles_table()
     assoc_table = get_association_scopes_entities_table()
 
     legacy_scope_subq = (

@@ -9,8 +9,8 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.repositories.base.purger import PurgerSpec
-from ai.backend.manager.repositories.base.types import ConflictCheck
 
 
 @dataclass

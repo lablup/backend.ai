@@ -7,12 +7,9 @@ from datetime import datetime
 from typing import Any, Self, override
 from uuid import UUID
 
-from sqlalchemy.engine import Row
-
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.permission.id import ScopeId
@@ -57,7 +54,6 @@ class UserStatus(enum.StrEnum):
 class UserInfoContext:
     uuid: UUID
     email: str
-    default_access_key: AccessKey
 
 
 @dataclass(frozen=True)
@@ -116,12 +112,9 @@ class UserData:
         return {RBACElementType.USER: user_permissions, **resource_entity_permissions}
 
     @classmethod
-    def from_row(cls, row: Row[Any], default_access_key: str | None) -> Self:
+    def from_row(cls, row: Any) -> Self:
         """
         Deprecated: Use `UserRow.to_data()` method instead.
-
-        ``default_access_key`` is passed in because the row may come from a Core
-        select, which carries the ``users`` column rather than the keypair marker.
         """
         return cls(
             id=row.uuid,
@@ -146,7 +139,7 @@ class UserData:
             totp_activated=row.totp_activated,
             totp_activated_at=row.totp_activated_at,
             sudo_session_enabled=row.sudo_session_enabled,
-            default_access_key=default_access_key,
+            default_access_key=row.default_access_key,
             container_uid=row.container_uid,
             container_main_gid=row.container_main_gid,
             container_gids=row.container_gids,

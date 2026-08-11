@@ -19,7 +19,7 @@ from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.app_config_fragment.types import (
-    AppConfigFragmentSearchScope,
+    AppConfigFragmentOperationScope,
 )
 from ai.backend.manager.repositories.app_config_fragment.upserters import (
     AppConfigFragmentUpserterSpec,
@@ -77,7 +77,9 @@ class TestBulkUpsertTargetElement:
     )
     def test_target_element_follows_the_written_scope(self, case: _ScopeTarget) -> None:
         action = BulkUpsertAppConfigFragmentsAction(
-            scope=AppConfigFragmentSearchScope(scope_type=case.scope_type, scope_id=case.scope_id),
+            scope=AppConfigFragmentOperationScope(
+                scope_type=case.scope_type, scope_id=case.scope_id
+            ),
             upserter_specs=[
                 AppConfigFragmentUpserterSpec(
                     config_name="cfg",

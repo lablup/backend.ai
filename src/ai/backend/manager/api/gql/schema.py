@@ -403,7 +403,13 @@ from .resource_preset import (
     admin_resource_presets_v2,
     admin_update_resource_preset_v2,
 )
-from .resource_slot.resolver import resource_slot_type, resource_slot_types
+from .resource_slot.resolver import (
+    admin_create_resource_slot_type,
+    admin_purge_resource_slot_type,
+    admin_update_resource_slot_type,
+    resource_slot_type,
+    resource_slot_types,
+)
 from .resource_usage import (
     admin_domain_usage_buckets,
     admin_project_usage_buckets,
@@ -771,6 +777,9 @@ class Mutation:
     admin_create_idle_checker_assignment = admin_create_idle_checker_assignment
     update_idle_checker_assignment = update_idle_checker_assignment
     purge_idle_checker_assignment = purge_idle_checker_assignment
+    admin_create_resource_slot_type = admin_create_resource_slot_type
+    admin_update_resource_slot_type = admin_update_resource_slot_type
+    admin_purge_resource_slot_type = admin_purge_resource_slot_type
     admin_create_app_config_allow_list = admin_create_app_config_allow_list
     admin_purge_app_config_allow_list = admin_purge_app_config_allow_list
     admin_update_app_config_allow_list = admin_update_app_config_allow_list

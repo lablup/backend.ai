@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Self
+from typing import Self
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.defs.session import SESSION_PRIORITY_MAX, SESSION_PRIORITY_MIN
 from ai.backend.common.types import (
@@ -25,11 +25,6 @@ from ai.backend.manager.models.base import (
 )
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
-if TYPE_CHECKING:
-    from ai.backend.manager.models.group import GroupRow
-    from ai.backend.manager.models.keypair import KeyPairRow
-    from ai.backend.manager.models.user import UserRow
-
 __all__: Sequence[str] = (
     "DefaultForUnspecified",
     "KeyPairResourcePolicyRow",
@@ -41,7 +36,7 @@ __all__: Sequence[str] = (
 )
 
 
-class KeyPairResourcePolicyRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class KeyPairResourcePolicyRow(CreatedAtMixin, Base):
     __tablename__ = "keypair_resource_policies"
     # A cap outside the requestable priority range is unsatisfiable: a
     # negative one would reject every session create for the keypair.
@@ -92,10 +87,6 @@ class KeyPairResourcePolicyRow(CreatedAtMixin, Base):  # type: ignore[misc]
     # TODO: implement with a many-to-many association table
     # allowed_scaling_groups: Mapped[list[str]] = mapped_column(sa.Array(sa.String), nullable=False)
 
-    keypairs: Mapped[list[KeyPairRow]] = relationship(
-        "KeyPairRow", back_populates="resource_policy_row"
-    )
-
     def to_dataclass(
         self,
     ) -> KeyPairResourcePolicyData:
@@ -121,7 +112,7 @@ class KeyPairResourcePolicyRow(CreatedAtMixin, Base):  # type: ignore[misc]
 keypair_resource_policies = KeyPairResourcePolicyRow.__table__
 
 
-class UserResourcePolicyRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class UserResourcePolicyRow(CreatedAtMixin, Base):
     __tablename__ = "user_resource_policies"
 
     name: Mapped[str] = mapped_column("name", sa.String(length=256), primary_key=True)
@@ -140,8 +131,6 @@ class UserResourcePolicyRow(CreatedAtMixin, Base):  # type: ignore[misc]
     max_concurrent_logins: Mapped[int | None] = mapped_column(
         "max_concurrent_logins", sa.Integer(), nullable=True, default=None
     )
-
-    users: Mapped[list[UserRow]] = relationship("UserRow", back_populates="resource_policy_row")
 
     def __init__(
         self,
@@ -187,7 +176,7 @@ class UserResourcePolicyRow(CreatedAtMixin, Base):  # type: ignore[misc]
 user_resource_policies = UserResourcePolicyRow.__table__
 
 
-class ProjectResourcePolicyRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class ProjectResourcePolicyRow(CreatedAtMixin, Base):
     __tablename__ = "project_resource_policies"
 
     name: Mapped[str] = mapped_column("name", sa.String(length=256), primary_key=True)
@@ -199,10 +188,6 @@ class ProjectResourcePolicyRow(CreatedAtMixin, Base):  # type: ignore[misc]
     )
     max_network_count: Mapped[int] = mapped_column(
         "max_network_count", sa.Integer(), nullable=False
-    )
-
-    projects: Mapped[list[GroupRow]] = relationship(
-        "GroupRow", back_populates="resource_policy_row"
     )
 
     def __init__(

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -242,3 +242,31 @@ async def execute_bulk_upserter[TRow: Base](
 
     result = await db_sess.execute(stmt)
     return BulkUpserterResult(upserted_count=cast(CursorResult[Any], result).rowcount)
+
+
+@dataclass
+class BulkUpserterError[TRow: Base]:
+    """Error information for one failed row of a partial bulk upsert.
+
+    Follows the same pattern as BulkUpdaterError.
+
+    Attributes:
+        spec: The UpserterSpec that failed
+        exception: The exception that occurred
+        index: Original position in the specs list for traceability
+    """
+
+    spec: UpserterSpec[TRow]
+    exception: Exception
+    index: int
+
+
+@dataclass
+class BulkUpserterResultWithFailures[TRow: Base]:
+    """Result of a partial bulk upsert: some rows may fail while the rest go through.
+
+    Names its fields as the other partial bulk results do (successes/errors).
+    """
+
+    successes: list[TRow] = field(default_factory=list)
+    errors: list[BulkUpserterError[TRow]] = field(default_factory=list)

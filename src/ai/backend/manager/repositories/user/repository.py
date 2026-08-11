@@ -12,6 +12,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -37,15 +38,15 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.keypair.types import (
-    KeypairResourcePolicyKeypairSearchScope,
-    UserKeypairSearchScope,
+    KeypairResourcePolicyKeypairOperationScope,
+    UserKeypairOperationScope,
 )
 from ai.backend.manager.repositories.user.creators import UserCreateSpec
 from ai.backend.manager.repositories.user.db_source import UserDBSource
 from ai.backend.manager.repositories.user.types import (
-    DomainUserSearchScope,
-    ProjectUserSearchScope,
-    RoleUserSearchScope,
+    DomainUserOperationScope,
+    ProjectUserOperationScope,
+    RoleUserOperationScope,
 )
 from ai.backend.manager.repositories.user.updaters import UserUpdateSpec
 
@@ -190,12 +191,9 @@ class UserRepository:
         self,
         user_uuid: UUID,
         target_user_uuid: UUID,
-        target_default_access_key: AccessKey,
     ) -> None:
         """Delegate endpoint ownership to another user."""
-        await self._db_source.delegate_endpoint_ownership(
-            user_uuid, target_user_uuid, target_default_access_key
-        )
+        await self._db_source.delegate_endpoint_ownership(user_uuid, target_user_uuid)
 
     @user_repository_resilience.apply()
     async def delete_endpoints(
@@ -257,12 +255,12 @@ class UserRepository:
 
     @user_repository_resilience.apply()
     async def search_users_by_domain(
-        self, scope: DomainUserSearchScope, querier: BatchQuerier
+        self, scope: DomainUserOperationScope, querier: BatchQuerier
     ) -> UserSearchResult:
         """Search users within a domain.
 
         Args:
-            scope: DomainUserSearchScope defining the domain to search within.
+            scope: DomainUserOperationScope defining the domain to search within.
             querier: BatchQuerier containing conditions, orders, and pagination.
 
         Returns:
@@ -272,12 +270,12 @@ class UserRepository:
 
     @user_repository_resilience.apply()
     async def search_users_by_project(
-        self, scope: ProjectUserSearchScope, querier: BatchQuerier
+        self, scope: ProjectUserOperationScope, querier: BatchQuerier
     ) -> UserSearchResult:
         """Search users within a project.
 
         Args:
-            scope: ProjectUserSearchScope defining the project to search within.
+            scope: ProjectUserOperationScope defining the project to search within.
             querier: BatchQuerier containing conditions, orders, and pagination.
 
         Returns:
@@ -287,7 +285,7 @@ class UserRepository:
 
     @user_repository_resilience.apply()
     async def search_users_by_role(
-        self, scope: RoleUserSearchScope, querier: BatchQuerier
+        self, scope: RoleUserOperationScope, querier: BatchQuerier
     ) -> UserSearchResult:
         """Search users assigned to a role."""
         return await self._db_source.search_users_by_role(scope, querier)
@@ -308,14 +306,14 @@ class UserRepository:
         return await self._db_source.update_my_keypair(user_uuid, updater)
 
     @user_repository_resilience.apply()
-    async def switch_my_default_access_key(self, user_uuid: UUID, access_key: str) -> None:
-        """Switch the main access key for the current user."""
-        await self._db_source.switch_my_default_access_key(user_uuid, access_key)
+    async def switch_default_access_key(self, user_id: UserID, access_key: AccessKey) -> None:
+        """Move the ``is_default`` marker among the user's keypairs onto ``access_key``."""
+        await self._db_source.switch_default_access_key(user_id, access_key)
 
     @user_repository_resilience.apply()
     async def search_my_keypairs(
         self,
-        scope: UserKeypairSearchScope,
+        scope: UserKeypairOperationScope,
         querier: BatchQuerier,
     ) -> SearchResult[KeyPairData]:
         """Search keypairs owned by the scoped user.
@@ -332,7 +330,7 @@ class UserRepository:
     @user_repository_resilience.apply()
     async def search_keypairs_by_resource_policy(
         self,
-        scope: KeypairResourcePolicyKeypairSearchScope,
+        scope: KeypairResourcePolicyKeypairOperationScope,
         querier: BatchQuerier,
     ) -> SearchResult[KeyPairData]:
         """Search keypairs assigned to a keypair resource policy.

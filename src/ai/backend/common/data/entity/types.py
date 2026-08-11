@@ -6,7 +6,9 @@ from ai.backend.common.identifier.entity import EntityID
 from ai.backend.common.identifier.scope import ScopeID
 
 EntityType = NewType("EntityType", str)
-ScopeType = NewType("ScopeType", str)
+# Every entity doubles as a scope, so a scope type IS an entity type; the
+# reverse direction stays an explicit declaration (`ScopeType(<entity type>)`).
+ScopeType = NewType("ScopeType", EntityType)
 
 
 @dataclass(frozen=True, slots=True)

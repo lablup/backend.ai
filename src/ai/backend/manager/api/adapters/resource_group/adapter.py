@@ -85,10 +85,9 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
 from ai.backend.manager.models.scaling_group.orders import ScalingGroupOrders
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    NoPagination,
-    OffsetPagination,
     combine_conditions_or,
     negate_conditions,
 )
@@ -407,6 +406,7 @@ class ResourceGroupAdapter(BaseAdapter):
             scheduler="fifo",
             description=input.description,
             is_active=True,
+            is_default=input.is_default,
         )
         creator = Creator(spec=creator_spec)
         action_result = await self._processors.scaling_group.create_scaling_group.wait_for_complete(
@@ -437,6 +437,7 @@ class ResourceGroupAdapter(BaseAdapter):
                 if input.is_active is not None
                 else OptionalState.nop()
             ),
+            is_default=OptionalState.from_nullable(input.is_default),
         )
         metadata_spec = ScalingGroupMetadataUpdaterSpec(
             description=(
@@ -605,6 +606,7 @@ class ResourceGroupAdapter(BaseAdapter):
                 if input.is_public is not None
                 else OptionalState.nop()
             ),
+            is_default=OptionalState.from_nullable(input.is_default),
         )
 
         metadata_spec = ScalingGroupMetadataUpdaterSpec(
@@ -648,6 +650,7 @@ class ResourceGroupAdapter(BaseAdapter):
                     preemption_min_runtime=timedelta(
                         seconds=input.preemption.preemption_min_runtime
                     ),
+                    victim_scope=input.preemption.victim_scope,
                 )
             )
 
@@ -869,6 +872,7 @@ class ResourceGroupAdapter(BaseAdapter):
                     order=data.scheduler.options.preemption.order,
                     mode=PreemptionModeDTO(data.scheduler.options.preemption.mode.value),
                     preemption_min_runtime=data.scheduler.options.preemption.preemption_min_runtime.total_seconds(),
+                    victim_scope=data.scheduler.options.preemption.victim_scope,
                 ),
             ),
             default_deployment_options=deployment_options_to_info(data.default_deployment_options),

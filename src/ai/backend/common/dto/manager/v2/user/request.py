@@ -163,7 +163,7 @@ class UpdateUserInput(BaseRequestModel):
     )
     main_access_key: str | Sentinel | None = Field(
         default=SENTINEL,
-        description="Set the primary API access key. Null is not accepted.",
+        description="Set the primary API access key. It cannot be cleared; null is ignored.",
     )
     container_uid: int | Sentinel | None = Field(
         default=SENTINEL,

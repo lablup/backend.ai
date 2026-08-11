@@ -44,6 +44,14 @@ class BaseLookupAction(ABC):
         """Return the type of entity being looked up."""
         raise NotImplementedError
 
+    @classmethod
+    @abstractmethod
+    def action_name(cls) -> str:
+        """Return the name recorded on audit rows: a lowercase snake_case verb phrase,
+        declared rather than derived so a class rename cannot split the recorded
+        history. Naming rule: services/AGENTS.md."""
+        raise NotImplementedError
+
     @abstractmethod
     def lookup_key(self) -> LookupKey:
         """Return the key being resolved."""

@@ -23,7 +23,7 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
 )
 from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInfo
 from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
-from ai.backend.common.types import PreemptionOrder
+from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope
 
 __all__ = (
     "AdminSearchResourceGroupsPayload",
@@ -131,6 +131,12 @@ class PreemptionConfigInfo(BaseResponseModel):
         description=(
             "Minimum session runtime in seconds before it becomes preemptible (0 = disabled)."
         )
+    )
+    victim_scope: PreemptionVictimScope = Field(
+        default=PreemptionVictimScope.USER,
+        description=(
+            "Scope preemption victims are drawn from (user/project/domain/resource-group)."
+        ),
     )
 
 

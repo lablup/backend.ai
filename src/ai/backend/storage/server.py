@@ -16,7 +16,7 @@ from contextlib import AsyncExitStack, asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from pprint import pformat, pprint
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import aiohttp_cors
 import aiomonitor
@@ -121,9 +121,6 @@ from .volumes.noop import init_noop_volume
 from .volumes.pool import VolumePool
 from .volumes.stats import VolumeState, VolumeStatsObserver, VolumeStatsObserverOptions
 from .watcher import WatcherClient, main_job
-
-if TYPE_CHECKING:
-    pass
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

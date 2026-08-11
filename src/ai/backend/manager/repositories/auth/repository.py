@@ -21,7 +21,7 @@ from ai.backend.manager.data.auth.types import (
 )
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.auth.db_source.db_source import (
@@ -202,7 +202,7 @@ class AuthRepository:
     @auth_repository_resilience.apply()
     async def search_login_sessions(
         self,
-        scope: SearchScope,
+        scope: OperationScope,
         querier: BatchQuerier,
     ) -> SearchResult[LoginSessionData]:
         return await self._db_source.search_login_sessions(scope, querier)
@@ -238,7 +238,7 @@ class AuthRepository:
     @auth_repository_resilience.apply()
     async def search_login_history(
         self,
-        scope: SearchScope,
+        scope: OperationScope,
         querier: BatchQuerier,
     ) -> SearchResult[LoginHistoryData]:
         return await self._db_source.search_login_history(scope, querier)

@@ -12,14 +12,14 @@ import sqlalchemy as sa
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.group.row import GroupRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.session.row import SessionRow
 
-__all__ = ("ProjectSessionSearchScope",)
+__all__ = ("ProjectSessionOperationScope",)
 
 
 @dataclass(frozen=True)
-class ProjectSessionSearchScope(SearchScope):
+class ProjectSessionOperationScope(OperationScope):
     """Required scope for searching sessions within a project.
 
     Used for project-scoped session search (project admin).

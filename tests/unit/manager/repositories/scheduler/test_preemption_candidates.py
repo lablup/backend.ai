@@ -17,11 +17,11 @@ import sqlalchemy as sa
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.user import UserID
 from ai.backend.common.schema.resource_group import PreemptionConfig
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    PreemptionVictimScope,
     ResourceSlot,
     SecretKey,
     SessionId,
@@ -32,14 +32,22 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.manager.views.sokovan.workload import PreemptionScopeKey
 
 from .conftest import create_pending_session_with_kernels
+
+
+def _user_key(user_uuid: uuid.UUID) -> PreemptionScopeKey:
+    """Snapshot key of an owner under the default (user) victim scope."""
+    return PreemptionScopeKey(user_uuid)
 
 
 async def _create_allocated_session(
@@ -120,6 +128,52 @@ async def _create_extra_user(
         )
         await db_sess.flush()
     return user_uuid, access_key
+
+
+async def _create_extra_project(
+    db: ExtendedAsyncSAEngine,
+    *,
+    domain_name: str,
+    project_resource_policy: str,
+) -> uuid.UUID:
+    """Create a second project in the given domain."""
+    group_id = uuid.uuid4()
+    async with db.begin_session() as db_sess:
+        db_sess.add(
+            GroupRow(
+                id=group_id,
+                name=f"extra-group-{uuid.uuid4().hex[:8]}",
+                description="Extra test group",
+                is_active=True,
+                domain_name=domain_name,
+                total_resource_slots=ResourceSlot(),
+                allowed_vfolder_hosts={},
+                resource_policy=project_resource_policy,
+            )
+        )
+        await db_sess.flush()
+    return group_id
+
+
+async def _create_extra_domain(
+    db: ExtendedAsyncSAEngine,
+) -> tuple[DomainID, str]:
+    """Create a second domain."""
+    domain_id = DomainID(uuid.uuid4())
+    domain_name = f"extra-domain-{uuid.uuid4().hex[:8]}"
+    async with db.begin_session() as db_sess:
+        db_sess.add(
+            DomainRow(
+                id=domain_id,
+                name=domain_name,
+                total_resource_slots=ResourceSlot({
+                    "cpu": Decimal("1000"),
+                    "mem": Decimal("1048576"),
+                }),
+            )
+        )
+        await db_sess.flush()
+    return domain_id, domain_name
 
 
 async def _create_extra_agent(
@@ -248,7 +302,7 @@ class TestFetchPreemptionCandidates:
         )
 
         assert fetch is not None
-        assert fetch.preemption_candidates.by_user == {}
+        assert fetch.preemption_candidates.by_key == {}
 
     async def test_excludes_non_victim_sessions(
         self,
@@ -352,9 +406,10 @@ class TestFetchPreemptionCandidates:
         )
 
         assert fetch is not None
-        by_user = fetch.preemption_candidates.by_user
-        assert set(by_user.keys()) == {UserID(test_user_uuid)}
-        candidates = by_user[UserID(test_user_uuid)].candidates
+        assert fetch.preemption_candidates.scope == PreemptionVictimScope.USER
+        by_key = fetch.preemption_candidates.by_key
+        assert set(by_key.keys()) == {_user_key(test_user_uuid)}
+        candidates = by_key[_user_key(test_user_uuid)].candidates
         assert [c.session_id for c in candidates] == [victim_id]
         candidate = candidates[0]
         assert candidate.job_priority == 5
@@ -413,7 +468,7 @@ class TestFetchPreemptionCandidates:
         )
 
         assert fetch is not None
-        candidates = fetch.preemption_candidates.by_user[UserID(test_user_uuid)].candidates
+        candidates = fetch.preemption_candidates.by_key[_user_key(test_user_uuid)].candidates
         assert [c.session_id for c in candidates] == [scheduled_victim_id]
         # Pre-running candidate: reservation amounts, no execution start
         candidate = candidates[0]
@@ -519,10 +574,10 @@ class TestFetchPreemptionCandidates:
         )
 
         assert fetch is not None
-        by_user = fetch.preemption_candidates.by_user
-        assert set(by_user.keys()) == {UserID(test_user_uuid), UserID(other_user)}
-        assert [c.session_id for c in by_user[UserID(test_user_uuid)].candidates] == [victim_id]
-        other_candidates = by_user[UserID(other_user)].candidates
+        by_key = fetch.preemption_candidates.by_key
+        assert set(by_key.keys()) == {_user_key(test_user_uuid), _user_key(other_user)}
+        assert [c.session_id for c in by_key[_user_key(test_user_uuid)].candidates] == [victim_id]
+        other_candidates = by_key[_user_key(other_user)].candidates
         assert [c.session_id for c in other_candidates] == [other_victim_id]
         assert other_candidates[0].job_priority == 2
 
@@ -607,9 +662,9 @@ class TestFetchPreemptionCandidates:
         )
 
         assert fetch is not None
-        by_user = fetch.preemption_candidates.by_user
-        assert set(by_user.keys()) == {UserID(other_user)}
-        assert [c.session_id for c in by_user[UserID(other_user)].candidates] == [other_victim_id]
+        by_key = fetch.preemption_candidates.by_key
+        assert set(by_key.keys()) == {_user_key(other_user)}
+        assert [c.session_id for c in by_key[_user_key(other_user)].candidates] == [other_victim_id]
 
     async def test_reclaimable_totals_sum_owner_victims_per_agent(
         self,
@@ -666,7 +721,7 @@ class TestFetchPreemptionCandidates:
         )
 
         assert fetch is not None
-        user_entry = fetch.preemption_candidates.by_user[UserID(test_user_uuid)]
+        user_entry = fetch.preemption_candidates.by_key[_user_key(test_user_uuid)]
         agent_entry = user_entry.by_agent[AgentId(test_agent_id)]
         assert {c.session_id for c in agent_entry.candidates} == victim_ids
         assert agent_entry.total_reclaimable == {
@@ -726,9 +781,9 @@ class TestFetchPreemptionCandidates:
         )
 
         assert fetch is not None
-        by_user = fetch.preemption_candidates.by_user
-        assert set(by_user.keys()) == {UserID(test_user_uuid)}
-        user_entry = by_user[UserID(test_user_uuid)]
+        by_key = fetch.preemption_candidates.by_key
+        assert set(by_key.keys()) == {_user_key(test_user_uuid)}
+        user_entry = by_key[_user_key(test_user_uuid)]
         assert len(user_entry.candidates) == 1
         candidate = user_entry.candidates[0]
         assert candidate.session_id == victim_id
@@ -834,5 +889,287 @@ class TestFetchPreemptionCandidates:
         )
 
         assert fetch is not None
-        candidates = fetch.preemption_candidates.by_user[UserID(test_user_uuid)].candidates
+        candidates = fetch.preemption_candidates.by_key[_user_key(test_user_uuid)].candidates
         assert [c.session_id for c in candidates] == [old_victim_id]
+
+
+class TestPreemptionVictimScope:
+    """BA-7308: widening the victim pool by the group's ``victim_scope``."""
+
+    async def test_project_scope_pools_candidates_within_project(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
+        test_domain_name: str,
+        test_scaling_group_id: ResourceGroupID,
+        test_scaling_group_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_access_key: AccessKey,
+        test_agent_id: str,
+        test_resource_policy_name: str,
+        test_user_resource_policy_name: str,
+        test_keypair_resource_policy_name: str,
+        resource_slot_types: None,
+    ) -> None:
+        """Other users' sessions in the same project qualify; other projects
+        and equal-or-higher priorities never do."""
+        await _set_preemption_config(
+            db_with_cleanup,
+            test_scaling_group_id,
+            PreemptionConfig(enabled=True, victim_scope=PreemptionVictimScope.PROJECT),
+        )
+        await create_pending_session_with_kernels(
+            db_with_cleanup,
+            agent_assignments=[(test_agent_id, Decimal("1"), Decimal("1024"))],
+            job_priority=10,
+            domain_id=test_domain_id,
+            domain_name=test_domain_name,
+            resource_group_id=test_scaling_group_id,
+            scaling_group_name=test_scaling_group_name,
+            group_id=test_group_id,
+            user_uuid=test_user_uuid,
+            access_key=test_access_key,
+        )
+        other_user, other_access_key = await _create_extra_user(
+            db_with_cleanup,
+            domain_name=test_domain_name,
+            user_resource_policy=test_user_resource_policy_name,
+            keypair_resource_policy=test_keypair_resource_policy_name,
+        )
+        # Included: another user's session in the pending owner's project
+        victim_id = await _create_allocated_session(
+            db_with_cleanup,
+            agent_assignments=[(test_agent_id, Decimal("2"), Decimal("4096"))],
+            job_priority=5,
+            domain_id=test_domain_id,
+            domain_name=test_domain_name,
+            resource_group_id=test_scaling_group_id,
+            scaling_group_name=test_scaling_group_name,
+            group_id=test_group_id,
+            user_uuid=other_user,
+            access_key=other_access_key,
+        )
+        # Excluded: same project but job_priority not strictly below the max pending
+        await _create_allocated_session(
+            db_with_cleanup,
+            agent_assignments=[(test_agent_id, Decimal("1"), Decimal("1024"))],
+            job_priority=10,
+            domain_id=test_domain_id,
+            domain_name=test_domain_name,
+            resource_group_id=test_scaling_group_id,
+            scaling_group_name=test_scaling_group_name,
+            group_id=test_group_id,
+            user_uuid=other_user,
+            access_key=other_access_key,
+        )
+        # Excluded: lower priority but in a different project
+        other_project = await _create_extra_project(
+            db_with_cleanup,
+            domain_name=test_domain_name,
+            project_resource_policy=test_resource_policy_name,
+        )
+        await _create_allocated_session(
+            db_with_cleanup,
+            agent_assignments=[(test_agent_id, Decimal("1"), Decimal("1024"))],
+            job_priority=5,
+            domain_id=test_domain_id,
+            domain_name=test_domain_name,
+            resource_group_id=test_scaling_group_id,
+            scaling_group_name=test_scaling_group_name,
+            group_id=other_project,
+            user_uuid=other_user,
+            access_key=other_access_key,
+        )
+
+        fetch = await ScheduleDBSource(db_with_cleanup).fetch_scheduling_fetch(
+            test_scaling_group_id
+        )
+
+        assert fetch is not None
+        snapshot = fetch.preemption_candidates
+        assert snapshot.scope == PreemptionVictimScope.PROJECT
+        assert set(snapshot.by_key.keys()) == {PreemptionScopeKey(test_group_id)}
+        candidates = snapshot.by_key[PreemptionScopeKey(test_group_id)].candidates
+        assert [c.session_id for c in candidates] == [victim_id]
+
+    async def test_domain_scope_pools_candidates_across_projects(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
+        test_domain_name: str,
+        test_scaling_group_id: ResourceGroupID,
+        test_scaling_group_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_access_key: AccessKey,
+        test_agent_id: str,
+        test_resource_policy_name: str,
+        test_user_resource_policy_name: str,
+        test_keypair_resource_policy_name: str,
+        resource_slot_types: None,
+    ) -> None:
+        """Any project inside the pending owner's domain qualifies; other
+        domains in the same resource group never do."""
+        await _set_preemption_config(
+            db_with_cleanup,
+            test_scaling_group_id,
+            PreemptionConfig(enabled=True, victim_scope=PreemptionVictimScope.DOMAIN),
+        )
+        await create_pending_session_with_kernels(
+            db_with_cleanup,
+            agent_assignments=[(test_agent_id, Decimal("1"), Decimal("1024"))],
+            job_priority=10,
+            domain_id=test_domain_id,
+            domain_name=test_domain_name,
+            resource_group_id=test_scaling_group_id,
+            scaling_group_name=test_scaling_group_name,
+            group_id=test_group_id,
+            user_uuid=test_user_uuid,
+            access_key=test_access_key,
+        )
+        # Included: another user's session in a different project of the same domain
+        other_user, other_access_key = await _create_extra_user(
+            db_with_cleanup,
+            domain_name=test_domain_name,
+            user_resource_policy=test_user_resource_policy_name,
+            keypair_resource_policy=test_keypair_resource_policy_name,
+        )
+        other_project = await _create_extra_project(
+            db_with_cleanup,
+            domain_name=test_domain_name,
+            project_resource_policy=test_resource_policy_name,
+        )
+        victim_id = await _create_allocated_session(
+            db_with_cleanup,
+            agent_assignments=[(test_agent_id, Decimal("2"), Decimal("4096"))],
+            job_priority=5,
+            domain_id=test_domain_id,
+            domain_name=test_domain_name,
+            resource_group_id=test_scaling_group_id,
+            scaling_group_name=test_scaling_group_name,
+            group_id=other_project,
+            user_uuid=other_user,
+            access_key=other_access_key,
+        )
+        # Excluded: lower priority but in a different domain of the same group
+        extra_domain_id, extra_domain_name = await _create_extra_domain(db_with_cleanup)
+        extra_domain_project = await _create_extra_project(
+            db_with_cleanup,
+            domain_name=extra_domain_name,
+            project_resource_policy=test_resource_policy_name,
+        )
+        extra_domain_user, extra_domain_access_key = await _create_extra_user(
+            db_with_cleanup,
+            domain_name=extra_domain_name,
+            user_resource_policy=test_user_resource_policy_name,
+            keypair_resource_policy=test_keypair_resource_policy_name,
+        )
+        await _create_allocated_session(
+            db_with_cleanup,
+            agent_assignments=[(test_agent_id, Decimal("1"), Decimal("1024"))],
+            job_priority=5,
+            domain_id=extra_domain_id,
+            domain_name=extra_domain_name,
+            resource_group_id=test_scaling_group_id,
+            scaling_group_name=test_scaling_group_name,
+            group_id=extra_domain_project,
+            user_uuid=extra_domain_user,
+            access_key=extra_domain_access_key,
+        )
+
+        fetch = await ScheduleDBSource(db_with_cleanup).fetch_scheduling_fetch(
+            test_scaling_group_id
+        )
+
+        assert fetch is not None
+        snapshot = fetch.preemption_candidates
+        assert snapshot.scope == PreemptionVictimScope.DOMAIN
+        assert set(snapshot.by_key.keys()) == {PreemptionScopeKey(test_domain_id)}
+        candidates = snapshot.by_key[PreemptionScopeKey(test_domain_id)].candidates
+        assert [c.session_id for c in candidates] == [victim_id]
+
+    async def test_resource_group_scope_pools_all_sessions(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
+        test_domain_name: str,
+        test_scaling_group_id: ResourceGroupID,
+        test_scaling_group_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_access_key: AccessKey,
+        test_agent_id: str,
+        test_resource_policy_name: str,
+        test_user_resource_policy_name: str,
+        test_keypair_resource_policy_name: str,
+        resource_slot_types: None,
+    ) -> None:
+        """Every session in the resource group qualifies regardless of owner;
+        the priority rule still filters equal-or-higher victims."""
+        await _set_preemption_config(
+            db_with_cleanup,
+            test_scaling_group_id,
+            PreemptionConfig(enabled=True, victim_scope=PreemptionVictimScope.RESOURCE_GROUP),
+        )
+        await create_pending_session_with_kernels(
+            db_with_cleanup,
+            agent_assignments=[(test_agent_id, Decimal("1"), Decimal("1024"))],
+            job_priority=10,
+            domain_id=test_domain_id,
+            domain_name=test_domain_name,
+            resource_group_id=test_scaling_group_id,
+            scaling_group_name=test_scaling_group_name,
+            group_id=test_group_id,
+            user_uuid=test_user_uuid,
+            access_key=test_access_key,
+        )
+        # Included: a session of an entirely different domain/project/user
+        extra_domain_id, extra_domain_name = await _create_extra_domain(db_with_cleanup)
+        extra_domain_project = await _create_extra_project(
+            db_with_cleanup,
+            domain_name=extra_domain_name,
+            project_resource_policy=test_resource_policy_name,
+        )
+        extra_domain_user, extra_domain_access_key = await _create_extra_user(
+            db_with_cleanup,
+            domain_name=extra_domain_name,
+            user_resource_policy=test_user_resource_policy_name,
+            keypair_resource_policy=test_keypair_resource_policy_name,
+        )
+        victim_id = await _create_allocated_session(
+            db_with_cleanup,
+            agent_assignments=[(test_agent_id, Decimal("2"), Decimal("4096"))],
+            job_priority=5,
+            domain_id=extra_domain_id,
+            domain_name=extra_domain_name,
+            resource_group_id=test_scaling_group_id,
+            scaling_group_name=test_scaling_group_name,
+            group_id=extra_domain_project,
+            user_uuid=extra_domain_user,
+            access_key=extra_domain_access_key,
+        )
+        # Excluded: job_priority not strictly below the group's max pending
+        await _create_allocated_session(
+            db_with_cleanup,
+            agent_assignments=[(test_agent_id, Decimal("1"), Decimal("1024"))],
+            job_priority=10,
+            domain_id=extra_domain_id,
+            domain_name=extra_domain_name,
+            resource_group_id=test_scaling_group_id,
+            scaling_group_name=test_scaling_group_name,
+            group_id=extra_domain_project,
+            user_uuid=extra_domain_user,
+            access_key=extra_domain_access_key,
+        )
+
+        fetch = await ScheduleDBSource(db_with_cleanup).fetch_scheduling_fetch(
+            test_scaling_group_id
+        )
+
+        assert fetch is not None
+        snapshot = fetch.preemption_candidates
+        assert snapshot.scope == PreemptionVictimScope.RESOURCE_GROUP
+        assert set(snapshot.by_key.keys()) == {PreemptionScopeKey(test_scaling_group_id)}
+        candidates_entry = snapshot.by_key[PreemptionScopeKey(test_scaling_group_id)]
+        assert [c.session_id for c in candidates_entry.candidates] == [victim_id]

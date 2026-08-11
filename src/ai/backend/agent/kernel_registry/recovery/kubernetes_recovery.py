@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Self
+from typing import Self
 
 from ai.backend.agent.kernel_registry.loader.pickle import PickleBasedKernelRegistryLoader
 from ai.backend.agent.kernel_registry.writer.pickle import PickleBasedKernelRegistryWriter
@@ -11,9 +11,6 @@ from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
 
 from .base_recovery import BaseKernelRegistryRecovery
-
-if TYPE_CHECKING:
-    pass
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

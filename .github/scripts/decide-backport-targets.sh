@@ -6,10 +6,10 @@
 #
 #   decide-backport-targets.sh --event <name> --pr <number> [options]
 #
-#     --event <name>            pull_request_target, a merged pull request whose
-#                               metadata the rules below decide from, or
-#                               issue_comment, a `/backport <version> ...`
-#                               comment naming the targets outright
+#     --event <name>            pull_request_target or pull_request, a pull
+#                               request whose metadata the rules below decide
+#                               from, or issue_comment, a `/backport <version>
+#                               ...` comment naming the targets outright
 #     --pr <number>             the pull request to back port
 #     --title <t>               its title, which the `fix:` rule reads
 #     --body <b>                its body, which carries the `Backport:` trailer
@@ -21,6 +21,11 @@
 #     --pr-author <login>       who the backport is assigned to
 #     --registry <path>         the maintained-version registry
 #                               (default: .github/maintained-versions.yml)
+#     --targets-only            print the target versions rather than the job
+#                               matrix, and answer for a pull request that has
+#                               not been merged yet -- no merge commit is
+#                               needed, no release branch is looked up and no
+#                               comment is posted
 #     --dry-run                 decide as usual, but report the pull request
 #                               comments instead of posting them
 #
@@ -53,6 +58,7 @@ usage() {
   echo "  --pr-author <login>       who the backport is assigned to"
   echo "  --registry <path>         maintained-version registry"
   echo "                            (default: .github/maintained-versions.yml)"
+  echo "  --targets-only            print the target versions, not the matrix"
   echo "  --dry-run                 report the pull request comments, post none"
 }
 
@@ -67,13 +73,14 @@ comment_body=""
 author_association=""
 pr_author_login=""
 registry=".github/maintained-versions.yml"
+targets_only=0
 dry_run=0
 
 while [ "$#" -gt 0 ]; do
-  # Every option but `--dry-run` takes a value; catching a missing one here
-  # keeps each branch below to a single assignment.
+  # Every flag-shaped option aside, each one takes a value; catching a missing
+  # one here keeps each branch below to a single assignment.
   case "$1" in
-    --dry-run|-h|--help) ;;
+    --targets-only|--dry-run|-h|--help) ;;
     *) [ "$#" -ge 2 ] || { echo "Error: $1 requires a value" >&2; usage >&2; exit 2; } ;;
   esac
   case "$1" in
@@ -88,6 +95,7 @@ while [ "$#" -gt 0 ]; do
     --author-association) author_association="$2"; shift ;;
     --pr-author) pr_author_login="$2"; shift ;;
     --registry) registry="$2"; shift ;;
+    --targets-only) targets_only=1 ;;
     --dry-run) dry_run=1 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Error: unknown option: $1" >&2; usage >&2; exit 2 ;;
@@ -99,6 +107,12 @@ if [ -z "$event_name" ] || [ -z "$pr_number" ]; then
   echo "Error: --event and --pr are required" >&2
   usage >&2
   exit 2
+fi
+
+# The question `--targets-only` answers is asked of a pull request still open,
+# where a comment would be noise rather than a record of what was backported.
+if [ "$targets_only" -eq 1 ]; then
+  dry_run=1
 fi
 
 maintained=()   # versions the registry declares alive
@@ -179,7 +193,7 @@ fi
 if [ "$pr_base" != "main" ]; then
   skip_and_exit "#$pr_number targets '$pr_base' rather than 'main'; nothing to backport."
 fi
-if [ -z "$merge_commit" ]; then
+if [ "$targets_only" -eq 0 ] && [ -z "$merge_commit" ]; then
   skip_and_exit "#$pr_number has no merge commit; nothing to backport."
 fi
 
@@ -248,6 +262,11 @@ if [ ${#targets[@]} -gt 0 ]; then
   targets=("${sorted[@]}")
 fi
 echo "Backport targets of #$pr_number: ${targets[*]}" >&2
+if [ "$targets_only" -eq 1 ]; then
+  # Which of these have a release branch is left undecided: a caller asking
+  # about an open pull request wants the rule's answer, not today's remote.
+  emit_and_exit "${targets[*]}"
+fi
 if [ ${#targets[@]} -eq 0 ]; then
   emit_and_exit "[]"
 fi

@@ -14,9 +14,9 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.manager.api.gql_legacy.user import (
-    _MAIN_KEYPAIR_ACCESS_KEY,
     User,
     UserNode,
+    _default_access_key,
 )
 from ai.backend.manager.models.base import ensure_all_tables_registered
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
@@ -46,13 +46,13 @@ class TestMainAccessKeySpecs:
         [
             _SpecCase(
                 name="user",
-                statement=sa.select(users, _MAIN_KEYPAIR_ACCESS_KEY).select_from(users),
+                statement=sa.select(users, _default_access_key().label("default_access_key")).select_from(users),
                 filter_spec=dict(User._queryfilter_fieldspec),
                 order_spec=dict(User._queryorder_colmap),
             ),
             _SpecCase(
                 name="user-group-scoped",
-                statement=sa.select(users, _MAIN_KEYPAIR_ACCESS_KEY).select_from(users),
+                statement=sa.select(users, _default_access_key().label("default_access_key")).select_from(users),
                 filter_spec={
                     key: ("users_" + spec[0], spec[1]) if isinstance(spec[0], str) else spec
                     for key, spec in User._queryfilter_fieldspec.items()
@@ -85,13 +85,13 @@ class TestMainAccessKeySpecs:
         [
             _SpecCase(
                 name="user",
-                statement=sa.select(users, _MAIN_KEYPAIR_ACCESS_KEY).select_from(users),
+                statement=sa.select(users, _default_access_key().label("default_access_key")).select_from(users),
                 filter_spec=dict(User._queryfilter_fieldspec),
                 order_spec=dict(User._queryorder_colmap),
             ),
             _SpecCase(
                 name="user-group-scoped",
-                statement=sa.select(users, _MAIN_KEYPAIR_ACCESS_KEY).select_from(users),
+                statement=sa.select(users, _default_access_key().label("default_access_key")).select_from(users),
                 filter_spec={
                     key: ("users_" + spec[0], spec[1]) if isinstance(spec[0], str) else spec
                     for key, spec in User._queryfilter_fieldspec.items()

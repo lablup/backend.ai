@@ -16,7 +16,7 @@ from ai.backend.manager.models.base import (
 from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
 
-class ScopeBindingRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class ScopeBindingRow(CreatedAtMixin, Base):
     __tablename__ = "scope_bindings"
     __table_args__ = (
         sa.Index("ix_scope_bindings_scope", "scope_type", "scope_id"),

@@ -27,13 +27,13 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
 __all__ = (
     # Scope types
-    "DomainFairShareSearchScope",
-    "ProjectFairShareSearchScope",
-    "UserFairShareSearchScope",
+    "DomainFairShareOperationScope",
+    "ProjectFairShareOperationScope",
+    "UserFairShareOperationScope",
     # Entity-based search results
     "DomainFairShareEntitySearchResult",
     "ProjectFairShareEntitySearchResult",
@@ -45,7 +45,7 @@ __all__ = (
 
 
 @dataclass(frozen=True)
-class DomainFairShareSearchScope(SearchScope):
+class DomainFairShareOperationScope(OperationScope):
     """Required scope for domain fair share entity search.
 
     Used for field-level queries where the resource group is determined by
@@ -82,7 +82,7 @@ class DomainFairShareSearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class ProjectFairShareSearchScope(SearchScope):
+class ProjectFairShareOperationScope(OperationScope):
     """Required scope for project fair share entity search.
 
     Used for field-level queries where the resource group and domain are
@@ -128,7 +128,7 @@ class ProjectFairShareSearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class UserFairShareSearchScope(SearchScope):
+class UserFairShareOperationScope(OperationScope):
     """Required scope for user fair share entity search.
 
     Used for field-level queries where the resource group, domain, and project

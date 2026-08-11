@@ -8,6 +8,8 @@ from strawberry import Info
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.identifier.user import UserID
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -90,15 +92,15 @@ async def update_my_keypair(
     BackendAIGQLMeta(
         added_version="26.4.2",
         description="Switch the main access key for the current user. The target keypair must be active and owned by the user.",
-    )
+    ),
 )
 async def switch_my_main_access_key(
     info: Info[StrawberryGQLContext],
     input: SwitchMyMainAccessKeyInputGQL,
 ) -> SwitchMyMainAccessKeyPayloadGQL | None:
     user_id = _get_current_user_id()
-    payload = await info.context.adapters.user.switch_my_default_access_key(
-        user_id, input.access_key
+    payload = await info.context.adapters.user.switch_default_access_key(
+        UserID(user_id), AccessKey(input.access_key)
     )
     return SwitchMyMainAccessKeyPayloadGQL.from_pydantic(payload)
 

@@ -45,7 +45,8 @@ from ai.backend.manager.models.notification.orders import (
     NotificationChannelOrders,
     NotificationRuleOrders,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.notification.updaters import (

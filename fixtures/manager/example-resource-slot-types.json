@@ -1,6 +1,7 @@
 {
   "resource_slot_types": [
     {
+      "uuid": "eff6619c-a85c-40f4-ae59-608b0f683b4f",
       "slot_name": "cpu",
       "slot_type": "count",
       "required": true,
@@ -8,10 +9,14 @@
       "description": "CPU",
       "display_unit": "Core",
       "display_icon": "cpu",
-      "number_format": {"binary": false, "round_length": 0},
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
       "rank": 100
     },
     {
+      "uuid": "9d1a589e-2a78-491e-97d0-32d2a0079564",
       "slot_name": "mem",
       "slot_type": "bytes",
       "required": true,
@@ -19,10 +24,14 @@
       "description": "Memory",
       "display_unit": "GiB",
       "display_icon": "ram",
-      "number_format": {"binary": true, "round_length": 0},
+      "number_format": {
+        "binary": true,
+        "round_length": 0
+      },
       "rank": 200
     },
     {
+      "uuid": "12fb9a43-2abb-403f-ae78-f04287f0223e",
       "slot_name": "cuda.device",
       "slot_type": "count",
       "required": false,
@@ -30,10 +39,14 @@
       "description": "CUDA-capable GPU",
       "display_unit": "GPU",
       "display_icon": "nvidia",
-      "number_format": {"binary": false, "round_length": 0},
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
       "rank": 300
     },
     {
+      "uuid": "6d6e386d-fecd-424b-b651-6c60bca59ab1",
       "slot_name": "cuda.shares",
       "slot_type": "count",
       "required": false,
@@ -41,10 +54,14 @@
       "description": "CUDA-capable GPU (fractional)",
       "display_unit": "fGPU",
       "display_icon": "nvidia",
-      "number_format": {"binary": false, "round_length": 2},
+      "number_format": {
+        "binary": false,
+        "round_length": 2
+      },
       "rank": 400
     },
     {
+      "uuid": "3759b036-ba21-4c54-90d3-0834aa7e5753",
       "slot_name": "rocm.device",
       "slot_type": "count",
       "required": false,
@@ -52,10 +69,14 @@
       "description": "ROCm-capable GPU",
       "display_unit": "GPU",
       "display_icon": "rocm",
-      "number_format": {"binary": false, "round_length": 0},
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
       "rank": 500
     },
     {
+      "uuid": "d8f5ef16-9977-4c9f-9117-99abb23ffc3d",
       "slot_name": "tpu.device",
       "slot_type": "count",
       "required": false,
@@ -63,10 +84,14 @@
       "description": "TPU device",
       "display_unit": "GPU",
       "display_icon": "tpu",
-      "number_format": {"binary": false, "round_length": 0},
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
       "rank": 600
     },
     {
+      "uuid": "0898aff8-166b-4e43-8967-b3fb9d419f4a",
       "slot_name": "ipu.device",
       "slot_type": "count",
       "required": false,
@@ -74,10 +99,14 @@
       "description": "IPU device",
       "display_unit": "IPU",
       "display_icon": "ipu",
-      "number_format": {"binary": false, "round_length": 0},
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
       "rank": 700
     },
     {
+      "uuid": "572eb443-ad2f-4269-9aa0-89a3c219c4e1",
       "slot_name": "atom.device",
       "slot_type": "count",
       "required": false,
@@ -85,10 +114,14 @@
       "description": "ATOM",
       "display_unit": "ATOM",
       "display_icon": "rebel",
-      "number_format": {"binary": false, "round_length": 0},
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
       "rank": 800
     },
     {
+      "uuid": "1d56735e-583f-4e43-b7f8-4409e9c60b56",
       "slot_name": "atom-plus.device",
       "slot_type": "count",
       "required": false,
@@ -96,10 +129,14 @@
       "description": "ATOM+",
       "display_unit": "ATOM+",
       "display_icon": "rebel",
-      "number_format": {"binary": false, "round_length": 0},
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
       "rank": 900
     },
     {
+      "uuid": "1c7add00-830d-426d-94e8-aad96ad1d42c",
       "slot_name": "atom-max.device",
       "slot_type": "count",
       "required": false,
@@ -107,10 +144,14 @@
       "description": "ATOM Max",
       "display_unit": "ATOM Max",
       "display_icon": "rebel",
-      "number_format": {"binary": false, "round_length": 0},
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
       "rank": 1000
     },
     {
+      "uuid": "a7aafaaa-dc67-45c9-813f-5d2ed7961aef",
       "slot_name": "gaudi2.device",
       "slot_type": "count",
       "required": false,
@@ -118,10 +159,14 @@
       "description": "Gaudi 2",
       "display_unit": "Gaudi 2",
       "display_icon": "gaudi",
-      "number_format": {"binary": false, "round_length": 0},
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
       "rank": 1100
     },
     {
+      "uuid": "feabbb54-3f27-4ed3-ba53-495fc32a53c9",
       "slot_name": "warboy.device",
       "slot_type": "count",
       "required": false,
@@ -129,10 +174,14 @@
       "description": "Furiosa Warboy",
       "display_unit": "Warboy",
       "display_icon": "furiosa",
-      "number_format": {"binary": false, "round_length": 0},
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
       "rank": 1200
     },
     {
+      "uuid": "c0a50265-9d5c-4cad-9082-42ef751e5db0",
       "slot_name": "rngd.device",
       "slot_type": "count",
       "required": false,
@@ -140,10 +189,14 @@
       "description": "Furiosa RNGD",
       "display_unit": "RNGD",
       "display_icon": "furiosa",
-      "number_format": {"binary": false, "round_length": 0},
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
       "rank": 1300
     },
     {
+      "uuid": "d788d8b6-f27b-4639-91b9-1337705b55b7",
       "slot_name": "hyperaccel-lpu.device",
       "slot_type": "count",
       "required": false,
@@ -151,7 +204,10 @@
       "description": "Hyperaccel LPU",
       "display_unit": "LPU",
       "display_icon": "lpu",
-      "number_format": {"binary": false, "round_length": 0},
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
       "rank": 1400
     }
   ]

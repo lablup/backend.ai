@@ -1,6 +1,6 @@
 # REST v2 API layer — Guardrails
 
-> For background (pagination mode behavior, DI example, scoped URL examples), see `CONTEXTS.md` in the same directory; for implementation patterns, see the `/api-guide` skill.
+> For background (pagination mode behavior, DI example, scoped URL examples), see `KNOWLEDGE.md` in the same directory; for implementation patterns, see the `/api-guide` skill.
 > REST v2 uses the Pydantic DTOs in `common/dto/manager/v2/` — the same DTOs as the GQL schema (single source).
 
 ## Architecture
@@ -42,7 +42,7 @@ REST v2 Handler → Adapter (api/adapters/) → Processor → Service → Reposi
 
 **scoped search URL** (under consideration):
 - Current: `POST /v2/{entity}/{scope_type}/{scope_id}/search` — express the scope as a nested resource path (not `search-by-{scope}`).
-  Example: `/v2/sessions/projects/{project_id}/search`. (More examples: `CONTEXTS.md`)
+  Example: `/v2/sessions/projects/{project_id}/search`. (More examples: `KNOWLEDGE.md`)
 - **Forward direction:** fixed path `/v2/{entity}/scoped/search` + scope as a request body field (not a path param).
   Consistent with SDK `scoped_search` and GQL `scopedFoosV2`.
 - All scoped search routes use the `auth_required` middleware.
@@ -65,7 +65,7 @@ REST v2 Handler → Adapter (api/adapters/) → Processor → Service → Reposi
 ## Pagination
 
 - Accept both cursor and offset arguments. Only one mode per request — mixing `first` and `limit` is an error.
-- For mode-specific behavior and defaults, see `CONTEXTS.md`.
+- For mode-specific behavior and defaults, see `KNOWLEDGE.md`.
 
 ## Routing
 

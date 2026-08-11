@@ -276,7 +276,7 @@ class IdleCheckerHost:
                     kernels.c.requested_slots,
                     kernels.c.cluster_size,
                     users.c.created_at.label("user_created_at"),
-                    keypairs.c.access_key.label("main_access_key"),
+                    keypairs.c.access_key.label("default_access_key"),
                 )
                 .select_from(j)
                 .where(
@@ -289,7 +289,7 @@ class IdleCheckerHost:
             rows = result.fetchall()
             for kernel in rows:
                 grace_period_end = await self._grace_period_checker.get_grace_period_end(kernel)
-                # The idle policy is resolved through the user's main keypair
+                # The idle policy is resolved through the user's default keypair
                 # instead of the kernel's own access key, which may be left
                 # orphaned by a keypair deletion.
                 default_access_key = cast(AccessKey | None, kernel.default_access_key)

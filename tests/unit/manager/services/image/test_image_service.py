@@ -46,8 +46,9 @@ from ai.backend.manager.errors.image import (
     ImageNotFound,
 )
 from ai.backend.manager.models.image import ImageStatus, ImageType
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.image.creators import ImageAliasCreatorSpec
 from ai.backend.manager.repositories.image.repository import ImageRepository

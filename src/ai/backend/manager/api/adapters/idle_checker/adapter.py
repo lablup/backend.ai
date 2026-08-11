@@ -52,10 +52,10 @@ from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.idle_checker.conditions import IdleCheckerConditions
 from ai.backend.manager.models.idle_checker.orders import IdleCheckerOrders
 from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
-    NoPagination,
     Purger,
     Updater,
     combine_conditions_or,

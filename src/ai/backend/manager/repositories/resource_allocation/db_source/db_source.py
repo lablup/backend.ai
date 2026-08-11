@@ -41,7 +41,6 @@ from ai.backend.manager.models.resource_slot import (
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
-from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.resource_preset.db_source.types import (
     AccessKeyFilter,
@@ -69,10 +68,10 @@ class ResourceAllocationDBSource:
         self._db = db
 
     async def get_keypair_context(self, user_id: UUID) -> KeypairContextData:
-        """Resolve a user's main keypair access_key and resource_policy from DB.
+        """Resolve a user's default keypair access_key and resource_policy from DB.
 
-        Joins users -> keypairs -> keypair_resource_policies to fetch the
-        access_key and policy fields needed for resource allocation queries.
+        Joins keypairs -> keypair_resource_policies to fetch the access_key and
+        policy fields needed for resource allocation queries.
         """
         async with self._db.begin_readonly_session() as session:
             query = (
@@ -81,17 +80,12 @@ class ResourceAllocationDBSource:
                     KeyPairResourcePolicyRow.total_resource_slots,
                     KeyPairResourcePolicyRow.default_for_unspecified,
                 )
-                .select_from(
-                    sa.join(
-                        UserRow,
-                        KeyPairRow,
-                        (KeyPairRow.user == UserRow.uuid) & KeyPairRow.is_default,
-                    ).join(
-                        KeyPairResourcePolicyRow,
-                        KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
-                    )
+                .select_from(KeyPairRow)
+                .join(
+                    KeyPairResourcePolicyRow,
+                    KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
                 )
-                .where(UserRow.uuid == user_id)
+                .where((KeyPairRow.user == user_id) & KeyPairRow.is_default)
             )
             result = await session.execute(query)
             row = result.first()
