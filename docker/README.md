@@ -152,7 +152,7 @@ long as the parity rule holds.
 | `[container] scratch-root` | `/var/lib/backend.ai/scratches` | Scratch roots of kernel containers |
 | `[agent] mount-path` | `/vfroot/local` | Vfolder tree whose subdirectories become kernel bind-mount sources |
 | `[agent] ipc-base-path` | `/tmp/backend.ai/ipc/agent` | Agent↔kernel IPC sockets |
-| `[agent] var-base-path` | `/var/lib/backend.ai/agent` | Plugin state bind-mounted into kernels (e.g. accelerator hook caches) |
+| `[agent] var-base-path` | `/var/lib/backend.ai` | Plugin state bind-mounted into kernels (e.g. accelerator hook caches); plugin dirs live as siblings of `scratches/`, `commit/`, and `krunner/` |
 | `[agent] image-commit-path` | `/var/lib/backend.ai/commit` | Session image-commit tarballs written by the host daemon |
 | env `BACKENDAI_KRUNNER_SHARED` | `/var/lib/backend.ai/krunner` | Kernel-runner files: the image entrypoint copies them here so the host daemon can mount them into kernels; the entrypoint **refuses to start** without the share being host-backed |
 
