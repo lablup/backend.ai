@@ -42,8 +42,13 @@ class KeypairNode(BaseResponseModel):
         default=None, description="Whether the keypair has admin privileges."
     )
     created_at: datetime | None = Field(default=None, description="When the keypair was created.")
+    updated_at: datetime | None = Field(
+        default=None, description="When the keypair was last updated."
+    )
     modified_at: datetime | None = Field(
-        default=None, description="When the keypair was last modified."
+        default=None,
+        description="When the keypair was last updated. Deprecated since 26.9.0; use updated_at.",
+        deprecated=True,
     )
     last_used: datetime | None = Field(
         default=None, description="When the keypair was last used for an API call."

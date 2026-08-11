@@ -138,7 +138,7 @@ def _make_keypair_data(user_uuid: uuid.UUID | None = None) -> KeyPairData:
         is_active=True,
         is_admin=False,
         created_at=datetime.now(tz=UTC),
-        modified_at=datetime.now(tz=UTC),
+        updated_at=datetime.now(tz=UTC),
         resource_policy_name="default",
         rate_limit=1000,
         ssh_public_key=None,

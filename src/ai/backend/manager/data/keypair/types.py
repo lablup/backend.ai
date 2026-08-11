@@ -32,7 +32,7 @@ class KeyPairData:
     is_active: bool
     is_admin: bool
     created_at: datetime | None
-    modified_at: datetime | None
+    updated_at: datetime | None
 
     resource_policy_name: str
     rate_limit: int

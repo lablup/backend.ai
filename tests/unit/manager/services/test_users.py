@@ -111,7 +111,7 @@ class TestCreateUser:
             is_active=True,
             is_admin=False,
             created_at=datetime.now(tz=UTC),
-            modified_at=datetime.now(tz=UTC),
+            updated_at=datetime.now(tz=UTC),
             resource_policy_name="default",
             rate_limit=60000,
             ssh_public_key=None,
