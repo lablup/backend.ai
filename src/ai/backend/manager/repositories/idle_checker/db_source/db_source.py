@@ -457,7 +457,7 @@ class IdleCheckerDBSource:
         checker_id: IdleCheckerID,
         session_ids: Sequence[SessionID],
     ) -> Sequence[SessionID]:
-        """Exclude the existing sessions' pairs, returning the session ids acted upon
+        """Exclude the existing sessions' pairs, returning the processed session ids
         in request order, deduplicated.
 
         Unknown session ids are skipped rather than failing the batch; the caller
@@ -489,7 +489,7 @@ class IdleCheckerDBSource:
         checker_id: IdleCheckerID,
         session_ids: Sequence[SessionID],
     ) -> Sequence[SessionID]:
-        """Re-include the existing sessions' pairs, returning the session ids acted upon
+        """Re-include the existing sessions' pairs, returning the processed session ids
         in request order, deduplicated.
 
         Unknown session ids are skipped rather than failing the batch; the caller
