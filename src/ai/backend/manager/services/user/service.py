@@ -438,10 +438,10 @@ class UserService:
         )
         return UpdateMyKeypairActionResult(keypair=keypair_data)
 
-    async def switch_my_main_access_key(
+    async def switch_my_default_access_key(
         self, action: SwitchMyDefaultAccessKeyAction
     ) -> SwitchMyDefaultAccessKeyActionResult:
-        await self._user_repository.switch_my_main_access_key(
+        await self._user_repository.switch_my_default_access_key(
             user_uuid=action.user_uuid, access_key=action.access_key
         )
         return SwitchMyDefaultAccessKeyActionResult(success=True)

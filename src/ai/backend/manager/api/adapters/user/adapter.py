@@ -697,11 +697,11 @@ class UserAdapter(BaseAdapter):
         )
         return UpdateMyKeypairPayload(keypair=self._keypair_data_to_node(result.keypair))
 
-    async def switch_my_main_access_key(
+    async def switch_my_default_access_key(
         self, user_id: UUID, access_key: str
     ) -> SwitchMyMainAccessKeyPayload:
         """Switch the main access key for the current user."""
-        result = await self._processors.user.switch_my_main_access_key.wait_for_complete(
+        result = await self._processors.user.switch_my_default_access_key.wait_for_complete(
             SwitchMyDefaultAccessKeyAction(user_uuid=user_id, access_key=access_key)
         )
         return SwitchMyMainAccessKeyPayload(success=result.success)

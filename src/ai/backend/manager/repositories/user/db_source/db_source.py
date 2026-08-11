@@ -316,7 +316,7 @@ class UserDBSource:
             # Handle main_access_key validation
             main_access_key = updater_spec.main_access_key.optional_value()
             if main_access_key:
-                await self._validate_and_update_main_access_key(session, email, main_access_key)
+                await self._validate_and_update_default_access_key(session, email, main_access_key)
 
             # Update user
             if updater_spec.password.optional_value():
@@ -427,7 +427,7 @@ class UserDBSource:
         # Handle main_access_key validation
         main_access_key = updater_spec.main_access_key.optional_value()
         if main_access_key:
-            await self._validate_and_update_main_access_key(
+            await self._validate_and_update_default_access_key(
                 session, current_user.email, main_access_key
             )
 
@@ -778,7 +778,7 @@ class UserDBSource:
             .values(is_default=True)
         )
 
-    async def _validate_and_update_main_access_key(
+    async def _validate_and_update_default_access_key(
         self, session: SASession, email: str, main_access_key: str
     ) -> None:
         """Private method to validate and update main access key."""
@@ -1239,7 +1239,7 @@ class UserDBSource:
 
             await session.execute(sa.delete(keypairs).where(keypairs.c.access_key == access_key))
 
-    async def switch_my_main_access_key(self, user_uuid: UUID, access_key: str) -> None:
+    async def switch_my_default_access_key(self, user_uuid: UUID, access_key: str) -> None:
         """Switch the main access key for the current user."""
         async with self._db.begin_session() as session:
             kp_row = (

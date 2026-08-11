@@ -201,7 +201,7 @@ from .keypair import (
     issue_my_keypair,
     my_keypairs,
     revoke_my_keypair,
-    switch_my_main_access_key,
+    switch_my_default_access_key,
     update_my_keypair,
 )
 from .legacy_node_stubs import (
@@ -911,7 +911,7 @@ class Mutation:
     # Keypair self-service mutations
     issue_my_keypair = issue_my_keypair
     revoke_my_keypair = revoke_my_keypair
-    switch_my_main_access_key = switch_my_main_access_key
+    switch_my_default_access_key = switch_my_default_access_key
     update_my_keypair = update_my_keypair
     # Keypair admin mutations
     admin_create_keypair_v2 = admin_create_keypair_v2
