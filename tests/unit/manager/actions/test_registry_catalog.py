@@ -51,6 +51,9 @@ from ai.backend.manager.services.resource_slot.processors import ResourceSlotPro
 from ai.backend.manager.services.retention_policy.processors import RetentionPolicyProcessors
 from ai.backend.manager.services.role_preset.processors import RolePresetProcessors
 from ai.backend.manager.services.runtime_variant.processors import RuntimeVariantProcessors
+from ai.backend.manager.services.runtime_variant_preset.processors import (
+    RuntimeVariantPresetProcessors,
+)
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
 from ai.backend.manager.services.user_resource_policy.processors import (
     UserResourcePolicyProcessors,
@@ -117,6 +120,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     VFSStorageProcessors(MagicMock(), registry.group())
     NotificationProcessors(MagicMock(), registry.group(), registry.group())
     PrometheusQueryPresetCategoryProcessors(registry.group())
+    RuntimeVariantPresetProcessors(MagicMock(), registry.group())
 
     wired = sorted(spec.type() for spec in registry.wired_specs())
     defined = sorted(cls.spec().type() for cls in _concrete_v2_action_classes())

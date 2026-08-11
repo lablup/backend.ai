@@ -10,6 +10,8 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetValueType,
     UIOption,
 )
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.manager.data.runtime_variant_preset.types import (
     ChoiceItemData,
     ChoiceOptionData,
@@ -87,8 +89,8 @@ class RuntimeVariantPresetRow(LifecycleTimestampsMixin, Base):
     def to_data(self) -> RuntimeVariantPresetData:
         ui_option_data = self._convert_ui_option_to_data(self.ui_option)
         return RuntimeVariantPresetData(
-            id=self.id,
-            runtime_variant_id=self.runtime_variant,
+            id=RuntimeVariantPresetID(self.id),
+            runtime_variant_id=RuntimeVariantID(self.runtime_variant),
             name=self.name,
             description=self.description,
             rank=self.rank,

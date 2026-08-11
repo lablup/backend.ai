@@ -13,6 +13,8 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetValueType,
 )
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 from ai.backend.manager.repositories.base.updater import Updater
@@ -50,8 +52,8 @@ class TestRuntimeVariantPresetServiceUpdateValidation:
     def flaging_preset_env(self, preset_id: uuid.UUID) -> RuntimeVariantPresetData:
         """Existing preset with preset_target=env."""
         return RuntimeVariantPresetData(
-            id=preset_id,
-            runtime_variant_id=uuid.uuid4(),
+            id=RuntimeVariantPresetID(preset_id),
+            runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
             name="test",
             description=None,
             rank=0,
@@ -72,8 +74,8 @@ class TestRuntimeVariantPresetServiceUpdateValidation:
     def flaging_preset_args(self, preset_id: uuid.UUID) -> RuntimeVariantPresetData:
         """Existing preset with preset_target=args."""
         return RuntimeVariantPresetData(
-            id=preset_id,
-            runtime_variant_id=uuid.uuid4(),
+            id=RuntimeVariantPresetID(preset_id),
+            runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
             name="test",
             description=None,
             rank=0,
@@ -102,7 +104,9 @@ class TestRuntimeVariantPresetServiceUpdateValidation:
             value_type=OptionalState.update(PresetValueType.FLAG),
         )
         updater: Updater[RuntimeVariantPresetRow] = Updater(spec=spec, pk_value=preset_id)
-        action = UpdateRuntimeVariantPresetAction(id=preset_id, updater=updater)
+        action = UpdateRuntimeVariantPresetAction(
+            id=RuntimeVariantPresetID(preset_id), updater=updater
+        )
 
         with pytest.raises(InvalidAPIParameters, match="flag"):
             await service.update(action)
@@ -115,7 +119,7 @@ class TestRuntimeVariantPresetServiceUpdateValidation:
         flaging_preset_args: RuntimeVariantPresetData,
     ) -> None:
         updated_data = RuntimeVariantPresetData(
-            id=preset_id,
+            id=RuntimeVariantPresetID(preset_id),
             runtime_variant_id=flaging_preset_args.runtime_variant_id,
             name="test",
             description=None,
@@ -138,7 +142,9 @@ class TestRuntimeVariantPresetServiceUpdateValidation:
             value_type=OptionalState.update(PresetValueType.FLAG),
         )
         updater: Updater[RuntimeVariantPresetRow] = Updater(spec=spec, pk_value=preset_id)
-        action = UpdateRuntimeVariantPresetAction(id=preset_id, updater=updater)
+        action = UpdateRuntimeVariantPresetAction(
+            id=RuntimeVariantPresetID(preset_id), updater=updater
+        )
 
         result = await service.update(action)
         assert result.preset.value_type == PresetValueType.FLAG
@@ -150,8 +156,8 @@ class TestRuntimeVariantPresetServiceUpdateValidation:
         preset_id: uuid.UUID,
     ) -> None:
         flaging = RuntimeVariantPresetData(
-            id=preset_id,
-            runtime_variant_id=uuid.uuid4(),
+            id=RuntimeVariantPresetID(preset_id),
+            runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
             name="test",
             description=None,
             rank=0,
@@ -172,7 +178,9 @@ class TestRuntimeVariantPresetServiceUpdateValidation:
             preset_target=OptionalState.update(PresetTarget.ENV),
         )
         updater: Updater[RuntimeVariantPresetRow] = Updater(spec=spec, pk_value=preset_id)
-        action = UpdateRuntimeVariantPresetAction(id=preset_id, updater=updater)
+        action = UpdateRuntimeVariantPresetAction(
+            id=RuntimeVariantPresetID(preset_id), updater=updater
+        )
 
         with pytest.raises(InvalidAPIParameters, match="flag"):
             await service.update(action)

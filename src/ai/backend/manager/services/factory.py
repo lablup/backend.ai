@@ -519,7 +519,7 @@ def create_processors(
         role_preset=RolePresetProcessors(registry.group(), registry.group()),
         runtime_variant=RuntimeVariantProcessors(registry.group()),
         runtime_variant_preset=RuntimeVariantPresetProcessors(
-            services.runtime_variant_preset, action_monitors, validators
+            services.runtime_variant_preset, registry.group()
         ),
         deployment_revision_preset=DeploymentRevisionPresetProcessors(
             services.deployment_revision_preset, action_monitors, validators
