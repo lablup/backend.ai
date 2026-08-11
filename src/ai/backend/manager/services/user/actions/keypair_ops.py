@@ -7,6 +7,7 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.action.scope import BaseScopeAction, BaseScopeActionResult
@@ -105,9 +106,8 @@ class UpdateMyKeypairActionResult(BaseActionResult):
 class SwitchDefaultAccessKeyAction(UserAction):
     """Move a user's default keypair marker onto ``access_key``."""
 
-    user_uuid: UUID
+    user_id: UserID
     access_key: AccessKey
-    require_active: bool
 
     @override
     def entity_id(self) -> str | None:

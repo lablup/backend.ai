@@ -27,6 +27,7 @@ from ai.backend.common.dto.manager.user import (
     UpdateUserRequest,
     UpdateUserResponse,
 )
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.user.types import UserInfoContext
@@ -207,9 +208,8 @@ class UserHandler:
         if body.parsed.main_access_key is not None:
             await self._user.switch_default_access_key.wait_for_complete(
                 SwitchDefaultAccessKeyAction(
-                    user_uuid=path.parsed.user_id,
+                    user_id=UserID(path.parsed.user_id),
                     access_key=AccessKey(body.parsed.main_access_key),
-                    require_active=False,
                 )
             )
 

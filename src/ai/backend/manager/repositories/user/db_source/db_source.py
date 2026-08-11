@@ -1207,15 +1207,8 @@ class UserDBSource:
 
             await session.execute(sa.delete(keypairs).where(keypairs.c.access_key == access_key))
 
-    async def switch_default_access_key(
-        self, user_uuid: UUID, access_key: AccessKey, *, require_active: bool
-    ) -> None:
-        """Move a user's default keypair marker onto ``access_key``.
-
-        ``require_active`` is what separates the two callers: a user picking their own
-        default must pick a usable keypair, while deactivating a user turns all of theirs
-        inactive, and an administrator still has to be able to move the marker afterwards.
-        """
+    async def switch_default_access_key(self, user_id: UserID, access_key: AccessKey) -> None:
+        """Move a user's default keypair marker onto ``access_key``."""
         async with self._db.begin_session() as session:
             kp_row = (
                 await session.scalars(
@@ -1233,14 +1226,14 @@ class UserDBSource:
             ).first()
             if not kp_row:
                 raise KeyPairNotFound("Cannot set non-existing access key as the main access key.")
-            if kp_row.user != user_uuid:
+            if kp_row.user != user_id:
                 raise KeyPairForbidden(
                     "Cannot set another user's access key as the main access key."
                 )
-            if require_active and not kp_row.is_active:
+            if not kp_row.is_active:
                 raise KeyPairForbidden("Cannot set an inactive keypair as the main access key.")
 
-            await self._switch_default_keypair(session, UserID(user_uuid), access_key)
+            await self._switch_default_keypair(session, user_id, access_key)
 
     async def update_my_keypair(self, user_uuid: UUID, updater: Updater[KeyPairRow]) -> KeyPairData:
         """Update a keypair owned by the current user."""

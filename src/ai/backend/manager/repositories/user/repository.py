@@ -12,6 +12,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -305,13 +306,9 @@ class UserRepository:
         return await self._db_source.update_my_keypair(user_uuid, updater)
 
     @user_repository_resilience.apply()
-    async def switch_default_access_key(
-        self, user_uuid: UUID, access_key: AccessKey, *, require_active: bool
-    ) -> None:
+    async def switch_default_access_key(self, user_id: UserID, access_key: AccessKey) -> None:
         """Move a user's default keypair marker onto ``access_key``."""
-        await self._db_source.switch_default_access_key(
-            user_uuid, access_key, require_active=require_active
-        )
+        await self._db_source.switch_default_access_key(user_id, access_key)
 
     @user_repository_resilience.apply()
     async def search_my_keypairs(

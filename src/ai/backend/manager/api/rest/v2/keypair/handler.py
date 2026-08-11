@@ -90,7 +90,7 @@ class V2KeypairHandler:
     ) -> APIResponse:
         """Switch the main access key for the current user."""
         result = await self._adapter.switch_default_access_key(
-            UserID(ctx.user_uuid), AccessKey(body.parsed.access_key), require_active=True
+            UserID(ctx.user_uuid), AccessKey(body.parsed.access_key)
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 

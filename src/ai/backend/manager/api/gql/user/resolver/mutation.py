@@ -350,7 +350,7 @@ async def admin_bulk_update_users_v2(
     payload = await ctx.adapters.user.bulk_modify_users(action)
 
     for user_id, access_key in default_key_switches:
-        await ctx.adapters.user.switch_default_access_key(user_id, access_key, require_active=False)
+        await ctx.adapters.user.switch_default_access_key(user_id, access_key)
 
     return BulkUpdateUsersV2PayloadGQL.from_pydantic(payload)
 

@@ -546,9 +546,7 @@ class UserAdapter(BaseAdapter):
             ModifyUserByIdAction(user_id=user_id, updater=updater)
         )
         if not isinstance(input.main_access_key, Sentinel) and input.main_access_key is not None:
-            await self.switch_default_access_key(
-                UserID(user_id), AccessKey(input.main_access_key), require_active=False
-            )
+            await self.switch_default_access_key(UserID(user_id), AccessKey(input.main_access_key))
         return UpdateUserPayload(user=self._user_data_to_node(result.data))
 
     async def delete_user_by_id(self, input: DeleteUserInput) -> DeleteUserPayload:
@@ -699,18 +697,11 @@ class UserAdapter(BaseAdapter):
         return UpdateMyKeypairPayload(keypair=self._keypair_data_to_node(result.keypair))
 
     async def switch_default_access_key(
-        self, user_id: UserID, access_key: AccessKey, *, require_active: bool
+        self, user_id: UserID, access_key: AccessKey
     ) -> SwitchMyMainAccessKeyPayload:
-        """Move a user's default keypair marker onto ``access_key``.
-
-        ``require_active`` is what separates the two callers: a user picking their own
-        default must pick a usable keypair, while deactivating a user turns all of theirs
-        inactive, and an administrator editing such a user still has to move the marker.
-        """
+        """Move a user's default keypair marker onto ``access_key``."""
         result = await self._processors.user.switch_default_access_key.wait_for_complete(
-            SwitchDefaultAccessKeyAction(
-                user_uuid=user_id, access_key=access_key, require_active=require_active
-            )
+            SwitchDefaultAccessKeyAction(user_id=user_id, access_key=access_key)
         )
         return SwitchMyMainAccessKeyPayload(success=result.success)
 

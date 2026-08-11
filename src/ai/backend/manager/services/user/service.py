@@ -442,9 +442,7 @@ class UserService:
         self, action: SwitchDefaultAccessKeyAction
     ) -> SwitchDefaultAccessKeyActionResult:
         await self._user_repository.switch_default_access_key(
-            user_uuid=action.user_uuid,
-            access_key=action.access_key,
-            require_active=action.require_active,
+            user_id=action.user_id, access_key=action.access_key
         )
         return SwitchDefaultAccessKeyActionResult(success=True)
 
