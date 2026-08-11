@@ -11,6 +11,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SecretKey
 
 __all__ = (
@@ -43,7 +44,7 @@ class KeypairNode(BaseResponseModel):
     )
     is_default: bool = Field(
         default=False,
-        description="Whether this is the owner's default keypair. Added in 26.9.0.",
+        description=f"Whether this is the owner's default keypair. Added in {NEXT_RELEASE_VERSION}.",
     )
     created_at: datetime | None = Field(default=None, description="When the keypair was created.")
     modified_at: datetime | None = Field(

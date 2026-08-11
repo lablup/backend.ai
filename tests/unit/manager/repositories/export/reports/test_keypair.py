@@ -39,8 +39,8 @@ class TestKeypairReportDefinition:
         assert KEYPAIR_REPORT.select_from is KeyPairRow.__table__
 
     def test_total_field_count(self) -> None:
-        """Should have 37 fields total (6 basic + 31 relationship)."""
-        assert len(KEYPAIR_REPORT.fields) == 37
+        """Should have 38 fields total (7 basic + 31 relationship)."""
+        assert len(KEYPAIR_REPORT.fields) == 38
 
 
 class TestKeypairFieldDefinitions:

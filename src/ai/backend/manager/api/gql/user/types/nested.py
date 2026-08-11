@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.v2.user.response import (
 from ai.backend.common.dto.manager.v2.user.response import (
     UserStatusInfo as UserStatusInfoDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -108,7 +109,7 @@ class UserOrganizationInfoGQL:
     )
     main_access_key: str | None = gql_field(
         description="Primary API access key for this user.",
-        deprecation_reason="Deprecated since 26.9.0. Use the keypair's is_default field.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use the keypair's is_default field.",
     )
 
 
