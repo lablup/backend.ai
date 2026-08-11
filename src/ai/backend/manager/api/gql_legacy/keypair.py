@@ -17,7 +17,6 @@ from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.models.keypair import (
-    KeyPairRow,
     keypairs,
     prepare_new_keypair,
 )
@@ -577,12 +576,16 @@ class DeleteKeyPair(graphene.Mutation):  # type: ignore[misc]
         info: graphene.ResolveInfo,
         access_key: AccessKey,
     ) -> DeleteKeyPair:
+        from ai.backend.manager.models.user.row import UserRow
+
         ctx: GraphQueryContext = info.context
         async with ctx.db.begin_readonly_session() as db_session:
-            is_default = await db_session.scalar(
-                sa.select(KeyPairRow.is_default).where(KeyPairRow.access_key == access_key)
+            user_query = (
+                sa.select(sa.func.count())
+                .select_from(UserRow)
+                .where(UserRow.main_access_key == access_key)
             )
-            if is_default:
+            if (await db_session.scalar(user_query) or 0) > 0:
                 return DeleteKeyPair(False, "the keypair is used as main access key by any user")
         delete_query = sa.delete(keypairs).where(keypairs.c.access_key == access_key)
         return await simple_db_mutate(cls, ctx, delete_query)
