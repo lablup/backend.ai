@@ -636,7 +636,6 @@ async def _query_auth_context_by_access_key(
                     UserRow.domain_name,
                     UserRow.domain_id,
                     UserRow.sudo_session_enabled,
-                    UserRow.main_access_key,
                     UserRow.allowed_client_ip,
                 ),
                 joinedload(UserRow.resource_policy_row),
@@ -668,9 +667,6 @@ async def _query_auth_context_by_access_key(
                 domain_name=user_row.domain_name,
                 domain_id=DomainID(user_row.domain_id),
                 sudo_session_enabled=user_row.sudo_session_enabled,
-                main_access_key=AccessKey(user_row.main_access_key)
-                if user_row.main_access_key
-                else None,
                 allowed_client_ip=user_row.allowed_client_ip,
                 resource_policy=user_row.resource_policy_row.to_dataclass(),
             ),
