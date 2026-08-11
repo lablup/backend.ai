@@ -37,13 +37,14 @@ _REQUIRED = (
 _TIGHTENED = (*_REQUIRED, *_BACKFILLED)
 
 
-def _delete_incomplete_keypairs(bind: Connection) -> None:
-    missing = " OR ".join(f"k.{column} IS NULL" for column in _REQUIRED)
+def _delete_keypairs_missing_a_required_value(bind: Connection) -> None:
+    any_missing = " OR ".join(f"k.{column} IS NULL" for column in _REQUIRED)
+    which_missing = ", ".join(f"CASE WHEN k.{c} IS NULL THEN '{c}' END" for c in _REQUIRED)
     doomed = bind.execute(
         sa.text(f"""
-            SELECT k.access_key, u.email
+            SELECT k.access_key, u.email, array_remove(ARRAY[{which_missing}], NULL) AS missing
             FROM keypairs k LEFT JOIN users u ON u."uuid" = k."user"
-            WHERE {missing}
+            WHERE {any_missing}
             ORDER BY k.access_key
         """)
     ).all()
@@ -51,13 +52,13 @@ def _delete_incomplete_keypairs(bind: Connection) -> None:
         return
 
     log.warning(
-        "Deleting %d keypair(s) missing one of %s — those have no default to fall back on,"
-        " and a keypair without them cannot authenticate anything:",
+        "Deleting %d keypair(s) with a null in a column that has no default to backfill from:",
         len(doomed),
-        ", ".join(_REQUIRED),
     )
-    for access_key, email in doomed:
-        log.warning("  %s (owner: %s)", access_key, email or "<unknown>")
+    for access_key, email, missing in doomed:
+        log.warning(
+            "  %s (owner: %s) missing %s", access_key, email or "<unknown>", ", ".join(missing)
+        )
 
     keys = [row.access_key for row in doomed]
     bind.execute(
@@ -80,7 +81,7 @@ def _delete_incomplete_keypairs(bind: Connection) -> None:
 
 def upgrade() -> None:
     bind = op.get_bind()
-    _delete_incomplete_keypairs(bind)
+    _delete_keypairs_missing_a_required_value(bind)
     for column, default in _BACKFILLED.items():
         bind.execute(sa.text(f"UPDATE keypairs SET {column} = {default} WHERE {column} IS NULL"))
 
