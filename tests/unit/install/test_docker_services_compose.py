@@ -118,11 +118,43 @@ def test_rendered_compose_networking_split(template: str) -> None:
             assert "ports" not in service
             assert "extra_hosts" not in service
         else:
-            # Bridge service: published ports and the host-gateway alias its
-            # rewritten outbound addresses (host.docker.internal) resolve to.
             assert "network_mode" not in service, f"{name} must stay on the bridge network"
             assert set(service["ports"]) == EXPECTED_PORTS[name], name
-            assert HOST_GATEWAY_ALIAS in service["extra_hosts"], name
+        # Only the webserver talks to a host-network process (the manager
+        # API); everything else uses compose service DNS in the unified
+        # project, so no other service needs the host-gateway alias.
+        if name == "webserver":
+            assert HOST_GATEWAY_ALIAS in service["extra_hosts"]
+        else:
+            assert "extra_hosts" not in service, name
+
+
+def test_rendered_compose_includes_halfstack_as_one_project(template: str) -> None:
+    doc = render(template, enable_gpu=False)
+    # The halfstack file joins THIS compose project, putting every container
+    # on one network (service DNS) under one `docker compose` entry file.
+    assert doc["include"] == ["docker-compose.halfstack.current.yml"]
+    # Startup is health-gated on the halfstack members, as in the reference
+    # hand-written deployment.
+    depends = {
+        name: set(service.get("depends_on", {}).keys()) for name, service in doc["services"].items()
+    }
+    assert depends["manager"] == {
+        "backendai-half-db",
+        "backendai-half-redis",
+        "backendai-half-etcd",
+    }
+    assert depends["agent"] == {"backendai-half-redis", "backendai-half-etcd"}
+    assert depends["webserver"] == {"backendai-half-redis"}
+    assert depends["storage-proxy"] == {"backendai-half-etcd"}
+    assert depends["appproxy-coordinator"] == {"backendai-half-db", "backendai-half-redis"}
+    assert depends["appproxy-worker"] == {"backendai-half-redis"}
+    assert depends["appproxy-worker-tcp"] == {"backendai-half-redis"}
+    # manager-cli one-offs run with --no-deps; it declares none.
+    assert depends["manager-cli"] == set()
+    for name, service in doc["services"].items():
+        for condition in service.get("depends_on", {}).values():
+            assert condition == {"condition": "service_healthy"}, name
 
 
 def test_rendered_compose_config_mounts_follow_default_command_paths(template: str) -> None:

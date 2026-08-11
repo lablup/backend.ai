@@ -35,11 +35,23 @@
 # - The compose project name is fixed so this file never shares a compose
 #   project with the halfstack file living in the same directory.
 name: backendai-services
+# The halfstack (PostgreSQL/Redis/etcd + optional observability) runs as part
+# of THIS compose project: the bridge-networked services below reach it by
+# service DNS and health-gate on it via depends_on. Requires Compose >= 2.20.
+include:
+  - docker-compose.halfstack.current.yml
 services:
   manager:
     image: lablup/backend.ai-manager:{{VERSION}}
     network_mode: host
     privileged: true
+    depends_on:
+      backendai-half-db:
+        condition: service_healthy
+      backendai-half-redis:
+        condition: service_healthy
+      backendai-half-etcd:
+        condition: service_healthy
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc/machine-id:/etc/machine-id:ro
@@ -69,6 +81,11 @@ services:
     image: lablup/backend.ai-agent:{{VERSION}}
     network_mode: host
     privileged: true
+    depends_on:
+      backendai-half-redis:
+        condition: service_healthy
+      backendai-half-etcd:
+        condition: service_healthy
     pid: host
     # REQUIRED: on cgroup v2 hosts Docker defaults to a private cgroup
     # namespace even for privileged containers, which breaks the agent's
@@ -93,6 +110,9 @@ services:
 
   webserver:
     image: lablup/backend.ai-webserver:{{VERSION}}
+    depends_on:
+      backendai-half-redis:
+        condition: service_healthy
     ports:
       - "8090:8090"  # ServiceConfig.webserver_addr
     extra_hosts:
@@ -103,14 +123,15 @@ services:
 
   storage-proxy:
     image: lablup/backend.ai-storage-proxy:{{VERSION}}
+    depends_on:
+      backendai-half-etcd:
+        condition: service_healthy
     # the installing user: vfolder files keep the same ownership as in
     # PACKAGE mode (the chown watcher, which needs root, is not used here)
     user: "{{UID}}:{{GID}}"
     ports:
       - "6021:6021"  # ServiceConfig.storage_proxy_client_facing_addr
       - "6022:6022"  # ServiceConfig.storage_proxy_manager_facing_addr
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     volumes:
       - {{BASE_PATH}}/storage-proxy.toml:/etc/backend.ai/storage-proxy.toml:ro
       # path parity: the vfolder tree it manages becomes kernel bind-mount
@@ -120,32 +141,37 @@ services:
 
   appproxy-coordinator:
     image: lablup/backend.ai-appproxy-coordinator:{{VERSION}}
+    depends_on:
+      backendai-half-db:
+        condition: service_healthy
+      backendai-half-redis:
+        condition: service_healthy
     ports:
       - "10200:10200"  # ServiceConfig.appproxy_coordinator_addr
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     volumes:
       - {{BASE_PATH}}/app-proxy-coordinator.toml:/etc/backend.ai/proxy-coordinator.toml:ro
     restart: unless-stopped
 
   appproxy-worker:
     image: lablup/backend.ai-appproxy-worker:{{VERSION}}
+    depends_on:
+      backendai-half-redis:
+        condition: service_healthy
     ports:
       - "10201:10201"  # ServiceConfig.appproxy_worker_addr
       - "10205-10300:10205-10300"  # [proxy_worker.port_proxy] bind_port_range
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     volumes:
       - {{BASE_PATH}}/app-proxy-worker.toml:/etc/backend.ai/proxy-worker.toml:ro
     restart: unless-stopped
 
   appproxy-worker-tcp:
     image: lablup/backend.ai-appproxy-worker:{{VERSION}}
+    depends_on:
+      backendai-half-redis:
+        condition: service_healthy
     ports:
       - "10202:10202"  # ServiceConfig.appproxy_tcp_worker_addr
       - "10501-10600:10501-10600"  # [proxy_worker.port_proxy] bind_port_range
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     volumes:
       - {{BASE_PATH}}/app-proxy-worker-tcp.toml:/etc/backend.ai/proxy-worker.toml:ro
     restart: unless-stopped
