@@ -2301,15 +2301,20 @@ class DockerContext(Context):
 
     - Every service container runs on the host network, so the configs
       generated for the package layout (127.0.0.1 addressing) work unchanged.
-    - The install target directory is bind-mounted into every service
-      container at the identical absolute path (path parity), so every path
-      under it that a service hands to the host Docker daemon — scratch
-      roots, IPC sockets, vfolder trees, plugin var state — resolves on the
-      host.
+    - The install target directory is bind-mounted at the identical absolute
+      path (path parity) into the services whose files must resolve on the
+      host or that share bootstrap state: the agent and storage-proxy hand
+      paths under it to the host Docker daemon (scratch roots, IPC sockets,
+      vfolder trees, plugin var state), and the manager/manager-cli exchange
+      the RPC keypair fixtures through it.
+    - The remaining services (webserver, app-proxy trio) mount only their own
+      config file read-only, so a compromised one cannot read the credentials
+      in the other configs; their working-dir-relative state stays
+      container-local.
     - One-off management commands (schema init, fixture loading, image
       rescan) run through ``docker compose run`` using the same images, with
-      host paths outside the install directory bind-mounted read-only on
-      demand.
+      host paths passed as arguments bind-mounted read-only on demand — only
+      paths already covered by the service's parity mount are skipped.
     """
 
     SERVICES_COMPOSE_FILENAME = "docker-compose.services.yml"
@@ -2373,20 +2378,35 @@ class DockerContext(Context):
             str(self.install_info.base_path / self.SERVICES_COMPOSE_FILENAME),
         ]
 
-    async def _run_service_cli(self, service: str, container_cmd: Sequence[str]) -> int:
+    async def _run_service_cli(
+        self,
+        service: str,
+        container_cmd: Sequence[str],
+        *,
+        parity_mounted: bool = True,
+    ) -> int:
         """
         Run a one-off management command inside a fresh container of the given
-        compose service (same image, same host network, same base_path parity
-        mount). Host paths passed as arguments that live outside the install
-        directory (e.g. fixture files extracted from the installer package)
-        are bind-mounted read-only at the identical path so the in-container
-        command can read them unchanged.
+        compose service (same image, same host network, same volumes). Host
+        paths passed as arguments (e.g. fixture files extracted from the
+        installer package) are bind-mounted read-only at the identical path so
+        the in-container command can read them unchanged.
+
+        ``parity_mounted`` states whether the compose service carries the
+        base_path parity mount: when it does, arguments under base_path are
+        already visible and are not mounted again (a duplicate mount target
+        would fail); when it does not (the config-only services), base_path
+        arguments get the same per-file read-only treatment as outside paths.
         """
         base_path = self.install_info.base_path
         volume_args: list[str] = []
         for arg in container_cmd:
             p = Path(arg)
-            if p.is_absolute() and p.exists() and not p.is_relative_to(base_path):
+            if (
+                p.is_absolute()
+                and p.exists()
+                and (not parity_mounted or not p.is_relative_to(base_path))
+            ):
                 volume_args += ["-v", f"{p}:{p}:ro"]
         return await self.run_exec([
             *self.docker_sudo,
@@ -2414,9 +2434,13 @@ class DockerContext(Context):
 
     @override
     async def run_appproxy_coordinator_cli(self, cmdargs: Sequence[str]) -> None:
+        # The coordinator service mounts only its own config file, so
+        # base_path arguments (e.g. the copied alembic-appproxy.ini) need the
+        # per-file read-only mounts too.
         exit_code = await self._run_service_cli(
             "appproxy-coordinator",
             ["backend.ai", "app-proxy-coordinator", *cmdargs],
+            parity_mounted=False,
         )
         if exit_code != 0:
             raise RuntimeError(

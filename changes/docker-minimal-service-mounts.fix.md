@@ -1,0 +1,1 @@
+Mount only each service's own config file (read-only) into the DOCKER install-mode webserver and app-proxy containers instead of the whole install directory, so they cannot read the credentials in the other services' configs

@@ -181,9 +181,14 @@ the **DOCKER install mode** of `backend.ai-installer` generates at
 
 - Every service runs on the host network, so the generated configs use the
   same `127.0.0.1` addressing as a package-based install.
-- The install directory is bind-mounted into every container at the identical
-  absolute path, and each service's `command:` reads its config from there —
-  no `/etc/backend.ai` mounts.
+- Each service's `command:` reads its config from the install directory — no
+  `/etc/backend.ai` mounts. The install directory is bind-mounted at the
+  identical absolute path (path parity) only into the services whose files
+  must resolve on the host or that share bootstrap state: agent and
+  storage-proxy (paths handed to the host Docker daemon) plus
+  manager/manager-cli (RPC keypair fixtures). The webserver and app-proxy
+  services mount **only their own config file, read-only**, so a compromised
+  one never sees the credentials in the other configs.
 - `/etc/machine-id` is passed through read-only to the manager and agent so
   anything deriving a stable host identity sees the host's, not the
   container's.

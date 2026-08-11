@@ -21,6 +21,20 @@ EXPECTED_SERVICES = {
 # One-off helper service: started only via `docker compose run`, never `up -d`.
 CLI_ONLY_SERVICES = {"manager-cli"}
 
+# Services carrying the base_path parity mount: the agent and storage-proxy
+# hand paths under it to the host Docker daemon, and the manager/manager-cli
+# share bootstrap state (RPC keypair fixtures) through it.
+PARITY_SERVICES = {"manager", "manager-cli", "agent", "storage-proxy"}
+
+# The rest mount ONLY their own config file, read-only — they must never see
+# the credentials in the other configs (e.g. the manager's DB password).
+CONFIG_ONLY_SERVICES = {
+    "webserver": "webserver.conf",
+    "appproxy-coordinator": "app-proxy-coordinator.toml",
+    "appproxy-worker": "app-proxy-worker.toml",
+    "appproxy-worker-tcp": "app-proxy-worker-tcp.toml",
+}
+
 BASE_PATH = Path("/home/bai/backendai")
 VERSION = "26.9.0"
 
@@ -56,21 +70,41 @@ def test_rendered_compose_has_dedicated_project_name(template: str) -> None:
     assert doc["name"] == "backendai-services"
 
 
-def test_rendered_compose_has_all_services_with_parity_mounts(template: str) -> None:
+def test_rendered_compose_has_all_services_with_expected_mounts(template: str) -> None:
     doc = render(template, enable_gpu=False)
     services = doc["services"]
     assert set(services.keys()) == EXPECTED_SERVICES
+    assert PARITY_SERVICES | set(CONFIG_ONLY_SERVICES) == EXPECTED_SERVICES
     parity_mount = f"{BASE_PATH}:{BASE_PATH}"
     for name, service in services.items():
         assert service["image"] == service["image"].split(":")[0] + f":{VERSION}"
         assert service["image"].startswith("lablup/backend.ai-")
         assert service["network_mode"] == "host"
         assert service["working_dir"] == str(BASE_PATH)
-        assert parity_mount in service["volumes"], f"{name} lacks the base_path parity mount"
+        if name in PARITY_SERVICES:
+            assert parity_mount in service["volumes"], f"{name} lacks the base_path parity mount"
+        else:
+            assert parity_mount not in service["volumes"], (
+                f"{name} must not see the whole install directory"
+            )
         if name in CLI_ONLY_SERVICES:
             assert "restart" not in service, f"{name} must not auto-restart"
         else:
             assert service["restart"] == "unless-stopped"
+
+
+def test_rendered_compose_config_only_services_mount_just_their_config(template: str) -> None:
+    doc = render(template, enable_gpu=False)
+    services = doc["services"]
+    for name, config_filename in CONFIG_ONLY_SERVICES.items():
+        service = services[name]
+        config_path = BASE_PATH / config_filename
+        # Exactly one volume: the service's own config, read-only — nothing
+        # else from the install directory (the other configs carry
+        # credentials this service has no business reading).
+        assert service["volumes"] == [f"{config_path}:{config_path}:ro"], name
+        # The command reads the exact file that is mounted.
+        assert str(config_path) in service["command"], name
 
 
 def test_rendered_compose_elevated_services(template: str) -> None:

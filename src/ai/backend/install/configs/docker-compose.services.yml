@@ -11,9 +11,16 @@
 # - Every service runs on the host network, so the generated configs use the
 #   same 127.0.0.1 addressing as the package-based install layout.
 # - The install directory is bind-mounted at the SAME absolute path (path
-#   parity): every path under it that a service hands to the host Docker
-#   daemon (scratch roots, IPC sockets, vfolder trees, plugin var state)
-#   resolves identically on the host and inside the containers.
+#   parity) into the services whose paths must resolve on the host — the
+#   agent and storage-proxy hand paths under it to the host Docker daemon
+#   (scratch roots, IPC sockets, vfolder trees, plugin var state), and the
+#   manager/manager-cli share bootstrap state (RPC keypair fixtures, fixture
+#   files) through it.
+# - The remaining services (webserver, app-proxy trio) mount ONLY their own
+#   config file, read-only: they never see the credentials in the other
+#   configs (e.g. the manager's DB password). Their working-dir-relative
+#   state (ipc/, var/, logs) stays container-local and ephemeral, which is
+#   fine — nothing outside the container consumes it.
 # - The agent additionally needs pid/cgroup host namespaces and the
 #   /var/lib/backend.ai/krunner share for kernel-runner bind-mounts.
 # - No agent-watcher container ships in this mode; the watcher endpoint in
@@ -76,7 +83,7 @@ services:
     working_dir: {{BASE_PATH}}
     command: ["python", "-m", "ai.backend.web.server", "-f", "{{BASE_PATH}}/webserver.conf"]
     volumes:
-      - {{BASE_PATH}}:{{BASE_PATH}}
+      - {{BASE_PATH}}/webserver.conf:{{BASE_PATH}}/webserver.conf:ro
     restart: unless-stopped
 
   storage-proxy:
@@ -94,7 +101,7 @@ services:
     working_dir: {{BASE_PATH}}
     command: ["python", "-m", "ai.backend.appproxy.coordinator.server", "-f", "{{BASE_PATH}}/app-proxy-coordinator.toml"]
     volumes:
-      - {{BASE_PATH}}:{{BASE_PATH}}
+      - {{BASE_PATH}}/app-proxy-coordinator.toml:{{BASE_PATH}}/app-proxy-coordinator.toml:ro
     restart: unless-stopped
 
   appproxy-worker:
@@ -103,7 +110,7 @@ services:
     working_dir: {{BASE_PATH}}
     command: ["python", "-m", "ai.backend.appproxy.worker.server", "-f", "{{BASE_PATH}}/app-proxy-worker.toml"]
     volumes:
-      - {{BASE_PATH}}:{{BASE_PATH}}
+      - {{BASE_PATH}}/app-proxy-worker.toml:{{BASE_PATH}}/app-proxy-worker.toml:ro
     restart: unless-stopped
 
   appproxy-worker-tcp:
@@ -112,5 +119,5 @@ services:
     working_dir: {{BASE_PATH}}
     command: ["python", "-m", "ai.backend.appproxy.worker.server", "-f", "{{BASE_PATH}}/app-proxy-worker-tcp.toml"]
     volumes:
-      - {{BASE_PATH}}:{{BASE_PATH}}
+      - {{BASE_PATH}}/app-proxy-worker-tcp.toml:{{BASE_PATH}}/app-proxy-worker-tcp.toml:ro
     restart: unless-stopped
