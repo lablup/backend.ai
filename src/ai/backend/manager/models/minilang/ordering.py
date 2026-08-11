@@ -28,6 +28,12 @@ _parser = Lark(
     maybe_placeholders=False,
 )
 
+type OrderingColumn = (
+    sa.Column[Any]
+    | sa.orm.attributes.InstrumentedAttribute[Any]
+    | sa.sql.elements.KeyedColumnElement[Any]
+    | sa.sql.elements.ColumnElement[Any]
+)
 type ColumnMapType = Mapping[str, OrderSpecItem] | None
 
 
@@ -37,11 +43,7 @@ class OrderDirection(enum.Enum):
 
 
 class OrderingItem(NamedTuple):
-    column: (
-        sa.Column[Any]
-        | sa.orm.attributes.InstrumentedAttribute[Any]
-        | sa.sql.elements.KeyedColumnElement[Any]
-    )
+    column: OrderingColumn
     order_direction: OrderDirection
 
 
@@ -53,24 +55,19 @@ class QueryOrderTransformer(Transformer[Any, Any]):
         self._sa_table = sa_table
         self._column_map = column_map
 
-    def _get_col(
-        self, col_name: str
-    ) -> (
-        sa.Column[Any]
-        | sa.orm.attributes.InstrumentedAttribute[Any]
-        | sa.sql.elements.KeyedColumnElement[Any]
-    ):
+    def _get_col(self, col_name: str) -> OrderingColumn:
         try:
             if self._column_map:
                 col_value, func = self._column_map[col_name]
+                matched_col: OrderingColumn
                 match col_value:
                     case str(column):
                         matched_col = get_col_from_table(self._sa_table, column)
                     case JSONFieldItem(_col, _key):
                         _column = get_col_from_table(self._sa_table, _col)
-                        matched_col = _column.op("->>")(_key)  # type: ignore[assignment]
+                        matched_col = _column.op("->>")(_key)
                     case ORMFieldItem(column):
-                        matched_col = column  # type: ignore[assignment]
+                        matched_col = column
                     case _:
                         raise ValueError("Invalid type of field name", col_name)
                 col = func(matched_col) if func is not None else matched_col  # type: ignore[arg-type]

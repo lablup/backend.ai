@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
@@ -629,10 +629,17 @@ class UserAdapter(BaseAdapter):
         ]
         return BulkCreateUsersWithKeypairPayload(created=created, failed=failed)
 
-    async def bulk_modify_users(self, action: BulkModifyUserAction) -> BulkUpdateUsersPayload:
-        """Bulk-modify users. Each item's transformation is the caller's responsibility."""
+    async def bulk_modify_users(
+        self,
+        action: BulkModifyUserAction,
+        default_key_switches: Mapping[UserID, AccessKey],
+    ) -> BulkUpdateUsersPayload:
+        """Bulk-modify users. Each item's transformation is the caller's responsibility.
+
+        A switch runs only for a user whose own update went through, and a switch that
+        fails turns that user into a failure instead of aborting the whole batch.
+        """
         result = await self._processors.user.bulk_modify_users.wait_for_complete(action)
-        updated_users = [self._user_data_to_node(u) for u in result.data.successes]
         failed = [
             BulkUpdateUserV2Error(
                 user_id=action.items[error.index].user_id,
@@ -640,6 +647,16 @@ class UserAdapter(BaseAdapter):
             )
             for error in result.data.failures
         ]
+        updated_users = []
+        for user in result.data.successes:
+            access_key = default_key_switches.get(UserID(user.id))
+            if access_key is not None:
+                try:
+                    await self.switch_default_access_key(UserID(user.id), access_key)
+                except Exception as e:
+                    failed.append(BulkUpdateUserV2Error(user_id=user.id, message=str(e)))
+                    continue
+            updated_users.append(self._user_data_to_node(user))
         return BulkUpdateUsersPayload(updated_users=updated_users, failed=failed)
 
     async def bulk_purge_users(self, action: BulkPurgeUserAction) -> BulkPurgeUsersPayload:

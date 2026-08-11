@@ -249,7 +249,7 @@ async def admin_bulk_update_users_v2(
     auth_config = ctx.config_provider.config.auth
 
     items: list[UserUpdateSpec] = []
-    default_key_switches: list[tuple[UserID, AccessKey]] = []
+    default_key_switches: dict[UserID, AccessKey] = {}
     for user_item in input.users:
         dto = user_item.input.to_pydantic()
 
@@ -343,15 +343,11 @@ async def admin_bulk_update_users_v2(
         )
 
         if not isinstance(dto.main_access_key, Sentinel) and dto.main_access_key is not None:
-            default_key_switches.append((UserID(user_item.user_id), AccessKey(dto.main_access_key)))
+            default_key_switches[UserID(user_item.user_id)] = AccessKey(dto.main_access_key)
         items.append(UserUpdateSpec(user_id=UserID(user_item.user_id), updater_spec=updater_spec))
 
     action = BulkModifyUserAction(items=items)
-    payload = await ctx.adapters.user.bulk_modify_users(action)
-
-    for user_id, access_key in default_key_switches:
-        await ctx.adapters.user.switch_default_access_key(user_id, access_key)
-
+    payload = await ctx.adapters.user.bulk_modify_users(action, default_key_switches)
     return BulkUpdateUsersV2PayloadGQL.from_pydantic(payload)
 
 
