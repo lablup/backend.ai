@@ -34,7 +34,6 @@ class ModelCardData:
     framework: list[str]
     label: list[str]
     license: str | None
-    min_resource: list[ResourceRequirementEntry]
     readme: str | None
     access_level: str
     created_at: datetime

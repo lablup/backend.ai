@@ -66,11 +66,19 @@ class ModelCardCreatorSpec(CreatorSpec[ModelCardRow]):
         row.license = self.license
         row.readme = self.readme
         row.access_level = self.access_level
-        row.resource_requirement_rows = [
+        return row
+
+    def build_requirement_rows(self, card_id: UUID) -> list[ModelCardResourceRequirementRow]:
+        """The requirement rows this card owns, once the card has an id.
+
+        Separate from ``build_row`` because they live in their own table: the card's
+        row projection does not carry them, so nothing loads them implicitly either.
+        """
+        return [
             ModelCardResourceRequirementRow(
+                model_card_id=card_id,
                 slot_name=entry.slot_name,
                 min_quantity=entry.min_quantity,
             )
             for entry in (self.min_resource or [])
         ]
-        return row

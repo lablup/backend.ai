@@ -1,44 +1,17 @@
 from __future__ import annotations
 
 import uuid
-from decimal import Decimal
-from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.identifier.vfolder import VFolderUUID
-from ai.backend.manager.data.model_card.types import ModelCardData, ResourceRequirementEntry
+from ai.backend.manager.data.model_card.types import ModelCardData
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
-if TYPE_CHECKING:
-    from ai.backend.manager.models.resource_slot.row import ModelCardResourceRequirementRow
-
 __all__ = ("ModelCardRow",)
-
-
-def _format_min_quantity(value: Decimal | str) -> str:
-    """Format a Numeric column value as a canonical string.
-
-    The underlying ``model_card_resource_requirements.min_quantity`` column
-    is ``sa.Numeric(precision=24, scale=6)``, so freshly-read rows come
-    back as ``Decimal("2.000000")``. ``str()`` of that keeps the trailing
-    zeros, which then drifts from the string the caller supplied on create
-    (e.g. ``"2"``) and from the "2" stored in ``to_data()`` before the
-    session was flushed. Collapse integer-equivalent values to ``"2"`` and
-    strip trailing zeros from genuinely fractional values so that
-    ``to_data()`` is stable across create / refetch / update paths.
-
-    The ORM attribute is typed ``Decimal`` but before flush it may still
-    be the raw string the creator handed in (e.g. ``"2"``); normalize
-    into ``Decimal`` first so both pre- and post-flush paths converge.
-    """
-    decimal_value = value if isinstance(value, Decimal) else Decimal(value)
-    if decimal_value == decimal_value.to_integral_value():
-        return str(int(decimal_value))
-    return format(decimal_value.normalize(), "f")
 
 
 class ModelCardRow(LifecycleTimestampsMixin, Base):
@@ -100,20 +73,14 @@ class ModelCardRow(LifecycleTimestampsMixin, Base):
         "access_level", sa.String(length=32), nullable=False, default="internal"
     )
 
-    resource_requirement_rows: Mapped[list[ModelCardResourceRequirementRow]] = relationship(
-        "ModelCardResourceRequirementRow",
-        cascade="all, delete-orphan",
-        lazy="selectin",
-    )
-
     def to_data(self) -> ModelCardData:
-        min_resource = [
-            ResourceRequirementEntry(
-                slot_name=r.slot_name,
-                min_quantity=_format_min_quantity(r.min_quantity),
-            )
-            for r in self.resource_requirement_rows
-        ]
+        """Project this row.
+
+        The minimum resource requirements live in their own table and are not read
+        here: a conversion that reaches into a child table forces a relationship and
+        an eager load on every read, and puts the card out of reach of the
+        single-entity read/write specs. Callers that need them ask for them.
+        """
         return ModelCardData(
             id=self.id,
             name=self.name,
@@ -131,7 +98,6 @@ class ModelCardRow(LifecycleTimestampsMixin, Base):
             framework=self.framework or [],
             label=self.label or [],
             license=self.license,
-            min_resource=min_resource,
             readme=self.readme,
             access_level=self.access_level,
             created_at=self.created_at,

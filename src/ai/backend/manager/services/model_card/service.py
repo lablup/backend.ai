@@ -27,6 +27,10 @@ from ai.backend.manager.services.model_card.actions.delete import (
     DeleteModelCardAction,
     DeleteModelCardActionResult,
 )
+from ai.backend.manager.services.model_card.actions.min_resources import (
+    GetModelCardMinResourcesAction,
+    GetModelCardMinResourcesActionResult,
+)
 from ai.backend.manager.services.model_card.actions.scan import (
     ScanProjectModelCardsAction,
     ScanProjectModelCardsActionResult,
@@ -101,6 +105,12 @@ class ModelCardService:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
+
+    async def get_min_resources(
+        self, action: GetModelCardMinResourcesAction
+    ) -> GetModelCardMinResourcesActionResult:
+        min_resources = await self._repository.min_resources_by_card_ids(action.card_ids)
+        return GetModelCardMinResourcesActionResult(min_resources=min_resources)
 
     async def available_presets(
         self, action: AvailablePresetsAction

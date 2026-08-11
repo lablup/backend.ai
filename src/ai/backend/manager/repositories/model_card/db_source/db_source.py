@@ -64,6 +64,7 @@ from ai.backend.manager.repositories.base.updater import (
     execute_updater,
 )
 from ai.backend.manager.repositories.base.upserter import BulkUpserter, execute_bulk_upserter
+from ai.backend.manager.repositories.model_card.creators import ModelCardCreatorSpec
 from ai.backend.manager.repositories.model_card.types import (
     AvailablePresetsSearchResult,
     ModelCardSearchResult,
@@ -77,6 +78,22 @@ from ai.backend.manager.types import TriState
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
+def format_min_quantity(value: Decimal | str) -> str:
+    """Format a Numeric column value as a canonical string.
+
+    ``model_card_resource_requirements.min_quantity`` is ``Numeric(24, 6)``, so a
+    freshly-read row comes back as ``Decimal("2.000000")``. Keeping the trailing
+    zeros would drift from the string the caller supplied on create (``"2"``), so
+    integer-equivalent values collapse to ``"2"`` and fractional ones lose their
+    trailing zeros. Before a flush the attribute may still be the raw string the
+    creator handed in, so normalize into ``Decimal`` first and let both converge.
+    """
+    decimal_value = value if isinstance(value, Decimal) else Decimal(value)
+    if decimal_value == decimal_value.to_integral_value():
+        return str(int(decimal_value))
+    return format(decimal_value.normalize(), "f")
+
+
 class ModelCardDBSource:
     _db: ExtendedAsyncSAEngine
 
@@ -86,6 +103,12 @@ class ModelCardDBSource:
     async def create(self, creator: RBACEntityCreator[ModelCardRow]) -> ModelCardData:
         async with self._db.begin_session() as session:
             result = await execute_rbac_entity_creator(session, creator)
+            spec = creator.spec
+            if isinstance(spec, ModelCardCreatorSpec):
+                rows = spec.build_requirement_rows(result.row.id)
+                if rows:
+                    session.add_all(rows)
+                    await session.flush()
             return result.row.to_data()
 
     async def get_by_id(self, card_id: UUID) -> ModelCardData:
@@ -111,10 +134,6 @@ class ModelCardDBSource:
             # touch this child table, so we delete-then-insert explicitly.
             if isinstance(updater.spec, ModelCardUpdaterSpec):
                 await self._apply_min_resource_change(session, row.id, updater.spec.min_resource)
-                if updater.spec.min_resource.is_update() or updater.spec.min_resource.is_nullify():
-                    # Re-read so to_data() reflects the new child rows via
-                    # the resource_requirement_rows relationship.
-                    await session.refresh(row)
 
             return row.to_data()
 
@@ -520,3 +539,30 @@ class ModelCardDBSource:
 
         if new_rows:
             await session.execute(sa.insert(ModelCardResourceRequirementRow).values(new_rows))
+
+    async def min_resources_by_card_ids(
+        self,
+        card_ids: Sequence[UUID],
+    ) -> dict[UUID, list[ResourceRequirementEntry]]:
+        """Read the minimum resource requirements of the named cards.
+
+        The card's row projection does not carry these — they live in their own
+        table — so whoever renders them asks here, and asks for every card at once.
+        A card with no requirements is absent from the mapping.
+        """
+        if not card_ids:
+            return {}
+        async with self._db.begin_readonly_session_read_committed() as session:
+            stmt = sa.select(ModelCardResourceRequirementRow).where(
+                ModelCardResourceRequirementRow.model_card_id.in_(list(card_ids))
+            )
+            rows = (await session.execute(stmt)).scalars().all()
+        by_card: dict[UUID, list[ResourceRequirementEntry]] = {}
+        for row in rows:
+            by_card.setdefault(row.model_card_id, []).append(
+                ResourceRequirementEntry(
+                    slot_name=row.slot_name,
+                    min_quantity=format_min_quantity(row.min_quantity),
+                )
+            )
+        return by_card

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import secrets
+from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
@@ -89,6 +90,9 @@ from ai.backend.manager.services.model_card.actions.bulk_delete import (
 )
 from ai.backend.manager.services.model_card.actions.create import CreateModelCardAction
 from ai.backend.manager.services.model_card.actions.delete import DeleteModelCardAction
+from ai.backend.manager.services.model_card.actions.min_resources import (
+    GetModelCardMinResourcesAction,
+)
 from ai.backend.manager.services.model_card.actions.scan import ScanProjectModelCardsAction
 from ai.backend.manager.services.model_card.actions.search import SearchModelCardsAction
 from ai.backend.manager.services.model_card.actions.search_in_project import (
@@ -181,7 +185,7 @@ class ModelCardAdapter(BaseAdapter):
             SearchModelCardsAction(querier=querier)
         )
         return SearchModelCardsPayload(
-            items=[self._data_to_node(d) for d in result.items],
+            items=await self._nodes_with_min_resources(result.items),
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
@@ -213,7 +217,7 @@ class ModelCardAdapter(BaseAdapter):
             SearchModelCardsInProjectAction(scope=scope, querier=querier)
         )
         return SearchModelCardsPayload(
-            items=[self._data_to_node(d) for d in result.items],
+            items=await self._nodes_with_min_resources(result.items),
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
@@ -249,7 +253,7 @@ class ModelCardAdapter(BaseAdapter):
             SearchModelCardsAction(querier=querier)
         )
         return SearchModelCardsPayload(
-            items=[self._data_to_node(d) for d in result.items],
+            items=await self._nodes_with_min_resources(result.items),
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
@@ -268,7 +272,7 @@ class ModelCardAdapter(BaseAdapter):
         )
         if not result.items:
             raise ModelCardNotFound()
-        return self._data_to_node(result.items[0])
+        return (await self._nodes_with_min_resources(result.items))[0]
 
     async def create(
         self,
@@ -308,7 +312,9 @@ class ModelCardAdapter(BaseAdapter):
         result = await self._processors.model_card.create.wait_for_complete(
             CreateModelCardAction(creator=creator)
         )
-        return CreateModelCardPayload(model_card=self._data_to_node(result.model_card))
+        return CreateModelCardPayload(
+            model_card=(await self._nodes_with_min_resources([result.model_card]))[0]
+        )
 
     async def update(
         self,
@@ -411,7 +417,9 @@ class ModelCardAdapter(BaseAdapter):
         result = await self._processors.model_card.update.wait_for_complete(
             UpdateModelCardAction(id=input.id, updater=updater)
         )
-        return UpdateModelCardPayload(model_card=self._data_to_node(result.model_card))
+        return UpdateModelCardPayload(
+            model_card=(await self._nodes_with_min_resources([result.model_card]))[0]
+        )
 
     async def delete(
         self,
@@ -655,8 +663,36 @@ class ModelCardAdapter(BaseAdapter):
                     result.append(ModelCardOrders.created_at(ascending))
         return result
 
+    async def _nodes_with_min_resources(
+        self, cards: Sequence[ModelCardData]
+    ) -> list[ModelCardNode]:
+        """Convert cards to nodes with their requirements filled in, in one extra read."""
+        by_card = await self.min_resources([card.id for card in cards])
+        return [self._data_to_node(card, by_card.get(card.id)) for card in cards]
+
+    async def min_resources(
+        self, card_ids: Sequence[UUID]
+    ) -> dict[UUID, list[ResourceSlotEntryInfo]]:
+        """Read the minimum resource requirements of the named cards.
+
+        A second read rather than a field on the card: the requirements are their own
+        table, so the card's projection does not carry them. REST fills the field with
+        this before answering; GraphQL calls it from the field resolver, which means a
+        query that does not select ``minResource`` never pays for it.
+        """
+        result = await self._processors.model_card.get_min_resources.wait_for_complete(
+            GetModelCardMinResourcesAction(card_ids=list(card_ids))
+        )
+        return {
+            card_id: _requirements_to_entries(entries)
+            for card_id, entries in result.min_resources.items()
+        }
+
     @staticmethod
-    def _data_to_node(data: ModelCardData) -> ModelCardNode:
+    def _data_to_node(
+        data: ModelCardData,
+        min_resource: list[ResourceSlotEntryInfo] | None = None,
+    ) -> ModelCardNode:
         return ModelCardNode(
             id=data.id,
             name=data.name,
@@ -676,9 +712,7 @@ class ModelCardAdapter(BaseAdapter):
                 label=data.label,
                 license=data.license,
             ),
-            min_resource=(
-                _requirements_to_entries(data.min_resource) if data.min_resource else None
-            ),
+            min_resource=min_resource,
             readme=data.readme,
             access_level=ModelCardAccessLevel(data.access_level),
             created_at=data.created_at,

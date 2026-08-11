@@ -20,6 +20,10 @@ from ai.backend.manager.services.model_card.actions.delete import (
     DeleteModelCardAction,
     DeleteModelCardActionResult,
 )
+from ai.backend.manager.services.model_card.actions.min_resources import (
+    GetModelCardMinResourcesAction,
+    GetModelCardMinResourcesActionResult,
+)
 from ai.backend.manager.services.model_card.actions.scan import (
     ScanProjectModelCardsAction,
     ScanProjectModelCardsActionResult,
@@ -50,6 +54,9 @@ class ModelCardProcessors:
     ]
     scan: ActionProcessor[ScanProjectModelCardsAction, ScanProjectModelCardsActionResult]
     available_presets: ActionProcessor[AvailablePresetsAction, AvailablePresetsActionResult]
+    get_min_resources: ActionProcessor[
+        GetModelCardMinResourcesAction, GetModelCardMinResourcesActionResult
+    ]
 
     def __init__(
         self,
@@ -71,3 +78,4 @@ class ModelCardProcessors:
         )
         self.scan = ActionProcessor(service.scan, action_monitors)
         self.available_presets = ActionProcessor(service.available_presets, action_monitors)
+        self.get_min_resources = ActionProcessor(service.get_min_resources, action_monitors)

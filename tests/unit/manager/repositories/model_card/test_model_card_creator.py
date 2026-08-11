@@ -309,8 +309,10 @@ class TestModelCardCreatorResourceRequirements:
         creator_with_min_resource: RBACEntityCreator[ModelCardRow],
     ) -> None:
         data: ModelCardData = await db_source.create(creator_with_min_resource)
-        assert len(data.min_resource) == 2
-        assert {(r.slot_name, r.min_quantity) for r in data.min_resource} == {
+        by_card = await db_source.min_resources_by_card_ids([data.id])
+        entries = by_card[data.id]
+        assert len(entries) == 2
+        assert {(r.slot_name, r.min_quantity) for r in entries} == {
             ("cpu", "2"),
             ("mem", "4096"),
         }
@@ -321,7 +323,7 @@ class TestModelCardCreatorResourceRequirements:
         creator_without_min_resource: RBACEntityCreator[ModelCardRow],
     ) -> None:
         data: ModelCardData = await db_source.create(creator_without_min_resource)
-        assert data.min_resource == []
+        assert await db_source.min_resources_by_card_ids([data.id]) == {}
 
     async def test_resource_requirements_persisted_in_db(
         self,
@@ -370,7 +372,8 @@ class TestModelCardCreatorResourceRequirements:
         updater: Updater[ModelCardRow] = Updater(spec=spec, pk_value=created.id)
         updated = await db_source.update(updater)
 
-        assert {(r.slot_name, r.min_quantity) for r in updated.min_resource} == {
+        by_card = await db_source.min_resources_by_card_ids([updated.id])
+        assert {(r.slot_name, r.min_quantity) for r in by_card[updated.id]} == {
             ("cpu", "8"),
             ("mem", "16384"),
         }
@@ -405,7 +408,7 @@ class TestModelCardCreatorResourceRequirements:
         updater: Updater[ModelCardRow] = Updater(spec=spec, pk_value=created.id)
         updated = await db_source.update(updater)
 
-        assert updated.min_resource == []
+        assert await db_source.min_resources_by_card_ids([updated.id]) == {}
 
         async with db_with_cleanup.begin_readonly_session() as session:
             rows = (
@@ -440,7 +443,8 @@ class TestModelCardCreatorResourceRequirements:
         updater: Updater[ModelCardRow] = Updater(spec=spec, pk_value=created.id)
         updated = await db_source.update(updater)
 
-        assert {(r.slot_name, r.min_quantity) for r in updated.min_resource} == {
+        by_card = await db_source.min_resources_by_card_ids([updated.id])
+        assert {(r.slot_name, r.min_quantity) for r in by_card[updated.id]} == {
             ("cpu", "2"),
             ("mem", "4096"),
         }
