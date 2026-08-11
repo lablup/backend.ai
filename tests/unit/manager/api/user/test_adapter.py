@@ -379,7 +379,7 @@ class TestUserAdapterUpdater:
             totp_activated=True,
             resource_policy="default",
             sudo_session_enabled=True,
-            default_access_key="AKIAIOSFODNN7EXAMPLE",
+            main_access_key="AKIAIOSFODNN7EXAMPLE",
             container_uid=1000,
             container_main_gid=1000,
             container_gids=[1000, 1001],

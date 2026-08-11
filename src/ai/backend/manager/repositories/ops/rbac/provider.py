@@ -1044,10 +1044,12 @@ class RBACWriteOps(WriteOps):
                 EntityMembersAddition(scope=project_scope, members=[member])
             )
 
-        # The insert leaves the server-default columns unloaded; reload so callers can
-        # read the row without a sync-context lazy refresh.
+        # The insert leaves the server-default columns unloaded, and default_keypair is the
+        # keypair created just above; reload both so callers can read the row without a
+        # sync-context lazy refresh.
         await self._sess.flush()
         await self._sess.refresh(user_row)
+        await self._sess.refresh(user_row, ["default_keypair"])
         return FullUserCreationResult(user_row=user_row, keypair_row=keypair_row)
 
     async def _domain_member_project_ids(

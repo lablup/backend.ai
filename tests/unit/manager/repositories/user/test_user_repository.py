@@ -1385,7 +1385,7 @@ class TestUserDataConversion:
             container_gids=None,
         )
 
-        user_data = UserData.from_row(user_row)
+        user_data = user_row.to_data()
 
         assert user_data.uuid == user_row.uuid
         assert user_data.username == user_row.username
@@ -1396,7 +1396,7 @@ class TestUserDataConversion:
         assert user_data.domain_name == user_row.domain_name
 
     def test_user_data_from_row_converts_readable_cidr_to_str(self) -> None:
-        """Test that UserData.from_row() converts ReadableCIDR objects to str for allowed_client_ip."""
+        """Test that UserRow.to_data() converts ReadableCIDR objects to str for allowed_client_ip."""
         user_row = UserRow(
             uuid=uuid.uuid4(),
             username="testuser",
@@ -1422,7 +1422,7 @@ class TestUserDataConversion:
             container_gids=None,
         )
 
-        user_data = UserData.from_row(user_row)
+        user_data = user_row.to_data()
 
         assert user_data.allowed_client_ip is not None
         assert user_data.allowed_client_ip == ["192.168.1.0/24", "10.0.0.0/8"]
@@ -1430,7 +1430,7 @@ class TestUserDataConversion:
             assert isinstance(ip, str)
 
     def test_user_data_from_row_with_none_allowed_client_ip(self) -> None:
-        """Test that UserData.from_row() passes through None for allowed_client_ip."""
+        """Test that UserRow.to_data() passes through None for allowed_client_ip."""
         user_row = UserRow(
             uuid=uuid.uuid4(),
             username="testuser",
@@ -1453,7 +1453,7 @@ class TestUserDataConversion:
             container_gids=None,
         )
 
-        user_data = UserData.from_row(user_row)
+        user_data = user_row.to_data()
 
         assert user_data.allowed_client_ip is None
 
