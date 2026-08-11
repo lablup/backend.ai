@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
+from ai.backend.common.identifier.storage_namespace import StorageNamespaceID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.models.base import (
@@ -52,7 +53,7 @@ class StorageNamespaceRow(Base):
 
     def to_dataclass(self) -> StorageNamespaceData:
         return StorageNamespaceData(
-            id=self.id,
+            id=StorageNamespaceID(self.id),
             storage_id=self.storage_id,
             namespace=self.namespace,
         )

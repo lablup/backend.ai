@@ -96,7 +96,7 @@ class ObjectStorageHandler:
 
         Note: This API is deprecated. Use /storage-namespaces instead.
         """
-        action_result = await self._storage_namespace.get_all_namespaces.wait_for_complete(
+        action_result = await self._storage_namespace.get_all_namespaces.run(
             GetAllNamespacesAction()
         )
 
@@ -113,11 +113,11 @@ class ObjectStorageHandler:
         """
         storage_id: uuid.UUID = path.parsed.storage_id
 
-        action_result = await self._storage_namespace.get_namespaces.wait_for_complete(
+        action_result = await self._storage_namespace.get_namespaces.run(
             GetNamespacesAction(storage_id=storage_id)
         )
 
-        bucket_names = [namespace_data.namespace for namespace_data in action_result.result]
+        bucket_names = [namespace_data.namespace for namespace_data in action_result.items]
         resp = ObjectStorageBucketsResponse(buckets=bucket_names)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 

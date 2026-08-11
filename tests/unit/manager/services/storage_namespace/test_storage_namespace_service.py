@@ -10,26 +10,15 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.identifier.storage_namespace import StorageNamespaceID
 from ai.backend.manager.data.storage_namespace.types import (
     StorageNamespaceData,
-    StorageNamespaceListResult,
 )
-from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.storage_namespace.repository import (
     StorageNamespaceRepository,
 )
 from ai.backend.manager.services.storage_namespace.actions.get_all import (
     GetAllNamespacesAction,
-)
-from ai.backend.manager.services.storage_namespace.actions.get_multi import (
-    GetNamespacesAction,
-)
-from ai.backend.manager.services.storage_namespace.actions.register import (
-    RegisterNamespaceAction,
-)
-from ai.backend.manager.services.storage_namespace.actions.search import (
-    SearchStorageNamespacesAction,
 )
 from ai.backend.manager.services.storage_namespace.actions.unregister import (
     UnregisterNamespaceAction,
@@ -57,49 +46,13 @@ class TestStorageNamespaceService:
     def sample_storage_namespace_data(self) -> StorageNamespaceData:
         """Create sample storage namespace data"""
         return StorageNamespaceData(
-            id=uuid4(),
+            id=StorageNamespaceID(uuid4()),
             storage_id=uuid4(),
             namespace="test-namespace",
         )
 
     # =========================================================================
     # Tests - Register
-    # =========================================================================
-
-    async def test_register_namespace_returns_storage_namespace_data(
-        self,
-        storage_namespace_service: StorageNamespaceService,
-        mock_repository: MagicMock,
-        sample_storage_namespace_data: StorageNamespaceData,
-    ) -> None:
-        """Test registering a namespace returns StorageNamespaceData with storage_id"""
-        mock_creator = MagicMock()
-        mock_repository.register = AsyncMock(return_value=sample_storage_namespace_data)
-
-        action = RegisterNamespaceAction(creator=mock_creator)
-        result = await storage_namespace_service.register(action)
-
-        assert result.result == sample_storage_namespace_data
-        assert result.storage_id == sample_storage_namespace_data.storage_id
-        mock_repository.register.assert_called_once_with(mock_creator)
-
-    async def test_register_namespace_duplicate_raises_error(
-        self,
-        storage_namespace_service: StorageNamespaceService,
-        mock_repository: MagicMock,
-    ) -> None:
-        """Test registering a duplicate namespace raises an error"""
-        mock_creator = MagicMock()
-        mock_repository.register = AsyncMock(
-            side_effect=Exception("Duplicate namespace registration")
-        )
-
-        action = RegisterNamespaceAction(creator=mock_creator)
-        with pytest.raises(Exception, match="Duplicate namespace registration"):
-            await storage_namespace_service.register(action)
-
-    # =========================================================================
-    # Tests - Unregister
     # =========================================================================
 
     async def test_unregister_namespace_returns_storage_id(
@@ -133,48 +86,6 @@ class TestStorageNamespaceService:
 
     # =========================================================================
     # Tests - GetNamespaces
-    # =========================================================================
-
-    async def test_get_namespaces_returns_list(
-        self,
-        storage_namespace_service: StorageNamespaceService,
-        mock_repository: MagicMock,
-        sample_storage_namespace_data: StorageNamespaceData,
-    ) -> None:
-        """Test getting namespaces for a storage_id returns namespace list"""
-        storage_id = sample_storage_namespace_data.storage_id
-        ns_data_2 = StorageNamespaceData(
-            id=uuid4(), storage_id=storage_id, namespace="second-namespace"
-        )
-        mock_repository.get_namespaces = AsyncMock(
-            return_value=[sample_storage_namespace_data, ns_data_2]
-        )
-
-        action = GetNamespacesAction(storage_id=storage_id)
-        result = await storage_namespace_service.get_namespaces(action)
-
-        assert len(result.result) == 2
-        assert result.result[0] == sample_storage_namespace_data
-        assert result.result[1] == ns_data_2
-        mock_repository.get_namespaces.assert_called_once_with(storage_id)
-
-    async def test_get_namespaces_empty_returns_empty_list(
-        self,
-        storage_namespace_service: StorageNamespaceService,
-        mock_repository: MagicMock,
-    ) -> None:
-        """Test getting namespaces when no registrations returns empty list"""
-        storage_id = uuid4()
-        mock_repository.get_namespaces = AsyncMock(return_value=[])
-
-        action = GetNamespacesAction(storage_id=storage_id)
-        result = await storage_namespace_service.get_namespaces(action)
-
-        assert result.result == []
-        mock_repository.get_namespaces.assert_called_once_with(storage_id)
-
-    # =========================================================================
-    # Tests - GetAllNamespaces
     # =========================================================================
 
     async def test_get_all_namespaces_returns_grouped_dict(
@@ -240,87 +151,3 @@ class TestStorageNamespaceService:
     # =========================================================================
     # Tests - Search
     # =========================================================================
-
-    async def test_search_storage_namespaces(
-        self,
-        storage_namespace_service: StorageNamespaceService,
-        mock_repository: MagicMock,
-        sample_storage_namespace_data: StorageNamespaceData,
-    ) -> None:
-        """Test searching storage namespaces with querier"""
-        mock_repository.search = AsyncMock(
-            return_value=StorageNamespaceListResult(
-                items=[sample_storage_namespace_data],
-                total_count=1,
-                has_next_page=False,
-                has_previous_page=False,
-            )
-        )
-
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        action = SearchStorageNamespacesAction(querier=querier)
-        result = await storage_namespace_service.search(action)
-
-        assert result.namespaces == [sample_storage_namespace_data]
-        assert result.total_count == 1
-        assert result.has_next_page is False
-        assert result.has_previous_page is False
-        mock_repository.search.assert_called_once_with(querier)
-
-    async def test_search_storage_namespaces_empty_result(
-        self,
-        storage_namespace_service: StorageNamespaceService,
-        mock_repository: MagicMock,
-    ) -> None:
-        """Test searching storage namespaces when no results are found"""
-        mock_repository.search = AsyncMock(
-            return_value=StorageNamespaceListResult(
-                items=[],
-                total_count=0,
-                has_next_page=False,
-                has_previous_page=False,
-            )
-        )
-
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        action = SearchStorageNamespacesAction(querier=querier)
-        result = await storage_namespace_service.search(action)
-
-        assert result.namespaces == []
-        assert result.total_count == 0
-
-    async def test_search_storage_namespaces_with_pagination(
-        self,
-        storage_namespace_service: StorageNamespaceService,
-        mock_repository: MagicMock,
-        sample_storage_namespace_data: StorageNamespaceData,
-    ) -> None:
-        """Test searching storage namespaces with pagination"""
-        mock_repository.search = AsyncMock(
-            return_value=StorageNamespaceListResult(
-                items=[sample_storage_namespace_data],
-                total_count=25,
-                has_next_page=True,
-                has_previous_page=True,
-            )
-        )
-
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=10),
-            conditions=[],
-            orders=[],
-        )
-        action = SearchStorageNamespacesAction(querier=querier)
-        result = await storage_namespace_service.search(action)
-
-        assert result.total_count == 25
-        assert result.has_next_page is True
-        assert result.has_previous_page is True

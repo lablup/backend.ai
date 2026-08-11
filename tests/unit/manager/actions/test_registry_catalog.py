@@ -63,6 +63,9 @@ from ai.backend.manager.services.runtime_variant_preset.processors import (
     RuntimeVariantPresetProcessors,
 )
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
+from ai.backend.manager.services.storage_namespace.processors import (
+    StorageNamespaceProcessors,
+)
 from ai.backend.manager.services.user_resource_policy.processors import (
     UserResourcePolicyProcessors,
 )
@@ -133,6 +136,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     AuditLogProcessors(MagicMock(), MagicMock(), registry.group())
     AppConfigDefinitionProcessors(registry.group())
     PrometheusQueryPresetProcessors(MagicMock(), registry.group())
+    StorageNamespaceProcessors(MagicMock(), registry.group())
 
     wired = sorted(spec.type() for spec in registry.wired_specs())
     defined = sorted(cls.spec().type() for cls in _concrete_v2_action_classes())

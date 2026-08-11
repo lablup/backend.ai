@@ -12,6 +12,7 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.identifier.storage_namespace import StorageNamespaceID
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactData,
@@ -129,7 +130,7 @@ class TestObjectStorageService:
         self, sample_object_storage_data: ObjectStorageData
     ) -> StorageNamespaceData:
         return StorageNamespaceData(
-            id=uuid4(),
+            id=StorageNamespaceID(uuid4()),
             storage_id=sample_object_storage_data.id,
             namespace="test-bucket",
         )

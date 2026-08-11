@@ -1,21 +1,17 @@
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.validators import ActionValidators
+from __future__ import annotations
+
+from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.ops.result import BatchOpsResult, CreatedEntityOpsResult
+from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.services.storage_namespace.actions.get_all import (
     GetAllNamespacesAction,
     GetAllNamespacesActionResult,
 )
-from ai.backend.manager.services.storage_namespace.actions.get_multi import (
-    GetNamespacesAction,
-    GetNamespacesActionResult,
-)
-from ai.backend.manager.services.storage_namespace.actions.register import (
-    RegisterNamespaceAction,
-    RegisterNamespaceActionResult,
-)
+from ai.backend.manager.services.storage_namespace.actions.get_multi import GetNamespacesAction
+from ai.backend.manager.services.storage_namespace.actions.register import RegisterNamespaceAction
 from ai.backend.manager.services.storage_namespace.actions.search import (
     SearchStorageNamespacesAction,
-    SearchStorageNamespacesActionResult,
 )
 from ai.backend.manager.services.storage_namespace.actions.unregister import (
     UnregisterNamespaceAction,
@@ -25,22 +21,27 @@ from ai.backend.manager.services.storage_namespace.service import StorageNamespa
 
 
 class StorageNamespaceProcessors:
-    register: ActionProcessor[RegisterNamespaceAction, RegisterNamespaceActionResult]
-    unregister: ActionProcessor[UnregisterNamespaceAction, UnregisterNamespaceActionResult]
-    get_namespaces: ActionProcessor[GetNamespacesAction, GetNamespacesActionResult]
-    get_all_namespaces: ActionProcessor[GetAllNamespacesAction, GetAllNamespacesActionResult]
-    search_storage_namespaces: ActionProcessor[
-        SearchStorageNamespacesAction, SearchStorageNamespacesActionResult
+    """Registration and the reads run against ops; two operations keep their service."""
+
+    register: GlobalActionProcessor[
+        RegisterNamespaceAction, CreatedEntityOpsResult[StorageNamespaceData]
     ]
+    search: GlobalActionProcessor[
+        SearchStorageNamespacesAction, BatchOpsResult[StorageNamespaceData]
+    ]
+    get_namespaces: GlobalActionProcessor[GetNamespacesAction, BatchOpsResult[StorageNamespaceData]]
+    unregister: GlobalActionProcessor[UnregisterNamespaceAction, UnregisterNamespaceActionResult]
+    get_all_namespaces: GlobalActionProcessor[GetAllNamespacesAction, GetAllNamespacesActionResult]
 
     def __init__(
         self,
         service: StorageNamespaceService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
+        group: ProcessorGroup[StorageNamespaceData],
     ) -> None:
-        self.register = ActionProcessor(service.register, action_monitors)
-        self.unregister = ActionProcessor(service.unregister, action_monitors)
-        self.get_namespaces = ActionProcessor(service.get_namespaces, action_monitors)
-        self.get_all_namespaces = ActionProcessor(service.get_all_namespaces, action_monitors)
-        self.search_storage_namespaces = ActionProcessor(service.search, action_monitors)
+        self.register = group.global_create_ops(RegisterNamespaceAction)
+        self.search = group.global_search_ops(SearchStorageNamespacesAction)
+        self.get_namespaces = group.global_search_ops(GetNamespacesAction)
+        self.unregister = group.global_scope(UnregisterNamespaceAction, service.unregister)
+        self.get_all_namespaces = group.global_scope(
+            GetAllNamespacesAction, service.get_all_namespaces
+        )

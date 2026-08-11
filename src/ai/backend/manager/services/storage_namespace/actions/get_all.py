@@ -4,14 +4,17 @@ from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.storage_namespace.actions.base import StorageNamespaceAction
+from ai.backend.manager.services.storage_namespace.actions.base import (
+    StorageNamespaceGlobalAction,
+)
 
 
 @dataclass
-class GetAllNamespacesAction(StorageNamespaceAction):
+class GetAllNamespacesAction(StorageNamespaceGlobalAction):
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_storage_namespaces_by_storage"
 
     @override
     @classmethod

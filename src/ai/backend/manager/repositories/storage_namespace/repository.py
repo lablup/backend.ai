@@ -9,12 +9,8 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.storage_namespace.types import (
     StorageNamespaceData,
-    StorageNamespaceListResult,
 )
-from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.storage_namespace.db_source.db_source import (
     StorageNamespaceDBSource,
 )
@@ -55,24 +51,9 @@ class StorageNamespaceRepository:
         return await self._db_source.get_by_id(storage_namespace_id)
 
     @storage_namespace_repository_resilience.apply()
-    async def register(self, creator: Creator[StorageNamespaceRow]) -> StorageNamespaceData:
-        return await self._db_source.register(creator)
-
-    @storage_namespace_repository_resilience.apply()
     async def unregister(self, storage_id: uuid.UUID, namespace: str) -> uuid.UUID:
         return await self._db_source.unregister(storage_id, namespace)
 
     @storage_namespace_repository_resilience.apply()
-    async def get_namespaces(self, storage_id: uuid.UUID) -> list[StorageNamespaceData]:
-        return await self._db_source.get_namespaces(storage_id)
-
-    @storage_namespace_repository_resilience.apply()
     async def get_all_namespaces_by_storage(self) -> dict[uuid.UUID, list[str]]:
         return await self._db_source.get_all_namespaces_by_storage()
-
-    @storage_namespace_repository_resilience.apply()
-    async def search(
-        self,
-        querier: BatchQuerier,
-    ) -> StorageNamespaceListResult:
-        return await self._db_source.search(querier)

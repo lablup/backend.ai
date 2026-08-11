@@ -548,9 +548,7 @@ def create_processors(
             services.artifact_revision, action_monitors, validators
         ),
         deployment=DeploymentProcessors(services.deployment, action_monitors, validators),
-        storage_namespace=StorageNamespaceProcessors(
-            services.storage_namespace, action_monitors, validators
-        ),
+        storage_namespace=StorageNamespaceProcessors(services.storage_namespace, registry.group()),
         audit_log=AuditLogProcessors(services.audit_log, validators, registry.group()),
         idle_checker_assignment=IdleCheckerAssignmentProcessors(
             services.idle_checker_assignment, action_monitors, validators

@@ -9,12 +9,9 @@ from ai.backend.common.exception import (
 )
 from ai.backend.manager.data.storage_namespace.types import (
     StorageNamespaceData,
-    StorageNamespaceListResult,
 )
 from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 
 
 class StorageNamespaceDBSource:
@@ -60,14 +57,6 @@ class StorageNamespaceDBSource:
                 )
             return row.to_dataclass()
 
-    async def register(self, creator: Creator[StorageNamespaceRow]) -> StorageNamespaceData:
-        """
-        Register a new namespace for the specified storage.
-        """
-        async with self._db.begin_session() as db_session:
-            creator_result = await execute_creator(db_session, creator)
-            return creator_result.row.to_dataclass()
-
     async def unregister(self, storage_id: uuid.UUID, namespace: str) -> uuid.UUID:
         """
         Unregister a namespace from the specified storage.
@@ -86,18 +75,6 @@ class StorageNamespaceDBSource:
             if deleted_storage_id is None:
                 raise StorageNamespaceNotFoundError()
             return deleted_storage_id
-
-    async def get_namespaces(self, storage_id: uuid.UUID) -> list[StorageNamespaceData]:
-        """
-        Get all namespaces for the specified storage.
-        """
-        async with self._db.begin_readonly_session_read_committed() as db_session:
-            query = sa.select(StorageNamespaceRow).where(
-                StorageNamespaceRow.storage_id == storage_id
-            )
-            result = await db_session.execute(query)
-            rows = result.scalars().all()
-            return [row.to_dataclass() for row in rows]
 
     async def get_all_namespaces_by_storage(self) -> dict[uuid.UUID, list[str]]:
         """
@@ -120,26 +97,3 @@ class StorageNamespaceDBSource:
                 namespaces_by_storage[storage_id].append(namespace)
 
             return namespaces_by_storage
-
-    async def search(
-        self,
-        querier: BatchQuerier,
-    ) -> StorageNamespaceListResult:
-        """Searches storage namespaces with total count."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(StorageNamespaceRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            items = [row.StorageNamespaceRow.to_dataclass() for row in result.rows]
-
-            return StorageNamespaceListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
