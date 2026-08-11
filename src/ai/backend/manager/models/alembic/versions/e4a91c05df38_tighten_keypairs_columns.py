@@ -2,8 +2,10 @@
 
 ``is_active``, ``is_admin`` and ``num_queries`` are backfilled with the value a
 null already behaved as — for ``is_active`` that is false, since every query
-filtering on it uses ``IS TRUE`` and so already skips those rows. ``user_id`` and
-``secret_key`` have no such value: a keypair missing either is deleted.
+filtering on it uses ``IS TRUE`` and so already skips those rows. ``user_id`` is
+recovered from the owner, which ``keypairs."user"`` always identifies. Only
+``secret_key`` cannot be reconstructed, and a keypair without one cannot sign a
+request, so those rows are deleted.
 
 Revision ID: e4a91c05df38
 Revises: 37d711158a8c
@@ -31,11 +33,7 @@ _BACKFILLED = {
     "is_admin": "false",
     "num_queries": "0",
 }
-_REQUIRED = (
-    "user_id",
-    "secret_key",
-)
-_TIGHTENED = (*_REQUIRED, *_BACKFILLED)
+_TIGHTENED = ("user_id", "secret_key", *_BACKFILLED)
 
 
 def _delete_keypairs(bind: Connection, keys: list[str]) -> None:
@@ -60,26 +58,29 @@ def _delete_keypairs(bind: Connection, keys: list[str]) -> None:
 
 def upgrade() -> None:
     bind = op.get_bind()
-    for column in _REQUIRED:
-        doomed = bind.execute(
-            sa.text(f"""
-                SELECT keypairs.access_key, users.email
-                FROM keypairs LEFT JOIN users ON users."uuid" = keypairs."user"
-                WHERE keypairs.{column} IS NULL
-                ORDER BY keypairs.access_key
-            """)
-        ).all()
-        if not doomed:
-            continue
+    doomed = bind.execute(
+        sa.text("""
+            SELECT keypairs.access_key, users.email
+            FROM keypairs LEFT JOIN users ON users."uuid" = keypairs."user"
+            WHERE keypairs.secret_key IS NULL
+            ORDER BY keypairs.access_key
+        """)
+    ).all()
+    if doomed:
         log.warning(
-            "Deleting %d keypair(s) with no %s — the column has no default to backfill from:",
-            len(doomed),
-            column,
+            "Deleting %d keypair(s) with no secret key — they cannot sign a request:", len(doomed)
         )
         for access_key, email in doomed:
             log.warning("  %s (owner: %s)", access_key, email or "<unknown>")
         _delete_keypairs(bind, [row.access_key for row in doomed])
 
+    bind.execute(
+        sa.text("""
+            UPDATE keypairs SET user_id = users.email
+            FROM users
+            WHERE users."uuid" = keypairs."user" AND keypairs.user_id IS NULL
+        """)
+    )
     for column, default in _BACKFILLED.items():
         bind.execute(sa.text(f"UPDATE keypairs SET {column} = {default} WHERE {column} IS NULL"))
 
