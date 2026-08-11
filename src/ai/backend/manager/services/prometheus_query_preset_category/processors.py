@@ -1,34 +1,51 @@
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.services.prometheus_query_preset_category.actions import (
-    CreateCategoryAction,
-    CreateCategoryActionResult,
-    DeleteCategoryAction,
-    DeleteCategoryActionResult,
-    GetCategoryAction,
-    GetCategoryActionResult,
-    SearchCategoriesAction,
-    SearchCategoriesActionResult,
+from __future__ import annotations
+
+from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    CreatedEntityOpsResult,
+    EntityOpsResult,
 )
-from ai.backend.manager.services.prometheus_query_preset_category.service import (
-    PrometheusQueryPresetCategoryService,
+from ai.backend.manager.data.prometheus_query_preset_category.types import (
+    PrometheusQueryPresetCategoryData,
+)
+from ai.backend.manager.services.prometheus_query_preset_category.actions.create import (
+    CreateCategoryAction,
+)
+from ai.backend.manager.services.prometheus_query_preset_category.actions.get import (
+    GetCategoryAction,
+)
+from ai.backend.manager.services.prometheus_query_preset_category.actions.purge import (
+    PurgeCategoryAction,
+)
+from ai.backend.manager.services.prometheus_query_preset_category.actions.search import (
+    SearchCategoriesAction,
 )
 
 
 class PrometheusQueryPresetCategoryProcessors:
-    create_category: ActionProcessor[CreateCategoryAction, CreateCategoryActionResult]
-    get_category: ActionProcessor[GetCategoryAction, GetCategoryActionResult]
-    search_categories: ActionProcessor[SearchCategoriesAction, SearchCategoriesActionResult]
-    delete_category: ActionProcessor[DeleteCategoryAction, DeleteCategoryActionResult]
+    """Every operation runs straight against ops, so this domain has no service."""
 
-    def __init__(
-        self,
-        service: PrometheusQueryPresetCategoryService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
-    ) -> None:
-        self.create_category = ActionProcessor(service.create_category, action_monitors)
-        self.get_category = ActionProcessor(service.get_category, action_monitors)
-        self.search_categories = ActionProcessor(service.search_categories, action_monitors)
-        self.delete_category = ActionProcessor(service.delete_category, action_monitors)
+    create_category: GlobalActionProcessor[
+        CreateCategoryAction,
+        CreatedEntityOpsResult[PrometheusQueryPresetCategoryData],
+    ]
+    get_category: GlobalActionProcessor[
+        GetCategoryAction,
+        EntityOpsResult[PrometheusQueryPresetCategoryData],
+    ]
+    search_categories: GlobalActionProcessor[
+        SearchCategoriesAction,
+        BatchOpsResult[PrometheusQueryPresetCategoryData],
+    ]
+    purge_category: GlobalActionProcessor[
+        PurgeCategoryAction,
+        EntityOpsResult[PrometheusQueryPresetCategoryData],
+    ]
+
+    def __init__(self, group: ProcessorGroup[PrometheusQueryPresetCategoryData]) -> None:
+        self.create_category = group.global_create_ops(CreateCategoryAction)
+        self.get_category = group.global_get_ops(GetCategoryAction)
+        self.search_categories = group.global_search_ops(SearchCategoriesAction)
+        self.purge_category = group.global_purge_ops(PurgeCategoryAction)

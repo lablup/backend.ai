@@ -221,9 +221,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.prometheus_query_preset_category.processors import (
         PrometheusQueryPresetCategoryProcessors,
     )
-    from ai.backend.manager.services.prometheus_query_preset_category.service import (
-        PrometheusQueryPresetCategoryService,
-    )
     from ai.backend.manager.services.resource_allocation.processors import (
         ResourceAllocationProcessors,
     )
@@ -402,7 +399,6 @@ class Services:
     manager_admin: ManagerAdminService
     user_resource_policy: UserResourcePolicyService
     prometheus_query_preset: PrometheusQueryPresetService
-    prometheus_query_preset_category: PrometheusQueryPresetCategoryService
     resource_preset: ResourcePresetService
     resource_slot: ResourceSlotService
     runtime_variant_preset: RuntimeVariantPresetService

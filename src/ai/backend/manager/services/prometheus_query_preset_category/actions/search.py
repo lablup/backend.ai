@@ -1,38 +1,42 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.prometheus_query_preset_category import (
+from ai.backend.common.data.entity.prometheus_query_preset_category import (
+    PROMETHEUS_QUERY_PRESET_CATEGORY_ENTITY_TYPE,
+)
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
+from ai.backend.manager.data.prometheus_query_preset_category.types import (
     PrometheusQueryPresetCategoryData,
 )
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.prometheus_query_preset_category.actions.base import (
-    PrometheusQueryPresetCategoryAction,
+from ai.backend.manager.models.prometheus_query_preset_category.row import (
+    PrometheusQueryPresetCategoryRow,
+)
+from ai.backend.manager.repositories.prometheus_query_preset_category.searchers import (
+    PrometheusQueryPresetCategorySearcher,
 )
 
 
 @dataclass
-class SearchCategoriesAction(PrometheusQueryPresetCategoryAction):
-    querier: BatchQuerier
+class SearchCategoriesAction(
+    SearchGlobalOpsAction[PrometheusQueryPresetCategoryRow, PrometheusQueryPresetCategoryData]
+):
+    """Page through the category catalog."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    searcher: PrometheusQueryPresetCategorySearcher
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass
-class SearchCategoriesActionResult(BaseActionResult):
-    items: list[PrometheusQueryPresetCategoryData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    def entity_type(cls) -> EntityType:
+        return PROMETHEUS_QUERY_PRESET_CATEGORY_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_prometheus_query_preset_categories"
+
+    @override
+    def to_searcher(self) -> PrometheusQueryPresetCategorySearcher:
+        return self.searcher

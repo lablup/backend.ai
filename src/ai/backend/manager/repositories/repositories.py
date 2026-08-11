@@ -51,9 +51,6 @@ from ai.backend.manager.repositories.permission_controller.repositories import (
 from ai.backend.manager.repositories.prometheus_query_preset import (
     PrometheusQueryPresetRepositories,
 )
-from ai.backend.manager.repositories.prometheus_query_preset_category.repositories import (
-    PrometheusQueryPresetCategoryRepositories,
-)
 from ai.backend.manager.repositories.replica_group.repositories import ReplicaGroupRepositories
 from ai.backend.manager.repositories.reservoir_registry.repositories import (
     ReservoirRegistryRepositories,
@@ -114,7 +111,6 @@ class Repositories:
     notification: NotificationRepositories
     permission_controller: PermissionControllerRepositories
     prometheus_query_preset: PrometheusQueryPresetRepositories
-    prometheus_query_preset_category: PrometheusQueryPresetCategoryRepositories
     replica_group: ReplicaGroupRepositories
     reservoir_registry: ReservoirRegistryRepositories
     resource_preset: ResourcePresetRepositories
@@ -167,9 +163,6 @@ class Repositories:
         notification_repositories = NotificationRepositories.create(args)
         permission_controller_repositories = PermissionControllerRepositories.create(args)
         prometheus_query_preset_repositories = PrometheusQueryPresetRepositories.create(args)
-        prometheus_query_preset_category_repositories = (
-            PrometheusQueryPresetCategoryRepositories.create(args)
-        )
         replica_group_repositories = ReplicaGroupRepositories.create(args)
         reservoir_registry_repositories = ReservoirRegistryRepositories.create(args)
         resource_preset_repositories = ResourcePresetRepositories.create(args)
@@ -223,7 +216,6 @@ class Repositories:
             notification=notification_repositories,
             permission_controller=permission_controller_repositories,
             prometheus_query_preset=prometheus_query_preset_repositories,
-            prometheus_query_preset_category=prometheus_query_preset_category_repositories,
             replica_group=replica_group_repositories,
             reservoir_registry=reservoir_registry_repositories,
             resource_preset=resource_preset_repositories,

@@ -5,6 +5,9 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.identifier.prometheus_query_preset_category import (
+    PrometheusQueryPresetCategoryID,
+)
 from ai.backend.manager.data.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryData,
 )
@@ -25,7 +28,7 @@ class PrometheusQueryPresetCategoryRow(LifecycleTimestampsMixin, Base):
 
     def to_data(self) -> PrometheusQueryPresetCategoryData:
         return PrometheusQueryPresetCategoryData(
-            id=self.id,
+            id=PrometheusQueryPresetCategoryID(self.id),
             name=self.name,
             description=self.description,
             created_at=self.created_at,

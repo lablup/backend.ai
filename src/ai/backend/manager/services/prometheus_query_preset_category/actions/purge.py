@@ -10,23 +10,27 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.identifier.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryID,
 )
-from ai.backend.manager.actions.v2.ops.base import GetGlobalOpsAction
+from ai.backend.manager.actions.v2.ops.base import PurgeGlobalOpsAction
 from ai.backend.manager.data.prometheus_query_preset_category.types import (
     PrometheusQueryPresetCategoryData,
+)
+from ai.backend.manager.models.prometheus_query_preset_category.purgers import (
+    PrometheusQueryPresetCategoryPurger,
 )
 from ai.backend.manager.models.prometheus_query_preset_category.row import (
     PrometheusQueryPresetCategoryRow,
 )
-from ai.backend.manager.repositories.prometheus_query_preset_category.queriers import (
-    PrometheusQueryPresetCategoryQuerier,
-)
 
 
 @dataclass
-class GetCategoryAction(
-    GetGlobalOpsAction[PrometheusQueryPresetCategoryRow, PrometheusQueryPresetCategoryData]
+class PurgeCategoryAction(
+    PurgeGlobalOpsAction[PrometheusQueryPresetCategoryRow, PrometheusQueryPresetCategoryData]
 ):
-    """Read one category from the catalog."""
+    """Remove a category from the catalog.
+
+    Purge-shaped: the table carries no lifecycle column, so removing one has always
+    been the row leaving the table.
+    """
 
     category_id: PrometheusQueryPresetCategoryID
 
@@ -38,8 +42,8 @@ class GetCategoryAction(
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "get_prometheus_query_preset_category"
+        return "purge_prometheus_query_preset_category"
 
     @override
-    def to_querier(self) -> PrometheusQueryPresetCategoryQuerier:
-        return PrometheusQueryPresetCategoryQuerier(category_id=self.category_id)
+    def to_purger(self) -> PrometheusQueryPresetCategoryPurger:
+        return PrometheusQueryPresetCategoryPurger(category_id=self.category_id)
