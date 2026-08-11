@@ -119,9 +119,9 @@ def kernel(request: pytest.FixtureRequest) -> DockerKernel:
         version=1,
         network_driver="bridge",
         agent_config={
-            _CONFIG_SECTION: KernelLifecyclesConfig(
-                service_launch_timeout_sec=case.configured_sec
-            ).model_dump(by_alias=True),
+            _CONFIG_SECTION: KernelLifecyclesConfig.model_validate({
+                _CONFIG_KEY: case.configured_sec
+            }).model_dump(by_alias=True),
         },
         resource_spec=Mock(),
         service_ports=[

@@ -224,9 +224,7 @@ class KubernetesKernel(AbstractKernel):
                 break
         else:
             return {"status": "failed", "error": "invalid service name"}
-        launch_timeout: float = self.agent_config["kernel-lifecycles"][
-            "service-launch-timeout-sec"
-        ]
+        launch_timeout: float = self.agent_config["kernel-lifecycles"]["service-launch-timeout-sec"]
         return await self.runner.feed_start_service(
             {
                 "name": service,
