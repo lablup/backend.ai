@@ -44,6 +44,7 @@ from ai.backend.manager.models.user import (
     UserStatus,
     users,
 )
+from ai.backend.manager.models.user.row import default_access_key_expr
 from ai.backend.manager.models.virtual_scope.queries import (
     user_scope_membership_exists,
     user_scope_membership_query,
@@ -111,22 +112,6 @@ def _project_membership_join(base_table: sa.Table | sa.sql.Join) -> sa.sql.Join:
     ).join(
         GroupRow,
         GroupRow.id == ms.c.scope_id,
-    )
-
-
-def _default_access_key() -> sa.ScalarSelect[str]:
-    """The owner's default keypair, as a correlated subquery.
-
-    A join would replace the statement's FROM, and minilang resolves its field specs against
-    ``select.froms[0]``.
-    """
-    from ai.backend.manager.models.keypair import keypairs
-
-    return (
-        sa.select(keypairs.c.access_key)
-        .where((keypairs.c.user == users.c.uuid) & keypairs.c.is_default)
-        .correlate(users)
-        .scalar_subquery()
     )
 
 
@@ -257,7 +242,7 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", dtparse),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-        "main_access_key": (ORMFieldItem(_default_access_key()), None),
+        "main_access_key": (ORMFieldItem(default_access_key_expr()), None),
     }
 
     # External table filter specifications
@@ -288,7 +273,7 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", None),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-        "main_access_key": (ORMFieldItem(_default_access_key()), None),
+        "main_access_key": (ORMFieldItem(default_access_key_expr()), None),
     }
 
     @staticmethod
@@ -671,7 +656,9 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         """
         Load user's information. Group names associated with the user are also returned.
         """
-        query = sa.select(users, _default_access_key().label("main_access_key")).select_from(users)
+        query = sa.select(users, default_access_key_expr().label("main_access_key")).select_from(
+            users
+        )
         if group_id is not None:
             query = query.where(
                 user_scope_membership_exists(PROJECT_SCOPE_TYPE, group_id, users.c.uuid)
@@ -709,7 +696,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", dtparse),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-        "main_access_key": (ORMFieldItem(_default_access_key()), None),
+        "main_access_key": (ORMFieldItem(default_access_key_expr()), None),
     }
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {
@@ -729,7 +716,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", None),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-        "main_access_key": (ORMFieldItem(_default_access_key()), None),
+        "main_access_key": (ORMFieldItem(default_access_key_expr()), None),
     }
 
     @classmethod
@@ -777,7 +764,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         order: str | None = None,
     ) -> Sequence[User]:
         query = (
-            sa.select(users, _default_access_key().label("main_access_key"))
+            sa.select(users, default_access_key_expr().label("main_access_key"))
             .select_from(users)
             .limit(limit)
             .offset(offset)
@@ -819,7 +806,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         if not emails:
             return []
         query = (
-            sa.select(users, _default_access_key().label("main_access_key"))
+            sa.select(users, default_access_key_expr().label("main_access_key"))
             .select_from(users)
             .where(users.c.email.in_(emails))
         )
@@ -853,7 +840,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         if not user_ids:
             return []
         query = (
-            sa.select(users, _default_access_key().label("main_access_key"))
+            sa.select(users, default_access_key_expr().label("main_access_key"))
             .select_from(users)
             .where(users.c.uuid.in_(user_ids))
         )

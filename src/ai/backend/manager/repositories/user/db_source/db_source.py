@@ -80,6 +80,7 @@ from ai.backend.manager.models.session import (
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.types import join_by_related_field
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
+from ai.backend.manager.models.user.row import default_access_key_expr
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
     VFolderDeletionInfo,
@@ -315,7 +316,10 @@ class UserDBSource:
             if status is not None and status != current_user.status:
                 to_update["status_info"] = "admin-requested"
             update_query = (
-                sa.update(users).where(users.c.email == email).values(to_update).returning(users)
+                sa.update(users)
+                .where(users.c.email == email)
+                .values(to_update)
+                .returning(users, default_access_key_expr().label("main_access_key"))
             )
             result = await session.execute(update_query)
             updated_user = result.first()
@@ -334,12 +338,7 @@ class UserDBSource:
             await self._sync_user_project_memberships(
                 updated_user.uuid, updated_user.domain_name, group_ids
             )
-        default_access_key = await session.scalar(
-            sa.select(KeyPairRow.access_key).where(
-                (KeyPairRow.user == updated_user.uuid) & KeyPairRow.is_default
-            )
-        )
-        return UserData.from_row(updated_user, default_access_key)
+        return UserData.from_row(updated_user)
 
     async def bulk_update_users_validated(
         self,
@@ -430,7 +429,10 @@ class UserDBSource:
         if status is not None and status != current_user.status:
             to_update["status_info"] = "admin-requested"
         update_query = (
-            sa.update(users).where(users.c.uuid == user_id).values(to_update).returning(users)
+            sa.update(users)
+            .where(users.c.uuid == user_id)
+            .values(to_update)
+            .returning(users, default_access_key_expr().label("main_access_key"))
         )
         result = await session.execute(update_query)
         updated_user = result.first()
@@ -449,12 +451,7 @@ class UserDBSource:
             await self._sync_user_project_memberships(
                 updated_user.uuid, updated_user.domain_name, group_ids
             )
-        default_access_key = await session.scalar(
-            sa.select(KeyPairRow.access_key).where(
-                (KeyPairRow.user == updated_user.uuid) & KeyPairRow.is_default
-            )
-        )
-        return UserData.from_row(updated_user, default_access_key)
+        return UserData.from_row(updated_user)
 
     async def update_user_by_uuid_validated(
         self,
