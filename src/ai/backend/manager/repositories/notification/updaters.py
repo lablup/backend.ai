@@ -1,17 +1,31 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
 
 from ai.backend.common.data.notification import WebhookSpec
 from ai.backend.common.data.notification.types import EmailSpec
-from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
-from ai.backend.manager.repositories.base.updater import UpdaterSpec
+from ai.backend.common.identifier.notification import (
+    NotificationChannelID,
+    NotificationRuleID,
+)
+from ai.backend.manager.data.notification.types import (
+    NotificationChannelData,
+    NotificationRuleData,
+)
+from ai.backend.manager.models.notification.row import (
+    NotificationChannelRow,
+    NotificationRuleRow,
+)
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.types import OptionalState, TriState
 
 
 @dataclass
-class NotificationChannelUpdaterSpec(UpdaterSpec[NotificationChannelRow]):
+class NotificationChannelUpdater(DataUpdater[NotificationChannelRow, NotificationChannelData]):
+    channel_id: NotificationChannelID
     """UpdaterSpec for notification channel updates."""
 
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
@@ -27,6 +41,19 @@ class NotificationChannelUpdaterSpec(UpdaterSpec[NotificationChannelRow]):
         return NotificationChannelRow
 
     @override
+    def pk_value(self) -> NotificationChannelID:
+        return self.channel_id
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def to_data(self, row: NotificationChannelRow) -> NotificationChannelData:
+        return row.to_data()
+
+    @override
     def build_values(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
         self.name.update_dict(to_update, "name")
@@ -39,7 +66,8 @@ class NotificationChannelUpdaterSpec(UpdaterSpec[NotificationChannelRow]):
 
 
 @dataclass
-class NotificationRuleUpdaterSpec(UpdaterSpec[NotificationRuleRow]):
+class NotificationRuleUpdater(DataUpdater[NotificationRuleRow, NotificationRuleData]):
+    rule_id: NotificationRuleID
     """UpdaterSpec for notification rule updates."""
 
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
@@ -51,6 +79,19 @@ class NotificationRuleUpdaterSpec(UpdaterSpec[NotificationRuleRow]):
     @override
     def row_class(self) -> type[NotificationRuleRow]:
         return NotificationRuleRow
+
+    @override
+    def pk_value(self) -> NotificationRuleID:
+        return self.rule_id
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def to_data(self, row: NotificationRuleRow) -> NotificationRuleData:
+        return row.to_data()
 
     @override
     def build_values(self) -> dict[str, Any]:

@@ -5,12 +5,14 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
+from ai.backend.common.data.entity.types import EntityData
 from ai.backend.common.data.notification import (
     EmailSpec,
     NotificationChannelType,
     NotificationRuleType,
     WebhookSpec,
 )
+from ai.backend.common.identifier.entity import EntityID
 from ai.backend.common.identifier.notification import (
     NotificationChannelID,
     NotificationRuleID,
@@ -19,7 +21,7 @@ from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
 
 @dataclass(frozen=True)
-class NotificationChannelData:
+class NotificationChannelData(EntityData):
     """Domain model data for notification channel."""
 
     id: NotificationChannelID
@@ -32,9 +34,13 @@ class NotificationChannelData:
     created_at: datetime = field(compare=False)
     updated_at: datetime = field(compare=False)
 
+    @override
+    def entity_id(self) -> EntityID:
+        return self.id
+
 
 @dataclass(frozen=True)
-class NotificationRuleData:
+class NotificationRuleData(EntityData):
     """Domain model data for notification rule.
 
     Names its channel by id rather than carrying the channel itself: a row
@@ -52,6 +58,10 @@ class NotificationRuleData:
     created_by: UUID
     created_at: datetime = field(compare=False)
     updated_at: datetime = field(compare=False)
+
+    @override
+    def entity_id(self) -> EntityID:
+        return self.id
 
 
 @dataclass(frozen=True)

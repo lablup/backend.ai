@@ -2,40 +2,42 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.entity.notification import NOTIFICATION_CHANNEL_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.identifier.notification import NotificationChannelID
+from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.permission.types import RBACElementRef
-
-from .base import NotificationChannelSingleEntityAction, NotificationChannelSingleEntityActionResult
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 
 
 @dataclass
-class ValidateChannelAction(NotificationChannelSingleEntityAction):
-    """Action to validate a notification channel (webhook sending test)."""
+class ValidateChannelAction(BaseGlobalAction):
+    """Send a test message through a channel to prove it is reachable."""
 
-    channel_id: UUID
+    channel_id: NotificationChannelID
     test_message: str
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return NOTIFICATION_CHANNEL_ENTITY_TYPE
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "validate_notification_channel"
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
-    @override
-    def target_entity_id(self) -> str:
-        return str(self.channel_id)
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.NOTIFICATION_CHANNEL, str(self.channel_id))
-
 
 @dataclass
-class ValidateChannelActionResult(NotificationChannelSingleEntityActionResult):
+class ValidateChannelActionResult(BaseActionResult):
     """Result of validating a notification channel."""
 
     @override
-    def target_entity_id(self) -> str:
-        return ""
+    def entity_id(self) -> str | None:
+        return None

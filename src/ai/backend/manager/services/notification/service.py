@@ -5,44 +5,22 @@ import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.notification.types import MatchingNotificationRuleData
 from ai.backend.manager.notification.types import ProcessRuleParams
-from ai.backend.manager.repositories.notification.creators import NotificationRuleCreatorSpec
-from ai.backend.manager.repositories.notification.updaters import NotificationRuleUpdaterSpec
 
 from .actions import (
-    CreateChannelAction,
-    CreateChannelActionResult,
-    CreateRuleAction,
-    CreateRuleActionResult,
-    DeleteChannelAction,
-    DeleteChannelActionResult,
-    DeleteRuleAction,
-    DeleteRuleActionResult,
-    GetChannelAction,
-    GetChannelActionResult,
-    GetRuleAction,
-    GetRuleActionResult,
-    ProcessedRuleSuccess,
     ProcessNotificationAction,
     ProcessNotificationActionResult,
-    SearchChannelsAction,
-    SearchChannelsActionResult,
-    SearchRulesAction,
-    SearchRulesActionResult,
-    UpdateChannelAction,
-    UpdateChannelActionResult,
-    UpdateRuleAction,
-    UpdateRuleActionResult,
     ValidateChannelAction,
     ValidateChannelActionResult,
     ValidateRuleAction,
     ValidateRuleActionResult,
 )
+from .actions.process_notification import ProcessedRuleSuccess
 
 if TYPE_CHECKING:
     from ai.backend.manager.notification import NotificationCenter
@@ -107,72 +85,6 @@ class NotificationService:
             errors=result.errors,
         )
 
-    async def create_channel(
-        self,
-        action: CreateChannelAction,
-    ) -> CreateChannelActionResult:
-        """Creates a new notification channel."""
-        channel_data = await self._repository.create_channel(action.creator)
-
-        return CreateChannelActionResult(
-            channel_data=channel_data,
-        )
-
-    async def create_rule(
-        self,
-        action: CreateRuleAction,
-    ) -> CreateRuleActionResult:
-        """Creates a new notification rule."""
-        spec = cast(NotificationRuleCreatorSpec, action.creator.spec)
-        # Validate message_template length
-        if len(spec.message_template) > 65536:
-            raise ValueError("message_template must not exceed 65536 characters (64KB)")
-
-        rule_data = await self._repository.create_rule(action.creator)
-
-        return CreateRuleActionResult(
-            rule_data=rule_data,
-        )
-
-    async def update_channel(
-        self,
-        action: UpdateChannelAction,
-    ) -> UpdateChannelActionResult:
-        """Updates an existing notification channel."""
-        channel_data = await self._repository.update_channel(updater=action.updater)
-
-        return UpdateChannelActionResult(
-            channel_data=channel_data,
-        )
-
-    async def update_rule(
-        self,
-        action: UpdateRuleAction,
-    ) -> UpdateRuleActionResult:
-        """Updates an existing notification rule."""
-        # Validate message_template length if being updated
-        spec = cast(NotificationRuleUpdaterSpec, action.updater.spec)
-        if (message_template := spec.message_template.optional_value()) is not None:
-            if len(message_template) > 65536:
-                raise ValueError("message_template must not exceed 65536 characters (64KB)")
-
-        rule_data = await self._repository.update_rule(updater=action.updater)
-
-        return UpdateRuleActionResult(
-            rule_data=rule_data,
-        )
-
-    async def delete_channel(
-        self,
-        action: DeleteChannelAction,
-    ) -> DeleteChannelActionResult:
-        """Deletes a notification channel."""
-        deleted = await self._repository.delete_channel(action.channel_id)
-
-        return DeleteChannelActionResult(
-            deleted=deleted,
-        )
-
     async def validate_channel(
         self,
         action: ValidateChannelAction,
@@ -230,70 +142,6 @@ class NotificationService:
         )
         return ValidateRuleActionResult(
             message=result.message,
-        )
-
-    async def delete_rule(
-        self,
-        action: DeleteRuleAction,
-    ) -> DeleteRuleActionResult:
-        """Deletes a notification rule."""
-        deleted = await self._repository.delete_rule(action.rule_id)
-
-        return DeleteRuleActionResult(
-            deleted=deleted,
-        )
-
-    async def get_channel(
-        self,
-        action: GetChannelAction,
-    ) -> GetChannelActionResult:
-        """Gets a notification channel by ID."""
-        channel_data = await self._repository.get_channel_by_id(action.channel_id)
-
-        return GetChannelActionResult(
-            channel_data=channel_data,
-        )
-
-    async def get_rule(
-        self,
-        action: GetRuleAction,
-    ) -> GetRuleActionResult:
-        """Gets a notification rule by ID."""
-        rule_data = await self._repository.get_rule_by_id(action.rule_id)
-
-        return GetRuleActionResult(
-            rule_data=rule_data,
-        )
-
-    async def search_channels(
-        self,
-        action: SearchChannelsAction,
-    ) -> SearchChannelsActionResult:
-        """Searches notification channels."""
-        result = await self._repository.search_channels(
-            querier=action.querier,
-        )
-
-        return SearchChannelsActionResult(
-            channels=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
-    async def search_rules(
-        self,
-        action: SearchRulesAction,
-    ) -> SearchRulesActionResult:
-        """Searches notification rules."""
-        result = await self._repository.search_rules(
-            querier=action.querier,
-        )
-        return SearchRulesActionResult(
-            rules=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
         )
 
     async def _process_notification(

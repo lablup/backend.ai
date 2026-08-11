@@ -2,36 +2,34 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-
-from .base import NotificationAction
+from ai.backend.common.data.entity.notification import NOTIFICATION_RULE_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.identifier.notification import NotificationRuleID
+from ai.backend.manager.actions.v2.ops.base import PurgeGlobalOpsAction
+from ai.backend.manager.data.notification.types import NotificationRuleData
+from ai.backend.manager.models.notification.purgers import NotificationRulePurger
+from ai.backend.manager.models.notification.row import NotificationRuleRow
 
 
 @dataclass
-class DeleteRuleAction(NotificationAction):
-    """Action to delete a notification rule."""
+class PurgeRuleAction(PurgeGlobalOpsAction[NotificationRuleRow, NotificationRuleData]):
+    """Remove a notification rule.
 
-    rule_id: UUID
+    Purge-shaped: the table carries no lifecycle column."""
+
+    rule_id: NotificationRuleID
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.DELETE
+    def entity_type(cls) -> EntityType:
+        return NOTIFICATION_RULE_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.rule_id)
-
-
-@dataclass
-class DeleteRuleActionResult(BaseActionResult):
-    """Result of deleting a notification rule."""
-
-    deleted: bool
+    @classmethod
+    def action_name(cls) -> str:
+        return "purge_notification_rule"
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def to_purger(self) -> NotificationRulePurger:
+        return NotificationRulePurger(rule_id=self.rule_id)

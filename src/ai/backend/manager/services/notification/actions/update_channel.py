@@ -3,42 +3,30 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.notification import NotificationChannelData
-from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.models.notification import NotificationChannelRow
-from ai.backend.manager.repositories.base.updater import Updater
-
-from .base import NotificationChannelSingleEntityAction, NotificationChannelSingleEntityActionResult
+from ai.backend.common.data.entity.notification import NOTIFICATION_CHANNEL_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import UpdateGlobalOpsAction
+from ai.backend.manager.data.notification.types import NotificationChannelData
+from ai.backend.manager.models.notification.row import NotificationChannelRow
+from ai.backend.manager.repositories.notification.updaters import NotificationChannelUpdater
 
 
 @dataclass
-class UpdateChannelAction(NotificationChannelSingleEntityAction):
-    """Action to update a notification channel."""
+class UpdateChannelAction(UpdateGlobalOpsAction[NotificationChannelRow, NotificationChannelData]):
+    """Retune one notification channel."""
 
-    updater: Updater[NotificationChannelRow]
+    updater: NotificationChannelUpdater
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
+    def entity_type(cls) -> EntityType:
+        return NOTIFICATION_CHANNEL_ENTITY_TYPE
 
     @override
-    def target_entity_id(self) -> str:
-        return str(self.updater.pk_value)
+    @classmethod
+    def action_name(cls) -> str:
+        return "update_notification_channel"
 
     @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.NOTIFICATION_CHANNEL, str(self.updater.pk_value))
-
-
-@dataclass
-class UpdateChannelActionResult(NotificationChannelSingleEntityActionResult):
-    """Result of updating a notification channel."""
-
-    channel_data: NotificationChannelData
-
-    @override
-    def target_entity_id(self) -> str:
-        return str(self.channel_data.id)
+    def to_updater(self) -> NotificationChannelUpdater:
+        return self.updater

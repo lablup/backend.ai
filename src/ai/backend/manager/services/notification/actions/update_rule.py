@@ -3,37 +3,30 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.notification import NotificationRuleData
-from ai.backend.manager.models.notification import NotificationRuleRow
-from ai.backend.manager.repositories.base.updater import Updater
-
-from .base import NotificationAction
+from ai.backend.common.data.entity.notification import NOTIFICATION_RULE_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import UpdateGlobalOpsAction
+from ai.backend.manager.data.notification.types import NotificationRuleData
+from ai.backend.manager.models.notification.row import NotificationRuleRow
+from ai.backend.manager.repositories.notification.updaters import NotificationRuleUpdater
 
 
 @dataclass
-class UpdateRuleAction(NotificationAction):
-    """Action to update a notification rule."""
+class UpdateRuleAction(UpdateGlobalOpsAction[NotificationRuleRow, NotificationRuleData]):
+    """Retune one notification rule."""
 
-    updater: Updater[NotificationRuleRow]
+    updater: NotificationRuleUpdater
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
+    def entity_type(cls) -> EntityType:
+        return NOTIFICATION_RULE_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.updater.pk_value)
-
-
-@dataclass
-class UpdateRuleActionResult(BaseActionResult):
-    """Result of updating a notification rule."""
-
-    rule_data: NotificationRuleData
+    @classmethod
+    def action_name(cls) -> str:
+        return "update_notification_rule"
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.rule_data.id)
+    def to_updater(self) -> NotificationRuleUpdater:
+        return self.updater

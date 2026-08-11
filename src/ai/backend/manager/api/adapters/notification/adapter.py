@@ -17,7 +17,6 @@ from ai.backend.common.data.notification.types import (
     SMTPAuth,
     SMTPConnection,
 )
-from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.notification.request import (
     CreateNotificationChannelInput,
     CreateNotificationRuleInput,
@@ -70,7 +69,6 @@ from ai.backend.common.identifier.notification import (
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.notification import InvalidNotificationSpec
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
@@ -78,33 +76,34 @@ from ai.backend.manager.models.notification.conditions import (
     NotificationChannelConditions,
     NotificationRuleConditions,
 )
+from ai.backend.manager.models.notification.creators import (
+    NotificationChannelCreator,
+    NotificationRuleCreator,
+)
 from ai.backend.manager.models.notification.orders import (
     NotificationChannelOrders,
     NotificationRuleOrders,
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    Updater,
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.repositories.notification.creators import (
-    NotificationChannelCreatorSpec,
-    NotificationRuleCreatorSpec,
+from ai.backend.manager.repositories.notification.searchers import (
+    NotificationChannelSearcher,
+    NotificationRuleSearcher,
 )
 from ai.backend.manager.repositories.notification.updaters import (
-    NotificationChannelUpdaterSpec,
-    NotificationRuleUpdaterSpec,
+    NotificationChannelUpdater,
+    NotificationRuleUpdater,
 )
 from ai.backend.manager.services.notification.actions import (
     CreateChannelAction,
     CreateRuleAction,
-    DeleteChannelAction,
-    DeleteRuleAction,
     GetChannelAction,
     GetRuleAction,
+    PurgeChannelAction,
+    PurgeRuleAction,
     SearchChannelsAction,
     SearchRulesAction,
     UpdateChannelAction,
@@ -174,14 +173,14 @@ class NotificationAdapter(BaseAdapter):
         """
         if not ids:
             return []
-        querier = BatchQuerier(
+        searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=len(ids)),
             conditions=[NotificationChannelConditions.by_ids(ids)],
         )
-        action_result = await self._processors.notification.search_channels.wait_for_complete(
-            SearchChannelsAction(querier=querier)
+        action_result = await self._processors.notification.search_channels.run(
+            SearchChannelsAction(searcher=searcher)
         )
-        channel_map = {ch.id: self._channel_data_to_dto(ch) for ch in action_result.channels}
+        channel_map = {ch.id: self._channel_data_to_dto(ch) for ch in action_result.items}
         return [channel_map.get(NotificationChannelID(channel_id)) for channel_id in ids]
 
     async def batch_load_rules_by_ids(
@@ -193,14 +192,14 @@ class NotificationAdapter(BaseAdapter):
         """
         if not ids:
             return []
-        querier = BatchQuerier(
+        searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=len(ids)),
             conditions=[NotificationRuleConditions.by_ids(ids)],
         )
-        action_result = await self._processors.notification.search_rules.wait_for_complete(
-            SearchRulesAction(querier=querier)
+        action_result = await self._processors.notification.search_rules.run(
+            SearchRulesAction(searcher=searcher)
         )
-        rule_map = {rule.id: self._rule_data_to_dto(rule) for rule in action_result.rules}
+        rule_map = {rule.id: self._rule_data_to_dto(rule) for rule in action_result.items}
         return [rule_map.get(NotificationRuleID(rule_id)) for rule_id in ids]
 
     # ------------------------------------------------------------------ channels
@@ -211,36 +210,30 @@ class NotificationAdapter(BaseAdapter):
         created_by: UUID,
     ) -> CreateNotificationChannelPayload:
         """Create a new notification channel."""
-        creator: RBACEntityCreator[NotificationChannelRow] = RBACEntityCreator(
-            spec=NotificationChannelCreatorSpec(
-                name=input.name,
-                description=input.description,
-                channel_type=NotificationChannelType(input.channel_type.value),
-                spec=_spec_input_to_domain(input.spec),
-                enabled=input.enabled,
-                created_by=created_by,
-            ),
-            element_type=RBACElementType.NOTIFICATION_CHANNEL,
-            scope_ref=RBACElementRef(RBACElementType.USER, str(created_by)),
+        creator = NotificationChannelCreator(
+            name=input.name,
+            description=input.description,
+            channel_type=NotificationChannelType(input.channel_type.value),
+            spec=_spec_input_to_domain(input.spec),
+            enabled=input.enabled,
+            created_by=created_by,
         )
 
-        action_result = await self._processors.notification.create_channel.wait_for_complete(
+        action_result = await self._processors.notification.create_channel.run(
             CreateChannelAction(creator=creator)
         )
 
         return CreateNotificationChannelPayload(
-            channel=self._channel_data_to_dto(action_result.channel_data)
+            channel=self._channel_data_to_dto(action_result.data)
         )
 
     async def get_channel(self, channel_id: UUID) -> GetNotificationChannelPayload:
         """Get a notification channel by ID."""
-        action_result = await self._processors.notification.get_channel.wait_for_complete(
-            GetChannelAction(channel_id=channel_id)
+        action_result = await self._processors.notification.get_channel.run(
+            GetChannelAction(channel_id=NotificationChannelID(channel_id))
         )
 
-        return GetNotificationChannelPayload(
-            item=self._channel_data_to_dto(action_result.channel_data)
-        )
+        return GetNotificationChannelPayload(item=self._channel_data_to_dto(action_result.data))
 
     async def update_channel(
         self,
@@ -248,25 +241,22 @@ class NotificationAdapter(BaseAdapter):
         input: UpdateNotificationChannelInput,
     ) -> UpdateNotificationChannelPayload:
         """Update an existing notification channel."""
-        updater: Updater[NotificationChannelRow] = Updater(
-            spec=self._build_channel_updater_spec(input),
-            pk_value=channel_id,
-        )
+        updater = self._build_channel_updater(NotificationChannelID(channel_id), input)
 
-        action_result = await self._processors.notification.update_channel.wait_for_complete(
+        action_result = await self._processors.notification.update_channel.run(
             UpdateChannelAction(updater=updater)
         )
 
         return UpdateNotificationChannelPayload(
-            channel=self._channel_data_to_dto(action_result.channel_data)
+            channel=self._channel_data_to_dto(action_result.data)
         )
 
     async def delete_channel(
         self, input: DeleteNotificationChannelInput
     ) -> DeleteNotificationChannelPayload:
         """Delete a notification channel."""
-        await self._processors.notification.delete_channel.wait_for_complete(
-            DeleteChannelAction(channel_id=input.id)
+        await self._processors.notification.purge_channel.run(
+            PurgeChannelAction(channel_id=NotificationChannelID(input.id))
         )
 
         return DeleteNotificationChannelPayload(id=input.id)
@@ -279,33 +269,29 @@ class NotificationAdapter(BaseAdapter):
         created_by: UUID,
     ) -> CreateNotificationRulePayload:
         """Create a new notification rule."""
-        creator: RBACEntityCreator[NotificationRuleRow] = RBACEntityCreator(
-            spec=NotificationRuleCreatorSpec(
-                name=input.name,
-                description=input.description,
-                rule_type=NotificationRuleType(input.rule_type.value),
-                channel_id=input.channel_id,
-                message_template=input.message_template,
-                enabled=input.enabled,
-                created_by=created_by,
-            ),
-            element_type=RBACElementType.NOTIFICATION_RULE,
-            scope_ref=RBACElementRef(RBACElementType.NOTIFICATION_CHANNEL, str(input.channel_id)),
+        creator = NotificationRuleCreator(
+            name=input.name,
+            description=input.description,
+            rule_type=NotificationRuleType(input.rule_type.value),
+            channel_id=NotificationChannelID(input.channel_id),
+            message_template=input.message_template,
+            enabled=input.enabled,
+            created_by=created_by,
         )
 
-        action_result = await self._processors.notification.create_rule.wait_for_complete(
+        action_result = await self._processors.notification.create_rule.run(
             CreateRuleAction(creator=creator)
         )
 
-        return CreateNotificationRulePayload(rule=self._rule_data_to_dto(action_result.rule_data))
+        return CreateNotificationRulePayload(rule=self._rule_data_to_dto(action_result.data))
 
     async def get_rule(self, rule_id: UUID) -> GetNotificationRulePayload:
         """Get a notification rule by ID."""
-        action_result = await self._processors.notification.get_rule.wait_for_complete(
-            GetRuleAction(rule_id=rule_id)
+        action_result = await self._processors.notification.get_rule.run(
+            GetRuleAction(rule_id=NotificationRuleID(rule_id))
         )
 
-        return GetNotificationRulePayload(item=self._rule_data_to_dto(action_result.rule_data))
+        return GetNotificationRulePayload(item=self._rule_data_to_dto(action_result.data))
 
     async def update_rule(
         self,
@@ -313,23 +299,20 @@ class NotificationAdapter(BaseAdapter):
         input: UpdateNotificationRuleInput,
     ) -> UpdateNotificationRulePayload:
         """Update an existing notification rule."""
-        updater: Updater[NotificationRuleRow] = Updater(
-            spec=self._build_rule_updater_spec(input),
-            pk_value=rule_id,
-        )
+        updater = self._build_rule_updater(NotificationRuleID(rule_id), input)
 
-        action_result = await self._processors.notification.update_rule.wait_for_complete(
+        action_result = await self._processors.notification.update_rule.run(
             UpdateRuleAction(updater=updater)
         )
 
-        return UpdateNotificationRulePayload(rule=self._rule_data_to_dto(action_result.rule_data))
+        return UpdateNotificationRulePayload(rule=self._rule_data_to_dto(action_result.data))
 
     async def delete_rule(
         self, input: DeleteNotificationRuleInput
     ) -> DeleteNotificationRulePayload:
         """Delete a notification rule."""
-        await self._processors.notification.delete_rule.wait_for_complete(
-            DeleteRuleAction(rule_id=input.id)
+        await self._processors.notification.purge_rule.run(
+            PurgeRuleAction(rule_id=NotificationRuleID(input.id))
         )
 
         return DeleteNotificationRulePayload(id=input.id)
@@ -338,8 +321,10 @@ class NotificationAdapter(BaseAdapter):
         self, input: ValidateNotificationChannelInput
     ) -> ValidateNotificationChannelPayload:
         """Validate a notification channel by sending a test message."""
-        await self._processors.notification.validate_channel.wait_for_complete(
-            ValidateChannelAction(channel_id=input.id, test_message=input.test_message)
+        await self._processors.notification.validate_channel.run(
+            ValidateChannelAction(
+                channel_id=NotificationChannelID(input.id), test_message=input.test_message
+            )
         )
         return ValidateNotificationChannelPayload(id=input.id)
 
@@ -347,8 +332,11 @@ class NotificationAdapter(BaseAdapter):
         self, input: ValidateNotificationRuleInput
     ) -> ValidateNotificationRulePayload:
         """Validate a notification rule by rendering its template with test data."""
-        action_result = await self._processors.notification.validate_rule.wait_for_complete(
-            ValidateRuleAction(rule_id=input.id, notification_data=input.notification_data or {})
+        action_result = await self._processors.notification.validate_rule.run(
+            ValidateRuleAction(
+                rule_id=NotificationRuleID(input.id),
+                notification_data=input.notification_data or {},
+            )
         )
         return ValidateNotificationRulePayload(message=action_result.message)
 
@@ -358,7 +346,8 @@ class NotificationAdapter(BaseAdapter):
         """Search notification channels with filter, order, and pagination."""
         conditions = self._convert_channel_filter(input.filter) if input.filter else []
         orders = self._convert_channel_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            NotificationChannelSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_channel_pagination_spec(),
@@ -370,12 +359,12 @@ class NotificationAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-        action_result = await self._processors.notification.search_channels.wait_for_complete(
-            SearchChannelsAction(querier=querier)
+        action_result = await self._processors.notification.search_channels.run(
+            SearchChannelsAction(searcher=searcher)
         )
 
         return SearchNotificationChannelsPayload(
-            items=[self._channel_data_to_dto(d) for d in action_result.channels],
+            items=[self._channel_data_to_dto(d) for d in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -387,7 +376,8 @@ class NotificationAdapter(BaseAdapter):
         """Search notification rules with filter, order, and pagination."""
         conditions = self._convert_rule_filter(input.filter) if input.filter else []
         orders = self._convert_rule_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            NotificationRuleSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_rule_pagination_spec(),
@@ -399,12 +389,12 @@ class NotificationAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-        action_result = await self._processors.notification.search_rules.wait_for_complete(
-            SearchRulesAction(querier=querier)
+        action_result = await self._processors.notification.search_rules.run(
+            SearchRulesAction(searcher=searcher)
         )
 
         return SearchNotificationRulesPayload(
-            items=[self._rule_data_to_dto(d) for d in action_result.rules],
+            items=[self._rule_data_to_dto(d) for d in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -481,10 +471,12 @@ class NotificationAdapter(BaseAdapter):
         )
 
     @staticmethod
-    def _build_channel_updater_spec(
+    def _build_channel_updater(
+        channel_id: NotificationChannelID,
         input: UpdateNotificationChannelInput,
-    ) -> NotificationChannelUpdaterSpec:
-        return NotificationChannelUpdaterSpec(
+    ) -> NotificationChannelUpdater:
+        return NotificationChannelUpdater(
+            channel_id=channel_id,
             name=(
                 OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
             ),
@@ -506,10 +498,12 @@ class NotificationAdapter(BaseAdapter):
         )
 
     @staticmethod
-    def _build_rule_updater_spec(
+    def _build_rule_updater(
+        rule_id: NotificationRuleID,
         input: UpdateNotificationRuleInput,
-    ) -> NotificationRuleUpdaterSpec:
-        return NotificationRuleUpdaterSpec(
+    ) -> NotificationRuleUpdater:
+        return NotificationRuleUpdater(
+            rule_id=rule_id,
             name=(
                 OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
             ),

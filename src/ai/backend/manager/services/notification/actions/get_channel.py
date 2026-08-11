@@ -2,42 +2,32 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
-from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.notification import NotificationChannelData
-from ai.backend.manager.data.permission.types import RBACElementRef
-
-from .base import NotificationChannelSingleEntityAction, NotificationChannelSingleEntityActionResult
+from ai.backend.common.data.entity.notification import NOTIFICATION_CHANNEL_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.identifier.notification import NotificationChannelID
+from ai.backend.manager.actions.v2.ops.base import GetGlobalOpsAction
+from ai.backend.manager.data.notification.types import NotificationChannelData
+from ai.backend.manager.models.notification.row import NotificationChannelRow
+from ai.backend.manager.repositories.notification.queriers import NotificationChannelQuerier
 
 
 @dataclass
-class GetChannelAction(NotificationChannelSingleEntityAction):
-    """Action to get a notification channel by ID."""
+class GetChannelAction(GetGlobalOpsAction[NotificationChannelRow, NotificationChannelData]):
+    """Read one notification channel."""
 
-    channel_id: UUID
+    channel_id: NotificationChannelID
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.GET
+    def entity_type(cls) -> EntityType:
+        return NOTIFICATION_CHANNEL_ENTITY_TYPE
 
     @override
-    def target_entity_id(self) -> str:
-        return str(self.channel_id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "get_notification_channel"
 
     @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.NOTIFICATION_CHANNEL, str(self.channel_id))
-
-
-@dataclass
-class GetChannelActionResult(NotificationChannelSingleEntityActionResult):
-    """Result of getting a notification channel."""
-
-    channel_data: NotificationChannelData
-
-    @override
-    def target_entity_id(self) -> str:
-        return str(self.channel_data.id)
+    def to_querier(self) -> NotificationChannelQuerier:
+        return NotificationChannelQuerier(channel_id=self.channel_id)

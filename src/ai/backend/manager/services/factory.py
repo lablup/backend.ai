@@ -548,7 +548,9 @@ def create_processors(
         ),
         login_client_type=LoginClientTypeProcessors(registry.group()),
         login_client_type_admin=LoginClientTypeAdminProcessors(registry.group()),
-        notification=NotificationProcessors(services.notification, action_monitors, validators),
+        notification=NotificationProcessors(
+            services.notification, registry.group(), registry.group()
+        ),
         object_storage=ObjectStorageProcessors(services.object_storage, registry.group()),
         permission_controller=PermissionControllerProcessors(
             services.permission_controller, action_monitors, validators
