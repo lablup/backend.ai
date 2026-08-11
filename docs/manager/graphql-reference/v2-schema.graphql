@@ -6649,6 +6649,9 @@ type KeyPairV2 implements Node {
   """Whether the keypair has admin privileges."""
   isAdmin: Boolean
 
+  """Added in 26.9.0. Whether this is the owner's default keypair."""
+  isDefault: Boolean!
+
   """Timestamp when the keypair was created."""
   createdAt: DateTime
 
@@ -6692,6 +6695,11 @@ Added in 26.4.2. Filter input for keypair queries. Supports filtering by active 
 input KeypairFilter {
   isActive: Boolean = null
   isAdmin: Boolean = null
+
+  """
+  Added in 26.9.0. Filter keypairs by whether they are their owner's default one.
+  """
+  isDefault: Boolean = null
   accessKey: StringFilter = null
   resourcePolicy: StringFilter = null
 
@@ -6713,13 +6721,14 @@ input KeypairOrderBy {
 }
 
 """
-Added in 26.4.2. Fields available for ordering keypair query results. CREATED_AT: Order by creation timestamp. LAST_USED: Order by last used timestamp. ACCESS_KEY: Order by access key alphabetically. IS_ACTIVE: Order by active status.
+Added in 26.4.2. Fields available for ordering keypair query results. CREATED_AT: Order by creation timestamp. LAST_USED: Order by last used timestamp. ACCESS_KEY: Order by access key alphabetically. IS_ACTIVE: Order by active status. IS_DEFAULT: Order by whether the keypair is its owner's default one.
 """
 enum KeypairOrderField {
   CREATED_AT
   LAST_USED
   ACCESS_KEY
   IS_ACTIVE
+  IS_DEFAULT
   RESOURCE_POLICY
 }
 
@@ -16824,7 +16833,7 @@ type UserV2OrganizationInfo {
   resourcePolicy: String!
 
   """Primary API access key for this user."""
-  mainAccessKey: String
+  mainAccessKey: String @deprecated(reason: "Deprecated since 26.9.0. Use the keypair's is_default field.")
 }
 
 """

@@ -37,6 +37,10 @@ class KeypairFilter(BaseRequestModel):
 
     is_active: bool | None = None
     is_admin: bool | None = None
+    is_default: bool | None = Field(
+        default=None,
+        description="Filter by whether the keypair is its owner's default one.",
+    )
     access_key: StringFilter | None = None
     resource_policy: StringFilter | None = None
     user_id: UUIDFilter | None = Field(
