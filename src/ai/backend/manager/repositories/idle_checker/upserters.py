@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.idle_checker.types import IdleCheckPhase
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.identifier.session import SessionID
+from ai.backend.manager.errors.idle_checker import IdleCheckerNotFound
+from ai.backend.manager.errors.kernel import SessionNotFound
+from ai.backend.manager.errors.repository import ForeignKeyViolationError
 from ai.backend.manager.models.idle_checker.row import SessionIdleCheckRow
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.base import UpserterSpec
 
 
@@ -21,6 +26,22 @@ class SessionIdleCheckExcludeUpserterSpec(UpserterSpec[SessionIdleCheckRow]):
     @override
     def row_class(self) -> type[SessionIdleCheckRow]:
         return SessionIdleCheckRow
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return (
+            IntegrityErrorCheck(
+                violation_type=ForeignKeyViolationError,
+                error=SessionNotFound(str(self.session_id)),
+                constraint_name="fk_session_idle_checks_session_id",
+            ),
+            IntegrityErrorCheck(
+                violation_type=ForeignKeyViolationError,
+                error=IdleCheckerNotFound(str(self.checker_id)),
+                constraint_name="fk_session_idle_checks_idle_checker_id",
+            ),
+        )
 
     @override
     def build_insert_values(self) -> dict[str, Any]:

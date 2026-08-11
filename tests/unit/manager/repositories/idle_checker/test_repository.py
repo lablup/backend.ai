@@ -28,6 +28,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.idle_checker import IdleCheckerNotFound
+from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.idle_checker.row import (
@@ -1243,7 +1244,10 @@ class TestSessionIdleCheckExclusion:
         )
 
         assert result.success == [SessionID(exclusion_rows.active_session_id)]
-        assert result.failed == [unknown_session_id]
+        # The FK violation is mapped to SessionNotFound naming the session.
+        assert set(result.errors) == {unknown_session_id}
+        assert isinstance(result.errors[unknown_session_id], SessionNotFound)
+
         async with database.begin_readonly_session() as db_sess:
             valid_row = await db_sess.get(
                 SessionIdleCheckRow,
@@ -1274,7 +1278,9 @@ class TestSessionIdleCheckExclusion:
         )
 
         assert result.success == [SessionID(exclusion_rows.excluded_session_id)]
-        assert result.failed == [unknown_session_id]
+        assert set(result.errors) == {unknown_session_id}
+        assert isinstance(result.errors[unknown_session_id], SessionNotFound)
+
         async with database.begin_readonly_session() as db_sess:
             reset_row = await db_sess.get(
                 SessionIdleCheckRow,

@@ -38,7 +38,9 @@ from ai.backend.manager.repositories.base import (
     BulkResultWithFailures,
     BulkUpdaterResult,
     BulkUpserter,
+    BulkUpserterError,
     BulkUpserterResult,
+    BulkUpserterResultWithFailures,
     Creator,
     CreatorResult,
     DataBatchPurger,
@@ -472,6 +474,35 @@ class WriteOps(ReadOps):
     ) -> BulkUpserterResult:
         """Insert or update multiple rows on conflict in a single statement."""
         return await execute_bulk_upserter(self._sess, bulk_upserter, index_elements=index_elements)
+
+    async def bulk_upsert_partial[TRow: Base](
+        self,
+        bulk_upserter: BulkUpserter[TRow],
+        index_elements: list[str],
+    ) -> BulkUpserterResultWithFailures[TRow]:
+        """Insert or update each row independently; one row's failure leaves the rest applied.
+
+        Each spec runs in its own savepoint (begin_nested), so a failing row rolls
+        back alone while the rest go through. Order is preserved in successes.
+        """
+        successes: list[TRow] = []
+        errors: list[BulkUpserterError[TRow]] = []
+        for index, spec in enumerate(bulk_upserter.specs):
+            try:
+                async with self._sess.begin_nested():
+                    result = await execute_upserter(
+                        self._sess, Upserter(spec=spec), index_elements=index_elements
+                    )
+                    successes.append(result.row)
+            except sa.exc.IntegrityError as e:
+                parsed = parse_integrity_error(e)
+                try:
+                    match_integrity_error(parsed, spec.integrity_error_checks)
+                except Exception as mapped:
+                    errors.append(BulkUpserterError(spec=spec, exception=mapped, index=index))
+            except Exception as e:
+                errors.append(BulkUpserterError(spec=spec, exception=e, index=index))
+        return BulkUpserterResultWithFailures(successes=successes, errors=errors)
 
     async def upsert_data[TRow: Base, TData](self, upserter: DataUpserter[TRow, TData]) -> TData:
         """Insert or update a single row on conflict, returning its ``data/`` type."""

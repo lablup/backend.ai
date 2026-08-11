@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, override
@@ -83,10 +83,10 @@ class IdleCheckBatchData:
 @dataclass(frozen=True)
 class SessionIdleCheckBatchResult:
     """Per-session outcome of a batch exclusion/inclusion: the sessions the write
-    was applied to and the ones skipped because they do not exist."""
+    was applied to and, for each failed one, the exception saying why."""
 
     success: Sequence[SessionID]
-    failed: Sequence[SessionID]
+    errors: Mapping[SessionID, Exception]
 
 
 @dataclass(frozen=True)

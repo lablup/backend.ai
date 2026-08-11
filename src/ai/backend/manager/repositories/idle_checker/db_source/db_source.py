@@ -33,6 +33,7 @@ from ai.backend.manager.errors.idle_checker import (
     IdleCheckerAssignmentScopeNotFound,
     IdleCheckerNotFound,
 )
+from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.group.row import GroupRow
@@ -89,9 +90,11 @@ from ai.backend.manager.repositories.idle_checker.updaters import (
 from ai.backend.manager.repositories.idle_checker.upserters import (
     SessionIdleCheckExcludeUpserterSpec,
 )
-from ai.backend.manager.repositories.ops import DBOpsProvider, WriteOps
+from ai.backend.manager.repositories.ops import DBOpsProvider
 
 _ASSIGNMENT_DELETE_BATCH_SIZE = 1000
+
+
 _IDLE_CHECK_UPDATE_BATCH_SIZE = 1000
 
 
@@ -458,34 +461,36 @@ class IdleCheckerDBSource:
         checker_id: IdleCheckerID,
         session_ids: Sequence[SessionID],
     ) -> SessionIdleCheckBatchResult:
-        """Exclude the existing sessions' pairs.
+        """Exclude the sessions' pairs, one savepoint-isolated upsert per row.
 
-        Unknown session ids are reported as failed rather than failing the batch;
-        both partitions come back in request order, deduplicated.
+        Session existence is enforced per row by the session_id foreign key (the
+        spec maps the violation to SessionNotFound), so a failing row lands in
+        ``failed`` with its reason instead of failing the batch.
         """
         async with self._ops.write_ops() as w:
-            existing = await self._resolve_existing_sessions(w, checker_id, session_ids)
-            # Deduplicate: a pair repeated in one INSERT..ON CONFLICT statement is an error.
-            unique_session_ids = list(dict.fromkeys(session_ids))
-            targets = [session_id for session_id in unique_session_ids if session_id in existing]
-            for id_batch in batched(targets, _IDLE_CHECK_UPDATE_BATCH_SIZE):
-                await w.bulk_upsert(
-                    BulkUpserter(
-                        specs=[
-                            SessionIdleCheckExcludeUpserterSpec(
-                                session_id=session_id,
-                                checker_id=checker_id,
-                            )
-                            for session_id in id_batch
-                        ]
-                    ),
-                    index_elements=["session_id", "idle_checker_id"],
-                )
+            checker = await w.query(Querier(row_class=IdleCheckerRow, pk_value=checker_id))
+            if checker is None:
+                raise IdleCheckerNotFound(str(checker_id))
+            result = await w.bulk_upsert_partial(
+                BulkUpserter(
+                    specs=[
+                        SessionIdleCheckExcludeUpserterSpec(
+                            session_id=session_id,
+                            checker_id=checker_id,
+                        )
+                        for session_id in dict.fromkeys(session_ids)
+                    ]
+                ),
+                index_elements=["session_id", "idle_checker_id"],
+            )
             return SessionIdleCheckBatchResult(
-                success=targets,
-                failed=[
-                    session_id for session_id in unique_session_ids if session_id not in existing
-                ],
+                success=[SessionID(row.session_id) for row in result.successes],
+                errors={
+                    cast(SessionIdleCheckExcludeUpserterSpec, error.spec).session_id: (
+                        error.exception
+                    )
+                    for error in result.errors
+                },
             )
 
     async def batch_include_session_idle_checks(
@@ -499,7 +504,17 @@ class IdleCheckerDBSource:
         both partitions come back in request order, deduplicated.
         """
         async with self._ops.write_ops() as w:
-            existing = await self._resolve_existing_sessions(w, checker_id, session_ids)
+            checker = await w.query(Querier(row_class=IdleCheckerRow, pk_value=checker_id))
+            if checker is None:
+                raise IdleCheckerNotFound(str(checker_id))
+            querier = BatchQuerier(
+                pagination=NoPagination(),
+                conditions=[
+                    SessionConditions.by_ids([SessionId(session_id) for session_id in session_ids])
+                ],
+            )
+            rows = (await w.batch_query_in_global(sa.select(SessionRow.id), querier)).rows
+            existing = {SessionID(row.id) for row in rows}
             unique_session_ids = list(dict.fromkeys(session_ids))
             targets = [session_id for session_id in unique_session_ids if session_id in existing]
             # Only rows exclusion wrote are reset, so re-including twice is a
@@ -517,33 +532,12 @@ class IdleCheckerDBSource:
                 )
             return SessionIdleCheckBatchResult(
                 success=targets,
-                failed=[
-                    session_id for session_id in unique_session_ids if session_id not in existing
-                ],
+                errors={
+                    session_id: SessionNotFound(str(session_id))
+                    for session_id in unique_session_ids
+                    if session_id not in existing
+                },
             )
-
-    async def _resolve_existing_sessions(
-        self,
-        w: WriteOps,
-        checker_id: IdleCheckerID,
-        session_ids: Sequence[SessionID],
-    ) -> set[SessionID]:
-        """Require the checker to exist and resolve which of the sessions do.
-
-        Pair rows need not exist: exclusion upserts them and assignment-sync
-        reconciles strays, so only the referenced entities themselves matter.
-        """
-        checker = await w.query(Querier(row_class=IdleCheckerRow, pk_value=checker_id))
-        if checker is None:
-            raise IdleCheckerNotFound(str(checker_id))
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[
-                SessionConditions.by_ids([SessionId(session_id) for session_id in session_ids])
-            ],
-        )
-        rows = (await w.batch_query_in_global(sa.select(SessionRow.id), querier)).rows
-        return {SessionID(row.id) for row in rows}
 
     async def batch_apply_session_idle_check_judgments(
         self,

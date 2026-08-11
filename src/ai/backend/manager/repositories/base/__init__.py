@@ -98,7 +98,9 @@ from .updater import (
 )
 from .upserter import (
     BulkUpserter,
+    BulkUpserterError,
     BulkUpserterResult,
+    BulkUpserterResultWithFailures,
     DataUpserter,
     Upserter,
     UpserterResult,
@@ -195,7 +197,9 @@ __all__ = [
     "execute_upserter",
     # BulkUpserter
     "BulkUpserter",
+    "BulkUpserterError",
     "BulkUpserterResult",
+    "BulkUpserterResultWithFailures",
     "execute_bulk_upserter",
     # Purger
     "DataBatchPurger",
