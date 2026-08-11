@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor.global_action import GlobalActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.services.app_config_definition.actions.admin_search import (
     AdminSearchAppConfigDefinitionsAction,
     SearchAppConfigDefinitionsActionResult,
@@ -28,7 +25,7 @@ from ai.backend.manager.services.app_config_definition.service import (
 )
 
 
-class AppConfigDefinitionProcessors(AbstractProcessorPackage):
+class AppConfigDefinitionProcessors:
     create: ScopeActionProcessor[
         CreateAppConfigDefinitionAction, CreateAppConfigDefinitionActionResult
     ]
@@ -51,12 +48,3 @@ class AppConfigDefinitionProcessors(AbstractProcessorPackage):
         self.get = SingleEntityActionProcessor(service.get, action_monitors)
         self.admin_search = GlobalActionProcessor(service.admin_search, action_monitors)
         self.purge = SingleEntityActionProcessor(service.purge, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateAppConfigDefinitionAction.spec(),
-            GetAppConfigDefinitionAction.spec(),
-            AdminSearchAppConfigDefinitionsAction.spec(),
-            PurgeAppConfigDefinitionAction.spec(),
-        ]

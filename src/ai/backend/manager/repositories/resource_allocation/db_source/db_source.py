@@ -82,7 +82,7 @@ class ResourceAllocationDBSource:
                     KeyPairResourcePolicyRow.default_for_unspecified,
                 )
                 .select_from(UserRow)
-                .join(UserRow.main_keypair)
+                .join(UserRow.default_keypair)
                 .join(
                     KeyPairResourcePolicyRow,
                     KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,

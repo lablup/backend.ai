@@ -43,17 +43,16 @@ from ai.backend.manager.models.idle_checker.row import (
 )
 from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
 from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
-from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.repositories.base import (
     BatchPurger,
     BatchQuerier,
     BatchUpdater,
     BulkCreator,
     Creator,
-    NoPagination,
-    OffsetPagination,
     Purger,
     Querier,
     Updater,
@@ -197,7 +196,7 @@ class IdleCheckerDBSource:
     async def scoped_search_assignments(
         self,
         querier: BatchQuerier,
-        scopes: Sequence[SearchScope],
+        scopes: Sequence[OperationScope],
     ) -> SearchResult[IdleCheckerAssignmentData]:
         """Search bindings whose rows match any of ``scopes`` (OR), narrowed by ``querier``."""
         async with self._ops.read_ops() as r:
@@ -459,9 +458,11 @@ class IdleCheckerDBSource:
                         spec=SessionIdleCheckJudgmentBatchUpdaterSpec(judgments),
                         conditions=[
                             SessionIdleCheckConditions.by_pairs(pairs),
-                            SessionIdleCheckConditions.by_status_not_equals(
-                                IdleCheckPhase.IDLE_EXPIRED
-                            ),
+                            SessionIdleCheckConditions.by_statuses((
+                                IdleCheckPhase.READY_TO_CHECK,
+                                IdleCheckPhase.ACTIVE,
+                                IdleCheckPhase.IDLE,
+                            )),
                         ],
                     )
                 )

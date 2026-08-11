@@ -12,12 +12,12 @@ import sqlalchemy as sa
 from ai.backend.common.exception import UserNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user import UserRow
 
 
 @dataclass(frozen=True)
-class MyLoginSessionSearchScope(SearchScope):
+class MyLoginSessionOperationScope(OperationScope):
     """Scope for searching login sessions owned by the current user."""
 
     user_id: UUID
@@ -44,7 +44,7 @@ class MyLoginSessionSearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class MyLoginHistorySearchScope(SearchScope):
+class MyLoginHistoryOperationScope(OperationScope):
     """Scope for searching login history of the current user."""
 
     user_id: UUID

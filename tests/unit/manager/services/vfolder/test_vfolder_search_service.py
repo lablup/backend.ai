@@ -20,10 +20,11 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOwnershipType,
     VFolderSearchResult,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.vfolder.admin_repository import VFolderAdminRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
-from ai.backend.manager.repositories.vfolder.types import UserVFolderSearchScope
+from ai.backend.manager.repositories.vfolder.types import UserVFolderOperationScope
 from ai.backend.manager.services.vfolder.actions.admin_search_vfolders import (
     AdminSearchVFoldersAction,
     AdminSearchVFoldersActionResult,
@@ -204,7 +205,7 @@ class TestVFolderServiceSearchUserVFolders:
                 has_previous_page=False,
             )
         )
-        search_scope = UserVFolderSearchScope(user_id=user_id)
+        search_scope = UserVFolderOperationScope(user_id=user_id)
         querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
         action = SearchUserVFoldersAction(scope=search_scope, querier=querier)
 

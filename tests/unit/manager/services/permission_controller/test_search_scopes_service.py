@@ -13,7 +13,8 @@ import pytest
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import ScopeData, ScopeListResult
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.permission_contoller.actions.get_scope_types import (
     GetScopeTypesAction,
 )

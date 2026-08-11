@@ -36,31 +36,9 @@ jobs:
     - name: Find all Dockerfiles and create matrix
       id: set-matrix
       run: |
-        # Find all Dockerfiles in docker/ directory
-        DOCKERFILES=$(find docker -type f -name "*.dockerfile" ! -name "backend.ai-*.dockerfile")
-
-        # Build JSON array for matrix
-        MATRIX_JSON='{"include":['
-        FIRST=true
-
-        for dockerfile in $DOCKERFILES; do
-          # Get image name from filename (e.g., krunner-extractor.dockerfile -> krunner-extractor)
-          BASENAME=$(basename "$dockerfile" .dockerfile)
-
-          if [ "$FIRST" = true ]; then
-            FIRST=false
-          else
-            MATRIX_JSON="${MATRIX_JSON},"
-          fi
-
-          MATRIX_JSON="${MATRIX_JSON}{\"name\":\"${BASENAME}\",\"dockerfile\":\"${dockerfile}\",\"context\":\"docker\"}"
-        done
-
-        MATRIX_JSON="${MATRIX_JSON}]}"
-
+        MATRIX_JSON=$(scripts/list-dockerfiles.sh --infra)
         echo "Found Dockerfiles matrix:"
         echo "$MATRIX_JSON" | jq .
-
         echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
 
   sbom-containers:

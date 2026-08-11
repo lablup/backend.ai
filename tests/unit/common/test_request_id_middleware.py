@@ -1,15 +1,12 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from aiohttp import web
 
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.middlewares.request_id import REQUEST_ID_HEADER, request_id_middleware
-
-if TYPE_CHECKING:
-    pass
 
 
 async def test_request_id_middleware_with_custom_request_id(aiohttp_client: Any) -> None:

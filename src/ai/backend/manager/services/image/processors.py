@@ -1,9 +1,6 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validator.single_entity import SingleEntityActionValidator
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import LegacyRBACValidators
@@ -93,7 +90,7 @@ from ai.backend.manager.services.image.actions.update_image_by_id import (
 from .service import ImageService
 
 
-class ImageProcessors(AbstractProcessorPackage):
+class ImageProcessors:
     forget_image: ActionProcessor[ForgetImageAction, ForgetImageActionResult]
     forget_image_by_id: SingleEntityActionProcessor[
         ForgetImageByIdAction, ForgetImageByIdActionResult
@@ -204,24 +201,3 @@ class ImageProcessors(AbstractProcessorPackage):
             service.set_image_resource_limit_by_id, action_monitors
         )
         self.search_aliases = ActionProcessor(service.search_aliases, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            ForgetImageAction.spec(),
-            ForgetImageByIdAction.spec(),
-            PurgeImageByIdAction.spec(),
-            AliasImageAction.spec(),
-            AliasImageByIdAction.spec(),
-            DealiasImageAction.spec(),
-            ModifyImageAction.spec(),
-            UpdateImageByIdAction.spec(),
-            PreloadImageAction.spec(),
-            UnloadImageAction.spec(),
-            UntagImageFromRegistryAction.spec(),
-            ScanImageAction.spec(),
-            PurgeImagesAction.spec(),
-            ClearImageCustomResourceLimitAction.spec(),
-            ClearImageCustomResourceLimitByIdAction.spec(),
-            SetImageResourceLimitByIdAction.spec(),
-        ]

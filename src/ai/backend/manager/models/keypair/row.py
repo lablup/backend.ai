@@ -12,7 +12,7 @@ from cryptography.hazmat.backends import default_backend as crypto_default_backe
 from cryptography.hazmat.primitives import serialization as crypto_serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.expression import false
 
 from ai.backend.common import msgpack
@@ -29,7 +29,6 @@ from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 if TYPE_CHECKING:
     from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
     from ai.backend.manager.models.scaling_group import ScalingGroupForKeypairsRow
-    from ai.backend.manager.models.session import SessionRow
     from ai.backend.manager.models.user import UserRow
 
 __all__: Sequence[str] = (
@@ -46,14 +45,7 @@ __all__: Sequence[str] = (
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 
 
-# Defined for avoiding circular import
-def _get_session_row_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.session import SessionRow
-
-    return KeyPairRow.access_key == foreign(SessionRow.access_key)
-
-
-class KeyPairRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class KeyPairRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "keypairs"
     __table_args__ = (
         # Partial unique index: at most one keypair per user may have is_default = true.
@@ -66,7 +58,9 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     )
 
     user_id: Mapped[str | None] = mapped_column("user_id", sa.String(length=256), index=True)
-    access_key: Mapped[str] = mapped_column("access_key", sa.String(length=20), primary_key=True)
+    access_key: Mapped[AccessKey] = mapped_column(
+        "access_key", sa.String(length=20), primary_key=True
+    )
     secret_key: Mapped[str | None] = mapped_column("secret_key", sa.String(length=40))
     is_active: Mapped[bool | None] = mapped_column("is_active", sa.Boolean, index=True)
     is_admin: Mapped[bool | None] = mapped_column(
@@ -101,14 +95,7 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     )
 
     # Relationships
-    sessions: Mapped[list[SessionRow]] = relationship(
-        "SessionRow",
-        primaryjoin=_get_session_row_join_condition,
-        foreign_keys="SessionRow.access_key",
-    )
-    resource_policy_row: Mapped[KeyPairResourcePolicyRow] = relationship(
-        "KeyPairResourcePolicyRow", back_populates="keypairs"
-    )
+    resource_policy_row: Mapped[KeyPairResourcePolicyRow] = relationship("KeyPairResourcePolicyRow")
     sgroup_for_keypairs_rows: Mapped[list[ScalingGroupForKeypairsRow]] = relationship(
         "ScalingGroupForKeypairsRow",
     )

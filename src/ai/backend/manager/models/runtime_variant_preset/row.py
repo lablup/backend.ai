@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
@@ -23,19 +22,10 @@ from ai.backend.manager.data.runtime_variant_preset.types import (
 from ai.backend.manager.models.base import GUID, Base, PydanticColumn
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
-if TYPE_CHECKING:
-    from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-
 __all__ = ("RuntimeVariantPresetRow",)
 
 
-def _get_runtime_variant_join_condition() -> sa.sql.elements.ColumnElement[Any]:
-    from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-
-    return foreign(RuntimeVariantPresetRow.runtime_variant) == RuntimeVariantRow.id
-
-
-class RuntimeVariantPresetRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class RuntimeVariantPresetRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "runtime_variant_presets"
 
     __table_args__ = (
@@ -74,11 +64,6 @@ class RuntimeVariantPresetRow(LifecycleTimestampsMixin, Base):  # type: ignore[m
     # separate ``ui_type`` column has been folded into this JSONB.
     ui_option: Mapped[UIOption | None] = mapped_column(
         "ui_option", PydanticColumn(UIOption), nullable=True
-    )
-
-    runtime_variant_row: Mapped[RuntimeVariantRow] = relationship(
-        "RuntimeVariantRow",
-        primaryjoin=_get_runtime_variant_join_condition,
     )
 
     @staticmethod

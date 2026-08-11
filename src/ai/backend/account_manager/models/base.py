@@ -14,7 +14,7 @@ from typing import (
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.engine.interfaces import Dialect
-from sqlalchemy.orm import registry
+from sqlalchemy.orm import DeclarativeBase, registry
 from sqlalchemy.types import CHAR, VARCHAR, TypeDecorator
 
 from ai.backend.account_manager.utils import hash_password
@@ -32,7 +32,15 @@ convention = {
 }
 metadata = sa.MetaData(naming_convention=convention)
 mapper_registry = registry(metadata=metadata)
-Base: Any = mapper_registry.generate_base()
+
+
+class Base(DeclarativeBase):
+    registry = mapper_registry
+    metadata = mapper_registry.metadata
+    # Narrowed from the stubs' ClassVar[FromClause]; declarative mapping always
+    # materializes __table__ as a real Table.
+    __table__: ClassVar[sa.Table]
+
 
 pgsql_connect_opts = {
     "server_settings": {

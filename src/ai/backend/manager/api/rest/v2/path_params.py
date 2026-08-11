@@ -132,3 +132,7 @@ class InvitationIdPathParam(BaseRequestModel):
 
 class IdleCheckerAssignmentIdPathParam(BaseRequestModel):
     idle_checker_assignment_id: UUID = Field(description="Idle checker assignment UUID")
+
+
+class SlotNamePathParam(BaseRequestModel):
+    slot_name: str = Field(description="Resource slot name")

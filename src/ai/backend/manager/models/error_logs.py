@@ -6,6 +6,7 @@ from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.manager.data.error_log.types import (
     ErrorLogContent,
@@ -14,42 +15,52 @@ from ai.backend.manager.data.error_log.types import (
     ErrorLogSeverity,
 )
 
-from .base import GUID, Base, IDColumn, mapper_registry
+from .base import GUID, Base
 
 __all__ = [
-    "error_logs",
     "ErrorLogRow",
 ]
 
-error_logs = sa.Table(
-    "error_logs",
-    mapper_registry.metadata,
-    IDColumn(),
-    sa.Column(
+
+class ErrorLogRow(Base):
+    __tablename__ = "error_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
+    created_at: Mapped[datetime] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
         server_default=sa.func.now(),
         index=True,
         nullable=False,
-    ),
-    sa.Column(
-        "severity", sa.Enum("critical", "error", "warning", name="errorlog_severity"), index=True
-    ),
-    sa.Column("source", sa.String),
-    sa.Column("user", GUID, sa.ForeignKey("users.uuid"), nullable=True, index=True),
-    sa.Column("is_read", sa.Boolean, default=False, index=True),
-    sa.Column("is_cleared", sa.Boolean, default=False, index=True),
-    sa.Column("message", sa.Text),
-    sa.Column("context_lang", sa.String),
-    sa.Column("context_env", postgresql.JSONB()),
-    sa.Column("request_url", sa.String, nullable=True),
-    sa.Column("request_status", sa.Integer, nullable=True),
-    sa.Column("traceback", sa.Text, nullable=True),
-)
-
-
-class ErrorLogRow(Base):  # type: ignore[misc]
-    __table__ = error_logs
+    )
+    # Columns keep the historical nullable=True of the imperative table definition;
+    # the annotations stay non-Optional because __init__ always assigns them.
+    severity: Mapped[str] = mapped_column(
+        "severity",
+        sa.Enum("critical", "error", "warning", name="errorlog_severity"),
+        nullable=True,
+        index=True,
+    )
+    source: Mapped[str] = mapped_column("source", sa.String, nullable=True)
+    user: Mapped[uuid.UUID | None] = mapped_column(
+        "user", GUID, sa.ForeignKey("users.uuid"), nullable=True, index=True
+    )
+    is_read: Mapped[bool] = mapped_column(
+        "is_read", sa.Boolean, default=False, nullable=True, index=True
+    )
+    is_cleared: Mapped[bool] = mapped_column(
+        "is_cleared", sa.Boolean, default=False, nullable=True, index=True
+    )
+    message: Mapped[str] = mapped_column("message", sa.Text, nullable=True)
+    context_lang: Mapped[str] = mapped_column("context_lang", sa.String, nullable=True)
+    context_env: Mapped[dict[str, Any]] = mapped_column(
+        "context_env", postgresql.JSONB(), nullable=True
+    )
+    request_url: Mapped[str | None] = mapped_column("request_url", sa.String, nullable=True)
+    request_status: Mapped[int | None] = mapped_column("request_status", sa.Integer, nullable=True)
+    traceback: Mapped[str | None] = mapped_column("traceback", sa.Text, nullable=True)
 
     def __init__(
         self,

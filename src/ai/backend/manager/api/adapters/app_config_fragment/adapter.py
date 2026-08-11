@@ -24,6 +24,7 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     AppConfigFragmentBulkErrorInfo,
     AppConfigFragmentNode,
+    AppConfigFragmentUpsertErrorInfo,
     BulkPurgeAppConfigFragmentPayload,
     PurgeAppConfigFragmentPayload,
     SearchAppConfigFragmentPayload,
@@ -50,7 +51,7 @@ from ai.backend.manager.repositories.app_config_fragment.purgers import (
     AppConfigFragmentPurgerSpec,
 )
 from ai.backend.manager.repositories.app_config_fragment.types import (
-    AppConfigFragmentSearchScope,
+    AppConfigFragmentOperationScope,
 )
 from ai.backend.manager.repositories.app_config_fragment.upserters import (
     AppConfigFragmentUpserterSpec,
@@ -100,7 +101,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
     ) -> UpsertAppConfigFragmentsPayload:
         """Upsert many fragments at the scope named in ``input`` (RBAC-authorized there)."""
         return await self._upsert(
-            AppConfigFragmentSearchScope(
+            AppConfigFragmentOperationScope(
                 scope_type=input.scope.scope_type, scope_id=input.scope.scope_id
             ),
             input.items,
@@ -116,14 +117,14 @@ class AppConfigFragmentAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        scope = AppConfigFragmentSearchScope(
+        scope = AppConfigFragmentOperationScope(
             scope_type=AppConfigScopeType.USER, scope_id=AppConfigScopeID(me.user_id)
         )
         return await self._upsert(scope, input.items)
 
     async def _upsert(
         self,
-        scope: AppConfigFragmentSearchScope,
+        scope: AppConfigFragmentOperationScope,
         items: Sequence[AppConfigFragmentUpsertItem],
     ) -> UpsertAppConfigFragmentsPayload:
         specs = [
@@ -139,7 +140,13 @@ class AppConfigFragmentAdapter(BaseAdapter):
             BulkUpsertAppConfigFragmentsAction(scope=scope, upserter_specs=specs)
         )
         return UpsertAppConfigFragmentsPayload(
-            items=[self._fragment_to_node(fragment) for fragment in action_result.fragments],
+            items=[self._fragment_to_node(fragment) for fragment in action_result.items],
+            failed=[
+                AppConfigFragmentUpsertErrorInfo(
+                    config_name=error.config_name, message=error.message
+                )
+                for error in action_result.failed
+            ],
         )
 
     async def get(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentNode:
@@ -192,7 +199,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
             pagination_spec=_get_app_config_fragment_pagination_spec(),
             limit=len(fragment_ids),
         )
-        scope = AppConfigFragmentSearchScope(
+        scope = AppConfigFragmentOperationScope(
             scope_type=AppConfigScopeType.USER,
             scope_id=AppConfigScopeID(me.user_id),
         )
@@ -209,11 +216,10 @@ class AppConfigFragmentAdapter(BaseAdapter):
     ) -> list[AppConfigFragmentNode | None]:
         """The fragments written at one scope for the given config names.
 
-        RBAC-authorized at that scope, so a caller reads only a scope they may read. Meant for
-        fetching the current fragment values before editing them.
+        Meant for fetching the current fragment values before editing them.
         """
         return await self._fragments_by_names(
-            AppConfigFragmentSearchScope(
+            AppConfigFragmentOperationScope(
                 scope_type=input.scope.scope_type, scope_id=input.scope.scope_id
             ),
             input.config_names,
@@ -230,14 +236,14 @@ class AppConfigFragmentAdapter(BaseAdapter):
         if me is None:
             raise UnreachableError("User context is not available")
         return await self._fragments_by_names(
-            AppConfigFragmentSearchScope(
+            AppConfigFragmentOperationScope(
                 scope_type=AppConfigScopeType.USER, scope_id=AppConfigScopeID(me.user_id)
             ),
             input.config_names,
         )
 
     async def _fragments_by_names(
-        self, scope: AppConfigFragmentSearchScope, config_names: list[str]
+        self, scope: AppConfigFragmentOperationScope, config_names: list[str]
     ) -> list[AppConfigFragmentNode | None]:
         if not config_names:
             return []
@@ -320,7 +326,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
         )
 
     @staticmethod
-    def _scope_to_search_scope(scope: AppConfigFragmentScope) -> AppConfigFragmentSearchScope:
+    def _scope_to_search_scope(scope: AppConfigFragmentScope) -> AppConfigFragmentOperationScope:
         """Reduce the scope item lists to the single scope the scope action takes.
 
         ``ScopedSearchAppConfigFragmentAction`` is a ``BaseScopeAction``, so it authorizes and
@@ -328,14 +334,14 @@ class AppConfigFragmentAdapter(BaseAdapter):
         the rest.
         """
         selected = [
-            AppConfigFragmentSearchScope(
+            AppConfigFragmentOperationScope(
                 scope_type=AppConfigScopeType.DOMAIN,
                 scope_id=AppConfigScopeID(item.value),
             )
             for item in scope.domain or []
         ]
         selected += [
-            AppConfigFragmentSearchScope(
+            AppConfigFragmentOperationScope(
                 scope_type=AppConfigScopeType.USER,
                 scope_id=AppConfigScopeID(item.value),
             )
@@ -343,7 +349,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
         ]
         if scope.public:
             selected.append(
-                AppConfigFragmentSearchScope(scope_type=AppConfigScopeType.PUBLIC, scope_id=None)
+                AppConfigFragmentOperationScope(scope_type=AppConfigScopeType.PUBLIC, scope_id=None)
             )
         # TODO(BA-7003): temporary single-scope restriction. The underlying
         # ScopedSearchAppConfigFragmentAction is a single-scope BaseScopeAction, so a request

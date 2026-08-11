@@ -1,6 +1,6 @@
 # Testing guidelines — Guardrails
 
-> For background and rationale, see `CONTEXTS.md` in this directory. For the TDD workflow, patterns, and code examples, see the `/tdd-guide` skill; for BUILD policies, see `BUILDING.md`.
+> For background and rationale, see `KNOWLEDGE.md` in this directory. For the TDD workflow, patterns, and code examples, see the `/tdd-guide` skill; for BUILD policies, see `BUILDING.md`.
 
 ## Which directory to use
 
@@ -17,14 +17,14 @@ Each directory keeps its setup patterns in its own `AGENTS.md`.
 
 - **Repository / Model**: Verify real interactions (queries, transactions, constraints) with a real DB (`ai.backend.testutils.db.with_tables`) and real Redis. Do NOT mock DB calls.
 - **Service / Handler / Controller**: Mocked unit tests. Mock repository calls and external dependencies with `unittest.mock.AsyncMock` and verify the business logic.
-- For the rationale behind the distinction, see `CONTEXTS.md`.
+- For the rationale behind the distinction, see `KNOWLEDGE.md`.
 
 ## What to test (behavior, not implementation)
 
 Test the observable contract — a good test is one that survives a refactor as long as the behavior is the same.
 
 - **Do test**: Constraints/preconditions the code enforces (e.g., empty scope → `EmptySearchScopeError`), the promises a method makes to its callers (abstraction guarantees), and actual results (with `with_tables`: create→read-back, update reflected, purge removed, scoped filtering).
-- **Do NOT test**: Implementation details, spying on internal call wiring, or delegation logic already verified by a lower layer. (For examples, see `CONTEXTS.md`)
+- **Do NOT test**: Implementation details, spying on internal call wiring, or delegation logic already verified by a lower layer. (For examples, see `KNOWLEDGE.md`)
 
 ## Test structure
 

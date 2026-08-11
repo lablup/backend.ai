@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from functools import cached_property
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from uuid import UUID
 
 import jwt
@@ -35,10 +35,6 @@ from .base import (
     EnumType,
     PydanticListColumn,
 )
-
-if TYPE_CHECKING:
-    pass
-
 
 __all__ = [
     "Circuit",

@@ -10,10 +10,10 @@ from ai.backend.manager.actions.action.types import SearchableActionTarget
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import ReplicaGroupHistoryData
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.scheduling_history.types import (
-    DeploymentReplicaGroupHistorySearchScope,
+    DeploymentReplicaGroupHistoryOperationScope,
 )
 
 
@@ -33,8 +33,8 @@ class DeploymentReplicaGroupHistoryTarget(ReplicaGroupHistoryTarget):
     deployment_id: DeploymentID
 
     @override
-    def to_search_scope(self) -> SearchScope:
-        return DeploymentReplicaGroupHistorySearchScope(deployment_id=self.deployment_id)
+    def to_search_scope(self) -> OperationScope:
+        return DeploymentReplicaGroupHistoryOperationScope(deployment_id=self.deployment_id)
 
     @override
     def to_rbac_element_ref(self) -> RBACElementRef:

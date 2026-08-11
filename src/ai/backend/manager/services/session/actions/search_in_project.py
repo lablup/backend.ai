@@ -9,7 +9,7 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
+from ai.backend.manager.repositories.session.types import ProjectSessionOperationScope
 from ai.backend.manager.services.session.base import SessionScopeAction
 
 
@@ -21,7 +21,7 @@ class SearchSessionsInProjectAction(SessionScopeAction):
     Used for project admin page.
     """
 
-    scope: ProjectSessionSearchScope
+    scope: ProjectSessionOperationScope
     querier: BatchQuerier
 
     @override

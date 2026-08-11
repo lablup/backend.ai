@@ -746,46 +746,35 @@ class CreateStorageNamespaceActionResult(StorageNamespaceActionResult):
 Processors orchestrate action execution with hooks, metrics, and middleware:
 
 ```python
-from ai.backend.manager.services.processors import (
-    AbstractProcessorPackage,
-    ActionProcessor,
-)
+from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.processor import ActionProcessor
 
 
-class StorageNamespaceProcessorPackage(AbstractProcessorPackage):
+class StorageNamespaceProcessors:
     """Processor package for storage namespace operations."""
+
+    create_storage_namespace: ActionProcessor[
+        CreateStorageNamespaceAction,
+        CreateStorageNamespaceActionResult,
+    ]
 
     def __init__(
         self,
-        service: StorageNamespaceServiceProtocol,
+        service: StorageNamespaceService,
+        action_monitors: list[ActionMonitor],
     ) -> None:
-        self._service = service
-        self._create_processor = ActionProcessor[
-            CreateStorageNamespaceAction,
-            CreateStorageNamespaceActionResult,
-        ](
-            action_name="create_storage_namespace",
-            handler=service.create_storage_namespace,
+        self.create_storage_namespace = ActionProcessor(
+            service.create_storage_namespace, action_monitors
         )
-
-    @property
-    def create_storage_namespace(
-        self,
-    ) -> ActionProcessor[
-        CreateStorageNamespaceAction,
-        CreateStorageNamespaceActionResult,
-    ]:
-        return self._create_processor
 ```
 
 **Key Components:**
-- **ProcessorPackage**: Container for all domain processors
+- **Processors package**: Container holding one processor field per action
 - **ActionProcessor**: Wraps service method with:
   - Pre/post hook execution
   - Metrics collection
   - Error handling
   - Logging
-- **Property Pattern**: Expose processors as properties for clean API
 
 ### Service Implementation Workflow
 

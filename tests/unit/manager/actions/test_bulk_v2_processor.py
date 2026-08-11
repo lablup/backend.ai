@@ -52,6 +52,11 @@ class _Action(BaseBulkAction):
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.DELETE
 
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "delete_sessions"
+
 
 @dataclass
 class _Result(BaseBulkActionResult):

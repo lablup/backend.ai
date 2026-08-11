@@ -1,8 +1,5 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor.global_action import GlobalActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.services.idle_checker.actions.admin_search import (
     AdminSearchIdleCheckersAction,
     SearchIdleCheckersActionResult,
@@ -22,7 +19,7 @@ from ai.backend.manager.services.idle_checker.actions.update import (
 from ai.backend.manager.services.idle_checker.service import IdleCheckerService
 
 
-class IdleCheckerProcessors(AbstractProcessorPackage):
+class IdleCheckerProcessors:
     admin_search: GlobalActionProcessor[
         AdminSearchIdleCheckersAction,
         SearchIdleCheckersActionResult,
@@ -40,12 +37,3 @@ class IdleCheckerProcessors(AbstractProcessorPackage):
         self.create = GlobalActionProcessor(service.create, action_monitors)
         self.update = GlobalActionProcessor(service.update, action_monitors)
         self.purge = GlobalActionProcessor(service.purge, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            AdminSearchIdleCheckersAction.spec(),
-            CreateIdleCheckerAction.spec(),
-            UpdateIdleCheckerAction.spec(),
-            PurgeIdleCheckerAction.spec(),
-        ]

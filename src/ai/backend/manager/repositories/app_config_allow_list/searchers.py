@@ -6,11 +6,10 @@ from dataclasses import dataclass
 from typing import Any, override
 
 import sqlalchemy as sa
-from sqlalchemy.engine import Row
 
 from ai.backend.manager.data.app_config_allow_list.types import AppConfigAllowListData
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
-from ai.backend.manager.repositories.base.searcher import Searcher
+from ai.backend.manager.models.specs.searcher import Searcher
 
 
 @dataclass
@@ -20,6 +19,5 @@ class AppConfigAllowListSearcher(Searcher[AppConfigAllowListRow, AppConfigAllowL
         return sa.select(AppConfigAllowListRow)
 
     @override
-    def to_data(self, row: Row[Any]) -> AppConfigAllowListData:
-        allow_list_row: AppConfigAllowListRow = row.AppConfigAllowListRow
-        return allow_list_row.to_data()
+    def to_data(self, row: AppConfigAllowListRow) -> AppConfigAllowListData:
+        return row.to_data()

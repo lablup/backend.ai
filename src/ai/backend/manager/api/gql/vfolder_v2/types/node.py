@@ -30,7 +30,7 @@ from ai.backend.manager.api.gql.model_card.types import (
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder_v2.types.enum import VFolderOperationStatusGQL
-from ai.backend.manager.repositories.model_card.types import VFolderModelCardSearchScope
+from ai.backend.manager.repositories.model_card.types import VFolderModelCardOperationScope
 
 from .nested import (
     VFolderAccessControlInfoGQL,
@@ -131,7 +131,7 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
         offset: int | None = None,
     ) -> ModelCardV2Connection | None:
         result = await info.context.adapters.model_card.search_by_vfolder(
-            scope=VFolderModelCardSearchScope(vfolder_id=VFolderUUID(UUID(self.id))),
+            scope=VFolderModelCardOperationScope(vfolder_id=VFolderUUID(UUID(self.id))),
             input=SearchModelCardsInput(
                 filter=filter.to_pydantic() if filter is not None else None,
                 order=[o.to_pydantic() for o in order_by] if order_by else None,

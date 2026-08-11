@@ -34,7 +34,7 @@ from ai.backend.manager.repositories.export.reports.session import SESSION_REPOR
 # =============================================================================
 
 
-class ParentRow(Base):  # type: ignore[misc]
+class ParentRow(Base):
     """Parent model for testing."""
 
     __tablename__ = "test_parent"
@@ -45,7 +45,7 @@ class ParentRow(Base):  # type: ignore[misc]
     policy_name: Mapped[str] = mapped_column(sa.String(50), nullable=True)
 
 
-class PolicyRow(Base):  # type: ignore[misc]
+class PolicyRow(Base):
     """Policy model for N:1 JOIN testing."""
 
     __tablename__ = "test_policy"
@@ -55,7 +55,7 @@ class PolicyRow(Base):  # type: ignore[misc]
     max_count: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=10)
 
 
-class ChildAssocRow(Base):  # type: ignore[misc]
+class ChildAssocRow(Base):
     """Association model for 1:N JOIN testing."""
 
     __tablename__ = "test_child_assoc"
@@ -66,7 +66,7 @@ class ChildAssocRow(Base):  # type: ignore[misc]
     child_id: Mapped[str] = mapped_column(GUID, nullable=False)
 
 
-class ChildRow(Base):  # type: ignore[misc]
+class ChildRow(Base):
     """Child model for 1:N JOIN testing."""
 
     __tablename__ = "test_child"

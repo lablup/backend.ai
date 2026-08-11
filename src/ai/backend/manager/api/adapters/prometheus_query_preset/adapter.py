@@ -49,10 +49,10 @@ from ai.backend.manager.models.prometheus_query_preset.conditions import (
     PrometheusQueryPresetConditions,
 )
 from ai.backend.manager.models.prometheus_query_preset.orders import PrometheusQueryPresetOrders
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
-    OffsetPagination,
     Updater,
     combine_conditions_or,
     negate_conditions,

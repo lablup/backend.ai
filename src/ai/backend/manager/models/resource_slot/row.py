@@ -15,6 +15,11 @@ from decimal import Decimal
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from ai.backend.common.identifier.resource_slot import ResourceSlotTypeUUID
+from ai.backend.manager.data.resource_slot.types import (
+    NumberFormatData,
+    ResourceSlotTypeData,
+)
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -33,7 +38,7 @@ __all__ = (
 )
 
 
-class ResourceSlotTypeRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class ResourceSlotTypeRow(LifecycleTimestampsMixin, Base):
     """Registry of known resource slot types with display metadata.
 
     Primary key is slot_name (e.g., 'cpu', 'mem', 'cuda.device').
@@ -41,6 +46,13 @@ class ResourceSlotTypeRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
 
     __tablename__ = "resource_slot_types"
 
+    uuid: Mapped[ResourceSlotTypeUUID] = mapped_column(
+        "uuid",
+        GUID(ResourceSlotTypeUUID),
+        unique=True,
+        nullable=False,
+        server_default=sa.text("uuid_generate_v4()"),
+    )
     slot_name: Mapped[str] = mapped_column("slot_name", sa.String(length=64), primary_key=True)
     slot_type: Mapped[str] = mapped_column("slot_type", sa.String(length=16), nullable=False)
     required: Mapped[bool] = mapped_column(
@@ -96,8 +108,26 @@ class ResourceSlotTypeRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         "rank", sa.Integer, nullable=False, server_default=sa.text("0")
     )
 
+    def to_data(self) -> ResourceSlotTypeData:
+        return ResourceSlotTypeData(
+            uuid=self.uuid,
+            slot_name=self.slot_name,
+            slot_type=self.slot_type,
+            required=self.required,
+            enabled=self.enabled,
+            display_name=self.display_name,
+            description=self.description,
+            display_unit=self.display_unit,
+            display_icon=self.display_icon,
+            number_format=NumberFormatData(
+                binary=self.number_format.binary,
+                round_length=self.number_format.round_length,
+            ),
+            rank=self.rank,
+        )
 
-class AgentResourceRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+
+class AgentResourceRow(LifecycleTimestampsMixin, Base):
     """Per-agent, per-slot resource capacity and usage.
 
     Composite primary key: (agent_id, slot_name).
@@ -151,7 +181,7 @@ class AgentResourceRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     )
 
 
-class ResourceAllocationRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class ResourceAllocationRow(CreatedAtMixin, Base):
     """Per-kernel, per-slot resource allocation.
 
     Composite primary key: (kernel_id, slot_name).
@@ -223,7 +253,7 @@ class ResourceAllocationRow(CreatedAtMixin, Base):  # type: ignore[misc]
     )
 
 
-class ModelCardResourceRequirementRow(Base):  # type: ignore[misc]
+class ModelCardResourceRequirementRow(Base):
     """Per-model-card, per-slot minimum resource requirement.
 
     Composite primary key: (model_card_id, slot_name).
@@ -253,7 +283,7 @@ class ModelCardResourceRequirementRow(Base):  # type: ignore[misc]
     )
 
 
-class PresetResourceSlotRow(Base):  # type: ignore[misc]
+class PresetResourceSlotRow(Base):
     """Per-preset, per-slot resource allocation.
 
     Composite primary key: (preset_id, slot_name).
@@ -283,7 +313,7 @@ class PresetResourceSlotRow(Base):  # type: ignore[misc]
     )
 
 
-class DeploymentRevisionResourceSlotRow(Base):  # type: ignore[misc]
+class DeploymentRevisionResourceSlotRow(Base):
     """Per-revision, per-slot resource allocation.
 
     Composite primary key: (revision_id, slot_name).
