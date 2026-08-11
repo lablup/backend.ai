@@ -75,6 +75,10 @@ __all__ = ["KernelOwnershipData"]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
+# Must exceed the launch timeout that ai.backend.kernel.base grants a service port, which cannot
+# be imported here because that package runs inside the container.
+SERVICE_START_REPLY_TIMEOUT_SEC = 35.0
+
 # msg types visible to the API client.
 # (excluding control signals such as 'finished' and 'waiting-input'
 # since they are passed as separate status field.)
@@ -952,7 +956,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             _dump_json_bytes(service_info),
         ])
         try:
-            with timeout(10):
+            with timeout(SERVICE_START_REPLY_TIMEOUT_SEC):
                 result = await self.service_queue.get()
             self.service_queue.task_done()
             return cast(dict[str, Any], load_json(result))
