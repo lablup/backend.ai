@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import contextlib
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from ai.backend.common.network.types import AttachKind, EndpointPlan, NetworkRole
@@ -22,6 +22,23 @@ class CniInvocation:
     ifname: str
     role: NetworkRole
     config: Mapping[str, Any]
+    capability_args: Mapping[str, Any] = field(default_factory=dict)
+
+    def effective_config(self) -> Mapping[str, Any]:
+        """The config a CNI plugin actually receives: play the runtime's role and inject each
+        declared capability's arg into ``runtimeConfig``. Only capabilities the config declares
+        under ``capabilities`` are injected, exactly as a conforming CNI runtime does — an
+        undeclared arg is dropped rather than smuggled in."""
+        if not self.capability_args:
+            return self.config
+        caps = self.config.get("capabilities") or {}
+        injected = {k: v for k, v in self.capability_args.items() if caps.get(k)}
+        if not injected:
+            return self.config
+        return {
+            **self.config,
+            "runtimeConfig": {**(self.config.get("runtimeConfig") or {}), **injected},
+        }
 
 
 # runner(command, *, ifname, netns, container_id, config) -> CNI result (assigned IPs) | None
@@ -43,7 +60,7 @@ def plan_to_invocations(plan: EndpointPlan) -> list[CniInvocation]:
     """Ordered CNI invocations for a plan's CNI attachments (order preserved:
     LOCAL first, then OVERLAY)."""
     return [
-        CniInvocation(a.interface_name, a.role, a.cni_config or {})
+        CniInvocation(a.interface_name, a.role, a.cni_config or {}, a.cni_capability_args or {})
         for a in plan.attachments
         if a.kind is AttachKind.CNI
     ]
@@ -82,7 +99,7 @@ class CniAttacher:
                     ifname=inv.ifname,
                     netns=netns,
                     container_id=container_id,
-                    config=inv.config,
+                    config=inv.effective_config(),
                 )
                 ip = _first_ip(result)
                 if ip is not None:
@@ -96,7 +113,7 @@ class CniAttacher:
                         ifname=inv.ifname,
                         netns=netns,
                         container_id=container_id,
-                        config=inv.config,
+                        config=inv.effective_config(),
                     )
             raise
 
@@ -108,5 +125,5 @@ class CniAttacher:
                 ifname=inv.ifname,
                 netns=netns,
                 container_id=container_id,
-                config=inv.config,
+                config=inv.effective_config(),
             )

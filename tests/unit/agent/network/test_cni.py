@@ -2,7 +2,7 @@ from typing import Any
 
 import pytest
 
-from ai.backend.agent.network.cni import CniAttacher, plan_to_invocations
+from ai.backend.agent.network.cni import CniAttacher, CniInvocation, plan_to_invocations
 from ai.backend.common.network.types import (
     AttachKind,
     EndpointPlan,
@@ -34,11 +34,13 @@ def _plan() -> EndpointPlan:
 class RecordingRunner:
     def __init__(self) -> None:
         self.calls: list[tuple[str, str]] = []
+        self.configs: list[Any] = []
 
     async def __call__(
         self, command: str, *, ifname: str, netns: str, container_id: str, config: Any
     ) -> None:
         self.calls.append((command, ifname))
+        self.configs.append(config)
 
 
 class TestPlanToInvocations:
@@ -67,7 +69,46 @@ class TestPlanToInvocations:
         assert [i.ifname for i in invs] == ["baimulti0"]
 
 
+class TestEffectiveConfig:
+    def test_injects_declared_capability_arg_into_runtime_config(self) -> None:
+        inv = CniInvocation(
+            "eth0",
+            NetworkRole.LOCAL,
+            {"type": "bridge", "capabilities": {"ips": True}},
+            {"ips": ["172.30.1.5/26"]},
+        )
+        assert inv.effective_config()["runtimeConfig"] == {"ips": ["172.30.1.5/26"]}
+
+    def test_drops_an_undeclared_capability_arg(self) -> None:
+        # A conforming CNI runtime injects runtimeConfig only for capabilities the config declares.
+        inv = CniInvocation(
+            "eth0", NetworkRole.LOCAL, {"type": "bridge"}, {"mac": "02:42:00:00:00:01"}
+        )
+        assert "runtimeConfig" not in inv.effective_config()
+
+    def test_no_capability_args_is_identity(self) -> None:
+        config = {"type": "bridge", "capabilities": {"mac": True}}
+        inv = CniInvocation("eth0", NetworkRole.OVERLAY, config)
+        assert inv.effective_config() is config
+
+
 class TestCniAttacher:
+    async def test_attach_passes_injected_runtime_config_to_the_runner(self) -> None:
+        runner = RecordingRunner()
+        plan = EndpointPlan(
+            attachments=[
+                NetworkAttachSpec(
+                    kind=AttachKind.CNI,
+                    interface_name="baimulti0",
+                    role=NetworkRole.OVERLAY,
+                    cni_config={"type": "bridge", "capabilities": {"mac": True}},
+                    cni_capability_args={"mac": "02:42:0a:80:05:07"},
+                ),
+            ]
+        )
+        await CniAttacher(runner).attach(plan, container_id="c1", netns="/proc/1/ns/net")
+        assert runner.configs[0]["runtimeConfig"] == {"mac": "02:42:0a:80:05:07"}
+
     async def test_attach_issues_add_in_order(self) -> None:
         runner = RecordingRunner()
         await CniAttacher(runner).attach(_plan(), container_id="c1", netns="/proc/1/ns/net")

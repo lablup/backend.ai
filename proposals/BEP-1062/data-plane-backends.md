@@ -125,5 +125,6 @@ confidentiality: wireguard only
 ## Implementation Notes
 
 - Each backend implements `AbstractNetworkAgentPluginV2` and emits a CNI conf via `attach_endpoint`; the containerd provisioner performs the CNI ADD.
+- **Pins use standard CNI vocabulary.** A pinned address / MAC is expressed as a declared `capabilities` (`ips` / `mac`) plus a `NetworkAttachSpec.cni_capability_args` value that the provisioner injects into `runtimeConfig` — the same channel a real `/opt/cni/bin` plugin reads. No non-standard config keys (`ipam.requested_ip`, top-level `mac`): a stock CNI binary would silently ignore those and hand out a dynamic address / random MAC, quietly breaking the single-node `/etc/hosts` pin and cross-node overlay unicast. This keeps the emitted conf portable to any future exec runner, not just the in-house `NativeBridgeAttachRunner`.
 - `probe_caps` per backend: vxlan always available; host-gw gated by the native-routing probe; wireguard gated by the `wireguard` kernel module.
 - Teardown must be idempotent and lease-recoverable (peer routes/FDB cleaned when a member disappears).
