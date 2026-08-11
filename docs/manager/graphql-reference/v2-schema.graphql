@@ -16826,9 +16826,7 @@ type UserV2OrganizationInfo {
   """Name of the user resource policy applied to this user."""
   resourcePolicy: String!
 
-  """
-  Primary API access key for this user. Deprecated since 26.9.0. Use the keypair's is_default field.
-  """
+  """Primary API access key for this user."""
   mainAccessKey: String @deprecated(reason: "Deprecated since 26.9.0. Use the keypair's is_default field.")
 }
 
