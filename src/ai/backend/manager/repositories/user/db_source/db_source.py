@@ -313,11 +313,6 @@ class UserDBSource:
                         f"Resource policy '{new_resource_policy}' does not exist."
                     )
 
-            # Handle main_access_key validation
-            main_access_key = updater_spec.main_access_key.optional_value()
-            if main_access_key:
-                await self._validate_and_update_default_access_key(session, email, main_access_key)
-
             # Update user
             if updater_spec.password.optional_value():
                 to_update["password_changed_at"] = sa.func.now()
@@ -423,13 +418,6 @@ class UserDBSource:
                 raise UserModificationBadRequest(
                     f"Resource policy '{new_resource_policy}' does not exist."
                 )
-
-        # Handle main_access_key validation
-        main_access_key = updater_spec.main_access_key.optional_value()
-        if main_access_key:
-            await self._validate_and_update_default_access_key(
-                session, current_user.email, main_access_key
-            )
 
         # Update user
         if updater_spec.password.optional_value():
@@ -759,7 +747,7 @@ class UserDBSource:
             raise UserNotFound(f"User with UUID {user_uuid} not found.")
         return cast(UserRow, res)
 
-    async def _set_default_keypair(
+    async def _switch_default_keypair(
         self, session: SASession, user_id: UserID, access_key: str
     ) -> None:
         """Move the default marker onto ``access_key``.
@@ -777,26 +765,6 @@ class UserDBSource:
             .where((KeyPairRow.user == user_id) & (KeyPairRow.access_key == access_key))
             .values(is_default=True)
         )
-
-    async def _validate_and_update_default_access_key(
-        self, session: SASession, email: str, main_access_key: str
-    ) -> None:
-        """Private method to validate and update main access key."""
-        keypair_query = (
-            sa.select(KeyPairRow)
-            .where(KeyPairRow.access_key == main_access_key)
-            .options(
-                noload("*"),
-                joinedload(KeyPairRow.user_row).options(load_only(UserRow.email)),
-            )
-        )
-        keypair_row = (await session.scalars(keypair_query)).first()
-        if not keypair_row:
-            raise KeyPairNotFound("Cannot set non-existing access key as the main access key.")
-        if keypair_row.user_row.email != email:
-            raise KeyPairForbidden("Cannot set another user's access key as the main access key.")
-
-        await self._set_default_keypair(session, keypair_row.user, main_access_key)
 
     async def _sync_keypair_roles(
         self, session: SASession, user_uuid: UUID, new_role: UserRole
@@ -1239,8 +1207,15 @@ class UserDBSource:
 
             await session.execute(sa.delete(keypairs).where(keypairs.c.access_key == access_key))
 
-    async def switch_my_default_access_key(self, user_uuid: UUID, access_key: str) -> None:
-        """Switch the main access key for the current user."""
+    async def switch_default_access_key(
+        self, user_uuid: UUID, access_key: str, *, require_active: bool = True
+    ) -> None:
+        """Move a user's default keypair marker onto ``access_key``.
+
+        ``require_active`` is what separates the two callers: a user picking their own
+        default must pick a usable keypair, while deactivating a user turns all of theirs
+        inactive, and an administrator still has to be able to move the marker afterwards.
+        """
         async with self._db.begin_session() as session:
             kp_row = (
                 await session.scalars(
@@ -1262,10 +1237,10 @@ class UserDBSource:
                 raise KeyPairForbidden(
                     "Cannot set another user's access key as the main access key."
                 )
-            if not kp_row.is_active:
+            if require_active and not kp_row.is_active:
                 raise KeyPairForbidden("Cannot set an inactive keypair as the main access key.")
 
-            await self._set_default_keypair(session, UserID(user_uuid), access_key)
+            await self._switch_default_keypair(session, UserID(user_uuid), access_key)
 
     async def update_my_keypair(self, user_uuid: UUID, updater: Updater[KeyPairRow]) -> KeyPairData:
         """Update a keypair owned by the current user."""

@@ -101,11 +101,12 @@ class UpdateMyKeypairActionResult(BaseActionResult):
 
 
 @dataclass
-class SwitchMyDefaultAccessKeyAction(UserAction):
-    """Switch the main access key for the current user."""
+class SwitchDefaultAccessKeyAction(UserAction):
+    """Move a user's default keypair marker onto ``access_key``."""
 
     user_uuid: UUID
     access_key: str
+    require_active: bool = True
 
     @override
     def entity_id(self) -> str | None:
@@ -118,7 +119,7 @@ class SwitchMyDefaultAccessKeyAction(UserAction):
 
 
 @dataclass
-class SwitchMyDefaultAccessKeyActionResult(BaseActionResult):
+class SwitchDefaultAccessKeyActionResult(BaseActionResult):
     success: bool
 
     @override

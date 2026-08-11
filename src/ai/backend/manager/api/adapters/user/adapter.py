@@ -146,7 +146,7 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     RevokeMyKeypairAction,
     SearchKeypairsByResourcePolicyAction,
     SearchMyKeypairsAction,
-    SwitchMyDefaultAccessKeyAction,
+    SwitchDefaultAccessKeyAction,
     UpdateMyKeypairAction,
 )
 from ai.backend.manager.services.user.actions.modify_user import (
@@ -513,11 +513,6 @@ class UserAdapter(BaseAdapter):
                 if input.sudo_session_enabled is not None
                 else OptionalState.nop()
             ),
-            main_access_key=(
-                TriState.nop()
-                if isinstance(input.main_access_key, Sentinel)
-                else TriState.from_graphql(input.main_access_key)
-            ),
             container_uid=(
                 TriState.nop()
                 if isinstance(input.container_uid, Sentinel)
@@ -545,6 +540,8 @@ class UserAdapter(BaseAdapter):
             ),
         )
         updater: Updater[UserRow] = Updater(spec=updater_spec, pk_value=user_id)
+        if not isinstance(input.main_access_key, Sentinel) and input.main_access_key is not None:
+            await self.switch_default_access_key_for(user_id, input.main_access_key)
         result = await self._processors.user.modify_user_by_id.wait_for_complete(
             ModifyUserByIdAction(user_id=user_id, updater=updater)
         )
@@ -697,14 +694,26 @@ class UserAdapter(BaseAdapter):
         )
         return UpdateMyKeypairPayload(keypair=self._keypair_data_to_node(result.keypair))
 
-    async def switch_my_default_access_key(
+    async def switch_default_access_key(
         self, user_id: UUID, access_key: str
     ) -> SwitchMyMainAccessKeyPayload:
-        """Switch the main access key for the current user."""
-        result = await self._processors.user.switch_my_default_access_key.wait_for_complete(
-            SwitchMyDefaultAccessKeyAction(user_uuid=user_id, access_key=access_key)
+        """Switch the default keypair of the user making the request."""
+        result = await self._processors.user.switch_default_access_key.wait_for_complete(
+            SwitchDefaultAccessKeyAction(user_uuid=user_id, access_key=access_key)
         )
         return SwitchMyMainAccessKeyPayload(success=result.success)
+
+    async def switch_default_access_key_for(self, user_id: UUID, access_key: str) -> None:
+        """Move another user's default keypair marker, as a user update may ask.
+
+        Deactivating a user turns all of their keypairs inactive, so an administrator
+        editing such a user has no active keypair to choose.
+        """
+        await self._processors.user.switch_default_access_key.wait_for_complete(
+            SwitchDefaultAccessKeyAction(
+                user_uuid=user_id, access_key=access_key, require_active=False
+            )
+        )
 
     async def search_my_keypairs(
         self,

@@ -60,6 +60,9 @@ from ai.backend.manager.services.user.actions.create_user import (
 from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
 )
+from ai.backend.manager.services.user.actions.keypair_ops import (
+    SwitchDefaultAccessKeyAction,
+)
 from ai.backend.manager.services.user.actions.modify_user import (
     ModifyUserAction,
     ModifyUserActionResult,
@@ -1034,9 +1037,6 @@ class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
             sudo_session_enabled=OptionalState[bool].from_graphql(
                 self.sudo_session_enabled,
             ),
-            main_access_key=TriState[str].from_graphql(
-                self.main_access_key,
-            ),
             container_uid=TriState[int].from_graphql(
                 self.container_uid,
             ),
@@ -1152,6 +1152,14 @@ class ModifyUser(graphene.Mutation):  # type: ignore[misc]
         action: ModifyUserAction = props.to_action(email, graph_ctx)
         user_data = await graph_ctx.user_repository.get_by_email_validated(email)
         action.user_uuid = user_data.id
+        if props.main_access_key is not Undefined and props.main_access_key is not None:
+            await graph_ctx.processors.user.switch_default_access_key.wait_for_complete(
+                SwitchDefaultAccessKeyAction(
+                    user_uuid=user_data.id,
+                    access_key=props.main_access_key,
+                    require_active=False,
+                )
+            )
         res: ModifyUserActionResult = await graph_ctx.processors.user.modify_user.wait_for_complete(
             action
         )

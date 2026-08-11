@@ -54,8 +54,8 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     SearchKeypairsByResourcePolicyActionResult,
     SearchMyKeypairsAction,
     SearchMyKeypairsActionResult,
-    SwitchMyDefaultAccessKeyAction,
-    SwitchMyDefaultAccessKeyActionResult,
+    SwitchDefaultAccessKeyAction,
+    SwitchDefaultAccessKeyActionResult,
     UpdateMyKeypairAction,
     UpdateMyKeypairActionResult,
 )
@@ -129,8 +129,8 @@ class UserProcessors:
     search_users: ActionProcessor[SearchUsersAction, SearchUsersActionResult]
     issue_my_keypair: ActionProcessor[IssueMyKeypairAction, IssueMyKeypairActionResult]
     revoke_my_keypair: ActionProcessor[RevokeMyKeypairAction, RevokeMyKeypairActionResult]
-    switch_my_default_access_key: ActionProcessor[
-        SwitchMyDefaultAccessKeyAction, SwitchMyDefaultAccessKeyActionResult
+    switch_default_access_key: ActionProcessor[
+        SwitchDefaultAccessKeyAction, SwitchDefaultAccessKeyActionResult
     ]
     update_my_keypair: ActionProcessor[UpdateMyKeypairAction, UpdateMyKeypairActionResult]
     search_my_keypairs: ActionProcessor[SearchMyKeypairsAction, SearchMyKeypairsActionResult]
@@ -231,8 +231,8 @@ class UserProcessors:
         self.search_users = ActionProcessor(user_service.search_users, action_monitors)
         self.issue_my_keypair = ActionProcessor(user_service.issue_my_keypair, action_monitors)
         self.revoke_my_keypair = ActionProcessor(user_service.revoke_my_keypair, action_monitors)
-        self.switch_my_default_access_key = ActionProcessor(
-            user_service.switch_my_default_access_key, action_monitors
+        self.switch_default_access_key = ActionProcessor(
+            user_service.switch_default_access_key, action_monitors
         )
         self.update_my_keypair = ActionProcessor(user_service.update_my_keypair, action_monitors)
         self.search_my_keypairs = ActionProcessor(user_service.search_my_keypairs, action_monitors)

@@ -39,6 +39,7 @@ from ai.backend.manager.services.domain.actions.get_domain import GetDomainActio
 from ai.backend.manager.services.user.actions.create_user import CreateUserAction
 from ai.backend.manager.services.user.actions.delete_user import DeleteUserAction
 from ai.backend.manager.services.user.actions.get_user import GetUserAction
+from ai.backend.manager.services.user.actions.keypair_ops import SwitchDefaultAccessKeyAction
 from ai.backend.manager.services.user.actions.modify_user import ModifyUserAction
 from ai.backend.manager.services.user.actions.purge_user import PurgeUserAction
 from ai.backend.manager.services.user.actions.search_users import SearchUsersAction
@@ -197,6 +198,15 @@ class UserHandler:
             )
 
         updater = self._adapter.build_updater(body.parsed, email, password_info)
+
+        if body.parsed.main_access_key is not None:
+            await self._user.switch_default_access_key.wait_for_complete(
+                SwitchDefaultAccessKeyAction(
+                    user_uuid=path.parsed.user_id,
+                    access_key=body.parsed.main_access_key,
+                    require_active=False,
+                )
+            )
 
         action_result = await self._user.modify_user.wait_for_complete(
             ModifyUserAction(user_uuid=path.parsed.user_id, email=email, updater=updater)

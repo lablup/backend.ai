@@ -319,11 +319,6 @@ async def admin_bulk_update_users_v2(
                 if dto.sudo_session_enabled is not None
                 else OptionalState.nop()
             ),
-            main_access_key=(
-                TriState.nop()
-                if isinstance(dto.main_access_key, Sentinel)
-                else TriState.from_graphql(dto.main_access_key)
-            ),
             container_uid=(
                 TriState.nop()
                 if isinstance(dto.container_uid, Sentinel)
@@ -346,6 +341,10 @@ async def admin_bulk_update_users_v2(
             ),
         )
 
+        if not isinstance(dto.main_access_key, Sentinel) and dto.main_access_key is not None:
+            await ctx.adapters.user.switch_default_access_key_for(
+                UUID(str(user_item.user_id)), dto.main_access_key
+            )
         items.append(UserUpdateSpec(user_id=UserID(user_item.user_id), updater_spec=updater_spec))
 
     action = BulkModifyUserAction(items=items)
