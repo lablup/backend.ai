@@ -8,11 +8,11 @@ from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.error_log.types import ErrorLogData
 
-from .base import ErrorLogAction
+from .base import ErrorLogGlobalAction
 
 
 @dataclass
-class ListErrorLogsAction(ErrorLogAction):
+class ListErrorLogsAction(ErrorLogGlobalAction):
     """Action to list error logs with role-based visibility."""
 
     user_uuid: uuid.UUID
@@ -25,12 +25,13 @@ class ListErrorLogsAction(ErrorLogAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+    def action_name(cls) -> str:
+        return "list_error_logs"
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
 
 @dataclass

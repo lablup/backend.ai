@@ -1,33 +1,32 @@
 from __future__ import annotations
 
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.validators import ActionValidators
-
-from .actions import CreateErrorLogAction, CreateErrorLogActionResult
-from .actions.list import ListErrorLogsAction, ListErrorLogsActionResult
-from .actions.mark_cleared import MarkClearedErrorLogAction, MarkClearedErrorLogActionResult
-from .actions.search import SearchErrorLogsAction, SearchErrorLogsActionResult
-from .service import ErrorLogService
-
-__all__ = ("ErrorLogProcessors",)
+from ai.backend.manager.actions.registry import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.ops.result import BatchOpsResult, CreatedEntityOpsResult
+from ai.backend.manager.data.error_log.types import ErrorLogData
+from ai.backend.manager.services.error_log.actions.create import CreateErrorLogAction
+from ai.backend.manager.services.error_log.actions.list import (
+    ListErrorLogsAction,
+    ListErrorLogsActionResult,
+)
+from ai.backend.manager.services.error_log.actions.mark_cleared import (
+    MarkClearedErrorLogAction,
+    MarkClearedErrorLogActionResult,
+)
+from ai.backend.manager.services.error_log.actions.search import SearchErrorLogsAction
+from ai.backend.manager.services.error_log.service import ErrorLogService
 
 
 class ErrorLogProcessors:
-    """Processor package for error log operations."""
+    """Recording and the admin read run against ops; the role-scoped reads keep the service."""
 
-    create: ActionProcessor[CreateErrorLogAction, CreateErrorLogActionResult]
-    search: ActionProcessor[SearchErrorLogsAction, SearchErrorLogsActionResult]
-    list_logs: ActionProcessor[ListErrorLogsAction, ListErrorLogsActionResult]
-    mark_cleared: ActionProcessor[MarkClearedErrorLogAction, MarkClearedErrorLogActionResult]
+    create: GlobalActionProcessor[CreateErrorLogAction, CreatedEntityOpsResult[ErrorLogData]]
+    search: GlobalActionProcessor[SearchErrorLogsAction, BatchOpsResult[ErrorLogData]]
+    list_logs: GlobalActionProcessor[ListErrorLogsAction, ListErrorLogsActionResult]
+    mark_cleared: GlobalActionProcessor[MarkClearedErrorLogAction, MarkClearedErrorLogActionResult]
 
-    def __init__(
-        self,
-        service: ErrorLogService,
-        action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
-    ) -> None:
-        self.create = ActionProcessor(service.create, action_monitors)
-        self.search = ActionProcessor(service.search, action_monitors)
-        self.list_logs = ActionProcessor(service.list_logs, action_monitors)
-        self.mark_cleared = ActionProcessor(service.mark_cleared, action_monitors)
+    def __init__(self, service: ErrorLogService, group: ProcessorGroup[ErrorLogData]) -> None:
+        self.create = group.global_create_ops(CreateErrorLogAction)
+        self.search = group.global_search_ops(SearchErrorLogsAction)
+        self.list_logs = group.global_scope(ListErrorLogsAction, service.list_logs)
+        self.mark_cleared = group.global_scope(MarkClearedErrorLogAction, service.mark_cleared)

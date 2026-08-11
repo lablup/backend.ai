@@ -13,8 +13,7 @@ from ai.backend.common.plugin.monitor import AbstractErrorReporterPlugin
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter, LogLevel
 from ai.backend.manager.data.error_log.types import ErrorLogSeverity
-from ai.backend.manager.repositories.base import Creator
-from ai.backend.manager.repositories.error_log.creators import ErrorLogCreatorSpec
+from ai.backend.manager.models.error_log.creators import ErrorLogCreator
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.error_log import ErrorLogRepository
@@ -77,16 +76,14 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
         message = "".join(traceback.format_exception_only(exc_type, exc_instance)).strip()
 
         error_log_severity = ErrorLogSeverity(severity.value.lower())
-        creator = Creator(
-            spec=ErrorLogCreatorSpec(
-                severity=error_log_severity,
-                source="manager",
-                user=user,
-                message=message,
-                context_lang="python",
-                context_env=dict(context) if context else {},
-                traceback="".join(traceback.format_tb(tb)).strip(),
-            )
+        creator = ErrorLogCreator(
+            severity=error_log_severity,
+            source="manager",
+            user=user,
+            message=message,
+            context_lang="python",
+            context_env=dict(context) if context else {},
+            traceback="".join(traceback.format_tb(tb)).strip(),
         )
         await self._error_log_repository.create(creator)
         log.debug(
@@ -126,16 +123,14 @@ class ErrorEventDispatcher(AbstractEventDispatcherPlugin):
         if not self.enabled:
             return
         error_log_severity = ErrorLogSeverity(event.severity.value.lower())
-        creator = Creator(
-            spec=ErrorLogCreatorSpec(
-                severity=error_log_severity,
-                source=source,
-                user=event.user,
-                message=event.message,
-                context_lang="python",
-                context_env=dict(event.context_env) if event.context_env else {},
-                traceback=event.traceback,
-            )
+        creator = ErrorLogCreator(
+            severity=error_log_severity,
+            source=source,
+            user=event.user,
+            message=event.message,
+            context_lang="python",
+            context_env=dict(event.context_env) if event.context_env else {},
+            traceback=event.traceback,
         )
         await self._error_log_repository.create(creator)
         log.debug(

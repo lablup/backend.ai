@@ -7,11 +7,11 @@ from typing import override
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 
-from .base import ErrorLogAction
+from .base import ErrorLogGlobalAction
 
 
 @dataclass
-class MarkClearedErrorLogAction(ErrorLogAction):
+class MarkClearedErrorLogAction(ErrorLogGlobalAction):
     """Action to mark an error log as cleared."""
 
     log_id: uuid.UUID
@@ -22,12 +22,13 @@ class MarkClearedErrorLogAction(ErrorLogAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
+    def action_name(cls) -> str:
+        return "mark_cleared_error_log"
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.log_id)
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass

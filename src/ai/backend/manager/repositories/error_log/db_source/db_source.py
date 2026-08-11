@@ -12,13 +12,12 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.error_log.types import ErrorLogData, ErrorLogListResult
+from ai.backend.manager.models.error_log.creators import ErrorLogCreator
 from ai.backend.manager.models.error_logs import ErrorLogRow
 from ai.backend.manager.models.group.row import AssocGroupUserRow, GroupRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    Creator,
     execute_batch_querier,
-    execute_creator,
 )
 
 if TYPE_CHECKING:
@@ -48,10 +47,12 @@ class ErrorLogDBSource:
         self._db = db
 
     @error_log_db_source_resilience.apply()
-    async def create(self, creator: Creator[ErrorLogRow]) -> ErrorLogData:
+    async def create(self, creator: ErrorLogCreator) -> ErrorLogData:
         async with self._db.begin_session() as db_sess:
-            result = await execute_creator(db_sess, creator)
-            return result.row.to_dataclass()
+            row = creator.build_row()
+            db_sess.add(row)
+            await db_sess.flush()
+            return creator.to_data(row)
 
     @error_log_db_source_resilience.apply()
     async def search(

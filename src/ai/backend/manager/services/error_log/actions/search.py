@@ -3,34 +3,30 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.error_log import ERROR_LOG_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.error_log.types import ErrorLogData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.error_log.actions.base import ErrorLogAction
+from ai.backend.manager.models.error_logs import ErrorLogRow
+from ai.backend.manager.repositories.error_log.searchers import ErrorLogSearcher
 
 
 @dataclass
-class SearchErrorLogsAction(ErrorLogAction):
-    querier: BatchQuerier
+class SearchErrorLogsAction(SearchGlobalOpsAction[ErrorLogRow, ErrorLogData]):
+    """Page through every recorded error — the super-admin read."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    searcher: ErrorLogSearcher
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass
-class SearchErrorLogsActionResult(BaseActionResult):
-    data: list[ErrorLogData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    def entity_type(cls) -> EntityType:
+        return ERROR_LOG_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    @classmethod
+    def action_name(cls) -> str:
+        return "search_error_logs"
+
+    @override
+    def to_searcher(self) -> ErrorLogSearcher:
+        return self.searcher

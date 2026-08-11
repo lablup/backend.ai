@@ -1,41 +1,32 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, override
+from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.error_log import ERROR_LOG_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import CreateGlobalOpsAction
 from ai.backend.manager.data.error_log.types import ErrorLogData
-from ai.backend.manager.repositories.base import Creator
-
-from .base import ErrorLogAction
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.error_logs import ErrorLogRow
+from ai.backend.manager.models.error_log.creators import ErrorLogCreator
+from ai.backend.manager.models.error_logs import ErrorLogRow
 
 
 @dataclass
-class CreateErrorLogAction(ErrorLogAction):
-    """Action to create an error log."""
+class CreateErrorLogAction(CreateGlobalOpsAction[ErrorLogRow, ErrorLogData]):
+    """Record one error."""
 
-    creator: Creator[ErrorLogRow]
+    creator: ErrorLogCreator
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.CREATE
+    def entity_type(cls) -> EntityType:
+        return ERROR_LOG_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return None
-
-
-@dataclass
-class CreateErrorLogActionResult(BaseActionResult):
-    """Result of creating an error log."""
-
-    error_log_data: ErrorLogData
+    @classmethod
+    def action_name(cls) -> str:
+        return "create_error_log"
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.error_log_data.id)
+    def to_creator(self) -> ErrorLogCreator:
+        return self.creator

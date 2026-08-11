@@ -23,8 +23,7 @@ from ai.backend.common.dto.manager.error_log.response import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.error_log.types import ErrorLogSeverity
 from ai.backend.manager.dto.context import UserContext
-from ai.backend.manager.repositories.base import Creator
-from ai.backend.manager.repositories.error_log.creators import ErrorLogCreatorSpec
+from ai.backend.manager.models.error_log.creators import ErrorLogCreator
 from ai.backend.manager.services.error_log.actions import CreateErrorLogAction
 from ai.backend.manager.services.error_log.actions.list import ListErrorLogsAction
 from ai.backend.manager.services.error_log.actions.mark_cleared import MarkClearedErrorLogAction
@@ -48,21 +47,19 @@ class ErrorLogHandler:
         log.info("CREATE (ak:{})", ctx.access_key)
 
         severity = ErrorLogSeverity(params.severity.lower())
-        creator = Creator(
-            spec=ErrorLogCreatorSpec(
-                severity=severity,
-                source=params.source,
-                user=ctx.user_uuid,
-                message=params.message,
-                context_lang=params.context_lang,
-                context_env=params.context_env,
-                request_url=params.request_url,
-                request_status=params.request_status,
-                traceback=params.traceback,
-            )
+        creator = ErrorLogCreator(
+            severity=severity,
+            source=params.source,
+            user=ctx.user_uuid,
+            message=params.message,
+            context_lang=params.context_lang,
+            context_env=params.context_env,
+            request_url=params.request_url,
+            request_status=params.request_status,
+            traceback=params.traceback,
         )
         action = CreateErrorLogAction(creator=creator)
-        await self._error_log.create.wait_for_complete(action)
+        await self._error_log.create.run(action)
 
         return APIResponse.build(HTTPStatus.OK, AppendErrorLogResponse(success=True))
 
@@ -83,7 +80,7 @@ class ErrorLogHandler:
             page_size=params.page_size,
             mark_read=params.mark_read,
         )
-        result = await self._error_log.list_logs.wait_for_complete(action)
+        result = await self._error_log.list_logs.run(action)
 
         is_admin = ctx.is_superadmin or ctx.is_admin
         log_items: list[ErrorLogDTO] = []
@@ -127,7 +124,7 @@ class ErrorLogHandler:
             is_superadmin=ctx.is_superadmin,
             is_admin=ctx.is_admin,
         )
-        await self._error_log.mark_cleared.wait_for_complete(action)
+        await self._error_log.mark_cleared.run(action)
 
         return APIResponse.build(
             HTTPStatus.OK,

@@ -24,6 +24,7 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.error_log.creators import ErrorLogCreator
 from ai.backend.manager.models.error_logs import ErrorLogRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
@@ -47,13 +48,10 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    BulkCreator,
-    Creator,
-    execute_bulk_creator,
-)
-from ai.backend.manager.repositories.error_log import ErrorLogCreatorSpec, ErrorLogRepository
+from ai.backend.manager.repositories.error_log import ErrorLogRepository
+from ai.backend.manager.repositories.error_log.searchers import ErrorLogSearcher
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -186,14 +184,23 @@ class TestErrorLogRepository:
         """Create ErrorLogRepository instance with database"""
         return ErrorLogRepository(db=db_with_cleanup)
 
+    @pytest.fixture
+    def error_log_ops(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> OpsRepository[ErrorLogData]:
+        """Searches run through the generic ops repository the v2 searcher wires to."""
+        return OpsRepository(V2DBOpsProvider(db_with_cleanup))
+
     async def test_create_multiple_error_logs(
         self,
         error_log_repository: ErrorLogRepository,
+        error_log_ops: OpsRepository[ErrorLogData],
         test_user_id: uuid.UUID,
     ) -> None:
         """Test creating multiple error logs and verifying them"""
         error_log_specs = [
-            ErrorLogCreatorSpec(
+            ErrorLogCreator(
                 severity=ErrorLogSeverity.CRITICAL,
                 source="manager",
                 user=test_user_id,
@@ -204,7 +211,7 @@ class TestErrorLogRepository:
                 request_status=500,
                 traceback="Traceback: ...",
             ),
-            ErrorLogCreatorSpec(
+            ErrorLogCreator(
                 severity=ErrorLogSeverity.ERROR,
                 source="agent",
                 user=test_user_id,
@@ -212,7 +219,7 @@ class TestErrorLogRepository:
                 context_lang="en",
                 context_env={"agent_id": "agent-001"},
             ),
-            ErrorLogCreatorSpec(
+            ErrorLogCreator(
                 severity=ErrorLogSeverity.WARNING,
                 source="storage",
                 message="Storage warning",
@@ -225,10 +232,8 @@ class TestErrorLogRepository:
 
         created_logs: list[ErrorLogData] = []
 
-        for spec in error_log_specs:
-            creator = Creator(spec=spec)
-            result = await error_log_repository.create(creator)
-            created_logs.append(result)
+        for creator in error_log_specs:
+            created_logs.append(await error_log_repository.create(creator))
 
         # Verify all logs were created with correct data
         assert len(created_logs) == 3
@@ -276,6 +281,7 @@ class TestErrorLogRepository:
     async def sample_error_logs_for_filtering(
         self,
         error_log_repository: ErrorLogRepository,
+        error_log_ops: OpsRepository[ErrorLogData],
         test_user_id: uuid.UUID,
     ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
         """Create sample error logs with different sources for filter testing"""
@@ -287,15 +293,13 @@ class TestErrorLogRepository:
         ]
 
         for source, severity, message in test_data:
-            creator = Creator(
-                spec=ErrorLogCreatorSpec(
-                    severity=severity,
-                    source=source,
-                    user=test_user_id,
-                    message=message,
-                    context_lang="en",
-                    context_env={},
-                )
+            creator = ErrorLogCreator(
+                severity=severity,
+                source=source,
+                user=test_user_id,
+                message=message,
+                context_lang="en",
+                context_env={},
             )
             result = await error_log_repository.create(creator)
             entity_map[source] = result.id
@@ -306,6 +310,7 @@ class TestErrorLogRepository:
     async def sample_error_logs_for_ordering(
         self,
         error_log_repository: ErrorLogRepository,
+        error_log_ops: OpsRepository[ErrorLogData],
         test_user_id: uuid.UUID,
     ) -> AsyncGenerator[list[uuid.UUID], None]:
         """Create sample error logs with predictable sources for ordering tests"""
@@ -313,15 +318,13 @@ class TestErrorLogRepository:
         sources = ["alpha-source", "beta-source", "gamma-source", "delta-source"]
 
         for source in sources:
-            creator = Creator(
-                spec=ErrorLogCreatorSpec(
-                    severity=ErrorLogSeverity.ERROR,
-                    source=source,
-                    user=test_user_id,
-                    message=f"Error from {source}",
-                    context_lang="en",
-                    context_env={},
-                )
+            creator = ErrorLogCreator(
+                severity=ErrorLogSeverity.ERROR,
+                source=source,
+                user=test_user_id,
+                message=f"Error from {source}",
+                context_lang="en",
+                context_env={},
             )
             result = await error_log_repository.create(creator)
             error_log_ids.append(result.id)
@@ -336,7 +339,7 @@ class TestErrorLogRepository:
     ) -> AsyncGenerator[list[uuid.UUID], None]:
         """Create 25 error logs for pagination testing"""
         specs = [
-            ErrorLogCreatorSpec(
+            ErrorLogCreator(
                 severity=ErrorLogSeverity.ERROR,
                 source=f"source_{i:02d}",
                 user=test_user_id,
@@ -348,10 +351,13 @@ class TestErrorLogRepository:
         ]
 
         async with db_with_cleanup.begin_session() as db_sess:
-            result = await execute_bulk_creator(db_sess, BulkCreator(specs=specs))
+            rows = [creator.build_row() for creator in specs]
+            db_sess.add_all(rows)
+            await db_sess.flush()
+            ids = [row.id for row in rows]
             await db_sess.commit()
 
-        yield [row.id for row in result.rows]
+        yield ids
 
     # =========================================================================
     # Tests - Search with filtering
@@ -359,13 +365,13 @@ class TestErrorLogRepository:
 
     async def test_search_error_logs_filter_by_source(
         self,
-        error_log_repository: ErrorLogRepository,
+        error_log_ops: OpsRepository[ErrorLogData],
         sample_error_logs_for_filtering: dict[str, uuid.UUID],
     ) -> None:
         """Test searching error logs filtered by source returns only matching error logs"""
         target_source = "manager"
 
-        querier = BatchQuerier(
+        searcher = ErrorLogSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -374,7 +380,7 @@ class TestErrorLogRepository:
             orders=[],
         )
 
-        result = await error_log_repository.search(querier=querier)
+        result = await error_log_ops.search_in_global(searcher)
 
         result_ids = [log.id for log in result.items]
         assert sample_error_logs_for_filtering["manager"] in result_ids
@@ -382,11 +388,11 @@ class TestErrorLogRepository:
 
     async def test_search_error_logs_filter_by_severity(
         self,
-        error_log_repository: ErrorLogRepository,
+        error_log_ops: OpsRepository[ErrorLogData],
         sample_error_logs_for_filtering: dict[str, uuid.UUID],
     ) -> None:
         """Test searching error logs filtered by severity"""
-        querier = BatchQuerier(
+        searcher = ErrorLogSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -395,7 +401,7 @@ class TestErrorLogRepository:
             orders=[],
         )
 
-        result = await error_log_repository.search(querier=querier)
+        result = await error_log_ops.search_in_global(searcher)
 
         assert len(result.items) == 1
         assert result.items[0].content.severity == ErrorLogSeverity.CRITICAL
@@ -406,17 +412,17 @@ class TestErrorLogRepository:
 
     async def test_search_error_logs_order_by_source_ascending(
         self,
-        error_log_repository: ErrorLogRepository,
+        error_log_ops: OpsRepository[ErrorLogData],
         sample_error_logs_for_ordering: list[uuid.UUID],
     ) -> None:
         """Test searching error logs ordered by source ascending"""
-        querier = BatchQuerier(
+        searcher = ErrorLogSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[ErrorLogRow.source.asc()],
         )
 
-        result = await error_log_repository.search(querier=querier)
+        result = await error_log_ops.search_in_global(searcher)
 
         result_sources = [log.meta.source for log in result.items]
         assert result_sources == sorted(result_sources)
@@ -425,17 +431,17 @@ class TestErrorLogRepository:
 
     async def test_search_error_logs_order_by_source_descending(
         self,
-        error_log_repository: ErrorLogRepository,
+        error_log_ops: OpsRepository[ErrorLogData],
         sample_error_logs_for_ordering: list[uuid.UUID],
     ) -> None:
         """Test searching error logs ordered by source descending"""
-        querier = BatchQuerier(
+        searcher = ErrorLogSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[ErrorLogRow.source.desc()],
         )
 
-        result = await error_log_repository.search(querier=querier)
+        result = await error_log_ops.search_in_global(searcher)
 
         result_sources = [log.meta.source for log in result.items]
         assert result_sources == sorted(result_sources, reverse=True)
@@ -448,51 +454,51 @@ class TestErrorLogRepository:
 
     async def test_search_error_logs_offset_pagination_first_page(
         self,
-        error_log_repository: ErrorLogRepository,
+        error_log_ops: OpsRepository[ErrorLogData],
         sample_error_logs_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test first page of offset-based pagination"""
-        querier = BatchQuerier(
+        searcher = ErrorLogSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        result = await error_log_repository.search(querier=querier)
+        result = await error_log_ops.search_in_global(searcher)
 
         assert len(result.items) == 10
         assert result.total_count == 25
 
     async def test_search_error_logs_offset_pagination_second_page(
         self,
-        error_log_repository: ErrorLogRepository,
+        error_log_ops: OpsRepository[ErrorLogData],
         sample_error_logs_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test second page of offset-based pagination"""
-        querier = BatchQuerier(
+        searcher = ErrorLogSearcher(
             pagination=OffsetPagination(limit=10, offset=10),
             conditions=[],
             orders=[],
         )
 
-        result = await error_log_repository.search(querier=querier)
+        result = await error_log_ops.search_in_global(searcher)
 
         assert len(result.items) == 10
         assert result.total_count == 25
 
     async def test_search_error_logs_offset_pagination_last_page(
         self,
-        error_log_repository: ErrorLogRepository,
+        error_log_ops: OpsRepository[ErrorLogData],
         sample_error_logs_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test last page of offset-based pagination with partial results"""
-        querier = BatchQuerier(
+        searcher = ErrorLogSearcher(
             pagination=OffsetPagination(limit=10, offset=20),
             conditions=[],
             orders=[],
         )
 
-        result = await error_log_repository.search(querier=querier)
+        result = await error_log_ops.search_in_global(searcher)
 
         assert len(result.items) == 5
         assert result.total_count == 25
@@ -503,11 +509,11 @@ class TestErrorLogRepository:
 
     async def test_search_error_logs_with_pagination_filter_and_order(
         self,
-        error_log_repository: ErrorLogRepository,
+        error_log_ops: OpsRepository[ErrorLogData],
         sample_error_logs_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test searching error logs with pagination, filter condition, and ordering combined"""
-        querier = BatchQuerier(
+        searcher = ErrorLogSearcher(
             pagination=OffsetPagination(limit=5, offset=2),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -516,7 +522,7 @@ class TestErrorLogRepository:
             orders=[ErrorLogRow.source.asc()],
         )
 
-        result = await error_log_repository.search(querier=querier)
+        result = await error_log_ops.search_in_global(searcher)
 
         assert result.total_count == 25
         assert len(result.items) == 5

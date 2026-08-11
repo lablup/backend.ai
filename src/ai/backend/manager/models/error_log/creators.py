@@ -1,19 +1,27 @@
+"""Write specs for error logs.
+
+The row itself still lives in the legacy flat ``models/error_logs.py``; this package
+holds only what the v2 lineage requires to sit under ``models/``.
+"""
+
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, override
 
-from ai.backend.manager.data.error_log.types import ErrorLogSeverity
+from ai.backend.manager.data.error_log.types import ErrorLogData, ErrorLogSeverity
 from ai.backend.manager.models.error_logs import ErrorLogRow
-from ai.backend.manager.repositories.base import CreatorSpec
-
-__all__ = ("ErrorLogCreatorSpec",)
+from ai.backend.manager.models.specs.creator import GlobalEntityCreator
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 
 @dataclass
-class ErrorLogCreatorSpec(CreatorSpec[ErrorLogRow]):
+class ErrorLogCreator(GlobalEntityCreator[ErrorLogRow, ErrorLogData]):
+    """Creator for one recorded error."""
+
     severity: ErrorLogSeverity
     source: str
     message: str
@@ -26,6 +34,10 @@ class ErrorLogCreatorSpec(CreatorSpec[ErrorLogRow]):
     request_status: int | None = None
     traceback: str | None = None
     created_at: datetime | None = None
+
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
 
     @override
     def build_row(self) -> ErrorLogRow:
@@ -43,3 +55,7 @@ class ErrorLogCreatorSpec(CreatorSpec[ErrorLogRow]):
             traceback=self.traceback,
             created_at=self.created_at,
         )
+
+    @override
+    def to_data(self, row: ErrorLogRow) -> ErrorLogData:
+        return row.to_dataclass()

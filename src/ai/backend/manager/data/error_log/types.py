@@ -4,7 +4,11 @@ import enum
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, override
+
+from ai.backend.common.data.entity.types import EntityData
+from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.identifier.error_log import ErrorLogID
 
 
 class ErrorLogSeverity(enum.StrEnum):
@@ -34,10 +38,14 @@ class ErrorLogContent:
 
 
 @dataclass
-class ErrorLogData:
-    id: uuid.UUID
+class ErrorLogData(EntityData):
+    id: ErrorLogID
     meta: ErrorLogMeta
     content: ErrorLogContent
+
+    @override
+    def entity_id(self) -> EntityID:
+        return self.id
 
 
 @dataclass

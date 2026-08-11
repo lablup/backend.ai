@@ -3,15 +3,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.actions.action import BaseAction
+from ai.backend.common.data.entity.error_log import ERROR_LOG_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 
 
 @dataclass
-class ErrorLogAction(BaseAction):
-    """Base action class for error log operations."""
+class ErrorLogGlobalAction(BaseGlobalAction):
+    """Base for the error-log reads the service still owns."""
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.ERROR_LOG
+        return ERROR_LOG_ENTITY_TYPE

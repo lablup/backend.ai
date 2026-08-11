@@ -31,15 +31,14 @@ from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.error_log.service import ErrorLogService
 from ai.backend.manager.services.manager_admin.processors import ManagerAdminProcessors
 from ai.backend.manager.services.manager_admin.service import ManagerAdminService
+from ai.backend.testutils.processors import ops_processor_group
 
 
 @pytest.fixture()
 def error_log_processors(database_engine: ExtendedAsyncSAEngine) -> ErrorLogProcessors:
     repo = ErrorLogRepository(database_engine)
     service = ErrorLogService(repo)
-    return ErrorLogProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
-    )
+    return ErrorLogProcessors(service=service, group=ops_processor_group(database_engine))
 
 
 @pytest.fixture()

@@ -8,6 +8,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.identifier.error_log import ErrorLogID
 from ai.backend.manager.data.error_log.types import (
     ErrorLogContent,
     ErrorLogData,
@@ -93,7 +94,7 @@ class ErrorLogRow(Base):
 
     def to_dataclass(self) -> ErrorLogData:
         return ErrorLogData(
-            id=self.id,
+            id=ErrorLogID(self.id),
             meta=ErrorLogMeta(
                 created_at=self.created_at,
                 user=self.user,

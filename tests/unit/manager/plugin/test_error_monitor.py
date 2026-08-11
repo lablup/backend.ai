@@ -3,19 +3,15 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
 
 from ai.backend.logging import LogLevel
 from ai.backend.manager.data.error_log.types import ErrorLogSeverity
+from ai.backend.manager.models.error_log.creators import ErrorLogCreator
 from ai.backend.manager.plugin.error_monitor import ErrorMonitor
-from ai.backend.manager.repositories.error_log.creators import ErrorLogCreatorSpec
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.error_logs import ErrorLogRow
-    from ai.backend.manager.repositories.base import Creator
 
 
 class TestErrorMonitor:
@@ -55,9 +51,8 @@ class TestErrorMonitor:
 
         mock_error_log_repository.create.assert_called_once()
         call_args = mock_error_log_repository.create.call_args
-        creator: Creator[ErrorLogRow] = call_args[0][0]
-        spec = creator.spec
-        assert isinstance(spec, ErrorLogCreatorSpec)
+        spec = call_args[0][0]
+        assert isinstance(spec, ErrorLogCreator)
 
         assert spec.severity == ErrorLogSeverity.ERROR
         assert spec.source == "manager"
