@@ -42,7 +42,6 @@ from ai.backend.manager.services.user.actions.create_user import CreateUserActio
 from ai.backend.manager.services.user.actions.delete_user import DeleteUserAction
 from ai.backend.manager.services.user.actions.get_user import GetUserAction
 from ai.backend.manager.services.user.actions.keypair_ops import SwitchDefaultAccessKeyAction
-from ai.backend.manager.services.user.actions.update_user import UpdateUserAction
 from ai.backend.manager.services.user.actions.purge_user import PurgeUserAction
 from ai.backend.manager.services.user.actions.search_users import SearchUsersAction
 from ai.backend.manager.services.user.actions.update_user import UpdateUserAction

@@ -65,10 +65,6 @@ from ai.backend.manager.services.user.actions.delete_user import (
 from ai.backend.manager.services.user.actions.keypair_ops import (
     SwitchDefaultAccessKeyAction,
 )
-from ai.backend.manager.services.user.actions.update_user import (
-    UpdateUserAction,
-    UpdateUserActionResult,
-)
 from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserAction,
 )

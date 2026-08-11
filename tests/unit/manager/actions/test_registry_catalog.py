@@ -31,12 +31,12 @@ from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.app_config_allow_list.processors import (
     AppConfigAllowListProcessors,
 )
-from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
 from ai.backend.manager.services.app_config_definition.processors import (
     AppConfigDefinitionProcessors,
 )
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
+from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
 from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
 )
