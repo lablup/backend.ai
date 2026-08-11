@@ -8,9 +8,13 @@ with the value the application would have written and sets them NOT NULL.
 are genuinely empty for a keypair that has never been used or has no SSH key.
 ``created_at`` and ``updated_at`` were already tightened by ``2dccb3069031``.
 
-``secret_key`` has no value that could be fabricated: a row without one is a
-keypair nothing can authenticate with. If any exists the ALTER stops the
-upgrade rather than inventing a secret.
+``secret_key`` has no value that could be fabricated, and a row without one is a
+keypair nothing can authenticate with — it cannot sign a request, so it grants
+nothing and no session can be running under it. Those rows are deleted rather
+than backfilled. The two foreign keys pointing at ``keypairs.access_key`` carry
+``ON DELETE SET NULL`` and ``ON DELETE CASCADE``, and ``kernels.access_key`` /
+``sessions.access_key`` are plain columns that already tolerate a missing
+keypair, so the delete needs no other table prepared.
 
 Revision ID: e4a91c05df38
 Revises: 37d711158a8c
@@ -39,6 +43,27 @@ _TIGHTENED = (
 
 def upgrade() -> None:
     bind = op.get_bind()
+    orphan_access_keys = (
+        bind.execute(sa.text("DELETE FROM keypairs WHERE secret_key IS NULL RETURNING access_key"))
+        .scalars()
+        .all()
+    )
+    if orphan_access_keys:
+        keys = list(orphan_access_keys)
+        bind.execute(
+            sa.text(
+                "DELETE FROM permissions WHERE scope_type = 'keypair' AND scope_id = ANY(:keys)"
+            ),
+            {"keys": keys},
+        )
+        bind.execute(
+            sa.text("""
+                DELETE FROM association_scopes_entities
+                WHERE (entity_type = 'keypair' AND entity_id = ANY(:keys))
+                   OR (scope_type = 'keypair' AND scope_id = ANY(:keys))
+            """),
+            {"keys": keys},
+        )
     bind.execute(
         sa.text("""
             UPDATE keypairs
