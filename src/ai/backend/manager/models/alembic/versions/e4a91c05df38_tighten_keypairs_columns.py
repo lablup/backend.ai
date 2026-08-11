@@ -1,8 +1,9 @@
 """tighten the always-populated keypairs columns
 
-``is_admin`` and ``num_queries`` have a default, so a null there is backfilled.
-The others do not: a keypair missing ``user_id``, ``secret_key`` or ``is_active``
-is deleted rather than given an invented value.
+``is_active``, ``is_admin`` and ``num_queries`` are backfilled with the value a
+null already behaved as — for ``is_active`` that is false, since every query
+filtering on it uses ``IS TRUE`` and so already skips those rows. ``user_id`` and
+``secret_key`` have no such value: a keypair missing either is deleted.
 
 Revision ID: e4a91c05df38
 Revises: 37d711158a8c
@@ -26,13 +27,13 @@ branch_labels = None
 depends_on = None
 
 _BACKFILLED = {
+    "is_active": "false",
     "is_admin": "false",
     "num_queries": "0",
 }
 _REQUIRED = (
     "user_id",
     "secret_key",
-    "is_active",
 )
 _TIGHTENED = (*_REQUIRED, *_BACKFILLED)
 
