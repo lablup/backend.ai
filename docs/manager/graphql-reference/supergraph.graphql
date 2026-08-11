@@ -9679,6 +9679,11 @@ input KeypairFilter
 {
   isActive: Boolean = null
   isAdmin: Boolean = null
+
+  """
+  Added in 26.9.0. Filter keypairs by whether they are their owner's default one.
+  """
+  isDefault: Boolean = null
   accessKey: StringFilter = null
   resourcePolicy: StringFilter = null
 
@@ -9720,7 +9725,7 @@ input KeypairOrderBy
 }
 
 """
-Added in 26.4.2. Fields available for ordering keypair query results. CREATED_AT: Order by creation timestamp. LAST_USED: Order by last used timestamp. ACCESS_KEY: Order by access key alphabetically. IS_ACTIVE: Order by active status.
+Added in 26.4.2. Fields available for ordering keypair query results. CREATED_AT: Order by creation timestamp. LAST_USED: Order by last used timestamp. ACCESS_KEY: Order by access key alphabetically. IS_ACTIVE: Order by active status. IS_DEFAULT: Order by whether the keypair is its owner's default one.
 """
 enum KeypairOrderField
   @join__type(graph: STRAWBERRY)
@@ -9729,6 +9734,7 @@ enum KeypairOrderField
   LAST_USED @join__enumValue(graph: STRAWBERRY)
   ACCESS_KEY @join__enumValue(graph: STRAWBERRY)
   IS_ACTIVE @join__enumValue(graph: STRAWBERRY)
+  IS_DEFAULT @join__enumValue(graph: STRAWBERRY)
   RESOURCE_POLICY @join__enumValue(graph: STRAWBERRY)
 }
 
