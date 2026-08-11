@@ -1,6 +1,12 @@
-# Builds the lablup/backend.ai-* service images from the docker/backend.ai-*
-# dockerfiles (discovered via scripts/list-dockerfiles.sh --service) and pushes
-# them to Docker Hub, multi-arch (linux/amd64 + linux/arm64).
+# Builds the lablup/backend.ai-* service images and pushes them to Docker Hub,
+# multi-arch (linux/amd64 + linux/arm64), in a single `docker buildx bake` run
+# (docker-bake.hcl): every service dockerfile starts FROM the shared
+# unpublished backend.ai-base image, which bake builds once per platform and
+# feeds to the service targets via named contexts — the heavy dependency layer
+# is built once instead of per image, and the base never has to exist in a
+# registry.  scripts/list-dockerfiles.sh remains the publishing registry: the
+# prepare job fails (scripts/check-bake-targets.sh) when its --service list
+# and the bake default group drift apart.
 #
 # Authentication is OIDC-only — no registry secret is stored in this repository:
 # - The Docker Hub org `lablup` has an OIDC connection whose ruleset accepts
@@ -52,12 +58,11 @@ concurrency:
 
 jobs:
   prepare:
-    name: Prepare build matrix
+    name: Validate the image registry and resolve versions
     runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
       python-version: ${{ steps.pyver.outputs.version }}
       pkgver: ${{ steps.pkgver.outputs.version }}
       is-prerelease: ${{ steps.release-type.outputs.is-prerelease }}
@@ -67,17 +72,8 @@ jobs:
       with:
         lfs: false
 
-    - name: Build the service image matrix
-      id: set-matrix
-      run: |
-        MATRIX_JSON=$(scripts/list-dockerfiles.sh --service)
-        echo "Found service image matrix:"
-        echo "$MATRIX_JSON" | jq .
-        if [ "$(echo "$MATRIX_JSON" | jq '.include | length')" -eq 0 ]; then
-          echo "::error::scripts/list-dockerfiles.sh --service returned an empty matrix — no service images would be built. This is always a bug on a release."
-          exit 1
-        fi
-        echo "matrix=$MATRIX_JSON" >> "$GITHUB_OUTPUT"
+    - name: Check the bake definition against the dockerfile registry
+      run: scripts/check-bake-targets.sh docker-bake.hcl
 
     - name: Resolve project Python version
       id: pyver
@@ -118,9 +114,8 @@ jobs:
         echo "is-prerelease=$IS_PRERELEASE" >> "$GITHUB_OUTPUT"
 
   build-push:
-    name: Build and push ${{ matrix.name }}
+    name: Build and push all service images
     needs: prepare
-    if: needs.prepare.outputs.matrix != '{"include":[]}'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: deploy-to-dockerhub
@@ -128,9 +123,6 @@ jobs:
       contents: read
       actions: read  # let download-artifact's REST path read the wheels artifact
       id-token: write  # mint the OIDC token exchanged for the Docker Hub login
-    strategy:
-      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
-      fail-fast: false
     steps:
     - name: Check the OIDC connection variable
       env:
@@ -167,30 +159,19 @@ jobs:
       with:
         username: lablup
 
-    - name: Generate image metadata
-      id: meta
-      uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302  # v6.2.0
+    # Tags, platforms, attestations (provenance mode=max + SBOM), and the gha
+    # cache configuration all live in docker-bake.hcl; the env vars below fill
+    # its variables.  `source: .` makes bake build from the checked-out
+    # workspace (where the wheels were just downloaded into dist/) instead of
+    # the action's default remote Git context.
+    - name: Build and push all service images
+      uses: docker/bake-action@d3418bd7d0e9324001bca92fa8ba175ea7e6dc9b  # v7.3.0
+      env:
+        PYTHON_VERSION: ${{ needs.prepare.outputs.python-version }}
+        PKGVER: ${{ needs.prepare.outputs.pkgver }}
+        TAG_LATEST: ${{ needs.prepare.outputs.is-prerelease == 'false' }}
+        REVISION: ${{ github.sha }}
       with:
-        images: ${{ matrix.image }}
-        flavor: |
-          latest=false
-        tags: |
-          type=raw,value=${{ needs.prepare.outputs.pkgver }}
-          type=raw,value=latest,enable=${{ needs.prepare.outputs.is-prerelease == 'false' }}
-
-    - name: Build and push
-      uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
-      with:
-        context: ${{ matrix.context }}
-        file: ${{ matrix.dockerfile }}
-        platforms: linux/amd64,linux/arm64
+        source: .
+        files: docker-bake.hcl
         push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        provenance: mode=max
-        sbom: true
-        cache-from: type=gha,scope=${{ matrix.name }}
-        cache-to: type=gha,mode=max,scope=${{ matrix.name }}
-        build-args: |
-          PYTHON_VERSION=${{ needs.prepare.outputs.python-version }}
-          PKGVER=${{ needs.prepare.outputs.pkgver }}
