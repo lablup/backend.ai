@@ -83,15 +83,14 @@ path the image's default command reads:
 | manager | `/etc/backend.ai/manager.toml` | also mount `fixtures/` at `/app/fixtures` **read-write** — manager RPC keypair (auto-generated at first start) + DB fixtures |
 | agent | `/etc/backend.ai/agent.toml` | see the privilege and path-parity sections below |
 | webserver | `/etc/backend.ai/webserver.conf` | note the `.conf` target name, not `.toml` |
-| storage-proxy | `/etc/backend.ai/storage-proxy.toml` | to run unprivileged, set the `user`/`group` knobs in `storage-proxy.toml` (the daemon drops privileges itself) rather than compose `user:` — the chown watcher requires *starting* as root; if TLS is enabled, mount the cert material read-only at whatever path `ssl-cert`/`ssl-privkey` point to |
+| storage-proxy | `/etc/backend.ai/storage-proxy.toml` | to run unprivileged with the chown watcher, set the `user`/`group` knobs in `storage-proxy.toml` (the daemon drops privileges itself after starting as root); when the watcher is not used, compose `user:` works too — the DOCKER install mode runs it as the installing user this way. If TLS is enabled, mount the cert material read-only at whatever path `ssl-cert`/`ssl-privkey` point to |
 | appproxy-coordinator | `/etc/backend.ai/proxy-coordinator.toml` | |
 | appproxy-worker | `/etc/backend.ai/proxy-worker.toml` | one container per worker: each needs its OWN toml with a unique `authority`, protocol (`http`/`tcp`), `api_bind_addr` port, and a non-overlapping `[proxy_worker.port_proxy] bind_port_range` (port-based frontends only) — and the compose port mappings must match |
 
-The `/etc/backend.ai/*` targets are what the images' **default commands** read.
-The DOCKER install mode (see the reference compose file below) instead keeps
-every config in the parity-mounted install directory and overrides each
-service's `command:` to point there — either layout works; pick one per
-deployment.
+The `/etc/backend.ai/*` targets are what the images' **default commands**
+read; the DOCKER install mode (see the reference compose file below) follows
+the same convention, mounting each generated config at its default-command
+path read-only.
 
 Shared prerequisites:
 
@@ -179,11 +178,24 @@ the **DOCKER install mode** of `backend.ai-installer` generates at
 `<install-dir>/docker-compose.services.yml` (rendered from
 `src/ai/backend/install/configs/docker-compose.services.yml`). Its contract:
 
-- Every service runs on the host network, so the generated configs use the
-  same `127.0.0.1` addressing as a package-based install.
-- The install directory is bind-mounted into every container at the identical
-  absolute path, and each service's `command:` reads its config from there —
-  no `/etc/backend.ai` mounts.
+- Every service reads its generated config from the image's default
+  `/etc/backend.ai/*` path via a per-file read-only mount and runs the
+  image's default command — the same convention as the deployment layout
+  above.
+- Host networking is granted only to the manager and the agent (and the
+  `manager-cli` one-off tool). The other services run on the project's
+  bridge network with published ports; their generated configs get outbound
+  addresses (halfstack, manager API, coordinator API) rewritten to
+  `host.docker.internal` (mapped via `extra_hosts: host-gateway`) and bind
+  addresses forced to `0.0.0.0`, while announce/advertised addresses are
+  untouched.
+- The install directory is bind-mounted at the identical absolute path (path
+  parity) only where files must resolve on the host: the agent and
+  storage-proxy (paths handed to the host Docker daemon) and `manager-cli`
+  (fixture files passed to one-off commands). The manager exchanges the RPC
+  keypair through `<install-dir>/fixtures` mounted at `/app/fixtures`.
+- The storage-proxy runs as the **installing user** (compose `user:`),
+  matching PACKAGE-mode file ownership of the vfolder tree.
 - `/etc/machine-id` is passed through read-only to the manager and agent so
   anything deriving a stable host identity sees the host's, not the
   container's.
@@ -209,13 +221,12 @@ services:
     image: lablup/backend.ai-manager:<version>
     network_mode: host    # optional — bridge works via the announce-addr knobs
     privileged: true      # installer default; the socket alone suffices (see the matrix) — remove for least privilege
-    working_dir: <install-dir>
-    command: ["python", "-m", "ai.backend.manager.server", "--config", "<install-dir>/manager.toml"]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock   # needed only when the `local` container registry is used
       - /etc/machine-id:/etc/machine-id:ro
-      # parity mount: configs, fixtures/ (RPC keypair, written relative to working_dir), vfolder/
-      - <install-dir>:<install-dir>
+      - <install-dir>/manager.toml:/etc/backend.ai/manager.toml:ro
+      # the image entrypoint generates the RPC keypair here at first start
+      - <install-dir>/fixtures:/app/fixtures
     restart: unless-stopped
 
   agent:
@@ -231,11 +242,10 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    working_dir: <install-dir>
-    command: ["python", "-m", "ai.backend.agent.server", "-f", "<install-dir>/agent.toml"]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc/machine-id:/etc/machine-id:ro
+      - <install-dir>/agent.toml:/etc/backend.ai/agent.toml:ro
       # path-parity mounts: host path == container path
       - <install-dir>:<install-dir>
       - /var/lib/backend.ai/krunner:/var/lib/backend.ai/krunner   # created by the Docker daemon on first start

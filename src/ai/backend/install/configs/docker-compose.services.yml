@@ -1,48 +1,68 @@
 # Backend.AI service containers (DOCKER install mode).
 #
-# This file is a template: the installer substitutes the install-directory
-# and release-version placeholders, and uncomments the GPU device-reservation
-# lines of the agent service when a CUDA accelerator is selected (the marker
-# prefix keeps that block a comment otherwise).
+# This file is a template: the installer substitutes the install-directory,
+# release-version, and uid/gid placeholders, and uncomments the GPU
+# device-reservation lines of the agent service when a CUDA accelerator is
+# selected (the marker prefix keeps that block a comment otherwise).
 #
-# Design contract (see docker/README.md for the rationale):
-# - The compose project name is fixed so this file never shares a compose
-#   project with the halfstack file living in the same directory.
-# - Every service runs on the host network, so the generated configs use the
-#   same 127.0.0.1 addressing as the package-based install layout.
+# Design contract (see docker/README.md for the rationale) — this file follows
+# the SAME deployment convention as a hand-written compose deployment: every
+# service reads its config from the image's default `/etc/backend.ai/*` path
+# via a per-file read-only mount, and runs the image's default command.
+#
+# - Host networking is granted only where required: the manager and the agent
+#   (kernel/RPC ports advertised on host addresses) — plus manager-cli, the
+#   installer's own one-off tool, which must reach halfstack at 127.0.0.1.
+# - The other services run on the project's default bridge network with
+#   published ports matching the fixed ports of the installer's
+#   ServiceConfig; their generated configs have outbound addresses rewritten
+#   to host.docker.internal (mapped to the host gateway below), while bind
+#   addresses are forced to 0.0.0.0 so the published ports work.
 # - The install directory is bind-mounted at the SAME absolute path (path
-#   parity): every path under it that a service hands to the host Docker
-#   daemon (scratch roots, IPC sockets, vfolder trees, plugin var state)
-#   resolves identically on the host and inside the containers.
+#   parity) only where files must resolve on the host: the agent and
+#   storage-proxy hand paths under it to the host Docker daemon (scratch
+#   roots, IPC sockets, vfolder trees), and manager-cli passes fixture files
+#   under it to one-off commands.
+# - The manager exchanges the RPC keypair through {{BASE_PATH}}/fixtures
+#   mounted at /app/fixtures, where its entrypoint generates it.
+# - The storage-proxy runs as the installing user ({{UID}}:{{GID}}), matching
+#   the PACKAGE-mode behavior; the vfolder tree and its self-signed TLS
+#   material are owned by that user.
 # - The agent additionally needs pid/cgroup host namespaces and the
 #   /var/lib/backend.ai/krunner share for kernel-runner bind-mounts.
 # - No agent-watcher container ships in this mode; the watcher endpoint in
 #   the generated agent config is inert.
-# - The manager-cli service is a non-privileged twin of the manager used only
-#   for one-off management commands via `docker compose run`; its "cli"
-#   profile keeps `docker compose up -d` from ever starting it.
+# - The compose project name is fixed so this file never shares a compose
+#   project with the halfstack file living in the same directory.
 name: backendai-services
 services:
   manager:
     image: lablup/backend.ai-manager:{{VERSION}}
     network_mode: host
     privileged: true
-    working_dir: {{BASE_PATH}}
-    command: ["python", "-m", "ai.backend.manager.server", "--config", "{{BASE_PATH}}/manager.toml"]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc/machine-id:/etc/machine-id:ro
-      - {{BASE_PATH}}:{{BASE_PATH}}
+      - {{BASE_PATH}}/manager.toml:/etc/backend.ai/manager.toml:ro
+      # the image entrypoint generates the RPC keypair here at first start
+      - {{BASE_PATH}}/fixtures:/app/fixtures
     restart: unless-stopped
 
+  # Non-privileged twin of the manager used only for one-off management
+  # commands via `docker compose run`; its "cli" profile keeps
+  # `docker compose up -d` from ever starting it. It carries the base_path
+  # parity mount so fixture files under the install directory resolve.
   manager-cli:
     image: lablup/backend.ai-manager:{{VERSION}}
     network_mode: host
+    # one-off CLI invocations use install-directory-relative paths
+    # (e.g. `mgr generate-rpc-keypair fixtures/manager`)
     working_dir: {{BASE_PATH}}
     profiles: ["cli"]
     command: ["true"]
     volumes:
       - /etc/machine-id:/etc/machine-id:ro
+      - {{BASE_PATH}}/manager.toml:/etc/backend.ai/manager.toml:ro
       - {{BASE_PATH}}:{{BASE_PATH}}
 
   agent:
@@ -61,56 +81,71 @@ services:
 #gpu#            - driver: nvidia
 #gpu#              count: all
 #gpu#              capabilities: [gpu]
-    working_dir: {{BASE_PATH}}
-    command: ["python", "-m", "ai.backend.agent.server", "-f", "{{BASE_PATH}}/agent.toml"]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc/machine-id:/etc/machine-id:ro
+      - {{BASE_PATH}}/agent.toml:/etc/backend.ai/agent.toml:ro
+      # path parity: scratch roots, IPC sockets, vfolder tree, plugin var
+      # state under the install directory are handed to the host daemon
       - {{BASE_PATH}}:{{BASE_PATH}}
       - /var/lib/backend.ai/krunner:/var/lib/backend.ai/krunner
     restart: unless-stopped
 
   webserver:
     image: lablup/backend.ai-webserver:{{VERSION}}
-    network_mode: host
-    working_dir: {{BASE_PATH}}
-    command: ["python", "-m", "ai.backend.web.server", "-f", "{{BASE_PATH}}/webserver.conf"]
+    ports:
+      - "8090:8090"  # ServiceConfig.webserver_addr
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
-      - {{BASE_PATH}}:{{BASE_PATH}}
+      - {{BASE_PATH}}/webserver.conf:/etc/backend.ai/webserver.conf:ro
     restart: unless-stopped
 
   storage-proxy:
     image: lablup/backend.ai-storage-proxy:{{VERSION}}
-    network_mode: host
-    working_dir: {{BASE_PATH}}
-    command: ["python", "-m", "ai.backend.storage.server", "-f", "{{BASE_PATH}}/storage-proxy.toml"]
+    # the installing user: vfolder files keep the same ownership as in
+    # PACKAGE mode (the chown watcher, which needs root, is not used here)
+    user: "{{UID}}:{{GID}}"
+    ports:
+      - "6021:6021"  # ServiceConfig.storage_proxy_client_facing_addr
+      - "6022:6022"  # ServiceConfig.storage_proxy_manager_facing_addr
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
+      - {{BASE_PATH}}/storage-proxy.toml:/etc/backend.ai/storage-proxy.toml:ro
+      # path parity: the vfolder tree it manages becomes kernel bind-mount
+      # sources on the host; also covers its TLS material and IPC dir
       - {{BASE_PATH}}:{{BASE_PATH}}
     restart: unless-stopped
 
   appproxy-coordinator:
     image: lablup/backend.ai-appproxy-coordinator:{{VERSION}}
-    network_mode: host
-    working_dir: {{BASE_PATH}}
-    command: ["python", "-m", "ai.backend.appproxy.coordinator.server", "-f", "{{BASE_PATH}}/app-proxy-coordinator.toml"]
+    ports:
+      - "10200:10200"  # ServiceConfig.appproxy_coordinator_addr
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
-      - {{BASE_PATH}}:{{BASE_PATH}}
+      - {{BASE_PATH}}/app-proxy-coordinator.toml:/etc/backend.ai/proxy-coordinator.toml:ro
     restart: unless-stopped
 
   appproxy-worker:
     image: lablup/backend.ai-appproxy-worker:{{VERSION}}
-    network_mode: host
-    working_dir: {{BASE_PATH}}
-    command: ["python", "-m", "ai.backend.appproxy.worker.server", "-f", "{{BASE_PATH}}/app-proxy-worker.toml"]
+    ports:
+      - "10201:10201"  # ServiceConfig.appproxy_worker_addr
+      - "10205-10300:10205-10300"  # [proxy_worker.port_proxy] bind_port_range
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
-      - {{BASE_PATH}}:{{BASE_PATH}}
+      - {{BASE_PATH}}/app-proxy-worker.toml:/etc/backend.ai/proxy-worker.toml:ro
     restart: unless-stopped
 
   appproxy-worker-tcp:
     image: lablup/backend.ai-appproxy-worker:{{VERSION}}
-    network_mode: host
-    working_dir: {{BASE_PATH}}
-    command: ["python", "-m", "ai.backend.appproxy.worker.server", "-f", "{{BASE_PATH}}/app-proxy-worker-tcp.toml"]
+    ports:
+      - "10202:10202"  # ServiceConfig.appproxy_tcp_worker_addr
+      - "10501-10600:10501-10600"  # [proxy_worker.port_proxy] bind_port_range
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
-      - {{BASE_PATH}}:{{BASE_PATH}}
+      - {{BASE_PATH}}/app-proxy-worker-tcp.toml:/etc/backend.ai/proxy-worker.toml:ro
     restart: unless-stopped
