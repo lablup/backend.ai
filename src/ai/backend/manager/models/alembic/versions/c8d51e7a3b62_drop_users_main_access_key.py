@@ -1,8 +1,6 @@
 """drop users.main_access_key
 
-Which keypair is a user's main one now lives on ``keypairs.is_default``, and
-nothing reads the column any more. Its foreign key was ``ON DELETE SET NULL``,
-so deleting any keypair silently cleared it — the reason for the move.
+``keypairs.is_default`` records this now, and nothing reads the column.
 
 The downgrade restores the column and refills it from the marker.
 
