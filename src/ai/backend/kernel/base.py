@@ -52,6 +52,8 @@ log = BraceStyleAdapter(logger)
 
 TReturn = TypeVar("TReturn")
 
+DEFAULT_SERVICE_LAUNCH_TIMEOUT_SEC = 30.0
+
 
 class FailureSentinel(enum.Enum):
     TOKEN = 0
@@ -871,7 +873,7 @@ class BaseRunner(metaclass=ABCMeta):
         service_info: Mapping[str, Any],
         *,
         cwd: str | None = None,
-        launch_timeout: float | None = 30.0,
+        launch_timeout: float | None = DEFAULT_SERVICE_LAUNCH_TIMEOUT_SEC,
     ) -> dict[str, Any]:
         error_reason = None
         try:
