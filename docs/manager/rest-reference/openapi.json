@@ -12247,6 +12247,19 @@
             "default": null,
             "title": "Is Admin"
           },
+          "is_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by whether the keypair is its owner's default one.",
+            "title": "Is Default"
+          },
           "access_key": {
             "anyOf": [
               {
@@ -12376,6 +12389,7 @@
           "last_used",
           "access_key",
           "is_active",
+          "is_default",
           "resource_policy"
         ],
         "title": "KeypairOrderField",

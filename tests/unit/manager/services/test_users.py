@@ -110,6 +110,7 @@ class TestCreateUser:
             secret_key=SecretKey("test-secret-key"),
             is_active=True,
             is_admin=False,
+            is_default=True,
             created_at=datetime.now(tz=UTC),
             modified_at=datetime.now(tz=UTC),
             resource_policy_name="default",
