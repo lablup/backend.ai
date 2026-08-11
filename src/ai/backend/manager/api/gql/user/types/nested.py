@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.v2.user.response import (
 from ai.backend.common.dto.manager.v2.user.response import (
     UserStatusInfo as UserStatusInfoDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -106,7 +107,10 @@ class UserOrganizationInfoGQL:
     resource_policy: str = gql_field(
         description="Name of the user resource policy applied to this user."
     )
-    main_access_key: str | None = gql_field(description="Primary API access key for this user.")
+    main_access_key: str | None = gql_field(
+        description="Primary API access key for this user.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use the keypair's is_default field.",
+    )
 
 
 @gql_pydantic_type(

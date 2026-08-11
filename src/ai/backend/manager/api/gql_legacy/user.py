@@ -21,6 +21,7 @@ from sqlalchemy.engine.row import Row
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.exception import UserNotFound
 from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.data.user.types import (
     UserData,
     UserInfoContext,
@@ -551,10 +552,12 @@ class User(graphene.ObjectType):  # type: ignore[misc]
     sudo_session_enabled = graphene.Boolean()
     main_access_key = graphene.String(
         description=(
-            "Added in 24.03.0. Used as the default authentication credential for password-based"
-            " logins and sets the user's total resource usage limit. User's main_access_key cannot"
-            " be deleted, and only super-admin can replace main_access_key."
-        )
+            f"Added in 24.03.0. Deprecated since {NEXT_RELEASE_VERSION}. Use the keypair's is_default field. Used as the default authentication credential for"
+            " password-based logins and sets the user's total resource usage limit. User's"
+            " main_access_key cannot be deleted, and only super-admin can replace"
+            " main_access_key."
+        ),
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use the keypair's is_default field.",
     )
     container_uid = graphene.Int(
         description="Added in 25.2.0. The user ID (UID) assigned to processes running inside the container."

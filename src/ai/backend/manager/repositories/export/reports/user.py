@@ -6,6 +6,7 @@ import json
 from decimal import Decimal
 from typing import Any
 
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.models.group.row import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
@@ -247,7 +248,10 @@ USER_FIELDS: list[ExportFieldDef] = [
     ExportFieldDef(
         key="main_access_key",
         name="Main Access Key",
-        description="Main keypair access key",
+        description=(
+            f"Main keypair access key. Deprecated since {NEXT_RELEASE_VERSION}."
+            " Use the keypair report's is_default field."
+        ),
         field_type=ExportFieldType.STRING,
         column=KeyPairRow.access_key,
         joins=frozenset({MAIN_KEYPAIR_JOIN}),

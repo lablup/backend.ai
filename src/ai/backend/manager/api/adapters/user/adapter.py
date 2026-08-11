@@ -789,6 +789,7 @@ class UserAdapter(BaseAdapter):
             access_key=str(data.access_key),
             is_active=data.is_active,
             is_admin=data.is_admin,
+            is_default=data.is_default,
             created_at=data.created_at,
             modified_at=data.modified_at,
             last_used=data.last_used,
@@ -972,6 +973,9 @@ class UserAdapter(BaseAdapter):
         if filter_req.is_admin is not None:
             conditions.append(KeypairConditions.by_is_admin(filter_req.is_admin))
 
+        if filter_req.is_default is not None:
+            conditions.append(KeypairConditions.by_is_default(filter_req.is_default))
+
         if filter_req.access_key is not None:
             condition = self.convert_string_filter(
                 filter_req.access_key,
@@ -1058,6 +1062,8 @@ class UserAdapter(BaseAdapter):
                 return KeypairOrders.access_key(ascending=ascending)
             case KeypairOrderField.IS_ACTIVE:
                 return KeypairOrders.is_active(ascending=ascending)
+            case KeypairOrderField.IS_DEFAULT:
+                return KeypairOrders.is_default(ascending=ascending)
             case KeypairOrderField.RESOURCE_POLICY:
                 return KeypairOrders.resource_policy(ascending=ascending)
 

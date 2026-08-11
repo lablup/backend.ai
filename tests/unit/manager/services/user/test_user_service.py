@@ -137,6 +137,7 @@ def _make_keypair_data(user_uuid: uuid.UUID | None = None) -> KeyPairData:
         secret_key=SecretKey("TESTSECRETKEY1234567890"),
         is_active=True,
         is_admin=False,
+        is_default=True,
         created_at=datetime.now(tz=UTC),
         modified_at=datetime.now(tz=UTC),
         resource_policy_name="default",

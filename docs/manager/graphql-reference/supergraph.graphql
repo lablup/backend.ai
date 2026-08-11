@@ -9634,6 +9634,9 @@ type KeyPair implements Item
   secret_key: String
   is_active: Boolean
   is_admin: Boolean
+
+  """Added in 26.9.0. Whether this is the owner's default keypair."""
+  is_default: Boolean
   resource_policy: String
   created_at: DateTime
   last_used: DateTime
@@ -9676,6 +9679,11 @@ input KeypairFilter
 {
   isActive: Boolean = null
   isAdmin: Boolean = null
+
+  """
+  Added in 26.9.0. Filter keypairs by whether they are their owner's default one.
+  """
+  isDefault: Boolean = null
   accessKey: StringFilter = null
   resourcePolicy: StringFilter = null
 
@@ -9717,7 +9725,7 @@ input KeypairOrderBy
 }
 
 """
-Added in 26.4.2. Fields available for ordering keypair query results. CREATED_AT: Order by creation timestamp. LAST_USED: Order by last used timestamp. ACCESS_KEY: Order by access key alphabetically. IS_ACTIVE: Order by active status.
+Added in 26.4.2. Fields available for ordering keypair query results. CREATED_AT: Order by creation timestamp. LAST_USED: Order by last used timestamp. ACCESS_KEY: Order by access key alphabetically. IS_ACTIVE: Order by active status. IS_DEFAULT: Order by whether the keypair is its owner's default one.
 """
 enum KeypairOrderField
   @join__type(graph: STRAWBERRY)
@@ -9726,6 +9734,7 @@ enum KeypairOrderField
   LAST_USED @join__enumValue(graph: STRAWBERRY)
   ACCESS_KEY @join__enumValue(graph: STRAWBERRY)
   IS_ACTIVE @join__enumValue(graph: STRAWBERRY)
+  IS_DEFAULT @join__enumValue(graph: STRAWBERRY)
   RESOURCE_POLICY @join__enumValue(graph: STRAWBERRY)
 }
 
@@ -9931,6 +9940,9 @@ type KeyPairV2 implements Node
 
   """Whether the keypair has admin privileges."""
   isAdmin: Boolean
+
+  """Added in 26.9.0. Whether this is the owner's default keypair."""
+  isDefault: Boolean!
 
   """Timestamp when the keypair was created."""
   createdAt: DateTime
@@ -22374,9 +22386,9 @@ type User implements Item
   sudo_session_enabled: Boolean
 
   """
-  Added in 24.03.0. Used as the default authentication credential for password-based logins and sets the user's total resource usage limit. User's main_access_key cannot be deleted, and only super-admin can replace main_access_key.
+  Added in 24.03.0. Deprecated since 26.9.0. Use the keypair's is_default field. Used as the default authentication credential for password-based logins and sets the user's total resource usage limit. User's main_access_key cannot be deleted, and only super-admin can replace main_access_key.
   """
-  main_access_key: String
+  main_access_key: String @deprecated(reason: "Deprecated since 26.9.0. Use the keypair's is_default field.")
 
   """
   Added in 25.2.0. The user ID (UID) assigned to processes running inside the container.
@@ -23325,7 +23337,7 @@ type UserV2OrganizationInfo
   resourcePolicy: String!
 
   """Primary API access key for this user."""
-  mainAccessKey: String
+  mainAccessKey: String @deprecated(reason: "Deprecated since 26.9.0. Use the keypair's is_default field.")
 }
 
 """
