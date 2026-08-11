@@ -57,14 +57,16 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):
         ),
     )
 
-    user_id: Mapped[str] = mapped_column("user_id", sa.String(length=256), index=True)
+    user_id: Mapped[str] = mapped_column(
+        "user_id", sa.String(length=256), index=True, nullable=False
+    )
     access_key: Mapped[AccessKey] = mapped_column(
         "access_key", sa.String(length=20), primary_key=True
     )
-    secret_key: Mapped[str] = mapped_column("secret_key", sa.String(length=40))
-    is_active: Mapped[bool] = mapped_column("is_active", sa.Boolean, index=True)
+    secret_key: Mapped[str] = mapped_column("secret_key", sa.String(length=40), nullable=False)
+    is_active: Mapped[bool] = mapped_column("is_active", sa.Boolean, index=True, nullable=False)
     is_admin: Mapped[bool] = mapped_column(
-        "is_admin", sa.Boolean, index=True, default=False, server_default=false()
+        "is_admin", sa.Boolean, index=True, default=False, server_default=false(), nullable=False
     )
     is_default: Mapped[bool] = mapped_column(
         "is_default", sa.Boolean, nullable=False, default=False, server_default=false()
@@ -73,7 +75,9 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):
         "last_used", sa.DateTime(timezone=True), nullable=True
     )
     rate_limit: Mapped[int | None] = mapped_column("rate_limit", sa.Integer)
-    num_queries: Mapped[int] = mapped_column("num_queries", sa.Integer, server_default="0")
+    num_queries: Mapped[int] = mapped_column(
+        "num_queries", sa.Integer, server_default="0", nullable=False
+    )
     # SSH Keypairs.
     ssh_public_key: Mapped[str | None] = mapped_column("ssh_public_key", sa.Text, nullable=True)
     ssh_private_key: Mapped[str | None] = mapped_column("ssh_private_key", sa.Text, nullable=True)
