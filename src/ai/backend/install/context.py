@@ -2462,9 +2462,9 @@ class DockerContext(Context):
     async def install(self) -> None:
         base_path = self.install_info.base_path
         base_path.mkdir(parents=True, exist_ok=True)
-        # Pre-create the parity-mounted directories so the root-owned service
-        # containers do not have to create them (and the host-side krunner
-        # share exists before the agent entrypoint checks for it).
+        # Pre-create the parity-mounted directories under base_path (owned by
+        # the installing user) so the root-owned service containers do not
+        # have to create them.
         service = self.install_info.service_config
         for subdir in (
             Path(service.agent_ipc_base_path),
@@ -2473,13 +2473,17 @@ class DockerContext(Context):
             base_path / service.vfolder_relpath,
         ):
             subdir.mkdir(parents=True, exist_ok=True)
+        # The krunner share lives under /var/lib, which is typically not
+        # writable by the installing user — do NOT create it here. The Docker
+        # daemon (running as root) creates missing bind-mount source
+        # directories automatically when the agent container starts. Only
+        # refuse an obviously hostile pre-existing state.
         if self.KRUNNER_SHARED_PATH.is_symlink():
             raise RuntimeError(
                 f"Refusing to use the krunner share at {self.KRUNNER_SHARED_PATH}: "
                 "the path is a symlink. Remove it (or point it back to a real "
                 "directory) and retry."
             )
-        self.KRUNNER_SHARED_PATH.mkdir(parents=True, exist_ok=True)
 
         self.log_header("Installing databases (halfstack)...")
         await self.install_halfstack()
