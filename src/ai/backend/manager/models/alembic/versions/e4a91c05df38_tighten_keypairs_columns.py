@@ -1,20 +1,8 @@
 """tighten the always-populated keypairs columns
 
-Five columns are nullable in the schema and never null in practice, so every
-reader has to handle a ``None`` that does not occur. Backfills the stragglers
-with the value the application would have written and sets them NOT NULL.
-
-``last_used``, ``ssh_public_key`` and ``ssh_private_key`` stay nullable — those
-are genuinely empty for a keypair that has never been used or has no SSH key.
-``created_at`` and ``updated_at`` were already tightened by ``2dccb3069031``.
-
-``secret_key`` has no value that could be fabricated, and a row without one is a
-keypair nothing can authenticate with — it cannot sign a request, so it grants
-nothing and no session can be running under it. Those rows are deleted rather
-than backfilled. The two foreign keys pointing at ``keypairs.access_key`` carry
-``ON DELETE SET NULL`` and ``ON DELETE CASCADE``, and ``kernels.access_key`` /
-``sessions.access_key`` are plain columns that already tolerate a missing
-keypair, so the delete needs no other table prepared.
+Backfills ``user_id``, ``is_active``, ``is_admin`` and ``num_queries``, then sets
+those and ``secret_key`` NOT NULL. A keypair with no ``secret_key`` cannot sign a
+request, so it is deleted rather than given a fabricated one.
 
 Revision ID: e4a91c05df38
 Revises: 37d711158a8c
