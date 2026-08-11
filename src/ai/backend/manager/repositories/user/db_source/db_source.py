@@ -23,7 +23,7 @@ from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.user import UserID
-from ai.backend.common.types import VFolderID
+from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
@@ -142,6 +142,16 @@ from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_de
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
+def _default_access_key() -> sa.ScalarSelect[str]:
+    """The owner's default keypair access key, correlated to the enclosing ``users`` row."""
+    return (
+        sa.select(KeyPairRow.access_key)
+        .where((KeyPairRow.user == UserRow.uuid) & KeyPairRow.is_default)
+        .correlate(UserRow)
+        .scalar_subquery()
+    )
+
+
 class UserDBSource:
     """Database source for user-related operations."""
 
@@ -171,7 +181,7 @@ class UserDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             user_row = await self._get_user_by_email(session, email)
-            return UserData.from_row(user_row)
+            return user_row.to_data()
 
     async def create_user_validated(
         self, creator: Creator[UserRow], group_ids: list[str] | None
@@ -303,11 +313,6 @@ class UserDBSource:
                         f"Resource policy '{new_resource_policy}' does not exist."
                     )
 
-            # Handle main_access_key validation
-            main_access_key = updater_spec.main_access_key.optional_value()
-            if main_access_key:
-                await self._validate_and_update_main_access_key(session, email, main_access_key)
-
             # Update user
             if updater_spec.password.optional_value():
                 to_update["password_changed_at"] = sa.func.now()
@@ -315,7 +320,10 @@ class UserDBSource:
             if status is not None and status != current_user.status:
                 to_update["status_info"] = "admin-requested"
             update_query = (
-                sa.update(users).where(users.c.email == email).values(to_update).returning(users)
+                sa.update(users)
+                .where(users.c.email == email)
+                .values(to_update)
+                .returning(users, _default_access_key().label("default_access_key"))
             )
             result = await session.execute(update_query)
             updated_user = result.first()
@@ -411,13 +419,6 @@ class UserDBSource:
                     f"Resource policy '{new_resource_policy}' does not exist."
                 )
 
-        # Handle main_access_key validation
-        main_access_key = updater_spec.main_access_key.optional_value()
-        if main_access_key:
-            await self._validate_and_update_main_access_key(
-                session, current_user.email, main_access_key
-            )
-
         # Update user
         if updater_spec.password.optional_value():
             to_update["password_changed_at"] = sa.func.now()
@@ -425,7 +426,10 @@ class UserDBSource:
         if status is not None and status != current_user.status:
             to_update["status_info"] = "admin-requested"
         update_query = (
-            sa.update(users).where(users.c.uuid == user_id).values(to_update).returning(users)
+            sa.update(users)
+            .where(users.c.uuid == user_id)
+            .values(to_update)
+            .returning(users, _default_access_key().label("default_access_key"))
         )
         result = await session.execute(update_query)
         updated_user = result.first()
@@ -699,14 +703,22 @@ class UserDBSource:
 
     async def _get_user_by_email(self, session: SASession, email: str) -> UserRow:
         """Private method to get user by email."""
-        res = await session.scalar(sa.select(UserRow).where(UserRow.email == email))
+        res = await session.scalar(
+            sa.select(UserRow)
+            .where(UserRow.email == email)
+            .options(joinedload(UserRow.default_keypair))
+        )
         if res is None:
             raise UserNotFound(f"User with email {email} not found.")
         return res
 
     async def _get_user_by_uuid(self, session: SASession, user_uuid: UUID) -> UserRow:
         """Private method to get user by UUID."""
-        res = await session.scalar(sa.select(UserRow).where(UserRow.uuid == user_uuid))
+        res = await session.scalar(
+            sa.select(UserRow)
+            .where(UserRow.uuid == user_uuid)
+            .options(joinedload(UserRow.default_keypair))
+        )
         if res is None:
             raise UserNotFound(f"User with UUID {user_uuid} not found.")
         return res
@@ -735,7 +747,7 @@ class UserDBSource:
             raise UserNotFound(f"User with UUID {user_uuid} not found.")
         return cast(UserRow, res)
 
-    async def _set_default_keypair(
+    async def _switch_default_keypair(
         self, session: SASession, user_id: UserID, access_key: str
     ) -> None:
         """Move the default marker onto ``access_key``.
@@ -752,29 +764,6 @@ class UserDBSource:
             sa.update(KeyPairRow)
             .where((KeyPairRow.user == user_id) & (KeyPairRow.access_key == access_key))
             .values(is_default=True)
-        )
-
-    async def _validate_and_update_main_access_key(
-        self, session: SASession, email: str, main_access_key: str
-    ) -> None:
-        """Private method to validate and update main access key."""
-        keypair_query = (
-            sa.select(KeyPairRow)
-            .where(KeyPairRow.access_key == main_access_key)
-            .options(
-                noload("*"),
-                joinedload(KeyPairRow.user_row).options(load_only(UserRow.email)),
-            )
-        )
-        keypair_row = (await session.scalars(keypair_query)).first()
-        if not keypair_row:
-            raise KeyPairNotFound("Cannot set non-existing access key as the main access key.")
-        if keypair_row.user_row.email != email:
-            raise KeyPairForbidden("Cannot set another user's access key as the main access key.")
-
-        await self._set_default_keypair(session, keypair_row.user, main_access_key)
-        await session.execute(
-            sa.update(users).where(users.c.email == email).values(main_access_key=main_access_key)
         )
 
     async def _sync_keypair_roles(
@@ -1046,7 +1035,7 @@ class UserDBSource:
             UserSearchResult with matching users and pagination info.
         """
         async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(UserRow)
+            query = sa.select(UserRow).options(joinedload(UserRow.default_keypair))
             result = await execute_batch_querier(db_session, query, querier)
 
             items = [row.UserRow.to_data() for row in result.rows]
@@ -1072,7 +1061,7 @@ class UserDBSource:
             UserSearchResult with matching users and pagination info.
         """
         async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(UserRow)
+            query = sa.select(UserRow).options(joinedload(UserRow.default_keypair))
             result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
 
             items = [row.UserRow.to_data() for row in result.rows]
@@ -1101,7 +1090,9 @@ class UserDBSource:
             UserSearchResult with matching users and pagination info.
         """
         async with self._db.begin_readonly_session() as db_session:
-            query = sa.select(UserRow).select_from(UserRow)
+            query = (
+                sa.select(UserRow).select_from(UserRow).options(joinedload(UserRow.default_keypair))
+            )
             result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
 
             items = [row.UserRow.to_data() for row in result.rows]
@@ -1129,6 +1120,7 @@ class UserDBSource:
                     UserRoleRow,
                     UserRow.uuid == UserRoleRow.user_id,
                 )
+                .options(joinedload(UserRow.default_keypair))
             )
             result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
 
@@ -1211,13 +1203,13 @@ class UserDBSource:
                 raise KeyPairForbidden("Cannot revoke another user's keypair")
             if kp_row.is_default:
                 raise KeyPairForbidden(
-                    "Cannot revoke the main access key. Switch main access key first."
+                    "Cannot revoke the default access key. Switch the default access key first."
                 )
 
             await session.execute(sa.delete(keypairs).where(keypairs.c.access_key == access_key))
 
-    async def switch_my_main_access_key(self, user_uuid: UUID, access_key: str) -> None:
-        """Switch the main access key for the current user."""
+    async def switch_default_access_key(self, user_id: UserID, access_key: AccessKey) -> None:
+        """Move the ``is_default`` marker among the user's keypairs onto ``access_key``."""
         async with self._db.begin_session() as session:
             kp_row = (
                 await session.scalars(
@@ -1234,18 +1226,17 @@ class UserDBSource:
                 )
             ).first()
             if not kp_row:
-                raise KeyPairNotFound("Cannot set non-existing access key as the main access key.")
-            if kp_row.user != user_uuid:
+                raise KeyPairNotFound(
+                    "Cannot set a non-existing access key as the default access key."
+                )
+            if kp_row.user != user_id:
                 raise KeyPairForbidden(
-                    "Cannot set another user's access key as the main access key."
+                    "Cannot set another user's access key as the default access key."
                 )
             if not kp_row.is_active:
-                raise KeyPairForbidden("Cannot set an inactive keypair as the main access key.")
+                raise KeyPairForbidden("Cannot set an inactive keypair as the default access key.")
 
-            await self._set_default_keypair(session, UserID(user_uuid), access_key)
-            await session.execute(
-                sa.update(users).where(users.c.uuid == user_uuid).values(main_access_key=access_key)
-            )
+            await self._switch_default_keypair(session, user_id, access_key)
 
     async def update_my_keypair(self, user_uuid: UUID, updater: Updater[KeyPairRow]) -> KeyPairData:
         """Update a keypair owned by the current user."""
@@ -1378,7 +1369,9 @@ class UserDBSource:
             if not kp_row:
                 raise KeyPairNotFound(f"Keypair {access_key} not found")
             if kp_row.is_default:
-                raise KeyPairForbidden("Cannot delete a keypair set as the user's main access key.")
+                raise KeyPairForbidden(
+                    "Cannot delete a keypair set as the user's default access key."
+                )
 
             await session.execute(sa.delete(keypairs).where(keypairs.c.access_key == access_key))
 

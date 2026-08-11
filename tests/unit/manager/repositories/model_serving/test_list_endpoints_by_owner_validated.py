@@ -179,9 +179,6 @@ async def test_user(
             )
         )
         await sess.flush()
-        await sess.execute(
-            sa.update(UserRow).where(UserRow.uuid == user_id).values(main_access_key="TESTKEY")
-        )
         await sess.flush()
     return user_id, email
 

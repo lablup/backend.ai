@@ -140,7 +140,6 @@ class TestModifyEndpointModelDefinitionRefresh:
                 )
             )
             await sess.flush()
-            # Create user without main_access_key first (FK to keypairs)
             sess.add(
                 UserRow(
                     uuid=user_id,
@@ -184,10 +183,6 @@ class TestModifyEndpointModelDefinitionRefresh:
                 )
             )
             await sess.flush()
-            # Now set main_access_key after keypair exists
-            await sess.execute(
-                sa.update(UserRow).where(UserRow.uuid == user_id).values(main_access_key="TESTKEY")
-            )
             await sess.flush()
         return user_id
 

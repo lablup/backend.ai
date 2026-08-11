@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
@@ -92,6 +92,8 @@ from ai.backend.common.dto.manager.v2.user.types import (
 )
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.user import UserID
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import UserData, UserStatus
@@ -146,7 +148,7 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     RevokeMyKeypairAction,
     SearchKeypairsByResourcePolicyAction,
     SearchMyKeypairsAction,
-    SwitchMyMainAccessKeyAction,
+    SwitchDefaultAccessKeyAction,
     UpdateMyKeypairAction,
 )
 from ai.backend.manager.services.user.actions.modify_user import (
@@ -513,11 +515,6 @@ class UserAdapter(BaseAdapter):
                 if input.sudo_session_enabled is not None
                 else OptionalState.nop()
             ),
-            main_access_key=(
-                TriState.nop()
-                if isinstance(input.main_access_key, Sentinel)
-                else TriState.from_graphql(input.main_access_key)
-            ),
             container_uid=(
                 TriState.nop()
                 if isinstance(input.container_uid, Sentinel)
@@ -548,6 +545,8 @@ class UserAdapter(BaseAdapter):
         result = await self._processors.user.modify_user_by_id.wait_for_complete(
             ModifyUserByIdAction(user_id=user_id, updater=updater)
         )
+        if not isinstance(input.main_access_key, Sentinel) and input.main_access_key is not None:
+            await self.switch_default_access_key(UserID(user_id), AccessKey(input.main_access_key))
         return UpdateUserPayload(user=self._user_data_to_node(result.data))
 
     async def delete_user_by_id(self, input: DeleteUserInput) -> DeleteUserPayload:
@@ -630,10 +629,17 @@ class UserAdapter(BaseAdapter):
         ]
         return BulkCreateUsersWithKeypairPayload(created=created, failed=failed)
 
-    async def bulk_modify_users(self, action: BulkModifyUserAction) -> BulkUpdateUsersPayload:
-        """Bulk-modify users. Each item's transformation is the caller's responsibility."""
+    async def bulk_modify_users(
+        self,
+        action: BulkModifyUserAction,
+        default_key_switches: Mapping[UserID, AccessKey],
+    ) -> BulkUpdateUsersPayload:
+        """Bulk-modify users. Each item's transformation is the caller's responsibility.
+
+        A switch runs only for a user whose own update went through, and a switch that
+        fails turns that user into a failure instead of aborting the whole batch.
+        """
         result = await self._processors.user.bulk_modify_users.wait_for_complete(action)
-        updated_users = [self._user_data_to_node(u) for u in result.data.successes]
         failed = [
             BulkUpdateUserV2Error(
                 user_id=action.items[error.index].user_id,
@@ -641,6 +647,16 @@ class UserAdapter(BaseAdapter):
             )
             for error in result.data.failures
         ]
+        updated_users = []
+        for user in result.data.successes:
+            access_key = default_key_switches.get(UserID(user.id))
+            if access_key is not None:
+                try:
+                    await self.switch_default_access_key(UserID(user.id), access_key)
+                except Exception as e:
+                    failed.append(BulkUpdateUserV2Error(user_id=user.id, message=str(e)))
+                    continue
+            updated_users.append(self._user_data_to_node(user))
         return BulkUpdateUsersPayload(updated_users=updated_users, failed=failed)
 
     async def bulk_purge_users(self, action: BulkPurgeUserAction) -> BulkPurgeUsersPayload:
@@ -697,12 +713,12 @@ class UserAdapter(BaseAdapter):
         )
         return UpdateMyKeypairPayload(keypair=self._keypair_data_to_node(result.keypair))
 
-    async def switch_my_main_access_key(
-        self, user_id: UUID, access_key: str
+    async def switch_default_access_key(
+        self, user_id: UserID, access_key: AccessKey
     ) -> SwitchMyMainAccessKeyPayload:
-        """Switch the main access key for the current user."""
-        result = await self._processors.user.switch_my_main_access_key.wait_for_complete(
-            SwitchMyMainAccessKeyAction(user_uuid=user_id, access_key=access_key)
+        """Move the ``is_default`` marker among the user's keypairs onto ``access_key``."""
+        result = await self._processors.user.switch_default_access_key.wait_for_complete(
+            SwitchDefaultAccessKeyAction(user_id=user_id, access_key=access_key)
         )
         return SwitchMyMainAccessKeyPayload(success=result.success)
 
@@ -1583,7 +1599,7 @@ class UserAdapter(BaseAdapter):
                 domain_name=data.domain_name,
                 role=UserRoleDTO(data.role.value) if data.role is not None else None,
                 resource_policy=data.resource_policy,
-                main_access_key=data.main_access_key,
+                main_access_key=data.default_access_key,
             ),
             security=UserSecurityInfo(
                 allowed_client_ip=data.allowed_client_ip,

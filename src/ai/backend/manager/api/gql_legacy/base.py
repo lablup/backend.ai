@@ -48,6 +48,7 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericForbidden, ObjectNotFound
 from ai.backend.manager.models.minilang.ordering import (
     OrderDirection,
+    OrderingColumn,
     OrderingItem,
     QueryOrderParser,
 )
@@ -972,9 +973,7 @@ def _apply_ordering(
             id_ordering_item = OrderingItem(id_column, OrderDirection.ASC)
 
             def set_ordering(
-                col: sa.Column[Any]
-                | InstrumentedAttribute[Any]
-                | sa.sql.elements.KeyedColumnElement[Any],
+                col: OrderingColumn,
                 direction: OrderDirection,
             ) -> Any:
                 return col.asc() if direction == OrderDirection.ASC else col.desc()
@@ -985,9 +984,7 @@ def _apply_ordering(
 
             # Reverse ordering direction for backward pagination
             def set_ordering(
-                col: sa.Column[Any]
-                | InstrumentedAttribute[Any]
-                | sa.sql.elements.KeyedColumnElement[Any],
+                col: OrderingColumn,
                 direction: OrderDirection,
             ) -> Any:
                 return col.desc() if direction == OrderDirection.ASC else col.asc()
@@ -1039,9 +1036,7 @@ def _apply_cursor_pagination(
         cursor_row_id = cursor_row_id_str
 
     def subq_to_condition(
-        column_to_be_compared: sa.Column[Any]
-        | InstrumentedAttribute[Any]
-        | sa.sql.elements.KeyedColumnElement[Any],
+        column_to_be_compared: OrderingColumn,
         subquery: ScalarSelect[Any],
         direction: OrderDirection,
     ) -> WhereClauseType:

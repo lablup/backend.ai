@@ -85,7 +85,6 @@ def sample_user() -> UserRow:
         resource_policy="default",
         created_at=datetime.now(UTC),
         modified_at=datetime.now(UTC),
-        main_access_key="test-access-key",
         sudo_session_enabled=False,
     )
 
@@ -108,7 +107,6 @@ def sample_admin_user() -> UserRow:
         resource_policy="default",
         created_at=datetime.now(UTC),
         modified_at=datetime.now(UTC),
-        main_access_key="admin-access-key",
         sudo_session_enabled=True,
     )
 
@@ -131,7 +129,6 @@ def sample_superadmin_user() -> UserRow:
         resource_policy="default",
         created_at=datetime.now(UTC),
         modified_at=datetime.now(UTC),
-        main_access_key="superadmin-access-key",
         sudo_session_enabled=True,
     )
 

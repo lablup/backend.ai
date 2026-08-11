@@ -21,7 +21,6 @@ from ai.backend.manager.api.rest.user.handler import UserHandler
 from ai.backend.manager.api.rest.user.registry import register_user_routes
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
-from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.user.processors import UserProcessors
 
@@ -312,7 +311,7 @@ class TestUpdateMyKeypair:
         regular_user_fixture: Any,
         db_engine: SAEngine,
     ) -> None:
-        """S-6: switchMyMainAccessKey moves keypairs.is_default and users.main_access_key together."""
+        """S-6: switchMyMainAccessKey moves the marker onto the chosen keypair."""
         original_access_key: str = regular_user_fixture.keypair.access_key
         user_uuid = str(regular_user_fixture.user_uuid)
         issue_payload = _assert_gql_success(
@@ -336,11 +335,7 @@ class TestUpdateMyKeypair:
                         )
                     )
                 ).scalars()
-                main_access_key = await conn.scalar(
-                    sa.select(UserRow.main_access_key).where(UserRow.uuid == user_uuid)
-                )
             assert marked.all() == [new_access_key], "Exactly the new keypair should be marked main"
-            assert main_access_key == new_access_key
         finally:
             # Move the marker back before dropping the extra keypair.
             _assert_gql_success(

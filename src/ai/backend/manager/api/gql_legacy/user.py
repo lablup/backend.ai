@@ -21,13 +21,16 @@ from sqlalchemy.engine.row import Row
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.exception import UserNotFound
 from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.user.types import (
     UserData,
     UserInfoContext,
 )
 from ai.backend.manager.models.group import GroupRow, groups
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.minilang import (
     ExternalTableFilterSpec,
     FieldSpecItem,
@@ -58,6 +61,9 @@ from ai.backend.manager.services.user.actions.create_user import (
 )
 from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
+)
+from ai.backend.manager.services.user.actions.keypair_ops import (
+    SwitchDefaultAccessKeyAction,
 )
 from ai.backend.manager.services.user.actions.modify_user import (
     ModifyUserAction,
@@ -111,6 +117,16 @@ def _project_membership_join(base_table: sa.Table | sa.sql.Join) -> sa.sql.Join:
     ).join(
         GroupRow,
         GroupRow.id == ms.c.scope_id,
+    )
+
+
+def _default_access_key() -> sa.ScalarSelect[str]:
+    """The owner's default keypair access key, correlated to the enclosing ``users`` row."""
+    return (
+        sa.select(KeyPairRow.access_key)
+        .where((KeyPairRow.user == UserRow.uuid) & KeyPairRow.is_default)
+        .correlate(UserRow)
+        .scalar_subquery()
     )
 
 
@@ -241,7 +257,7 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", dtparse),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-        "main_access_key": ("main_access_key", None),
+        "main_access_key": (ORMFieldItem(_default_access_key()), None),
     }
 
     # External table filter specifications
@@ -272,7 +288,7 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", None),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-        "main_access_key": ("main_access_key", None),
+        "main_access_key": (ORMFieldItem(_default_access_key()), None),
     }
 
     @staticmethod
@@ -603,7 +619,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
             totp_activated=dto.totp_activated,
             totp_activated_at=dto.totp_activated_at,
             sudo_session_enabled=dto.sudo_session_enabled,
-            main_access_key=dto.main_access_key,
+            main_access_key=dto.default_access_key,
             container_uid=dto.container_uid,
             container_main_gid=dto.container_main_gid,
             container_gids=dto.container_gids,
@@ -635,7 +651,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
             totp_activated=row.totp_activated,
             totp_activated_at=row.totp_activated_at,
             sudo_session_enabled=row.sudo_session_enabled,
-            main_access_key=row.main_access_key,
+            main_access_key=row.default_access_key,
             container_uid=row.container_uid,
             container_main_gid=row.container_main_gid,
             container_gids=row.container_gids,
@@ -655,7 +671,9 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         """
         Load user's information. Group names associated with the user are also returned.
         """
-        query = sa.select(users).select_from(users)
+        query = sa.select(users, _default_access_key().label("default_access_key")).select_from(
+            users
+        )
         if group_id is not None:
             query = query.where(
                 user_scope_membership_exists(PROJECT_SCOPE_TYPE, group_id, users.c.uuid)
@@ -693,7 +711,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", dtparse),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-        "main_access_key": ("main_access_key", None),
+        "main_access_key": (ORMFieldItem(_default_access_key()), None),
     }
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {
@@ -713,7 +731,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", None),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-        "main_access_key": ("main_access_key", None),
+        "main_access_key": (ORMFieldItem(_default_access_key()), None),
     }
 
     @classmethod
@@ -760,7 +778,12 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         filter: str | None = None,
         order: str | None = None,
     ) -> Sequence[User]:
-        query = sa.select(users).select_from(users).limit(limit).offset(offset)
+        query = (
+            sa.select(users, _default_access_key().label("default_access_key"))
+            .select_from(users)
+            .limit(limit)
+            .offset(offset)
+        )
         if group_id is not None:
             query = query.where(
                 user_scope_membership_exists(PROJECT_SCOPE_TYPE, group_id, users.c.uuid)
@@ -797,7 +820,11 @@ class User(graphene.ObjectType):  # type: ignore[misc]
     ) -> Sequence[User | None]:
         if not emails:
             return []
-        query = sa.select(users).select_from(users).where(users.c.email.in_(emails))
+        query = (
+            sa.select(users, _default_access_key().label("default_access_key"))
+            .select_from(users)
+            .where(users.c.email.in_(emails))
+        )
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if status is not None:
@@ -827,7 +854,11 @@ class User(graphene.ObjectType):  # type: ignore[misc]
     ) -> Sequence[User | None]:
         if not user_ids:
             return []
-        query = sa.select(users).select_from(users).where(users.c.uuid.in_(user_ids))
+        query = (
+            sa.select(users, _default_access_key().label("default_access_key"))
+            .select_from(users)
+            .where(users.c.uuid.in_(user_ids))
+        )
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if status is not None:
@@ -1008,9 +1039,6 @@ class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
             sudo_session_enabled=OptionalState[bool].from_graphql(
                 self.sudo_session_enabled,
             ),
-            main_access_key=TriState[str].from_graphql(
-                self.main_access_key,
-            ),
             container_uid=TriState[int].from_graphql(
                 self.container_uid,
             ),
@@ -1129,6 +1157,13 @@ class ModifyUser(graphene.Mutation):  # type: ignore[misc]
         res: ModifyUserActionResult = await graph_ctx.processors.user.modify_user.wait_for_complete(
             action
         )
+        if props.main_access_key is not Undefined and props.main_access_key is not None:
+            await graph_ctx.processors.user.switch_default_access_key.wait_for_complete(
+                SwitchDefaultAccessKeyAction(
+                    user_id=UserID(user_data.id),
+                    access_key=AccessKey(props.main_access_key),
+                )
+            )
 
         return cls(
             ok=True,

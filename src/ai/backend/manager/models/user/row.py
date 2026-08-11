@@ -183,12 +183,6 @@ class UserRow(LifecycleTimestampsMixin, Base):
         default=False,
         nullable=False,
     )
-    main_access_key: Mapped[str | None] = mapped_column(
-        "main_access_key",
-        sa.String(length=20),
-        sa.ForeignKey("keypairs.access_key", ondelete="SET NULL"),
-        nullable=True,  # keypairs.user is non-nullable
-    )
     container_uid: Mapped[int | None] = mapped_column(
         "container_uid", sa.Integer, nullable=True, server_default=sa.null()
     )
@@ -313,7 +307,7 @@ class UserRow(LifecycleTimestampsMixin, Base):
             raise ObjectNotFound(f"User with id {user_uuid} not found")
         return rows[0]
 
-    def get_main_keypair_row(self) -> KeyPairRow | None:
+    def get_default_keypair_row(self) -> KeyPairRow | None:
         keypair_candidate: KeyPairRow | None = None
         default_keypair_row = self.default_keypair
         if default_keypair_row is None:
@@ -357,7 +351,7 @@ class UserRow(LifecycleTimestampsMixin, Base):
             totp_activated=self.totp_activated,
             totp_activated_at=self.totp_activated_at,
             sudo_session_enabled=self.sudo_session_enabled,
-            main_access_key=self.main_access_key,
+            default_access_key=(self.default_keypair.access_key if self.default_keypair else None),
             container_uid=self.container_uid,
             container_main_gid=self.container_main_gid,
             container_gids=self.container_gids,
