@@ -1222,6 +1222,7 @@ class TestSearchUserFairSharesEntityBased:
             db_sess.add(
                 KeyPairRow(
                     user=user_uuid,
+                    user_id=f"test-{user_uuid.hex[:8]}@test.com",
                     access_key=f"AKIATEST{uuid.uuid4().hex[:12].upper()}",
                     secret_key="test-secret-key",
                     is_active=True,

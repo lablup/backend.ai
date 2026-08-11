@@ -185,11 +185,12 @@ class TestQueryUserinfo:
                 )
             )
             await sess.flush()
+            user_email = f"test-{uuid.uuid4().hex[:8]}@test.io"
             sess.add(
                 UserRow(
                     uuid=user_uuid,
                     username=f"user-{uuid.uuid4().hex[:8]}",
-                    email=f"test-{uuid.uuid4().hex[:8]}@test.io",
+                    email=user_email,
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy,
@@ -198,6 +199,7 @@ class TestQueryUserinfo:
             await sess.flush()
             sess.add(
                 KeyPairRow(
+                    user_id=user_email,
                     access_key=access_key,
                     secret_key="secret",
                     user=user_uuid,
@@ -306,11 +308,12 @@ class TestQueryUserinfo:
                 )
             )
             await sess.flush()
+            user_email = f"inactive-{uuid.uuid4().hex[:8]}@test.io"
             sess.add(
                 UserRow(
                     uuid=user_uuid,
                     username=f"inactive-{uuid.uuid4().hex[:8]}",
-                    email=f"inactive-{uuid.uuid4().hex[:8]}@test.io",
+                    email=user_email,
                     domain_name=domain,
                     role=UserRole.USER,
                     resource_policy=user_policy,
@@ -319,6 +322,7 @@ class TestQueryUserinfo:
             await sess.flush()
             sess.add(
                 KeyPairRow(
+                    user_id=user_email,
                     access_key=ak,
                     secret_key="secret",
                     user=user_uuid,
@@ -337,11 +341,12 @@ class TestQueryUserinfo:
         admin_uuid = uuid.uuid4()
         admin_ak = AccessKey(f"AK{uuid.uuid4().hex[:16]}")
         async with db.begin_session() as sess:
+            admin_email = f"admin-{uuid.uuid4().hex[:8]}@test.io"
             sess.add(
                 UserRow(
                     uuid=admin_uuid,
                     username=f"admin-{uuid.uuid4().hex[:8]}",
-                    email=f"admin-{uuid.uuid4().hex[:8]}@test.io",
+                    email=admin_email,
                     domain_name=seed.domain_name,
                     role=UserRole.SUPERADMIN,
                     resource_policy=seed.user_policy_name,
@@ -350,6 +355,7 @@ class TestQueryUserinfo:
             await sess.flush()
             sess.add(
                 KeyPairRow(
+                    user_id=admin_email,
                     access_key=admin_ak,
                     secret_key="secret",
                     user=admin_uuid,
@@ -573,11 +579,12 @@ class TestQueryUserinfoFromSession:
                 )
             )
             await sess.flush()
+            user_email = f"test-{uuid.uuid4().hex[:8]}@test.io"
             sess.add(
                 UserRow(
                     uuid=user_uuid,
                     username=f"user-{uuid.uuid4().hex[:8]}",
-                    email=f"test-{uuid.uuid4().hex[:8]}@test.io",
+                    email=user_email,
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy,
@@ -586,6 +593,7 @@ class TestQueryUserinfoFromSession:
             await sess.flush()
             sess.add(
                 KeyPairRow(
+                    user_id=user_email,
                     access_key=access_key,
                     secret_key="secret",
                     user=user_uuid,
