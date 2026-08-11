@@ -63,7 +63,6 @@ class IdleCheckerUpdaterSpec(UpdaterSpec[IdleCheckerRow]):
 @dataclass
 class SessionIdleCheckPhaseBatchUpdaterSpec(BatchUpdaterSpec[SessionIdleCheckRow]):
     to_phase: IdleCheckPhase
-    message: str | None = None
 
     @property
     @override
@@ -72,10 +71,24 @@ class SessionIdleCheckPhaseBatchUpdaterSpec(BatchUpdaterSpec[SessionIdleCheckRow
 
     @override
     def build_values(self) -> dict[str, Any]:
-        values: dict[str, Any] = {"last_status": self.to_phase}
-        if self.message is not None:
-            values["last_message"] = self.message
-        return values
+        return {"last_status": self.to_phase}
+
+
+@dataclass
+class SessionIdleCheckIncludeBatchUpdaterSpec(BatchUpdaterSpec[SessionIdleCheckRow]):
+    @property
+    @override
+    def row_class(self) -> type[SessionIdleCheckRow]:
+        return SessionIdleCheckRow
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        # Same values a fresh row gets, so a re-included pair restarts the grace period.
+        return {
+            "last_status": IdleCheckPhase.NOT_CHECKED,
+            "expire_at": None,
+            "last_message": "Not checked yet.",
+        }
 
 
 @dataclass

@@ -43,6 +43,7 @@ from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
@@ -52,16 +53,12 @@ from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
 from ai.backend.manager.repositories.app_config_fragment.types import (
-    AppConfigFragmentSearchScope,
-    ResolvedAppConfigScope,
+    AppConfigFragmentOperationScope,
 )
 from ai.backend.manager.repositories.app_config_fragment.upserters import (
     AppConfigFragmentUpserterSpec,
 )
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
-)
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 from ai.backend.testutils.db import with_tables
 
@@ -331,7 +328,7 @@ class TestSearch:
 class _ScopedSearchCase:
     """One scope a scoped search runs against, and the rows it must return."""
 
-    scope: AppConfigFragmentSearchScope
+    scope: AppConfigFragmentOperationScope
     expected_scope_type: AppConfigScopeType
     expected_scope_id: AppConfigScopeID | None
 
@@ -340,7 +337,7 @@ class _ScopedSearchCase:
 class _MissingOwnerCase:
     """A scope whose owner does not exist, and the error the existence check must raise."""
 
-    scope: AppConfigFragmentSearchScope
+    scope: AppConfigFragmentOperationScope
     expected_error: type[BackendAIError]
 
 
@@ -385,21 +382,21 @@ class TestScopedSearch:
         "case",
         [
             _ScopedSearchCase(
-                scope=AppConfigFragmentSearchScope(
+                scope=AppConfigFragmentOperationScope(
                     scope_type=AppConfigScopeType.DOMAIN, scope_id=_DOMAIN_SCOPE_ID
                 ),
                 expected_scope_type=AppConfigScopeType.DOMAIN,
                 expected_scope_id=_DOMAIN_SCOPE_ID,
             ),
             _ScopedSearchCase(
-                scope=AppConfigFragmentSearchScope(
+                scope=AppConfigFragmentOperationScope(
                     scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
                 ),
                 expected_scope_type=AppConfigScopeType.USER,
                 expected_scope_id=_USER_SCOPE_ID,
             ),
             _ScopedSearchCase(
-                scope=AppConfigFragmentSearchScope(
+                scope=AppConfigFragmentOperationScope(
                     scope_type=AppConfigScopeType.PUBLIC, scope_id=None
                 ),
                 expected_scope_type=AppConfigScopeType.PUBLIC,
@@ -431,14 +428,14 @@ class TestScopedSearch:
         "case",
         [
             _MissingOwnerCase(
-                scope=AppConfigFragmentSearchScope(
+                scope=AppConfigFragmentOperationScope(
                     scope_type=AppConfigScopeType.DOMAIN,
                     scope_id=AppConfigScopeID(uuid.uuid4()),
                 ),
                 expected_error=DomainNotFound,
             ),
             _MissingOwnerCase(
-                scope=AppConfigFragmentSearchScope(
+                scope=AppConfigFragmentOperationScope(
                     scope_type=AppConfigScopeType.USER,
                     scope_id=AppConfigScopeID(uuid.uuid4()),
                 ),
@@ -472,10 +469,10 @@ class TestScopedSearch:
         result = await repository.scoped_search(
             BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
             [
-                AppConfigFragmentSearchScope(
+                AppConfigFragmentOperationScope(
                     scope_type=AppConfigScopeType.DOMAIN, scope_id=_DOMAIN_SCOPE_ID
                 ),
-                AppConfigFragmentSearchScope(
+                AppConfigFragmentOperationScope(
                     scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
                 ),
             ],
@@ -615,14 +612,36 @@ class TestVisibilityConditions:
 
 
 class TestApplicableFragments:
+    async def test_naming_no_domain_drops_the_overlay(
+        self,
+        repository: AppConfigFragmentRepository,
+        scope_owners: None,
+        fragments_across_scopes: list[AppConfigFragmentData],
+    ) -> None:
+        # A caller whose session carries no domain gets public and its own, never a
+        # domain's — the absent domain narrows the query rather than widening it.
+        applicable = await repository.list_visible_fragments_bulk(
+            ["theme"],
+            UserID(uuid.uuid4()),
+            None,
+        )
+        expected = [
+            f
+            for f in fragments_across_scopes
+            if f.config_name == "theme" and f.scope_type is AppConfigScopeType.PUBLIC
+        ]
+        assert [f.id for f in applicable] == [f.id for f in expected]
+
     async def test_one_query_returns_public_domain_user_rank_ordered(
         self,
         repository: AppConfigFragmentRepository,
+        scope_owners: None,
         fragments_across_scopes: list[AppConfigFragmentData],
     ) -> None:
         applicable = await repository.list_visible_fragments_bulk(
             ["theme"],
-            ResolvedAppConfigScope(domain_id=_DOMAIN_ID, user_id=_USER_ID),
+            _USER_ID,
+            _DOMAIN_ID,
         )
         # public + the caller's domain + the caller's own user fragment, ordered by the
         # allow-list entries' ranks (scope-type defaults: public < domain < user).
@@ -646,22 +665,26 @@ class TestApplicableFragments:
     async def test_unknown_config_name_returns_empty(
         self,
         repository: AppConfigFragmentRepository,
+        scope_owners: None,
         fragments_across_scopes: list[AppConfigFragmentData],
     ) -> None:
         applicable = await repository.list_visible_fragments_bulk(
             ["unregistered"],
-            ResolvedAppConfigScope(domain_id=_DOMAIN_ID, user_id=_USER_ID),
+            _USER_ID,
+            _DOMAIN_ID,
         )
         assert applicable == []
 
     async def test_bulk_returns_visible_fragments_for_all_names_ordered(
         self,
         repository: AppConfigFragmentRepository,
+        scope_owners: None,
         fragments_across_scopes: list[AppConfigFragmentData],
     ) -> None:
         applicable = await repository.list_visible_fragments_bulk(
             ["theme", "menu"],
-            ResolvedAppConfigScope(domain_id=_DOMAIN_ID, user_id=_USER_ID),
+            _USER_ID,
+            _DOMAIN_ID,
         )
         # public + the caller's domain + the caller's own user fragment, for both names.
         expected = {
@@ -684,11 +707,13 @@ class TestApplicableFragments:
     async def test_bulk_empty_names_returns_empty(
         self,
         repository: AppConfigFragmentRepository,
+        scope_owners: None,
         fragments_across_scopes: list[AppConfigFragmentData],
     ) -> None:
         applicable = await repository.list_visible_fragments_bulk(
             [],
-            ResolvedAppConfigScope(domain_id=_DOMAIN_ID, user_id=_USER_ID),
+            _USER_ID,
+            _DOMAIN_ID,
         )
         assert applicable == []
 
@@ -768,7 +793,10 @@ class TestRBACScopeAssociation:
                 config={"k": "v"},
             )
         ])
-        assert await self._scope_bindings(database, str(upserted[0].id)) == case.expected_bindings
+        assert (
+            await self._scope_bindings(database, str(upserted.items[0].id))
+            == case.expected_bindings
+        )
 
     @pytest.mark.parametrize(
         "case",
@@ -806,7 +834,7 @@ class TestRBACScopeAssociation:
                 config={"k": "v"},
             )
         ])
-        created = upserted[0]
+        created = upserted.items[0]
         assert await self._scope_bindings(database, str(created.id)) == case.expected_bindings
         purged = await repository.purge(AppConfigFragmentPurgerSpec(fragment_id=created.id))
         assert purged.id == created.id
@@ -831,7 +859,7 @@ class TestRBACScopeAssociation:
                 config={"k": "v"},
             )
         ])
-        created = upserted[0]
+        created = upserted.items[0]
         assert await self._scope_bindings(database, str(created.id)) == [
             _ScopeBinding(scope_type=ScopeType.USER, scope_id=str(_USER_ID))
         ]
@@ -876,7 +904,7 @@ class TestUpsert:
         case: _FragmentScopeCase,
     ) -> None:
         """An insert binds the new row to its RBAC scope, exactly as a create does."""
-        upserted = await repository.bulk_upsert([
+        result = await repository.bulk_upsert([
             AppConfigFragmentUpserterSpec(
                 config_name="theme",
                 scope_type=case.scope_type,
@@ -885,6 +913,8 @@ class TestUpsert:
             )
         ])
 
+        assert result.failed == []
+        upserted = result.items
         assert [(f.config_name, f.scope_type, f.scope_id) for f in upserted] == [
             ("theme", case.scope_type, case.scope_id)
         ]
@@ -936,7 +966,7 @@ class TestUpsert:
         """
         existing = fragment_at_every_scope[case.scope_type]
 
-        upserted = await repository.bulk_upsert([
+        result = await repository.bulk_upsert([
             AppConfigFragmentUpserterSpec(
                 config_name="theme",
                 scope_type=case.scope_type,
@@ -945,6 +975,8 @@ class TestUpsert:
             )
         ])
 
+        assert result.failed == []
+        upserted = result.items
         assert [f.id for f in upserted] == [existing.id]
         assert upserted[0].config == {"theme": "light"}
         async with database.begin_readonly_session() as db_sess:
@@ -983,7 +1015,7 @@ class TestUpsert:
             )
         ])
 
-        upserted = await repository.bulk_upsert([
+        result = await repository.bulk_upsert([
             AppConfigFragmentUpserterSpec(
                 config_name="theme",
                 scope_type=AppConfigScopeType.PUBLIC,
@@ -998,7 +1030,8 @@ class TestUpsert:
             ),
         ])
 
-        assert [(f.scope_type, f.config) for f in upserted] == [
+        assert result.failed == []
+        assert [(f.scope_type, f.config) for f in result.items] == [
             (AppConfigScopeType.PUBLIC, {"theme": "light"}),
             (AppConfigScopeType.USER, {"theme": "solarized"}),
         ]
@@ -1055,4 +1088,6 @@ class TestUpsert:
     async def test_upsert_of_no_items_writes_nothing(
         self, repository: AppConfigFragmentRepository, theme_registered: None
     ) -> None:
-        assert await repository.bulk_upsert([]) == []
+        result = await repository.bulk_upsert([])
+        assert result.items == []
+        assert result.failed == []

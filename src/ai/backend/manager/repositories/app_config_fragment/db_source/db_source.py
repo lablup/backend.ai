@@ -9,6 +9,8 @@ import sqlalchemy as sa
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -18,6 +20,7 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentBulkResult,
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
+    AppConfigFragmentUpsertBulkResult,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.app_config import (
@@ -26,19 +29,16 @@ from ai.backend.manager.errors.app_config import (
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
-from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
     AppConfigFragmentPurgerSpec,
-)
-from ai.backend.manager.repositories.app_config_fragment.types import (
-    ResolvedAppConfigScope,
 )
 from ai.backend.manager.repositories.app_config_fragment.upserters import (
     AppConfigFragmentUpserterSpec,
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    NoPagination,
     Querier,
 )
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
@@ -81,7 +81,7 @@ class AppConfigFragmentDBSource:
     @app_config_fragment_db_source_resilience.apply()
     async def bulk_upsert(
         self, specs: Sequence[AppConfigFragmentUpserterSpec]
-    ) -> list[AppConfigFragmentData]:
+    ) -> AppConfigFragmentUpsertBulkResult:
         """Upsert each fragment at its scope in one transaction (all-or-nothing).
 
         Each item inserts-or-updates; a newly inserted row binds to its scope, an updated one
@@ -107,7 +107,7 @@ class AppConfigFragmentDBSource:
                     ),
                 )
                 results.append((await w.upsert_scoped(upserter)).row.to_data())
-            return results
+            return AppConfigFragmentUpsertBulkResult(items=results, failed=[])
 
     @app_config_fragment_db_source_resilience.apply()
     async def get_by_id(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentData:
@@ -169,7 +169,7 @@ class AppConfigFragmentDBSource:
     async def scoped_search(
         self,
         querier: BatchQuerier,
-        scopes: Sequence[SearchScope],
+        scopes: Sequence[OperationScope],
     ) -> AppConfigFragmentSearchResult:
         """Scoped path: query the fragments written at ``scopes`` (combined with OR)."""
         async with self._rbac_ops_provider.read_ops() as r:
@@ -185,30 +185,17 @@ class AppConfigFragmentDBSource:
 
     @app_config_fragment_db_source_resilience.apply()
     async def list_visible_fragments_bulk(
-        self, config_names: list[str], scope: ResolvedAppConfigScope | None = None
+        self, config_names: list[str], user_id: UserID | None, domain_id: DomainID | None
     ) -> list[AppConfigFragmentData]:
-        """Visible fragments for several ``config_names`` in one query, ordered by ascending ``rank``.
+        """Visible fragments for several ``config_names``, ordered by ascending ``rank``.
 
-        ``public`` always contributes; a ``scope`` additionally admits its domain and user
-        overlay, while ``scope=None`` (anonymous) sees only ``public``. Rank-ordered so the
-        caller can group by name and deep-merge each name's fragments in order.
+        ``public`` always contributes; a ``user_id`` additionally admits that user's own
+        overlay and a ``domain_id`` its domain's, while naming neither (anonymous) sees only
+        ``public``. Both come from the session, so neither is looked up here. Rank-ordered so
+        the caller can group by name and deep-merge each name's fragments in order.
         """
         if not config_names:
             return []
-        scope_visibility = [AppConfigFragmentConditions.by_public_visibility()]
-        if scope is not None:
-            scope_visibility += [
-                AppConfigFragmentConditions.by_domain_visibility(scope.domain_id),
-                AppConfigFragmentConditions.by_user_visibility(scope.user_id),
-            ]
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[
-                AppConfigFragmentConditions.by_config_names(config_names),
-                lambda: sa.or_(*(visibility() for visibility in scope_visibility)),
-            ],
-            orders=[AppConfigAllowListRow.rank.asc()],
-        )
         # Join each fragment to its allow-list entry (indexed ``(config_name, scope_type)`` FK
         # pair), which carries the merge ``rank`` the result is ordered by.
         selector = sa.select(AppConfigFragmentRow).join(
@@ -219,5 +206,18 @@ class AppConfigFragmentDBSource:
             ),
         )
         async with self._rbac_ops_provider.read_ops() as r:
+            scope_visibility = [AppConfigFragmentConditions.by_public_visibility()]
+            if user_id is not None:
+                scope_visibility.append(AppConfigFragmentConditions.by_user_visibility(user_id))
+            if domain_id is not None:
+                scope_visibility.append(AppConfigFragmentConditions.by_domain_visibility(domain_id))
+            querier = BatchQuerier(
+                pagination=NoPagination(),
+                conditions=[
+                    AppConfigFragmentConditions.by_config_names(config_names),
+                    lambda: sa.or_(*(visibility() for visibility in scope_visibility)),
+                ],
+                orders=[AppConfigAllowListRow.rank.asc()],
+            )
             result = await r.batch_query_in_global(selector, querier)
             return [row.AppConfigFragmentRow.to_data() for row in result.rows]

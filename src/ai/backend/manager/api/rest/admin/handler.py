@@ -246,11 +246,10 @@ class AdminHandler:
         self,
         body: BodyParam[GraphQLRequest],
     ) -> APIResponse:
-        """Anonymous (unauthenticated) GraphQL endpoint.
+        """Execute a GraphQL query without credentials.
 
-        Registered without ``auth_required`` so unauthenticated callers reach it. It serves a
-        separate ``PublicQueries`` schema that contains only public fields, so private fields are
-        physically absent and cannot be queried (no runtime gate needed). Authenticated routes are
-        unaffected.
+        Serves the public schema, which holds only the fields that are safe to read anonymously;
+        every other field is absent from it and cannot be queried here. The full schema is at
+        ``POST /admin/gql/strawberry`` and requires authentication.
         """
         return await self._execute_strawberry(body.parsed, schema=self._public_strawberry_schema)

@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions.check_group_membership import (
@@ -23,7 +20,7 @@ from .service import DotfileService
 __all__ = ("DotfileProcessors",)
 
 
-class DotfileProcessors(AbstractProcessorPackage):
+class DotfileProcessors:
     """Processor package for dotfile operations."""
 
     create: ActionProcessor[CreateDotfileAction, CreateDotfileActionResult]
@@ -55,16 +52,3 @@ class DotfileProcessors(AbstractProcessorPackage):
         )
         self.get_bootstrap = ActionProcessor(service.get_bootstrap_script, action_monitors)
         self.update_bootstrap = ActionProcessor(service.update_bootstrap_script, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateDotfileAction.spec(),
-            ListOrGetDotfilesAction.spec(),
-            UpdateDotfileAction.spec(),
-            DeleteDotfileAction.spec(),
-            ResolveGroupAction.spec(),
-            CheckGroupMembershipAction.spec(),
-            GetBootstrapScriptAction.spec(),
-            UpdateBootstrapScriptAction.spec(),
-        ]

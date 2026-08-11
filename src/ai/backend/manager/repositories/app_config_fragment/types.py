@@ -1,4 +1,4 @@
-"""Types for app config fragment repository operations (search scopes, resolve arguments)."""
+"""Types for app config fragment repository operations (search scopes)."""
 
 from __future__ import annotations
 
@@ -11,46 +11,18 @@ import sqlalchemy as sa
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.exception import UserNotFound
 from ai.backend.common.identifier.app_config import AppConfigScopeID
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user import UserRow
 
-__all__ = (
-    "AppConfigFragmentSearchScope",
-    "AppConfigScopeArguments",
-    "ResolvedAppConfigScope",
-)
+__all__ = ("AppConfigFragmentOperationScope",)
 
 
 @dataclass(frozen=True)
-class AppConfigScopeArguments:
-    """The scope arguments a caller supplies for a resolve — the domain, never the user.
-
-    Add new caller-supplied scope dimensions here rather than growing method signatures.
-    """
-
-    domain_id: DomainID
-
-
-@dataclass(frozen=True)
-class ResolvedAppConfigScope:
-    """The principal an ``AppConfig`` is resolved for: the resolving user and its domain.
-
-    :class:`AppConfigScopeArguments` plus the session user. Plain value object — not a
-    :class:`SearchScope`.
-    """
-
-    domain_id: DomainID
-    user_id: UserID
-
-
-@dataclass(frozen=True)
-class AppConfigFragmentSearchScope(SearchScope):
+class AppConfigFragmentOperationScope(OperationScope):
     """The fragments written at one scope, matching the row's ``(scope_type, scope_id)``.
 
     The owner named by ``scope_id`` is existence-checked so a search at a scope that does

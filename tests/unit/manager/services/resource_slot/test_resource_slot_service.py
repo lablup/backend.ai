@@ -12,8 +12,8 @@ from ai.backend.manager.data.resource_slot.types import (
     ResourceAllocationData,
     ResourceAllocationSearchResult,
 )
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.pagination import OffsetPagination
 from ai.backend.manager.repositories.resource_slot.repository import ResourceSlotRepository
 from ai.backend.manager.services.resource_slot.actions.get_agent_resources import (
     GetAgentResourcesAction,

@@ -81,7 +81,8 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     ReplaceResourceGroupDefaultSessionOptionsPayload as ReplaceResourceGroupDefaultSessionOptionsPayloadDTO,
 )
 from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.types import PreemptionOrder
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -115,6 +116,7 @@ __all__ = (
     "PreemptionConfigInput",
     "PreemptionModeGQL",
     "PreemptionOrderGQL",
+    "PreemptionVictimScopeGQL",
     "ResourceGroupFilterGQL",
     "ResourceGroupGQL",
     "ResourceGroupMetadataGQL",
@@ -176,6 +178,20 @@ PreemptionOrderGQL: type[PreemptionOrder] = gql_enum(
 )
 
 
+PreemptionVictimScopeGQL: type[PreemptionVictimScope] = gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.8.1",
+        description=(
+            "Scope preemption victims are drawn from. USER limits victims to the "
+            "pending session's owner; PROJECT/DOMAIN widen to sessions of the same "
+            "project/domain; RESOURCE_GROUP allows any session in the resource group."
+        ),
+    ),
+    PreemptionVictimScope,
+    name="PreemptionVictimScope",
+)
+
+
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0",
@@ -205,6 +221,14 @@ class PreemptionConfigGQL(PydanticOutputMixin[PreemptionConfigInfo]):
             added_version="26.8.0",
             description=(
                 "Minimum session runtime in seconds before it becomes preemptible (0 = disabled)."
+            ),
+        )
+    )
+    victim_scope: PreemptionVictimScopeGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.1",
+            description=(
+                "Scope preemption victims are drawn from (USER, PROJECT, DOMAIN, RESOURCE_GROUP)."
             ),
         )
     )
@@ -502,6 +526,16 @@ class PreemptionConfigInput(PydanticInputMixin[PreemptionConfigInputDTO]):
         ),
         default=0.0,
     )
+    victim_scope: PreemptionVictimScopeGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.1",
+            description=(
+                "Scope preemption victims are drawn from (USER, PROJECT, DOMAIN, "
+                "RESOURCE_GROUP). Default is USER."
+            ),
+        ),
+        default=PreemptionVictimScopeGQL.USER,
+    )
 
 
 # Mutation Input/Payload types
@@ -580,6 +614,17 @@ class UpdateResourceGroupInput(PydanticInputMixin[UpdateResourceGroupConfigInput
         description="Whether the resource group is public. Leave null to keep existing value.",
         default=None,
     )
+    is_default: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Whether this is the default resource group. At most one resource group may"
+                " hold the flag, so setting it to true is rejected while another one holds it;"
+                " clear that one first. Leave null to keep existing value."
+            ),
+        ),
+        default=None,
+    )
 
     # Metadata fields (ScalingGroupMetadataUpdaterSpec)
     description: str | None = gql_field(
@@ -641,6 +686,16 @@ class CreateResourceGroupInputGQL(PydanticInputMixin[CreateResourceGroupInputDTO
     name: str = gql_field(description="Resource group name.")
     domain_name: str = gql_field(description="Domain to create the resource group in.")
     description: str | None = gql_field(default=None, description="Optional description.")
+    is_default: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Make this the default resource group. At most one resource group may hold"
+                " the flag, so this is rejected while another one holds it; clear that one first."
+            ),
+        ),
+        default=False,
+    )
 
 
 @gql_pydantic_type(

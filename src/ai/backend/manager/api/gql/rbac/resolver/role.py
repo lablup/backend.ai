@@ -45,7 +45,7 @@ from ai.backend.manager.api.gql.rbac.types.role import RoleAssignmentEdge, RoleE
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.models.rbac_models.conditions import AssignedUserConditions
-from ai.backend.manager.repositories.permission_controller.types import ScopedRoleSearchScope
+from ai.backend.manager.repositories.permission_controller.types import ScopedRoleOperationScope
 
 # ==================== Query Resolvers ====================
 
@@ -229,7 +229,7 @@ async def project_roles(
     offset: int | None = None,
 ) -> RoleConnection | None:
     result = await info.context.adapters.rbac.search_roles_in_scope(
-        ScopedRoleSearchScope(element_type=RBACElementType.PROJECT, scope_id=str(project_id)),
+        ScopedRoleOperationScope(element_type=RBACElementType.PROJECT, scope_id=str(project_id)),
         SearchRolesInput(
             filter=filter.to_pydantic() if filter is not None else None,
             order=[o.to_pydantic() for o in order_by] if order_by is not None else None,

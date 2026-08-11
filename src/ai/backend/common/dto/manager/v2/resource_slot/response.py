@@ -5,6 +5,7 @@ Response DTOs for resource slot DTO v2.
 from __future__ import annotations
 
 from decimal import Decimal
+from uuid import UUID
 
 from pydantic import Field
 
@@ -20,9 +21,12 @@ __all__ = (
     "AdminSearchResourceSlotTypesPayload",
     "AgentResourceNode",
     "AllocatedResourceSlotNode",
+    "CreateResourceSlotTypePayload",
+    "PurgeResourceSlotTypePayload",
     "ResourceAllocationNode",
     "ResourceSlotTypeNode",
     "SearchAllocatedResourceSlotsPayload",
+    "UpdateResourceSlotTypePayload",
 )
 
 
@@ -30,11 +34,16 @@ class ResourceSlotTypeNode(BaseResponseModel):
     """Node model representing a resource slot type entity."""
 
     id: str | None = Field(default=None, description="Node ID (same as slot_name).")
+    uuid: UUID = Field(description="Stable UUID identity of the resource slot type.")
     slot_name: str = Field(
         description="Unique identifier for the resource slot (e.g., 'cpu', 'mem', 'cuda.device')."
     )
     slot_type: str = Field(
-        description="Category of the slot type (e.g., 'count', 'bytes', 'unique-count')."
+        description="Category of the slot type: one of 'count', 'bytes', 'unique', 'unified'."
+    )
+    required: bool = Field(description="Whether a session request must name this slot.")
+    enabled: bool = Field(
+        description="Whether the scheduler considers this slot when placing sessions."
     )
     display_name: str = Field(description="Human-readable name for display in UIs.")
     description: str = Field(
@@ -59,6 +68,26 @@ class AdminSearchResourceSlotTypesPayload(BaseResponseModel):
     total_count: int = Field(description="Total number of resource slot types matching the filter.")
     has_next_page: bool = Field(description="Whether there is a next page.")
     has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class CreateResourceSlotTypePayload(BaseResponseModel):
+    """Payload for resource slot type registration."""
+
+    resource_slot_type: ResourceSlotTypeNode = Field(
+        description="The registered resource slot type."
+    )
+
+
+class UpdateResourceSlotTypePayload(BaseResponseModel):
+    """Payload for resource slot type update."""
+
+    resource_slot_type: ResourceSlotTypeNode = Field(description="The updated resource slot type.")
+
+
+class PurgeResourceSlotTypePayload(BaseResponseModel):
+    """Payload for resource slot type removal."""
+
+    slot_name: str = Field(description="Slot name of the removed resource slot type.")
 
 
 class AgentResourceNode(BaseResponseModel):

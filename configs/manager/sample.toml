@@ -189,10 +189,14 @@
   # Added in 25.8.0
   ## ssl-privkey = "/etc/backend.ai/ssl/manager.key"
   # List of trusted reverse proxy IP addresses or CIDR ranges. When configured,
-  # the manager uses aiohttp_remotes.XForwardedStrict middleware to securely
-  # resolve client IPs from X-Forwarded-For headers. Only proxies in this list
-  # are trusted to set forwarding headers. If empty (default), the manager falls
-  # back to manual X-Forwarded-For parsing.
+  # the client IP is resolved by walking the X-Forwarded-For chain inwards from
+  # the peer of the connection and taking the first address that is not one of
+  # these proxies, so any number of proxy hops is supported. The X-Forwarded-URL
+  # header, which overrides the host and path used for HMAC signature
+  # verification, is honored only when the request comes directly from one of
+  # these proxies. If empty (default), the manager falls back to manual
+  # X-Forwarded-For parsing and accepts X-Forwarded-URL from any client, which
+  # is deprecated.
   # Added in 26.4.2
   trusted-proxies = ["10.0.0.0/8", "172.16.0.0/12"]
   # Event loop implementation to use for async operations. 'asyncio' is the
@@ -252,12 +256,12 @@
   # exactly which plugins are active in production. Leave as None to load all
   # available plugins except disabled_plugins.
   # Added in 25.8.0
-  ## allowed-plugins = "[\"example.plugin.what.you.want\"]"
+  ## allowed-plugins = ["example.plugin.what.you.want"]
   # List of plugins to explicitly disable (blacklist). These plugins won't be
   # loaded even if they're installed. Useful for disabling problematic or
   # unwanted plugins without uninstalling.
   # Added in 25.8.0
-  ## disabled-plugins = "[\"example.plugin.what.you.want\"]"
+  ## disabled-plugins = ["example.plugin.what.you.want"]
   # Whether to hide detailed agent information in API responses. When enabled,
   # agent details are obscured in user-facing APIs. Recommended for multi-tenant
   # environments to improve security and privacy.
@@ -513,6 +517,20 @@
   # customizable alerting based on system events.
   # Added in 25.8.0
   [reporter.action-monitors]
+
+# Audit log recording policy. Mutating operations are always recorded, as are
+# failures and permission denials; this section only opts successful read
+# operations in.
+# Added in 26.9.0
+[audit-log]
+  # Opt-in list: a read operation is recorded only if it is named here. The
+  # default is an empty list, so successful reads are not recorded at all and
+  # read volume stays off until an operator turns it on. A listed operation is
+  # recorded for every entity type. Must be 'get' or 'search': mutating
+  # operations are always recorded and listing them here is rejected. Failed and
+  # denied reads are recorded either way.
+  # Added in 26.9.0
+  record-read-operations = []
 
 # System-wide configuration settings. Controls general Backend.AI system
 # behavior that affects all components. These settings typically apply globally

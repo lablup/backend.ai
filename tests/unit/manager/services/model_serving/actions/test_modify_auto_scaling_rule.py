@@ -11,6 +11,7 @@ import pytest
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -49,6 +50,7 @@ class TestModifyAutoScalingRule:
             is_superadmin=False,
             role=UserRole.USER,
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
         )
 
     @pytest.fixture(autouse=True)

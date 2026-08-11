@@ -1,3 +1,4 @@
+import dataclasses
 import logging
 import time
 import uuid
@@ -31,18 +32,15 @@ from ai.backend.manager.errors.auth import (
     GroupMembershipNotFoundError,
     PasswordExpired,
     TooManyConcurrentLoginSessions,
-    UserCreationError,
 )
 from ai.backend.manager.errors.common import (
     GenericBadRequest,
     GenericForbidden,
-    InternalServerError,
     ObjectNotFound,
     RejectedByHook,
 )
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import (
-    generate_keypair,
     generate_ssh_keypair,
 )
 from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
@@ -55,6 +53,7 @@ from ai.backend.manager.models.user import (
 from ai.backend.manager.repositories.auth.db_source.db_source import ActiveSessionInfo
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.group.repository import GroupRepository
+from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
@@ -473,58 +472,48 @@ class AuthService:
             salt_size=auth_config.password_hash_salt_size,
         )
 
-        data = {
-            "domain_name": action.domain_name,
-            "username": action.username if action.username is not None else action.email,
-            "email": action.email,
-            "password": password_info,  # Pass PasswordInfo object
-            "need_password_change": False,
-            "full_name": action.full_name if action.full_name is not None else "",
-            "description": action.description if action.description is not None else "",
-            "status": UserStatus.INACTIVE,
-            "status_info": "user-signup",
-            "role": UserRole.USER,
-            "integration_id": None,
-            "resource_policy": "default",
-            "sudo_session_enabled": False,
-        }
+        user_spec = UserCreatorSpec(
+            domain_name=action.domain_name,
+            username=action.username if action.username is not None else action.email,
+            email=action.email,
+            password=password_info,
+            need_password_change=False,
+            full_name=action.full_name if action.full_name is not None else "",
+            description=action.description if action.description is not None else "",
+            status=UserStatus.INACTIVE,
+            status_info="user-signup",
+            role=UserRole.USER,
+            resource_policy="default",
+            sudo_session_enabled=False,
+        )
         if user_data_overriden:
-            for key, val in user_data_overriden.items():
-                if (
-                    key in data  # take only valid fields
-                    and key != "resource_policy"  # resource_policy in user_data is for keypair
-                ):
-                    data[key] = val
-
-        # Create user's first access_key and secret_key.
-        ak, sk = generate_keypair()
-        resource_policy = user_data_overriden.get("resource_policy", "default")
-        kp_data = {
-            "user_id": action.email,
-            "access_key": ak,
-            "secret_key": sk,
-            "is_active": data.get("status") == UserStatus.ACTIVE,
-            "is_admin": False,
-            "resource_policy": resource_policy,
-            "rate_limit": 1000,
-            "num_queries": 0,
-        }
-
-        try:
-            user = await self._auth_repository.create_user_with_keypair(
-                user_data=data,
-                keypair_data=kp_data,
+            spec_fields = {f.name for f in dataclasses.fields(UserCreatorSpec)}
+            overrides = {
+                # Hooks name the DB column; the spec field is integration_name.
+                ("integration_name" if key == "integration_id" else key): val
+                for key, val in user_data_overriden.items()
+                if key != "resource_policy"  # resource_policy in user_data is for keypair
+            }
+            user_spec = dataclasses.replace(
+                user_spec,
+                **{key: val for key, val in overrides.items() if key in spec_fields},
             )
-        except UserCreationError as e:
-            raise InternalServerError("Error creating user account") from e
 
-        # Assign the new user to the default project
+        # Resolve the default project to enroll the new user in.
         group_name = user_data_overriden.get("group", DEFAULT_PROJECT_NAME)
         project_id = await self._group_repository.project_id_by_name_in_domain(
             action.domain_name, group_name
         )
-        if project_id is not None:
-            await self._user_repository.assign_project_membership(user.uuid, project_id)
+
+        resource_policy = user_data_overriden.get("resource_policy", "default")
+        creation = await self._auth_repository.create_user_with_keypair(
+            user_spec=user_spec,
+            project_ids=[project_id] if project_id is not None else [],
+            keypair_resource_policy=resource_policy,
+            keypair_rate_limit=1000,
+        )
+        user = creation.user
+        keypair = creation.keypair
 
         # [Hooking point for POST_SIGNUP as one-way notification]
         # The hook handlers should accept a tuple of the user email,
@@ -538,8 +527,8 @@ class AuthService:
         )
         return SignupActionResult(
             user_id=user.uuid,
-            access_key=ak,
-            secret_key=sk,
+            access_key=keypair.access_key,
+            secret_key=keypair.secret_key,
         )
 
     async def logout(self, action: LogoutAction) -> LogoutActionResult:

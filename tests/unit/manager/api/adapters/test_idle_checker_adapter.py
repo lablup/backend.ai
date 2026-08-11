@@ -10,6 +10,7 @@ import pytest
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
+    MetricLabel,
     SessionLifetimeSpec,
 )
 from ai.backend.common.dto.manager.v2.idle_checker.request import (
@@ -19,6 +20,8 @@ from ai.backend.common.dto.manager.v2.idle_checker.request import (
     UtilizationSpecInputDTO,
     UtilizationThresholdInputDTO,
 )
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import MetricLabelEntry
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import MetricLabelEntryInfo
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.types import SessionTypes
@@ -130,6 +133,38 @@ class TestIdleCheckerAdapter:
         assert info.utilization.max_underutilized_duration_seconds == 900
         assert info.utilization.threshold.preset_id == preset_id
         assert info.utilization.threshold.threshold == Decimal("0.25")
+
+    def test_converts_utilization_spec_labels_round_trip(
+        self,
+        adapter: IdleCheckerAdapter,
+    ) -> None:
+        spec = adapter._build_spec(
+            IdleCheckerSpecInputDTO(
+                utilization=UtilizationSpecInputDTO(
+                    max_underutilized_duration_seconds=900,
+                    threshold=UtilizationThresholdInputDTO(
+                        preset_id=PrometheusQueryPresetID(uuid4()),
+                        threshold=Decimal("0.25"),
+                        filter_labels=[
+                            MetricLabelEntry(key="container_metric_name", value="cpu_util")
+                        ],
+                        group_labels=["session_id", "device"],
+                    ),
+                )
+            )
+        )
+        info = adapter._spec_to_info(spec)
+
+        assert spec.utilization is not None
+        assert spec.utilization.threshold.filter_labels == [
+            MetricLabel(key="container_metric_name", value="cpu_util")
+        ]
+        assert spec.utilization.threshold.group_labels == ["session_id", "device"]
+        assert info.utilization is not None
+        assert info.utilization.threshold.filter_labels == [
+            MetricLabelEntryInfo(key="container_metric_name", value="cpu_util")
+        ]
+        assert info.utilization.threshold.group_labels == ["session_id", "device"]
 
     async def test_batch_load_preserves_input_order_and_missing_entries(
         self,

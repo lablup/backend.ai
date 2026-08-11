@@ -9,7 +9,8 @@ import glide
 
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.message_queue.abc import AbstractSubscriber
-from ai.backend.common.message_queue.types import BroadcastMessage
+from ai.backend.common.message_queue.exceptions import InvalidMessagePayloadError
+from ai.backend.common.message_queue.payload import BroadcastPayload
 from ai.backend.common.types import RedisTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
@@ -25,7 +26,7 @@ class RedisSubscriber(AbstractSubscriber):
     """
 
     _client: ValkeyStreamClient
-    _subscribe_queue: asyncio.Queue[BroadcastMessage]
+    _subscribe_queue: asyncio.Queue[BroadcastPayload]
     _channels: set[str]
     _closed: bool
     _loop_task: asyncio.Task[Any] | None
@@ -68,7 +69,7 @@ class RedisSubscriber(AbstractSubscriber):
         return cls(client, channels)
 
     @override
-    async def subscribe_queue(self) -> AsyncGenerator[BroadcastMessage, None]:  # type: ignore[override]
+    async def subscribe_queue(self) -> AsyncGenerator[BroadcastPayload, None]:  # type: ignore[override]
         """
         Subscribe to broadcast messages.
 
@@ -77,7 +78,7 @@ class RedisSubscriber(AbstractSubscriber):
         acknowledgment.
 
         Yields:
-            BroadcastMessage: Broadcast messages from subscribed channels
+            BroadcastPayload: Broadcast messages from subscribed channels
 
         Raises:
             RuntimeError: If the subscriber is closed
@@ -131,7 +132,13 @@ class RedisSubscriber(AbstractSubscriber):
     async def _read_broadcast_messages(self) -> None:
         """
         Read broadcast messages and put them in the subscribe queue.
+
+        A message that does not conform to the broadcast envelope is dropped: there is
+        no ack path to retry it on, and it would otherwise fail later at field access.
         """
-        payload = await self._client.receive_broadcast_message()
-        msg = BroadcastMessage(payload)
-        await self._subscribe_queue.put(msg)
+        try:
+            payload = await self._client.receive_broadcast_message()
+        except InvalidMessagePayloadError as e:
+            log.warning("Dropping malformed broadcast message: {}", e)
+            return
+        await self._subscribe_queue.put(payload)

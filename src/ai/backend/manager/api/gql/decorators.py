@@ -33,6 +33,7 @@ from pydantic import BaseModel
 from strawberry.experimental.pydantic.conversion_types import StrawberryTypeFromPydantic
 from strawberry.relay import Connection
 from strawberry.schema_directives import OneOf
+from strawberry.types.base import get_object_definition
 from strawberry.types.field import StrawberryField
 from strawberry.types.field import field as strawberry_field
 
@@ -206,8 +207,14 @@ def gql_pydantic_type[PydanticModel: BaseModel](
     Strawberry auto-generates from_pydantic() and to_pydantic() methods.
     Use all_fields=True for scalar-only types, or declare fields explicitly
     for types with nested GQL node fields.
+
+    Field descriptions declared via ``gql_field``/``gql_added_field`` take
+    precedence over the DTO's ``Field(description=...)``: Strawberry's
+    pydantic integration rebuilds every resolver-less field with the
+    pydantic description, so the declared ones are restored after wrapping
+    (the DTO description remains the fallback).
     """
-    return strawberry.experimental.pydantic.type(
+    strawberry_wrap = strawberry.experimental.pydantic.type(
         model=model,
         name=name,
         description=_build_description(meta),
@@ -215,6 +222,21 @@ def gql_pydantic_type[PydanticModel: BaseModel](
         all_fields=all_fields,
         use_pydantic_alias=use_pydantic_alias,
     )
+
+    def wrap(cls: type) -> type[StrawberryTypeFromPydantic[PydanticModel]]:
+        declared_descriptions = {
+            field_name: value.description
+            for field_name, value in vars(cls).items()
+            if isinstance(value, StrawberryField) and value.description is not None
+        }
+        wrapped = strawberry_wrap(cls)
+        for field in get_object_definition(wrapped, strict=True).fields:
+            declared = declared_descriptions.get(field.python_name)
+            if declared is not None:
+                field.description = declared
+        return wrapped
+
+    return wrap
 
 
 def gql_field(
@@ -242,12 +264,21 @@ def gql_added_field(
     *,
     name: str | None = None,
     default: Any = strawberry.UNSET,
+    default_factory: Callable[[], Any] | None = None,
     deprecation_reason: str | None = None,
 ) -> Any:
     """Field added after the parent type was released (has its own version).
 
     Automatically prefixes the description with "Added in {version}."
+    ``default_factory`` renders the default into the schema SDL (input fields).
     """
+    if default_factory is not None:
+        return strawberry.field(
+            description=_build_description(meta),
+            name=name,
+            default_factory=default_factory,
+            deprecation_reason=deprecation_reason,
+        )
     return strawberry.field(
         description=_build_description(meta),
         name=name,

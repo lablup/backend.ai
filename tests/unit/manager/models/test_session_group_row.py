@@ -146,6 +146,7 @@ class TestSessionGroupRow:
         )
         user = UserRow(
             uuid=uuid.uuid4(),
+            username=f"testuser-{uuid.uuid4().hex[:8]}",
             email=f"user-{uuid.uuid4().hex[:8]}@example.com",
             domain_name=domain.name,
             resource_policy=user_policy.name,

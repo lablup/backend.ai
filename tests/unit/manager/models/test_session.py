@@ -182,6 +182,7 @@ class TestSessionUniqueNamePerUser:
         """Create test user for testing unique constraint."""
         user_a = UserRow(
             uuid=uuid.uuid4(),
+            username=f"testuser-{uuid.uuid4().hex[:8]}",
             email=f"user-a-{uuid.uuid4().hex[:8]}@example.com",
             domain_name=domain.name,
             resource_policy=user_policy.name,
@@ -202,6 +203,7 @@ class TestSessionUniqueNamePerUser:
     ) -> AsyncGenerator[UserData, None]:
         user_b = UserRow(
             uuid=uuid.uuid4(),
+            username=f"testuser-{uuid.uuid4().hex[:8]}",
             email=f"user-b-{uuid.uuid4().hex[:8]}@example.com",
             domain_name=domain.name,
             resource_policy=user_policy.name,

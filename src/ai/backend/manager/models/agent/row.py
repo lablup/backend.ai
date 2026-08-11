@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, cast, override
+from typing import Any, cast, override
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
@@ -20,6 +20,7 @@ from sqlalchemy.orm import (
 from sqlalchemy.sql.expression import false, true
 
 from ai.backend.common.auth import PublicKey
+from ai.backend.common.identifier.agent import AgentUUID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SlotName, SlotTypes
 from ai.backend.manager.data.agent.types import (
@@ -38,7 +39,6 @@ from ai.backend.manager.models.base import (
     EnumType,
     ResourceSlotColumn,
 )
-from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
@@ -54,9 +54,6 @@ from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.types import QueryCondition
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
-if TYPE_CHECKING:
-    from ai.backend.manager.models.scaling_group import ScalingGroupRow
-
 __all__: Sequence[str] = (
     "AgentRow",
     "agents",
@@ -64,10 +61,17 @@ __all__: Sequence[str] = (
 )
 
 
-class AgentRow(Base):  # type: ignore[misc]
+class AgentRow(Base):
     __tablename__ = "agents"
 
-    id: Mapped[str] = mapped_column("id", sa.String(length=64), primary_key=True)
+    uuid: Mapped[AgentUUID] = mapped_column(
+        "uuid",
+        GUID(AgentUUID),
+        unique=True,
+        nullable=False,
+        server_default=sa.text("uuid_generate_v4()"),
+    )
+    id: Mapped[AgentId] = mapped_column("id", sa.String(length=64), primary_key=True)
     status: Mapped[AgentStatus] = mapped_column(
         "status", EnumType(AgentStatus), nullable=False, index=True, default=AgentStatus.ALIVE
     )
@@ -128,13 +132,7 @@ class AgentRow(Base):  # type: ignore[misc]
         default=False,
     )
 
-    kernels: Mapped[list[KernelRow]] = relationship("KernelRow", back_populates="agent_row")
     agent_resource_rows: Mapped[list[AgentResourceRow]] = relationship("AgentResourceRow")
-    scaling_group_row: Mapped[ScalingGroupRow] = relationship(
-        "ScalingGroupRow",
-        back_populates="agents",
-        foreign_keys="[AgentRow.scaling_group]",
-    )
 
     def actual_occupied_slots(self) -> ResourceSlot:
         occupied = ResourceSlot()
@@ -341,7 +339,7 @@ class AgentPermissionContext(AbstractPermissionContext[AgentPermission, AgentRow
     @override
     async def calculate_final_permission(self, rbac_obj: AgentRow) -> frozenset[AgentPermission]:
         agent_row = rbac_obj
-        agent_id = cast(AgentId, agent_row.id)
+        agent_id = agent_row.id
         permissions: set[AgentPermission] = set()
 
         if (
@@ -397,6 +395,7 @@ class AgentPermissionContextBuilder(
         ctx: ClientContext,
         scope: DomainScope,
     ) -> AgentPermissionContext:
+        from ai.backend.manager.models.domain import DomainRow
         from ai.backend.manager.models.scaling_group import (
             ScalingGroupForDomainRow,
             ScalingGroupRow,
@@ -407,7 +406,12 @@ class AgentPermissionContextBuilder(
 
         _stmt = (
             sa.select(ScalingGroupForDomainRow)
-            .where(ScalingGroupForDomainRow.domain == scope.domain_name)
+            .where(
+                ScalingGroupForDomainRow.domain_id
+                == sa.select(DomainRow.id)
+                .where(DomainRow.name == scope.domain_name)
+                .scalar_subquery()
+            )
             .options(
                 joinedload(ScalingGroupForDomainRow.sgroup_row).options(
                     selectinload(ScalingGroupRow.agents)

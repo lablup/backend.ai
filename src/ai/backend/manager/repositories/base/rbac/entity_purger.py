@@ -311,7 +311,7 @@ async def _delete_row_by_pk_returning(
     if row_data is None:
         return None
 
-    return cast(TRow, row_class(**dict(row_data._mapping)))
+    return row_class(**dict(row_data._mapping))
 
 
 # =============================================================================

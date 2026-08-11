@@ -47,7 +47,7 @@ from ai.backend.manager.data.kernel.types import (
     UserPermission,
 )
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
-from ai.backend.manager.repositories.base import NoPagination, OffsetPagination
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.services.session.actions.search import SearchSessionsAction
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
 

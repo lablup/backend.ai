@@ -23,11 +23,12 @@ from ai.backend.common.dto.manager.user import (
 )
 from ai.backend.common.dto.manager.user.types import UserRole as UserRoleDTO
 from ai.backend.common.dto.manager.user.types import UserStatus as UserStatusDTO
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.api.rest.user.adapter import UserAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.repositories.base import OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 
 
@@ -482,6 +483,7 @@ class TestUserAdapterConversion:
             created_at=now,
             modified_at=now,
             domain_name="default",
+            domain_id=DomainID(uuid4()),
             role=DataUserRole.USER,
             resource_policy="default",
             allowed_client_ip=["10.0.0.1"],
@@ -526,7 +528,7 @@ class TestUserAdapterConversion:
         user_data = UserData(
             id=user_id,
             uuid=user_id,
-            username=None,
+            username="minimal",
             email="minimal@example.com",
             need_password_change=None,
             full_name=None,
@@ -537,6 +539,7 @@ class TestUserAdapterConversion:
             created_at=None,
             modified_at=None,
             domain_name=None,
+            domain_id=None,
             role=None,
             resource_policy="default",
             allowed_client_ip=None,
@@ -554,7 +557,7 @@ class TestUserAdapterConversion:
 
         assert isinstance(dto, UserDTO)
         assert dto.id == user_id
-        assert dto.username is None
+        assert dto.username == "minimal"
         assert dto.email == "minimal@example.com"
         assert dto.need_password_change is None
         assert dto.full_name is None

@@ -14,6 +14,7 @@ Test matrix:
 from __future__ import annotations
 
 import secrets
+import uuid
 from collections.abc import Callable, Coroutine
 from typing import Any
 
@@ -35,6 +36,7 @@ from ai.backend.common.dto.manager.domain import (
     UpdateDomainRequest,
 )
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupOpts,
@@ -139,9 +141,14 @@ class TestDomainCreateCRUD:
 
         # Insert a scaling group and associate it with the domain directly.
         sgroup_name = f"crud-sg-{secrets.token_hex(4)}"
+        sgroup_id = uuid.uuid4()
         async with db_engine.begin() as conn:
+            domain_id = (
+                await conn.execute(sa.select(domains.c.id).where(domains.c.name == domain_name))
+            ).scalar_one()
             await conn.execute(
                 sa.insert(scaling_groups).values(
+                    id=sgroup_id,
                     name=sgroup_name,
                     description=f"CRUD test scaling group {sgroup_name}",
                     is_active=True,
@@ -154,17 +161,17 @@ class TestDomainCreateCRUD:
             )
             await conn.execute(
                 sa.insert(sgroups_for_domains).values(
-                    scaling_group=sgroup_name,
-                    domain=domain_name,
+                    resource_group_id=sgroup_id,
+                    domain_id=domain_id,
                 )
             )
 
         try:
             async with db_engine.connect() as conn:
                 row = await conn.execute(
-                    sa.select(sgroups_for_domains.c.scaling_group).where(
-                        (sgroups_for_domains.c.domain == domain_name)
-                        & (sgroups_for_domains.c.scaling_group == sgroup_name)
+                    sa.select(sgroups_for_domains.c.resource_group_id).where(
+                        (sgroups_for_domains.c.domain_id == domain_id)
+                        & (sgroups_for_domains.c.resource_group_id == sgroup_id)
                     )
                 )
                 assoc = row.fetchone()
@@ -173,7 +180,7 @@ class TestDomainCreateCRUD:
             async with db_engine.begin() as conn:
                 await conn.execute(
                     sgroups_for_domains.delete().where(
-                        sgroups_for_domains.c.scaling_group == sgroup_name
+                        sgroups_for_domains.c.resource_group_id == sgroup_id
                     )
                 )
                 await conn.execute(

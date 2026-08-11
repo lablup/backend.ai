@@ -14,10 +14,20 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import Mapped, foreign, joinedload, mapped_column, relationship, selectinload
+from sqlalchemy.orm import (
+    Mapped,
+    foreign,
+    joinedload,
+    mapped_column,
+    relationship,
+    selectinload,
+)
 from sqlalchemy.orm.strategy_options import _AbstractLoad
+from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -33,6 +43,7 @@ from ai.backend.manager.models.base import (
 )
 from ai.backend.manager.models.hasher import PasswordHasherFactory
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordColumn, PasswordInfo
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 from ai.backend.manager.models.types import (
     QueryCondition,
     QueryOption,
@@ -42,14 +53,8 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.domain import DomainRow
-    from ai.backend.manager.models.endpoint import EndpointRow
-    from ai.backend.manager.models.group import AssocGroupUserRow
-    from ai.backend.manager.models.kernel import KernelRow
     from ai.backend.manager.models.keypair import KeyPairRow
-    from ai.backend.manager.models.rbac_models import UserRoleRow
     from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
-    from ai.backend.manager.models.session import SessionRow
-    from ai.backend.manager.models.vfolder import VFolderRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -78,52 +83,10 @@ INACTIVE_USER_STATUSES = (
 
 
 # Defined for avoiding circular import
-def _get_session_row_join_condition() -> Any:
-    from ai.backend.manager.models.session import SessionRow
-
-    return UserRow.uuid == foreign(SessionRow.user_uuid)
-
-
-def _get_kernel_row_join_condition() -> Any:
-    from ai.backend.manager.models.kernel import KernelRow
-
-    return UserRow.uuid == foreign(KernelRow.user_uuid)
-
-
-def _get_created_endpoints_join_condition() -> Any:
-    from ai.backend.manager.models.endpoint import EndpointRow
-
-    return foreign(EndpointRow.created_user) == UserRow.uuid
-
-
-def _get_owned_endpoints_join_condition() -> Any:
-    from ai.backend.manager.models.endpoint import EndpointRow
-
-    return foreign(EndpointRow.session_owner) == UserRow.uuid
-
-
-def _get_vfolder_rows_join_condition() -> Any:
-    from ai.backend.manager.models.vfolder import VFolderRow
-
-    return UserRow.uuid == foreign(VFolderRow.user)
-
-
-def _get_role_assignments_join_condition() -> Any:
-    from ai.backend.manager.models.rbac_models import UserRoleRow
-
-    return UserRow.uuid == foreign(UserRoleRow.user_id)
-
-
 def _get_domain_join_condition() -> Any:
     from ai.backend.manager.models.domain import DomainRow
 
     return DomainRow.name == foreign(UserRow.domain_name)
-
-
-def _get_groups_join_condition() -> Any:
-    from ai.backend.manager.models.group import AssocGroupUserRow
-
-    return foreign(AssocGroupUserRow.user_id) == UserRow.uuid
 
 
 def _get_resource_policy_join_condition() -> Any:
@@ -138,20 +101,20 @@ def _get_keypairs_join_condition() -> Any:
     return foreign(KeyPairRow.user) == UserRow.uuid
 
 
-def _get_main_keypair_join_condition() -> Any:
+def _get_default_keypair_join_condition() -> Any:
     from ai.backend.manager.models.keypair import KeyPairRow
 
-    return KeyPairRow.access_key == foreign(UserRow.main_access_key)
+    return (foreign(KeyPairRow.user) == UserRow.uuid) & KeyPairRow.is_default
 
 
-class UserRow(Base):  # type: ignore[misc]
+class UserRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "users"
 
     uuid: Mapped[uuid_mod.UUID] = mapped_column(
         "uuid", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    username: Mapped[str | None] = mapped_column(
-        "username", sa.String(length=64), unique=True, nullable=True
+    username: Mapped[str] = mapped_column(
+        "username", sa.String(length=64), unique=True, nullable=False
     )
     email: Mapped[str] = mapped_column(
         "email", sa.String(length=64), index=True, nullable=False, unique=True
@@ -160,11 +123,11 @@ class UserRow(Base):  # type: ignore[misc]
     need_password_change: Mapped[bool | None] = mapped_column(
         "need_password_change", sa.Boolean, nullable=True
     )
-    password_changed_at: Mapped[datetime | None] = mapped_column(
+    password_changed_at: Mapped[datetime] = mapped_column(
         "password_changed_at",
         sa.DateTime(timezone=True),
         server_default=sa.func.now(),
-        nullable=True,
+        nullable=False,
     )
     full_name: Mapped[str | None] = mapped_column("full_name", sa.String(length=64), nullable=True)
     description: Mapped[str | None] = mapped_column(
@@ -176,24 +139,22 @@ class UserRow(Base):  # type: ignore[misc]
     status_info: Mapped[str | None] = mapped_column(
         "status_info", sa.Unicode(), nullable=True, default=sa.null()
     )
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=True
-    )
-    modified_at: Mapped[datetime | None] = mapped_column(
-        "modified_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        onupdate=sa.func.current_timestamp(),
-        nullable=True,
-    )
     #: Field for synchronization with external services.
     integration_id: Mapped[str | None] = mapped_column(
         "integration_id", sa.String(length=512), nullable=True
     )
+    #: Deprecated: use ``domain_id``.
     domain_name: Mapped[str | None] = mapped_column(
         "domain_name",
         sa.String(length=64),
         sa.ForeignKey("domains.name"),
+        index=True,
+        nullable=True,
+    )
+    domain_id: Mapped[DomainID | None] = mapped_column(
+        "domain_id",
+        GUID,
+        sa.ForeignKey("domains.id"),
         index=True,
         nullable=True,
     )
@@ -239,27 +200,11 @@ class UserRow(Base):  # type: ignore[misc]
     )
 
     # Relationships
-    sessions: Mapped[list[SessionRow]] = relationship(
-        "SessionRow",
-        back_populates="user",
-        primaryjoin=_get_session_row_join_condition,
-        foreign_keys="SessionRow.user_uuid",
-    )
-    kernels: Mapped[list[KernelRow]] = relationship(
-        "KernelRow",
-        back_populates="user_row",
-        primaryjoin=_get_kernel_row_join_condition,
-        foreign_keys="KernelRow.user_uuid",
-    )
     domain: Mapped[DomainRow | None] = relationship(
-        "DomainRow", back_populates="users", primaryjoin=_get_domain_join_condition
-    )
-    groups: Mapped[list[AssocGroupUserRow]] = relationship(
-        "AssocGroupUserRow", back_populates="user", primaryjoin=_get_groups_join_condition
+        "DomainRow", primaryjoin=_get_domain_join_condition
     )
     resource_policy_row: Mapped[UserResourcePolicyRow] = relationship(
         "UserResourcePolicyRow",
-        back_populates="users",
         primaryjoin=_get_resource_policy_join_condition,
     )
     keypairs: Mapped[list[KeyPairRow]] = relationship(
@@ -269,34 +214,20 @@ class UserRow(Base):  # type: ignore[misc]
         foreign_keys="KeyPairRow.user",
     )
 
-    created_endpoints: Mapped[list[EndpointRow]] = relationship(
-        "EndpointRow",
-        back_populates="created_user_row",
-        primaryjoin=_get_created_endpoints_join_condition,
-    )
-    owned_endpoints: Mapped[list[EndpointRow]] = relationship(
-        "EndpointRow",
-        back_populates="session_owner_row",
-        primaryjoin=_get_owned_endpoints_join_condition,
-    )
-
-    main_keypair: Mapped[KeyPairRow | None] = relationship(
+    default_keypair: Mapped[KeyPairRow | None] = relationship(
         "KeyPairRow",
-        primaryjoin=_get_main_keypair_join_condition,
-        foreign_keys="UserRow.main_access_key",
+        primaryjoin=_get_default_keypair_join_condition,
+        foreign_keys="KeyPairRow.user",
+        viewonly=True,
     )
 
-    vfolder_rows: Mapped[list[VFolderRow]] = relationship(
-        "VFolderRow",
-        back_populates="user_row",
-        primaryjoin=_get_vfolder_rows_join_condition,
-    )
+    @classmethod
+    def scope_id_expr(cls) -> SQLColumnExpression[ScopeID]:
+        return cls.uuid
 
-    role_assignments: Mapped[list[UserRoleRow]] = relationship(
-        "UserRoleRow",
-        back_populates="user_row",
-        primaryjoin=_get_role_assignments_join_condition,
-    )
+    @classmethod
+    def scope_name_expr(cls) -> SQLColumnExpression[str]:
+        return cls.username
 
     @classmethod
     def load_keypairs(cls) -> _AbstractLoad:
@@ -305,10 +236,12 @@ class UserRow(Base):  # type: ignore[misc]
         return selectinload(UserRow.keypairs).options(joinedload(KeyPairRow.resource_policy_row))
 
     @classmethod
-    def load_main_keypair(cls) -> _AbstractLoad:
+    def load_default_keypair(cls) -> _AbstractLoad:
         from ai.backend.manager.models.keypair import KeyPairRow
 
-        return joinedload(UserRow.main_keypair).options(joinedload(KeyPairRow.resource_policy_row))
+        return joinedload(UserRow.default_keypair).options(
+            joinedload(KeyPairRow.resource_policy_row)
+        )
 
     @classmethod
     def load_resource_policy(cls) -> _AbstractLoad:
@@ -371,7 +304,7 @@ class UserRow(Base):  # type: ignore[misc]
             [by_user_uuid(user_uuid)],
             [
                 load_related_field(cls.load_keypairs()),
-                load_related_field(cls.load_main_keypair()),
+                load_related_field(cls.load_default_keypair()),
                 load_related_field(cls.load_resource_policy()),
             ],
             db=db,
@@ -381,21 +314,17 @@ class UserRow(Base):  # type: ignore[misc]
         return rows[0]
 
     def get_main_keypair_row(self) -> KeyPairRow | None:
-        # `cast()` requires import of KeyPairRow
-
         keypair_candidate: KeyPairRow | None = None
-        main_keypair_row = self.main_keypair
-        if main_keypair_row is None:
+        default_keypair_row = self.default_keypair
+        if default_keypair_row is None:
             keypair_rows = self.keypairs
             active_keypairs = [row for row in keypair_rows if row.is_active]
             for row in active_keypairs:
                 if keypair_candidate is None or not keypair_candidate.is_admin:
                     keypair_candidate = row
                     break
-            if keypair_candidate is not None:
-                self.main_keypair = keypair_candidate
         else:
-            keypair_candidate = main_keypair_row
+            keypair_candidate = default_keypair_row
         return keypair_candidate
 
     def to_model_serving_user_data(self) -> ModelServingUserData:
@@ -417,8 +346,9 @@ class UserRow(Base):  # type: ignore[misc]
             status=self.status.value,
             status_info=self.status_info,
             created_at=self.created_at,
-            modified_at=self.modified_at,
+            modified_at=self.updated_at,
             domain_name=self.domain_name,
+            domain_id=self.domain_id,
             role=self.role,
             resource_policy=self.resource_policy,
             allowed_client_ip=[str(ip) for ip in self.allowed_client_ip]

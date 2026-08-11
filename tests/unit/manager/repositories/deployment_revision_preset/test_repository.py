@@ -13,7 +13,7 @@ from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.config import ModelDefinitionDraft
+from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
@@ -92,7 +92,7 @@ async def repository(
                 RuntimeVariantRow(
                     id=_VARIANT_ID,
                     name="rv-test",
-                    default_model_definition=ModelDefinitionDraft(),
+                    default_model_definition=DefaultModelDefinition(),
                 )
             )
             session.add_all([

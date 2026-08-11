@@ -83,6 +83,9 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.resource_preset.repository import (
     ResourcePresetRepository,
 )
@@ -90,6 +93,7 @@ from ai.backend.manager.repositories.resource_preset.types import (
     CheckPresetsResult,
 )
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
 
 
 def _qty(slots: list[SlotQuantity], name: str) -> Decimal:
@@ -148,6 +152,9 @@ class TestCheckPresetsOccupiedSlots:
                 sgroups_for_keypairs,  # association table
                 sgroups_for_groups,  # association table
                 AssociationScopesEntitiesRow,  # RBAC project membership
+                VirtualScopeRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
             ],
         ):
             # Seed default resource slot types (FK target for normalized tables)
@@ -198,6 +205,7 @@ class TestCheckPresetsOccupiedSlots:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
+        test_domain_id: DomainID,
         test_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[str, None]:
         """Create test scaling group and return scaling group name"""
@@ -224,8 +232,8 @@ class TestCheckPresetsOccupiedSlots:
             # Associate scaling group with domain
             await db_sess.execute(
                 sa.insert(sgroups_for_domains).values(
-                    scaling_group=sg_name,
-                    domain=test_domain_name,
+                    resource_group_id=test_scaling_group_id,
+                    domain_id=test_domain_id,
                 )
             )
             await db_sess.flush()
@@ -319,6 +327,7 @@ class TestCheckPresetsOccupiedSlots:
                     entity_id=str(test_user_uuid),
                 )
             )
+            await VirtualScopeSeeder().enroll_user_in_project(db_sess, group_id, test_user_uuid)
             await db_sess.flush()
 
         try:
@@ -1271,6 +1280,9 @@ class TestCheckPresetsZeroValues:
                 sgroups_for_keypairs,  # association table
                 sgroups_for_groups,  # association table
                 AssociationScopesEntitiesRow,  # RBAC project membership
+                VirtualScopeRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
             ],
         ):
             # Seed default resource slot types (FK target for normalized tables)
@@ -1282,15 +1294,25 @@ class TestCheckPresetsZeroValues:
             yield database_connection
 
     @pytest.fixture
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid.uuid4())
+
+    @pytest.fixture
+    def test_scaling_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid.uuid4())
+
+    @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
     ) -> AsyncGenerator[str, None]:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-zero-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 total_resource_slots=ResourceSlot({
                     "cpu": Decimal("1000"),
@@ -1310,12 +1332,15 @@ class TestCheckPresetsZeroValues:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
+        test_domain_id: DomainID,
+        test_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[str, None]:
         """Create test scaling group and return scaling group name."""
         sg_name = f"test-sgroup-zero-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             sg = ScalingGroupRow(
+                id=test_scaling_group_id,
                 name=sg_name,
                 driver="test-driver",
                 scheduler="fifo",
@@ -1334,8 +1359,8 @@ class TestCheckPresetsZeroValues:
             # Associate scaling group with domain
             await db_sess.execute(
                 sa.insert(sgroups_for_domains).values(
-                    scaling_group=sg_name,
-                    domain=test_domain_name,
+                    resource_group_id=test_scaling_group_id,
+                    domain_id=test_domain_id,
                 )
             )
             await db_sess.flush()
@@ -1462,6 +1487,7 @@ class TestCheckPresetsZeroValues:
                     entity_id=str(test_user_uuid),
                 )
             )
+            await VirtualScopeSeeder().enroll_user_in_project(db_sess, group_id, test_user_uuid)
             await db_sess.flush()
 
         try:

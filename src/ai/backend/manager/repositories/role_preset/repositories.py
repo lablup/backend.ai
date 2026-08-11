@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Self
 
+from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 from ai.backend.manager.repositories.role_preset.repository import RolePresetRepository
 from ai.backend.manager.repositories.types import RepositoryArgs
 
@@ -12,5 +13,5 @@ class RolePresetRepositories:
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
         return cls(
-            repository=RolePresetRepository(args.ops_provider),
+            repository=RolePresetRepository(RBACOpsProvider(args.db)),
         )

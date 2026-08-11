@@ -7,11 +7,9 @@ from datetime import datetime
 from typing import Any, Self, override
 from uuid import UUID
 
-from sqlalchemy.engine import Row
-
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.types import AccessKey
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.permission.id import ScopeId
@@ -56,7 +54,6 @@ class UserStatus(enum.StrEnum):
 class UserInfoContext:
     uuid: UUID
     email: str
-    main_access_key: AccessKey
 
 
 @dataclass(frozen=True)
@@ -73,7 +70,7 @@ class SessionOwnerContext:
 class UserData:
     id: UUID = field(compare=False)
     uuid: UUID = field(compare=False)  # legacy
-    username: str | None
+    username: str
     email: str
     need_password_change: bool | None
     full_name: str | None
@@ -84,6 +81,7 @@ class UserData:
     created_at: datetime | None = field(compare=False)
     modified_at: datetime | None = field(compare=False)
     domain_name: str | None
+    domain_id: DomainID | None
     role: UserRole | None
     resource_policy: str
     allowed_client_ip: list[str] | None
@@ -114,7 +112,7 @@ class UserData:
         return {RBACElementType.USER: user_permissions, **resource_entity_permissions}
 
     @classmethod
-    def from_row(cls, row: Row[Any]) -> Self:
+    def from_row(cls, row: Any) -> Self:
         """
         Deprecated: Use `UserRow.to_data()` method instead.
         """
@@ -130,8 +128,9 @@ class UserData:
             status=row.status,
             status_info=row.status_info,
             created_at=row.created_at,
-            modified_at=row.modified_at,
+            modified_at=row.updated_at,
             domain_name=row.domain_name,
+            domain_id=row.domain_id,
             role=row.role,
             resource_policy=row.resource_policy,
             allowed_client_ip=[str(ip) for ip in row.allowed_client_ip]

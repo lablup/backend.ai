@@ -16,21 +16,17 @@ from ai.backend.manager.data.resource_slot.types import (
     AgentResourceData,
     AgentResourceDrift,
     AgentResourceSearchResult,
-    NumberFormatData,
     OrphanedAllocation,
     ReconciliationResult,
     ResourceAllocationData,
     ResourceAllocationSearchResult,
     ResourceOccupancy,
-    ResourceSlotTypeData,
-    ResourceSlotTypeSearchResult,
     TerminalSessionKernelReconciliation,
 )
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.resource_slot import (
     AgentResourceNotFound,
     ResourceAllocationNotFound,
-    ResourceSlotTypeNotFound,
 )
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_slot import (
@@ -80,59 +76,6 @@ class ResourceSlotDBSource:
             )
             result = await db_sess.execute(stmt)
             return list(result.scalars().all())
-
-    async def get_slot_type(
-        self,
-        slot_name: str,
-    ) -> ResourceSlotTypeRow:
-        """Get a specific resource slot type by name.
-
-        Args:
-            slot_name: The slot type name to look up.
-
-        Returns:
-            ResourceSlotTypeRow for the given slot name.
-
-        Raises:
-            ResourceSlotTypeNotFound: If the slot type does not exist.
-        """
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            stmt = sa.select(ResourceSlotTypeRow).where(
-                ResourceSlotTypeRow.slot_name == slot_name,
-            )
-            result = await db_sess.execute(stmt)
-            row = result.scalar_one_or_none()
-            if row is None:
-                raise ResourceSlotTypeNotFound(f"Resource slot type '{slot_name}' not found.")
-            return row
-
-    async def search_slot_types(self, querier: BatchQuerier) -> ResourceSlotTypeSearchResult:
-        """Paginated search across all resource_slot_types rows."""
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(ResourceSlotTypeRow)
-            result = await execute_batch_querier(db_sess, query, querier)
-            items = [
-                ResourceSlotTypeData(
-                    slot_name=row.ResourceSlotTypeRow.slot_name,
-                    slot_type=row.ResourceSlotTypeRow.slot_type,
-                    display_name=row.ResourceSlotTypeRow.display_name,
-                    description=row.ResourceSlotTypeRow.description,
-                    display_unit=row.ResourceSlotTypeRow.display_unit,
-                    display_icon=row.ResourceSlotTypeRow.display_icon,
-                    number_format=NumberFormatData(
-                        binary=row.ResourceSlotTypeRow.number_format.binary,
-                        round_length=row.ResourceSlotTypeRow.number_format.round_length,
-                    ),
-                    rank=row.ResourceSlotTypeRow.rank,
-                )
-                for row in result.rows
-            ]
-            return ResourceSlotTypeSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
 
     # ==================== agent_resources Read ====================
 

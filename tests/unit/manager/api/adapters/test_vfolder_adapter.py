@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     SearchVFoldersInput,
     VFolderFilter,
 )
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
@@ -48,6 +49,7 @@ class TestVFolderAdapterMySearch:
             is_superadmin=False,
             role=UserRole.USER,
             domain_name="default",
+            domain_id=DomainID(uuid4()),
         )
 
     @pytest.fixture

@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.model_serving.request import ServiceFilterMod
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.hub import EventHub
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.validators import ActionValidators
@@ -50,6 +51,7 @@ class TestSearchServices:
             is_superadmin=False,
             role=UserRole.USER,
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
         )
 
     @pytest.fixture(autouse=True)

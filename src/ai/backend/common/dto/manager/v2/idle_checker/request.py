@@ -6,6 +6,7 @@ from typing import Self
 from pydantic import ConfigDict, Field, model_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.data.idle_checker.types import SESSION_ID_LABEL
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.idle_checker.types import (
@@ -13,6 +14,7 @@ from ai.backend.common.dto.manager.v2.idle_checker.types import (
     IdleCheckerInputTypeDTO,
     IdleCheckerOrderField,
 )
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import MetricLabelEntry
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.types import SessionTypes
@@ -29,6 +31,15 @@ class NetworkTimeoutSpecInputDTO(BaseRequestModel):
 class UtilizationThresholdInputDTO(BaseRequestModel):
     preset_id: PrometheusQueryPresetID
     threshold: Decimal
+    filter_labels: list[MetricLabelEntry] = Field(default_factory=list)
+    group_labels: list[str] = Field(default_factory=lambda: [SESSION_ID_LABEL])
+
+    @model_validator(mode="after")
+    def _validate_unique_filter_label_keys(self) -> Self:
+        keys = [entry.key for entry in self.filter_labels]
+        if len(keys) != len(set(keys)):
+            raise ValueError("filter_labels must not contain duplicate keys")
+        return self
 
 
 class UtilizationSpecInputDTO(BaseRequestModel):

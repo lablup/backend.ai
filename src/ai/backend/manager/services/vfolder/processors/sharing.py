@@ -1,8 +1,5 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.vfolder.actions.sharing import (
     ListSharedVFoldersAction,
@@ -17,7 +14,7 @@ from ai.backend.manager.services.vfolder.actions.sharing import (
 from ai.backend.manager.services.vfolder.services.sharing import VFolderSharingService
 
 
-class VFolderSharingProcessors(AbstractProcessorPackage):
+class VFolderSharingProcessors:
     share: ActionProcessor[ShareVFolderAction, ShareVFolderActionResult]
     unshare: ActionProcessor[UnshareVFolderAction, UnshareVFolderActionResult]
     list_shared: ActionProcessor[ListSharedVFoldersAction, ListSharedVFoldersActionResult]
@@ -35,12 +32,3 @@ class VFolderSharingProcessors(AbstractProcessorPackage):
         self.unshare = ActionProcessor(service.unshare, action_monitors)
         self.list_shared = ActionProcessor(service.list_shared_vfolders, action_monitors)
         self.update_sharing_status = ActionProcessor(service.update_sharing_status, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            ShareVFolderAction.spec(),
-            UnshareVFolderAction.spec(),
-            ListSharedVFoldersAction.spec(),
-            UpdateVFolderSharingStatusAction.spec(),
-        ]

@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+from uuid import uuid4
+
 from ai.backend.common.dto.manager.v2.resource_slot.response import ResourceSlotTypeNode
 from ai.backend.common.dto.manager.v2.resource_slot.types import NumberFormatInfo
 
 
 def _make_resource_slot_type_node(slot_name: str = "cpu") -> ResourceSlotTypeNode:
     return ResourceSlotTypeNode(
+        uuid=uuid4(),
         slot_name=slot_name,
         slot_type="count",
+        required=True,
+        enabled=True,
         display_name="CPU",
         description="CPU cores",
         display_unit="cores",
@@ -28,6 +33,8 @@ class TestResourceSlotTypeNode:
         assert node.slot_type == "count"
         assert node.display_name == "CPU"
         assert node.rank == 1
+        assert node.required is True
+        assert node.enabled is True
 
     def test_nested_number_format(self) -> None:
         node = _make_resource_slot_type_node()
@@ -36,8 +43,11 @@ class TestResourceSlotTypeNode:
 
     def test_memory_slot(self) -> None:
         node = ResourceSlotTypeNode(
+            uuid=uuid4(),
             slot_name="mem",
             slot_type="bytes",
+            required=True,
+            enabled=True,
             display_name="Memory",
             description="RAM",
             display_unit="GiB",
@@ -65,8 +75,11 @@ class TestResourceSlotTypeNode:
 
     def test_cuda_slot(self) -> None:
         node = ResourceSlotTypeNode(
+            uuid=uuid4(),
             slot_name="cuda.device",
-            slot_type="unique-count",
+            slot_type="unique",
+            required=False,
+            enabled=False,
             display_name="GPU",
             description="NVIDIA GPU",
             display_unit="devices",
@@ -75,4 +88,6 @@ class TestResourceSlotTypeNode:
             rank=3,
         )
         assert node.slot_name == "cuda.device"
-        assert node.slot_type == "unique-count"
+        assert node.slot_type == "unique"
+        assert node.required is False
+        assert node.enabled is False

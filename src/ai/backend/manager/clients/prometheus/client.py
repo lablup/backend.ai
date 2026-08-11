@@ -1,4 +1,4 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from http import HTTPMethod
 from typing import Any, cast
 
@@ -17,7 +17,7 @@ from ai.backend.common.exception import (
     FailedToGetMetric,
     PrometheusConnectionError,
 )
-from ai.backend.common.types import KernelId, SessionId
+from ai.backend.common.types import KernelId
 from ai.backend.manager.clients.prometheus.fixed_query_builder import (
     ContainerLiveStatQueryBuilder,
     ContainerMetricQueryBuilder,
@@ -29,7 +29,7 @@ from ai.backend.manager.clients.prometheus.metric_types import (
     KernelLiveStatBatchResult,
     MetricResultValue,
 )
-from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset, regex_union
+from ai.backend.manager.clients.prometheus.preset import MetricPreset
 
 DEFAULT_TIMEOUT_SECONDS: float = 30.0
 
@@ -110,46 +110,17 @@ class PrometheusClient:
 
     async def execute_preset(
         self,
+        preset: MetricPreset,
         *,
-        query_template: str,
-        filter_labels: Mapping[str, str],
-        group_labels: Sequence[str],
-        time_window: str,
         time_range: QueryTimeRange | None,
+        time: str | None = None,
     ) -> PrometheusResponse:
-        metric_preset = MetricPreset(
-            template=query_template,
-            labels={
-                label_name: LabelMatcher.exact(label_value)
-                for label_name, label_value in filter_labels.items()
-            },
-            group_by=set(group_labels),
-            window=time_window,
-        )
         if time_range is None:
-            return await self._query_instant(preset=metric_preset)
+            return await self._query_instant(preset=preset, time=time)
         return await self._query_range(
-            preset=metric_preset,
+            preset=preset,
             time_range=time_range,
         )
-
-    async def fetch_session_utilization(
-        self,
-        *,
-        query_template: str,
-        time_window: str,
-        session_ids: Sequence[SessionId],
-        evaluation_time: str,
-    ) -> PrometheusResponse:
-        session_id_pattern = regex_union([
-            str(session_id) for session_id in dict.fromkeys(session_ids)
-        ])
-        preset = MetricPreset(
-            template=query_template,
-            labels={"session_id": LabelMatcher.regex(session_id_pattern)},
-            window=time_window,
-        )
-        return await self._query_instant(preset, time=evaluation_time)
 
     async def preview_query_template(
         self,

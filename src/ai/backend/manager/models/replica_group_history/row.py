@@ -16,7 +16,7 @@ from ai.backend.manager.models.mixins.history import ReconcileHistoryMixin
 __all__ = ("ReplicaGroupHistoryRow",)
 
 
-class ReplicaGroupHistoryRow(ReconcileHistoryMixin, Base):  # type: ignore[misc]
+class ReplicaGroupHistoryRow(ReconcileHistoryMixin, Base):
     __tablename__ = "replica_group_history"
 
     # Common columns (id, phase, from/to_status, result, error_code, message,

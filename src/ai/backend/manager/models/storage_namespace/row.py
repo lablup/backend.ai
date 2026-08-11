@@ -28,7 +28,7 @@ def _get_storage_namespace_join_cond() -> sa.ColumnElement[bool]:
     return foreign(StorageNamespaceRow.storage_id) == ObjectStorageRow.id
 
 
-class StorageNamespaceRow(Base):  # type: ignore[misc]
+class StorageNamespaceRow(Base):
     __tablename__ = "storage_namespace"
     __table_args__ = (
         # constraint
@@ -47,7 +47,6 @@ class StorageNamespaceRow(Base):  # type: ignore[misc]
 
     object_storage_row: Mapped[ObjectStorageRow] = relationship(
         "ObjectStorageRow",
-        back_populates="namespace_rows",
         primaryjoin=_get_storage_namespace_join_cond,
     )
 

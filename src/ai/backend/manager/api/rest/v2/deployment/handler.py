@@ -52,11 +52,11 @@ from ai.backend.manager.api.rest.v2.path_params import (
     TokenIdPathParam,
 )
 from ai.backend.manager.data.deployment.types import (
-    AccessTokenSearchScope,
-    AutoScalingRuleSearchScope,
-    ReplicaSearchScope,
-    RevisionSearchScope,
-    RouteSearchScope,
+    AccessTokenOperationScope,
+    AutoScalingRuleOperationScope,
+    ReplicaOperationScope,
+    RevisionOperationScope,
+    RouteOperationScope,
 )
 from ai.backend.manager.dto.context import UserContext
 
@@ -195,7 +195,7 @@ class V2DeploymentHandler:
         body: BodyParam[AdminSearchRevisionsInput],
     ) -> APIResponse:
         """Search revisions scoped to a specific deployment."""
-        scope = RevisionSearchScope(deployment_id=path.parsed.deployment_id)
+        scope = RevisionOperationScope(deployment_id=path.parsed.deployment_id)
         result = await self._adapter.search_revisions(scope, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
@@ -237,7 +237,7 @@ class V2DeploymentHandler:
         body: BodyParam[SearchReplicasInput],
     ) -> APIResponse:
         """Search replicas scoped to a specific deployment."""
-        scope = ReplicaSearchScope(deployment_id=path.parsed.deployment_id)
+        scope = ReplicaOperationScope(deployment_id=path.parsed.deployment_id)
         result = await self._adapter.search_replicas(scope, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
@@ -282,7 +282,7 @@ class V2DeploymentHandler:
         body: BodyParam[SearchRoutesInput],
     ) -> APIResponse:
         """Search routes scoped to a specific deployment."""
-        scope = RouteSearchScope(deployment_id=path.parsed.deployment_id)
+        scope = RouteOperationScope(deployment_id=path.parsed.deployment_id)
         result = await self._adapter.search_routes(scope, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
@@ -315,7 +315,7 @@ class V2DeploymentHandler:
         body: BodyParam[SearchAccessTokensInput],
     ) -> APIResponse:
         """Search access tokens scoped to a specific deployment."""
-        scope = AccessTokenSearchScope(deployment_id=path.parsed.deployment_id)
+        scope = AccessTokenOperationScope(deployment_id=path.parsed.deployment_id)
         result = await self._adapter.search_access_tokens(scope, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
@@ -361,7 +361,7 @@ class V2DeploymentHandler:
         body: BodyParam[SearchAutoScalingRulesInput],
     ) -> APIResponse:
         """Search auto-scaling rules scoped to a specific deployment."""
-        scope = AutoScalingRuleSearchScope(deployment_id=path.parsed.deployment_id)
+        scope = AutoScalingRuleOperationScope(deployment_id=path.parsed.deployment_id)
         result = await self._adapter.search_rules(scope, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 

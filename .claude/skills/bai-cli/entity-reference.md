@@ -58,7 +58,7 @@ Syntax: `./bai [admin|my] {entity} [{sub-entity}] {command} [options]`
 - **resource-allocation**: user(project-usage, resource-group-usage) | admin(search, create, update, delete) | my(search)
 - **resource-preset**: admin(search, get, create, update, delete)
 - **resource-policy**: admin(search, get, create, update, delete) | my(search)
-- **resource-slot**: sub: slot-type(search), agent-resource(search), allocation(search)
+- **resource-slot**: sub: slot-type(search, create, update, delete), agent-resource(search), allocation(search)
 - **resource-usage**: sub: domain(search), project(search), user(search)
 - **retention-policy**: admin(search, get, create, update, delete, purge)
 

@@ -47,6 +47,15 @@ def agent() -> None:
 
 @admin.group(
     cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.app_config_fragment:app_config_fragment",
+    name="app-config-fragment",
+)
+def app_config_fragment() -> None:
+    """Admin app config fragment commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.admin.app_config_allow_list:app_config_allow_list",
     name="app-config-allow-list",
 )

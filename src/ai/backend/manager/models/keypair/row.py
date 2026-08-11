@@ -12,10 +12,11 @@ from cryptography.hazmat.backends import default_backend as crypto_default_backe
 from cryptography.hazmat.primitives import serialization as crypto_serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.expression import false
 
 from ai.backend.common import msgpack
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData, KeyPairSecrets
 from ai.backend.manager.defs import RESERVED_DOTFILES
@@ -23,11 +24,11 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
 )
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
     from ai.backend.manager.models.scaling_group import ScalingGroupForKeypairsRow
-    from ai.backend.manager.models.session import SessionRow
     from ai.backend.manager.models.user import UserRow
 
 __all__: Sequence[str] = (
@@ -44,31 +45,29 @@ __all__: Sequence[str] = (
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 
 
-# Defined for avoiding circular import
-def _get_session_row_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.session import SessionRow
-
-    return KeyPairRow.access_key == foreign(SessionRow.access_key)
-
-
-class KeyPairRow(Base):  # type: ignore[misc]
+class KeyPairRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "keypairs"
+    __table_args__ = (
+        # Partial unique index: at most one keypair per user may have is_default = true.
+        sa.Index(
+            "uq_keypairs_is_default",
+            "user",
+            unique=True,
+            postgresql_where=sa.text("is_default"),
+        ),
+    )
 
     user_id: Mapped[str | None] = mapped_column("user_id", sa.String(length=256), index=True)
-    access_key: Mapped[str] = mapped_column("access_key", sa.String(length=20), primary_key=True)
+    access_key: Mapped[AccessKey] = mapped_column(
+        "access_key", sa.String(length=20), primary_key=True
+    )
     secret_key: Mapped[str | None] = mapped_column("secret_key", sa.String(length=40))
     is_active: Mapped[bool | None] = mapped_column("is_active", sa.Boolean, index=True)
     is_admin: Mapped[bool | None] = mapped_column(
         "is_admin", sa.Boolean, index=True, default=False, server_default=false()
     )
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
-    )
-    modified_at: Mapped[datetime | None] = mapped_column(
-        "modified_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        onupdate=sa.func.current_timestamp(),
+    is_default: Mapped[bool] = mapped_column(
+        "is_default", sa.Boolean, nullable=False, default=False, server_default=false()
     )
     last_used: Mapped[datetime | None] = mapped_column(
         "last_used", sa.DateTime(timezone=True), nullable=True
@@ -78,8 +77,8 @@ class KeyPairRow(Base):  # type: ignore[misc]
     # SSH Keypairs.
     ssh_public_key: Mapped[str | None] = mapped_column("ssh_public_key", sa.Text, nullable=True)
     ssh_private_key: Mapped[str | None] = mapped_column("ssh_private_key", sa.Text, nullable=True)
-    user: Mapped[uuid.UUID] = mapped_column(
-        "user", GUID, sa.ForeignKey("users.uuid"), nullable=False
+    user: Mapped[UserID] = mapped_column(
+        "user", GUID(UserID), sa.ForeignKey("users.uuid"), nullable=False
     )
     resource_policy: Mapped[str] = mapped_column(
         "resource_policy",
@@ -96,18 +95,9 @@ class KeyPairRow(Base):  # type: ignore[misc]
     )
 
     # Relationships
-    sessions: Mapped[list[SessionRow]] = relationship(
-        "SessionRow",
-        primaryjoin=_get_session_row_join_condition,
-        foreign_keys="SessionRow.access_key",
-        back_populates="access_key_row",
-    )
-    resource_policy_row: Mapped[KeyPairResourcePolicyRow] = relationship(
-        "KeyPairResourcePolicyRow", back_populates="keypairs"
-    )
+    resource_policy_row: Mapped[KeyPairResourcePolicyRow] = relationship("KeyPairResourcePolicyRow")
     sgroup_for_keypairs_rows: Mapped[list[ScalingGroupForKeypairsRow]] = relationship(
         "ScalingGroupForKeypairsRow",
-        back_populates="keypair_row",
     )
     user_row: Mapped[UserRow] = relationship(
         "UserRow", back_populates="keypairs", foreign_keys=[user]
@@ -122,7 +112,7 @@ class KeyPairRow(Base):  # type: ignore[misc]
             "is_active": self.is_active,
             "is_admin": self.is_admin,
             "created_at": self.created_at,
-            "modified_at": self.modified_at,
+            "modified_at": self.updated_at,
             "last_used": self.last_used,
             "rate_limit": self.rate_limit,
             "num_queries": self.num_queries,
@@ -141,6 +131,7 @@ class KeyPairRow(Base):  # type: ignore[misc]
         generated_data: KeyPairSecrets,
         user_id: uuid.UUID,
         email: str,
+        is_default: bool,
     ) -> Self:
         return cls(
             user_id=email,
@@ -149,6 +140,7 @@ class KeyPairRow(Base):  # type: ignore[misc]
             secret_key=generated_data.secret_key,
             is_active=creator.is_active,
             is_admin=creator.is_admin,
+            is_default=is_default,
             resource_policy=creator.resource_policy,
             rate_limit=creator.rate_limit,
             num_queries=0,
@@ -166,7 +158,7 @@ class KeyPairRow(Base):  # type: ignore[misc]
             is_active=self.is_active if self.is_active is not None else True,
             is_admin=self.is_admin if self.is_admin is not None else False,
             created_at=self.created_at,
-            modified_at=self.modified_at,
+            modified_at=self.updated_at,
             resource_policy_name=self.resource_policy,
             rate_limit=self.rate_limit if self.rate_limit is not None else 0,
             ssh_public_key=self.ssh_public_key,

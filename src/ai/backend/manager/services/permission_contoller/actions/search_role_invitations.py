@@ -23,9 +23,9 @@ from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.role_invitation.types import RoleInvitationData
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.role_invitation.types import (
-    InviteeSearchScope,
-    InviterSearchScope,
-    RoleInvitationSearchScope,
+    InviteeOperationScope,
+    InviterOperationScope,
+    RoleInvitationOperationScope,
 )
 
 # ------------------------------------------------------------------ scope base (create, search)
@@ -197,7 +197,7 @@ class SearchMyRoleInvitationsAction(_UserScopedInvitationAction):
     """Search invitations addressed to the current user."""
 
     querier: BatchQuerier
-    scope: InviteeSearchScope
+    scope: InviteeOperationScope
 
     @override
     @classmethod
@@ -222,7 +222,7 @@ class SearchMySentRoleInvitationsAction(_UserScopedInvitationAction):
     """Search invitations sent by the current user."""
 
     querier: BatchQuerier
-    scope: InviterSearchScope
+    scope: InviterOperationScope
 
     @override
     @classmethod
@@ -247,7 +247,7 @@ class SearchRoleInvitationsByRoleAction(_RoleScopedInvitationAction):
     """Search invitations by role (admin/project-admin view)."""
 
     querier: BatchQuerier
-    scope: RoleInvitationSearchScope
+    scope: RoleInvitationOperationScope
 
     @override
     @classmethod

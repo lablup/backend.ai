@@ -7,7 +7,11 @@ from datetime import datetime
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.filter_specs import (
+    StringMatchSpec,
+    UUIDEqualMatchSpec,
+    UUIDInMatchSpec,
+)
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.clauses import QueryCondition
@@ -16,7 +20,7 @@ from ai.backend.manager.models.condition_utils import (
     make_string_in_factory,
 )
 from ai.backend.manager.models.group.row import GroupRow
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
+from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, ScalingGroupRow
 from ai.backend.manager.models.user import UserRow
 
 from .row import DomainRow
@@ -33,6 +37,26 @@ class DomainConditions:
     def by_ids(ids: Collection[DomainID]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return DomainRow.id.in_(ids)
+
+        return inner
+
+    @staticmethod
+    def by_id_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = DomainRow.id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = DomainRow.id.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -250,8 +274,13 @@ class DomainConditions:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.exists(
                 sa.select(1)
-                .where(ScalingGroupForDomainRow.domain == DomainRow.name)
-                .where(ScalingGroupForDomainRow.scaling_group == resource_group)
+                .where(ScalingGroupForDomainRow.domain_id == DomainRow.id)
+                .where(
+                    ScalingGroupForDomainRow.resource_group_id
+                    == sa.select(ScalingGroupRow.id)
+                    .where(ScalingGroupRow.name == resource_group)
+                    .scalar_subquery()
+                )
             )
 
         return inner

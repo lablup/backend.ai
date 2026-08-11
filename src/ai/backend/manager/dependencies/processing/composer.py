@@ -25,32 +25,47 @@ from ai.backend.common.message_queue.abc.queue import AbstractMessageQueue
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
-from ai.backend.manager.actions.bulk.monitor.audit_log import BulkActionAuditLogMonitor
-from ai.backend.manager.actions.bulk.monitor.prometheus import BulkActionPrometheusMonitor
-from ai.backend.manager.actions.bulk.monitor.reporter import BulkActionReporterMonitor
-from ai.backend.manager.actions.bulk.validator.rbac import (
-    VirtualScopeBulkActionRBACValidator,
-)
+from ai.backend.manager.actions.audit_policy import AuditLogPolicy
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
-from ai.backend.manager.actions.scope.monitor.audit_log import ScopeActionAuditLogMonitor
-from ai.backend.manager.actions.scope.monitor.prometheus import ScopeActionPrometheusMonitor
-from ai.backend.manager.actions.scope.monitor.reporter import ScopeActionReporterMonitor
-from ai.backend.manager.actions.scope.validator.rbac import (
+from ai.backend.manager.actions.v2 import validators as v2_validators
+from ai.backend.manager.actions.v2.bulk.monitor.audit_log import BulkActionAuditLogMonitor
+from ai.backend.manager.actions.v2.bulk.monitor.prometheus import BulkActionPrometheusMonitor
+from ai.backend.manager.actions.v2.bulk.monitor.reporter import BulkActionReporterMonitor
+from ai.backend.manager.actions.v2.bulk.validator.rbac import (
+    VirtualScopeBulkActionRBACValidator,
+)
+from ai.backend.manager.actions.v2.global_scope.monitor.audit_log import (
+    GlobalActionAuditLogMonitor,
+)
+from ai.backend.manager.actions.v2.global_scope.monitor.prometheus import (
+    GlobalActionPrometheusMonitor,
+)
+from ai.backend.manager.actions.v2.global_scope.monitor.reporter import (
+    GlobalActionReporterMonitor,
+)
+from ai.backend.manager.actions.v2.lookup.monitor.audit_log import LookupActionAuditLogMonitor
+from ai.backend.manager.actions.v2.lookup.monitor.prometheus import (
+    LookupActionPrometheusMonitor,
+)
+from ai.backend.manager.actions.v2.scope.monitor.audit_log import ScopeActionAuditLogMonitor
+from ai.backend.manager.actions.v2.scope.monitor.prometheus import ScopeActionPrometheusMonitor
+from ai.backend.manager.actions.v2.scope.monitor.reporter import ScopeActionReporterMonitor
+from ai.backend.manager.actions.v2.scope.validator.rbac import (
     VirtualScopeScopeActionRBACValidator,
 )
-from ai.backend.manager.actions.single_entity.monitor.audit_log import (
+from ai.backend.manager.actions.v2.single_entity.monitor.audit_log import (
     SingleEntityActionAuditLogMonitor,
 )
-from ai.backend.manager.actions.single_entity.monitor.prometheus import (
+from ai.backend.manager.actions.v2.single_entity.monitor.prometheus import (
     SingleEntityActionPrometheusMonitor,
 )
-from ai.backend.manager.actions.single_entity.monitor.reporter import (
+from ai.backend.manager.actions.v2.single_entity.monitor.reporter import (
     SingleEntityActionReporterMonitor,
 )
-from ai.backend.manager.actions.single_entity.validator.rbac import (
+from ai.backend.manager.actions.v2.single_entity.validator.rbac import (
     VirtualScopeSingleEntityActionRBACValidator,
 )
 from ai.backend.manager.actions.validators import ActionValidators
@@ -253,23 +268,35 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         reporter_monitor = ReporterMonitor(reporter_hub)
         prometheus_monitor = PrometheusMonitor()
         audit_log_repository = setup_input.repositories.audit_log.repository
-        audit_log_monitor = AuditLogMonitor(audit_log_repository)
+        audit_log_policy = AuditLogPolicy(
+            setup_input.config_provider.config.audit_log.record_read_operations
+        )
+        audit_log_monitor = AuditLogMonitor(audit_log_repository, audit_log_policy)
         action_monitors = ActionMonitors(
             legacy=[reporter_monitor, prometheus_monitor, audit_log_monitor],
             single_entity=[
                 SingleEntityActionReporterMonitor(reporter_hub),
                 SingleEntityActionPrometheusMonitor(),
-                SingleEntityActionAuditLogMonitor(audit_log_repository),
+                SingleEntityActionAuditLogMonitor(audit_log_repository, audit_log_policy),
             ],
             bulk=[
                 BulkActionReporterMonitor(reporter_hub),
                 BulkActionPrometheusMonitor(),
-                BulkActionAuditLogMonitor(audit_log_repository),
+                BulkActionAuditLogMonitor(audit_log_repository, audit_log_policy),
             ],
             scope=[
                 ScopeActionReporterMonitor(reporter_hub),
                 ScopeActionPrometheusMonitor(),
-                ScopeActionAuditLogMonitor(audit_log_repository),
+                ScopeActionAuditLogMonitor(audit_log_repository, audit_log_policy),
+            ],
+            global_scope=[
+                GlobalActionReporterMonitor(reporter_hub),
+                GlobalActionPrometheusMonitor(),
+                GlobalActionAuditLogMonitor(audit_log_repository, audit_log_policy),
+            ],
+            lookup=[
+                LookupActionPrometheusMonitor(),
+                LookupActionAuditLogMonitor(audit_log_repository, audit_log_policy),
             ],
         )
 
@@ -341,6 +368,11 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                     rbac=rbac_validators,
                     legacy_rbac=legacy_rbac_validators,
                     virtual_scope_rbac=virtual_scope_rbac_validators,
+                ),
+                v2_validators=v2_validators.ActionValidators(
+                    single_entity=[virtual_scope_rbac_validators.single_entity],
+                    bulk=[virtual_scope_rbac_validators.bulk],
+                    scope=[virtual_scope_rbac_validators.scope],
                 ),
             ),
         )

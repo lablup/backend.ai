@@ -25,7 +25,7 @@ The gateway is configured via `gateway.config.ts` which includes:
 
 ## Subgraphs
 
-The federated graph consists of two subgraphs:
+The federated graph consists of three subgraphs:
 
 1. **graphene**: Legacy GraphQL API (`/admin/gql`)
    - Schema: `../../docs/manager/graphql-reference/schema.graphql`
@@ -33,6 +33,10 @@ The federated graph consists of two subgraphs:
 2. **strawberry**: New GraphQL API (`/admin/gql/strawberry`)
    - Schema: `../../docs/manager/graphql-reference/v2-schema.graphql`
    - Supports WebSocket subscriptions via `graphql-ws` protocol
+
+3. **public**: Unauthenticated fields (`/admin/gql/strawberry/public`)
+   - Schema: `../../docs/manager/graphql-reference/v2-public-schema.graphql`
+   - The only routing URL without auth middleware — an anonymous query resolves here alone
 
 ## Schema Updates
 

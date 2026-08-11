@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ai.backend.common.exception import (
     DomainNotFound,
 )
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import ResourceSlot, Sentinel
 from ai.backend.manager.data.domain.types import (
     DomainData,
@@ -57,6 +58,9 @@ from ai.backend.manager.services.domain.actions.modify_domain_node import (
     ModifyDomainNodeActionResult,
 )
 from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
+from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_id_by_name import (
+    ResolveResourceGroupIDByNameAction,
+)
 from ai.backend.manager.types import OptionalState, TriState
 
 from .base import (
@@ -344,6 +348,19 @@ class DomainConnection(Connection):
         description = "Added in 24.12.0"
 
 
+async def _resolve_sgroup_ids(
+    graph_ctx: GraphQueryContext,
+    sgroup_names: Iterable[str],
+) -> list[ResourceGroupID]:
+    resolved: list[ResourceGroupID] = []
+    for name in sgroup_names:
+        result = await graph_ctx.processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
+            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(name))
+        )
+        resolved.append(result.resource_group_id)
+    return resolved
+
+
 async def _ensure_sgroup_permission(
     graph_ctx: GraphQueryContext, sgroup_names: Iterable[str], *, db_session: AsyncSession
 ) -> None:
@@ -380,7 +397,11 @@ class CreateDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
 
     scaling_groups = graphene.List(lambda: graphene.String, required=False)
 
-    def to_action(self, user_info: UserInfo) -> CreateDomainNodeAction:
+    def to_action(
+        self,
+        user_info: UserInfo,
+        scaling_group_ids: list[ResourceGroupID] | None,
+    ) -> CreateDomainNodeAction:
         def value_or_none(value: Any) -> Any:
             return value if value is not graphql.Undefined else None
 
@@ -402,7 +423,7 @@ class CreateDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
                 )
             ),
             user_info=user_info,
-            scaling_groups=value_or_none(self.scaling_groups),
+            scaling_group_ids=scaling_group_ids,
         )
 
 
@@ -435,9 +456,13 @@ class CreateDomainNode(graphene.Mutation):  # type: ignore[misc]
             domain_name=graph_ctx.user["domain_name"],
         )
 
+        scaling_group_ids: list[ResourceGroupID] | None = None
+        if input.scaling_groups is not graphql.Undefined and input.scaling_groups is not None:
+            scaling_group_ids = await _resolve_sgroup_ids(graph_ctx, input.scaling_groups)
+
         res: CreateDomainNodeActionResult = (
             await graph_ctx.processors.domain.create_domain_node.wait_for_complete(
-                input.to_action(user_info)
+                input.to_action(user_info, scaling_group_ids)
             )
         )
 
@@ -469,7 +494,13 @@ class ModifyDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
             return converter(field_value)
         return field_value
 
-    def to_action(self, name: str, user_info: UserInfo) -> ModifyDomainNodeAction:
+    def to_action(
+        self,
+        name: str,
+        user_info: UserInfo,
+        sgroup_ids_to_add: set[ResourceGroupID] | None,
+        sgroup_ids_to_remove: set[ResourceGroupID] | None,
+    ) -> ModifyDomainNodeAction:
         spec = DomainNodeUpdaterSpec(
             description=TriState[str].from_graphql(
                 self.description,
@@ -496,12 +527,8 @@ class ModifyDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
         return ModifyDomainNodeAction(
             user_info=user_info,
             updater=Updater(spec=spec, pk_value=name),
-            sgroups_to_add=set(self.sgroups_to_add)
-            if self.sgroups_to_add is not Undefined
-            else None,
-            sgroups_to_remove=set(self.sgroups_to_remove)
-            if self.sgroups_to_remove is not Undefined
-            else None,
+            sgroup_ids_to_add=sgroup_ids_to_add,
+            sgroup_ids_to_remove=sgroup_ids_to_remove,
         )
 
 
@@ -532,9 +559,23 @@ class ModifyDomainNode(graphene.Mutation):  # type: ignore[misc]
             role=graph_ctx.user["role"],
             domain_name=graph_ctx.user["domain_name"],
         )
+        sgroup_ids_to_add: set[ResourceGroupID] | None = None
+        if input.sgroups_to_add is not Undefined and input.sgroups_to_add is not None:
+            sgroup_ids_to_add = set(await _resolve_sgroup_ids(graph_ctx, input.sgroups_to_add))
+        sgroup_ids_to_remove: set[ResourceGroupID] | None = None
+        if input.sgroups_to_remove is not Undefined and input.sgroups_to_remove is not None:
+            sgroup_ids_to_remove = set(
+                await _resolve_sgroup_ids(graph_ctx, input.sgroups_to_remove)
+            )
+
         res: ModifyDomainNodeActionResult = (
             await graph_ctx.processors.domain.modify_domain_node.wait_for_complete(
-                input.to_action(name=domain_name, user_info=user_info)
+                input.to_action(
+                    name=domain_name,
+                    user_info=user_info,
+                    sgroup_ids_to_add=sgroup_ids_to_add,
+                    sgroup_ids_to_remove=sgroup_ids_to_remove,
+                )
             )
         )
 

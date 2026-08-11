@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship, selectinload
+from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.identifier.deployment import DeploymentID
@@ -34,9 +34,7 @@ from ai.backend.manager.models.base import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
     from ai.backend.manager.models.endpoint import EndpointRow
-    from ai.backend.manager.models.replica_group import ReplicaGroupRow
     from ai.backend.manager.models.session import SessionRow
 
 
@@ -46,19 +44,7 @@ __all__ = ("RouteStatus", "RoutingRow")
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def _get_deployment_revision_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-
-    return RoutingRow.revision == DeploymentRevisionRow.id
-
-
-def _get_replica_group_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.replica_group import ReplicaGroupRow
-
-    return foreign(RoutingRow.replica_group_id) == ReplicaGroupRow.id
-
-
-class RoutingRow(Base):  # type: ignore[misc]
+class RoutingRow(Base):
     __tablename__ = "routings"
     __table_args__ = (
         sa.UniqueConstraint("endpoint", "session", name="uq_routings_endpoint_session"),
@@ -170,18 +156,7 @@ class RoutingRow(Base):  # type: ignore[misc]
 
     endpoint_row: Mapped[EndpointRow] = relationship("EndpointRow", back_populates="routings")
     session_row: Mapped[SessionRow | None] = relationship(
-        "SessionRow", back_populates="routing", foreign_keys="RoutingRow.session"
-    )
-    revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
-        "DeploymentRevisionRow",
-        primaryjoin=_get_deployment_revision_join_condition,
-        foreign_keys="RoutingRow.revision",
-        viewonly=True,
-    )
-    replica_group_row: Mapped[ReplicaGroupRow | None] = relationship(
-        "ReplicaGroupRow",
-        primaryjoin=_get_replica_group_join_condition,
-        viewonly=True,
+        "SessionRow", foreign_keys="RoutingRow.session"
     )
 
     @classmethod

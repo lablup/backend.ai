@@ -16,6 +16,7 @@ from ai.backend.common.types import (
     BackendAISchema,
     PreemptionMode,
     PreemptionOrder,
+    PreemptionVictimScope,
     ResourceSlot,
     SessionTypes,
     SlotQuantity,
@@ -78,6 +79,7 @@ class PreemptionConfig:
     order: PreemptionOrder = PreemptionOrder.OLDEST
     mode: PreemptionMode = PreemptionMode.TERMINATE
     preemption_min_runtime: timedelta = timedelta(seconds=0)
+    victim_scope: PreemptionVictimScope = PreemptionVictimScope.USER
 
 
 @dataclass
@@ -109,6 +111,7 @@ class ScalingGroupSchedulerOptions:
                 "order": self.preemption.order.value,
                 "mode": self.preemption.mode.value,
                 "preemption_min_runtime": self.preemption.preemption_min_runtime.total_seconds(),
+                "victim_scope": self.preemption.victim_scope.value,
             },
         }
 

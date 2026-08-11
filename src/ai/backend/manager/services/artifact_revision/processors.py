@@ -1,8 +1,5 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.artifact_revision.actions.approve import (
     ApproveArtifactRevisionAction,
@@ -59,7 +56,7 @@ from ai.backend.manager.services.artifact_revision.actions.search import (
 from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
 
 
-class ArtifactRevisionProcessors(AbstractProcessorPackage):
+class ArtifactRevisionProcessors:
     get: ActionProcessor[GetArtifactRevisionAction, GetArtifactRevisionActionResult]
     get_readme: ActionProcessor[
         GetArtifactRevisionReadmeAction, GetArtifactRevisionReadmeActionResult
@@ -118,21 +115,3 @@ class ArtifactRevisionProcessors(AbstractProcessorPackage):
         self.disassociate_with_storage = ActionProcessor(
             service.disassociate_with_storage, action_monitors
         )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            GetArtifactRevisionAction.spec(),
-            GetArtifactRevisionReadmeAction.spec(),
-            GetArtifactRevisionVerificationResultAction.spec(),
-            GetDownloadProgressAction.spec(),
-            SearchArtifactRevisionsAction.spec(),
-            ApproveArtifactRevisionAction.spec(),
-            RejectArtifactRevisionAction.spec(),
-            ImportArtifactRevisionAction.spec(),
-            CancelImportAction.spec(),
-            CleanupArtifactRevisionAction.spec(),
-            AssociateWithStorageAction.spec(),
-            DisassociateWithStorageAction.spec(),
-            DelegateImportArtifactRevisionBatchAction.spec(),
-        ]

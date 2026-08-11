@@ -19,8 +19,11 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentBulkResult,
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
+    AppConfigFragmentUpsertBulkResult,
+    AppConfigFragmentUpsertItemError,
 )
 from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
     AppConfigFragmentPurgerSpec,
 )
@@ -28,15 +31,12 @@ from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
 from ai.backend.manager.repositories.app_config_fragment.types import (
-    AppConfigFragmentSearchScope,
+    AppConfigFragmentOperationScope,
 )
 from ai.backend.manager.repositories.app_config_fragment.upserters import (
     AppConfigFragmentUpserterSpec,
 )
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
-)
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
     AdminSearchAppConfigFragmentAction,
 )
@@ -69,8 +69,14 @@ _DOMAIN_SCOPE_ID = AppConfigScopeID(_DOMAIN_ID)
 class _ScopedSearchCase:
     """One scope a scoped search runs at, and the RBAC scope id it reports."""
 
-    scope: AppConfigFragmentSearchScope
+    scope: AppConfigFragmentOperationScope
     expected_rbac_scope_id: str
+
+
+@pytest.fixture
+def rejected_upsert_item() -> AppConfigFragmentUpsertItemError:
+    """One rejected item for the repository mock to return alongside the written fragment."""
+    return AppConfigFragmentUpsertItemError(config_name="menu", message="not allow-listed")
 
 
 @pytest.fixture
@@ -143,9 +149,14 @@ class TestAppConfigFragmentService:
         service: AppConfigFragmentService,
         mock_repository: MagicMock,
         scoped_fragment: AppConfigFragmentData,
+        rejected_upsert_item: AppConfigFragmentUpsertItemError,
         case: _RBACScopeCase,
     ) -> None:
-        mock_repository.bulk_upsert = AsyncMock(return_value=[scoped_fragment])
+        mock_repository.bulk_upsert = AsyncMock(
+            return_value=AppConfigFragmentUpsertBulkResult(
+                items=[scoped_fragment], failed=[rejected_upsert_item]
+            )
+        )
         specs = [
             AppConfigFragmentUpserterSpec(
                 config_name="theme",
@@ -154,13 +165,14 @@ class TestAppConfigFragmentService:
                 config={"k": "v"},
             )
         ]
-        scope = AppConfigFragmentSearchScope(scope_type=case.scope_type, scope_id=case.scope_id)
+        scope = AppConfigFragmentOperationScope(scope_type=case.scope_type, scope_id=case.scope_id)
 
         result = await service.bulk_upsert(
             BulkUpsertAppConfigFragmentsAction(scope=scope, upserter_specs=specs)
         )
 
-        assert result.fragments == [scoped_fragment]
+        assert result.items == [scoped_fragment]
+        assert result.failed == [rejected_upsert_item]
         # The result reports the RBAC scope the upsert was authorized at.
         assert result.scope_type() == case.expected_scope_type
         assert result.scope_id() == case.expected_scope_id
@@ -228,13 +240,13 @@ class TestAppConfigFragmentService:
         "case",
         [
             _ScopedSearchCase(
-                scope=AppConfigFragmentSearchScope(
+                scope=AppConfigFragmentOperationScope(
                     scope_type=AppConfigScopeType.DOMAIN, scope_id=_DOMAIN_SCOPE_ID
                 ),
                 expected_rbac_scope_id=str(_DOMAIN_SCOPE_ID),
             ),
             _ScopedSearchCase(
-                scope=AppConfigFragmentSearchScope(
+                scope=AppConfigFragmentOperationScope(
                     scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
                 ),
                 expected_rbac_scope_id=str(_USER_SCOPE_ID),
@@ -353,7 +365,9 @@ class TestUpsertActionScope:
     )
     def test_scope_follows_the_written_scope(self, case: _RBACScopeCase) -> None:
         action = BulkUpsertAppConfigFragmentsAction(
-            scope=AppConfigFragmentSearchScope(scope_type=case.scope_type, scope_id=case.scope_id),
+            scope=AppConfigFragmentOperationScope(
+                scope_type=case.scope_type, scope_id=case.scope_id
+            ),
             upserter_specs=[
                 AppConfigFragmentUpserterSpec(
                     config_name="theme",

@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 __all__ = ("LoginClientTypeRow",)
 
 
-class LoginClientTypeRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class LoginClientTypeRow(CreatedAtMixin, Base):
     __tablename__ = "login_client_types"
 
     id: Mapped[uuid.UUID] = mapped_column(

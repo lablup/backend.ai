@@ -206,6 +206,7 @@ from ai.backend.common.data.storage.types import ArtifactStorageImportStep, Name
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
     CompositeType,
     ConfigExample,
@@ -222,6 +223,7 @@ from ai.backend.common.typed_validators import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.config import LoggingConfig
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW
 from ai.backend.manager.pglock import PgAdvisoryLock
@@ -818,10 +820,14 @@ class ManagerConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "List of trusted reverse proxy IP addresses or CIDR ranges. "
-                "When configured, the manager uses aiohttp_remotes.XForwardedStrict middleware "
-                "to securely resolve client IPs from X-Forwarded-For headers. "
-                "Only proxies in this list are trusted to set forwarding headers. "
-                "If empty (default), the manager falls back to manual X-Forwarded-For parsing."
+                "When configured, the client IP is resolved by walking the X-Forwarded-For chain "
+                "inwards from the peer of the connection and taking the first address that is not "
+                "one of these proxies, so any number of proxy hops is supported. "
+                "The X-Forwarded-URL header, which overrides the host and path used for HMAC "
+                "signature verification, is honored only when the request comes directly from one "
+                "of these proxies. "
+                "If empty (default), the manager falls back to manual X-Forwarded-For parsing and "
+                "accepts X-Forwarded-URL from any client, which is deprecated."
             ),
             added_version="26.4.2",
             example=ConfigExample(local="", prod='["10.0.0.0/8", "172.16.0.0/12"]'),
@@ -1497,6 +1503,49 @@ class ActionMonitorsConfig(BaseConfigSchema):
             example=ConfigExample(local="smtp", prod="smtp"),
         ),
     ]
+
+
+class AuditLogConfig(BaseConfigSchema):
+    """Which action runs are written to the audit log.
+
+    Mutating operations are always recorded and cannot be switched off — the minimum
+    guarantee of an audit trail must not be removable by configuration. Failures and
+    permission denials are likewise always recorded. Only *successful* reads are
+    configurable, because they are what generates volume.
+    """
+
+    record_read_operations: Annotated[
+        list[ActionOperationType],
+        Field(
+            default=[],
+            validation_alias=AliasChoices("record-read-operations", "record_read_operations"),
+            serialization_alias="record-read-operations",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Opt-in list: a read operation is recorded only if it is named here. The "
+                "default is an empty list, so successful reads are not recorded at all and "
+                "read volume stays off until an operator turns it on. A listed operation is "
+                "recorded for every entity type. Must be 'get', 'search' or 'lookup': mutating "
+                "operations are always recorded and listing them here is rejected. Failed "
+                "and denied reads are recorded either way."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+        ),
+    ]
+
+    @field_validator("record_read_operations")
+    @classmethod
+    def _reject_mutating_operations(
+        cls, value: list[ActionOperationType]
+    ) -> list[ActionOperationType]:
+        rejected = [op for op in value if op not in ActionOperationType.read_operations()]
+        if rejected:
+            raise ValueError(
+                f"{', '.join(rejected)} is not a read operation; mutating operations are "
+                "always recorded and cannot be listed here"
+            )
+        return value
 
 
 class ReporterConfig(BaseConfigSchema):
@@ -3519,6 +3568,24 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "can be independently configured."
             ),
             added_version="25.8.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+
+    audit_log: Annotated[
+        AuditLogConfig,
+        Field(
+            default_factory=AuditLogConfig,
+            validation_alias=AliasChoices("audit_log", "audit-log"),
+            serialization_alias="audit-log",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Audit log recording policy. Mutating operations are always recorded, as are "
+                "failures and permission denials; this section only opts successful read "
+                "operations in."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
             composite=CompositeType.FIELD,
         ),
     ]

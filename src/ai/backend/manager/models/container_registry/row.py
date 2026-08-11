@@ -13,9 +13,11 @@ import yarl
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship
+from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.exception import UnknownImageRegistry
+from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.container_registry import (
@@ -32,7 +34,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.association_container_registries_groups import (
         AssociationContainerRegistriesGroupsRow,
     )
-    from ai.backend.manager.models.image import ImageRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -97,12 +98,6 @@ class ContainerRegistryValidator:
                 pass
 
 
-def _get_image_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.image import ImageRow
-
-    return ContainerRegistryRow.id == foreign(ImageRow.registry_id)
-
-
 def _get_association_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.association_container_registries_groups import (
         AssociationContainerRegistriesGroupsRow,
@@ -111,7 +106,7 @@ def _get_association_join_condition() -> sa.ColumnElement[bool]:
     return ContainerRegistryRow.id == foreign(AssociationContainerRegistriesGroupsRow.registry_id)
 
 
-class ContainerRegistryRow(Base):  # type: ignore[misc]
+class ContainerRegistryRow(Base):
     __tablename__ = "container_registries"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -144,17 +139,10 @@ class ContainerRegistryRow(Base):  # type: ignore[misc]
         "extra", sa.JSON, nullable=True, default=None
     )
 
-    image_rows: Mapped[list[ImageRow]] = relationship(
-        "ImageRow",
-        back_populates="registry_row",
-        primaryjoin=_get_image_join_condition,
-    )
-
     association_container_registries_groups_rows: Mapped[
         list[AssociationContainerRegistriesGroupsRow]
     ] = relationship(
         "AssociationContainerRegistriesGroupsRow",
-        back_populates="container_registry_row",
         primaryjoin=_get_association_join_condition,
     )
 
@@ -259,6 +247,14 @@ class ContainerRegistryRow(Base):  # type: ignore[misc]
                 result[project] = {}
             result[project][registry_name] = yarl.URL(url)
         return result
+
+    @classmethod
+    def scope_id_expr(cls) -> SQLColumnExpression[ScopeID]:
+        return cls.id
+
+    @classmethod
+    def scope_name_expr(cls) -> SQLColumnExpression[str]:
+        return cls.registry_name
 
     @classmethod
     def from_dataclass(cls, data: ContainerRegistryData) -> Self:

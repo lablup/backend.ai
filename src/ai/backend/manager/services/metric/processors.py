@@ -1,8 +1,5 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.metric.actions.container import (
     ContainerMetricAction,
@@ -17,7 +14,7 @@ from ai.backend.manager.services.metric.actions.live_stat import (
 from ai.backend.manager.services.metric.service import MetricService
 
 
-class MetricProcessors(AbstractProcessorPackage):
+class MetricProcessors:
     query_container: ActionProcessor[ContainerMetricAction, ContainerMetricActionResult]
     query_container_metadata: ActionProcessor[
         ContainerMetricMetadataAction, ContainerMetricMetadataActionResult
@@ -39,11 +36,3 @@ class MetricProcessors(AbstractProcessorPackage):
         self.query_container_live_stat = ActionProcessor(
             service.query_container_live_stats, action_monitors
         )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            ContainerMetricAction.spec(),
-            ContainerMetricMetadataAction.spec(),
-            ContainerLiveStatAction.spec(),
-        ]

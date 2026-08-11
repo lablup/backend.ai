@@ -21,5 +21,27 @@
       "uuid": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
       "main_access_key": "AKIANAMONITOREXAMPLE"
     }
+  ],
+  "keypairs": [
+    {
+      "access_key": "AKIAIOSFODNN7EXAMPLE",
+      "is_default": true
+    },
+    {
+      "access_key": "AKIAHUKCHDEZGEXAMPLE",
+      "is_default": true
+    },
+    {
+      "access_key": "AKIANABBDUSEREXAMPLE",
+      "is_default": true
+    },
+    {
+      "access_key": "AKIANATWOUSEREXAMPLE",
+      "is_default": true
+    },
+    {
+      "access_key": "AKIANAMONITOREXAMPLE",
+      "is_default": true
+    }
   ]
 }

@@ -32,8 +32,9 @@ from ai.backend.manager.errors.image import (
     HarborWebhookContainerRegistryRowNotFound,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )

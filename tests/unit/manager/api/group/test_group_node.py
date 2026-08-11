@@ -198,7 +198,7 @@ class TestGroupNodeQuery:
         row.description = "Test group"
         row.is_active = True
         row.created_at = datetime.now(tz=UTC)
-        row.modified_at = datetime.now(tz=UTC)
+        row.updated_at = datetime.now(tz=UTC)
         row.domain_name = "default"
         row.total_resource_slots = ResourceSlot({})
         # VFolderHostPermissionColumn.process_result_value() returns VFolderHostPermissionMap

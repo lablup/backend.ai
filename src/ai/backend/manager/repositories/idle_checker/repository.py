@@ -3,11 +3,13 @@ from __future__ import annotations
 from collections.abc import Collection, Sequence
 
 from ai.backend.common.data.idle_checker.types import IdleCheckPhase
+from ai.backend.common.identifier.idle_checker import IdleCheckerID
+from ai.backend.common.identifier.session import SessionID
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData, IdleCheckerData
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
-from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
@@ -24,7 +26,6 @@ from ai.backend.manager.repositories.idle_checker.types import (
     InitialGracePeriodBatchData,
     SessionIdleCheckAssignmentData,
     SessionIdleCheckPair,
-    SessionIdleCheckTarget,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
@@ -74,7 +75,7 @@ class IdleCheckerRepository:
     async def scoped_search_assignments(
         self,
         querier: BatchQuerier,
-        scopes: Sequence[SearchScope],
+        scopes: Sequence[OperationScope],
     ) -> SearchResult[IdleCheckerAssignmentData]:
         """Search bindings whose rows match any of ``scopes`` (OR), narrowed by ``querier``."""
         return await self._db_source.scoped_search_assignments(querier, scopes)
@@ -111,18 +112,6 @@ class IdleCheckerRepository:
             pairs_to_delete,
         )
 
-    async def exclude_session_idle_checks(
-        self,
-        target: SessionIdleCheckTarget,
-    ) -> None:
-        await self._db_source.exclude_session_idle_checks(target)
-
-    async def include_session_idle_checks(
-        self,
-        target: SessionIdleCheckTarget,
-    ) -> None:
-        await self._db_source.include_session_idle_checks(target)
-
     async def batch_update_session_idle_check_phase(
         self,
         pairs: Sequence[SessionIdleCheckPair],
@@ -135,6 +124,20 @@ class IdleCheckerRepository:
             from_phase=from_phase,
             to_phase=to_phase,
         )
+
+    async def batch_exclude_session_idle_checks(
+        self,
+        checker_id: IdleCheckerID,
+        session_ids: Sequence[SessionID],
+    ) -> None:
+        await self._db_source.batch_exclude_session_idle_checks(checker_id, session_ids)
+
+    async def batch_include_session_idle_checks(
+        self,
+        checker_id: IdleCheckerID,
+        session_ids: Sequence[SessionID],
+    ) -> None:
+        await self._db_source.batch_include_session_idle_checks(checker_id, session_ids)
 
     async def batch_apply_session_idle_check_judgments(
         self,

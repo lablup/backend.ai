@@ -9,6 +9,7 @@ import sqlalchemy as sa
 from graphql import Undefined
 
 from ai.backend.common.container_registry import AllowedGroupsModel
+from ai.backend.common.identifier.container_registry import ContainerRegistryID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryValidator,
@@ -244,7 +245,9 @@ class DeleteContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
         result = (
             await ctx.processors.container_registry.delete_container_registry.wait_for_complete(
                 DeleteContainerRegistryAction(
-                    purger=Purger(spec=ContainerRegistryPurgerSpec(registry_id=reg_id))
+                    purger=Purger(
+                        spec=ContainerRegistryPurgerSpec(registry_id=ContainerRegistryID(reg_id))
+                    )
                 )
             )
         )

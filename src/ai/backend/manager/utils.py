@@ -5,9 +5,9 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.types import AccessKey
 
-from .data.permission.types import EntityType, ScopeType
 from .data.user.types import SessionOwnerContext
 from .errors.api import InvalidAPIParameters
 from .errors.auth import AccessKeyNotFound, UserNotFound
@@ -15,9 +15,9 @@ from .errors.common import InternalServerError
 from .models.domain import domains
 from .models.group import groups
 from .models.keypair import keypairs
-from .models.rbac_models.association_scopes_entities import AssociationScopesEntitiesRow
 from .models.resource_policy import keypair_resource_policies
 from .models.user import UserRole, users
+from .models.virtual_scope.queries import user_scope_membership_exists
 
 
 def check_if_requester_is_eligible_to_act_as_target_user(
@@ -212,16 +212,9 @@ async def query_userinfo(
             raise InvalidAPIParameters("You can only set the domain to your domain.")
         query = (
             sa.select(groups.c.id)
-            .select_from(
-                groups.join(
-                    AssociationScopesEntitiesRow,
-                    AssociationScopesEntitiesRow.scope_id == sa.cast(groups.c.id, sa.String),
-                )
-            )
+            .select_from(groups)
             .where(
-                (AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT)
-                & (AssociationScopesEntitiesRow.entity_type == EntityType.USER)
-                & (AssociationScopesEntitiesRow.entity_id == str(owner_uuid))
+                user_scope_membership_exists(PROJECT_SCOPE_TYPE, groups.c.id, owner_uuid)
                 & (groups.c.domain_name == owner_domain)
                 & (group_match_query)
                 & (groups.c.is_active),
@@ -373,16 +366,9 @@ async def query_userinfo_from_session(
             raise InvalidAPIParameters("You can only set the domain to your domain.")
         query = (
             sa.select(groups.c.id)
-            .select_from(
-                groups.join(
-                    AssociationScopesEntitiesRow,
-                    AssociationScopesEntitiesRow.scope_id == sa.cast(groups.c.id, sa.String),
-                )
-            )
+            .select_from(groups)
             .where(
-                (AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT)
-                & (AssociationScopesEntitiesRow.entity_type == EntityType.USER)
-                & (AssociationScopesEntitiesRow.entity_id == str(owner_uuid))
+                user_scope_membership_exists(PROJECT_SCOPE_TYPE, groups.c.id, owner_uuid)
                 & (groups.c.domain_name == owner_domain)
                 & (group_match_query)
                 & (groups.c.is_active),

@@ -327,9 +327,9 @@ class TestAgentResourceStatsPayload:
 
     def test_round_trip(self) -> None:
         payload = AgentResourceStatsPayload(
-            total_used_slots={"cpu": "8", "mem": "32g", "cuda.devices": "2"},
-            total_free_slots={"cpu": "24", "mem": "96g", "cuda.devices": "6"},
-            total_capacity_slots={"cpu": "32", "mem": "128g", "cuda.devices": "8"},
+            total_used_slots={"cpu": "8", "mem": "32g", "cuda.device": "2"},
+            total_free_slots={"cpu": "24", "mem": "96g", "cuda.device": "6"},
+            total_capacity_slots={"cpu": "32", "mem": "128g", "cuda.device": "8"},
         )
         json_str = payload.model_dump_json()
         restored = AgentResourceStatsPayload.model_validate_json(json_str)

@@ -3,6 +3,25 @@
 Re-exports all public APIs for backward compatibility.
 """
 
+from ai.backend.manager.models.specs.lookup import DataLookup
+from ai.backend.manager.models.specs.pagination import (
+    CursorBackwardPagination,
+    CursorForwardPagination,
+    NoPagination,
+    OffsetPagination,
+    PageInfoResult,
+    QueryPagination,
+)
+from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.specs.searcher import (
+    Searcher,
+    SearcherResult,
+)
+from ai.backend.manager.models.specs.types import (
+    BulkResultWithFailures,
+    IntegrityErrorCheck,
+)
+
 from .creator import (
     BulkCreator,
     BulkCreatorError,
@@ -11,6 +30,7 @@ from .creator import (
     Creator,
     CreatorResult,
     CreatorSpec,
+    DataCreator,
     DependentCreatorSpec,
     NextValuePolicy,
     execute_bulk_creator,
@@ -35,20 +55,14 @@ from .integrity import (
     match_integrity_error,
     parse_integrity_error,
 )
-from .pagination import (
-    CursorBackwardPagination,
-    CursorForwardPagination,
-    NoPagination,
-    OffsetPagination,
-    PageInfoResult,
-    QueryPagination,
-)
 from .purger import (
     BatchPurger,
     BatchPurgerResult,
     BatchPurgerSpec,
     BulkPurgerError,
     BulkPurgerResultWithFailures,
+    DataBatchPurger,
+    DataPurger,
     Purger,
     PurgerResult,
     execute_batch_purger,
@@ -64,13 +78,8 @@ from .querier import (
     execute_batch_querier,
     execute_querier,
 )
-from .searcher import (
-    Searcher,
-    SearcherResult,
-)
 from .types import (
     CursorConditionFactory,
-    IntegrityErrorCheck,
 )
 from .updater import (
     BatchUpdater,
@@ -78,6 +87,8 @@ from .updater import (
     BatchUpdaterSpec,
     BulkUpdaterError,
     BulkUpdaterResult,
+    DataBatchUpdater,
+    DataUpdater,
     Updater,
     UpdaterResult,
     UpdaterSpec,
@@ -88,6 +99,7 @@ from .updater import (
 from .upserter import (
     BulkUpserter,
     BulkUpserterResult,
+    DataUpserter,
     Upserter,
     UpserterResult,
     UpserterSpec,
@@ -102,6 +114,7 @@ from .utils import (
 
 __all__ = [
     # Types
+    "BulkResultWithFailures",
     "CursorConditionFactory",
     "IntegrityErrorCheck",
     # Integrity
@@ -125,6 +138,8 @@ __all__ = [
     "CursorBackwardPagination",
     "PageInfoResult",
     # Querier
+    "DataLookup",
+    "DataQuerier",
     "Querier",
     "QuerierResult",
     "execute_querier",
@@ -138,6 +153,7 @@ __all__ = [
     "SearcherResult",
     # Creator
     "CreatorSpec",
+    "DataCreator",
     "Creator",
     "CreatorResult",
     "execute_creator",
@@ -157,6 +173,8 @@ __all__ = [
     "execute_bulk_creator_partial",
     # Updater
     "UpdaterSpec",
+    "DataBatchUpdater",
+    "DataUpdater",
     "Updater",
     "UpdaterResult",
     "execute_updater",
@@ -171,6 +189,7 @@ __all__ = [
     "execute_bulk_updater_partial",
     # Upserter
     "UpserterSpec",
+    "DataUpserter",
     "Upserter",
     "UpserterResult",
     "execute_upserter",
@@ -179,6 +198,8 @@ __all__ = [
     "BulkUpserterResult",
     "execute_bulk_upserter",
     # Purger
+    "DataBatchPurger",
+    "DataPurger",
     "Purger",
     "PurgerResult",
     "execute_purger",

@@ -15,6 +15,7 @@ import pytest
 
 from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
 from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermission, VFolderHostPermissionMap
 from ai.backend.manager.data.domain.types import DomainData, UserInfo
 from ai.backend.manager.errors.resource import (
@@ -668,7 +669,7 @@ class TestCreateDomainNode:
                 )
             ),
             user_info=admin_user,
-            scaling_groups=None,
+            scaling_group_ids=None,
         )
 
         result = await service.create_domain_node(action)
@@ -696,7 +697,7 @@ class TestCreateDomainNode:
                 )
             ),
             user_info=superadmin_user,
-            scaling_groups=["sg1", "sg2"],
+            scaling_group_ids=[ResourceGroupID(uuid4()), ResourceGroupID(uuid4())],
         )
 
         result = await service.create_domain_node(action)
@@ -906,14 +907,17 @@ class TestModifyDomainNode:
         superadmin_user: UserInfo,
     ) -> None:
         """Modify domain node with overlapping add/remove scaling groups should raise error."""
+        sg1 = ResourceGroupID(uuid4())
+        sg2 = ResourceGroupID(uuid4())
+        sg3 = ResourceGroupID(uuid4())
         action = ModifyDomainNodeAction(
             user_info=superadmin_user,
             updater=Updater(
                 spec=DomainNodeUpdaterSpec(),
                 pk_value="test-domain",
             ),
-            sgroups_to_add={"sg1", "sg2"},
-            sgroups_to_remove={"sg1", "sg3"},  # sg1 overlaps
+            sgroup_ids_to_add={sg1, sg2},
+            sgroup_ids_to_remove={sg1, sg3},  # sg1 overlaps
         )
 
         with pytest.raises(InvalidAPIParameters):
@@ -937,8 +941,8 @@ class TestModifyDomainNode:
                 spec=DomainNodeUpdaterSpec(),
                 pk_value="test-domain",
             ),
-            sgroups_to_add={"sg1", "sg2"},
-            sgroups_to_remove=None,
+            sgroup_ids_to_add={ResourceGroupID(uuid4()), ResourceGroupID(uuid4())},
+            sgroup_ids_to_remove=None,
         )
 
         result = await service.modify_domain_node(action)
@@ -964,8 +968,8 @@ class TestModifyDomainNode:
                 spec=DomainNodeUpdaterSpec(),
                 pk_value="test-domain",
             ),
-            sgroups_to_add=None,
-            sgroups_to_remove={"sg3"},
+            sgroup_ids_to_add=None,
+            sgroup_ids_to_remove={ResourceGroupID(uuid4())},
         )
 
         result = await service.modify_domain_node(action)
@@ -991,8 +995,8 @@ class TestModifyDomainNode:
                 spec=DomainNodeUpdaterSpec(),
                 pk_value="test-domain",
             ),
-            sgroups_to_add={"sg1", "sg2"},
-            sgroups_to_remove={"sg3", "sg4"},  # No overlap
+            sgroup_ids_to_add={ResourceGroupID(uuid4()), ResourceGroupID(uuid4())},
+            sgroup_ids_to_remove={ResourceGroupID(uuid4()), ResourceGroupID(uuid4())},  # No overlap
         )
 
         result = await service.modify_domain_node(action)
@@ -1018,8 +1022,8 @@ class TestModifyDomainNode:
                 spec=DomainNodeUpdaterSpec(),
                 pk_value="test-domain",
             ),
-            sgroups_to_add=set(),
-            sgroups_to_remove=set(),
+            sgroup_ids_to_add=set(),
+            sgroup_ids_to_remove=set(),
         )
 
         result = await service.modify_domain_node(action)

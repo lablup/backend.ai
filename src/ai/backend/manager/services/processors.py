@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, Any
 
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.registry import ProcessorRegistry
+from ai.backend.manager.actions.v2.validators import ActionValidators
 
 # fmt: off
 if TYPE_CHECKING:
@@ -53,9 +54,6 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.services.app_config_allow_list.processors import (
         AppConfigAllowListProcessors,
-    )
-    from ai.backend.manager.services.app_config_allow_list.service import (
-        AppConfigAllowListService,
     )
     from ai.backend.manager.services.app_config_definition.processors import (
         AppConfigDefinitionProcessors,
@@ -402,7 +400,6 @@ class ServiceArgs:
 class Services:
     agent: AgentService
     app_config: AppConfigService
-    app_config_allow_list: AppConfigAllowListService
     app_config_definition: AppConfigDefinitionService
     app_config_fragment: AppConfigFragmentService
     domain: DomainService
@@ -468,10 +465,11 @@ class ProcessorArgs:
     service_args: ServiceArgs
     event_hub: EventHub
     event_fetcher: EventFetcher
+    validators: ActionValidators
 
 
 @dataclass
-class Processors(AbstractProcessorPackage):
+class Processors:
     agent: AgentProcessors
     app_config: AppConfigProcessors
     app_config_allow_list: AppConfigAllowListProcessors
@@ -534,68 +532,13 @@ class Processors(AbstractProcessorPackage):
     login_client_type: LoginClientTypeProcessors
     login_client_type_admin: LoginClientTypeAdminProcessors
 
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            *self.agent.supported_actions(),
-            *self.app_config.supported_actions(),
-            *self.app_config_allow_list.supported_actions(),
-            *self.app_config_definition.supported_actions(),
-            *self.app_config_fragment.supported_actions(),
-            *self.domain.supported_actions(),
-            *self.dotfile.supported_actions(),
-            *self.error_log.supported_actions(),
-            *self.etcd_config.supported_actions(),
-            *self.export.supported_actions(),
-            *self.fair_share.supported_actions(),
-            *self.group.supported_actions(),
-            *self.user.supported_actions(),
-            *self.idle_checker.supported_actions(),
-            *self.image.supported_actions(),
-            *self.container_registry.supported_actions(),
-            *self.vfolder.supported_actions(),
-            *self.vfolder_admin.supported_actions(),
-            *self.vfolder_file.supported_actions(),
-            *self.vfolder_invite.supported_actions(),
-            *self.vfolder_sharing.supported_actions(),
-            *self.session.supported_actions(),
-            *self.keypair_resource_policy.supported_actions(),
-            *self.manager_admin.supported_actions(),
-            *self.user_resource_policy.supported_actions(),
-            *self.project_resource_policy.supported_actions(),
-            *self.prometheus_query_preset.supported_actions(),
-            *self.prometheus_query_preset_category.supported_actions(),
-            *self.resource_preset.supported_actions(),
-            *self.resource_slot.supported_actions(),
-            *self.retention_policy.supported_actions(),
-            *self.role_preset.supported_actions(),
-            *self.runtime_variant.supported_actions(),
-            *self.runtime_variant_preset.supported_actions(),
-            *self.deployment_revision_preset.supported_actions(),
-            *self.model_card.supported_actions(),
-            *self.resource_usage.supported_actions(),
-            *self.scaling_group.supported_actions(),
-            *self.metric.supported_actions(),
-            *self.model_serving.supported_actions(),
-            *self.model_serving_auto_scaling.supported_actions(),
-            *self.auth.supported_actions(),
-            *self.notification.supported_actions(),
-            *self.object_storage.supported_actions(),
-            *self.permission_controller.supported_actions(),
-            *self.vfs_storage.supported_actions(),
-            *self.artifact_registry.supported_actions(),
-            *self.artifact_revision.supported_actions(),
-            *self.artifact.supported_actions(),
-            *self.deployment.supported_actions(),
-            *self.storage_namespace.supported_actions(),
-            *self.audit_log.supported_actions(),
-            *self.idle_checker_assignment.supported_actions(),
-            *self.scheduling_history.supported_actions(),
-            *self.service_catalog.supported_actions(),
-            *self.template.supported_actions(),
-            *self.resource_allocation.supported_actions(),
-            *self.stream.supported_actions(),
-            *self.events.supported_actions(),
-            *self.login_client_type.supported_actions(),
-            *self.login_client_type_admin.supported_actions(),
-        ]
+
+@dataclass
+class ProcessorsBundle:
+    """What processor assembly hands back, without widening the Processors contract:
+    the processors themselves, plus the one registry every v2-wired package
+    registered through — its wired_specs() is the catalog of every registered
+    action."""
+
+    processors: Processors
+    registry: ProcessorRegistry[Any]

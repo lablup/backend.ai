@@ -56,6 +56,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentFilter as DeploymentFilterV2,
 )
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.identifier.vfolder import VFolderUUID
@@ -371,6 +372,7 @@ class TestDeploymentAdapterFilter:
             is_superadmin=True,
             role=UserRole.SUPERADMIN,
             domain_name=domain,
+            domain_id=DomainID(uuid.uuid4()),
         )
 
     @staticmethod
