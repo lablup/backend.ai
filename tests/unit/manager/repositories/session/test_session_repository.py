@@ -48,10 +48,11 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow, ResourceSlotTypeRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow, batch_populate_session_occupied_slots
-from ai.backend.manager.models.session_template import TemplateType, session_templates
+from ai.backend.manager.models.session_template import SessionTemplateRow, TemplateType
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.testutils.db import with_tables
 
@@ -939,7 +940,7 @@ class TestGetTemplateInfoById:
                 KeyPairResourcePolicyRow,
                 UserRow,
                 GroupRow,
-                session_templates,
+                SessionTemplateRow,
                 KeyPairRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -1036,7 +1037,7 @@ class TestGetTemplateInfoById:
             await db_sess.flush()
 
             await db_sess.execute(
-                sa.insert(session_templates).values(
+                sa.insert(SessionTemplateRow).values(
                     id=template_id,
                     is_active=is_active,
                     domain_name=domain_name,

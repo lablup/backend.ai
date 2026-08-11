@@ -44,21 +44,13 @@ from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 from ai.backend.manager.models.runtime_variant_preset.types import RuntimeVariantPresetValueEntry
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.endpoint import EndpointRow
     from ai.backend.manager.models.image import ImageRow
     from ai.backend.manager.models.resource_slot.row import DeploymentRevisionResourceSlotRow
-    from ai.backend.manager.models.routing import RoutingRow
     from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 
 __all__ = ("DeploymentRevisionRow",)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-def _get_endpoint_join_condition() -> sa.sql.elements.ColumnElement[Any]:
-    from ai.backend.manager.models.endpoint import EndpointRow
-
-    return foreign(DeploymentRevisionRow.endpoint) == EndpointRow.id
 
 
 def _get_image_join_condition() -> sa.sql.elements.ColumnElement[Any]:
@@ -73,13 +65,7 @@ def _get_runtime_variant_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     return foreign(DeploymentRevisionRow.runtime_variant_id) == RuntimeVariantRow.id
 
 
-def _get_routings_join_condition() -> sa.sql.elements.ColumnElement[Any]:
-    from ai.backend.manager.models.routing import RoutingRow
-
-    return DeploymentRevisionRow.id == foreign(RoutingRow.revision)
-
-
-class DeploymentRevisionRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class DeploymentRevisionRow(CreatedAtMixin, Base):
     """
     Represents a deployment revision (K8s ReplicaSet equivalent).
 
@@ -248,11 +234,6 @@ class DeploymentRevisionRow(CreatedAtMixin, Base):  # type: ignore[misc]
         lazy="selectin",
     )
 
-    endpoint_row: Mapped[EndpointRow] = relationship(
-        "EndpointRow",
-        back_populates="revisions",
-        primaryjoin=_get_endpoint_join_condition,
-    )
     image_row: Mapped[ImageRow] = relationship(
         "ImageRow",
         primaryjoin=_get_image_join_condition,
@@ -262,11 +243,6 @@ class DeploymentRevisionRow(CreatedAtMixin, Base):  # type: ignore[misc]
         primaryjoin=_get_runtime_variant_join_condition,
         lazy="joined",
         innerjoin=True,
-    )
-    routings: Mapped[list[RoutingRow]] = relationship(
-        "RoutingRow",
-        primaryjoin=_get_routings_join_condition,
-        viewonly=True,
     )
 
     def to_data(self) -> ModelRevisionData:

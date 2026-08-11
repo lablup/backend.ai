@@ -16,6 +16,7 @@ from ai.backend.manager.models.app_config_definition.conditions import (
 )
 from ai.backend.manager.models.app_config_definition.orders import AppConfigDefinitionOrders
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
+from ai.backend.manager.models.specs.pagination import CursorForwardPagination, OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_definition.creators import (
     AppConfigDefinitionCreatorSpec,
@@ -29,8 +30,6 @@ from ai.backend.manager.repositories.app_config_definition.repository import (
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
-    CursorForwardPagination,
-    OffsetPagination,
     Purger,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider

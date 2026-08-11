@@ -22,11 +22,9 @@ from ai.backend.manager.models.prometheus_query_preset.row import PresetOptions
 from ai.backend.manager.models.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryRow,
 )
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
-)
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.prometheus_query_preset import (
     PrometheusQueryPresetRepository,
 )

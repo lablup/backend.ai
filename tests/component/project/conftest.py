@@ -25,6 +25,7 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.permission.types import RelationType
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
@@ -86,7 +87,7 @@ from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_valid
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
-    from tests.component.conftest import ServerInfo, UserFixtureData
+    from tests.component.conftest import ServerInfo, UserFixtureData, VirtualScopeSeeder
 
 
 def _build_validators(
@@ -536,6 +537,7 @@ async def assigned_users(
     group_fixture: uuid.UUID,
     domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
+    virtual_scope_seeder: VirtualScopeSeeder,
 ) -> AsyncIterator[list[uuid.UUID]]:
     """Insert test users and assign them to the target project via ASE.
 
@@ -597,6 +599,8 @@ async def assigned_users(
                     relation_type=RelationType.AUTO,
                 )
             )
+            await virtual_scope_seeder.insert_user_scope(conn, UserID(uid))
+            await virtual_scope_seeder.enroll_user_in_project(conn, group_fixture, UserID(uid))
             user_ids.append(uid)
             emails.append(email)
             access_keys.append(ak)
@@ -611,6 +615,18 @@ async def assigned_users(
                     AssociationScopesEntitiesRow.scope_id == str(group_fixture),
                     AssociationScopesEntitiesRow.entity_type == EntityType.USER,
                     AssociationScopesEntitiesRow.entity_id == str(uid),
+                )
+            )
+            await conn.execute(
+                EntityMembershipRow.__table__.delete().where(
+                    EntityMembershipRow.__table__.c.entity_type == EntityType.USER,
+                    EntityMembershipRow.__table__.c.entity_id == str(uid),
+                )
+            )
+            await conn.execute(
+                VirtualScopeRow.__table__.delete().where(
+                    VirtualScopeRow.__table__.c.scope_type == ScopeType.USER,
+                    VirtualScopeRow.__table__.c.scope_id == str(uid),
                 )
             )
         for ak in reversed(access_keys):

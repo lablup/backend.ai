@@ -178,7 +178,6 @@ def sample_vfolder() -> VFolderRow:
     vfolder.unmanaged_path = ""
     vfolder.usage_mode = VFolderUsageMode.MODEL
     vfolder.permission = VFolderMountPermission.READ_WRITE
-    vfolder.last_size_update = datetime.now(UTC)
     vfolder.status = VFolderOperationStatus.READY
     return vfolder
 
@@ -235,7 +234,6 @@ def sample_endpoint(
     endpoint.url = f"https://api.example.com/v1/models/{endpoint.name}"
     endpoint.open_to_public = False
     # Set related rows for from_row method
-    endpoint.image_row = sample_image
     endpoint.session_owner_row = sample_user
     endpoint.created_user_row = sample_user
     endpoint.routings = []
@@ -463,7 +461,6 @@ def create_full_featured_endpoint(
     endpoint_row.retries = 0
     endpoint_row.url = "https://api.example.com/v1/models/full-featured"
     endpoint_row.open_to_public = False
-    endpoint_row.image_row = sample_image
     endpoint_row.session_owner_row = sample_user
     endpoint_row.created_user_row = sample_user
     endpoint_row.routings = []

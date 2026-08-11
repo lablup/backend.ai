@@ -20,8 +20,8 @@ from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
 from ai.backend.manager.models.runtime_variant_preset.types import (
     RuntimeVariantPresetValueEntry,
 )
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.base.creator import DependentCreatorSpec
-from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 
 def _parse_quantity(value: str) -> Decimal:

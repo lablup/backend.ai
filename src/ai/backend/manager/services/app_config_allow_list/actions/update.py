@@ -32,6 +32,11 @@ class UpdateAppConfigAllowListAction(
         return APP_CONFIG_ALLOW_LIST_ENTITY_TYPE
 
     @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "update_app_config_allow_list"
+
+    @override
     def entity_id(self) -> EntityID:
         return self.updater.allow_list_id
 

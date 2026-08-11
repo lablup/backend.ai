@@ -28,7 +28,7 @@ __all__ = (
 )
 
 
-class ServiceCatalogRow(Base):  # type: ignore[misc]
+class ServiceCatalogRow(Base):
     """A registered service instance in the service catalog.
 
     Tracks service identity, health status, and heartbeat information.
@@ -72,7 +72,6 @@ class ServiceCatalogRow(Base):  # type: ignore[misc]
 
     endpoints: Mapped[list[ServiceCatalogEndpointRow]] = relationship(
         "ServiceCatalogEndpointRow",
-        back_populates="service",
         cascade="all, delete-orphan",
     )
 
@@ -87,7 +86,7 @@ class ServiceCatalogRow(Base):  # type: ignore[misc]
     )
 
 
-class ServiceCatalogEndpointRow(Base):  # type: ignore[misc]
+class ServiceCatalogEndpointRow(Base):
     """An endpoint exposed by a service instance.
 
     Describes how a specific role/scope of a service can be reached.
@@ -111,11 +110,6 @@ class ServiceCatalogEndpointRow(Base):  # type: ignore[misc]
     protocol: Mapped[str] = mapped_column("protocol", sa.String(length=16), nullable=False)
     metadata_: Mapped[dict[str, Any]] = mapped_column(
         "metadata", JSONB, nullable=True, server_default=sa.text("'{}'::jsonb")
-    )
-
-    service: Mapped[ServiceCatalogRow] = relationship(
-        "ServiceCatalogRow",
-        back_populates="endpoints",
     )
 
     __table_args__ = (

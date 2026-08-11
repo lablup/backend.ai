@@ -2,7 +2,7 @@ from datetime import timedelta
 
 import pytest
 
-from ai.backend.common.types import PreemptionMode, PreemptionOrder
+from ai.backend.common.types import PreemptionMode, PreemptionOrder, PreemptionVictimScope
 from ai.backend.manager.data.scaling_group.types import PreemptionConfig
 from ai.backend.manager.repositories.scaling_group.updaters import (
     ScalingGroupSchedulerConfigUpdaterSpec,
@@ -18,6 +18,7 @@ def preemption_config() -> PreemptionConfig:
         order=PreemptionOrder.NEWEST,
         mode=PreemptionMode.RESCHEDULE,
         preemption_min_runtime=timedelta(seconds=30),
+        victim_scope=PreemptionVictimScope.PROJECT,
     )
 
 
@@ -37,4 +38,5 @@ class TestSchedulerConfigUpdater:
             "order": "newest",
             "mode": "reschedule",
             "preemption_min_runtime": 30.0,
+            "victim_scope": "project",
         }

@@ -1,8 +1,5 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.vfolder.actions.file import (
     CreateArchiveDownloadSessionAction,
@@ -39,7 +36,7 @@ from ai.backend.manager.services.vfolder.actions.file_v2 import (
 from ai.backend.manager.services.vfolder.services.file import VFolderFileService
 
 
-class VFolderFileProcessors(AbstractProcessorPackage):
+class VFolderFileProcessors:
     upload_file: ActionProcessor[CreateUploadSessionAction, CreateUploadSessionActionResult]
     download_file: ActionProcessor[CreateDownloadSessionAction, CreateDownloadSessionActionResult]
     create_archive_download_session: ActionProcessor[
@@ -83,22 +80,3 @@ class VFolderFileProcessors(AbstractProcessorPackage):
         self.move_file_v2 = ActionProcessor(service.move_file_v2, action_monitors)
         self.delete_files_v2 = ActionProcessor(service.delete_files_v2, action_monitors)
         self.download_file_v2 = ActionProcessor(service.download_file_v2, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateUploadSessionAction.spec(),
-            CreateDownloadSessionAction.spec(),
-            CreateArchiveDownloadSessionAction.spec(),
-            ListFilesAction.spec(),
-            RenameFileAction.spec(),
-            DeleteFilesAction.spec(),
-            DeleteFilesAsyncAction.spec(),
-            MkdirAction.spec(),
-            MoveFileAction.spec(),
-            ListFilesV2Action.spec(),
-            MkdirV2Action.spec(),
-            MoveFileV2Action.spec(),
-            DeleteFilesV2Action.spec(),
-            CreateDownloadSessionV2Action.spec(),
-        ]

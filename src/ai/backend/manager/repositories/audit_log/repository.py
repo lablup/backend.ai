@@ -10,7 +10,7 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogListResult
 from ai.backend.manager.models.audit_log import AuditLogRow, AuditLogScopeRow
-from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkCreator,
@@ -76,7 +76,7 @@ class AuditLogRepository:
     async def scoped_search(
         self,
         querier: BatchQuerier,
-        scopes: Sequence[SearchScope],
+        scopes: Sequence[OperationScope],
     ) -> AuditLogListResult:
         """Search audit logs whose rows match any of ``scopes`` (OR), narrowed by ``querier``."""
         return await self._db_source.scoped_search(querier=querier, scopes=scopes)

@@ -3,6 +3,25 @@
 Re-exports all public APIs for backward compatibility.
 """
 
+from ai.backend.manager.models.specs.lookup import DataLookup
+from ai.backend.manager.models.specs.pagination import (
+    CursorBackwardPagination,
+    CursorForwardPagination,
+    NoPagination,
+    OffsetPagination,
+    PageInfoResult,
+    QueryPagination,
+)
+from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.specs.searcher import (
+    Searcher,
+    SearcherResult,
+)
+from ai.backend.manager.models.specs.types import (
+    BulkResultWithFailures,
+    IntegrityErrorCheck,
+)
+
 from .creator import (
     BulkCreator,
     BulkCreatorError,
@@ -36,14 +55,6 @@ from .integrity import (
     match_integrity_error,
     parse_integrity_error,
 )
-from .pagination import (
-    CursorBackwardPagination,
-    CursorForwardPagination,
-    NoPagination,
-    OffsetPagination,
-    PageInfoResult,
-    QueryPagination,
-)
 from .purger import (
     BatchPurger,
     BatchPurgerResult,
@@ -62,21 +73,13 @@ from .querier import (
     BatchQuerier,
     BatchQuerierResult,
     BatchQueryOptions,
-    DataFinder,
-    DataQuerier,
     Querier,
     QuerierResult,
     execute_batch_querier,
     execute_querier,
 )
-from .searcher import (
-    Searcher,
-    SearcherResult,
-)
 from .types import (
-    BulkResultWithFailures,
     CursorConditionFactory,
-    IntegrityErrorCheck,
 )
 from .updater import (
     BatchUpdater,
@@ -135,7 +138,7 @@ __all__ = [
     "CursorBackwardPagination",
     "PageInfoResult",
     # Querier
-    "DataFinder",
+    "DataLookup",
     "DataQuerier",
     "Querier",
     "QuerierResult",

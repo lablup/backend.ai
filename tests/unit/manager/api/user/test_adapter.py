@@ -28,7 +28,7 @@ from ai.backend.manager.api.rest.user.adapter import UserAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.repositories.base import OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 
 

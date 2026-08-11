@@ -29,7 +29,7 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.session_template import TemplateType, session_templates
+from ai.backend.manager.models.session_template import SessionTemplateRow, TemplateType
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.template.repository import TemplateRepository
@@ -74,7 +74,7 @@ class TestTemplateRepository:
                 ImageRow,
                 SessionRow,
                 KernelRow,
-                session_templates,
+                SessionTemplateRow,
             ],
         ):
             yield database_connection

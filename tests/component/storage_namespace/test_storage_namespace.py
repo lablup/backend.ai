@@ -19,7 +19,11 @@ from ai.backend.common.dto.manager.object_storage.response import (
     ObjectStorageBucketsResponse,
 )
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Creator,
+)
 from ai.backend.manager.repositories.storage_namespace.creators import StorageNamespaceCreatorSpec
 from ai.backend.manager.services.storage_namespace.actions.get_all import GetAllNamespacesAction
 from ai.backend.manager.services.storage_namespace.actions.get_multi import GetNamespacesAction

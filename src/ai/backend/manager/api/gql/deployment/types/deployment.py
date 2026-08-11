@@ -164,10 +164,10 @@ from ai.backend.manager.api.gql.project import Project
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.deployment.types import (
-    AccessTokenSearchScope,
-    AutoScalingRuleSearchScope,
-    ReplicaSearchScope,
-    RevisionSearchScope,
+    AccessTokenOperationScope,
+    AutoScalingRuleOperationScope,
+    ReplicaOperationScope,
+    RevisionOperationScope,
 )
 
 if TYPE_CHECKING:
@@ -442,7 +442,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_revisions(
-            scope=RevisionSearchScope(deployment_id=UUID(str(self.id))),
+            scope=RevisionOperationScope(deployment_id=UUID(str(self.id))),
             input=AdminSearchRevisionsInput(
                 filter=pydantic_filter,
                 order=pydantic_order,
@@ -483,7 +483,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_replicas(
-            scope=ReplicaSearchScope(deployment_id=UUID(str(self.id))),
+            scope=ReplicaOperationScope(deployment_id=UUID(str(self.id))),
             input=SearchReplicasInput(
                 filter=pydantic_filter,
                 order=pydantic_order,
@@ -603,7 +603,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_rules(
-            scope=AutoScalingRuleSearchScope(deployment_id=UUID(str(self.id))),
+            scope=AutoScalingRuleOperationScope(deployment_id=UUID(str(self.id))),
             input=SearchAutoScalingRulesInput(
                 filter=pydantic_filter,
                 order=pydantic_order,
@@ -646,7 +646,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_access_tokens(
-            scope=AccessTokenSearchScope(deployment_id=UUID(str(self.id))),
+            scope=AccessTokenOperationScope(deployment_id=UUID(str(self.id))),
             input=SearchAccessTokensInput(
                 filter=pydantic_filter,
                 order=pydantic_order,

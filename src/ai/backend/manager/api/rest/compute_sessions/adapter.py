@@ -26,7 +26,8 @@ from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.orders import SessionOrders
-from ai.backend.manager.repositories.base import BatchQuerier, NoPagination, OffsetPagination
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 

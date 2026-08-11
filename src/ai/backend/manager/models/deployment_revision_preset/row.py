@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
@@ -30,13 +28,10 @@ from ai.backend.manager.models.runtime_variant_preset.types import (
     RuntimeVariantPresetValueEntry,
 )
 
-if TYPE_CHECKING:
-    from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
-
 __all__ = ("DeploymentRevisionPresetRow",)
 
 
-class DeploymentRevisionPresetRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class DeploymentRevisionPresetRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "deployment_revision_presets"
 
     __table_args__ = (
@@ -110,12 +105,6 @@ class DeploymentRevisionPresetRow(LifecycleTimestampsMixin, Base):  # type: igno
         pgsql.JSONB(),
         nullable=False,
         server_default=sa.text("'{}'::jsonb"),
-    )
-
-    resource_slot_rows: Mapped[list[PresetResourceSlotRow]] = relationship(
-        "PresetResourceSlotRow",
-        cascade="all, delete-orphan",
-        lazy="selectin",
     )
 
     def to_data(self) -> DeploymentRevisionPresetData:

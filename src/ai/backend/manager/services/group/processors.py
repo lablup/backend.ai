@@ -1,10 +1,7 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.group.actions.assign_users_to_project import (
     AssignUsersToProjectAction,
@@ -54,7 +51,7 @@ from ai.backend.manager.services.group.actions.usage_per_period import (
 from ai.backend.manager.services.group.service import GroupService
 
 
-class GroupProcessors(AbstractProcessorPackage):
+class GroupProcessors:
     create_group: ScopeActionProcessor[CreateGroupAction, CreateGroupActionResult]
     modify_group: SingleEntityActionProcessor[ModifyGroupAction, ModifyGroupActionResult]
     delete_group: SingleEntityActionProcessor[DeleteGroupAction, DeleteGroupActionResult]
@@ -124,21 +121,3 @@ class GroupProcessors(AbstractProcessorPackage):
         self.resolve_project_id_by_name = ActionProcessor(
             group_service.resolve_project_id_by_name, action_monitors
         )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateGroupAction.spec(),
-            ModifyGroupAction.spec(),
-            DeleteGroupAction.spec(),
-            PurgeGroupAction.spec(),
-            UsagePerMonthAction.spec(),
-            UsagePerPeriodAction.spec(),
-            SearchProjectsAction.spec(),
-            SearchProjectsByDomainAction.spec(),
-            SearchProjectsByUserAction.spec(),
-            GetProjectAction.spec(),
-            AssignUsersToProjectAction.spec(),
-            UnassignUsersFromProjectAction.spec(),
-            ResolveProjectIdByNameAction.spec(),
-        ]

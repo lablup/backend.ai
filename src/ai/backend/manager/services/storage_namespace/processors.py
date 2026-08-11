@@ -1,8 +1,5 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.storage_namespace.actions.get_all import (
     GetAllNamespacesAction,
@@ -27,7 +24,7 @@ from ai.backend.manager.services.storage_namespace.actions.unregister import (
 from ai.backend.manager.services.storage_namespace.service import StorageNamespaceService
 
 
-class StorageNamespaceProcessors(AbstractProcessorPackage):
+class StorageNamespaceProcessors:
     register: ActionProcessor[RegisterNamespaceAction, RegisterNamespaceActionResult]
     unregister: ActionProcessor[UnregisterNamespaceAction, UnregisterNamespaceActionResult]
     get_namespaces: ActionProcessor[GetNamespacesAction, GetNamespacesActionResult]
@@ -47,13 +44,3 @@ class StorageNamespaceProcessors(AbstractProcessorPackage):
         self.get_namespaces = ActionProcessor(service.get_namespaces, action_monitors)
         self.get_all_namespaces = ActionProcessor(service.get_all_namespaces, action_monitors)
         self.search_storage_namespaces = ActionProcessor(service.search, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            RegisterNamespaceAction.spec(),
-            UnregisterNamespaceAction.spec(),
-            GetNamespacesAction.spec(),
-            GetAllNamespacesAction.spec(),
-            SearchStorageNamespacesAction.spec(),
-        ]

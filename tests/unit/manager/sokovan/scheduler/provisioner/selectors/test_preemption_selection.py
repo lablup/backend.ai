@@ -36,7 +36,7 @@ from ai.backend.manager.views.sokovan.agent import (
 )
 from ai.backend.manager.views.sokovan.snapshot import (
     PreemptionCandidate,
-    UserVictimCandidates,
+    ScopeVictimCandidates,
 )
 from ai.backend.manager.views.sokovan.workload import ResourceRequest
 
@@ -94,7 +94,7 @@ def _criteria(
     requirements: list[ResourceRequirements],
     *,
     job_priority: int,
-    victim_candidates: UserVictimCandidates | None,
+    victim_candidates: ScopeVictimCandidates | None,
 ) -> AgentSelectionCriteria:
     return AgentSelectionCriteria(
         session_id=SessionId(uuid.uuid4()),
@@ -133,7 +133,7 @@ class TestPreemptionPath:
         self,
         full_agent: list[AgentInfo],
     ) -> None:
-        victims = UserVictimCandidates(
+        victims = ScopeVictimCandidates(
             candidates=[
                 _victim(OLD_SESSION, 1, 2020, {"agent-a": {"cpu": "2"}}),
                 _victim(NEW_SESSION, 1, 2024, {"agent-a": {"cpu": "2"}}),
@@ -160,7 +160,7 @@ class TestPreemptionPath:
         self,
         full_agent: list[AgentInfo],
     ) -> None:
-        victims = UserVictimCandidates(
+        victims = ScopeVictimCandidates(
             candidates=[
                 _victim(OLD_SESSION, 1, 2020, {"agent-a": {"cpu": "2"}}),
                 _victim(NEW_SESSION, 1, 2024, {"agent-a": {"cpu": "2"}}),
@@ -183,7 +183,7 @@ class TestPreemptionPath:
         full_agent: list[AgentInfo],
     ) -> None:
         """job_priority ascending precedes the order key."""
-        victims = UserVictimCandidates(
+        victims = ScopeVictimCandidates(
             candidates=[
                 _victim(OLD_SESSION, 3, 2020, {"agent-a": {"cpu": "2"}}),
                 _victim(NEW_SESSION, 1, 2024, {"agent-a": {"cpu": "2"}}),
@@ -206,7 +206,7 @@ class TestPreemptionPath:
         full_agent: list[AgentInfo],
     ) -> None:
         """Only strictly lower job_priority sessions may be reclaimed."""
-        victims = UserVictimCandidates(
+        victims = ScopeVictimCandidates(
             candidates=[
                 _victim(HIGH_PRIORITY_SESSION, 5, 2020, {"agent-a": {"cpu": "8"}}),
             ]
@@ -228,7 +228,7 @@ class TestPreemptionPath:
         self,
         full_agent: list[AgentInfo],
     ) -> None:
-        victims = UserVictimCandidates(
+        victims = ScopeVictimCandidates(
             candidates=[
                 _victim(OLD_SESSION, 1, 2020, {"agent-a": {"cpu": "1"}}),
             ]
@@ -250,7 +250,7 @@ class TestPreemptionPath:
         self,
         full_agent: list[AgentInfo],
     ) -> None:
-        victims = UserVictimCandidates(
+        victims = ScopeVictimCandidates(
             candidates=[
                 _victim(OLD_SESSION, 1, 2020, {"agent-a": {"cpu": "2"}}),
                 _victim(NEW_SESSION, 1, 2024, {"agent-a": {"cpu": "2"}}),
@@ -276,7 +276,7 @@ class TestPreemptionPath:
         small_a = SessionId(uuid.UUID(int=11))
         small_b = SessionId(uuid.UUID(int=12))
         big = SessionId(uuid.UUID(int=13))
-        victims = UserVictimCandidates(
+        victims = ScopeVictimCandidates(
             candidates=[
                 _victim(small_a, 1, 2020, {"agent-many": {"cpu": "1"}}),
                 _victim(small_b, 1, 2021, {"agent-many": {"cpu": "1"}}),
@@ -301,7 +301,7 @@ class TestPreemptionPath:
         self,
         full_agent: list[AgentInfo],
     ) -> None:
-        victims = UserVictimCandidates(
+        victims = ScopeVictimCandidates(
             candidates=[_victim(OLD_SESSION, 1, 2020, {"agent-a": {"cpu": "4"}})]
         )
         criteria = _criteria([_req({"cpu": "2"})], job_priority=5, victim_candidates=victims)
@@ -326,7 +326,7 @@ class TestPreemptionPath:
         """A session with preemption reserves its resources for real: the
         diffs commit so later sessions see the paper occupancy, while the
         victims' credit is dropped (their resources are not free yet)."""
-        victims = UserVictimCandidates(
+        victims = ScopeVictimCandidates(
             candidates=[_victim(OLD_SESSION, 1, 2020, {"agent-a": {"cpu": "4"}})]
         )
         criteria = _criteria([_req({"cpu": "2"})], job_priority=5, victim_candidates=victims)
@@ -350,7 +350,7 @@ class TestMultiNodePreemption:
 
     async def test_one_victim_admits_both_kernels(self) -> None:
         agents = [_agent("agent-a", {"cpu": "8"}, used={"cpu": "8"})]
-        victims = UserVictimCandidates(
+        victims = ScopeVictimCandidates(
             candidates=[_victim(OLD_SESSION, 1, 2020, {"agent-a": {"cpu": "8"}})]
         )
         criteria = _criteria(
@@ -381,7 +381,7 @@ class TestMultiNodePreemption:
         """A victim already claimed by an earlier kernel cannot admit a
         later one again."""
         agents = [_agent("agent-a", {"cpu": "8"}, used={"cpu": "8"})]
-        victims = UserVictimCandidates(
+        victims = ScopeVictimCandidates(
             candidates=[_victim(OLD_SESSION, 1, 2020, {"agent-a": {"cpu": "2"}})]
         )
         criteria = _criteria(
@@ -408,7 +408,7 @@ class TestMultiNodePreemption:
             _agent("agent-a", {"cpu": "8"}, used={"cpu": "8"}),
             _agent("agent-b", {"cpu": "8"}, used={"cpu": "6"}),
         ]
-        victims = UserVictimCandidates(
+        victims = ScopeVictimCandidates(
             candidates=[
                 _victim(OLD_SESSION, 1, 2020, {"agent-a": {"cpu": "2"}, "agent-b": {"cpu": "2"}})
             ]

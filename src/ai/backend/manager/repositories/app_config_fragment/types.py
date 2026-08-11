@@ -15,14 +15,14 @@ from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.user import UserRow
 
-__all__ = ("AppConfigFragmentSearchScope",)
+__all__ = ("AppConfigFragmentOperationScope",)
 
 
 @dataclass(frozen=True)
-class AppConfigFragmentSearchScope(SearchScope):
+class AppConfigFragmentOperationScope(OperationScope):
     """The fragments written at one scope, matching the row's ``(scope_type, scope_id)``.
 
     The owner named by ``scope_id`` is existence-checked so a search at a scope that does

@@ -128,11 +128,11 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
             KeyPairGQL,
         )
         from ai.backend.manager.repositories.keypair.types import (
-            KeypairResourcePolicyKeypairSearchScope,
+            KeypairResourcePolicyKeypairOperationScope,
         )
 
         result = await info.context.adapters.user.gql_search_keypairs_by_resource_policy(
-            scope=KeypairResourcePolicyKeypairSearchScope(resource_policy_name=self.name),
+            scope=KeypairResourcePolicyKeypairOperationScope(resource_policy_name=self.name),
             input=SearchKeypairsRequest(
                 filter=filter.to_pydantic() if filter is not None else None,
                 order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
