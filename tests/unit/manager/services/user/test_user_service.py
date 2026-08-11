@@ -104,7 +104,7 @@ def _make_user_data(
         totp_activated=False,
         totp_activated_at=None,
         sudo_session_enabled=False,
-        default_access_key="TESTKEY1234567890",
+        main_access_key="TESTKEY1234567890",
         container_uid=None,
         container_main_gid=None,
         container_gids=None,

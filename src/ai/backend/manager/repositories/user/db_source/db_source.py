@@ -303,9 +303,10 @@ class UserDBSource:
                         f"Resource policy '{new_resource_policy}' does not exist."
                     )
 
-            default_access_key = updater_spec.main_access_key.optional_value()
-            if default_access_key:
-                await self._validate_and_set_default_keypair(session, email, default_access_key)
+            # Handle main_access_key validation
+            main_access_key = updater_spec.main_access_key.optional_value()
+            if main_access_key:
+                await self._validate_and_update_main_access_key(session, email, main_access_key)
 
             # Update user
             if updater_spec.password.optional_value():
@@ -410,10 +411,11 @@ class UserDBSource:
                     f"Resource policy '{new_resource_policy}' does not exist."
                 )
 
-        default_access_key = updater_spec.main_access_key.optional_value()
-        if default_access_key:
-            await self._validate_and_set_default_keypair(
-                session, current_user.email, default_access_key
+        # Handle main_access_key validation
+        main_access_key = updater_spec.main_access_key.optional_value()
+        if main_access_key:
+            await self._validate_and_update_main_access_key(
+                session, current_user.email, main_access_key
             )
 
         # Update user
@@ -752,13 +754,13 @@ class UserDBSource:
             .values(is_default=True)
         )
 
-    async def _validate_and_set_default_keypair(
-        self, session: SASession, email: str, default_access_key: str
+    async def _validate_and_update_main_access_key(
+        self, session: SASession, email: str, main_access_key: str
     ) -> None:
         """Private method to validate and update main access key."""
         keypair_query = (
             sa.select(KeyPairRow)
-            .where(KeyPairRow.access_key == default_access_key)
+            .where(KeyPairRow.access_key == main_access_key)
             .options(
                 noload("*"),
                 joinedload(KeyPairRow.user_row).options(load_only(UserRow.email)),
@@ -770,11 +772,9 @@ class UserDBSource:
         if keypair_row.user_row.email != email:
             raise KeyPairForbidden("Cannot set another user's access key as the main access key.")
 
-        await self._set_default_keypair(session, keypair_row.user, default_access_key)
+        await self._set_default_keypair(session, keypair_row.user, main_access_key)
         await session.execute(
-            sa.update(users)
-            .where(users.c.email == email)
-            .values(main_access_key=default_access_key)
+            sa.update(users).where(users.c.email == email).values(main_access_key=main_access_key)
         )
 
     async def _sync_keypair_roles(
@@ -1216,7 +1216,7 @@ class UserDBSource:
 
             await session.execute(sa.delete(keypairs).where(keypairs.c.access_key == access_key))
 
-    async def set_my_default_keypair(self, user_uuid: UUID, access_key: str) -> None:
+    async def switch_my_main_access_key(self, user_uuid: UUID, access_key: str) -> None:
         """Switch the main access key for the current user."""
         async with self._db.begin_session() as session:
             kp_row = (

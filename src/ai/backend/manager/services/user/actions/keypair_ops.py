@@ -101,8 +101,8 @@ class UpdateMyKeypairActionResult(BaseActionResult):
 
 
 @dataclass
-class SetMyDefaultKeypairAction(UserAction):
-    """Mark one of the current user's keypairs as their default."""
+class SwitchMyMainAccessKeyAction(UserAction):
+    """Switch the main access key for the current user."""
 
     user_uuid: UUID
     access_key: str
@@ -118,7 +118,7 @@ class SetMyDefaultKeypairAction(UserAction):
 
 
 @dataclass
-class SetMyDefaultKeypairActionResult(BaseActionResult):
+class SwitchMyMainAccessKeyActionResult(BaseActionResult):
     success: bool
 
     @override

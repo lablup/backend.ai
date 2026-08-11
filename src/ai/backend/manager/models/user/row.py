@@ -357,7 +357,7 @@ class UserRow(LifecycleTimestampsMixin, Base):
             totp_activated=self.totp_activated,
             totp_activated_at=self.totp_activated_at,
             sudo_session_enabled=self.sudo_session_enabled,
-            default_access_key=self.main_access_key,
+            main_access_key=self.main_access_key,
             container_uid=self.container_uid,
             container_main_gid=self.container_main_gid,
             container_gids=self.container_gids,

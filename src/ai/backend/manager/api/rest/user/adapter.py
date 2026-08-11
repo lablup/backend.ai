@@ -58,7 +58,7 @@ class UserAdapter(BaseFilterAdapter):
             allowed_client_ip=data.allowed_client_ip,
             totp_activated=data.totp_activated,
             sudo_session_enabled=data.sudo_session_enabled,
-            main_access_key=data.default_access_key,
+            main_access_key=data.main_access_key,
             container_uid=data.container_uid,
             container_main_gid=data.container_main_gid,
             container_gids=data.container_gids,

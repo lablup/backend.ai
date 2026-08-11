@@ -305,9 +305,9 @@ class UserRepository:
         return await self._db_source.update_my_keypair(user_uuid, updater)
 
     @user_repository_resilience.apply()
-    async def set_my_default_keypair(self, user_uuid: UUID, access_key: str) -> None:
+    async def switch_my_main_access_key(self, user_uuid: UUID, access_key: str) -> None:
         """Switch the main access key for the current user."""
-        await self._db_source.set_my_default_keypair(user_uuid, access_key)
+        await self._db_source.switch_my_main_access_key(user_uuid, access_key)
 
     @user_repository_resilience.apply()
     async def search_my_keypairs(
