@@ -3,13 +3,11 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -21,6 +19,7 @@ from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 from ai.backend.manager.services.vfs_storage.service import VFSStorageService
+from ai.backend.testutils.processors import ops_processor_group
 
 # Statically imported so that Pants includes these modules in the test PEX.
 _VFS_STORAGE_SERVER_SUBAPP_MODULES = (_auth_api,)
@@ -39,9 +38,7 @@ def vfs_storage_processors(
         vfs_storage_repository=vfs_storage_repository,
         storage_manager=storage_manager,
     )
-    return VFSStorageProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
-    )
+    return VFSStorageProcessors(service=service, group=ops_processor_group(database_engine))
 
 
 @pytest.fixture()

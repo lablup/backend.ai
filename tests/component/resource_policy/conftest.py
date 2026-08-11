@@ -28,7 +28,6 @@ from ai.backend.common.dto.manager.v2.resource_policy.response import (
     CreateProjectResourcePolicyPayload,
     CreateUserResourcePolicyPayload,
 )
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
@@ -45,9 +44,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.keypair_resource_policy.repository import (
     KeypairResourcePolicyRepository,
 )
-from ai.backend.manager.repositories.project_resource_policy.repository import (
-    ProjectResourcePolicyRepository,
-)
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
@@ -61,15 +57,13 @@ from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
-from ai.backend.manager.services.project_resource_policy.service import (
-    ProjectResourcePolicyService,
-)
 from ai.backend.manager.services.user_resource_policy.processors import (
     UserResourcePolicyProcessors,
 )
 from ai.backend.manager.services.user_resource_policy.service import (
     UserResourcePolicyService,
 )
+from ai.backend.testutils.processors import ops_processor_group
 
 KeypairResourcePolicyFactory = Callable[
     ..., Coroutine[Any, Any, CreateKeypairResourcePolicyPayload]
@@ -89,28 +83,20 @@ def resource_policy_processors(
     ProjectResourcePolicyProcessors,
 ]:
     kp_repo = KeypairResourcePolicyRepository(database_engine)
-    kp_service = KeypairResourcePolicyService(kp_repo)
     kp_processors = KeypairResourcePolicyProcessors(
-        service=kp_service,
+        service=KeypairResourcePolicyService(kp_repo),
         action_monitors=[],
-        validators=MagicMock(spec=ActionValidators),
+        group=ops_processor_group(database_engine),
     )
 
     up_repo = UserResourcePolicyRepository(database_engine)
-    up_service = UserResourcePolicyService(up_repo)
     up_processors = UserResourcePolicyProcessors(
-        service=up_service,
+        service=UserResourcePolicyService(up_repo),
         action_monitors=[],
-        validators=MagicMock(spec=ActionValidators),
+        group=ops_processor_group(database_engine),
     )
 
-    pp_repo = ProjectResourcePolicyRepository(database_engine)
-    pp_service = ProjectResourcePolicyService(pp_repo)
-    pp_processors = ProjectResourcePolicyProcessors(
-        service=pp_service,
-        action_monitors=[],
-        validators=MagicMock(spec=ActionValidators),
-    )
+    pp_processors = ProjectResourcePolicyProcessors(group=ops_processor_group(database_engine))
 
     return kp_processors, up_processors, pp_processors
 

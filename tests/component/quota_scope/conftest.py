@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
 from ai.backend.manager.api.rest.quota_scope.handler import QuotaScopeHandler
@@ -15,6 +14,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 from ai.backend.manager.services.vfs_storage.service import VFSStorageService
+from ai.backend.testutils.processors import ops_processor_group
 
 
 @pytest.fixture()
@@ -24,9 +24,7 @@ def vfs_storage_processors(
 ) -> VFSStorageProcessors:
     repo = VFSStorageRepository(database_engine)
     service = VFSStorageService(repo, storage_manager=storage_manager)
-    return VFSStorageProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
-    )
+    return VFSStorageProcessors(service=service, group=ops_processor_group(database_engine))
 
 
 @pytest.fixture()

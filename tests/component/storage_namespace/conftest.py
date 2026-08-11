@@ -28,6 +28,7 @@ from ai.backend.manager.services.object_storage.processors import ObjectStorageP
 from ai.backend.manager.services.object_storage.service import ObjectStorageService
 from ai.backend.manager.services.storage_namespace.processors import StorageNamespaceProcessors
 from ai.backend.manager.services.storage_namespace.service import StorageNamespaceService
+from ai.backend.testutils.processors import ops_processor_group
 
 _STORAGE_NAMESPACE_SERVER_SUBAPP_MODULES = (_auth_api,)
 
@@ -53,9 +54,7 @@ def object_storage_processors(
         storage_manager=storage_manager,
         config_provider=config_provider,
     )
-    return ObjectStorageProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
-    )
+    return ObjectStorageProcessors(service=service, group=ops_processor_group(database_engine))
 
 
 @pytest.fixture()

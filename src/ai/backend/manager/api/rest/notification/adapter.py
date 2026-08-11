@@ -137,13 +137,13 @@ class NotificationChannelAdapter(BaseFilterAdapter):
         self, request: SearchNotificationChannelsRequest
     ) -> NotificationChannelSearcher:
         """
-        Build a BatchQuerier for notification channels from search request.
+        Build the searcher for notification channels from a search request.
 
         Args:
             request: Search request containing filter, order, and pagination
 
         Returns:
-            BatchQuerier object with converted conditions, orders, and pagination
+            Searcher carrying the converted conditions, orders, and pagination
         """
         conditions = self._convert_filter(request.filter) if request.filter else []
         orders = [self._convert_order(o) for o in request.order] if request.order else []
@@ -246,13 +246,13 @@ class NotificationRuleAdapter(BaseFilterAdapter):
 
     def build_searcher(self, request: SearchNotificationRulesRequest) -> NotificationRuleSearcher:
         """
-        Build a BatchQuerier for notification rules from search request.
+        Build the searcher for notification rules from a search request.
 
         Args:
             request: Search request containing filter, order, and pagination
 
         Returns:
-            BatchQuerier object with converted conditions, orders, and pagination
+            Searcher carrying the converted conditions, orders, and pagination
         """
         conditions = self._convert_filter(request.filter) if request.filter else []
         orders = [self._convert_order(o) for o in request.order] if request.order else []

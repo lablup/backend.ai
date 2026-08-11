@@ -21,7 +21,10 @@ from ai.backend.common.data.notification.types import (
     NotificationRuleType,
     WebhookSpec,
 )
-from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.common.identifier.notification import (
+    NotificationChannelID,
+    NotificationRuleID,
+)
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
     NotificationRuleData,
@@ -35,6 +38,7 @@ from ai.backend.manager.services.notification.actions import (
 )
 from ai.backend.manager.services.notification.processors import NotificationProcessors
 from ai.backend.manager.services.notification.service import NotificationService
+from ai.backend.testutils.processors import ops_processor_group
 
 
 @pytest.fixture()
@@ -55,19 +59,21 @@ def notification_processors(
     notification_center: NotificationCenter,
 ) -> NotificationProcessors:
     service = NotificationService(mock_repository, notification_center)
-    # Create properly structured ActionValidators mock with async validators
-    validators = MagicMock(spec=ActionValidators)
-    validators.rbac = MagicMock()
-    validators.rbac.scope = AsyncMock()
-    validators.rbac.single_entity = AsyncMock()
-    return NotificationProcessors(service=service, action_monitors=[], validators=validators)
+    # Only the dispatch path is exercised here; the ops-wired CRUD processors are
+    # built but never reached, so the groups may sit on a stand-in engine.
+    engine = MagicMock()
+    return NotificationProcessors(
+        service=service,
+        channel_group=ops_processor_group(engine),
+        rule_group=ops_processor_group(engine),
+    )
 
 
 @pytest.fixture()
 def sample_channel_data() -> NotificationChannelData:
     now = datetime.now(tz=UTC)
     return NotificationChannelData(
-        id=uuid.uuid4(),
+        id=NotificationChannelID(uuid.uuid4()),
         name="test-webhook",
         description="Test webhook channel",
         channel_type=NotificationChannelType.WEBHOOK,
@@ -83,11 +89,11 @@ def sample_channel_data() -> NotificationChannelData:
 def sample_rule_data(sample_channel_data: NotificationChannelData) -> NotificationRuleData:
     now = datetime.now(tz=UTC)
     return NotificationRuleData(
-        id=uuid.uuid4(),
+        id=NotificationRuleID(uuid.uuid4()),
         name="fixture-notification-rule",
         description="Fixture rule for unit tests",
         rule_type=NotificationRuleType.SESSION_STARTED,
-        channel=sample_channel_data,
+        channel_id=sample_channel_data.id,
         message_template="Session {{ session_name }} started ({{ session_type }})",
         enabled=True,
         created_by=uuid.uuid4(),
@@ -124,7 +130,7 @@ class TestNotificationProcessing:
                     status="RUNNING",
                 ),
             )
-            result = await notification_processors.process_notification.wait_for_complete(action)
+            result = await notification_processors.process_notification.run(action)
 
         assert isinstance(result, ProcessNotificationActionResult)
         assert result.rules_matched >= 1
@@ -141,7 +147,7 @@ class TestNotificationProcessing:
         """When one channel send fails, other channels still receive the notification."""
         now = datetime.now(tz=UTC)
         channel2_data = NotificationChannelData(
-            id=uuid.uuid4(),
+            id=NotificationChannelID(uuid.uuid4()),
             name="partial-failure-channel-2",
             description="Second channel for partial failure test",
             channel_type=NotificationChannelType.WEBHOOK,
@@ -152,11 +158,11 @@ class TestNotificationProcessing:
             updated_at=now,
         )
         rule1_data = NotificationRuleData(
-            id=uuid.uuid4(),
+            id=NotificationRuleID(uuid.uuid4()),
             name="partial-fail-rule-1",
             description=None,
             rule_type=NotificationRuleType.SESSION_STARTED,
-            channel=sample_channel_data,
+            channel_id=sample_channel_data.id,
             message_template="Rule 1: {{ session_name }}",
             enabled=True,
             created_by=uuid.uuid4(),
@@ -164,11 +170,11 @@ class TestNotificationProcessing:
             updated_at=now,
         )
         rule2_data = NotificationRuleData(
-            id=uuid.uuid4(),
+            id=NotificationRuleID(uuid.uuid4()),
             name="partial-fail-rule-2",
             description=None,
             rule_type=NotificationRuleType.SESSION_STARTED,
-            channel=channel2_data,
+            channel_id=channel2_data.id,
             message_template="Rule 2: {{ session_name }}",
             enabled=True,
             created_by=uuid.uuid4(),
@@ -203,7 +209,7 @@ class TestNotificationProcessing:
                     status="RUNNING",
                 ),
             )
-            result = await notification_processors.process_notification.wait_for_complete(action)
+            result = await notification_processors.process_notification.run(action)
 
         assert isinstance(result, ProcessNotificationActionResult)
         assert result.rules_matched >= 2

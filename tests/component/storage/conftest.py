@@ -25,6 +25,7 @@ from ai.backend.manager.services.storage_namespace.processors import StorageName
 from ai.backend.manager.services.storage_namespace.service import StorageNamespaceService
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 from ai.backend.manager.services.vfs_storage.service import VFSStorageService
+from ai.backend.testutils.processors import ops_processor_group
 
 # Statically imported so that Pants includes these modules in the test PEX.
 # build_root_app() loads them at runtime via importlib.import_module(),
@@ -48,9 +49,7 @@ def object_storage_processors(
         storage_manager=storage_manager,
         config_provider=config_provider,
     )
-    return ObjectStorageProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
-    )
+    return ObjectStorageProcessors(service=service, group=ops_processor_group(database_engine))
 
 
 @pytest.fixture()
@@ -76,9 +75,7 @@ def vfs_storage_processors(
         vfs_storage_repository=vfs_storage_repository,
         storage_manager=storage_manager,
     )
-    return VFSStorageProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
-    )
+    return VFSStorageProcessors(service=service, group=ops_processor_group(database_engine))
 
 
 @pytest.fixture()

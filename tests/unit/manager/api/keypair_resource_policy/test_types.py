@@ -7,7 +7,7 @@ from graphql import Undefined
 
 from ai.backend.manager.api.gql_legacy.resource_policy import ModifyKeyPairResourcePolicyInput
 from ai.backend.manager.repositories.keypair_resource_policy.updaters import (
-    KeyPairResourcePolicyUpdaterSpec,
+    KeyPairResourcePolicyUpdater,
 )
 from ai.backend.manager.types import _TriStateEnum
 
@@ -41,5 +41,5 @@ class TestModifyKeyPairResourcePolicyInputType:
         mock_modify_input.total_resource_slots = {}
         result = ModifyKeyPairResourcePolicyInput.to_updater(mock_modify_input, "test_policy")
 
-        assert isinstance(result.spec, KeyPairResourcePolicyUpdaterSpec)
-        assert result.spec.total_resource_slots._state == _TriStateEnum.UPDATE
+        assert isinstance(result, KeyPairResourcePolicyUpdater)
+        assert result.total_resource_slots._state == _TriStateEnum.UPDATE

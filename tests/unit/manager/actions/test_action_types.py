@@ -7,20 +7,21 @@ from ai.backend.manager.actions.types import ActionOperationType
 # Import representative concrete action classes across different entity types
 # and operation types to verify enum usage at runtime.
 from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
-from ai.backend.manager.services.object_storage.actions.create import CreateObjectStorageAction
-from ai.backend.manager.services.object_storage.actions.update import UpdateObjectStorageAction
+from ai.backend.manager.services.model_card.actions.create import CreateModelCardAction
+from ai.backend.manager.services.model_card.actions.delete import DeleteModelCardAction
+from ai.backend.manager.services.model_card.actions.update import UpdateModelCardAction
 from ai.backend.manager.services.session.actions.search import SearchSessionsAction
 from ai.backend.manager.services.user.actions.purge_user import PurgeUserAction
-from ai.backend.manager.services.vfs_storage.actions.delete import DeleteVFSStorageAction
-from ai.backend.manager.services.vfs_storage.actions.get import GetVFSStorageAction
 
+# Legacy-family actions only. The v2 families answer with
+# ``ai.backend.common.data.entity.types.EntityType``, a distinct NewType, so mixing
+# them in would conflate two type systems rather than test either one.
 _REPRESENTATIVE_ACTION_CLASSES: list[type[BaseAction]] = [
     GetArtifactAction,
-    GetVFSStorageAction,
     SearchSessionsAction,
-    CreateObjectStorageAction,
-    UpdateObjectStorageAction,
-    DeleteVFSStorageAction,
+    CreateModelCardAction,
+    UpdateModelCardAction,
+    DeleteModelCardAction,
     PurgeUserAction,
 ]
 
@@ -146,14 +147,13 @@ class TestAllActionClassesUseEnums:
     def test_covers_all_operation_types(self) -> None:
         """Ensure the representative classes cover every declarable operation.
 
-        ``RESTORE`` and ``UPSERT`` are excluded: no concrete action declares them
-        yet. The existing upsert actions still sit on the legacy base and are
-        re-declared once they move to the v2 bases. ``LOOKUP`` is excluded because
-        only the v2 lookup base declares it, and every class here is a legacy one.
+        ``UPSERT`` is excluded: the upsert actions declare ``CREATE`` today, so
+        nothing can stand for it. ``RESTORE`` and ``LOOKUP`` are excluded because
+        no legacy-family action declares either, and every class here is a legacy one.
         """
         expected = set(ActionOperationType) - {
-            ActionOperationType.RESTORE,
             ActionOperationType.UPSERT,
+            ActionOperationType.RESTORE,
             ActionOperationType.LOOKUP,
         }
         covered = {cls.operation_type() for cls in _REPRESENTATIVE_ACTION_CLASSES}

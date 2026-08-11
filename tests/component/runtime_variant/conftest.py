@@ -24,23 +24,16 @@ from ai.backend.manager.api.rest.v2.runtime_variant.registry import (
     register_v2_runtime_variant_routes,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.runtime_variant.processors import RuntimeVariantProcessors
-from ai.backend.manager.services.runtime_variant.service import RuntimeVariantService
+from ai.backend.testutils.processors import ops_processor_group
 
 
 @pytest.fixture()
 def runtime_variant_processors(
     database_engine: ExtendedAsyncSAEngine,
 ) -> RuntimeVariantProcessors:
-    repo = RuntimeVariantRepository(database_engine)
-    service = RuntimeVariantService(repo)
-    return RuntimeVariantProcessors(
-        service=service,
-        action_monitors=[],
-        validators=MagicMock(),
-    )
+    return RuntimeVariantProcessors(group=ops_processor_group(database_engine))
 
 
 @pytest.fixture()

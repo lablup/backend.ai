@@ -18,51 +18,28 @@ from ai.backend.common.data.notification import (
     SessionTerminatedMessage,
     WebhookSpec,
 )
-from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
+from ai.backend.common.identifier.notification import (
+    NotificationChannelID,
+    NotificationRuleID,
+)
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
-    NotificationChannelListResult,
     NotificationRuleData,
-    NotificationRuleListResult,
 )
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.notification import (
     NotificationChannelNotFound,
     NotificationRuleNotFound,
     NotificationTemplateRenderingFailure,
 )
-from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.notification.notification_center import NotificationCenter
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.notification import NotificationRepository
-from ai.backend.manager.repositories.notification.creators import (
-    NotificationChannelCreatorSpec,
-    NotificationRuleCreatorSpec,
-)
-from ai.backend.manager.repositories.notification.updaters import (
-    NotificationChannelUpdaterSpec,
-    NotificationRuleUpdaterSpec,
-)
 from ai.backend.manager.services.notification.actions import (
-    CreateChannelAction,
-    CreateRuleAction,
-    DeleteChannelAction,
-    DeleteRuleAction,
-    GetChannelAction,
-    GetRuleAction,
     ProcessNotificationAction,
-    SearchChannelsAction,
-    SearchRulesAction,
-    UpdateChannelAction,
-    UpdateRuleAction,
     ValidateChannelAction,
     ValidateRuleAction,
 )
 from ai.backend.manager.services.notification.service import NotificationService
-from ai.backend.manager.types import OptionalState
 
 
 class TestNotificationService:
@@ -109,7 +86,7 @@ class TestNotificationService:
         """Create sample webhook notification channel"""
         now = datetime.now(tz=UTC)
         return NotificationChannelData(
-            id=uuid4(),
+            id=NotificationChannelID(uuid4()),
             name="Test Webhook",
             description="Test webhook channel",
             channel_type=NotificationChannelType.WEBHOOK,
@@ -131,11 +108,11 @@ class TestNotificationService:
         """Create sample notification rule"""
         now = datetime.now(tz=UTC)
         return NotificationRuleData(
-            id=uuid4(),
+            id=NotificationRuleID(uuid4()),
             name="Session Started Rule",
             description="Notify when session starts",
             rule_type=NotificationRuleType.SESSION_STARTED,
-            channel=sample_webhook_channel,
+            channel_id=sample_webhook_channel.id,
             message_template="Session {{ session_id }} ({{ session_type }}) is now {{ status }}",
             enabled=True,
             created_by=uuid4(),
@@ -242,11 +219,11 @@ class TestNotificationService:
 
         now = datetime.now(tz=UTC)
         rule1 = NotificationRuleData(
-            id=uuid4(),
+            id=NotificationRuleID(uuid4()),
             name="Rule 1",
             description=None,
             rule_type=NotificationRuleType.SESSION_STARTED,
-            channel=sample_webhook_channel,
+            channel_id=sample_webhook_channel.id,
             message_template="Rule 1: Session {{ session_id }}",
             enabled=True,
             created_by=uuid4(),
@@ -255,11 +232,11 @@ class TestNotificationService:
         )
 
         rule2 = NotificationRuleData(
-            id=uuid4(),
+            id=NotificationRuleID(uuid4()),
             name="Rule 2",
             description=None,
             rule_type=NotificationRuleType.SESSION_STARTED,
-            channel=sample_webhook_channel,
+            channel_id=sample_webhook_channel.id,
             message_template="Rule 2: User {{ user_name }}",
             enabled=True,
             created_by=uuid4(),
@@ -290,11 +267,11 @@ class TestNotificationService:
         # Create rule with invalid template syntax
         now = datetime.now(tz=UTC)
         invalid_rule = NotificationRuleData(
-            id=uuid4(),
+            id=NotificationRuleID(uuid4()),
             name="Invalid Template Rule",
             description=None,
             rule_type=NotificationRuleType.SESSION_STARTED,
-            channel=sample_webhook_channel,
+            channel_id=sample_webhook_channel.id,
             message_template="Session {{ unclosed_tag",  # Invalid Jinja2 syntax
             enabled=True,
             created_by=uuid4(),
@@ -328,11 +305,11 @@ class TestNotificationService:
 
         now = datetime.now(tz=UTC)
         rule = NotificationRuleData(
-            id=uuid4(),
+            id=NotificationRuleID(uuid4()),
             name="Timestamp Rule",
             description=None,
             rule_type=NotificationRuleType.SESSION_STARTED,
-            channel=sample_webhook_channel,
+            channel_id=sample_webhook_channel.id,
             message_template="Event at {{ timestamp.isoformat() }}",
             enabled=True,
             created_by=uuid4(),
@@ -375,11 +352,11 @@ class TestNotificationService:
 
         now = datetime.now(tz=UTC)
         rule = NotificationRuleData(
-            id=uuid4(),
+            id=NotificationRuleID(uuid4()),
             name="Session Terminated Rule",
             description=None,
             rule_type=NotificationRuleType.SESSION_TERMINATED,
-            channel=sample_webhook_channel,
+            channel_id=sample_webhook_channel.id,
             message_template="Session {{ session_id }} ({{ session_type }}) {{ status }}: {{ termination_reason }}",
             enabled=True,
             created_by=uuid4(),
@@ -440,250 +417,6 @@ class TestNotificationService:
 
     # CRUD action tests
 
-    async def test_create_channel(
-        self,
-        notification_service: NotificationService,
-        mock_repository: MagicMock,
-        sample_webhook_channel: NotificationChannelData,
-    ) -> None:
-        """Test creating a notification channel"""
-        # TODO: Remove isinstance check when Email channel is implemented
-        assert isinstance(sample_webhook_channel.spec, WebhookSpec)
-        creator = RBACEntityCreator(
-            spec=NotificationChannelCreatorSpec(
-                name=sample_webhook_channel.name,
-                description=sample_webhook_channel.description,
-                channel_type=sample_webhook_channel.channel_type,
-                spec=sample_webhook_channel.spec,
-                enabled=sample_webhook_channel.enabled,
-                created_by=sample_webhook_channel.created_by,
-            ),
-            element_type=RBACElementType.NOTIFICATION_CHANNEL,
-            scope_ref=RBACElementRef(RBACElementType.USER, str(sample_webhook_channel.created_by)),
-        )
-        mock_repository.create_channel = AsyncMock(return_value=sample_webhook_channel)
-
-        action = CreateChannelAction(creator=creator)
-        result = await notification_service.create_channel(action)
-
-        assert result.channel_data == sample_webhook_channel
-        mock_repository.create_channel.assert_called_once_with(creator)
-
-    async def test_create_rule(
-        self,
-        notification_service: NotificationService,
-        mock_repository: MagicMock,
-        sample_rule: NotificationRuleData,
-    ) -> None:
-        """Test creating a notification rule"""
-        creator = RBACEntityCreator(
-            spec=NotificationRuleCreatorSpec(
-                name=sample_rule.name,
-                description=sample_rule.description,
-                rule_type=sample_rule.rule_type,
-                channel_id=sample_rule.channel.id,
-                message_template=sample_rule.message_template,
-                enabled=sample_rule.enabled,
-                created_by=sample_rule.created_by,
-            ),
-            element_type=RBACElementType.NOTIFICATION_RULE,
-            scope_ref=RBACElementRef(
-                RBACElementType.NOTIFICATION_CHANNEL, str(sample_rule.channel.id)
-            ),
-        )
-        mock_repository.create_rule = AsyncMock(return_value=sample_rule)
-
-        action = CreateRuleAction(creator=creator)
-        result = await notification_service.create_rule(action)
-
-        assert result.rule_data == sample_rule
-        mock_repository.create_rule.assert_called_once_with(creator)
-
-    async def test_get_channel(
-        self,
-        notification_service: NotificationService,
-        mock_repository: MagicMock,
-        sample_webhook_channel: NotificationChannelData,
-    ) -> None:
-        """Test getting a notification channel by ID"""
-        mock_repository.get_channel_by_id = AsyncMock(return_value=sample_webhook_channel)
-
-        action = GetChannelAction(channel_id=sample_webhook_channel.id)
-        result = await notification_service.get_channel(action)
-
-        assert result.channel_data == sample_webhook_channel
-        mock_repository.get_channel_by_id.assert_called_once_with(sample_webhook_channel.id)
-
-    async def test_get_rule(
-        self,
-        notification_service: NotificationService,
-        mock_repository: MagicMock,
-        sample_rule: NotificationRuleData,
-    ) -> None:
-        """Test getting a notification rule by ID"""
-        mock_repository.get_rule_by_id = AsyncMock(return_value=sample_rule)
-
-        action = GetRuleAction(rule_id=sample_rule.id)
-        result = await notification_service.get_rule(action)
-
-        assert result.rule_data == sample_rule
-        mock_repository.get_rule_by_id.assert_called_once_with(sample_rule.id)
-
-    async def test_update_channel(
-        self,
-        notification_service: NotificationService,
-        mock_repository: MagicMock,
-        sample_webhook_channel: NotificationChannelData,
-    ) -> None:
-        """Test updating a notification channel"""
-        updater_spec = NotificationChannelUpdaterSpec(
-            name=OptionalState.update("Updated Channel"),
-            enabled=OptionalState.update(False),
-        )
-        updater = Updater(
-            spec=updater_spec,
-            pk_value=sample_webhook_channel.id,
-        )
-        updated_channel = NotificationChannelData(
-            id=sample_webhook_channel.id,
-            name="Updated Channel",
-            description=sample_webhook_channel.description,
-            channel_type=sample_webhook_channel.channel_type,
-            spec=sample_webhook_channel.spec,
-            enabled=False,
-            created_by=sample_webhook_channel.created_by,
-            created_at=sample_webhook_channel.created_at,
-            updated_at=datetime.now(tz=UTC),
-        )
-        mock_repository.update_channel = AsyncMock(return_value=updated_channel)
-
-        action = UpdateChannelAction(updater=updater)
-        result = await notification_service.update_channel(action)
-
-        assert result.channel_data == updated_channel
-        mock_repository.update_channel.assert_called_once_with(updater=updater)
-
-    async def test_update_rule(
-        self,
-        notification_service: NotificationService,
-        mock_repository: MagicMock,
-        sample_rule: NotificationRuleData,
-    ) -> None:
-        """Test updating a notification rule"""
-        updater_spec = NotificationRuleUpdaterSpec(
-            name=OptionalState.update("Updated Rule"),
-            enabled=OptionalState.update(False),
-        )
-        updater = Updater(
-            spec=updater_spec,
-            pk_value=sample_rule.id,
-        )
-        updated_rule = NotificationRuleData(
-            id=sample_rule.id,
-            name="Updated Rule",
-            description=sample_rule.description,
-            rule_type=sample_rule.rule_type,
-            channel=sample_rule.channel,
-            message_template=sample_rule.message_template,
-            enabled=False,
-            created_by=sample_rule.created_by,
-            created_at=sample_rule.created_at,
-            updated_at=datetime.now(tz=UTC),
-        )
-        mock_repository.update_rule = AsyncMock(return_value=updated_rule)
-
-        action = UpdateRuleAction(updater=updater)
-        result = await notification_service.update_rule(action)
-
-        assert result.rule_data == updated_rule
-        mock_repository.update_rule.assert_called_once_with(updater=updater)
-
-    async def test_delete_channel(
-        self,
-        notification_service: NotificationService,
-        mock_repository: MagicMock,
-        sample_webhook_channel: NotificationChannelData,
-    ) -> None:
-        """Test deleting a notification channel"""
-        mock_repository.delete_channel = AsyncMock(return_value=True)
-
-        action = DeleteChannelAction(channel_id=sample_webhook_channel.id)
-        result = await notification_service.delete_channel(action)
-
-        assert result.deleted is True
-        mock_repository.delete_channel.assert_called_once_with(sample_webhook_channel.id)
-
-    async def test_delete_rule(
-        self,
-        notification_service: NotificationService,
-        mock_repository: MagicMock,
-        sample_rule: NotificationRuleData,
-    ) -> None:
-        """Test deleting a notification rule"""
-        mock_repository.delete_rule = AsyncMock(return_value=True)
-
-        action = DeleteRuleAction(rule_id=sample_rule.id)
-        result = await notification_service.delete_rule(action)
-
-        assert result.deleted is True
-        mock_repository.delete_rule.assert_called_once_with(sample_rule.id)
-
-    async def test_search_channels(
-        self,
-        notification_service: NotificationService,
-        mock_repository: MagicMock,
-        sample_webhook_channel: NotificationChannelData,
-    ) -> None:
-        """Test searching notification channels with querier"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        mock_repository.search_channels = AsyncMock(
-            return_value=NotificationChannelListResult(
-                items=[sample_webhook_channel],
-                total_count=1,
-                has_next_page=False,
-                has_previous_page=False,
-            )
-        )
-
-        action = SearchChannelsAction(querier=querier)
-        result = await notification_service.search_channels(action)
-
-        assert result.channels == [sample_webhook_channel]
-        assert result.total_count == 1
-        mock_repository.search_channels.assert_called_once_with(querier=querier)
-
-    async def test_search_rules(
-        self,
-        notification_service: NotificationService,
-        mock_repository: MagicMock,
-        sample_rule: NotificationRuleData,
-    ) -> None:
-        """Test searching notification rules with querier"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        mock_repository.search_rules = AsyncMock(
-            return_value=NotificationRuleListResult(
-                items=[sample_rule],
-                total_count=1,
-                has_next_page=False,
-                has_previous_page=False,
-            )
-        )
-
-        action = SearchRulesAction(querier=querier)
-        result = await notification_service.search_rules(action)
-
-        assert result.rules == [sample_rule]
-        assert result.total_count == 1
-        mock_repository.search_rules.assert_called_once_with(querier=querier)
-
     async def test_validate_channel_success(
         self,
         notification_service: NotificationService,
@@ -729,7 +462,7 @@ class TestNotificationService:
         )
 
         action = ValidateChannelAction(
-            channel_id=channel_id,
+            channel_id=NotificationChannelID(channel_id),
             test_message="Test notification from Backend.AI",
         )
         with pytest.raises(NotificationChannelNotFound):
@@ -790,11 +523,11 @@ class TestNotificationService:
     ) -> None:
         """Test validating a rule with invalid template"""
         invalid_rule = NotificationRuleData(
-            id=uuid4(),
+            id=NotificationRuleID(uuid4()),
             name="Invalid Template Rule",
             description=None,
             rule_type=NotificationRuleType.SESSION_STARTED,
-            channel=sample_webhook_channel,
+            channel_id=sample_webhook_channel.id,
             message_template="Invalid {{ unclosed",  # Invalid Jinja2 syntax
             enabled=True,
             created_by=uuid4(),
@@ -833,7 +566,7 @@ class TestNotificationService:
         )
 
         action = ValidateRuleAction(
-            rule_id=rule_id,
+            rule_id=NotificationRuleID(rule_id),
             notification_data={"test": "data"},
         )
         with pytest.raises(NotificationRuleNotFound):
