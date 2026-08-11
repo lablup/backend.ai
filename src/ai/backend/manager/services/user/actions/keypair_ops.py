@@ -52,7 +52,12 @@ class IssueMyKeypairActionResult(BaseActionResult):
 
 @dataclass
 class RevokeMyKeypairAction(UserAction):
-    """Revoke a keypair owned by the current user."""
+    """Revoke a keypair owned by the current user.
+
+    ``PURGE``: the row leaves the keypairs table. Deleting a user turns the same
+    table's ``is_active`` off instead, which is the soft delete; this path is the
+    hard one and says so.
+    """
 
     user_uuid: UUID
     access_key: str
@@ -64,7 +69,7 @@ class RevokeMyKeypairAction(UserAction):
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.DELETE
+        return ActionOperationType.PURGE
 
 
 @dataclass
@@ -210,7 +215,11 @@ class AdminUpdateKeypairActionResult(BaseActionResult):
 
 @dataclass
 class AdminDeleteKeypairAction(UserAction):
-    """Admin action to delete any keypair."""
+    """Admin action to delete any keypair.
+
+    ``PURGE`` for the same reason as the self-service revoke: the row is removed,
+    not flagged.
+    """
 
     access_key: str
 
@@ -221,7 +230,7 @@ class AdminDeleteKeypairAction(UserAction):
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.DELETE
+        return ActionOperationType.PURGE
 
 
 @dataclass

@@ -149,6 +149,12 @@ class ListInvitationActionResult(BaseActionResult):
 
 @dataclass
 class LeaveInvitedVFolderAction(VFolderInvitationAction):
+    """Give up one's own access to a shared folder.
+
+    ``PURGE``: what goes away is the permission row, and that table carries no
+    lifecycle flag to set instead.
+    """
+
     vfolder_uuid: uuid.UUID
     requester_user_uuid: uuid.UUID
     shared_user_uuid: uuid.UUID | None = None
@@ -160,7 +166,7 @@ class LeaveInvitedVFolderAction(VFolderInvitationAction):
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.DELETE
+        return ActionOperationType.PURGE
 
 
 @dataclass
@@ -174,6 +180,11 @@ class LeaveInvitedVFolderActionResult(BaseActionResult):
 
 @dataclass
 class RevokeInvitedVFolderAction(VFolderInvitationAction):
+    """Take a shared folder's access away from someone else.
+
+    ``PURGE`` for the same reason as leaving one: the permission row is removed.
+    """
+
     vfolder_id: uuid.UUID
     shared_user_id: uuid.UUID
 
@@ -184,7 +195,7 @@ class RevokeInvitedVFolderAction(VFolderInvitationAction):
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.DELETE
+        return ActionOperationType.PURGE
 
 
 @dataclass
