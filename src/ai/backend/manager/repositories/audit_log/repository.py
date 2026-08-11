@@ -65,13 +65,6 @@ class AuditLogRepository:
         return await self._db_source.bulk_create(bulk_creator)
 
     @audit_log_repository_resilience.apply()
-    async def search(
-        self,
-        querier: BatchQuerier,
-    ) -> AuditLogListResult:
-        """Search audit logs with querier pattern."""
-        return await self._db_source.search(querier=querier)
-
     @audit_log_repository_resilience.apply()
     async def scoped_search(
         self,

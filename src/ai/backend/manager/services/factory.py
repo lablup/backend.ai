@@ -559,7 +559,7 @@ def create_processors(
         storage_namespace=StorageNamespaceProcessors(
             services.storage_namespace, action_monitors, validators
         ),
-        audit_log=AuditLogProcessors(services.audit_log, [], validators),
+        audit_log=AuditLogProcessors(services.audit_log, validators, registry.group()),
         idle_checker_assignment=IdleCheckerAssignmentProcessors(
             services.idle_checker_assignment, action_monitors, validators
         ),

@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.v2.audit_log.types import (
     AuditLogStatus,
     OrderDirection,
 )
+from ai.backend.common.identifier.audit_log import AuditLogID
 from ai.backend.manager.actions.action.types import SearchableActionTarget
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -30,8 +31,8 @@ from ai.backend.manager.models.audit_log import AuditLogRow
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.audit_log.options import AuditLogConditions, AuditLogOrders
+from ai.backend.manager.repositories.audit_log.searchers import AuditLogSearcher
 from ai.backend.manager.repositories.base import (
-    BatchQuerier,
     combine_conditions_or,
     negate_conditions,
 )
@@ -61,21 +62,22 @@ class AuditLogAdapter(BaseAdapter):
         """
         if not ids:
             return []
-        querier = BatchQuerier(
+        searcher = AuditLogSearcher(
             pagination=OffsetPagination(limit=len(ids)),
             conditions=[AuditLogConditions.by_ids(ids)],
         )
-        action_result = await self._processors.audit_log.search.wait_for_complete(
-            SearchAuditLogsAction(querier=querier)
+        action_result = await self._processors.audit_log.search.run(
+            SearchAuditLogsAction(searcher=searcher)
         )
-        audit_log_map = {item.id: self._data_to_node(item) for item in action_result.data}
-        return [audit_log_map.get(audit_log_id) for audit_log_id in ids]
+        audit_log_map = {item.id: self._data_to_node(item) for item in action_result.items}
+        return [audit_log_map.get(AuditLogID(audit_log_id)) for audit_log_id in ids]
 
     async def admin_search(self, input: AdminSearchAuditLogsInput) -> SearchAuditLogsPayload:
         """Search audit logs with filters, ordering, and pagination."""
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
+        searcher = self._build_searcher(
+            AuditLogSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_AUDIT_LOG_PAGINATION_SPEC,
@@ -86,11 +88,11 @@ class AuditLogAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.audit_log.search.wait_for_complete(
-            SearchAuditLogsAction(querier=querier)
+        action_result = await self._processors.audit_log.search.run(
+            SearchAuditLogsAction(searcher=searcher)
         )
         return SearchAuditLogsPayload(
-            items=[self._data_to_node(item) for item in action_result.data],
+            items=[self._data_to_node(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -244,7 +246,7 @@ class AuditLogAdapter(BaseAdapter):
             action_id=data.action_id,
             entity_type=data.entity_type,
             operation=data.operation,
-            entity_id=data.entity_id,
+            entity_id=data.target_entity_id,
             created_at=data.created_at,
             request_id=data.request_id,
             triggered_by=data.triggered_by,

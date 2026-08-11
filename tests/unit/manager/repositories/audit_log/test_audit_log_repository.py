@@ -14,6 +14,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
+from ai.backend.common.identifier.audit_log import AuditLogID
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.models.audit_log import AuditLogRow
@@ -21,11 +22,13 @@ from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.audit_log import AuditLogRepository
 from ai.backend.manager.repositories.audit_log.creators import GlobalAuditLogCreatorSpec
 from ai.backend.manager.repositories.audit_log.options import AuditLogConditions
+from ai.backend.manager.repositories.audit_log.searchers import AuditLogSearcher
 from ai.backend.manager.repositories.base import (
-    BatchQuerier,
     Creator,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:
@@ -57,9 +60,18 @@ class TestAuditLogRepository:
         return AuditLogRepository(DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
+    def audit_log_ops(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> OpsRepository[AuditLogData]:
+        """Searches run through the generic ops repository the v2 searcher wires to."""
+        return OpsRepository(V2DBOpsProvider(db_with_cleanup))
+
+    @pytest.fixture
     async def sample_audit_logs_for_filtering(
         self,
         audit_log_repository: AuditLogRepository,
+        audit_log_ops: OpsRepository[AuditLogData],
     ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
         """Create sample audit logs with different entity_types for filter testing"""
         now = datetime.now(UTC)
@@ -95,6 +107,7 @@ class TestAuditLogRepository:
     async def sample_audit_logs_for_ordering(
         self,
         audit_log_repository: AuditLogRepository,
+        audit_log_ops: OpsRepository[AuditLogData],
     ) -> AsyncGenerator[list[uuid.UUID], None]:
         """Create sample audit logs with predictable operations for ordering tests"""
         now = datetime.now(UTC)
@@ -126,6 +139,7 @@ class TestAuditLogRepository:
     async def sample_audit_logs_for_pagination(
         self,
         audit_log_repository: AuditLogRepository,
+        audit_log_ops: OpsRepository[AuditLogData],
     ) -> AsyncGenerator[list[uuid.UUID], None]:
         """Create 25 audit logs for pagination testing"""
         now = datetime.now(UTC)
@@ -159,6 +173,7 @@ class TestAuditLogRepository:
     async def test_create_multiple_audit_logs(
         self,
         audit_log_repository: AuditLogRepository,
+        audit_log_ops: OpsRepository[AuditLogData],
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
         """Test creating multiple audit logs"""
@@ -167,7 +182,7 @@ class TestAuditLogRepository:
 
         for i, status in enumerate(statuses):
             data = AuditLogData(
-                id=uuid.uuid4(),
+                id=AuditLogID(uuid.uuid4()),
                 action_id=uuid.uuid4(),
                 entity_type="agent",
                 operation=f"operation_{i}",
@@ -176,7 +191,7 @@ class TestAuditLogRepository:
                 description=f"Operation {i}",
                 status=status,
                 action_kind=ActionKind.GLOBAL,
-                entity_id=None,
+                target_entity_id=None,
                 lookup_kind=None,
                 lookup_key=None,
                 request_id=None,
@@ -215,13 +230,13 @@ class TestAuditLogRepository:
 
     async def test_search_audit_logs_filter_by_entity_type(
         self,
-        audit_log_repository: AuditLogRepository,
+        audit_log_ops: OpsRepository[AuditLogData],
         sample_audit_logs_for_filtering: dict[str, uuid.UUID],
     ) -> None:
         """Test searching audit logs filtered by entity_type returns only matching audit logs"""
         target_entity_type = "session"
 
-        querier = BatchQuerier(
+        searcher = AuditLogSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -230,7 +245,7 @@ class TestAuditLogRepository:
             orders=[],
         )
 
-        result = await audit_log_repository.search(querier=querier)
+        result = await audit_log_ops.search_in_global(searcher)
 
         result_ids = [log.id for log in result.items]
         assert sample_audit_logs_for_filtering["session"] in result_ids
@@ -238,11 +253,11 @@ class TestAuditLogRepository:
 
     async def test_search_audit_logs_filter_by_operation_pattern(
         self,
-        audit_log_repository: AuditLogRepository,
+        audit_log_ops: OpsRepository[AuditLogData],
         sample_audit_logs_for_ordering: list[uuid.UUID],
     ) -> None:
         """Test searching audit logs with operation pattern filter"""
-        querier = BatchQuerier(
+        searcher = AuditLogSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -251,7 +266,7 @@ class TestAuditLogRepository:
             orders=[],
         )
 
-        result = await audit_log_repository.search(querier=querier)
+        result = await audit_log_ops.search_in_global(searcher)
 
         assert len(result.items) == 1
         assert result.items[0].operation == "alpha-op"
@@ -260,6 +275,7 @@ class TestAuditLogRepository:
     async def sample_audit_logs_by_acted_as(
         self,
         audit_log_repository: AuditLogRepository,
+        audit_log_ops: OpsRepository[AuditLogData],
     ) -> AsyncGenerator[dict[uuid.UUID, uuid.UUID], None]:
         """Seed audit logs with two distinct acted_as UUIDs; returns {acted_as: row_id}."""
         now = datetime.now(UTC)
@@ -287,12 +303,12 @@ class TestAuditLogRepository:
 
     async def test_search_filter_by_acted_as_equals(
         self,
-        audit_log_repository: AuditLogRepository,
+        audit_log_ops: OpsRepository[AuditLogData],
         sample_audit_logs_by_acted_as: dict[uuid.UUID, uuid.UUID],
     ) -> None:
         """Filtering by acted_as returns only rows that ran as that effective user UUID."""
         target_acted_as, other_acted_as = sample_audit_logs_by_acted_as.keys()
-        querier = BatchQuerier(
+        searcher = AuditLogSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 AuditLogConditions.by_acted_as_equals(
@@ -302,7 +318,7 @@ class TestAuditLogRepository:
             orders=[],
         )
 
-        result = await audit_log_repository.search(querier=querier)
+        result = await audit_log_ops.search_in_global(searcher)
 
         result_ids = [log.id for log in result.items]
         assert sample_audit_logs_by_acted_as[target_acted_as] in result_ids
@@ -315,17 +331,17 @@ class TestAuditLogRepository:
 
     async def test_search_audit_logs_order_by_operation_ascending(
         self,
-        audit_log_repository: AuditLogRepository,
+        audit_log_ops: OpsRepository[AuditLogData],
         sample_audit_logs_for_ordering: list[uuid.UUID],
     ) -> None:
         """Test searching audit logs ordered by operation ascending"""
-        querier = BatchQuerier(
+        searcher = AuditLogSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[AuditLogRow.operation.asc()],
         )
 
-        result = await audit_log_repository.search(querier=querier)
+        result = await audit_log_ops.search_in_global(searcher)
 
         result_operations = [log.operation for log in result.items]
         assert result_operations == sorted(result_operations)
@@ -334,17 +350,17 @@ class TestAuditLogRepository:
 
     async def test_search_audit_logs_order_by_operation_descending(
         self,
-        audit_log_repository: AuditLogRepository,
+        audit_log_ops: OpsRepository[AuditLogData],
         sample_audit_logs_for_ordering: list[uuid.UUID],
     ) -> None:
         """Test searching audit logs ordered by operation descending"""
-        querier = BatchQuerier(
+        searcher = AuditLogSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[AuditLogRow.operation.desc()],
         )
 
-        result = await audit_log_repository.search(querier=querier)
+        result = await audit_log_ops.search_in_global(searcher)
 
         result_operations = [log.operation for log in result.items]
         assert result_operations == sorted(result_operations, reverse=True)
@@ -357,51 +373,51 @@ class TestAuditLogRepository:
 
     async def test_search_audit_logs_offset_pagination_first_page(
         self,
-        audit_log_repository: AuditLogRepository,
+        audit_log_ops: OpsRepository[AuditLogData],
         sample_audit_logs_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test first page of offset-based pagination"""
-        querier = BatchQuerier(
+        searcher = AuditLogSearcher(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
             orders=[],
         )
 
-        result = await audit_log_repository.search(querier=querier)
+        result = await audit_log_ops.search_in_global(searcher)
 
         assert len(result.items) == 10
         assert result.total_count == 25
 
     async def test_search_audit_logs_offset_pagination_second_page(
         self,
-        audit_log_repository: AuditLogRepository,
+        audit_log_ops: OpsRepository[AuditLogData],
         sample_audit_logs_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test second page of offset-based pagination"""
-        querier = BatchQuerier(
+        searcher = AuditLogSearcher(
             pagination=OffsetPagination(limit=10, offset=10),
             conditions=[],
             orders=[],
         )
 
-        result = await audit_log_repository.search(querier=querier)
+        result = await audit_log_ops.search_in_global(searcher)
 
         assert len(result.items) == 10
         assert result.total_count == 25
 
     async def test_search_audit_logs_offset_pagination_last_page(
         self,
-        audit_log_repository: AuditLogRepository,
+        audit_log_ops: OpsRepository[AuditLogData],
         sample_audit_logs_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test last page of offset-based pagination with partial results"""
-        querier = BatchQuerier(
+        searcher = AuditLogSearcher(
             pagination=OffsetPagination(limit=10, offset=20),
             conditions=[],
             orders=[],
         )
 
-        result = await audit_log_repository.search(querier=querier)
+        result = await audit_log_ops.search_in_global(searcher)
 
         assert len(result.items) == 5
         assert result.total_count == 25
@@ -412,11 +428,11 @@ class TestAuditLogRepository:
 
     async def test_search_audit_logs_with_pagination_filter_and_order(
         self,
-        audit_log_repository: AuditLogRepository,
+        audit_log_ops: OpsRepository[AuditLogData],
         sample_audit_logs_for_pagination: list[uuid.UUID],
     ) -> None:
         """Test searching audit logs with pagination, filter condition, and ordering combined"""
-        querier = BatchQuerier(
+        searcher = AuditLogSearcher(
             pagination=OffsetPagination(limit=5, offset=2),
             conditions=[
                 # TODO: Refactor after adding Condition type
@@ -425,7 +441,7 @@ class TestAuditLogRepository:
             orders=[AuditLogRow.operation.asc()],
         )
 
-        result = await audit_log_repository.search(querier=querier)
+        result = await audit_log_ops.search_in_global(searcher)
 
         assert result.total_count == 25
         assert len(result.items) == 5

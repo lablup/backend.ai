@@ -9,6 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.identifier.action import ActionID
+from ai.backend.common.identifier.audit_log import AuditLogID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
 from ai.backend.manager.data.audit_log.types import AuditLogData
@@ -140,7 +141,7 @@ class AuditLogRow(Base):
 
     def to_dataclass(self) -> AuditLogData:
         return AuditLogData(
-            id=self.id,
+            id=AuditLogID(self.id),
             action_id=self.action_id,
             action_kind=self.action_kind,
             action_name=self.action_name,
@@ -149,7 +150,7 @@ class AuditLogRow(Base):
             created_at=self.created_at,
             description=self.description,
             status=self.status,
-            entity_id=self.entity_id,
+            target_entity_id=self.entity_id,
             lookup_kind=self.lookup_kind,
             lookup_key=self.lookup_key,
             request_id=self.request_id,
