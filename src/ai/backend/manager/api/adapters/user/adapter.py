@@ -151,11 +151,6 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     SwitchDefaultAccessKeyAction,
     UpdateMyKeypairAction,
 )
-from ai.backend.manager.services.user.actions.modify_user import (
-    BulkModifyUserAction,
-    ModifyUserAction,
-    ModifyUserByIdAction,
-)
 from ai.backend.manager.services.user.actions.purge_user import (
     BulkPurgeUserAction,
     PurgeUserByIdAction,
@@ -169,6 +164,11 @@ from ai.backend.manager.services.user.actions.search_users_by_project import (
 )
 from ai.backend.manager.services.user.actions.search_users_by_role import (
     SearchUsersByRoleAction,
+)
+from ai.backend.manager.services.user.actions.update_user import (
+    BulkUpdateUserAction,
+    UpdateUserAction,
+    UpdateUserByIdAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -446,7 +446,7 @@ class UserAdapter(BaseAdapter):
             keypair=self._keypair_data_to_created_payload(result.data.keypair),
         )
 
-    async def modify_user_by_id(self, user_id: UUID, input: UpdateUserInput) -> UpdateUserPayload:
+    async def update_user_by_id(self, user_id: UUID, input: UpdateUserInput) -> UpdateUserPayload:
         """Update a user by UUID."""
         updater_spec = UserUpdaterSpec(
             username=(
@@ -542,8 +542,8 @@ class UserAdapter(BaseAdapter):
             ),
         )
         updater: Updater[UserRow] = Updater(spec=updater_spec, pk_value=user_id)
-        result = await self._processors.user.modify_user_by_id.wait_for_complete(
-            ModifyUserByIdAction(user_id=user_id, updater=updater)
+        result = await self._processors.user.update_user_by_id.wait_for_complete(
+            UpdateUserByIdAction(user_id=user_id, updater=updater)
         )
         if not isinstance(input.main_access_key, Sentinel) and input.main_access_key is not None:
             await self.switch_default_access_key(UserID(user_id), AccessKey(input.main_access_key))
@@ -631,7 +631,7 @@ class UserAdapter(BaseAdapter):
 
     async def bulk_modify_users(
         self,
-        action: BulkModifyUserAction,
+        action: BulkUpdateUserAction,
         default_key_switches: Mapping[UserID, AccessKey],
     ) -> BulkUpdateUsersPayload:
         """Bulk-modify users. Each item's transformation is the caller's responsibility.
@@ -674,9 +674,9 @@ class UserAdapter(BaseAdapter):
             failed=failed,
         )
 
-    async def modify_user(self, action: ModifyUserAction) -> UpdateMyAllowedClientIPPayload:
+    async def update_user(self, action: UpdateUserAction) -> UpdateMyAllowedClientIPPayload:
         """Modify a user. Caller is responsible for building the action."""
-        await self._processors.user.modify_user.wait_for_complete(action)
+        await self._processors.user.update_user.wait_for_complete(action)
         return UpdateMyAllowedClientIPPayload(success=True)
 
     # ------------------------------------------------------------------ keypair operations

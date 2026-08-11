@@ -16,7 +16,7 @@ from ai.backend.manager.services.image.actions.base import ImageAction
 
 
 @dataclass
-class ModifyImageAction(ImageAction):
+class UpdateImageAction(ImageAction):
     target: str
     architecture: str
     updater_spec: ImageUpdaterSpec
@@ -32,7 +32,7 @@ class ModifyImageAction(ImageAction):
 
 
 @dataclass
-class ModifyImageActionResult(BaseActionResult):
+class UpdateImageActionResult(BaseActionResult):
     image: ImageData
 
     @override
@@ -40,7 +40,7 @@ class ModifyImageActionResult(BaseActionResult):
         return str(self.image.id)
 
 
-class ModifyImageActionUnknownImageReferenceError(BackendAIError):
+class UpdateImageActionUnknownImageReferenceError(BackendAIError):
     error_type = "https://api.backend.ai/probs/image-not-found"
     error_title = "Unknown image reference."
 

@@ -17,14 +17,6 @@ from ai.backend.manager.services.domain.actions.get_domain import (
     GetDomainAction,
     GetDomainActionResult,
 )
-from ai.backend.manager.services.domain.actions.modify_domain import (
-    ModifyDomainAction,
-    ModifyDomainActionResult,
-)
-from ai.backend.manager.services.domain.actions.modify_domain_node import (
-    ModifyDomainNodeAction,
-    ModifyDomainNodeActionResult,
-)
 from ai.backend.manager.services.domain.actions.purge_domain import (
     PurgeDomainAction,
     PurgeDomainActionResult,
@@ -41,15 +33,23 @@ from ai.backend.manager.services.domain.actions.search_rg_domains import (
     SearchRGDomainsAction,
     SearchRGDomainsActionResult,
 )
+from ai.backend.manager.services.domain.actions.update_domain import (
+    UpdateDomainAction,
+    UpdateDomainActionResult,
+)
+from ai.backend.manager.services.domain.actions.update_domain_node import (
+    UpdateDomainNodeAction,
+    UpdateDomainNodeActionResult,
+)
 
 from .service import DomainService
 
 
 class DomainProcessors:
     create_domain_node: ActionProcessor[CreateDomainNodeAction, CreateDomainNodeActionResult]
-    modify_domain_node: ActionProcessor[ModifyDomainNodeAction, ModifyDomainNodeActionResult]
+    update_domain_node: ActionProcessor[UpdateDomainNodeAction, UpdateDomainNodeActionResult]
     create_domain: ActionProcessor[CreateDomainAction, CreateDomainActionResult]
-    modify_domain: ActionProcessor[ModifyDomainAction, ModifyDomainActionResult]
+    update_domain: ActionProcessor[UpdateDomainAction, UpdateDomainActionResult]
     delete_domain: ActionProcessor[DeleteDomainAction, DeleteDomainActionResult]
     purge_domain: ActionProcessor[PurgeDomainAction, PurgeDomainActionResult]
     get_domain: ActionProcessor[GetDomainAction, GetDomainActionResult]
@@ -66,9 +66,9 @@ class DomainProcessors:
         validators: ActionValidators,
     ) -> None:
         self.create_domain_node = ActionProcessor(service.create_domain_node, action_monitors)
-        self.modify_domain_node = ActionProcessor(service.modify_domain_node, action_monitors)
+        self.update_domain_node = ActionProcessor(service.update_domain_node, action_monitors)
         self.create_domain = ActionProcessor(service.create_domain, action_monitors)
-        self.modify_domain = ActionProcessor(service.modify_domain, action_monitors)
+        self.update_domain = ActionProcessor(service.update_domain, action_monitors)
         self.delete_domain = ActionProcessor(service.delete_domain, action_monitors)
         self.purge_domain = ActionProcessor(service.purge_domain, action_monitors)
         self.get_domain = ActionProcessor(service.get_domain, action_monitors)

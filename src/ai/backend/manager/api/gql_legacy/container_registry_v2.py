@@ -32,8 +32,8 @@ from ai.backend.manager.services.container_registry.actions.create_container_reg
 from ai.backend.manager.services.container_registry.actions.delete_container_registry import (
     DeleteContainerRegistryAction,
 )
-from ai.backend.manager.services.container_registry.actions.modify_container_registry import (
-    ModifyContainerRegistryAction,
+from ai.backend.manager.services.container_registry.actions.update_container_registry import (
+    UpdateContainerRegistryAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -151,7 +151,7 @@ class ModifyContainerRegistryNodeInputV2(graphene.InputObjectType):  # type: ign
     extra = graphene.JSONString(description="Added in 25.3.0.")
     allowed_groups = AllowedGroups(description="Added in 25.3.0.")
 
-    def to_action(self, registry_id: uuid.UUID) -> ModifyContainerRegistryAction:
+    def to_action(self, registry_id: uuid.UUID) -> UpdateContainerRegistryAction:
         if self.allowed_groups is not Undefined:
             allowed_groups_model = AllowedGroupsModel(
                 add=self.allowed_groups.add or [],
@@ -161,7 +161,7 @@ class ModifyContainerRegistryNodeInputV2(graphene.InputObjectType):  # type: ign
         else:
             allowed_groups_state = TriState.nop()
 
-        return ModifyContainerRegistryAction(
+        return UpdateContainerRegistryAction(
             updater=Updater(
                 spec=ContainerRegistryUpdaterSpec(
                     url=OptionalState.from_graphql(self.url),
@@ -209,7 +209,7 @@ class ModifyContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
         reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
 
         result = (
-            await ctx.processors.container_registry.modify_container_registry.wait_for_complete(
+            await ctx.processors.container_registry.update_container_registry.wait_for_complete(
                 props.to_action(reg_id)
             )
         )

@@ -23,7 +23,7 @@ def register_prometheus_query_preset_routes(
     reg.add("POST", "", handler.create_preset, middlewares=[superadmin_required])
     reg.add("POST", "/search", handler.search_presets, middlewares=[superadmin_required])
     reg.add("GET", "/{id}", handler.get_preset, middlewares=[superadmin_required])
-    reg.add("PATCH", "/{id}", handler.modify_preset, middlewares=[superadmin_required])
+    reg.add("PATCH", "/{id}", handler.update_preset, middlewares=[superadmin_required])
     reg.add("DELETE", "/{id}", handler.delete_preset, middlewares=[superadmin_required])
 
     # Execute endpoint (superadmin only)

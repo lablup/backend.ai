@@ -37,9 +37,9 @@ from ai.backend.manager.repositories.domain.updaters import (
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.create_domain_node import CreateDomainNodeAction
 from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
-from ai.backend.manager.services.domain.actions.modify_domain import ModifyDomainAction
-from ai.backend.manager.services.domain.actions.modify_domain_node import ModifyDomainNodeAction
 from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
+from ai.backend.manager.services.domain.actions.update_domain import UpdateDomainAction
+from ai.backend.manager.services.domain.actions.update_domain_node import UpdateDomainNodeAction
 from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -332,10 +332,10 @@ class TestModifyDomain:
         modified_domain_data: DomainData,
     ) -> None:
         """Modify domain with valid data should return updated domain."""
-        mock_repository.modify_domain = AsyncMock(return_value=modified_domain_data)
+        mock_repository.update_domain = AsyncMock(return_value=modified_domain_data)
         assert modified_domain_data.description is not None
 
-        action = ModifyDomainAction(
+        action = UpdateDomainAction(
             user_info=admin_user,
             updater=Updater(
                 spec=DomainUpdaterSpec(
@@ -345,10 +345,10 @@ class TestModifyDomain:
             ),
         )
 
-        result = await service.modify_domain(action)
+        result = await service.update_domain(action)
 
         assert result.domain_data.description == modified_domain_data.description
-        mock_repository.modify_domain.assert_called_once()
+        mock_repository.update_domain.assert_called_once()
 
     async def test_modify_as_superadmin_returns_domain(
         self,
@@ -358,10 +358,10 @@ class TestModifyDomain:
         modified_domain_data: DomainData,
     ) -> None:
         """Modify domain as superadmin should return domain."""
-        mock_repository.modify_domain = AsyncMock(return_value=modified_domain_data)
+        mock_repository.update_domain = AsyncMock(return_value=modified_domain_data)
         assert modified_domain_data.description is not None
 
-        action = ModifyDomainAction(
+        action = UpdateDomainAction(
             user_info=superadmin_user,
             updater=Updater(
                 spec=DomainUpdaterSpec(
@@ -371,10 +371,10 @@ class TestModifyDomain:
             ),
         )
 
-        result = await service.modify_domain(action)
+        result = await service.update_domain(action)
 
         assert result.domain_data.description == modified_domain_data.description
-        mock_repository.modify_domain.assert_called_once()
+        mock_repository.update_domain.assert_called_once()
 
     async def test_modify_nonexistent_domain_raises_not_found(
         self,
@@ -383,9 +383,9 @@ class TestModifyDomain:
         admin_user: UserInfo,
     ) -> None:
         """Modify non-existent domain should raise DomainNotFound."""
-        mock_repository.modify_domain = AsyncMock(side_effect=DomainNotFound("Domain not found"))
+        mock_repository.update_domain = AsyncMock(side_effect=DomainNotFound("Domain not found"))
 
-        action = ModifyDomainAction(
+        action = UpdateDomainAction(
             user_info=admin_user,
             updater=Updater(
                 spec=DomainUpdaterSpec(
@@ -396,7 +396,7 @@ class TestModifyDomain:
         )
 
         with pytest.raises(DomainNotFound):
-            await service.modify_domain(action)
+            await service.update_domain(action)
 
     async def test_modify_deactivation(
         self,
@@ -406,9 +406,9 @@ class TestModifyDomain:
         deactivated_domain_data: DomainData,
     ) -> None:
         """Modify domain to deactivate should succeed."""
-        mock_repository.modify_domain = AsyncMock(return_value=deactivated_domain_data)
+        mock_repository.update_domain = AsyncMock(return_value=deactivated_domain_data)
 
-        action = ModifyDomainAction(
+        action = UpdateDomainAction(
             user_info=admin_user,
             updater=Updater(
                 spec=DomainUpdaterSpec(
@@ -418,7 +418,7 @@ class TestModifyDomain:
             ),
         )
 
-        result = await service.modify_domain(action)
+        result = await service.update_domain(action)
 
         assert result.domain_data.is_active == deactivated_domain_data.is_active
 
@@ -430,9 +430,9 @@ class TestModifyDomain:
         nullified_domain_data: DomainData,
     ) -> None:
         """Modify domain with tristate nullify should set fields to None."""
-        mock_repository.modify_domain = AsyncMock(return_value=nullified_domain_data)
+        mock_repository.update_domain = AsyncMock(return_value=nullified_domain_data)
 
-        action = ModifyDomainAction(
+        action = UpdateDomainAction(
             user_info=admin_user,
             updater=Updater(
                 spec=DomainUpdaterSpec(
@@ -443,7 +443,7 @@ class TestModifyDomain:
             ),
         )
 
-        result = await service.modify_domain(action)
+        result = await service.update_domain(action)
 
         assert result.domain_data.description == nullified_domain_data.description
 
@@ -818,7 +818,7 @@ class TestModifyDomainNode:
         )
         assert modified_domain_node_data.description is not None
 
-        action = ModifyDomainNodeAction(
+        action = UpdateDomainNodeAction(
             user_info=admin_user,
             updater=Updater(
                 spec=DomainNodeUpdaterSpec(
@@ -828,7 +828,7 @@ class TestModifyDomainNode:
             ),
         )
 
-        result = await service.modify_domain_node(action)
+        result = await service.update_domain_node(action)
 
         assert result.domain_data.description == modified_domain_node_data.description
         mock_repository.modify_domain_node_with_permissions.assert_called_once()
@@ -846,7 +846,7 @@ class TestModifyDomainNode:
         )
         assert modified_domain_node_data.description is not None
 
-        action = ModifyDomainNodeAction(
+        action = UpdateDomainNodeAction(
             user_info=superadmin_user,
             updater=Updater(
                 spec=DomainNodeUpdaterSpec(
@@ -856,7 +856,7 @@ class TestModifyDomainNode:
             ),
         )
 
-        result = await service.modify_domain_node(action)
+        result = await service.update_domain_node(action)
 
         assert result.domain_data.description == modified_domain_node_data.description
         mock_repository.modify_domain_node_with_permissions.assert_called_once()
@@ -872,7 +872,7 @@ class TestModifyDomainNode:
             side_effect=DomainNotFound("Domain not found")
         )
 
-        action = ModifyDomainNodeAction(
+        action = UpdateDomainNodeAction(
             user_info=admin_user,
             updater=Updater(
                 spec=DomainNodeUpdaterSpec(
@@ -883,7 +883,7 @@ class TestModifyDomainNode:
         )
 
         with pytest.raises(DomainNotFound):
-            await service.modify_domain_node(action)
+            await service.update_domain_node(action)
 
     async def test_modify_domain_node_without_permission_raises_error(
         self,
@@ -896,7 +896,7 @@ class TestModifyDomainNode:
             side_effect=DomainUpdateNotAllowed("Permission denied")
         )
 
-        action = ModifyDomainNodeAction(
+        action = UpdateDomainNodeAction(
             user_info=regular_user,
             updater=Updater(
                 spec=DomainNodeUpdaterSpec(
@@ -907,7 +907,7 @@ class TestModifyDomainNode:
         )
 
         with pytest.raises(DomainUpdateNotAllowed):
-            await service.modify_domain_node(action)
+            await service.update_domain_node(action)
 
     async def test_modify_domain_node_with_overlapping_scaling_groups_raises_error(
         self,
@@ -918,7 +918,7 @@ class TestModifyDomainNode:
         sg1 = ResourceGroupID(uuid4())
         sg2 = ResourceGroupID(uuid4())
         sg3 = ResourceGroupID(uuid4())
-        action = ModifyDomainNodeAction(
+        action = UpdateDomainNodeAction(
             user_info=superadmin_user,
             updater=Updater(
                 spec=DomainNodeUpdaterSpec(),
@@ -929,7 +929,7 @@ class TestModifyDomainNode:
         )
 
         with pytest.raises(InvalidAPIParameters):
-            await service.modify_domain_node(action)
+            await service.update_domain_node(action)
 
     async def test_modify_domain_node_with_scaling_groups_to_add(
         self,
@@ -943,7 +943,7 @@ class TestModifyDomainNode:
             return_value=sample_domain_data
         )
 
-        action = ModifyDomainNodeAction(
+        action = UpdateDomainNodeAction(
             user_info=superadmin_user,
             updater=Updater(
                 spec=DomainNodeUpdaterSpec(),
@@ -953,7 +953,7 @@ class TestModifyDomainNode:
             sgroup_ids_to_remove=None,
         )
 
-        result = await service.modify_domain_node(action)
+        result = await service.update_domain_node(action)
 
         assert result.domain_data is not None
         mock_repository.modify_domain_node_with_permissions.assert_called_once()
@@ -970,7 +970,7 @@ class TestModifyDomainNode:
             return_value=sample_domain_data
         )
 
-        action = ModifyDomainNodeAction(
+        action = UpdateDomainNodeAction(
             user_info=superadmin_user,
             updater=Updater(
                 spec=DomainNodeUpdaterSpec(),
@@ -980,7 +980,7 @@ class TestModifyDomainNode:
             sgroup_ids_to_remove={ResourceGroupID(uuid4())},
         )
 
-        result = await service.modify_domain_node(action)
+        result = await service.update_domain_node(action)
 
         assert result.domain_data is not None
         mock_repository.modify_domain_node_with_permissions.assert_called_once()
@@ -997,7 +997,7 @@ class TestModifyDomainNode:
             return_value=sample_domain_data
         )
 
-        action = ModifyDomainNodeAction(
+        action = UpdateDomainNodeAction(
             user_info=superadmin_user,
             updater=Updater(
                 spec=DomainNodeUpdaterSpec(),
@@ -1007,7 +1007,7 @@ class TestModifyDomainNode:
             sgroup_ids_to_remove={ResourceGroupID(uuid4()), ResourceGroupID(uuid4())},  # No overlap
         )
 
-        result = await service.modify_domain_node(action)
+        result = await service.update_domain_node(action)
 
         assert result.domain_data is not None
         mock_repository.modify_domain_node_with_permissions.assert_called_once()
@@ -1024,7 +1024,7 @@ class TestModifyDomainNode:
             return_value=sample_domain_data
         )
 
-        action = ModifyDomainNodeAction(
+        action = UpdateDomainNodeAction(
             user_info=superadmin_user,
             updater=Updater(
                 spec=DomainNodeUpdaterSpec(),
@@ -1034,7 +1034,7 @@ class TestModifyDomainNode:
             sgroup_ids_to_remove=set(),
         )
 
-        result = await service.modify_domain_node(action)
+        result = await service.update_domain_node(action)
 
         assert result.domain_data is not None
         mock_repository.modify_domain_node_with_permissions.assert_called_once()

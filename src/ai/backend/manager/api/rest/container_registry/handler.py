@@ -61,10 +61,10 @@ from ai.backend.manager.services.container_registry.actions.load_all_container_r
 from ai.backend.manager.services.container_registry.actions.load_container_registries import (
     LoadContainerRegistriesAction,
 )
-from ai.backend.manager.services.container_registry.actions.modify_container_registry import (
-    ModifyContainerRegistryAction,
-)
 from ai.backend.manager.services.container_registry.actions.rescan_images import RescanImagesAction
+from ai.backend.manager.services.container_registry.actions.update_container_registry import (
+    UpdateContainerRegistryAction,
+)
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -273,8 +273,8 @@ class ContainerRegistryHandler:
                 else TriState.nop()
             ),
         )
-        result = await self._container_registry.modify_container_registry.wait_for_complete(
-            ModifyContainerRegistryAction(updater=Updater(spec=updater_spec, pk_value=registry_id))
+        result = await self._container_registry.update_container_registry.wait_for_complete(
+            UpdateContainerRegistryAction(updater=Updater(spec=updater_spec, pk_value=registry_id))
         )
 
         resp = PatchContainerRegistryResponseModel(

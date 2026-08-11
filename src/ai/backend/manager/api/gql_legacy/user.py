@@ -65,12 +65,16 @@ from ai.backend.manager.services.user.actions.delete_user import (
 from ai.backend.manager.services.user.actions.keypair_ops import (
     SwitchDefaultAccessKeyAction,
 )
-from ai.backend.manager.services.user.actions.modify_user import (
-    ModifyUserAction,
-    ModifyUserActionResult,
+from ai.backend.manager.services.user.actions.update_user import (
+    UpdateUserAction,
+    UpdateUserActionResult,
 )
 from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserAction,
+)
+from ai.backend.manager.services.user.actions.update_user import (
+    UpdateUserAction,
+    UpdateUserActionResult,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -986,7 +990,7 @@ class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
         description="Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.",
     )
 
-    def to_action(self, email: str, graph_ctx: GraphQueryContext) -> ModifyUserAction:
+    def to_action(self, email: str, graph_ctx: GraphQueryContext) -> UpdateUserAction:
         # Create PasswordInfo if password is being changed
         password_state = OptionalState[PasswordInfo].nop()
         if self.password is not Undefined and self.password is not None:
@@ -1053,7 +1057,7 @@ class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
             ),
         )
         # Note: User update uses email for lookup, pk_value is not used
-        return ModifyUserAction(
+        return UpdateUserAction(
             email=email,
             updater=Updater(spec=spec, pk_value=email),
         )
@@ -1151,10 +1155,10 @@ class ModifyUser(graphene.Mutation):  # type: ignore[misc]
 
         validate_user_mutation_props(props)
 
-        action: ModifyUserAction = props.to_action(email, graph_ctx)
+        action: UpdateUserAction = props.to_action(email, graph_ctx)
         user_data = await graph_ctx.user_repository.get_by_email_validated(email)
         action.user_uuid = user_data.id
-        res: ModifyUserActionResult = await graph_ctx.processors.user.modify_user.wait_for_complete(
+        res: UpdateUserActionResult = await graph_ctx.processors.user.update_user.wait_for_complete(
             action
         )
         if props.main_access_key is not Undefined and props.main_access_key is not None:

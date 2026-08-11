@@ -25,10 +25,10 @@ from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
 from ai.backend.manager.services.prometheus_query_preset.actions import (
     ExecutePresetAction,
     ExecutePresetActionResult,
-    ModifyPresetAction,
-    ModifyPresetActionResult,
     PreviewPresetAction,
     PreviewPresetActionResult,
+    UpdatePresetAction,
+    UpdatePresetActionResult,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -58,13 +58,13 @@ class PrometheusQueryPresetService:
         preset_data = await self._repository.create(action.creator)
         return CreatePresetActionResult(preset=preset_data)
 
-    async def modify_preset(self, action: ModifyPresetAction) -> ModifyPresetActionResult:
+    async def update_preset(self, action: UpdatePresetAction) -> UpdatePresetActionResult:
         spec = cast(PrometheusQueryPresetUpdaterSpec, action.updater.spec)
         template = spec.query_template.optional_value()
         if template is not None:
             self._template_renderer.validate(template)
         preset_data = await self._repository.update(action.updater)
-        return ModifyPresetActionResult(preset=preset_data)
+        return UpdatePresetActionResult(preset=preset_data)
 
     def _validate_labels(
         self,

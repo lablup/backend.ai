@@ -42,9 +42,10 @@ from ai.backend.manager.services.user.actions.create_user import CreateUserActio
 from ai.backend.manager.services.user.actions.delete_user import DeleteUserAction
 from ai.backend.manager.services.user.actions.get_user import GetUserAction
 from ai.backend.manager.services.user.actions.keypair_ops import SwitchDefaultAccessKeyAction
-from ai.backend.manager.services.user.actions.modify_user import ModifyUserAction
+from ai.backend.manager.services.user.actions.update_user import UpdateUserAction
 from ai.backend.manager.services.user.actions.purge_user import PurgeUserAction
 from ai.backend.manager.services.user.actions.search_users import SearchUsersAction
+from ai.backend.manager.services.user.actions.update_user import UpdateUserAction
 from ai.backend.manager.types import OptionalState
 
 from .adapter import UserAdapter
@@ -183,7 +184,7 @@ class UserHandler:
     ) -> APIResponse:
         log.info("UPDATE_USER (ak:{}, u:{})", ctx.access_key, path.parsed.user_id)
 
-        # First get the user to obtain email (required by ModifyUserAction)
+        # First get the user to obtain email (required by UpdateUserAction)
         get_result = await self._user.get_user.wait_for_complete(
             GetUserAction(user_uuid=path.parsed.user_id)
         )
@@ -201,8 +202,8 @@ class UserHandler:
 
         updater = self._adapter.build_updater(body.parsed, email, password_info)
 
-        action_result = await self._user.modify_user.wait_for_complete(
-            ModifyUserAction(user_uuid=path.parsed.user_id, email=email, updater=updater)
+        action_result = await self._user.update_user.wait_for_complete(
+            UpdateUserAction(user_uuid=path.parsed.user_id, email=email, updater=updater)
         )
 
         if body.parsed.main_access_key is not None:

@@ -15,7 +15,7 @@ from ai.backend.manager.types import OptionalState
 
 
 @dataclass
-class ModifyGroupAction(GroupSingleEntityAction):
+class UpdateGroupAction(GroupSingleEntityAction):
     updater: Updater[GroupRow]
     user_update_mode: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     user_uuids: OptionalState[list[str]] = field(default_factory=OptionalState[list[str]].nop)
@@ -40,7 +40,7 @@ class ModifyGroupAction(GroupSingleEntityAction):
 
 
 @dataclass
-class ModifyGroupActionResult(GroupSingleEntityActionResult):
+class UpdateGroupActionResult(GroupSingleEntityActionResult):
     data: GroupData | None
 
     @override

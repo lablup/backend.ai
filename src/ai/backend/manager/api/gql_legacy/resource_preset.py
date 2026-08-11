@@ -284,14 +284,14 @@ class ModifyResourcePreset(graphene.Mutation):  # type: ignore[misc]
         name: str | None,
         props: ModifyResourcePresetInput,
     ) -> ModifyResourcePreset:
-        from ai.backend.manager.services.resource_preset.actions.modify_preset import (
-            ModifyResourcePresetAction,
+        from ai.backend.manager.services.resource_preset.actions.update_preset import (
+            UpdateResourcePresetAction,
         )
 
         graph_ctx: GraphQueryContext = info.context
 
-        await graph_ctx.processors.resource_preset.modify_preset.wait_for_complete(
-            ModifyResourcePresetAction(id=id, name=name, updater=props.to_updater(id, name))
+        await graph_ctx.processors.resource_preset.update_preset.wait_for_complete(
+            UpdateResourcePresetAction(id=id, name=name, updater=props.to_updater(id, name))
         )
 
         return cls(True, "success")

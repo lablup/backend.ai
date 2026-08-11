@@ -69,10 +69,6 @@ from ai.backend.manager.services.image.actions.forget_image import (
 from ai.backend.manager.services.image.actions.get_image_installed_agents import (
     GetImageInstalledAgentsAction,
 )
-from ai.backend.manager.services.image.actions.modify_image import (
-    ModifyImageAction,
-    ModifyImageActionUnknownImageReferenceError,
-)
 from ai.backend.manager.services.image.actions.preload_image import PreloadImageAction
 from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImageByIdAction,
@@ -86,6 +82,10 @@ from ai.backend.manager.services.image.actions.set_image_resource_limit import (
 )
 from ai.backend.manager.services.image.actions.untag_image_from_registry import (
     UntagImageFromRegistryAction,
+)
+from ai.backend.manager.services.image.actions.update_image import (
+    UpdateImageAction,
+    UpdateImageActionUnknownImageReferenceError,
 )
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.image.service import ImageService
@@ -503,7 +503,7 @@ class TestModifyImage(ImageServiceBaseFixtures):
         mock_image_repository.resolve_image = AsyncMock(return_value=image_data)
         mock_image_repository.update_image_properties = AsyncMock(return_value=updated_image)
 
-        action = ModifyImageAction(
+        action = UpdateImageAction(
             target=image_data.name,
             architecture=image_data.architecture,
             updater_spec=ImageUpdaterSpec(
@@ -511,7 +511,7 @@ class TestModifyImage(ImageServiceBaseFixtures):
             ),
         )
 
-        result = await processors.modify_image.wait_for_complete(action)
+        result = await processors.update_image.wait_for_complete(action)
 
         assert result.image.registry == "cr.backend.ai2"
         mock_image_repository.update_image_properties.assert_called_once()
@@ -527,7 +527,7 @@ class TestModifyImage(ImageServiceBaseFixtures):
         mock_image_repository.resolve_image = AsyncMock(return_value=image_data)
         mock_image_repository.update_image_properties = AsyncMock(return_value=updated_image)
 
-        action = ModifyImageAction(
+        action = UpdateImageAction(
             target=image_data.name,
             architecture=image_data.architecture,
             updater_spec=ImageUpdaterSpec(
@@ -535,7 +535,7 @@ class TestModifyImage(ImageServiceBaseFixtures):
             ),
         )
 
-        result = await processors.modify_image.wait_for_complete(action)
+        result = await processors.update_image.wait_for_complete(action)
 
         assert result.image.accelerators is None
 
@@ -566,7 +566,7 @@ class TestModifyImage(ImageServiceBaseFixtures):
         mock_image_repository.resolve_image = AsyncMock(return_value=image_data)
         mock_image_repository.update_image_properties = AsyncMock(return_value=updated_image)
 
-        action = ModifyImageAction(
+        action = UpdateImageAction(
             target=image_data.name,
             architecture=image_data.architecture,
             updater_spec=ImageUpdaterSpec(
@@ -578,7 +578,7 @@ class TestModifyImage(ImageServiceBaseFixtures):
             ),
         )
 
-        result = await processors.modify_image.wait_for_complete(action)
+        result = await processors.update_image.wait_for_complete(action)
 
         assert result.image.type == ImageType.SERVICE
         assert result.image.registry == "cr.backend.ai2"
@@ -589,12 +589,12 @@ class TestModifyImage(ImageServiceBaseFixtures):
         processors: ImageProcessors,
         mock_image_repository: MagicMock,
     ) -> None:
-        """Modify non-existent image should raise ModifyImageActionUnknownImageReferenceError."""
+        """Modify non-existent image should raise UpdateImageActionUnknownImageReferenceError."""
         mock_image_repository.resolve_image = AsyncMock(
             side_effect=UnknownImageReference("Image not found")
         )
 
-        action = ModifyImageAction(
+        action = UpdateImageAction(
             target="non-existent-image",
             architecture="x86_64",
             updater_spec=ImageUpdaterSpec(
@@ -602,8 +602,8 @@ class TestModifyImage(ImageServiceBaseFixtures):
             ),
         )
 
-        with pytest.raises(ModifyImageActionUnknownImageReferenceError):
-            await processors.modify_image.wait_for_complete(action)
+        with pytest.raises(UpdateImageActionUnknownImageReferenceError):
+            await processors.update_image.wait_for_complete(action)
 
 
 class TestPurgeImageById(ImageServiceBaseFixtures):

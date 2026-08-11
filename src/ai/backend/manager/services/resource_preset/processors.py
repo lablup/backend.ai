@@ -17,20 +17,20 @@ from ai.backend.manager.services.resource_preset.actions.list_presets import (
     ListResourcePresetsAction,
     ListResourcePresetsResult,
 )
-from ai.backend.manager.services.resource_preset.actions.modify_preset import (
-    ModifyResourcePresetAction,
-    ModifyResourcePresetActionResult,
-)
 from ai.backend.manager.services.resource_preset.actions.search_presets import (
     SearchResourcePresetsV2Action,
     SearchResourcePresetsV2ActionResult,
+)
+from ai.backend.manager.services.resource_preset.actions.update_preset import (
+    UpdateResourcePresetAction,
+    UpdateResourcePresetActionResult,
 )
 from ai.backend.manager.services.resource_preset.service import ResourcePresetService
 
 
 class ResourcePresetProcessors:
     create_preset: ActionProcessor[CreateResourcePresetAction, CreateResourcePresetActionResult]
-    modify_preset: ActionProcessor[ModifyResourcePresetAction, ModifyResourcePresetActionResult]
+    update_preset: ActionProcessor[UpdateResourcePresetAction, UpdateResourcePresetActionResult]
     delete_preset: ActionProcessor[DeleteResourcePresetAction, DeleteResourcePresetActionResult]
     list_presets: ActionProcessor[ListResourcePresetsAction, ListResourcePresetsResult]
     check_presets: ActionProcessor[CheckResourcePresetsAction, CheckResourcePresetsActionResult]
@@ -45,7 +45,7 @@ class ResourcePresetProcessors:
         validators: ActionValidators,
     ) -> None:
         self.create_preset = ActionProcessor(service.create_preset, action_monitors)
-        self.modify_preset = ActionProcessor(service.modify_preset, action_monitors)
+        self.update_preset = ActionProcessor(service.update_preset, action_monitors)
         self.delete_preset = ActionProcessor(service.delete_preset, action_monitors)
         self.list_presets = ActionProcessor(service.list_presets, action_monitors)
         self.check_presets = ActionProcessor(service.check_presets, action_monitors)

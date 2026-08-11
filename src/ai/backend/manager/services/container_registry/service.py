@@ -53,10 +53,6 @@ from ai.backend.manager.services.container_registry.actions.load_container_regis
     LoadContainerRegistriesAction,
     LoadContainerRegistriesActionResult,
 )
-from ai.backend.manager.services.container_registry.actions.modify_container_registry import (
-    ModifyContainerRegistryAction,
-    ModifyContainerRegistryActionResult,
-)
 from ai.backend.manager.services.container_registry.actions.read_registry_quota import (
     ReadRegistryQuotaAction,
     ReadRegistryQuotaActionResult,
@@ -68,6 +64,10 @@ from ai.backend.manager.services.container_registry.actions.rescan_images import
 from ai.backend.manager.services.container_registry.actions.search_container_registries import (
     SearchContainerRegistriesAction,
     SearchContainerRegistriesActionResult,
+)
+from ai.backend.manager.services.container_registry.actions.update_container_registry import (
+    UpdateContainerRegistryAction,
+    UpdateContainerRegistryActionResult,
 )
 from ai.backend.manager.services.container_registry.actions.update_registry_quota import (
     UpdateRegistryQuotaAction,
@@ -104,11 +104,11 @@ class ContainerRegistryService:
         data = await self._container_registry_repository.create_registry(action.creator)
         return CreateContainerRegistryActionResult(data=data)
 
-    async def modify_container_registry(
-        self, action: ModifyContainerRegistryAction
-    ) -> ModifyContainerRegistryActionResult:
+    async def update_container_registry(
+        self, action: UpdateContainerRegistryAction
+    ) -> UpdateContainerRegistryActionResult:
         data = await self._container_registry_repository.modify_registry(action.updater)
-        return ModifyContainerRegistryActionResult(data=data)
+        return UpdateContainerRegistryActionResult(data=data)
 
     async def delete_container_registry(
         self, action: DeleteContainerRegistryAction

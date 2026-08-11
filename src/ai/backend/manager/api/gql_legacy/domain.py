@@ -52,12 +52,12 @@ from ai.backend.manager.services.domain.actions.create_domain_node import (
     CreateDomainNodeActionResult,
 )
 from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
-from ai.backend.manager.services.domain.actions.modify_domain import ModifyDomainAction
-from ai.backend.manager.services.domain.actions.modify_domain_node import (
-    ModifyDomainNodeAction,
-    ModifyDomainNodeActionResult,
-)
 from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
+from ai.backend.manager.services.domain.actions.update_domain import UpdateDomainAction
+from ai.backend.manager.services.domain.actions.update_domain_node import (
+    UpdateDomainNodeAction,
+    UpdateDomainNodeActionResult,
+)
 from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_id_by_name import (
     ResolveResourceGroupIDByNameAction,
 )
@@ -500,7 +500,7 @@ class ModifyDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
         user_info: UserInfo,
         sgroup_ids_to_add: set[ResourceGroupID] | None,
         sgroup_ids_to_remove: set[ResourceGroupID] | None,
-    ) -> ModifyDomainNodeAction:
+    ) -> UpdateDomainNodeAction:
         spec = DomainNodeUpdaterSpec(
             description=TriState[str].from_graphql(
                 self.description,
@@ -524,7 +524,7 @@ class ModifyDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
                 self.dotfiles,
             ),
         )
-        return ModifyDomainNodeAction(
+        return UpdateDomainNodeAction(
             user_info=user_info,
             updater=Updater(spec=spec, pk_value=name),
             sgroup_ids_to_add=sgroup_ids_to_add,
@@ -568,8 +568,8 @@ class ModifyDomainNode(graphene.Mutation):  # type: ignore[misc]
                 await _resolve_sgroup_ids(graph_ctx, input.sgroups_to_remove)
             )
 
-        res: ModifyDomainNodeActionResult = (
-            await graph_ctx.processors.domain.modify_domain_node.wait_for_complete(
+        res: UpdateDomainNodeActionResult = (
+            await graph_ctx.processors.domain.update_domain_node.wait_for_complete(
                 input.to_action(
                     name=domain_name,
                     user_info=user_info,
@@ -724,7 +724,7 @@ class ModifyDomainInput(graphene.InputObjectType):  # type: ignore[misc]
             return converter(field_value)
         return field_value
 
-    def to_action(self, domain_name: str, user_info: UserInfo) -> ModifyDomainAction:
+    def to_action(self, domain_name: str, user_info: UserInfo) -> UpdateDomainAction:
         spec = DomainUpdaterSpec(
             name=OptionalState[str].from_graphql(self.name),
             description=TriState[str].from_graphql(
@@ -746,7 +746,7 @@ class ModifyDomainInput(graphene.InputObjectType):  # type: ignore[misc]
             ),
             integration_name=TriState[str].from_graphql(self.integration_id),
         )
-        return ModifyDomainAction(
+        return UpdateDomainAction(
             user_info=user_info,
             updater=Updater(spec=spec, pk_value=domain_name),
         )
@@ -816,7 +816,7 @@ class ModifyDomain(graphene.Mutation):  # type: ignore[misc]
         )
 
         action = props.to_action(name, user_info)
-        res = await ctx.processors.domain.modify_domain.wait_for_complete(action)
+        res = await ctx.processors.domain.update_domain.wait_for_complete(action)
         return cls(
             ok=True,
             msg="domain modification succeed",

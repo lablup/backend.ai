@@ -295,13 +295,13 @@ class TestResourcePresetRepository:
         )
 
         # Mock modify operation
-        mock_db_source.modify_preset = AsyncMock(return_value=preset_data)
+        mock_db_source.update_preset = AsyncMock(return_value=preset_data)
         mock_cache_source.invalidate_preset = AsyncMock()
 
         result = await resource_preset_repository.modify_preset_validated(updater)
 
         assert result is not None
-        mock_db_source.modify_preset.assert_called_once_with(updater)
+        mock_db_source.update_preset.assert_called_once_with(updater)
         mock_cache_source.invalidate_preset.assert_called_once_with(preset_id, None)
 
     async def test_modify_preset_validated_not_found(
@@ -320,7 +320,7 @@ class TestResourcePresetRepository:
         )
 
         # Mock modify to raise exception
-        mock_db_source.modify_preset = AsyncMock(side_effect=ResourcePresetNotFound())
+        mock_db_source.update_preset = AsyncMock(side_effect=ResourcePresetNotFound())
 
         with pytest.raises(ResourcePresetNotFound):
             await resource_preset_repository.modify_preset_validated(updater)
@@ -337,7 +337,7 @@ class TestResourcePresetRepository:
         )
 
         # Mock db_source to raise ValueError
-        mock_db_source.modify_preset = AsyncMock(
+        mock_db_source.update_preset = AsyncMock(
             side_effect=ValueError("Either preset_id or name must be provided")
         )
 

@@ -28,9 +28,9 @@ from ai.backend.manager.repositories.model_serving.repository import ModelServin
 from ai.backend.manager.repositories.model_serving.updaters import (
     EndpointAutoScalingRuleUpdaterSpec,
 )
-from ai.backend.manager.services.model_serving.actions.modify_auto_scaling_rule import (
-    ModifyEndpointAutoScalingRuleAction,
-    ModifyEndpointAutoScalingRuleActionResult,
+from ai.backend.manager.services.model_serving.actions.update_auto_scaling_rule import (
+    UpdateEndpointAutoScalingRuleAction,
+    UpdateEndpointAutoScalingRuleActionResult,
 )
 from ai.backend.manager.services.model_serving.processors.auto_scaling import (
     ModelServingAutoScalingProcessors,
@@ -143,7 +143,7 @@ class TestModifyAutoScalingRule:
         [
             ScenarioBase.success(
                 "Modify threshold",
-                ModifyEndpointAutoScalingRuleAction(
+                UpdateEndpointAutoScalingRuleAction(
                     id=RuleId(uuid.UUID("88888888-8888-8888-8888-888888888888")),
                     updater=Updater(
                         spec=EndpointAutoScalingRuleUpdaterSpec(
@@ -152,14 +152,14 @@ class TestModifyAutoScalingRule:
                         pk_value=uuid.UUID("88888888-8888-8888-8888-888888888888"),
                     ),
                 ),
-                ModifyEndpointAutoScalingRuleActionResult(
+                UpdateEndpointAutoScalingRuleActionResult(
                     success=True,
                     data=MagicMock(id=uuid.UUID("88888888-8888-8888-8888-888888888888")),
                 ),
             ),
             ScenarioBase.success(
                 "Modify min/max replicas",
-                ModifyEndpointAutoScalingRuleAction(
+                UpdateEndpointAutoScalingRuleAction(
                     id=RuleId(uuid.UUID("99999999-9999-9999-9999-999999999999")),
                     updater=Updater(
                         spec=EndpointAutoScalingRuleUpdaterSpec(
@@ -169,28 +169,28 @@ class TestModifyAutoScalingRule:
                         pk_value=uuid.UUID("99999999-9999-9999-9999-999999999999"),
                     ),
                 ),
-                ModifyEndpointAutoScalingRuleActionResult(
+                UpdateEndpointAutoScalingRuleActionResult(
                     success=True,
                     data=MagicMock(id=uuid.UUID("99999999-9999-9999-9999-999999999999")),
                 ),
             ),
             ScenarioBase.success(
                 "Disable rule",
-                ModifyEndpointAutoScalingRuleAction(
+                UpdateEndpointAutoScalingRuleAction(
                     id=RuleId(uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")),
                     updater=Updater(
                         spec=EndpointAutoScalingRuleUpdaterSpec(),
                         pk_value=uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
                     ),
                 ),
-                ModifyEndpointAutoScalingRuleActionResult(
+                UpdateEndpointAutoScalingRuleActionResult(
                     success=True,
                     data=MagicMock(id=uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")),
                 ),
             ),
             ScenarioBase.failure(
                 "Rule not found",
-                ModifyEndpointAutoScalingRuleAction(
+                UpdateEndpointAutoScalingRuleAction(
                     id=RuleId(uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")),
                     updater=Updater(
                         spec=EndpointAutoScalingRuleUpdaterSpec(
@@ -206,7 +206,7 @@ class TestModifyAutoScalingRule:
     async def test_modify_auto_scaling_rule(
         self,
         scenario: ScenarioBase[
-            ModifyEndpointAutoScalingRuleAction, ModifyEndpointAutoScalingRuleActionResult
+            UpdateEndpointAutoScalingRuleAction, UpdateEndpointAutoScalingRuleActionResult
         ],
         user_data: UserData,
         auto_scaling_processors: ModelServingAutoScalingProcessors,
@@ -253,22 +253,22 @@ class TestModifyAutoScalingRule:
             mock_get_auto_scaling_rule_by_id.return_value = None
             mock_modify_auto_scaling_rule.return_value = None
 
-        async def modify_auto_scaling_rule(
-            action: ModifyEndpointAutoScalingRuleAction,
-        ) -> ModifyEndpointAutoScalingRuleActionResult:
+        async def update_auto_scaling_rule(
+            action: UpdateEndpointAutoScalingRuleAction,
+        ) -> UpdateEndpointAutoScalingRuleActionResult:
             return (
-                await auto_scaling_processors.modify_endpoint_auto_scaling_rule.wait_for_complete(
+                await auto_scaling_processors.update_endpoint_auto_scaling_rule.wait_for_complete(
                     action
                 )
             )
 
         # For failure scenarios, expect exception
         if scenario.expected_exception is not None:
-            await scenario.test(modify_auto_scaling_rule)
+            await scenario.test(update_auto_scaling_rule)
             return
 
         # For success scenarios, call the action and verify the result
-        result = await modify_auto_scaling_rule(action)
+        result = await update_auto_scaling_rule(action)
         assert result.success is True
         expected = scenario.expected
         if expected and expected.data:

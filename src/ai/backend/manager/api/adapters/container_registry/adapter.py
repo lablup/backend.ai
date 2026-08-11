@@ -58,11 +58,11 @@ from ai.backend.manager.services.container_registry.actions.create_container_reg
 from ai.backend.manager.services.container_registry.actions.delete_container_registry import (
     DeleteContainerRegistryAction,
 )
-from ai.backend.manager.services.container_registry.actions.modify_container_registry import (
-    ModifyContainerRegistryAction,
-)
 from ai.backend.manager.services.container_registry.actions.search_container_registries import (
     SearchContainerRegistriesAction,
+)
+from ai.backend.manager.services.container_registry.actions.update_container_registry import (
+    UpdateContainerRegistryAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -176,8 +176,8 @@ class ContainerRegistryAdapter(BaseAdapter):
         )
         updater: Updater[ContainerRegistryRow] = Updater(spec=spec, pk_value=input.id)
         result = (
-            await self._processors.container_registry.modify_container_registry.wait_for_complete(
-                ModifyContainerRegistryAction(updater=updater)
+            await self._processors.container_registry.update_container_registry.wait_for_complete(
+                UpdateContainerRegistryAction(updater=updater)
             )
         )
         return UpdateContainerRegistryPayload(registry=self._data_to_dto(result.data))

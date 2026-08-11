@@ -87,14 +87,14 @@ from ai.backend.manager.services.scaling_group.actions.disassociate_with_keypair
 from ai.backend.manager.services.scaling_group.actions.disassociate_with_user_group import (
     DisassociateScalingGroupWithUserGroupsAction,
 )
-from ai.backend.manager.services.scaling_group.actions.modify import (
-    ModifyScalingGroupAction,
-)
 from ai.backend.manager.services.scaling_group.actions.purge_scaling_group import (
     PurgeScalingGroupAction,
 )
 from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_id_by_name import (
     ResolveResourceGroupIDByNameAction,
+)
+from ai.backend.manager.services.scaling_group.actions.update import (
+    UpdateScalingGroupAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -797,8 +797,8 @@ class ModifyScalingGroup(graphene.Mutation):  # type: ignore[misc]
         props: ModifyScalingGroupInput,
     ) -> ModifyScalingGroup:
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.scaling_group.modify_scaling_group.wait_for_complete(
-            ModifyScalingGroupAction(updater=props.to_updater(name))
+        await graph_ctx.processors.scaling_group.update_scaling_group.wait_for_complete(
+            UpdateScalingGroupAction(updater=props.to_updater(name))
         )
         return cls(ok=True, msg="success")
 

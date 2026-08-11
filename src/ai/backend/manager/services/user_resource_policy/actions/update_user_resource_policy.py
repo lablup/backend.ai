@@ -16,7 +16,7 @@ from ai.backend.manager.repositories.user_resource_policy.updaters import (
 
 
 @dataclass
-class ModifyUserResourcePolicyAction(
+class UpdateUserResourcePolicyAction(
     UpdateGlobalOpsAction[UserResourcePolicyRow, UserResourcePolicyData]
 ):
     """Retune one user resource policy; the name stays the key."""

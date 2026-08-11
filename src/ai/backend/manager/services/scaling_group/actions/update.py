@@ -13,7 +13,7 @@ from .base import ScalingGroupAction
 
 
 @dataclass(frozen=True)
-class ModifyScalingGroupAction(ScalingGroupAction):
+class UpdateScalingGroupAction(ScalingGroupAction):
     """Action to modify a scaling group."""
 
     updater: Updater[ScalingGroupRow]
@@ -29,7 +29,7 @@ class ModifyScalingGroupAction(ScalingGroupAction):
 
 
 @dataclass(frozen=True)
-class ModifyScalingGroupActionResult(BaseActionResult):
+class UpdateScalingGroupActionResult(BaseActionResult):
     """Result of modifying a scaling group."""
 
     scaling_group: ScalingGroupData

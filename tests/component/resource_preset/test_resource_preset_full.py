@@ -43,9 +43,9 @@ from ai.backend.manager.services.resource_preset.actions.delete_preset import (
 from ai.backend.manager.services.resource_preset.actions.list_presets import (
     ListResourcePresetsAction,
 )
-from ai.backend.manager.services.resource_preset.actions.modify_preset import (
-    ModifyResourcePresetAction,
-    ModifyResourcePresetActionResult,
+from ai.backend.manager.services.resource_preset.actions.update_preset import (
+    UpdateResourcePresetAction,
+    UpdateResourcePresetActionResult,
 )
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
 from ai.backend.manager.types import OptionalState
@@ -204,7 +204,7 @@ class TestPresetCRUD:
             name="crud-modify-s5-orig",
         )
 
-        modify_action = ModifyResourcePresetAction(
+        modify_action = UpdateResourcePresetAction(
             updater=Updater(
                 spec=ResourcePresetUpdaterSpec(
                     name=OptionalState.update("crud-modify-s5-new"),
@@ -214,10 +214,10 @@ class TestPresetCRUD:
             id=preset.id,
             name=None,
         )
-        modify_result = await resource_preset_processors.modify_preset.wait_for_complete(
+        modify_result = await resource_preset_processors.update_preset.wait_for_complete(
             modify_action
         )
-        assert isinstance(modify_result, ModifyResourcePresetActionResult)
+        assert isinstance(modify_result, UpdateResourcePresetActionResult)
         assert modify_result.resource_preset.name == "crud-modify-s5-new"
 
         # Verify via SDK
@@ -239,7 +239,7 @@ class TestPresetCRUD:
             resource_slots=ResourceSlot({"cpu": "2", "mem": "2147483648"}),
         )
 
-        modify_action = ModifyResourcePresetAction(
+        modify_action = UpdateResourcePresetAction(
             updater=Updater(
                 spec=ResourcePresetUpdaterSpec(
                     resource_slots=OptionalState.update(
@@ -251,7 +251,7 @@ class TestPresetCRUD:
             id=preset.id,
             name=None,
         )
-        modify_result = await resource_preset_processors.modify_preset.wait_for_complete(
+        modify_result = await resource_preset_processors.update_preset.wait_for_complete(
             modify_action
         )
         assert modify_result.resource_preset.resource_slots["cpu"] is not None

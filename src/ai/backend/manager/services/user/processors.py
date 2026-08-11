@@ -59,14 +59,6 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     UpdateMyKeypairAction,
     UpdateMyKeypairActionResult,
 )
-from ai.backend.manager.services.user.actions.modify_user import (
-    BulkModifyUserAction,
-    BulkModifyUserActionResult,
-    ModifyUserAction,
-    ModifyUserActionResult,
-    ModifyUserByIdAction,
-    ModifyUserByIdActionResult,
-)
 from ai.backend.manager.services.user.actions.purge_user import (
     BulkPurgeUserAction,
     BulkPurgeUserActionResult,
@@ -91,6 +83,14 @@ from ai.backend.manager.services.user.actions.search_users_by_role import (
     SearchUsersByRoleAction,
     SearchUsersByRoleActionResult,
 )
+from ai.backend.manager.services.user.actions.update_user import (
+    BulkUpdateUserAction,
+    BulkUpdateUserActionResult,
+    UpdateUserAction,
+    UpdateUserActionResult,
+    UpdateUserByIdAction,
+    UpdateUserByIdActionResult,
+)
 from ai.backend.manager.services.user.actions.user_month_stats import (
     UserMonthStatsAction,
     UserMonthStatsActionResult,
@@ -113,15 +113,15 @@ class UserProcessors:
     ]
     # Single entity actions with RBAC
     get_user: SingleEntityActionProcessor[GetUserAction, GetUserActionResult]
-    modify_user: SingleEntityActionProcessor[ModifyUserAction, ModifyUserActionResult]
-    modify_user_by_id: SingleEntityActionProcessor[ModifyUserByIdAction, ModifyUserByIdActionResult]
+    update_user: SingleEntityActionProcessor[UpdateUserAction, UpdateUserActionResult]
+    update_user_by_id: SingleEntityActionProcessor[UpdateUserByIdAction, UpdateUserByIdActionResult]
     delete_user: ActionProcessor[DeleteUserAction, DeleteUserActionResult]
     delete_user_by_id: SingleEntityActionProcessor[DeleteUserByIdAction, DeleteUserByIdActionResult]
     purge_user: SingleEntityActionProcessor[PurgeUserAction, PurgeUserActionResult]
     purge_user_by_id: SingleEntityActionProcessor[PurgeUserByIdAction, PurgeUserByIdActionResult]
     # Bulk actions without RBAC (special handling)
     bulk_create_users: ActionProcessor[BulkCreateUserAction, BulkCreateUserActionResult]
-    bulk_modify_users: ActionProcessor[BulkModifyUserAction, BulkModifyUserActionResult]
+    bulk_modify_users: ActionProcessor[BulkUpdateUserAction, BulkUpdateUserActionResult]
     bulk_purge_users: ActionProcessor[BulkPurgeUserAction, BulkPurgeUserActionResult]
     # Internal/stats actions without RBAC
     user_month_stats: ActionProcessor[UserMonthStatsAction, UserMonthStatsActionResult]
@@ -194,13 +194,13 @@ class UserProcessors:
             user_service.get_user, action_monitors, validators=[validators.rbac.single_entity]
         )
         # modify_user is also invoked from gql_legacy — non-enforcing validator.
-        self.modify_user = SingleEntityActionProcessor(
-            user_service.modify_user,
+        self.update_user = SingleEntityActionProcessor(
+            user_service.update_user,
             action_monitors,
             validators=[legacy_single_entity_validator],
         )
-        self.modify_user_by_id = SingleEntityActionProcessor(
-            user_service.modify_user_by_id,
+        self.update_user_by_id = SingleEntityActionProcessor(
+            user_service.update_user_by_id,
             action_monitors,
             validators=[validators.rbac.single_entity],
         )

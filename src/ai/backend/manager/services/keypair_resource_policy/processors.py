@@ -20,14 +20,14 @@ from ai.backend.manager.services.keypair_resource_policy.actions.get_my_keypair_
     GetMyKeypairResourcePolicyAction,
     GetMyKeypairResourcePolicyActionResult,
 )
-from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
-    ModifyKeyPairResourcePolicyAction,
-)
 from ai.backend.manager.services.keypair_resource_policy.actions.purge_keypair_resource_policy import (
     PurgeKeyPairResourcePolicyAction,
 )
 from ai.backend.manager.services.keypair_resource_policy.actions.search_keypair_resource_policies import (
     SearchKeypairResourcePoliciesAction,
+)
+from ai.backend.manager.services.keypair_resource_policy.actions.update_keypair_resource_policy import (
+    UpdateKeyPairResourcePolicyAction,
 )
 from ai.backend.manager.services.keypair_resource_policy.service import (
     KeypairResourcePolicyService,
@@ -47,8 +47,8 @@ class KeypairResourcePolicyProcessors:
     create_keypair_resource_policy: GlobalActionProcessor[
         CreateKeyPairResourcePolicyAction, CreatedEntityOpsResult[KeyPairResourcePolicyData]
     ]
-    modify_keypair_resource_policy: GlobalActionProcessor[
-        ModifyKeyPairResourcePolicyAction, EntityOpsResult[KeyPairResourcePolicyData]
+    update_keypair_resource_policy: GlobalActionProcessor[
+        UpdateKeyPairResourcePolicyAction, EntityOpsResult[KeyPairResourcePolicyData]
     ]
     purge_keypair_resource_policy: GlobalActionProcessor[
         PurgeKeyPairResourcePolicyAction, EntityOpsResult[KeyPairResourcePolicyData]
@@ -70,8 +70,8 @@ class KeypairResourcePolicyProcessors:
         self.create_keypair_resource_policy = group.global_create_ops(
             CreateKeyPairResourcePolicyAction
         )
-        self.modify_keypair_resource_policy = group.global_update_ops(
-            ModifyKeyPairResourcePolicyAction
+        self.update_keypair_resource_policy = group.global_update_ops(
+            UpdateKeyPairResourcePolicyAction
         )
         self.purge_keypair_resource_policy = group.global_purge_ops(
             PurgeKeyPairResourcePolicyAction

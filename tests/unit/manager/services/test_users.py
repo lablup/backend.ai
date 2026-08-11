@@ -38,12 +38,12 @@ from ai.backend.manager.services.user.actions.create_user import (
 from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
 )
-from ai.backend.manager.services.user.actions.modify_user import (
-    ModifyUserAction,
-)
 from ai.backend.manager.services.user.actions.purge_user import (
     BulkPurgeUserAction,
     PurgeUserAction,
+)
+from ai.backend.manager.services.user.actions.update_user import (
+    UpdateUserAction,
 )
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.manager.types import OptionalState
@@ -297,7 +297,7 @@ class TestModifyUser:
         mock_user_repository.update_user_validated = AsyncMock(return_value=modified_user_data)
 
         assert modified_user_data.username is not None
-        action = ModifyUserAction(
+        action = UpdateUserAction(
             email=modified_user_data.email,
             updater=Updater(
                 spec=UserUpdaterSpec(
@@ -307,7 +307,7 @@ class TestModifyUser:
             ),
         )
 
-        result = await service.modify_user(action)
+        result = await service.update_user(action)
 
         assert result.data is not None
         assert result.data.username == modified_user_data.username
@@ -326,7 +326,7 @@ class TestModifyUser:
             side_effect=UserNotFound("User not found")
         )
 
-        action = ModifyUserAction(
+        action = UpdateUserAction(
             email="nonexistent@example.com",
             updater=Updater(
                 spec=UserUpdaterSpec(
@@ -337,7 +337,7 @@ class TestModifyUser:
         )
 
         with pytest.raises(UserNotFound):
-            await service.modify_user(action)
+            await service.update_user(action)
 
 
 class TestDeleteUser:

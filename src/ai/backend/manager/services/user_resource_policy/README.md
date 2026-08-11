@@ -36,9 +36,9 @@ When an administrator needs to define a new resource policy for users:
 When resource limits need to be adjusted:
 
 1. Create a `UserResourcePolicyModifier` with fields to update
-2. Execute `ModifyUserResourcePolicyAction` with the policy name
+2. Execute `UpdateUserResourcePolicyAction` with the policy name
 3. The service updates only the specified fields via the repository
-4. Returns `ModifyUserResourcePolicyActionResult` with updated policy data
+4. Returns `UpdateUserResourcePolicyActionResult` with updated policy data
 
 ### Deleting a User Resource Policy
 
@@ -74,8 +74,8 @@ result = await user_resource_policy_service.create_user_resource_policy(action)
 ### Modify User Resource Policy
 
 ```python
-from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
-    ModifyUserResourcePolicyAction,
+from ai.backend.manager.services.user_resource_policy.actions.update_user_resource_policy import (
+    UpdateUserResourcePolicyAction,
     UserResourcePolicyModifier,
 )
 from ai.backend.manager.types import OptionalState
@@ -87,7 +87,7 @@ modifier = UserResourcePolicyModifier(
     max_session_count_per_model_session=OptionalState.update(None),  # Remove limit
 )
 
-action = ModifyUserResourcePolicyAction(
+action = UpdateUserResourcePolicyAction(
     name="standard-user-policy",
     modifier=modifier,
 )

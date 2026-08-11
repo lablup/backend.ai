@@ -36,14 +36,14 @@ from ai.backend.manager.services.prometheus_query_preset.actions.execute_preset 
 from ai.backend.manager.services.prometheus_query_preset.actions.get import (
     GetPresetAction,
 )
-from ai.backend.manager.services.prometheus_query_preset.actions.modify import (
-    ModifyPresetAction,
-)
 from ai.backend.manager.services.prometheus_query_preset.actions.purge import (
     PurgePresetAction,
 )
 from ai.backend.manager.services.prometheus_query_preset.actions.search import (
     SearchPresetsAction,
+)
+from ai.backend.manager.services.prometheus_query_preset.actions.update import (
+    UpdatePresetAction,
 )
 from ai.backend.manager.services.prometheus_query_preset.processors import (
     PrometheusQueryPresetProcessors,
@@ -112,15 +112,15 @@ class PrometheusQueryPresetHandler:
         resp = GetQueryDefinitionResponse(item=self._adapter.convert_to_dto(action_result.data))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
-    async def modify_preset(
+    async def update_preset(
         self,
         path: PathParam[QueryDefinitionIdPathParam],
         body: BodyParam[ModifyQueryDefinitionRequest],
     ) -> APIResponse:
         """Modify a preset."""
         updater = self._adapter.build_updater(body.parsed, path.parsed.id)
-        action_result = await self._processor.modify_preset.run(
-            ModifyPresetAction(preset_id=PrometheusQueryPresetID(path.parsed.id), updater=updater)
+        action_result = await self._processor.update_preset.run(
+            UpdatePresetAction(preset_id=PrometheusQueryPresetID(path.parsed.id), updater=updater)
         )
         resp = ModifyQueryDefinitionResponse(
             item=self._adapter.convert_to_dto(action_result.preset)

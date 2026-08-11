@@ -14,16 +14,16 @@ from ai.backend.manager.services.prometheus_query_preset.actions.execute_preset 
     ExecutePresetActionResult,
 )
 from ai.backend.manager.services.prometheus_query_preset.actions.get import GetPresetAction
-from ai.backend.manager.services.prometheus_query_preset.actions.modify import (
-    ModifyPresetAction,
-    ModifyPresetActionResult,
-)
 from ai.backend.manager.services.prometheus_query_preset.actions.preview import (
     PreviewPresetAction,
     PreviewPresetActionResult,
 )
 from ai.backend.manager.services.prometheus_query_preset.actions.purge import PurgePresetAction
 from ai.backend.manager.services.prometheus_query_preset.actions.search import SearchPresetsAction
+from ai.backend.manager.services.prometheus_query_preset.actions.update import (
+    UpdatePresetAction,
+    UpdatePresetActionResult,
+)
 from ai.backend.manager.services.prometheus_query_preset.service import (
     PrometheusQueryPresetService,
 )
@@ -40,7 +40,7 @@ class PrometheusQueryPresetProcessors:
     purge_preset: GlobalActionProcessor[
         PurgePresetAction, EntityOpsResult[PrometheusQueryPresetData]
     ]
-    modify_preset: GlobalActionProcessor[ModifyPresetAction, ModifyPresetActionResult]
+    update_preset: GlobalActionProcessor[UpdatePresetAction, UpdatePresetActionResult]
     preview_preset: GlobalActionProcessor[PreviewPresetAction, PreviewPresetActionResult]
     execute_preset: GlobalActionProcessor[ExecutePresetAction, ExecutePresetActionResult]
 
@@ -54,6 +54,6 @@ class PrometheusQueryPresetProcessors:
         self.get_preset = group.global_get_ops(GetPresetAction)
         self.search_presets = group.global_search_ops(SearchPresetsAction)
         self.purge_preset = group.global_purge_ops(PurgePresetAction)
-        self.modify_preset = group.global_scope(ModifyPresetAction, service.modify_preset)
+        self.update_preset = group.global_scope(UpdatePresetAction, service.update_preset)
         self.preview_preset = group.global_scope(PreviewPresetAction, service.preview_preset)
         self.execute_preset = group.global_scope(ExecutePresetAction, service.execute_preset)

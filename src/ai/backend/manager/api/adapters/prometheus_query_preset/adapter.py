@@ -72,10 +72,10 @@ from ai.backend.manager.services.prometheus_query_preset.actions import (
     CreatePresetAction,
     ExecutePresetAction,
     GetPresetAction,
-    ModifyPresetAction,
     PreviewPresetAction,
     PurgePresetAction,
     SearchPresetsAction,
+    UpdatePresetAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -156,8 +156,8 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
             pk_value=preset_id,
         )
 
-        action_result = await self._processors.prometheus_query_preset.modify_preset.run(
-            ModifyPresetAction(preset_id=PrometheusQueryPresetID(preset_id), updater=updater)
+        action_result = await self._processors.prometheus_query_preset.update_preset.run(
+            UpdatePresetAction(preset_id=PrometheusQueryPresetID(preset_id), updater=updater)
         )
 
         return ModifyQueryDefinitionPayload(item=self._data_to_dto(action_result.preset))

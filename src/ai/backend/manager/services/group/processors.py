@@ -15,10 +15,6 @@ from ai.backend.manager.services.group.actions.delete_group import (
     DeleteGroupAction,
     DeleteGroupActionResult,
 )
-from ai.backend.manager.services.group.actions.modify_group import (
-    ModifyGroupAction,
-    ModifyGroupActionResult,
-)
 from ai.backend.manager.services.group.actions.purge_group import (
     PurgeGroupAction,
     PurgeGroupActionResult,
@@ -40,6 +36,10 @@ from ai.backend.manager.services.group.actions.unassign_users import (
     UnassignUsersFromProjectAction,
     UnassignUsersFromProjectActionResult,
 )
+from ai.backend.manager.services.group.actions.update_group import (
+    UpdateGroupAction,
+    UpdateGroupActionResult,
+)
 from ai.backend.manager.services.group.actions.usage_per_month import (
     UsagePerMonthAction,
     UsagePerMonthActionResult,
@@ -53,7 +53,7 @@ from ai.backend.manager.services.group.service import GroupService
 
 class GroupProcessors:
     create_group: ScopeActionProcessor[CreateGroupAction, CreateGroupActionResult]
-    modify_group: SingleEntityActionProcessor[ModifyGroupAction, ModifyGroupActionResult]
+    update_group: SingleEntityActionProcessor[UpdateGroupAction, UpdateGroupActionResult]
     delete_group: SingleEntityActionProcessor[DeleteGroupAction, DeleteGroupActionResult]
     purge_group: SingleEntityActionProcessor[PurgeGroupAction, PurgeGroupActionResult]
     usage_per_month: ActionProcessor[UsagePerMonthAction, UsagePerMonthActionResult]
@@ -87,8 +87,8 @@ class GroupProcessors:
         self.create_group = ScopeActionProcessor(
             group_service.create_group, action_monitors, validators=rbac_scope_validators
         )
-        self.modify_group = SingleEntityActionProcessor(
-            group_service.modify_group, action_monitors, validators=rbac_single_entity_validators
+        self.update_group = SingleEntityActionProcessor(
+            group_service.update_group, action_monitors, validators=rbac_single_entity_validators
         )
         self.delete_group = SingleEntityActionProcessor(
             group_service.delete_group, action_monitors, validators=rbac_single_entity_validators

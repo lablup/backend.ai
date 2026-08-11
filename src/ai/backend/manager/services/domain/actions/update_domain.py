@@ -10,7 +10,7 @@ from ai.backend.manager.services.domain.actions.base import DomainAction
 
 
 @dataclass
-class ModifyDomainAction(DomainAction):
+class UpdateDomainAction(DomainAction):
     user_info: UserInfo
     updater: Updater[DomainRow]
 
@@ -25,7 +25,7 @@ class ModifyDomainAction(DomainAction):
 
 
 @dataclass
-class ModifyDomainActionResult(BaseActionResult):
+class UpdateDomainActionResult(BaseActionResult):
     domain_data: DomainData
 
     @override

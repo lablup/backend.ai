@@ -10,7 +10,7 @@ from ai.backend.manager.services.container_registry.actions.base import Containe
 
 
 @dataclass
-class ModifyContainerRegistryAction(ContainerRegistryAction):
+class UpdateContainerRegistryAction(ContainerRegistryAction):
     updater: Updater[ContainerRegistryRow]
 
     @override
@@ -24,7 +24,7 @@ class ModifyContainerRegistryAction(ContainerRegistryAction):
 
 
 @dataclass
-class ModifyContainerRegistryActionResult(BaseActionResult):
+class UpdateContainerRegistryActionResult(BaseActionResult):
     data: ContainerRegistryData
 
     @override

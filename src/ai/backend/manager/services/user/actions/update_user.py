@@ -19,18 +19,18 @@ from ai.backend.manager.services.user.actions.base import (
 )
 
 __all__ = (
-    "ModifyUserAction",
-    "ModifyUserActionResult",
-    "ModifyUserByIdAction",
-    "ModifyUserByIdActionResult",
+    "UpdateUserAction",
+    "UpdateUserActionResult",
+    "UpdateUserByIdAction",
+    "UpdateUserByIdActionResult",
     "UserUpdateSpec",
-    "BulkModifyUserAction",
-    "BulkModifyUserActionResult",
+    "BulkUpdateUserAction",
+    "BulkUpdateUserActionResult",
 )
 
 
 @dataclass
-class ModifyUserAction(UserSingleEntityAction):
+class UpdateUserAction(UserSingleEntityAction):
     email: str  # Still needed for the service layer implementation
     updater: Updater[UserRow]
     user_uuid: UUID | None = None  # Set by API layer for RBAC validation
@@ -54,7 +54,7 @@ class ModifyUserAction(UserSingleEntityAction):
 
 
 @dataclass
-class ModifyUserActionResult(UserSingleEntityActionResult):
+class UpdateUserActionResult(UserSingleEntityActionResult):
     data: UserData
 
     @override
@@ -67,7 +67,7 @@ class ModifyUserActionResult(UserSingleEntityActionResult):
 
 
 @dataclass
-class ModifyUserByIdAction(UserSingleEntityAction):
+class UpdateUserByIdAction(UserSingleEntityAction):
     """UUID-based user update action for Strawberry v2 mutations."""
 
     user_id: UUID
@@ -88,7 +88,7 @@ class ModifyUserByIdAction(UserSingleEntityAction):
 
 
 @dataclass
-class ModifyUserByIdActionResult(UserSingleEntityActionResult):
+class UpdateUserByIdActionResult(UserSingleEntityActionResult):
     data: UserData
 
     @override
@@ -101,7 +101,7 @@ class ModifyUserByIdActionResult(UserSingleEntityActionResult):
 
 
 @dataclass
-class BulkModifyUserAction(UserAction):
+class BulkUpdateUserAction(UserAction):
     """Action for bulk updating multiple users."""
 
     items: list[UserUpdateSpec]
@@ -117,7 +117,7 @@ class BulkModifyUserAction(UserAction):
 
 
 @dataclass
-class BulkModifyUserActionResult(BaseActionResult):
+class BulkUpdateUserActionResult(BaseActionResult):
     """Result of bulk user update."""
 
     data: BulkUserUpdateResultData

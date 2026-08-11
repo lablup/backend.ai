@@ -394,13 +394,13 @@ class ModifyKeyPairResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         name: str,
         props: ModifyKeyPairResourcePolicyInput,
     ) -> ModifyKeyPairResourcePolicy:
-        from ai.backend.manager.services.keypair_resource_policy.actions.modify_keypair_resource_policy import (
-            ModifyKeyPairResourcePolicyAction,
+        from ai.backend.manager.services.keypair_resource_policy.actions.update_keypair_resource_policy import (
+            UpdateKeyPairResourcePolicyAction,
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.keypair_resource_policy.modify_keypair_resource_policy.run(
-            ModifyKeyPairResourcePolicyAction(props.to_updater(name))
+        await graph_ctx.processors.keypair_resource_policy.update_keypair_resource_policy.run(
+            UpdateKeyPairResourcePolicyAction(props.to_updater(name))
         )
 
         return ModifyKeyPairResourcePolicy(
@@ -644,13 +644,13 @@ class ModifyUserResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         name: str,
         props: ModifyUserResourcePolicyInput,
     ) -> ModifyUserResourcePolicy:
-        from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
-            ModifyUserResourcePolicyAction,
+        from ai.backend.manager.services.user_resource_policy.actions.update_user_resource_policy import (
+            UpdateUserResourcePolicyAction,
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.user_resource_policy.modify_user_resource_policy.run(
-            ModifyUserResourcePolicyAction(props.to_updater(name))
+        await graph_ctx.processors.user_resource_policy.update_user_resource_policy.run(
+            UpdateUserResourcePolicyAction(props.to_updater(name))
         )
 
         return ModifyUserResourcePolicy(
@@ -887,13 +887,13 @@ class ModifyProjectResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         name: str,
         props: ModifyProjectResourcePolicyInput,
     ) -> ModifyProjectResourcePolicy:
-        from ai.backend.manager.services.project_resource_policy.actions.modify_project_resource_policy import (
-            ModifyProjectResourcePolicyAction,
+        from ai.backend.manager.services.project_resource_policy.actions.update_project_resource_policy import (
+            UpdateProjectResourcePolicyAction,
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.project_resource_policy.modify_project_resource_policy.run(
-            ModifyProjectResourcePolicyAction(props.to_updater(name))
+        await graph_ctx.processors.project_resource_policy.update_project_resource_policy.run(
+            UpdateProjectResourcePolicyAction(props.to_updater(name))
         )
 
         return ModifyProjectResourcePolicy(

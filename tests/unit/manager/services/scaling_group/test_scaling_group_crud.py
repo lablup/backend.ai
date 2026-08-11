@@ -64,10 +64,10 @@ from ai.backend.manager.services.scaling_group.actions.disassociate_with_domain 
 from ai.backend.manager.services.scaling_group.actions.disassociate_with_keypair import (
     DisassociateScalingGroupWithKeypairsAction,
 )
-from ai.backend.manager.services.scaling_group.actions.modify import ModifyScalingGroupAction
 from ai.backend.manager.services.scaling_group.actions.purge_scaling_group import (
     PurgeScalingGroupAction,
 )
+from ai.backend.manager.services.scaling_group.actions.update import UpdateScalingGroupAction
 from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -175,7 +175,7 @@ class TestScalingGroupCRUD:
         name = f"crud-mod-{uuid.uuid4().hex[:8]}"
         await _create_sgroup(scaling_group_processors, name)
         try:
-            action = ModifyScalingGroupAction(
+            action = UpdateScalingGroupAction(
                 updater=Updater(
                     spec=ScalingGroupUpdaterSpec(
                         metadata=ScalingGroupMetadataUpdaterSpec(
@@ -185,7 +185,7 @@ class TestScalingGroupCRUD:
                     pk_value=name,
                 )
             )
-            result = await scaling_group_processors.modify_scaling_group.wait_for_complete(action)
+            result = await scaling_group_processors.update_scaling_group.wait_for_complete(action)
             assert result.scaling_group.metadata.description == "Updated description"
         finally:
             await _purge_sgroup(scaling_group_processors, name)
@@ -200,7 +200,7 @@ class TestScalingGroupCRUD:
         sg = await _create_sgroup(scaling_group_processors, name, is_public=True)
         assert sg.status.is_public is True
         try:
-            action = ModifyScalingGroupAction(
+            action = UpdateScalingGroupAction(
                 updater=Updater(
                     spec=ScalingGroupUpdaterSpec(
                         status=ScalingGroupStatusUpdaterSpec(
@@ -210,7 +210,7 @@ class TestScalingGroupCRUD:
                     pk_value=name,
                 )
             )
-            result = await scaling_group_processors.modify_scaling_group.wait_for_complete(action)
+            result = await scaling_group_processors.update_scaling_group.wait_for_complete(action)
             assert result.scaling_group.status.is_public is False
         finally:
             await _purge_sgroup(scaling_group_processors, name)
@@ -224,7 +224,7 @@ class TestScalingGroupCRUD:
         name = f"crud-mod3-{uuid.uuid4().hex[:8]}"
         await _create_sgroup(scaling_group_processors, name, is_active=True)
         try:
-            action = ModifyScalingGroupAction(
+            action = UpdateScalingGroupAction(
                 updater=Updater(
                     spec=ScalingGroupUpdaterSpec(
                         status=ScalingGroupStatusUpdaterSpec(
@@ -234,7 +234,7 @@ class TestScalingGroupCRUD:
                     pk_value=name,
                 )
             )
-            result = await scaling_group_processors.modify_scaling_group.wait_for_complete(action)
+            result = await scaling_group_processors.update_scaling_group.wait_for_complete(action)
             assert result.scaling_group.status.is_active is False
         finally:
             await _purge_sgroup(scaling_group_processors, name)
@@ -248,7 +248,7 @@ class TestScalingGroupCRUD:
         name = f"crud-mod4-{uuid.uuid4().hex[:8]}"
         await _create_sgroup(scaling_group_processors, name, driver="static")
         try:
-            action = ModifyScalingGroupAction(
+            action = UpdateScalingGroupAction(
                 updater=Updater(
                     spec=ScalingGroupUpdaterSpec(
                         driver=ScalingGroupDriverConfigUpdaterSpec(
@@ -259,7 +259,7 @@ class TestScalingGroupCRUD:
                     pk_value=name,
                 )
             )
-            result = await scaling_group_processors.modify_scaling_group.wait_for_complete(action)
+            result = await scaling_group_processors.update_scaling_group.wait_for_complete(action)
             assert result.scaling_group.driver.name == "static"
         finally:
             await _purge_sgroup(scaling_group_processors, name)

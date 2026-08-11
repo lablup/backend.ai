@@ -12,7 +12,7 @@ from ai.backend.manager.services.model_serving.actions.base import ModelServiceA
 
 
 @dataclass
-class ModifyEndpointAutoScalingRuleAction(ModelServiceAction):
+class UpdateEndpointAutoScalingRuleAction(ModelServiceAction):
     id: RuleId
     updater: Updater[EndpointAutoScalingRuleRow]
 
@@ -32,7 +32,7 @@ class ModifyEndpointAutoScalingRuleAction(ModelServiceAction):
 
 
 @dataclass
-class ModifyEndpointAutoScalingRuleActionResult(BaseActionResult):
+class UpdateEndpointAutoScalingRuleActionResult(BaseActionResult):
     success: bool
     data: EndpointAutoScalingRuleData | None
 

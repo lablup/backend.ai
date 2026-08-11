@@ -42,10 +42,6 @@ from ai.backend.manager.services.image.actions.get_images import (
     GetImagesByCanonicalsAction,
     GetImagesByCanonicalsActionResult,
 )
-from ai.backend.manager.services.image.actions.modify_image import (
-    ModifyImageAction,
-    ModifyImageActionResult,
-)
 from ai.backend.manager.services.image.actions.preload_image import (
     PreloadImageAction,
     PreloadImageActionResult,
@@ -82,6 +78,10 @@ from ai.backend.manager.services.image.actions.untag_image_from_registry import 
     UntagImageFromRegistryAction,
     UntagImageFromRegistryActionResult,
 )
+from ai.backend.manager.services.image.actions.update_image import (
+    UpdateImageAction,
+    UpdateImageActionResult,
+)
 from ai.backend.manager.services.image.actions.update_image_by_id import (
     UpdateImageByIdAction,
     UpdateImageByIdActionResult,
@@ -99,7 +99,7 @@ class ImageProcessors:
     alias_image: ActionProcessor[AliasImageAction, AliasImageActionResult]
     alias_image_by_id: ActionProcessor[AliasImageByIdAction, AliasImageByIdActionResult]
     dealias_image: ActionProcessor[DealiasImageAction, DealiasImageActionResult]
-    modify_image: ActionProcessor[ModifyImageAction, ModifyImageActionResult]
+    update_image: ActionProcessor[UpdateImageAction, UpdateImageActionResult]
     update_image_by_id: ActionProcessor[UpdateImageByIdAction, UpdateImageByIdActionResult]
     preload_image: ActionProcessor[PreloadImageAction, PreloadImageActionResult]
     unload_image: ActionProcessor[UnloadImageAction, UnloadImageActionResult]
@@ -181,7 +181,7 @@ class ImageProcessors:
         self.alias_image = ActionProcessor(service.alias_image, action_monitors)
         self.alias_image_by_id = ActionProcessor(service.alias_image_by_id, action_monitors)
         self.dealias_image = ActionProcessor(service.dealias_image, action_monitors)
-        self.modify_image = ActionProcessor(service.modify_image, action_monitors)
+        self.update_image = ActionProcessor(service.update_image, action_monitors)
         self.update_image_by_id = ActionProcessor(service.update_image_by_id, action_monitors)
         self.preload_image = ActionProcessor(service.preload_image, action_monitors)
         self.unload_image = ActionProcessor(service.unload_image, action_monitors)

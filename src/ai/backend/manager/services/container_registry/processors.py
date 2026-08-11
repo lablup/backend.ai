@@ -37,10 +37,6 @@ from ai.backend.manager.services.container_registry.actions.load_container_regis
     LoadContainerRegistriesAction,
     LoadContainerRegistriesActionResult,
 )
-from ai.backend.manager.services.container_registry.actions.modify_container_registry import (
-    ModifyContainerRegistryAction,
-    ModifyContainerRegistryActionResult,
-)
 from ai.backend.manager.services.container_registry.actions.read_registry_quota import (
     ReadRegistryQuotaAction,
     ReadRegistryQuotaActionResult,
@@ -52,6 +48,10 @@ from ai.backend.manager.services.container_registry.actions.rescan_images import
 from ai.backend.manager.services.container_registry.actions.search_container_registries import (
     SearchContainerRegistriesAction,
     SearchContainerRegistriesActionResult,
+)
+from ai.backend.manager.services.container_registry.actions.update_container_registry import (
+    UpdateContainerRegistryAction,
+    UpdateContainerRegistryActionResult,
 )
 from ai.backend.manager.services.container_registry.actions.update_registry_quota import (
     UpdateRegistryQuotaAction,
@@ -75,8 +75,8 @@ class ContainerRegistryProcessors:
     create_container_registry: ActionProcessor[
         CreateContainerRegistryAction, CreateContainerRegistryActionResult
     ]
-    modify_container_registry: ActionProcessor[
-        ModifyContainerRegistryAction, ModifyContainerRegistryActionResult
+    update_container_registry: ActionProcessor[
+        UpdateContainerRegistryAction, UpdateContainerRegistryActionResult
     ]
     delete_container_registry: ActionProcessor[
         DeleteContainerRegistryAction, DeleteContainerRegistryActionResult
@@ -118,8 +118,8 @@ class ContainerRegistryProcessors:
         self.create_container_registry = ActionProcessor(
             service.create_container_registry, action_monitors
         )
-        self.modify_container_registry = ActionProcessor(
-            service.modify_container_registry, action_monitors
+        self.update_container_registry = ActionProcessor(
+            service.update_container_registry, action_monitors
         )
         self.delete_container_registry = ActionProcessor(
             service.delete_container_registry, action_monitors

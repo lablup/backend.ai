@@ -23,14 +23,6 @@ from ai.backend.manager.services.domain.actions.get_domain import (
     GetDomainAction,
     GetDomainActionResult,
 )
-from ai.backend.manager.services.domain.actions.modify_domain import (
-    ModifyDomainAction,
-    ModifyDomainActionResult,
-)
-from ai.backend.manager.services.domain.actions.modify_domain_node import (
-    ModifyDomainNodeAction,
-    ModifyDomainNodeActionResult,
-)
 from ai.backend.manager.services.domain.actions.purge_domain import (
     PurgeDomainAction,
     PurgeDomainActionResult,
@@ -46,6 +38,14 @@ from ai.backend.manager.services.domain.actions.search_domains import (
 from ai.backend.manager.services.domain.actions.search_rg_domains import (
     SearchRGDomainsAction,
     SearchRGDomainsActionResult,
+)
+from ai.backend.manager.services.domain.actions.update_domain import (
+    UpdateDomainAction,
+    UpdateDomainActionResult,
+)
+from ai.backend.manager.services.domain.actions.update_domain_node import (
+    UpdateDomainNodeAction,
+    UpdateDomainNodeActionResult,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -71,9 +71,9 @@ class DomainService:
             domain_data=domain_data,
         )
 
-    async def modify_domain(self, action: ModifyDomainAction) -> ModifyDomainActionResult:
-        domain_data = await self._repository.modify_domain(action.updater)
-        return ModifyDomainActionResult(
+    async def update_domain(self, action: UpdateDomainAction) -> UpdateDomainActionResult:
+        domain_data = await self._repository.update_domain(action.updater)
+        return UpdateDomainActionResult(
             domain_data=domain_data,
         )
 
@@ -110,9 +110,9 @@ class DomainService:
             domain_data=domain_data,
         )
 
-    async def modify_domain_node(
-        self, action: ModifyDomainNodeAction
-    ) -> ModifyDomainNodeActionResult:
+    async def update_domain_node(
+        self, action: UpdateDomainNodeAction
+    ) -> UpdateDomainNodeActionResult:
         if action.sgroup_ids_to_add is not None and action.sgroup_ids_to_remove is not None:
             if conflict := action.sgroup_ids_to_add & action.sgroup_ids_to_remove:
                 raise InvalidAPIParameters(
@@ -126,7 +126,7 @@ class DomainService:
             action.sgroup_ids_to_add,
             action.sgroup_ids_to_remove,
         )
-        return ModifyDomainNodeActionResult(
+        return UpdateDomainNodeActionResult(
             domain_data=domain_data,
         )
 

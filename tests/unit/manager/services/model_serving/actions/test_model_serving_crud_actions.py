@@ -42,8 +42,8 @@ from ai.backend.manager.services.model_serving.actions.delete_route import (
 from ai.backend.manager.services.model_serving.actions.force_sync import (
     ForceSyncAction,
 )
-from ai.backend.manager.services.model_serving.actions.modify_endpoint import (
-    ModifyEndpointAction,
+from ai.backend.manager.services.model_serving.actions.update_endpoint import (
+    UpdateEndpointAction,
 )
 from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
@@ -281,8 +281,8 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
             success=True, message="ok", data=mock_endpoint_data
         )
 
-        action = ModifyEndpointAction(deployment_id=DeploymentID(endpoint_id), updater=mock_updater)
-        result = await model_serving_processors.modify_endpoint.wait_for_complete(action)
+        action = UpdateEndpointAction(deployment_id=DeploymentID(endpoint_id), updater=mock_updater)
+        result = await model_serving_processors.update_endpoint.wait_for_complete(action)
 
         assert result.success is True
         assert result.data == mock_endpoint_data
@@ -337,8 +337,8 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
         mock_deployment_controller.add_revision = AsyncMock(return_value=mock_revision)
         mock_deployment_controller.activate_revision = AsyncMock()
 
-        action = ModifyEndpointAction(deployment_id=DeploymentID(endpoint_id), updater=mock_updater)
-        result = await model_serving_processors.modify_endpoint.wait_for_complete(action)
+        action = UpdateEndpointAction(deployment_id=DeploymentID(endpoint_id), updater=mock_updater)
+        result = await model_serving_processors.update_endpoint.wait_for_complete(action)
 
         assert result.success is True
         mock_deployment_controller.add_revision.assert_awaited_once()
@@ -364,8 +364,8 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
             success=True, message="ok", data=mock_endpoint_data
         )
 
-        action = ModifyEndpointAction(deployment_id=DeploymentID(endpoint_id), updater=mock_updater)
-        result = await model_serving_processors.modify_endpoint.wait_for_complete(action)
+        action = UpdateEndpointAction(deployment_id=DeploymentID(endpoint_id), updater=mock_updater)
+        result = await model_serving_processors.update_endpoint.wait_for_complete(action)
 
         assert result.success is True
         mock_deployment_controller.mark_lifecycle_needed.assert_not_called()
@@ -382,9 +382,9 @@ class TestModifyEndpoint(ModelServingCRUDBaseFixtures):
         mock_updater.spec = updater_spec
         mock_modify_endpoint.side_effect = Exception("Endpoint not found")
 
-        action = ModifyEndpointAction(deployment_id=DeploymentID(endpoint_id), updater=mock_updater)
+        action = UpdateEndpointAction(deployment_id=DeploymentID(endpoint_id), updater=mock_updater)
         with pytest.raises(Exception, match="Endpoint not found"):
-            await model_serving_processors.modify_endpoint.wait_for_complete(action)
+            await model_serving_processors.update_endpoint.wait_for_complete(action)
 
 
 class TestForceSync(ModelServingCRUDBaseFixtures):

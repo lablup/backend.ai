@@ -48,10 +48,10 @@ from ai.backend.manager.repositories.domain.updaters import DomainNodeUpdaterSpe
 from ai.backend.manager.services.domain.actions.create_domain_node import CreateDomainNodeAction
 from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
 from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
-from ai.backend.manager.services.domain.actions.modify_domain_node import ModifyDomainNodeAction
 from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
 from ai.backend.manager.services.domain.actions.search_domains import SearchDomainsAction
 from ai.backend.manager.services.domain.actions.search_rg_domains import SearchRGDomainsAction
+from ai.backend.manager.services.domain.actions.update_domain_node import UpdateDomainNodeAction
 from ai.backend.manager.types import OptionalState, TriState
 
 _DOMAIN_PAGINATION_SPEC = PaginationSpec(
@@ -227,8 +227,8 @@ class DomainAdapter(BaseAdapter):
             ),
         )
         updater: Updater[DomainRow] = Updater(spec=spec, pk_value=domain_name)
-        result = await self._processors.domain.modify_domain_node.wait_for_complete(
-            ModifyDomainNodeAction(
+        result = await self._processors.domain.update_domain_node.wait_for_complete(
+            UpdateDomainNodeAction(
                 user_info=user_info,
                 updater=updater,
             )

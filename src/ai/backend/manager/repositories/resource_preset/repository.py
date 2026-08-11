@@ -139,7 +139,7 @@ class ResourcePresetRepository:
         Modifies an existing resource preset.
         Raises ResourcePresetNotFound if the preset doesn't exist.
         """
-        preset = await self._db_source.modify_preset(updater)
+        preset = await self._db_source.update_preset(updater)
         with suppress_with_log(
             [Exception], message="Failed to invalidate cache after preset modification"
         ):

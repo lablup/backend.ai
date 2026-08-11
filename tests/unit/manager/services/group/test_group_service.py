@@ -35,7 +35,6 @@ from ai.backend.manager.repositories.group.types import (
 from ai.backend.manager.repositories.group.updaters import GroupUpdaterSpec
 from ai.backend.manager.services.group.actions.create_group import CreateGroupAction
 from ai.backend.manager.services.group.actions.delete_group import DeleteGroupAction
-from ai.backend.manager.services.group.actions.modify_group import ModifyGroupAction
 from ai.backend.manager.services.group.actions.purge_group import PurgeGroupAction
 from ai.backend.manager.services.group.actions.search_projects import (
     GetProjectAction,
@@ -43,6 +42,7 @@ from ai.backend.manager.services.group.actions.search_projects import (
     SearchProjectsByDomainAction,
     SearchProjectsByUserAction,
 )
+from ai.backend.manager.services.group.actions.update_group import UpdateGroupAction
 from ai.backend.manager.services.group.actions.usage_per_month import (
     UsagePerMonthAction,
 )
@@ -192,9 +192,9 @@ class TestModifyGroup:
             spec=GroupUpdaterSpec(name=OptionalState.update("renamed-project")),
             pk_value=group_id,
         )
-        action = ModifyGroupAction(updater=updater)
+        action = UpdateGroupAction(updater=updater)
 
-        result = await service.modify_group(action)
+        result = await service.update_group(action)
 
         assert result.data is not None
         assert result.data.name == "renamed-project"
@@ -212,13 +212,13 @@ class TestModifyGroup:
         user_uuids = [str(uuid.uuid4()), str(uuid.uuid4())]
         group_id = uuid.uuid4()
         updater = Updater(spec=GroupUpdaterSpec(), pk_value=group_id)
-        action = ModifyGroupAction(
+        action = UpdateGroupAction(
             updater=updater,
             user_update_mode=OptionalState.update("add"),
             user_uuids=OptionalState.update(user_uuids),
         )
 
-        await service.modify_group(action)
+        await service.update_group(action)
 
         call_args = mock_group_repository.modify_validated.call_args
         assert call_args[0][1] == "add"
@@ -236,13 +236,13 @@ class TestModifyGroup:
         user_uuids = [str(uuid.uuid4())]
         group_id = uuid.uuid4()
         updater = Updater(spec=GroupUpdaterSpec(), pk_value=group_id)
-        action = ModifyGroupAction(
+        action = UpdateGroupAction(
             updater=updater,
             user_update_mode=OptionalState.update("remove"),
             user_uuids=OptionalState.update(user_uuids),
         )
 
-        await service.modify_group(action)
+        await service.update_group(action)
 
         call_args = mock_group_repository.modify_validated.call_args
         assert call_args[0][1] == "remove"
@@ -261,10 +261,10 @@ class TestModifyGroup:
             spec=GroupUpdaterSpec(name=OptionalState.update("new-name")),
             pk_value=uuid.uuid4(),
         )
-        action = ModifyGroupAction(updater=updater)
+        action = UpdateGroupAction(updater=updater)
 
         with pytest.raises(ProjectNotFound):
-            await service.modify_group(action)
+            await service.update_group(action)
 
 
 class TestDeleteGroup:

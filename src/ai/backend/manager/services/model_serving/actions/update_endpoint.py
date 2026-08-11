@@ -15,7 +15,7 @@ from ai.backend.manager.services.model_serving.actions.base import (
 
 
 @dataclass
-class ModifyEndpointAction(ModelServiceSingleEntityAction):
+class UpdateEndpointAction(ModelServiceSingleEntityAction):
     deployment_id: DeploymentID
     updater: Updater[EndpointRow]
 
@@ -34,7 +34,7 @@ class ModifyEndpointAction(ModelServiceSingleEntityAction):
 
 
 @dataclass
-class ModifyEndpointActionResult(ModelServiceSingleEntityActionResult):
+class UpdateEndpointActionResult(ModelServiceSingleEntityActionResult):
     deployment_id: DeploymentID
     success: bool
     data: EndpointData | None

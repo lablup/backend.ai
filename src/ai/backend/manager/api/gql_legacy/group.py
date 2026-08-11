@@ -51,10 +51,10 @@ from ai.backend.manager.services.group.actions.create_group import CreateGroupAc
 from ai.backend.manager.services.group.actions.delete_group import (
     DeleteGroupAction,
 )
-from ai.backend.manager.services.group.actions.modify_group import ModifyGroupAction
 from ai.backend.manager.services.group.actions.purge_group import (
     PurgeGroupAction,
 )
+from ai.backend.manager.services.group.actions.update_group import UpdateGroupAction
 from ai.backend.manager.types import OptionalState, TriState
 
 from .base import (
@@ -611,7 +611,7 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
         required=False, default_value={}, description="Added in 24.03.0"
     )
 
-    def to_action(self, group_id: uuid.UUID) -> ModifyGroupAction:
+    def to_action(self, group_id: uuid.UUID) -> UpdateGroupAction:
         spec = GroupUpdaterSpec(
             name=OptionalState[str].from_graphql(
                 self.name,
@@ -643,7 +643,7 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
                 self.container_registry,
             ),
         )
-        return ModifyGroupAction(
+        return UpdateGroupAction(
             updater=Updater[GroupRow](spec=spec, pk_value=group_id),
             user_update_mode=OptionalState[str].from_graphql(
                 self.user_update_mode,
@@ -723,7 +723,7 @@ class ModifyGroup(graphene.Mutation):  # type: ignore[misc]
         graph_ctx: GraphQueryContext = info.context
 
         action = props.to_action(gid)
-        res = await graph_ctx.processors.group.modify_group.wait_for_complete(action)
+        res = await graph_ctx.processors.group.update_group.wait_for_complete(action)
         return cls(
             ok=True,
             msg="success",

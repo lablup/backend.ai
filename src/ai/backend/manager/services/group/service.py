@@ -33,10 +33,6 @@ from ai.backend.manager.services.group.actions.delete_group import (
     DeleteGroupAction,
     DeleteGroupActionResult,
 )
-from ai.backend.manager.services.group.actions.modify_group import (
-    ModifyGroupAction,
-    ModifyGroupActionResult,
-)
 from ai.backend.manager.services.group.actions.purge_group import (
     PurgeGroupAction,
     PurgeGroupActionResult,
@@ -57,6 +53,10 @@ from ai.backend.manager.services.group.actions.search_projects import (
 from ai.backend.manager.services.group.actions.unassign_users import (
     UnassignUsersFromProjectAction,
     UnassignUsersFromProjectActionResult,
+)
+from ai.backend.manager.services.group.actions.update_group import (
+    UpdateGroupAction,
+    UpdateGroupActionResult,
 )
 from ai.backend.manager.services.group.actions.usage_per_month import (
     UsagePerMonthAction,
@@ -92,7 +92,7 @@ class GroupService:
         group_data = await self._group_repository.create(action.creator)
         return CreateGroupActionResult(data=group_data, _domain_name=action._domain_name)
 
-    async def modify_group(self, action: ModifyGroupAction) -> ModifyGroupActionResult:
+    async def update_group(self, action: UpdateGroupAction) -> UpdateGroupActionResult:
         # Convert user_uuids from list[str] to list[UUID] if provided
         user_uuids_converted = None
         user_uuids_list = action.user_uuids.optional_value()
@@ -105,7 +105,7 @@ class GroupService:
             user_uuids_converted,
         )
         # If no group data is returned, it means only user updates were performed or no updates at all
-        return ModifyGroupActionResult(data=group_data)
+        return UpdateGroupActionResult(data=group_data)
 
     async def delete_group(self, action: DeleteGroupAction) -> DeleteGroupActionResult:
         await self._group_repository.mark_inactive(action.group_id)

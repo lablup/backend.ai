@@ -122,7 +122,6 @@ from ai.backend.manager.services.scaling_group.actions.get_resource_info import 
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
 )
-from ai.backend.manager.services.scaling_group.actions.modify import ModifyScalingGroupAction
 from ai.backend.manager.services.scaling_group.actions.purge_scaling_group import (
     PurgeScalingGroupAction,
 )
@@ -138,6 +137,7 @@ from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_id
 from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_ids_by_names import (
     ResolveResourceGroupIDsByNamesAction,
 )
+from ai.backend.manager.services.scaling_group.actions.update import UpdateScalingGroupAction
 from ai.backend.manager.services.scaling_group.actions.update_allowed_domains_for_rg import (
     UpdateAllowedDomainsForResourceGroupAction,
 )
@@ -455,8 +455,8 @@ class ResourceGroupAdapter(BaseAdapter):
             metadata=metadata_spec,
         )
         updater = Updater(spec=updater_spec, pk_value=name)
-        action_result = await self._processors.scaling_group.modify_scaling_group.wait_for_complete(
-            ModifyScalingGroupAction(updater=updater)
+        action_result = await self._processors.scaling_group.update_scaling_group.wait_for_complete(
+            UpdateScalingGroupAction(updater=updater)
         )
 
         return UpdateResourceGroupPayload(
@@ -671,8 +671,8 @@ class ResourceGroupAdapter(BaseAdapter):
         )
         updater = Updater(spec=updater_spec, pk_value=input.resource_group_name)
 
-        action_result = await self._processors.scaling_group.modify_scaling_group.wait_for_complete(
-            ModifyScalingGroupAction(updater=updater)
+        action_result = await self._processors.scaling_group.update_scaling_group.wait_for_complete(
+            UpdateScalingGroupAction(updater=updater)
         )
         return UpdateResourceGroupConfigPayloadNode(
             resource_group=self._data_to_detail_node(action_result.scaling_group),

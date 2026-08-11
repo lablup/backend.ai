@@ -74,7 +74,6 @@ from ai.backend.manager.services.group.actions.assign_users_to_project import (
 )
 from ai.backend.manager.services.group.actions.create_group import CreateGroupAction
 from ai.backend.manager.services.group.actions.delete_group import DeleteGroupAction
-from ai.backend.manager.services.group.actions.modify_group import ModifyGroupAction
 from ai.backend.manager.services.group.actions.purge_group import PurgeGroupAction
 from ai.backend.manager.services.group.actions.search_projects import (
     GetProjectAction,
@@ -85,6 +84,7 @@ from ai.backend.manager.services.group.actions.search_projects import (
 from ai.backend.manager.services.group.actions.unassign_users import (
     UnassignUsersFromProjectAction,
 )
+from ai.backend.manager.services.group.actions.update_group import UpdateGroupAction
 from ai.backend.manager.types import OptionalState, TriState
 
 _PROJECT_PAGINATION_SPEC = PaginationSpec(
@@ -221,8 +221,8 @@ class ProjectAdapter(BaseAdapter):
             ),
         )
         updater: Updater[GroupRow] = Updater(spec=spec, pk_value=project_id)
-        result = await self._processors.group.modify_group.wait_for_complete(
-            ModifyGroupAction(updater=updater)
+        result = await self._processors.group.update_group.wait_for_complete(
+            UpdateGroupAction(updater=updater)
         )
         if result.data is None:
             raise UnreachableError("modify_group must return data")

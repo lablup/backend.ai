@@ -143,7 +143,7 @@ class ResourcePresetDBSource:
             raise ResourcePresetNotFound()
         return preset_row
 
-    async def modify_preset(self, updater: Updater[ResourcePresetRow]) -> ResourcePresetData:
+    async def update_preset(self, updater: Updater[ResourcePresetRow]) -> ResourcePresetData:
         """
         Modifies an existing resource preset.
         Raises ResourcePresetNotFound if the preset doesn't exist.

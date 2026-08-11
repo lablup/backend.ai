@@ -46,8 +46,8 @@ from ai.backend.manager.services.container_registry.actions.create_container_reg
 from ai.backend.manager.services.container_registry.actions.delete_container_registry import (
     DeleteContainerRegistryAction,
 )
-from ai.backend.manager.services.container_registry.actions.modify_container_registry import (
-    ModifyContainerRegistryAction,
+from ai.backend.manager.services.container_registry.actions.update_container_registry import (
+    UpdateContainerRegistryAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -460,7 +460,7 @@ class ModifyContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
         _, _id = AsyncNode.resolve_global_id(info, id)
         reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
 
-        action = ModifyContainerRegistryAction(
+        action = UpdateContainerRegistryAction(
             updater=Updater(
                 spec=ContainerRegistryUpdaterSpec(
                     url=OptionalState.from_graphql(url),
@@ -480,7 +480,7 @@ class ModifyContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
 
         # Execute action through processor
         result = (
-            await ctx.processors.container_registry.modify_container_registry.wait_for_complete(
+            await ctx.processors.container_registry.update_container_registry.wait_for_complete(
                 action
             )
         )

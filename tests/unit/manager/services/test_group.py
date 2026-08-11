@@ -31,11 +31,11 @@ from ai.backend.manager.services.group.actions.create_group import (
 from ai.backend.manager.services.group.actions.delete_group import (
     DeleteGroupAction,
 )
-from ai.backend.manager.services.group.actions.modify_group import (
-    ModifyGroupAction,
-)
 from ai.backend.manager.services.group.actions.purge_group import (
     PurgeGroupAction,
+)
+from ai.backend.manager.services.group.actions.update_group import (
+    UpdateGroupAction,
 )
 from ai.backend.manager.services.group.service import GroupService
 from ai.backend.manager.types import OptionalState, TriState
@@ -223,7 +223,7 @@ class TestModifyGroup:
         assert modified_group_data.description is not None
 
         assert modified_group_data.is_active is not None
-        action = ModifyGroupAction(
+        action = UpdateGroupAction(
             updater=Updater(
                 spec=GroupUpdaterSpec(
                     name=OptionalState.update(modified_group_data.name),
@@ -234,7 +234,7 @@ class TestModifyGroup:
             ),
         )
 
-        result = await service.modify_group(action)
+        result = await service.update_group(action)
 
         assert result.data is not None
         assert result.data.name == modified_group_data.name
@@ -251,7 +251,7 @@ class TestModifyGroup:
             side_effect=ProjectNotFound("Group not found")
         )
 
-        action = ModifyGroupAction(
+        action = UpdateGroupAction(
             updater=Updater(
                 spec=GroupUpdaterSpec(
                     name=OptionalState.update("modified_name"),
@@ -263,7 +263,7 @@ class TestModifyGroup:
         )
 
         with pytest.raises(ProjectNotFound):
-            await service.modify_group(action)
+            await service.update_group(action)
 
 
 class TestDeleteGroup:

@@ -79,10 +79,6 @@ from ai.backend.manager.services.scaling_group.actions.list_scaling_groups impor
     SearchScalingGroupsAction,
     SearchScalingGroupsActionResult,
 )
-from ai.backend.manager.services.scaling_group.actions.modify import (
-    ModifyScalingGroupAction,
-    ModifyScalingGroupActionResult,
-)
 from ai.backend.manager.services.scaling_group.actions.purge_scaling_group import (
     PurgeScalingGroupAction,
     PurgeScalingGroupActionResult,
@@ -102,6 +98,10 @@ from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_id
 from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_ids_by_names import (
     ResolveResourceGroupIDsByNamesAction,
     ResolveResourceGroupIDsByNamesActionResult,
+)
+from ai.backend.manager.services.scaling_group.actions.update import (
+    UpdateScalingGroupAction,
+    UpdateScalingGroupActionResult,
 )
 from ai.backend.manager.services.scaling_group.actions.update_allowed_domains_for_rg import (
     UpdateAllowedDomainsForResourceGroupAction,
@@ -222,12 +222,12 @@ class ScalingGroupService:
         data = await self._repository.purge_scaling_group(action.purger)
         return PurgeScalingGroupActionResult(data=data)
 
-    async def modify_scaling_group(
-        self, action: ModifyScalingGroupAction
-    ) -> ModifyScalingGroupActionResult:
+    async def update_scaling_group(
+        self, action: UpdateScalingGroupAction
+    ) -> UpdateScalingGroupActionResult:
         """Modifies a scaling group."""
         scaling_group_data = await self._repository.update_scaling_group(action.updater)
-        return ModifyScalingGroupActionResult(scaling_group=scaling_group_data)
+        return UpdateScalingGroupActionResult(scaling_group=scaling_group_data)
 
     async def replace_default_deployment_options(
         self, action: ReplaceDefaultDeploymentOptionsAction

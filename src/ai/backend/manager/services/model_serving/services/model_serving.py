@@ -150,13 +150,13 @@ from ai.backend.manager.services.model_serving.actions.list_model_service import
     ListModelServiceAction,
     ListModelServiceActionResult,
 )
-from ai.backend.manager.services.model_serving.actions.modify_endpoint import (
-    ModifyEndpointAction,
-    ModifyEndpointActionResult,
-)
 from ai.backend.manager.services.model_serving.actions.search_services import (
     SearchServicesAction,
     SearchServicesActionResult,
+)
+from ai.backend.manager.services.model_serving.actions.update_endpoint import (
+    UpdateEndpointAction,
+    UpdateEndpointActionResult,
 )
 from ai.backend.manager.services.model_serving.actions.update_route import (
     UpdateRouteAction,
@@ -834,7 +834,7 @@ class ModelServingService:
 
         return ForceSyncActionResult(success=True)
 
-    async def modify_endpoint(self, action: ModifyEndpointAction) -> ModifyEndpointActionResult:
+    async def update_endpoint(self, action: UpdateEndpointAction) -> UpdateEndpointActionResult:
         spec = cast(EndpointUpdaterSpec, action.updater.spec)
 
         # 1. Apply endpoint-level changes (name, resource_group, replicas)
@@ -891,7 +891,7 @@ class ModelServingService:
                 DeploymentLifecycleType.CHECK_REPLICA,
             )
 
-        return ModifyEndpointActionResult(
+        return UpdateEndpointActionResult(
             deployment_id=action.deployment_id, success=result.success, data=result.data
         )
 

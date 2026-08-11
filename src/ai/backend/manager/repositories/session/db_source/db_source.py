@@ -373,7 +373,7 @@ class SessionDBSource:
             )
             return cast(SessionRow | None, await db_session.scalar(stmt))
 
-    async def modify_session(
+    async def update_session(
         self,
         updater: Updater[SessionRow],
         session_name: str | None = None,

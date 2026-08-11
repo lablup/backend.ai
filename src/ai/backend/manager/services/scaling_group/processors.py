@@ -61,10 +61,6 @@ from ai.backend.manager.services.scaling_group.actions.list_scaling_groups impor
     SearchScalingGroupsAction,
     SearchScalingGroupsActionResult,
 )
-from ai.backend.manager.services.scaling_group.actions.modify import (
-    ModifyScalingGroupAction,
-    ModifyScalingGroupActionResult,
-)
 from ai.backend.manager.services.scaling_group.actions.purge_scaling_group import (
     PurgeScalingGroupAction,
     PurgeScalingGroupActionResult,
@@ -84,6 +80,10 @@ from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_id
 from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_ids_by_names import (
     ResolveResourceGroupIDsByNamesAction,
     ResolveResourceGroupIDsByNamesActionResult,
+)
+from ai.backend.manager.services.scaling_group.actions.update import (
+    UpdateScalingGroupAction,
+    UpdateScalingGroupActionResult,
 )
 from ai.backend.manager.services.scaling_group.actions.update_allowed_domains_for_rg import (
     UpdateAllowedDomainsForResourceGroupAction,
@@ -111,7 +111,7 @@ from ai.backend.manager.services.scaling_group.service import ScalingGroupServic
 class ScalingGroupProcessors:
     create_scaling_group: ActionProcessor[CreateScalingGroupAction, CreateScalingGroupActionResult]
     purge_scaling_group: ActionProcessor[PurgeScalingGroupAction, PurgeScalingGroupActionResult]
-    modify_scaling_group: ActionProcessor[ModifyScalingGroupAction, ModifyScalingGroupActionResult]
+    update_scaling_group: ActionProcessor[UpdateScalingGroupAction, UpdateScalingGroupActionResult]
     search_scaling_groups: ActionProcessor[
         SearchScalingGroupsAction, SearchScalingGroupsActionResult
     ]
@@ -199,7 +199,7 @@ class ScalingGroupProcessors:
     ) -> None:
         self.create_scaling_group = ActionProcessor(service.create_scaling_group, action_monitors)
         self.purge_scaling_group = ActionProcessor(service.purge_scaling_group, action_monitors)
-        self.modify_scaling_group = ActionProcessor(service.modify_scaling_group, action_monitors)
+        self.update_scaling_group = ActionProcessor(service.update_scaling_group, action_monitors)
         self.search_scaling_groups = ActionProcessor(service.search_scaling_groups, action_monitors)
         self.list_allowed_sgroups = ActionProcessor(service.list_allowed_sgroups, action_monitors)
         self.get_wsproxy_version = ActionProcessor(service.get_wsproxy_version, action_monitors)

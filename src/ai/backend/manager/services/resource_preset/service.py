@@ -24,13 +24,13 @@ from ai.backend.manager.services.resource_preset.actions.list_presets import (
     ListResourcePresetsAction,
     ListResourcePresetsResult,
 )
-from ai.backend.manager.services.resource_preset.actions.modify_preset import (
-    ModifyResourcePresetAction,
-    ModifyResourcePresetActionResult,
-)
 from ai.backend.manager.services.resource_preset.actions.search_presets import (
     SearchResourcePresetsV2Action,
     SearchResourcePresetsV2ActionResult,
+)
+from ai.backend.manager.services.resource_preset.actions.update_preset import (
+    UpdateResourcePresetAction,
+    UpdateResourcePresetActionResult,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -57,9 +57,9 @@ class ResourcePresetService:
         preset_data = await self._resource_preset_repository.create_preset_validated(creator)
         return CreateResourcePresetActionResult(resource_preset=preset_data)
 
-    async def modify_preset(
-        self, action: ModifyResourcePresetAction
-    ) -> ModifyResourcePresetActionResult:
+    async def update_preset(
+        self, action: UpdateResourcePresetAction
+    ) -> UpdateResourcePresetActionResult:
         name = action.name
         preset_id = action.id
         spec = cast(ResourcePresetUpdaterSpec, action.updater.spec)
@@ -81,7 +81,7 @@ class ResourcePresetService:
 
         preset_data = await self._resource_preset_repository.modify_preset_validated(action.updater)
 
-        return ModifyResourcePresetActionResult(resource_preset=preset_data)
+        return UpdateResourcePresetActionResult(resource_preset=preset_data)
 
     async def delete_preset(
         self, action: DeleteResourcePresetAction

@@ -11,7 +11,7 @@ from ai.backend.manager.services.resource_preset.actions.base import ResourcePre
 
 
 @dataclass
-class ModifyResourcePresetAction(ResourcePresetAction):
+class UpdateResourcePresetAction(ResourcePresetAction):
     updater: Updater[ResourcePresetRow]
     id: uuid.UUID | None
     name: str | None
@@ -27,7 +27,7 @@ class ModifyResourcePresetAction(ResourcePresetAction):
 
 
 @dataclass
-class ModifyResourcePresetActionResult(BaseActionResult):
+class UpdateResourcePresetActionResult(BaseActionResult):
     resource_preset: ResourcePresetData
 
     @override

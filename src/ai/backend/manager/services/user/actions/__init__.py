@@ -29,13 +29,6 @@ from .get_user import (
     GetUserAction,
     GetUserActionResult,
 )
-from .modify_user import (
-    BulkModifyUserAction,
-    BulkModifyUserActionResult,
-    ModifyUserAction,
-    ModifyUserActionResult,
-    UserUpdateSpec,
-)
 from .purge_user import (
     BulkPurgeUserAction,
     BulkPurgeUserActionResult,
@@ -58,6 +51,13 @@ from .search_users_by_role import (
     SearchUsersByRoleAction,
     SearchUsersByRoleActionResult,
 )
+from .update_user import (
+    BulkUpdateUserAction,
+    BulkUpdateUserActionResult,
+    UpdateUserAction,
+    UpdateUserActionResult,
+    UserUpdateSpec,
+)
 from .user_month_stats import (
     UserMonthStatsAction,
     UserMonthStatsActionResult,
@@ -68,8 +68,8 @@ __all__ = (
     "AdminMonthStatsActionResult",
     "BulkCreateUserAction",
     "BulkCreateUserActionResult",
-    "BulkModifyUserAction",
-    "BulkModifyUserActionResult",
+    "BulkUpdateUserAction",
+    "BulkUpdateUserActionResult",
     "BulkPurgeUserAction",
     "BulkPurgeUserActionResult",
     "CreateUserAction",
@@ -78,8 +78,8 @@ __all__ = (
     "DeleteUserActionResult",
     "GetUserAction",
     "GetUserActionResult",
-    "ModifyUserAction",
-    "ModifyUserActionResult",
+    "UpdateUserAction",
+    "UpdateUserActionResult",
     "PurgeUserAction",
     "PurgeUserActionResult",
     "SearchUsersAction",

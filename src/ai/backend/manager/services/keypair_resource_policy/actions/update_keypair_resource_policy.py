@@ -16,7 +16,7 @@ from ai.backend.manager.repositories.keypair_resource_policy.updaters import (
 
 
 @dataclass
-class ModifyKeyPairResourcePolicyAction(
+class UpdateKeyPairResourcePolicyAction(
     UpdateGlobalOpsAction[KeyPairResourcePolicyRow, KeyPairResourcePolicyData]
 ):
     """Retune one keypair resource policy; the name stays the key."""

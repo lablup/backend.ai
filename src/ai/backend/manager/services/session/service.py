@@ -204,10 +204,6 @@ from ai.backend.manager.services.session.actions.match_sessions import (
     MatchSessionsAction,
     MatchSessionsActionResult,
 )
-from ai.backend.manager.services.session.actions.modify_session import (
-    ModifySessionAction,
-    ModifySessionActionResult,
-)
 from ai.backend.manager.services.session.actions.rename_session import (
     RenameSessionAction,
     RenameSessionActionResult,
@@ -243,6 +239,10 @@ from ai.backend.manager.services.session.actions.start_service import (
 from ai.backend.manager.services.session.actions.terminate_sessions import (
     TerminateSessionsAction,
     TerminateSessionsActionResult,
+)
+from ai.backend.manager.services.session.actions.update_session import (
+    UpdateSessionAction,
+    UpdateSessionActionResult,
 )
 from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
@@ -1515,17 +1515,17 @@ class SessionService:
         )
         return GetSessionActionResult(session_data=session_data)
 
-    async def modify_session(self, action: ModifySessionAction) -> ModifySessionActionResult:
+    async def update_session(self, action: UpdateSessionAction) -> UpdateSessionActionResult:
         session_id = action.session_id
         spec = cast(SessionUpdaterSpec, action.updater.spec)
         session_name = spec.name.optional_value()
 
-        session_row = await self._session_repository.modify_session(action.updater, session_name)
+        session_row = await self._session_repository.update_session(action.updater, session_name)
         if session_row is None:
             raise ValueError(f"Session not found (id:{session_id})")
         session_owner_data = await self._session_repository.get_session_owner(str(session_id))
 
-        return ModifySessionActionResult(
+        return UpdateSessionActionResult(
             session_data=session_row.to_dataclass(owner=session_owner_data)
         )
 

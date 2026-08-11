@@ -44,8 +44,8 @@ from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
 )
 from ai.backend.manager.services.prometheus_query_preset.actions import (
     ExecutePresetAction,
-    ModifyPresetAction,
     PreviewPresetAction,
+    UpdatePresetAction,
 )
 from ai.backend.manager.services.prometheus_query_preset.service import (
     PrometheusQueryPresetService,
@@ -154,8 +154,8 @@ class TestPrometheusQueryPresetService:
             ),
             pk_value=preset_data.id,
         )
-        action = ModifyPresetAction(preset_id=preset_data.id, updater=updater)
-        result = await service.modify_preset(action)
+        action = UpdatePresetAction(preset_id=preset_data.id, updater=updater)
+        result = await service.update_preset(action)
 
         assert result.preset == preset_data
         mock_repository.update.assert_called_once_with(updater)

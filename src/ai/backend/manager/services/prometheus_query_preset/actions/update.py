@@ -13,14 +13,14 @@ from ai.backend.manager.services.prometheus_query_preset.actions.base import (
 
 
 @dataclass
-class ModifyPresetAction(PrometheusQueryPresetGlobalAction):
+class UpdatePresetAction(PrometheusQueryPresetGlobalAction):
     preset_id: UUID
     updater: Updater[PrometheusQueryPresetRow]
 
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "modify_prometheus_query_preset"
+        return "update_prometheus_query_preset"
 
     @override
     @classmethod
@@ -29,7 +29,7 @@ class ModifyPresetAction(PrometheusQueryPresetGlobalAction):
 
 
 @dataclass
-class ModifyPresetActionResult(BaseActionResult):
+class UpdatePresetActionResult(BaseActionResult):
     preset: PrometheusQueryPresetData
 
     @override

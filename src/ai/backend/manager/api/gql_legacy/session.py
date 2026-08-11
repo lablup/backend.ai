@@ -76,7 +76,7 @@ from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.models.vfolder import get_permission_ctx as get_vfolder_permission_ctx
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.session.updaters import SessionUpdaterSpec
-from ai.backend.manager.services.session.actions.modify_session import ModifySessionAction
+from ai.backend.manager.services.session.actions.update_session import UpdateSessionAction
 from ai.backend.manager.types import OptionalState
 
 from .base import (
@@ -919,8 +919,8 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):  # type: ignore[mis
         if name:
             _validate_name_input(name)
 
-        result = await graph_ctx.processors.session.modify_session.wait_for_complete(
-            ModifySessionAction(
+        result = await graph_ctx.processors.session.update_session.wait_for_complete(
+            UpdateSessionAction(
                 session_id=session_id,
                 updater=Updater(
                     spec=SessionUpdaterSpec(

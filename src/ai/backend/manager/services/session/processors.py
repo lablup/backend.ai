@@ -106,10 +106,6 @@ from ai.backend.manager.services.session.actions.match_sessions import (
     MatchSessionsAction,
     MatchSessionsActionResult,
 )
-from ai.backend.manager.services.session.actions.modify_session import (
-    ModifySessionAction,
-    ModifySessionActionResult,
-)
 from ai.backend.manager.services.session.actions.rename_session import (
     RenameSessionAction,
     RenameSessionActionResult,
@@ -145,6 +141,10 @@ from ai.backend.manager.services.session.actions.start_service import (
 from ai.backend.manager.services.session.actions.terminate_sessions import (
     TerminateSessionsAction,
     TerminateSessionsActionResult,
+)
+from ai.backend.manager.services.session.actions.update_session import (
+    UpdateSessionAction,
+    UpdateSessionActionResult,
 )
 from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
@@ -205,7 +205,7 @@ class SessionProcessors:
     terminate_sessions: BulkActionProcessor[TerminateSessionsAction, TerminateSessionsActionResult]
     upload_files: ActionProcessor[UploadFilesAction, UploadFilesActionResult]
     get_session: SingleEntityActionProcessor[GetSessionAction, GetSessionActionResult]
-    modify_session: SingleEntityActionProcessor[ModifySessionAction, ModifySessionActionResult]
+    update_session: SingleEntityActionProcessor[UpdateSessionAction, UpdateSessionActionResult]
 
     def __init__(
         self,
@@ -308,8 +308,8 @@ class SessionProcessors:
             action_monitors,
             validators=rbac_single_entity_validators,
         )
-        self.modify_session = SingleEntityActionProcessor(
-            service.modify_session,
+        self.update_session = SingleEntityActionProcessor(
+            service.update_session,
             action_monitors,
             validators=rbac_single_entity_validators,
         )

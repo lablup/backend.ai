@@ -15,7 +15,7 @@ from ai.backend.manager.services.session.base import (
 
 
 @dataclass
-class ModifySessionAction(SessionSingleEntityAction):
+class UpdateSessionAction(SessionSingleEntityAction):
     session_id: uuid.UUID
     updater: Updater[SessionRow]
 
@@ -34,7 +34,7 @@ class ModifySessionAction(SessionSingleEntityAction):
 
 
 @dataclass
-class ModifySessionActionResult(SessionSingleEntityActionResult):
+class UpdateSessionActionResult(SessionSingleEntityActionResult):
     session_data: SessionData
 
     @override

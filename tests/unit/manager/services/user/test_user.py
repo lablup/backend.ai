@@ -27,8 +27,8 @@ from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.services.user.actions.admin_month_stats import AdminMonthStatsAction
 from ai.backend.manager.services.user.actions.create_user import CreateUserAction
 from ai.backend.manager.services.user.actions.delete_user import DeleteUserAction
-from ai.backend.manager.services.user.actions.modify_user import ModifyUserAction
 from ai.backend.manager.services.user.actions.purge_user import PurgeUserAction
+from ai.backend.manager.services.user.actions.update_user import UpdateUserAction
 from ai.backend.manager.services.user.actions.user_month_stats import UserMonthStatsAction
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
@@ -162,7 +162,7 @@ class TestUserServiceCompatibility:
     async def test_modify_user_action_structure(
         self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]
     ) -> None:
-        """Test that ModifyUserAction supports the expected modifications."""
+        """Test that UpdateUserAction supports the expected modifications."""
         mock_user_data = MagicMock()
         mock_user_data.full_name = "Updated Name"
         mock_user_data.role = UserRole.ADMIN
@@ -172,7 +172,7 @@ class TestUserServiceCompatibility:
         )
 
         # Test 2.1: Basic information modification
-        action = ModifyUserAction(
+        action = UpdateUserAction(
             email="user@example.com",
             updater=Updater(
                 spec=UserUpdaterSpec(
@@ -183,7 +183,7 @@ class TestUserServiceCompatibility:
             ),
         )
 
-        await user_service.modify_user(action)
+        await user_service.update_user(action)
         mock_dependencies["user_repository"].update_user_validated.assert_called_once()
 
     async def test_delete_user_action_structure(

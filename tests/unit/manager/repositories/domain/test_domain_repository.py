@@ -556,7 +556,7 @@ class TestDomainRepository:
         updater = Updater(spec=updater_spec, pk_value=domain_name)
 
         # Modify domain
-        modified_domain = await domain_repository.modify_domain(updater)
+        modified_domain = await domain_repository.update_domain(updater)
 
         assert modified_domain is not None
         assert modified_domain.name == domain_name
@@ -580,7 +580,7 @@ class TestDomainRepository:
         updater = Updater(spec=updater_spec, pk_value="nonexistent-domain")
 
         with pytest.raises(DomainNotFound):
-            await domain_repository.modify_domain(updater)
+            await domain_repository.update_domain(updater)
 
     async def test_soft_delete_domain_success(
         self,

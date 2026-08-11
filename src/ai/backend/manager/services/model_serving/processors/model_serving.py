@@ -40,13 +40,13 @@ from ai.backend.manager.services.model_serving.actions.list_model_service import
     ListModelServiceAction,
     ListModelServiceActionResult,
 )
-from ai.backend.manager.services.model_serving.actions.modify_endpoint import (
-    ModifyEndpointAction,
-    ModifyEndpointActionResult,
-)
 from ai.backend.manager.services.model_serving.actions.search_services import (
     SearchServicesAction,
     SearchServicesActionResult,
+)
+from ai.backend.manager.services.model_serving.actions.update_endpoint import (
+    UpdateEndpointAction,
+    UpdateEndpointActionResult,
 )
 from ai.backend.manager.services.model_serving.actions.update_route import (
     UpdateRouteAction,
@@ -72,7 +72,7 @@ class ModelServingProcessors:
     delete_model_service: SingleEntityActionProcessor[
         DeleteModelServiceAction, DeleteModelServiceActionResult
     ]
-    modify_endpoint: SingleEntityActionProcessor[ModifyEndpointAction, ModifyEndpointActionResult]
+    update_endpoint: SingleEntityActionProcessor[UpdateEndpointAction, UpdateEndpointActionResult]
     update_route: SingleEntityActionProcessor[UpdateRouteAction, UpdateRouteActionResult]
     delete_route: SingleEntityActionProcessor[DeleteRouteAction, DeleteRouteActionResult]
 
@@ -113,8 +113,8 @@ class ModelServingProcessors:
             if isinstance(legacy_rbac, LegacyRBACValidators)
             else validators.rbac.single_entity
         )
-        self.modify_endpoint = SingleEntityActionProcessor(
-            service.modify_endpoint,
+        self.update_endpoint = SingleEntityActionProcessor(
+            service.update_endpoint,
             action_monitors,
             validators=[legacy_single_entity_validator],
         )

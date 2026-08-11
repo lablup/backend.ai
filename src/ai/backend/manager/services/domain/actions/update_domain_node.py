@@ -11,7 +11,7 @@ from ai.backend.manager.services.domain.actions.base import DomainAction
 
 
 @dataclass
-class ModifyDomainNodeAction(DomainAction):
+class UpdateDomainNodeAction(DomainAction):
     user_info: UserInfo
     updater: Updater[DomainRow]
     sgroup_ids_to_add: set[ResourceGroupID] | None = None
@@ -28,7 +28,7 @@ class ModifyDomainNodeAction(DomainAction):
 
 
 @dataclass
-class ModifyDomainNodeActionResult(BaseActionResult):
+class UpdateDomainNodeActionResult(BaseActionResult):
     domain_data: DomainData
 
     @override

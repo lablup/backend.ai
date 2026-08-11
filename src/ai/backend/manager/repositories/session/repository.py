@@ -198,12 +198,12 @@ class SessionRepository:
         return await self._db_source.get_session_by_id(session_id)
 
     @session_repository_resilience.apply()
-    async def modify_session(
+    async def update_session(
         self,
         updater: Updater[SessionRow],
         session_name: str | None = None,
     ) -> SessionRow | None:
-        return await self._db_source.modify_session(updater, session_name)
+        return await self._db_source.update_session(updater, session_name)
 
     @session_repository_resilience.apply()
     async def query_userinfo(

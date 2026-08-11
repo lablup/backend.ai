@@ -53,11 +53,11 @@ from ai.backend.manager.services.resource_preset.actions.create_preset import (
 from ai.backend.manager.services.resource_preset.actions.delete_preset import (
     DeleteResourcePresetAction,
 )
-from ai.backend.manager.services.resource_preset.actions.modify_preset import (
-    ModifyResourcePresetAction,
-)
 from ai.backend.manager.services.resource_preset.actions.search_presets import (
     SearchResourcePresetsV2Action,
+)
+from ai.backend.manager.services.resource_preset.actions.update_preset import (
+    UpdateResourcePresetAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -186,8 +186,8 @@ class ResourcePresetAdapter(BaseAdapter):
             scaling_group_name=resource_group_state,
         )
         updater = Updater(spec=updater_spec, pk_value=input.id)
-        result = await self._processors.resource_preset.modify_preset.wait_for_complete(
-            ModifyResourcePresetAction(updater=updater, id=input.id, name=None)
+        result = await self._processors.resource_preset.update_preset.wait_for_complete(
+            UpdateResourcePresetAction(updater=updater, id=input.id, name=None)
         )
         return UpdateResourcePresetPayload(
             resource_preset=self._data_to_node(result.resource_preset),

@@ -22,13 +22,13 @@ from ai.backend.manager.services.model_serving.actions.delete_auto_scaling_rule 
     DeleteEndpointAutoScalingRuleAction,
     DeleteEndpointAutoScalingRuleActionResult,
 )
-from ai.backend.manager.services.model_serving.actions.modify_auto_scaling_rule import (
-    ModifyEndpointAutoScalingRuleAction,
-    ModifyEndpointAutoScalingRuleActionResult,
-)
 from ai.backend.manager.services.model_serving.actions.scale_service_replicas import (
     ScaleServiceReplicasAction,
     ScaleServiceReplicasActionResult,
+)
+from ai.backend.manager.services.model_serving.actions.update_auto_scaling_rule import (
+    UpdateEndpointAutoScalingRuleAction,
+    UpdateEndpointAutoScalingRuleActionResult,
 )
 from ai.backend.manager.services.model_serving.services.utils import validate_endpoint_access
 
@@ -117,9 +117,9 @@ class AutoScalingService:
             data=created_rule,
         )
 
-    async def modify_endpoint_auto_scaling_rule(
-        self, action: ModifyEndpointAutoScalingRuleAction
-    ) -> ModifyEndpointAutoScalingRuleActionResult:
+    async def update_endpoint_auto_scaling_rule(
+        self, action: UpdateEndpointAutoScalingRuleAction
+    ) -> UpdateEndpointAutoScalingRuleActionResult:
         # Get the rule to find the endpoint
         rule_data = await self._repository.get_auto_scaling_rule_by_id(action.id)
         if rule_data is None:
@@ -139,7 +139,7 @@ class AutoScalingService:
         if updated_rule is None:
             raise EndpointAutoScalingRuleNotFound
 
-        return ModifyEndpointAutoScalingRuleActionResult(
+        return UpdateEndpointAutoScalingRuleActionResult(
             success=True,
             data=updated_rule,
         )

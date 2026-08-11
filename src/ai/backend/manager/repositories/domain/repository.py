@@ -141,7 +141,7 @@ class DomainRepository:
             return data
 
     @domain_repository_resilience.apply()
-    async def modify_domain(self, updater: Updater[DomainRow]) -> DomainData:
+    async def update_domain(self, updater: Updater[DomainRow]) -> DomainData:
         """
         Modifies an existing domain.
         Validates domain modification permissions.
@@ -229,7 +229,7 @@ class DomainRepository:
             return domain_row.to_data()
 
     @domain_repository_resilience.apply()
-    async def modify_domain_node(
+    async def update_domain_node(
         self,
         updater: Updater[DomainRow],
         sgroup_ids_to_add: set[ResourceGroupID] | None = None,
@@ -374,7 +374,7 @@ class DomainRepository:
                     user_info, sgroup_ids_to_remove, db_session=db_session
                 )
 
-            return await self.modify_domain_node(
+            return await self.update_domain_node(
                 updater,
                 sgroup_ids_to_add,
                 sgroup_ids_to_remove,

@@ -31,11 +31,11 @@ from ai.backend.manager.services.domain.actions.create_domain import CreateDomai
 from ai.backend.manager.services.domain.actions.create_domain_node import CreateDomainNodeAction
 from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
 from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
-from ai.backend.manager.services.domain.actions.modify_domain import ModifyDomainAction
-from ai.backend.manager.services.domain.actions.modify_domain_node import ModifyDomainNodeAction
 from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
 from ai.backend.manager.services.domain.actions.search_domains import SearchDomainsAction
 from ai.backend.manager.services.domain.actions.search_rg_domains import SearchRGDomainsAction
+from ai.backend.manager.services.domain.actions.update_domain import UpdateDomainAction
+from ai.backend.manager.services.domain.actions.update_domain_node import UpdateDomainNodeAction
 from ai.backend.manager.services.domain.service import DomainService
 
 if TYPE_CHECKING:
@@ -315,7 +315,7 @@ class TestModifyDomain:
     @pytest.fixture
     def mock_repository(self) -> MagicMock:
         repository = MagicMock()
-        repository.modify_domain = AsyncMock()
+        repository.update_domain = AsyncMock()
         return repository
 
     @pytest.fixture
@@ -328,14 +328,14 @@ class TestModifyDomain:
         mock_repository: MagicMock,
     ) -> None:
         updated = _make_domain_data(name="updated-domain", description="new desc")
-        mock_repository.modify_domain.return_value = updated
+        mock_repository.update_domain.return_value = updated
 
         updater = MagicMock()
-        action = ModifyDomainAction(updater=updater, user_info=_make_user_info())
+        action = UpdateDomainAction(updater=updater, user_info=_make_user_info())
 
-        result = await service.modify_domain(action)
+        result = await service.update_domain(action)
 
-        mock_repository.modify_domain.assert_called_once_with(updater)
+        mock_repository.update_domain.assert_called_once_with(updater)
         assert result.domain_data.name == "updated-domain"
         assert result.domain_data.description == "new desc"
 
@@ -344,13 +344,13 @@ class TestModifyDomain:
         service: DomainService,
         mock_repository: MagicMock,
     ) -> None:
-        mock_repository.modify_domain.side_effect = DomainNotFound
+        mock_repository.update_domain.side_effect = DomainNotFound
 
         updater = MagicMock()
-        action = ModifyDomainAction(updater=updater, user_info=_make_user_info())
+        action = UpdateDomainAction(updater=updater, user_info=_make_user_info())
 
         with pytest.raises(DomainNotFound):
-            await service.modify_domain(action)
+            await service.update_domain(action)
 
 
 class TestDeleteDomain:
@@ -566,14 +566,14 @@ class TestModifyDomainNode:
         updater = MagicMock()
         sgroup_ids_to_add = {ResourceGroupID(uuid.uuid4())}
         sgroup_ids_to_remove = {ResourceGroupID(uuid.uuid4())}
-        action = ModifyDomainNodeAction(
+        action = UpdateDomainNodeAction(
             user_info=user_info,
             updater=updater,
             sgroup_ids_to_add=sgroup_ids_to_add,
             sgroup_ids_to_remove=sgroup_ids_to_remove,
         )
 
-        result = await service.modify_domain_node(action)
+        result = await service.update_domain_node(action)
 
         mock_repository.modify_domain_node_with_permissions.assert_called_once_with(
             updater,
@@ -590,7 +590,7 @@ class TestModifyDomainNode:
     ) -> None:
         updater = MagicMock()
         sg_overlap = ResourceGroupID(uuid.uuid4())
-        action = ModifyDomainNodeAction(
+        action = UpdateDomainNodeAction(
             user_info=_make_user_info(),
             updater=updater,
             sgroup_ids_to_add={sg_overlap, ResourceGroupID(uuid.uuid4())},
@@ -598,7 +598,7 @@ class TestModifyDomainNode:
         )
 
         with pytest.raises(InvalidAPIParameters):
-            await service.modify_domain_node(action)
+            await service.update_domain_node(action)
 
         mock_repository.modify_domain_node_with_permissions.assert_not_called()
 
@@ -612,14 +612,14 @@ class TestModifyDomainNode:
 
         user_info = _make_user_info()
         updater = MagicMock()
-        action = ModifyDomainNodeAction(
+        action = UpdateDomainNodeAction(
             user_info=user_info,
             updater=updater,
             sgroup_ids_to_add=None,
             sgroup_ids_to_remove=None,
         )
 
-        result = await service.modify_domain_node(action)
+        result = await service.update_domain_node(action)
 
         mock_repository.modify_domain_node_with_permissions.assert_called_once_with(
             updater,
@@ -638,14 +638,14 @@ class TestModifyDomainNode:
         mock_repository.modify_domain_node_with_permissions.return_value = domain_data
 
         updater = MagicMock()
-        action = ModifyDomainNodeAction(
+        action = UpdateDomainNodeAction(
             user_info=_make_user_info(),
             updater=updater,
             sgroup_ids_to_add={ResourceGroupID(uuid.uuid4())},
             sgroup_ids_to_remove=None,
         )
 
-        await service.modify_domain_node(action)
+        await service.update_domain_node(action)
 
         mock_repository.modify_domain_node_with_permissions.assert_called_once()
 

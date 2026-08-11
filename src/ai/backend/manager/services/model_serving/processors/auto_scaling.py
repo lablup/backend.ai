@@ -9,13 +9,13 @@ from ai.backend.manager.services.model_serving.actions.delete_auto_scaling_rule 
     DeleteEndpointAutoScalingRuleAction,
     DeleteEndpointAutoScalingRuleActionResult,
 )
-from ai.backend.manager.services.model_serving.actions.modify_auto_scaling_rule import (
-    ModifyEndpointAutoScalingRuleAction,
-    ModifyEndpointAutoScalingRuleActionResult,
-)
 from ai.backend.manager.services.model_serving.actions.scale_service_replicas import (
     ScaleServiceReplicasAction,
     ScaleServiceReplicasActionResult,
+)
+from ai.backend.manager.services.model_serving.actions.update_auto_scaling_rule import (
+    UpdateEndpointAutoScalingRuleAction,
+    UpdateEndpointAutoScalingRuleActionResult,
 )
 from ai.backend.manager.services.model_serving.services.auto_scaling import AutoScalingService
 
@@ -30,8 +30,8 @@ class ModelServingAutoScalingProcessors:
     delete_endpoint_auto_scaling_rule: ActionProcessor[
         DeleteEndpointAutoScalingRuleAction, DeleteEndpointAutoScalingRuleActionResult
     ]
-    modify_endpoint_auto_scaling_rule: ActionProcessor[
-        ModifyEndpointAutoScalingRuleAction, ModifyEndpointAutoScalingRuleActionResult
+    update_endpoint_auto_scaling_rule: ActionProcessor[
+        UpdateEndpointAutoScalingRuleAction, UpdateEndpointAutoScalingRuleActionResult
     ]
 
     def __init__(
@@ -49,6 +49,6 @@ class ModelServingAutoScalingProcessors:
         self.delete_endpoint_auto_scaling_rule = ActionProcessor(
             service.delete_endpoint_auto_scaling_rule, action_monitors
         )
-        self.modify_endpoint_auto_scaling_rule = ActionProcessor(
-            service.modify_endpoint_auto_scaling_rule, action_monitors
+        self.update_endpoint_auto_scaling_rule = ActionProcessor(
+            service.update_endpoint_auto_scaling_rule, action_monitors
         )

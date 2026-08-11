@@ -52,11 +52,6 @@ from ai.backend.manager.services.user.actions.create_user import (
 )
 from ai.backend.manager.services.user.actions.delete_user import DeleteUserAction
 from ai.backend.manager.services.user.actions.get_user import GetUserAction
-from ai.backend.manager.services.user.actions.modify_user import (
-    BulkModifyUserAction,
-    ModifyUserAction,
-    UserUpdateSpec,
-)
 from ai.backend.manager.services.user.actions.purge_user import (
     BulkPurgeUserAction,
     PurgeUserAction,
@@ -67,6 +62,11 @@ from ai.backend.manager.services.user.actions.search_users_by_domain import (
 )
 from ai.backend.manager.services.user.actions.search_users_by_project import (
     SearchUsersByProjectAction,
+)
+from ai.backend.manager.services.user.actions.update_user import (
+    BulkUpdateUserAction,
+    UpdateUserAction,
+    UserUpdateSpec,
 )
 from ai.backend.manager.services.user.actions.user_month_stats import UserMonthStatsAction
 from ai.backend.manager.services.user.service import UserService
@@ -421,7 +421,7 @@ class TestBulkModifyUser:
             )
             for i in range(5)
         ]
-        action = BulkModifyUserAction(items=items)
+        action = BulkUpdateUserAction(items=items)
 
         result = await service.bulk_modify_users(action)
 
@@ -456,7 +456,7 @@ class TestBulkModifyUser:
             )
             for i in range(5)
         ]
-        action = BulkModifyUserAction(items=items)
+        action = BulkUpdateUserAction(items=items)
 
         result = await service.bulk_modify_users(action)
 
@@ -474,7 +474,7 @@ class TestBulkModifyUser:
             return_value=BulkUserUpdateResultData(successes=[], failures=[])
         )
 
-        action = BulkModifyUserAction(items=[])
+        action = BulkUpdateUserAction(items=[])
         result = await service.bulk_modify_users(action)
 
         assert result.data.success_count() == 0
@@ -703,9 +703,9 @@ class TestModifyUser:
             spec=UserUpdaterSpec(full_name=TriState.update("New Name")),
             pk_value=uuid.uuid4(),
         )
-        action = ModifyUserAction(email="user@example.com", updater=updater)
+        action = UpdateUserAction(email="user@example.com", updater=updater)
 
-        result = await service.modify_user(action)
+        result = await service.update_user(action)
 
         assert result.data.email == "user@example.com"
         mock_user_repository.update_user_validated.assert_called_once_with(
@@ -726,10 +726,10 @@ class TestModifyUser:
             spec=UserUpdaterSpec(full_name=TriState.update("Name")),
             pk_value=uuid.uuid4(),
         )
-        action = ModifyUserAction(email="missing@example.com", updater=updater)
+        action = UpdateUserAction(email="missing@example.com", updater=updater)
 
         with pytest.raises(UserNotFound):
-            await service.modify_user(action)
+            await service.update_user(action)
 
 
 class TestDeleteUser:

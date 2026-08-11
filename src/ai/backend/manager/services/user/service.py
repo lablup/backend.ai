@@ -65,14 +65,6 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     UpdateMyKeypairAction,
     UpdateMyKeypairActionResult,
 )
-from ai.backend.manager.services.user.actions.modify_user import (
-    BulkModifyUserAction,
-    BulkModifyUserActionResult,
-    ModifyUserAction,
-    ModifyUserActionResult,
-    ModifyUserByIdAction,
-    ModifyUserByIdActionResult,
-)
 from ai.backend.manager.services.user.actions.purge_user import (
     BulkPurgeUserAction,
     BulkPurgeUserActionResult,
@@ -96,6 +88,14 @@ from ai.backend.manager.services.user.actions.search_users_by_project import (
 from ai.backend.manager.services.user.actions.search_users_by_role import (
     SearchUsersByRoleAction,
     SearchUsersByRoleActionResult,
+)
+from ai.backend.manager.services.user.actions.update_user import (
+    BulkUpdateUserAction,
+    BulkUpdateUserActionResult,
+    UpdateUserAction,
+    UpdateUserActionResult,
+    UpdateUserByIdAction,
+    UpdateUserByIdActionResult,
 )
 from ai.backend.manager.services.user.actions.user_month_stats import (
     UserMonthStatsAction,
@@ -146,18 +146,18 @@ class UserService:
         result = await self._user_repository.bulk_create_users_validated(action.items)
         return BulkCreateUserActionResult(data=result)
 
-    async def modify_user(self, action: ModifyUserAction) -> ModifyUserActionResult:
+    async def update_user(self, action: UpdateUserAction) -> UpdateUserActionResult:
         user_data_result = await self._user_repository.update_user_validated(
             email=action.email,
             updater=action.updater,
         )
-        return ModifyUserActionResult(
+        return UpdateUserActionResult(
             data=user_data_result,
         )
 
-    async def bulk_modify_users(self, action: BulkModifyUserAction) -> BulkModifyUserActionResult:
+    async def bulk_modify_users(self, action: BulkUpdateUserAction) -> BulkUpdateUserActionResult:
         result = await self._user_repository.bulk_update_users_validated(action.items)
-        return BulkModifyUserActionResult(data=result)
+        return BulkUpdateUserActionResult(data=result)
 
     async def delete_user(self, action: DeleteUserAction) -> DeleteUserActionResult:
         await self._user_repository.soft_delete_user_validated(
@@ -165,12 +165,12 @@ class UserService:
         )
         return DeleteUserActionResult()
 
-    async def modify_user_by_id(self, action: ModifyUserByIdAction) -> ModifyUserByIdActionResult:
+    async def update_user_by_id(self, action: UpdateUserByIdAction) -> UpdateUserByIdActionResult:
         user_data = await self._user_repository.update_user_by_uuid_validated(
             user_uuid=action.user_id,
             updater=action.updater,
         )
-        return ModifyUserByIdActionResult(data=user_data)
+        return UpdateUserByIdActionResult(data=user_data)
 
     async def delete_user_by_id(self, action: DeleteUserByIdAction) -> DeleteUserByIdActionResult:
         await self._user_repository.delete_user_by_uuid_validated(user_uuid=action.user_id)

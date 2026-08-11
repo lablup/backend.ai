@@ -41,9 +41,9 @@ from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
 from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
-from ai.backend.manager.services.domain.actions.modify_domain import ModifyDomainAction
 from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
 from ai.backend.manager.services.domain.actions.search_domains import SearchDomainsAction
+from ai.backend.manager.services.domain.actions.update_domain import UpdateDomainAction
 
 from .adapter import DomainAdapter
 
@@ -160,8 +160,8 @@ class DomainHandler:
             domain_name=ctx.user_domain,
         )
 
-        action_result = await self._domain.modify_domain.wait_for_complete(
-            ModifyDomainAction(user_info=user_info, updater=updater)
+        action_result = await self._domain.update_domain.wait_for_complete(
+            UpdateDomainAction(user_info=user_info, updater=updater)
         )
 
         resp = UpdateDomainResponse(domain=self._adapter.convert_to_dto(action_result.domain_data))

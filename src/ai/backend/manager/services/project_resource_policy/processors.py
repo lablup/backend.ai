@@ -14,14 +14,14 @@ from ai.backend.manager.services.project_resource_policy.actions.create_project_
 from ai.backend.manager.services.project_resource_policy.actions.get_project_resource_policy import (
     GetProjectResourcePolicyAction,
 )
-from ai.backend.manager.services.project_resource_policy.actions.modify_project_resource_policy import (
-    ModifyProjectResourcePolicyAction,
-)
 from ai.backend.manager.services.project_resource_policy.actions.purge_project_resource_policy import (
     PurgeProjectResourcePolicyAction,
 )
 from ai.backend.manager.services.project_resource_policy.actions.search_project_resource_policies import (
     SearchProjectResourcePoliciesAction,
+)
+from ai.backend.manager.services.project_resource_policy.actions.update_project_resource_policy import (
+    UpdateProjectResourcePolicyAction,
 )
 
 
@@ -37,8 +37,8 @@ class ProjectResourcePolicyProcessors:
     create_project_resource_policy: GlobalActionProcessor[
         CreateProjectResourcePolicyAction, CreatedEntityOpsResult[ProjectResourcePolicyData]
     ]
-    modify_project_resource_policy: GlobalActionProcessor[
-        ModifyProjectResourcePolicyAction, EntityOpsResult[ProjectResourcePolicyData]
+    update_project_resource_policy: GlobalActionProcessor[
+        UpdateProjectResourcePolicyAction, EntityOpsResult[ProjectResourcePolicyData]
     ]
     purge_project_resource_policy: GlobalActionProcessor[
         PurgeProjectResourcePolicyAction, EntityOpsResult[ProjectResourcePolicyData]
@@ -52,8 +52,8 @@ class ProjectResourcePolicyProcessors:
         self.create_project_resource_policy = group.global_create_ops(
             CreateProjectResourcePolicyAction
         )
-        self.modify_project_resource_policy = group.global_update_ops(
-            ModifyProjectResourcePolicyAction
+        self.update_project_resource_policy = group.global_update_ops(
+            UpdateProjectResourcePolicyAction
         )
         self.purge_project_resource_policy = group.global_purge_ops(
             PurgeProjectResourcePolicyAction

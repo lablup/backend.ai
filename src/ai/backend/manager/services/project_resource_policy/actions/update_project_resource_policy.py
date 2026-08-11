@@ -16,7 +16,7 @@ from ai.backend.manager.repositories.project_resource_policy.updaters import (
 
 
 @dataclass
-class ModifyProjectResourcePolicyAction(
+class UpdateProjectResourcePolicyAction(
     UpdateGlobalOpsAction[ProjectResourcePolicyRow, ProjectResourcePolicyData]
 ):
     """Retune one project resource policy; the name stays the key."""

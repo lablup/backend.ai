@@ -99,8 +99,8 @@ from ai.backend.manager.services.scaling_group.actions.list_allowed import (
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
 )
-from ai.backend.manager.services.scaling_group.actions.modify import (
-    ModifyScalingGroupAction,
+from ai.backend.manager.services.scaling_group.actions.update import (
+    UpdateScalingGroupAction,
 )
 from ai.backend.manager.services.scaling_group.service import (
     WSPROXY_V1_VERSION,
@@ -411,8 +411,8 @@ class TestScalingGroupService:
             ),
         )
         updater = Updater(spec=spec, pk_value="default")
-        action = ModifyScalingGroupAction(updater=updater)
-        result = await scaling_group_service.modify_scaling_group(action)
+        action = UpdateScalingGroupAction(updater=updater)
+        result = await scaling_group_service.update_scaling_group(action)
 
         assert result.scaling_group == sample_scaling_group
         mock_repository.update_scaling_group.assert_called_once_with(updater)
@@ -433,10 +433,10 @@ class TestScalingGroupService:
             ),
         )
         updater = Updater(spec=spec, pk_value="nonexistent")
-        action = ModifyScalingGroupAction(updater=updater)
+        action = UpdateScalingGroupAction(updater=updater)
 
         with pytest.raises(ScalingGroupNotFound):
-            await scaling_group_service.modify_scaling_group(action)
+            await scaling_group_service.update_scaling_group(action)
 
     # Associate with Domain Tests
 

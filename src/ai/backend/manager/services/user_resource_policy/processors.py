@@ -20,14 +20,14 @@ from ai.backend.manager.services.user_resource_policy.actions.get_my_user_resour
 from ai.backend.manager.services.user_resource_policy.actions.get_user_resource_policy import (
     GetUserResourcePolicyAction,
 )
-from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
-    ModifyUserResourcePolicyAction,
-)
 from ai.backend.manager.services.user_resource_policy.actions.purge_user_resource_policy import (
     PurgeUserResourcePolicyAction,
 )
 from ai.backend.manager.services.user_resource_policy.actions.search_user_resource_policies import (
     SearchUserResourcePoliciesAction,
+)
+from ai.backend.manager.services.user_resource_policy.actions.update_user_resource_policy import (
+    UpdateUserResourcePolicyAction,
 )
 from ai.backend.manager.services.user_resource_policy.service import UserResourcePolicyService
 
@@ -45,8 +45,8 @@ class UserResourcePolicyProcessors:
     create_user_resource_policy: GlobalActionProcessor[
         CreateUserResourcePolicyAction, CreatedEntityOpsResult[UserResourcePolicyData]
     ]
-    modify_user_resource_policy: GlobalActionProcessor[
-        ModifyUserResourcePolicyAction, EntityOpsResult[UserResourcePolicyData]
+    update_user_resource_policy: GlobalActionProcessor[
+        UpdateUserResourcePolicyAction, EntityOpsResult[UserResourcePolicyData]
     ]
     purge_user_resource_policy: GlobalActionProcessor[
         PurgeUserResourcePolicyAction, EntityOpsResult[UserResourcePolicyData]
@@ -66,5 +66,5 @@ class UserResourcePolicyProcessors:
             SearchUserResourcePoliciesAction
         )
         self.create_user_resource_policy = group.global_create_ops(CreateUserResourcePolicyAction)
-        self.modify_user_resource_policy = group.global_update_ops(ModifyUserResourcePolicyAction)
+        self.update_user_resource_policy = group.global_update_ops(UpdateUserResourcePolicyAction)
         self.purge_user_resource_policy = group.global_purge_ops(PurgeUserResourcePolicyAction)

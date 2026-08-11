@@ -84,12 +84,12 @@ from ai.backend.manager.services.image.actions.get_images import (
     GetImageByIdentifierAction,
     GetImagesByCanonicalsAction,
 )
-from ai.backend.manager.services.image.actions.modify_image import (
-    ModifyImageAction,
-)
 from ai.backend.manager.services.image.actions.purge_images import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.untag_image_from_registry import (
     UntagImageFromRegistryAction,
+)
+from ai.backend.manager.services.image.actions.update_image import (
+    UpdateImageAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -1217,8 +1217,8 @@ class ModifyImage(graphene.Mutation):  # type: ignore[misc]
         log.info("modify image {0} by API request", target)
         arch = architecture if architecture is not None else DEFAULT_IMAGE_ARCH
 
-        await ctx.processors.image.modify_image.wait_for_complete(
-            ModifyImageAction(
+        await ctx.processors.image.update_image.wait_for_complete(
+            UpdateImageAction(
                 target=target,
                 architecture=arch,
                 updater_spec=props.to_updater_spec(),
