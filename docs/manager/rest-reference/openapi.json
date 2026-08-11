@@ -52362,7 +52362,7 @@
         "description": "Retrieve a single user by UUID.\n\n**Preconditions:**\n* User privilege required.\n"
       },
       "patch": {
-        "operationId": "v2/users.modify_user",
+        "operationId": "v2/users.update_user",
         "tags": [
           "v2/users"
         ],
@@ -64851,7 +64851,7 @@
         "description": "Get a preset by ID.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       },
       "patch": {
-        "operationId": "resource/prometheus-query-definitions.modify_preset",
+        "operationId": "resource/prometheus-query-definitions.update_preset",
         "tags": [
           "resource/prometheus-query-definitions"
         ],
