@@ -13,6 +13,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSpec, IdleCheckPhase
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
+from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.models.clauses import QueryCondition
@@ -77,6 +78,15 @@ class IdleCheckBatchData:
     """Handler-oriented idle-check input for one reconciler tick."""
 
     assignments: Sequence[IdleCheckAssignmentData]
+
+
+@dataclass(frozen=True)
+class SessionIdleCheckBatchResult:
+    """Per-session outcome of a batch exclusion/inclusion: the sessions the write
+    was applied to and the ones skipped because they do not exist."""
+
+    success: Sequence[SessionID]
+    failed: Sequence[SessionID]
 
 
 @dataclass(frozen=True)

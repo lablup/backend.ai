@@ -1234,7 +1234,7 @@ class TestSessionIdleCheckExclusion:
     ) -> None:
         unknown_session_id = SessionID(uuid.uuid4())
 
-        processed_session_ids = await repository.batch_exclude_session_idle_checks(
+        result = await repository.batch_exclude_session_idle_checks(
             exclusion_rows.checker_id,
             [
                 SessionID(exclusion_rows.active_session_id),
@@ -1242,7 +1242,8 @@ class TestSessionIdleCheckExclusion:
             ],
         )
 
-        assert processed_session_ids == [SessionID(exclusion_rows.active_session_id)]
+        assert result.success == [SessionID(exclusion_rows.active_session_id)]
+        assert result.failed == [unknown_session_id]
         async with database.begin_readonly_session() as db_sess:
             valid_row = await db_sess.get(
                 SessionIdleCheckRow,
@@ -1264,7 +1265,7 @@ class TestSessionIdleCheckExclusion:
     ) -> None:
         unknown_session_id = SessionID(uuid.uuid4())
 
-        processed_session_ids = await repository.batch_include_session_idle_checks(
+        result = await repository.batch_include_session_idle_checks(
             exclusion_rows.checker_id,
             [
                 SessionID(exclusion_rows.excluded_session_id),
@@ -1272,7 +1273,8 @@ class TestSessionIdleCheckExclusion:
             ],
         )
 
-        assert processed_session_ids == [SessionID(exclusion_rows.excluded_session_id)]
+        assert result.success == [SessionID(exclusion_rows.excluded_session_id)]
+        assert result.failed == [unknown_session_id]
         async with database.begin_readonly_session() as db_sess:
             reset_row = await db_sess.get(
                 SessionIdleCheckRow,

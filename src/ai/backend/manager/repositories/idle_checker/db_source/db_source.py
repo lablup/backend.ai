@@ -78,6 +78,7 @@ from ai.backend.manager.repositories.idle_checker.types import (
     InitialGracePeriodBatchData,
     InitialGracePeriodCheckData,
     SessionIdleCheckAssignmentData,
+    SessionIdleCheckBatchResult,
     SessionIdleCheckPair,
 )
 from ai.backend.manager.repositories.idle_checker.updaters import (
@@ -456,19 +457,17 @@ class IdleCheckerDBSource:
         self,
         checker_id: IdleCheckerID,
         session_ids: Sequence[SessionID],
-    ) -> Sequence[SessionID]:
-        """Exclude the existing sessions' pairs, returning the processed session ids
-        in request order, deduplicated.
+    ) -> SessionIdleCheckBatchResult:
+        """Exclude the existing sessions' pairs.
 
-        Unknown session ids are skipped rather than failing the batch; the caller
-        reports them per entity.
+        Unknown session ids are reported as failed rather than failing the batch;
+        both partitions come back in request order, deduplicated.
         """
         async with self._ops.write_ops() as w:
             existing = await self._resolve_existing_sessions(w, checker_id, session_ids)
             # Deduplicate: a pair repeated in one INSERT..ON CONFLICT statement is an error.
-            targets = [
-                session_id for session_id in dict.fromkeys(session_ids) if session_id in existing
-            ]
+            unique_session_ids = list(dict.fromkeys(session_ids))
+            targets = [session_id for session_id in unique_session_ids if session_id in existing]
             for id_batch in batched(targets, _IDLE_CHECK_UPDATE_BATCH_SIZE):
                 await w.bulk_upsert(
                     BulkUpserter(
@@ -482,24 +481,27 @@ class IdleCheckerDBSource:
                     ),
                     index_elements=["session_id", "idle_checker_id"],
                 )
-            return targets
+            return SessionIdleCheckBatchResult(
+                success=targets,
+                failed=[
+                    session_id for session_id in unique_session_ids if session_id not in existing
+                ],
+            )
 
     async def batch_include_session_idle_checks(
         self,
         checker_id: IdleCheckerID,
         session_ids: Sequence[SessionID],
-    ) -> Sequence[SessionID]:
-        """Re-include the existing sessions' pairs, returning the processed session ids
-        in request order, deduplicated.
+    ) -> SessionIdleCheckBatchResult:
+        """Re-include the existing sessions' pairs.
 
-        Unknown session ids are skipped rather than failing the batch; the caller
-        reports them per entity.
+        Unknown session ids are reported as failed rather than failing the batch;
+        both partitions come back in request order, deduplicated.
         """
         async with self._ops.write_ops() as w:
             existing = await self._resolve_existing_sessions(w, checker_id, session_ids)
-            targets = [
-                session_id for session_id in dict.fromkeys(session_ids) if session_id in existing
-            ]
+            unique_session_ids = list(dict.fromkeys(session_ids))
+            targets = [session_id for session_id in unique_session_ids if session_id in existing]
             # Only rows exclusion wrote are reset, so re-including twice is a
             # no-op, pairs without a row stay absent, and other phases are untouched.
             for id_batch in batched(targets, _IDLE_CHECK_UPDATE_BATCH_SIZE):
@@ -513,7 +515,12 @@ class IdleCheckerDBSource:
                         ],
                     )
                 )
-            return targets
+            return SessionIdleCheckBatchResult(
+                success=targets,
+                failed=[
+                    session_id for session_id in unique_session_ids if session_id not in existing
+                ],
+            )
 
     async def _resolve_existing_sessions(
         self,
