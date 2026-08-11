@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from typing import override
 
+from ai.backend.common.data.entity.types import EntityData
 from ai.backend.common.dto.manager.response import ObjectStorageResponse
+from ai.backend.common.identifier.entity import EntityID
 
 
 @dataclass
@@ -17,7 +20,7 @@ class ObjectStorageListResult:
 
 
 @dataclass
-class ObjectStorageData:
+class ObjectStorageData(EntityData):
     id: uuid.UUID
     name: str
     host: str
@@ -25,6 +28,10 @@ class ObjectStorageData:
     secret_key: str
     endpoint: str
     region: str | None
+
+    @override
+    def entity_id(self) -> EntityID:
+        return self.id
 
     def to_dto(self) -> ObjectStorageResponse:
         return ObjectStorageResponse(

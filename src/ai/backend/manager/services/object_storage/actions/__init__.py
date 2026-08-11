@@ -1,6 +1,5 @@
-from .create import CreateObjectStorageAction, CreateObjectStorageActionResult
-from .delete import DeleteObjectStorageAction, DeleteObjectStorageActionResult
-from .get import GetObjectStorageAction, GetObjectStorageActionResult
+from .create import CreateObjectStorageAction
+from .get import GetObjectStorageAction
 from .get_download_presigned_url import (
     GetDownloadPresignedURLAction,
     GetDownloadPresignedURLActionResult,
@@ -9,25 +8,20 @@ from .get_upload_presigned_url import (
     GetUploadPresignedURLAction,
     GetUploadPresignedURLActionResult,
 )
-from .list import ListObjectStorageAction, ListObjectStorageActionResult
-from .search import SearchObjectStoragesAction, SearchObjectStoragesActionResult
-from .update import UpdateObjectStorageAction, UpdateObjectStorageActionResult
+from .list import ListObjectStorageAction
+from .purge import PurgeObjectStorageAction
+from .search import SearchObjectStoragesAction
+from .update import UpdateObjectStorageAction
 
 __all__ = [
     "CreateObjectStorageAction",
-    "CreateObjectStorageActionResult",
-    "DeleteObjectStorageAction",
-    "DeleteObjectStorageActionResult",
     "GetDownloadPresignedURLAction",
     "GetDownloadPresignedURLActionResult",
     "GetObjectStorageAction",
-    "GetObjectStorageActionResult",
     "GetUploadPresignedURLAction",
     "GetUploadPresignedURLActionResult",
     "ListObjectStorageAction",
-    "ListObjectStorageActionResult",
+    "PurgeObjectStorageAction",
     "SearchObjectStoragesAction",
-    "SearchObjectStoragesActionResult",
     "UpdateObjectStorageAction",
-    "UpdateObjectStorageActionResult",
 ]

@@ -39,6 +39,7 @@ from ai.backend.manager.services.login_client_type.processors import (
     LoginClientTypeAdminProcessors,
     LoginClientTypeProcessors,
 )
+from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
@@ -107,6 +108,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     KeypairResourcePolicyProcessors(MagicMock(), [], registry.group())
     RolePresetProcessors(registry.group(), registry.group())
     RuntimeVariantProcessors(registry.group())
+    ObjectStorageProcessors(MagicMock(), registry.group())
 
     wired = sorted(spec.type() for spec in registry.wired_specs())
     defined = sorted(cls.spec().type() for cls in _concrete_v2_action_classes())

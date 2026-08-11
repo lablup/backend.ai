@@ -22,6 +22,8 @@ from ai.backend.common.dto.manager.response import (
     ObjectStorageListResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.repositories.object_storage.searchers import ObjectStorageSearcher
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
 )
@@ -58,7 +60,7 @@ class ObjectStorageHandler:
         body: BodyParam[GetPresignedDownloadURLReq],
     ) -> APIResponse:
         """Generate a presigned URL for safely downloading artifact files."""
-        action_result = await self._object_storage.get_presigned_download_url.wait_for_complete(
+        action_result = await self._object_storage.get_presigned_download_url.run(
             GetDownloadPresignedURLAction(
                 artifact_revision_id=body.parsed.artifact_revision_id,
                 key=body.parsed.key,
@@ -74,7 +76,7 @@ class ObjectStorageHandler:
         body: BodyParam[GetPresignedUploadURLReq],
     ) -> APIResponse:
         """Generate a presigned URL for uploading artifact files."""
-        action_result = await self._object_storage.get_presigned_upload_url.wait_for_complete(
+        action_result = await self._object_storage.get_presigned_upload_url.run(
             GetUploadPresignedURLAction(
                 artifact_revision_id=body.parsed.artifact_revision_id,
                 key=body.parsed.key,
@@ -123,11 +125,11 @@ class ObjectStorageHandler:
         self,
     ) -> APIResponse:
         """List all configured object storage systems."""
-        action_result = await self._object_storage.list_storages.wait_for_complete(
-            ListObjectStorageAction()
+        action_result = await self._object_storage.list_storages.run(
+            ListObjectStorageAction(searcher=ObjectStorageSearcher(pagination=NoPagination()))
         )
 
-        storage_responses = [storage_data.to_dto() for storage_data in action_result.data]
+        storage_responses = [storage_data.to_dto() for storage_data in action_result.items]
 
         resp = ObjectStorageListResponse(storages=storage_responses)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)

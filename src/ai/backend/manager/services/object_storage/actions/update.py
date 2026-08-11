@@ -1,32 +1,32 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.object_storage import OBJECT_STORAGE_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import UpdateGlobalOpsAction
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
-from ai.backend.manager.models.object_storage import ObjectStorageRow
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.services.object_storage.actions.base import ObjectStorageAction
+from ai.backend.manager.models.object_storage.row import ObjectStorageRow
+from ai.backend.manager.repositories.object_storage.updaters import ObjectStorageUpdater
 
 
 @dataclass
-class UpdateObjectStorageAction(ObjectStorageAction):
-    updater: Updater[ObjectStorageRow]
+class UpdateObjectStorageAction(UpdateGlobalOpsAction[ObjectStorageRow, ObjectStorageData]):
+    """Retune one object storage registration."""
 
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.updater.pk_value)
+    updater: ObjectStorageUpdater
 
     @override
     @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.UPDATE
-
-
-@dataclass
-class UpdateObjectStorageActionResult(BaseActionResult):
-    result: ObjectStorageData
+    def entity_type(cls) -> EntityType:
+        return OBJECT_STORAGE_ENTITY_TYPE
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.result.id)
+    @classmethod
+    def action_name(cls) -> str:
+        return "update_object_storage"
+
+    @override
+    def to_updater(self) -> ObjectStorageUpdater:
+        return self.updater
