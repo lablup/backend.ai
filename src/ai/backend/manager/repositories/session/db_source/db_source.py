@@ -141,11 +141,12 @@ class SessionDBSource:
                 sa.select(UserRow)
                 .join(SessionRow, SessionRow.user_uuid == UserRow.uuid)
                 .where(SessionRow.id == session_id)
+                .options(joinedload(UserRow.default_keypair))
             )
             user = await db_sess.scalar(query)
             if user is None:
                 raise SessionNotFound(f"Session with id {session_id} not found")
-            return UserData.from_row(user)
+            return user.to_data()
 
     async def get_session_validated(
         self,

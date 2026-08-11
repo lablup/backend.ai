@@ -112,9 +112,12 @@ class UserData:
         return {RBACElementType.USER: user_permissions, **resource_entity_permissions}
 
     @classmethod
-    def from_row(cls, row: Any) -> Self:
+    def from_row(cls, row: Any, default_access_key: str | None = None) -> Self:
         """
         Deprecated: Use `UserRow.to_data()` method instead.
+
+        ``main_access_key`` is no longer a ``users`` column, so a caller holding a Core row
+        has to look the owner's default keypair up and pass it in.
         """
         return cls(
             id=row.uuid,
@@ -139,7 +142,7 @@ class UserData:
             totp_activated=row.totp_activated,
             totp_activated_at=row.totp_activated_at,
             sudo_session_enabled=row.sudo_session_enabled,
-            main_access_key=row.main_access_key,
+            main_access_key=default_access_key,
             container_uid=row.container_uid,
             container_main_gid=row.container_main_gid,
             container_gids=row.container_gids,

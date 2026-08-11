@@ -241,7 +241,6 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", dtparse),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-        "main_access_key": ("main_access_key", None),
     }
 
     # External table filter specifications
@@ -272,7 +271,6 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", None),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-        "main_access_key": ("main_access_key", None),
     }
 
     @staticmethod
@@ -528,6 +526,22 @@ class UserGroup(graphene.ObjectType):  # type: ignore[misc]
             )
 
 
+def _default_access_key() -> sa.ScalarSelect[str]:
+    """The owner's default keypair, as a correlated subquery.
+
+    A join would replace the statement's FROM, and minilang resolves its field specs against
+    ``select.froms[0]``.
+    """
+    from ai.backend.manager.models.keypair import keypairs
+
+    return (
+        sa.select(keypairs.c.access_key)
+        .where((keypairs.c.user == users.c.uuid) & keypairs.c.is_default)
+        .correlate(users)
+        .scalar_subquery()
+    )
+
+
 class User(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
@@ -655,7 +669,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         """
         Load user's information. Group names associated with the user are also returned.
         """
-        query = sa.select(users).select_from(users)
+        query = sa.select(users, _default_access_key().label("main_access_key")).select_from(users)
         if group_id is not None:
             query = query.where(
                 user_scope_membership_exists(PROJECT_SCOPE_TYPE, group_id, users.c.uuid)
@@ -693,7 +707,6 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", dtparse),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-        "main_access_key": ("main_access_key", None),
     }
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {
@@ -713,7 +726,6 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", None),
         "sudo_session_enabled": ("sudo_session_enabled", None),
-        "main_access_key": ("main_access_key", None),
     }
 
     @classmethod
@@ -760,7 +772,12 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         filter: str | None = None,
         order: str | None = None,
     ) -> Sequence[User]:
-        query = sa.select(users).select_from(users).limit(limit).offset(offset)
+        query = (
+            sa.select(users, _default_access_key().label("main_access_key"))
+            .select_from(users)
+            .limit(limit)
+            .offset(offset)
+        )
         if group_id is not None:
             query = query.where(
                 user_scope_membership_exists(PROJECT_SCOPE_TYPE, group_id, users.c.uuid)
@@ -797,7 +814,11 @@ class User(graphene.ObjectType):  # type: ignore[misc]
     ) -> Sequence[User | None]:
         if not emails:
             return []
-        query = sa.select(users).select_from(users).where(users.c.email.in_(emails))
+        query = (
+            sa.select(users, _default_access_key().label("main_access_key"))
+            .select_from(users)
+            .where(users.c.email.in_(emails))
+        )
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if status is not None:
@@ -827,7 +848,11 @@ class User(graphene.ObjectType):  # type: ignore[misc]
     ) -> Sequence[User | None]:
         if not user_ids:
             return []
-        query = sa.select(users).select_from(users).where(users.c.uuid.in_(user_ids))
+        query = (
+            sa.select(users, _default_access_key().label("main_access_key"))
+            .select_from(users)
+            .where(users.c.uuid.in_(user_ids))
+        )
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if status is not None:
