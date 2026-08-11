@@ -146,7 +146,7 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     RevokeMyKeypairAction,
     SearchKeypairsByResourcePolicyAction,
     SearchMyKeypairsAction,
-    SwitchMyMainAccessKeyAction,
+    SetMyDefaultKeypairAction,
     UpdateMyKeypairAction,
 )
 from ai.backend.manager.services.user.actions.modify_user import (
@@ -697,12 +697,12 @@ class UserAdapter(BaseAdapter):
         )
         return UpdateMyKeypairPayload(keypair=self._keypair_data_to_node(result.keypair))
 
-    async def switch_my_main_access_key(
+    async def set_my_default_keypair(
         self, user_id: UUID, access_key: str
     ) -> SwitchMyMainAccessKeyPayload:
         """Switch the main access key for the current user."""
-        result = await self._processors.user.switch_my_main_access_key.wait_for_complete(
-            SwitchMyMainAccessKeyAction(user_uuid=user_id, access_key=access_key)
+        result = await self._processors.user.set_my_default_keypair.wait_for_complete(
+            SetMyDefaultKeypairAction(user_uuid=user_id, access_key=access_key)
         )
         return SwitchMyMainAccessKeyPayload(success=result.success)
 
@@ -1577,7 +1577,7 @@ class UserAdapter(BaseAdapter):
                 domain_name=data.domain_name,
                 role=UserRoleDTO(data.role.value) if data.role is not None else None,
                 resource_policy=data.resource_policy,
-                main_access_key=data.main_access_key,
+                main_access_key=data.default_access_key,
             ),
             security=UserSecurityInfo(
                 allowed_client_ip=data.allowed_client_ip,

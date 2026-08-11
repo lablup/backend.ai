@@ -88,7 +88,7 @@ class UserData:
     totp_activated: bool | None
     totp_activated_at: datetime | None = field(compare=False)
     sudo_session_enabled: bool
-    main_access_key: str | None = field(compare=False)
+    default_access_key: str | None = field(compare=False)
     container_uid: int | None = field(compare=False)
     container_main_gid: int | None = field(compare=False)
     container_gids: list[int] | None = field(compare=False)
@@ -139,7 +139,7 @@ class UserData:
             totp_activated=row.totp_activated,
             totp_activated_at=row.totp_activated_at,
             sudo_session_enabled=row.sudo_session_enabled,
-            main_access_key=row.main_access_key,
+            default_access_key=row.main_access_key,
             container_uid=row.container_uid,
             container_main_gid=row.container_main_gid,
             container_gids=row.container_gids,

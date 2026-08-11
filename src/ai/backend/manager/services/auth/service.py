@@ -272,13 +272,13 @@ class AuthService:
         await self._check_password_age(user, auth_config)
 
         user_row = await self._auth_repository.get_user_row_by_uuid(user.uuid)
-        main_keypair_row = user_row.get_main_keypair_row()
-        if main_keypair_row is None:
+        default_keypair_row = user_row.get_default_keypair_row()
+        if default_keypair_row is None:
             raise AuthorizationFailed("No API keypairs found.")
 
         hook_result = await self._hook_plugin_ctx.dispatch(
             "POST_AUTHORIZE",
-            (action.request, action.hook_params, user, main_keypair_row.mapping),
+            (action.request, action.hook_params, user, default_keypair_row.mapping),
             return_when=FIRST_COMPLETED,
         )
         if hook_result.status != PASSED:
@@ -299,7 +299,7 @@ class AuthService:
                     session_info.session_token, LoginAttemptResult.EXPIRED
                 )
 
-        return main_keypair_row, live_sessions
+        return default_keypair_row, live_sessions
 
     def _enforce_max_concurrent_logins(
         self,
