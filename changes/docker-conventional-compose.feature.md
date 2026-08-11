@@ -1,0 +1,1 @@
+Make the DOCKER install mode emit a conventional compose deployment: per-file `/etc/backend.ai` config mounts with image default commands, host networking only for the manager and agent, bridge networking with published ports (and `host.docker.internal` outbound rewrites) for the other services, and the storage-proxy running as the installing user
