@@ -12,7 +12,7 @@ import shutil
 import tempfile
 import uuid
 from abc import ABCMeta, abstractmethod
-from collections.abc import AsyncIterator, Iterator, Sequence
+from collections.abc import AsyncIterator, Callable, Iterator, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -1216,11 +1216,20 @@ class Context(metaclass=ABCMeta):
         # resource path), so this must run through the coordinator CLI -- the
         # installer's own interpreter cannot import them in PACKAGE mode.
         alembic_ini = self.copy_config("alembic-appproxy.ini")
+        self._fixup_appproxy_alembic_ini(alembic_ini)
         await self.run_appproxy_coordinator_cli(["schema", "oneshot", "-f", str(alembic_ini)])
         # NOTE: The "default" scaling_group's wsproxy_addr/token are set by
         # configure_appproxy_fixture(), which runs after load_fixtures() seeds
         # the row. Do not update scaling_groups here -- the row does not exist
         # yet at this point in the install flow.
+
+    def _fixup_appproxy_alembic_ini(self, alembic_ini: Path) -> None:
+        """
+        Hook for install modes whose coordinator CLI container cannot reach
+        the database at the address the copied ini carries (see the
+        DockerContext override). The default (in-place package layouts) needs
+        no rewrite.
+        """
 
     async def configure_appproxy(self) -> None:
         halfstack = self.install_info.halfstack_config
@@ -2297,19 +2306,31 @@ class DockerContext(Context):
     compose, reusing the same configuration, schema, fixture, and image
     bootstrap steps as the package-based install.
 
-    Contract (mirrors ``docker/README.md``):
+    Contract (mirrors ``docker/README.md``) — the generated compose file
+    follows the same conventions as a hand-written deployment:
 
-    - Every service container runs on the host network, so the configs
-      generated for the package layout (127.0.0.1 addressing) work unchanged.
-    - The install target directory is bind-mounted into every service
-      container at the identical absolute path (path parity), so every path
-      under it that a service hands to the host Docker daemon — scratch
-      roots, IPC sockets, vfolder trees, plugin var state — resolves on the
-      host.
-    - One-off management commands (schema init, fixture loading, image
-      rescan) run through ``docker compose run`` using the same images, with
-      host paths outside the install directory bind-mounted read-only on
-      demand.
+    - Every service reads its config from the image's default
+      ``/etc/backend.ai/*`` path via a per-file read-only mount and runs the
+      image's default command.
+    - Host networking is granted only to the manager and the agent (and to
+      manager-cli, the installer's one-off tool); the other services run on
+      the compose project's bridge network with published ports, and
+      ``_fixup_bridge_service_addresses`` rewrites their generated configs:
+      outbound addresses (halfstack, manager API, coordinator API) point at
+      ``host.docker.internal`` while bind addresses become ``0.0.0.0``.
+    - The install target directory is bind-mounted at the identical absolute
+      path (path parity) only where files must resolve on the host: the
+      agent and storage-proxy (paths handed to the host Docker daemon) and
+      manager-cli (fixture files passed to one-off commands, which keeps
+      ``working_dir`` at the install directory for the relative-path CLI
+      invocations). The manager exchanges the RPC keypair through
+      ``<base_path>/fixtures`` mounted at ``/app/fixtures``.
+    - The storage-proxy runs as the installing user (uid/gid substituted into
+      the template), matching PACKAGE-mode file ownership.
+    - One-off management commands run through ``docker compose run`` using
+      the same images, with host paths passed as arguments bind-mounted
+      read-only on demand — paths already covered by the service's parity
+      mount are skipped.
     """
 
     SERVICES_COMPOSE_FILENAME = "docker-compose.services.yml"
@@ -2317,6 +2338,9 @@ class DockerContext(Context):
     # (env-overridable there via BACKENDAI_KRUNNER_SHARED; the entrypoint
     # fails fast when the share is not mounted).
     KRUNNER_SHARED_PATH = Path("/var/lib/backend.ai/krunner")
+    # Alias for the host as seen from the bridge-networked service containers
+    # (mapped to the host gateway via `extra_hosts` in the compose template).
+    HOST_ALIAS = "host.docker.internal"
 
     @override
     def hydrate_install_info(self) -> InstallInfo:
@@ -2333,6 +2357,10 @@ class DockerContext(Context):
         # mount in the generated compose file makes them host-resolvable.
         service.agent_ipc_base_path = str(base_path / "ipc" / "agent")
         service.agent_var_base_path = str(base_path / "var" / "agent")
+        # The storage-proxy runs as the (non-root) installing user with the
+        # image's default working directory, so its IPC dir must be an
+        # absolute, pre-created, user-owned path under the parity mount.
+        service.storage_proxy_ipc_base_path = str(base_path / "ipc" / "storage-proxy")
         return info
 
     @override
@@ -2373,20 +2401,35 @@ class DockerContext(Context):
             str(self.install_info.base_path / self.SERVICES_COMPOSE_FILENAME),
         ]
 
-    async def _run_service_cli(self, service: str, container_cmd: Sequence[str]) -> int:
+    async def _run_service_cli(
+        self,
+        service: str,
+        container_cmd: Sequence[str],
+        *,
+        parity_mounted: bool = True,
+    ) -> int:
         """
         Run a one-off management command inside a fresh container of the given
-        compose service (same image, same host network, same base_path parity
-        mount). Host paths passed as arguments that live outside the install
-        directory (e.g. fixture files extracted from the installer package)
-        are bind-mounted read-only at the identical path so the in-container
-        command can read them unchanged.
+        compose service (same image, same networking, same volumes). Host
+        paths passed as arguments (e.g. fixture files extracted from the
+        installer package) are bind-mounted read-only at the identical path so
+        the in-container command can read them unchanged.
+
+        ``parity_mounted`` states whether the compose service carries the
+        base_path parity mount: when it does, arguments under base_path are
+        already visible and are not mounted again (a duplicate mount target
+        would fail); when it does not (the config-only services), base_path
+        arguments get the same per-file read-only treatment as outside paths.
         """
         base_path = self.install_info.base_path
         volume_args: list[str] = []
         for arg in container_cmd:
             p = Path(arg)
-            if p.is_absolute() and p.exists() and not p.is_relative_to(base_path):
+            if (
+                p.is_absolute()
+                and p.exists()
+                and (not parity_mounted or not p.is_relative_to(base_path))
+            ):
                 volume_args += ["-v", f"{p}:{p}:ro"]
         return await self.run_exec([
             *self.docker_sudo,
@@ -2414,9 +2457,13 @@ class DockerContext(Context):
 
     @override
     async def run_appproxy_coordinator_cli(self, cmdargs: Sequence[str]) -> None:
+        # The coordinator service mounts only its own config file, so
+        # base_path arguments (e.g. the copied alembic-appproxy.ini) need the
+        # per-file read-only mounts too.
         exit_code = await self._run_service_cli(
             "appproxy-coordinator",
             ["backend.ai", "app-proxy-coordinator", *cmdargs],
+            parity_mounted=False,
         )
         if exit_code != 0:
             raise RuntimeError(
@@ -2430,13 +2477,21 @@ class DockerContext(Context):
         base_path: Path,
         version: str,
         enable_gpu: bool,
+        uid: int,
+        gid: int,
     ) -> str:
         """
-        Fill the bundled compose template: substitute the install directory
-        and image version, and strip the ``#gpu#`` comment prefixes when a
+        Fill the bundled compose template: substitute the install directory,
+        image version, and the installing user's uid/gid (the storage-proxy
+        runs as that user), and strip the ``#gpu#`` comment prefixes when a
         CUDA accelerator is selected (leaving them keeps the block a comment).
         """
-        rendered = template.replace("{{BASE_PATH}}", str(base_path)).replace("{{VERSION}}", version)
+        rendered = (
+            template.replace("{{BASE_PATH}}", str(base_path))
+            .replace("{{VERSION}}", version)
+            .replace("{{UID}}", str(uid))
+            .replace("{{GID}}", str(gid))
+        )
         if enable_gpu:
             # Line-anchored so only the marker prefixes are stripped, never an
             # occurrence of the token inside a line (e.g. in a comment).
@@ -2451,6 +2506,8 @@ class DockerContext(Context):
                 base_path=self.install_info.base_path,
                 version=self.dist_info.version,
                 enable_gpu=self.install_info.accelerator == Accelerator.CUDA,
+                uid=os.getuid(),
+                gid=os.getgid(),
             )
         )
         return compose_path
@@ -2465,6 +2522,7 @@ class DockerContext(Context):
         for subdir in (
             Path(service.agent_ipc_base_path),
             Path(service.agent_var_base_path),
+            Path(service.storage_proxy_ipc_base_path),
             base_path / "scratches",
             base_path / service.vfolder_relpath,
         ):
@@ -2519,8 +2577,15 @@ class DockerContext(Context):
         await self.configure_webserver()
         await self.configure_webui()
         self.log_header("Configuring app-proxy...")
-        await self.install_appproxy_db()
+        # configure_appproxy() must run BEFORE install_appproxy_db(): the
+        # latter's schema-oneshot one-off starts the coordinator compose
+        # service, whose definition bind-mounts the coordinator config file —
+        # if the source does not exist yet, the Docker daemon creates a
+        # root-owned directory in its place. The bridge-address fixup must
+        # also precede it, so the coordinator container reaches the DB.
         await self.configure_appproxy()
+        await self._fixup_bridge_service_addresses()
+        await self.install_appproxy_db()
         self.log_header("Generating client environ configs...")
         await self.configure_client()
         self.log_header("Loading fixtures...")
@@ -2558,6 +2623,89 @@ class DockerContext(Context):
                 ),
             ],
         )
+
+    @override
+    def _fixup_appproxy_alembic_ini(self, alembic_ini: Path) -> None:
+        # The schema-oneshot one-off runs inside the bridge-networked
+        # coordinator container, where the host's published halfstack ports
+        # are reachable only via the host-gateway alias, not localhost.
+        self.sed_in_place(alembic_ini, "@localhost:", f"@{self.HOST_ALIAS}:")
+
+    async def _fixup_bridge_service_addresses(self) -> None:
+        """
+        Rewrite the generated configs of the bridge-networked services
+        (webserver, storage-proxy, app-proxy trio), which the package-layout
+        generators wrote with host-loopback addressing:
+
+        - outbound addresses (halfstack, manager API, coordinator API, and
+          the default OTLP endpoint) become ``host.docker.internal``, and
+        - bind addresses become ``0.0.0.0`` so the published container ports
+          actually receive traffic,
+
+        while announce/advertised addresses (consumed by *other* components
+        through the published host ports) are left untouched. The
+        storage-proxy additionally needs its working-dir-relative paths
+        (vfolder root, TLS material, IPC dir) made absolute, because it runs
+        with the image's default working directory instead of the install
+        directory.
+        """
+        base_path = self.install_info.base_path
+        halfstack = self.install_info.halfstack_config
+        service = self.install_info.service_config
+        if halfstack.redis_addr is None:
+            raise RuntimeError("redis_addr must be configured")
+        redis_hostport = f"{self.HOST_ALIAS}:{halfstack.redis_addr.face.port}"
+
+        def rewrite(filename: str, mutate: Callable[[Any], None]) -> None:
+            path = base_path / filename
+            with path.open("r") as fp:
+                data = tomlkit.load(fp)
+            mutate(data)
+            with path.open("w") as fp:
+                tomlkit.dump(data, fp)
+
+        def fixup_otel(data: Any) -> None:
+            # Only the untouched default — a custom --otel-endpoint given at
+            # install time must stay as the operator wrote it.
+            if data.get("otel", {}).get("endpoint") == "http://127.0.0.1:4317":
+                data["otel"]["endpoint"] = f"http://{self.HOST_ALIAS}:4317"
+
+        def fixup_webserver(data: Any) -> None:
+            data["api"]["endpoint"] = f"http://{self.HOST_ALIAS}:{service.manager_addr.face.port}"
+            data["session"]["redis"]["addr"] = redis_hostport
+            fixup_otel(data)
+
+        def fixup_storage_proxy(data: Any) -> None:
+            data["etcd"]["addr"]["host"] = self.HOST_ALIAS
+            data["api"]["client"]["service-addr"]["host"] = "0.0.0.0"
+            data["api"]["manager"]["service-addr"]["host"] = "0.0.0.0"
+            data["api"]["manager"]["ssl-cert"] = str(
+                base_path / "configs" / "storage-proxy" / "ssl" / "manager-api-selfsigned.cert.pem"
+            )
+            data["api"]["manager"]["ssl-privkey"] = str(
+                base_path / "configs" / "storage-proxy" / "ssl" / "manager-api-selfsigned.key.pem"
+            )
+            data["volume"]["volume1"]["path"] = str(base_path / service.vfolder_relpath)
+            fixup_otel(data)
+
+        def fixup_coordinator(data: Any) -> None:
+            data["db"]["addr"]["host"] = self.HOST_ALIAS
+            data["redis"]["addr"]["host"] = self.HOST_ALIAS
+            fixup_otel(data)
+
+        def fixup_worker(data: Any) -> None:
+            data["redis"]["addr"]["host"] = self.HOST_ALIAS
+            data["proxy_worker"]["coordinator_endpoint"] = (
+                f"http://{self.HOST_ALIAS}:{service.appproxy_coordinator_addr.bind.port}"
+            )
+            data["proxy_worker"]["api_bind_addr"]["host"] = "0.0.0.0"
+            fixup_otel(data)
+
+        rewrite("webserver.conf", fixup_webserver)
+        rewrite("storage-proxy.toml", fixup_storage_proxy)
+        rewrite("app-proxy-coordinator.toml", fixup_coordinator)
+        rewrite("app-proxy-worker.toml", fixup_worker)
+        rewrite("app-proxy-worker-tcp.toml", fixup_worker)
 
     async def start_services(self) -> None:
         self.log_header("Starting the Backend.AI services...")
