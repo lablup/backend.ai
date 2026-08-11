@@ -1,9 +1,6 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validator.single_entity import SingleEntityActionValidator
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import LegacyRBACValidators
@@ -64,7 +61,7 @@ from ai.backend.manager.services.model_serving.services.model_serving import (
 )
 
 
-class ModelServingProcessors(AbstractProcessorPackage):
+class ModelServingProcessors:
     list_model_service: ActionProcessor[ListModelServiceAction, ListModelServiceActionResult]
     search_services: ActionProcessor[SearchServicesAction, SearchServicesActionResult]
 
@@ -137,21 +134,3 @@ class ModelServingProcessors(AbstractProcessorPackage):
         self.validate_model_service = ActionProcessor(
             service.validate_model_service, action_monitors
         )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            ListModelServiceAction.spec(),
-            DeleteModelServiceAction.spec(),
-            DryRunModelServiceAction.spec(),
-            GetModelServiceInfoAction.spec(),
-            ListErrorsAction.spec(),
-            ClearErrorAction.spec(),
-            ForceSyncAction.spec(),
-            UpdateRouteAction.spec(),
-            DeleteRouteAction.spec(),
-            GenerateTokenAction.spec(),
-            ModifyEndpointAction.spec(),
-            SearchServicesAction.spec(),
-            ValidateModelServiceAction.spec(),
-        ]

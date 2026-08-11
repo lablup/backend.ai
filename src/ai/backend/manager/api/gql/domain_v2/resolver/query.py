@@ -20,7 +20,7 @@ from ai.backend.manager.api.gql.domain_v2.types import (
 )
 from ai.backend.manager.api.gql.types import ResourceGroupDomainScope, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
-from ai.backend.manager.repositories.domain.types import DomainSearchScope
+from ai.backend.manager.repositories.domain.types import DomainOperationScope
 
 
 @gql_root_field(
@@ -98,7 +98,7 @@ async def rg_domains_v2(
     limit: int | None = None,
     offset: int | None = None,
 ) -> DomainV2Connection | None:
-    repo_scope = DomainSearchScope(resource_group=scope.resource_group_name)
+    repo_scope = DomainOperationScope(resource_group=scope.resource_group_name)
     payload = await info.context.adapters.domain.search_rg_domains(
         scope=repo_scope,
         input=AdminSearchDomainsInput(

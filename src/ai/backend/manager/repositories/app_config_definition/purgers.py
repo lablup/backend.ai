@@ -6,8 +6,8 @@ from typing import override
 
 from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
+from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.repositories.base.purger import PurgerSpec
-from ai.backend.manager.repositories.base.types import ConflictCheck
 
 
 @dataclass

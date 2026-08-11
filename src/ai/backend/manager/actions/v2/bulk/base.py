@@ -21,6 +21,14 @@ class BaseBulkAction(ABC):
         """Return the operation that this action performs on the entities."""
         raise NotImplementedError
 
+    @classmethod
+    @abstractmethod
+    def action_name(cls) -> str:
+        """Return the name recorded on audit rows: a lowercase snake_case verb phrase,
+        declared rather than derived so a class rename cannot split the recorded
+        history. Naming rule: services/AGENTS.md."""
+        raise NotImplementedError
+
     @abstractmethod
     def entity_ids(self) -> Sequence[EntityID]:
         """Return the IDs of the entities that this action applies to."""

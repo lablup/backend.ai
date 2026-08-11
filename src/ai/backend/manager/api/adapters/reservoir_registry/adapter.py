@@ -25,7 +25,11 @@ from ai.backend.manager.data.artifact_registries.types import (
 )
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.models.reservoir_registry.conditions import ReservoirRegistryConditions
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination, Updater
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Updater,
+)
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.reservoir_registry import ReservoirRegistryCreatorSpec
 from ai.backend.manager.repositories.reservoir_registry.updaters import (

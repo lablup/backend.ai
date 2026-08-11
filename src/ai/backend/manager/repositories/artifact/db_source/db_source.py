@@ -375,7 +375,7 @@ class ArtifactDBSource:
                     artifacts_map[artifact_row.id][1].append(existing_revision)
                 else:
                     # Insert new artifact revision
-                    creator = RBACEntityCreator(
+                    revision_creator = RBACEntityCreator(
                         spec=ArtifactRevisionCreatorSpec(
                             artifact_id=artifact_row.id,
                             version=model.revision,
@@ -391,8 +391,10 @@ class ArtifactDBSource:
                         element_type=RBACElementType.ARTIFACT_REVISION,
                         scope_ref=RBACElementRef(RBACElementType.ARTIFACT, str(artifact_row.id)),
                     )
-                    creator_result = await execute_rbac_entity_creator(db_sess, creator)
-                    artifacts_map[artifact_row.id][1].append(creator_result.row)
+                    revision_creator_result = await execute_rbac_entity_creator(
+                        db_sess, revision_creator
+                    )
+                    artifacts_map[artifact_row.id][1].append(revision_creator_result.row)
                     artifact_ids_to_update.add(artifact_row.id)
 
             # Update artifact updated_at timestamp for affected artifacts

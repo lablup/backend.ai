@@ -1,5 +1,4 @@
 import enum
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Final
 
@@ -111,13 +110,6 @@ class ActionSpec:
 
     def type(self) -> str:
         return f"{self.entity_type}:{self.operation_type}"
-
-
-class AbstractProcessorPackage(ABC):
-    @abstractmethod
-    def supported_actions(self) -> list[ActionSpec]:
-        """Get the list of action specs that this processors can handle."""
-        raise NotImplementedError
 
 
 @dataclass(frozen=True)

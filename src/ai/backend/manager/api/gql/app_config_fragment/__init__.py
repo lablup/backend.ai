@@ -15,11 +15,13 @@ from .types import (
     AppConfigFragmentGQL,
     AppConfigFragmentOrderByGQL,
     AppConfigFragmentOrderFieldGQL,
+    AppConfigFragmentUpsertErrorGQL,
     AppConfigFragmentUpsertItemGQL,
     AppConfigScopeRefGQL,
     AppConfigScopeTypeFilterGQL,
     MyUpsertAppConfigFragmentsInputGQL,
     ScopedUpsertAppConfigFragmentsInputGQL,
+    UpsertAppConfigFragmentsPayloadGQL,
 )
 
 __all__ = (
@@ -31,10 +33,12 @@ __all__ = (
     "AppConfigFragmentOrderByGQL",
     "AppConfigFragmentOrderFieldGQL",
     "AppConfigScopeRefGQL",
+    "AppConfigFragmentUpsertErrorGQL",
     "AppConfigFragmentUpsertItemGQL",
     "AppConfigScopeTypeFilterGQL",
     "MyUpsertAppConfigFragmentsInputGQL",
     "ScopedUpsertAppConfigFragmentsInputGQL",
+    "UpsertAppConfigFragmentsPayloadGQL",
     # Query resolvers
     "admin_app_config_fragments",
     "app_config_fragment",

@@ -27,9 +27,9 @@ from ai.backend.manager.models.service_catalog.orders import (
     TIEBREAKER_ORDER,
     resolve_order,
 )
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    OffsetPagination,
     combine_conditions_or,
     negate_conditions,
 )

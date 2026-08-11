@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions.delete_config import DeleteConfigAction, DeleteConfigActionResult
@@ -21,7 +18,7 @@ from .service import EtcdConfigService
 __all__ = ("EtcdConfigProcessors",)
 
 
-class EtcdConfigProcessors(AbstractProcessorPackage):
+class EtcdConfigProcessors:
     """Processor package for etcd config operations."""
 
     get_resource_slots: ActionProcessor[GetResourceSlotsAction, GetResourceSlotsActionResult]
@@ -45,14 +42,3 @@ class EtcdConfigProcessors(AbstractProcessorPackage):
         self.get_config = ActionProcessor(service.get_config, action_monitors)
         self.set_config = ActionProcessor(service.set_config, action_monitors)
         self.delete_config = ActionProcessor(service.delete_config, action_monitors)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            GetResourceSlotsAction.spec(),
-            GetResourceMetadataAction.spec(),
-            GetVfolderTypesAction.spec(),
-            GetConfigAction.spec(),
-            SetConfigAction.spec(),
-            DeleteConfigAction.spec(),
-        ]

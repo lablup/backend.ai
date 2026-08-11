@@ -42,9 +42,9 @@ from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
     get_scaling_groups,
 )
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
-from ai.backend.manager.repositories.base.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.repositories.base.purger import BatchPurger
 from ai.backend.manager.repositories.base.querier import BatchQuerier, Querier
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
@@ -56,7 +56,7 @@ from ai.backend.manager.repositories.domain.purgers import (
     DomainKernelBatchPurgerSpec,
     DomainPurgerSpec,
 )
-from ai.backend.manager.repositories.domain.types import DomainSearchResult, DomainSearchScope
+from ai.backend.manager.repositories.domain.types import DomainOperationScope, DomainSearchResult
 from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
 from ai.backend.manager.repositories.ops.rbac.provider import (
     RBACOpsProvider,
@@ -439,13 +439,13 @@ class DomainRepository:
 
     async def search_rg_domains(
         self,
-        scope: DomainSearchScope,
+        scope: DomainOperationScope,
         querier: BatchQuerier,
     ) -> DomainSearchResult:
         """Search domains within a resource group scope.
 
         Args:
-            scope: DomainSearchScope containing resource_group filter.
+            scope: DomainOperationScope containing resource_group filter.
             querier: Contains additional conditions, orders, and pagination.
 
         Returns:

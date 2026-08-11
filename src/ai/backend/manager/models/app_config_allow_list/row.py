@@ -14,7 +14,7 @@ from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 __all__ = ("AppConfigAllowListRow",)
 
 
-class AppConfigAllowListRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class AppConfigAllowListRow(LifecycleTimestampsMixin, Base):
     """Permission to write config fragments for one config name at one scope type.
 
     A config fragment may be created only when a matching row exists here.

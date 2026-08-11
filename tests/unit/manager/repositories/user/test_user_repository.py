@@ -219,11 +219,12 @@ class TestUserRepository:
         sample_domain: DomainFixtureData,
         user_resource_policy: str,
     ) -> str:
-        """Create a test user and return the email."""
+        """Create a test user (with its own virtual scope) and return the email."""
         email = f"test-{uuid.uuid4().hex[:8]}@example.com"
+        user_uuid = uuid.uuid4()
         async with db_with_cleanup.begin_session() as session:
             user = UserRow(
-                uuid=uuid.uuid4(),
+                uuid=user_uuid,
                 username=f"testuser-{uuid.uuid4().hex[:8]}",
                 email=email,
                 password=create_test_password_info("test_password"),
@@ -237,6 +238,7 @@ class TestUserRepository:
                 resource_policy=user_resource_policy,
             )
             session.add(user)
+            session.add(VirtualScopeRow(scope_type=ScopeType.USER.value, scope_id=user_uuid))
             await session.commit()
         return email
 

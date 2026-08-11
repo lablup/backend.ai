@@ -19,7 +19,7 @@ from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 __all__ = ("SessionGroupRow",)
 
 
-class SessionGroupRow(CreatedAtMixin, Base):  # type: ignore[misc]
+class SessionGroupRow(CreatedAtMixin, Base):
     """
     A set of sessions sharing a common concern, holding their placement policy.
 

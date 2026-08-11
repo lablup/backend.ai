@@ -2286,8 +2286,8 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
                 db_conn, domain_name, ProjectID(project_id), access_key
             )
         conditions = [and_names([sgroup.name for sgroup in sgroup_rows])]
-        sgroup_rows = await ScalingGroupRow.list_by_condition(conditions, db=ctx.db)
-        return [ScalingGroup.from_orm_row(row).masked for row in sgroup_rows]
+        sgroup_orm_rows = await ScalingGroupRow.list_by_condition(conditions, db=ctx.db)
+        return [ScalingGroup.from_orm_row(row).masked for row in sgroup_orm_rows]
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)

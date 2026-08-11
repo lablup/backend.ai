@@ -9,8 +9,8 @@ import sqlalchemy as sa
 
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
+from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec, PurgerSpec
-from ai.backend.manager.repositories.base.types import ConflictCheck
 
 
 @dataclass

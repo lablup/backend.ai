@@ -9,7 +9,7 @@ from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.domain.types import DomainSearchScope
+from ai.backend.manager.repositories.domain.types import DomainOperationScope
 from ai.backend.manager.services.domain.actions.base import DomainAction
 
 
@@ -21,11 +21,11 @@ class SearchRGDomainsAction(DomainAction):
     through the sgroups_for_domains relationship.
 
     Args:
-        scope: DomainSearchScope containing resource_group filter.
+        scope: DomainOperationScope containing resource_group filter.
         querier: BatchQuerier containing additional filters, orders, and pagination.
     """
 
-    scope: DomainSearchScope
+    scope: DomainOperationScope
     querier: BatchQuerier
 
     @override

@@ -8,7 +8,7 @@ from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import RouteHistoryData
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.scheduling_history.types import RouteHistorySearchScope
+from ai.backend.manager.repositories.scheduling_history.types import RouteHistoryOperationScope
 
 from .base import SchedulingHistoryAction
 
@@ -21,7 +21,7 @@ class SearchRouteScopedHistoryAction(SchedulingHistoryAction):
     Scope is required and specifies which route to query history for.
     """
 
-    scope: RouteHistorySearchScope
+    scope: RouteHistoryOperationScope
     querier: BatchQuerier
 
     @override

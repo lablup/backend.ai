@@ -21,7 +21,7 @@ class TestProcessorsDependency:
     ) -> None:
         """Dependency should create Processors via create_processors()."""
         mock_processors = MagicMock()
-        mock_create_processors.return_value = mock_processors
+        mock_create_processors.return_value = MagicMock(processors=mock_processors)
 
         mock_service_args = MagicMock()
         mock_monitors = ActionMonitors(legacy=[MagicMock(), MagicMock()])

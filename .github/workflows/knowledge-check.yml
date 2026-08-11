@@ -1,0 +1,22 @@
+name: knowledge-check
+
+on:
+  pull_request:
+    paths:
+      - "**/KNOWLEDGE.md"
+      - "scripts/knowledge/**"
+      - ".github/workflows/knowledge-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  check-knowledge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the revision
+        uses: actions/checkout@v6
+        with:
+          lfs: false
+      - name: Check KNOWLEDGE.md conformance
+        run: python3 scripts/knowledge/check.py

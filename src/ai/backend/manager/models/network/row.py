@@ -40,7 +40,7 @@ def _get_domain_join_condition() -> sa.ColumnElement[bool]:
     return DomainRow.name == foreign(NetworkRow.domain_name)
 
 
-class NetworkRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
+class NetworkRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "networks"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -70,7 +70,6 @@ class NetworkRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
 
     project_row: Mapped[GroupRow] = relationship(
         "GroupRow",
-        back_populates="networks",
         primaryjoin=_get_project_join_condition,
     )
     domain_row: Mapped[DomainRow] = relationship(

@@ -13,6 +13,7 @@ from sqlalchemy.engine import CursorResult
 
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.specs import purger as specs_purger
 from ai.backend.manager.repositories.base.types import ConflictCheck
 
 from .integrity import parse_integrity_error
@@ -241,32 +242,15 @@ class BatchPurgerSpec[TRow: Base](ABC):
         raise NotImplementedError
 
 
-class DataBatchPurger[TRow: Base, TData](BatchPurgerSpec[TRow], ABC):
-    """A batch purger that also says how each deleted row becomes data.
+class DataBatchPurger[TRow: Base, TData](
+    BatchPurgerSpec[TRow], specs_purger.DataBatchPurger[TRow, TData], ABC
+):
+    """Legacy-compatible view of the v2 batch purge spec.
 
-    ``BatchPurgerSpec`` is already self-contained about what to delete; this adds the
-    conversion so the operation returns the entities it removed rather than a count,
-    which is what the scope shape reports through its result.
-
-    Example:
-        class PurgeOldSessions(DataBatchPurger[SessionRow, SessionData]):
-            def build_subquery(self) -> sa.sql.Select[tuple[SessionRow]]:
-                return sa.select(SessionRow).where(SessionRow.terminated_at < self._cutoff)
-
-            def conflict_checks(self) -> Sequence[ConflictCheck]:
-                return ()
-
-            def to_data(self, row: SessionRow) -> SessionData:
-                return row.to_data()
-
-        async with ops.write_ops() as w:
-            removed = await w.batch_purge_data(PurgeOldSessions(cutoff))
+    The declaration lives in ``models/specs/purger.py``; this adds the legacy
+    ``BatchPurgerSpec`` contract on top, so existing executors and domain specs
+    keep working during the transition.
     """
-
-    @abstractmethod
-    def to_data(self, row: TRow) -> TData:
-        """Convert one deleted row into its ``data/`` type."""
-        raise NotImplementedError
 
 
 @dataclass

@@ -49,6 +49,7 @@ from ai.backend.manager.repositories.app_config_fragment.repository import (
 )
 from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.services.app_config.processors import AppConfigProcessors
 from ai.backend.manager.services.app_config.service import AppConfigService
 from ai.backend.manager.services.app_config_allow_list.processors import (
@@ -97,16 +98,16 @@ def app_config_definition_adapter(
 def app_config_allow_list_adapter(
     database_engine: ExtendedAsyncSAEngine,
 ) -> AppConfigAllowListAdapter:
-    """This domain runs straight against ops, so it takes a processor registry, not a service."""
+    """This domain runs straight against ops, so it takes a processor group, not a service."""
     processors = MagicMock()
     processors.app_config_allow_list = AppConfigAllowListProcessors(
         ProcessorRegistry(
             ProcessorDependencies(
                 monitors=ActionMonitors(),
                 validators=ActionValidators(),
-                repository=OpsRepository(RBACOpsProvider(database_engine)),
+                repository=OpsRepository(V2DBOpsProvider(database_engine)),
             )
-        )
+        ).group()
     )
     return AppConfigAllowListAdapter(processors)
 

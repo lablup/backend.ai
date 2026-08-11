@@ -34,16 +34,16 @@ from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.domain.orders import DomainOrders
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    NoPagination,
     combine_conditions_or,
     negate_conditions,
 )
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
-from ai.backend.manager.repositories.domain.types import DomainSearchScope
+from ai.backend.manager.repositories.domain.types import DomainOperationScope
 from ai.backend.manager.repositories.domain.updaters import DomainNodeUpdaterSpec
 from ai.backend.manager.services.domain.actions.create_domain_node import CreateDomainNodeAction
 from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
@@ -139,7 +139,7 @@ class DomainAdapter(BaseAdapter):
 
     async def search_rg_domains(
         self,
-        scope: DomainSearchScope,
+        scope: DomainOperationScope,
         input: AdminSearchDomainsInput,
     ) -> AdminSearchDomainsPayload:
         """Search domains within a resource group scope."""

@@ -44,12 +44,13 @@ from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.types import ProjectDeploymentSearchScope
+from ai.backend.manager.repositories.deployment.types import ProjectDeploymentOperationScope
 from ai.backend.testutils.db import with_tables
 
 
@@ -294,7 +295,7 @@ class TestEndpointSearchInProject:
             conditions=[],
             orders=[],
         )
-        scope = ProjectDeploymentSearchScope(project_id=test_data.project_a_id)
+        scope = ProjectDeploymentOperationScope(project_id=test_data.project_a_id)
 
         result = await deployment_repository.search_deployments_in_project(querier, scope)
 
@@ -314,7 +315,7 @@ class TestEndpointSearchInProject:
             conditions=[],
             orders=[],
         )
-        scope = ProjectDeploymentSearchScope(project_id=test_data.project_b_id)
+        scope = ProjectDeploymentOperationScope(project_id=test_data.project_b_id)
 
         result = await deployment_repository.search_deployments_in_project(querier, scope)
 
@@ -333,7 +334,7 @@ class TestEndpointSearchInProject:
             conditions=[],
             orders=[],
         )
-        scope = ProjectDeploymentSearchScope(project_id=test_data.project_a_id)
+        scope = ProjectDeploymentOperationScope(project_id=test_data.project_a_id)
 
         result = await deployment_repository.search_deployments_in_project(querier, scope)
 

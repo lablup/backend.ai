@@ -120,6 +120,11 @@ class _ProjectCreateScopeAction(BaseScopeAction):
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
 
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "create_project"
+
 
 @dataclass
 class _VfolderUpdateAction(BaseSingleEntityAction):
@@ -136,6 +141,11 @@ class _VfolderUpdateAction(BaseSingleEntityAction):
     @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "update_vfolder"
 
     @override
     def entity_id(self) -> EntityID:
@@ -158,6 +168,11 @@ class _VfolderUpsertAction(BaseSingleEntityAction):
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPSERT
 
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "upsert_vfolder"
+
     @override
     def entity_id(self) -> EntityID:
         return self.vfolder_id
@@ -179,13 +194,18 @@ class _BulkVfolderUpdateAction(BaseBulkAction):
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "update_vfolders"
+
     @override
     def entity_ids(self) -> Sequence[EntityID]:
         return self.ids
 
 
 def _domain_scope(scope_id: ScopeID) -> ScopeRef:
-    return ScopeRef(scope_type=ScopeType("domain"), scope_id=scope_id)
+    return ScopeRef(scope_type=ScopeType(EntityType("domain")), scope_id=scope_id)
 
 
 def _make_user_data(user_id: uuid.UUID, *, is_superadmin: bool) -> UserData:
@@ -297,7 +317,7 @@ async def _seed_vs_chain(
         db_sess.add(
             VirtualScopeRow(
                 id=vs_id,
-                scope_type=ScopeType(owner_scope_type),
+                scope_type=ScopeType(EntityType(owner_scope_type)),
                 scope_id=owner_scope_id,
             )
         )
@@ -305,7 +325,7 @@ async def _seed_vs_chain(
         db_sess.add(
             ScopeBindingRow(
                 virtual_scope_id=vs_id,
-                scope_type=ScopeType(owner_scope_type),
+                scope_type=ScopeType(EntityType(owner_scope_type)),
                 scope_id=owner_scope_id,
                 permission_cap=scope_cap,
             )

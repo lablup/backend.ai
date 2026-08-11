@@ -7,9 +7,10 @@ from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
 import jwt
-from aiohttp import web
+from aiohttp import hdrs, web
 from pydantic import AnyUrl, Field
 
+from ai.backend.appproxy.common.defs import MEDIA_TYPE_HTML, MEDIA_TYPE_JSON
 from ai.backend.appproxy.common.errors import (
     InvalidCredentials,
     ObjectNotFound,
@@ -208,7 +209,8 @@ async def proxy(
     app_url = f"{worker.api_endpoint}/setup?{urllib.parse.urlencode(qdict)}"
     log.debug("Redirect URL created: {}", app_url)
 
-    if mime_match(request.headers.get("accept", "text/html"), "application/json", strict=True):
+    accept = request.headers.get(hdrs.ACCEPT, MEDIA_TYPE_HTML)
+    if mime_match(accept, MEDIA_TYPE_JSON, strict=True):
         # Web browsers block redirect between cross-origins if Access-Control-Allow-Origin value is set to a concrete Origin instead of wildcard;
         # Hence we need to send "*" as allowed origin manually, instead of benefiting from aiohttp-cors
         return PydanticResponse(
