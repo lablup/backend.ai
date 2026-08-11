@@ -1,6 +1,6 @@
 """tighten the always-populated keypairs columns
 
-Six columns are nullable in the schema and never null in practice, so every
+Five columns are nullable in the schema and never null in practice, so every
 reader has to handle a ``None`` that does not occur. Backfills the stragglers
 with the value the application would have written and sets them NOT NULL.
 
@@ -28,14 +28,11 @@ down_revision = "37d711158a8c"
 branch_labels = None
 depends_on = None
 
-_DEFAULT_RATE_LIMIT = 10000
-
 _TIGHTENED = (
     "user_id",
     "secret_key",
     "is_active",
     "is_admin",
-    "rate_limit",
     "num_queries",
 )
 
@@ -52,10 +49,6 @@ def upgrade() -> None:
     )
     bind.execute(sa.text("UPDATE keypairs SET is_active = true WHERE is_active IS NULL"))
     bind.execute(sa.text("UPDATE keypairs SET is_admin = false WHERE is_admin IS NULL"))
-    bind.execute(
-        sa.text("UPDATE keypairs SET rate_limit = :limit WHERE rate_limit IS NULL"),
-        {"limit": _DEFAULT_RATE_LIMIT},
-    )
     bind.execute(sa.text("UPDATE keypairs SET num_queries = 0 WHERE num_queries IS NULL"))
 
     for column in _TIGHTENED:

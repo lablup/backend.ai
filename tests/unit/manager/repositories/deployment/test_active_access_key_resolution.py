@@ -130,7 +130,6 @@ class TestResolveUserAndActiveAccessKey:
                         secret_key="secret",
                         user=spec.user_uuid,
                         is_active=kp.is_active,
-                        rate_limit=30000,
                         resource_policy=kp_policy,
                         created_at=kp.created_at,
                     )

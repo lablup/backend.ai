@@ -203,7 +203,6 @@ class TestQueryUserinfo:
                     secret_key="secret",
                     user=user_uuid,
                     is_active=True,
-                    rate_limit=30000,
                     resource_policy=kp_policy,
                 )
             )
@@ -326,7 +325,6 @@ class TestQueryUserinfo:
                     secret_key="secret",
                     user=user_uuid,
                     is_active=True,
-                    rate_limit=30000,
                     resource_policy=seed.kp_policy_name,
                 )
             )
@@ -359,7 +357,6 @@ class TestQueryUserinfo:
                     secret_key="secret",
                     user=admin_uuid,
                     is_active=True,
-                    rate_limit=30000,
                     resource_policy=seed.kp_policy_name,
                 )
             )
@@ -597,7 +594,6 @@ class TestQueryUserinfoFromSession:
                     secret_key="secret",
                     user=user_uuid,
                     is_active=True,
-                    rate_limit=30000,
                     resource_policy=kp_policy,
                 )
             )
