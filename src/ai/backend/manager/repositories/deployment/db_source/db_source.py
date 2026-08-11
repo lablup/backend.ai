@@ -2086,19 +2086,15 @@ class DeploymentDBSource:
         user_uuid: uuid.UUID,
     ) -> _DeploymentUserResolution:
         # Pick a deterministic, currently-active keypair for the given user.
-        # Preference order: main_access_key match, then latest created_at,
+        # Preference order: the default keypair, then latest created_at,
         # then access_key lexicographic order as a final stable tie-break.
-        is_main_access_key = sa.case(
-            (UserRow.main_access_key == keypairs.c.access_key, 1),
-            else_=0,
-        )
         active_stmt = (
             sa.select(UserRow, keypairs.c.access_key)
             .select_from(sa.join(UserRow, keypairs, UserRow.uuid == keypairs.c.user))
             .where(UserRow.uuid == user_uuid)
             .where(keypairs.c.is_active.is_(True))
             .order_by(
-                is_main_access_key.desc(),
+                keypairs.c.is_default.desc(),
                 keypairs.c.created_at.desc(),
                 keypairs.c.access_key.asc(),
             )

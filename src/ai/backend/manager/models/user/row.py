@@ -14,7 +14,14 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import Mapped, foreign, joinedload, mapped_column, relationship, selectinload
+from sqlalchemy.orm import (
+    Mapped,
+    foreign,
+    joinedload,
+    mapped_column,
+    relationship,
+    selectinload,
+)
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 from sqlalchemy.sql.expression import SQLColumnExpression
 
@@ -94,10 +101,10 @@ def _get_keypairs_join_condition() -> Any:
     return foreign(KeyPairRow.user) == UserRow.uuid
 
 
-def _get_main_keypair_join_condition() -> Any:
+def _get_default_keypair_join_condition() -> Any:
     from ai.backend.manager.models.keypair import KeyPairRow
 
-    return KeyPairRow.access_key == foreign(UserRow.main_access_key)
+    return (foreign(KeyPairRow.user) == UserRow.uuid) & KeyPairRow.is_default
 
 
 class UserRow(LifecycleTimestampsMixin, Base):
@@ -207,10 +214,11 @@ class UserRow(LifecycleTimestampsMixin, Base):
         foreign_keys="KeyPairRow.user",
     )
 
-    main_keypair: Mapped[KeyPairRow | None] = relationship(
+    default_keypair: Mapped[KeyPairRow | None] = relationship(
         "KeyPairRow",
-        primaryjoin=_get_main_keypair_join_condition,
-        foreign_keys="UserRow.main_access_key",
+        primaryjoin=_get_default_keypair_join_condition,
+        foreign_keys="KeyPairRow.user",
+        viewonly=True,
     )
 
     @classmethod
@@ -228,10 +236,12 @@ class UserRow(LifecycleTimestampsMixin, Base):
         return selectinload(UserRow.keypairs).options(joinedload(KeyPairRow.resource_policy_row))
 
     @classmethod
-    def load_main_keypair(cls) -> _AbstractLoad:
+    def load_default_keypair(cls) -> _AbstractLoad:
         from ai.backend.manager.models.keypair import KeyPairRow
 
-        return joinedload(UserRow.main_keypair).options(joinedload(KeyPairRow.resource_policy_row))
+        return joinedload(UserRow.default_keypair).options(
+            joinedload(KeyPairRow.resource_policy_row)
+        )
 
     @classmethod
     def load_resource_policy(cls) -> _AbstractLoad:
@@ -294,7 +304,7 @@ class UserRow(LifecycleTimestampsMixin, Base):
             [by_user_uuid(user_uuid)],
             [
                 load_related_field(cls.load_keypairs()),
-                load_related_field(cls.load_main_keypair()),
+                load_related_field(cls.load_default_keypair()),
                 load_related_field(cls.load_resource_policy()),
             ],
             db=db,
@@ -304,21 +314,17 @@ class UserRow(LifecycleTimestampsMixin, Base):
         return rows[0]
 
     def get_main_keypair_row(self) -> KeyPairRow | None:
-        # `cast()` requires import of KeyPairRow
-
         keypair_candidate: KeyPairRow | None = None
-        main_keypair_row = self.main_keypair
-        if main_keypair_row is None:
+        default_keypair_row = self.default_keypair
+        if default_keypair_row is None:
             keypair_rows = self.keypairs
             active_keypairs = [row for row in keypair_rows if row.is_active]
             for row in active_keypairs:
                 if keypair_candidate is None or not keypair_candidate.is_admin:
                     keypair_candidate = row
                     break
-            if keypair_candidate is not None:
-                self.main_keypair = keypair_candidate
         else:
-            keypair_candidate = main_keypair_row
+            keypair_candidate = default_keypair_row
         return keypair_candidate
 
     def to_model_serving_user_data(self) -> ModelServingUserData:

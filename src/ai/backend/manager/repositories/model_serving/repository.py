@@ -847,7 +847,12 @@ class ModelServingRepository:
                 session_owner = endpoint_row.session_owner_row
                 if session_owner is None:
                     raise InvalidAPIParameters("Session owner not found for endpoint")
-                if session_owner.main_access_key is None:
+                default_access_key = await db_session.scalar(
+                    sa.select(KeyPairRow.access_key).where(
+                        (KeyPairRow.user == session_owner.uuid) & KeyPairRow.is_default
+                    )
+                )
+                if default_access_key is None:
                     raise InvalidAPIParameters("Session owner has no access key")
 
                 conn = await db_session.connection()
@@ -857,7 +862,7 @@ class ModelServingRepository:
                 await self._check_inference_scaling_group(
                     conn,
                     endpoint_row.resource_group,
-                    AccessKey(session_owner.main_access_key),
+                    AccessKey(default_access_key),
                     endpoint_row.domain,
                     ProjectID(endpoint_row.project),
                 )
