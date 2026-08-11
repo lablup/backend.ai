@@ -1,22 +1,9 @@
-# Build context MUST be the repository root (the paths below are context-relative):
-#   docker build -f docker/backend.ai-agent.dockerfile --build-arg PYTHON_VERSION=<ver> --build-arg PKGVER=<ver> .
-ARG PYTHON_VERSION
-FROM python:${PYTHON_VERSION} AS builder
+# Build context MUST be the repository root.  Starts FROM the shared
+# backend.ai-base image (docker/backend.ai-base.dockerfile), which must be
+# buildable at the same PKGVER — bake builds both (see docker-bake.hcl):
+#   docker buildx bake backend_ai-agent --set '*.platform=linux/amd64' --load
 ARG PKGVER
-COPY ./dist /dist
-COPY ./requirements.txt /requirements.txt
-# Install dependencies from requirements.txt to respect version constraints
-RUN pip wheel --wheel-dir=/wheels --no-cache-dir -r /requirements.txt
-# Install backend.ai packages from /dist (these are not in requirements.txt or PyPI)
-RUN pip wheel --wheel-dir=/wheels --no-cache-dir backend.ai-agent==${PKGVER} --find-links=/dist --no-deps
-
-FROM python:${PYTHON_VERSION}
-ENV PYTHONUNBUFFERED=1
-COPY --from=builder /wheels /wheels
-COPY ./dist /dist
-# Install all wheels (looking in /dist for backend.ai packages) and drop the
-# wheel/dist inputs in the same layer to keep the image slim
-RUN pip install --no-cache-dir --find-links=/dist /wheels/*.whl && rm -rf /wheels /dist
+FROM backend.ai-base:${PKGVER}
 
 # Docker CLI for DooD: the agent shells out to `docker load` / `docker exec`
 # against the host daemon socket. The binary is statically linked, so copying
@@ -39,4 +26,4 @@ WORKDIR /app
 COPY --chmod=0755 ./docker/backend.ai-agent-entrypoint.sh /app/entrypoint.sh
 
 ENTRYPOINT ["/app/entrypoint.sh"]
-CMD ["python", "-m", "ai.backend.agent.server", "-f", "/etc/backend.ai/agent.toml"]
+CMD ["backend.ai", "ag", "start-server", "-f", "/etc/backend.ai/agent.toml"]
