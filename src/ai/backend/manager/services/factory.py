@@ -553,7 +553,7 @@ def create_processors(
         permission_controller=PermissionControllerProcessors(
             services.permission_controller, action_monitors, validators
         ),
-        vfs_storage=VFSStorageProcessors(services.vfs_storage, action_monitors, validators),
+        vfs_storage=VFSStorageProcessors(services.vfs_storage, registry.group()),
         artifact=ArtifactProcessors(services.artifact, action_monitors, validators),
         artifact_registry=ArtifactRegistryProcessors(
             services.artifact_registry, action_monitors, validators

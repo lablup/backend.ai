@@ -51,6 +51,7 @@ from ai.backend.manager.services.service_catalog.processors import ServiceCatalo
 from ai.backend.manager.services.user_resource_policy.processors import (
     UserResourcePolicyProcessors,
 )
+from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 
 _V2_ACTION_BASES: tuple[type[Any], ...] = (
     BaseSingleEntityAction,
@@ -109,6 +110,7 @@ def test_every_defined_v2_action_is_wired() -> None:
     RolePresetProcessors(registry.group(), registry.group())
     RuntimeVariantProcessors(registry.group())
     ObjectStorageProcessors(MagicMock(), registry.group())
+    VFSStorageProcessors(MagicMock(), registry.group())
 
     wired = sorted(spec.type() for spec in registry.wired_specs())
     defined = sorted(cls.spec().type() for cls in _concrete_v2_action_classes())

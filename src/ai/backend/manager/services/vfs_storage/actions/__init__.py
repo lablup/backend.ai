@@ -1,21 +1,17 @@
-from .create import CreateVFSStorageAction, CreateVFSStorageActionResult
-from .delete import DeleteVFSStorageAction, DeleteVFSStorageActionResult
-from .get import GetVFSStorageAction, GetVFSStorageActionResult
-from .list import ListVFSStorageAction, ListVFSStorageActionResult
-from .search import SearchVFSStoragesAction, SearchVFSStoragesActionResult
-from .update import UpdateVFSStorageAction, UpdateVFSStorageActionResult
+from .create import CreateVFSStorageAction
+from .get import GetVFSStorageAction
+from .list import ListVFSStorageAction
+from .purge import PurgeVFSStorageAction
+from .resolve_by_name import ResolveVFSStorageByNameAction
+from .search import SearchVFSStoragesAction
+from .update import UpdateVFSStorageAction
 
 __all__ = [
     "CreateVFSStorageAction",
-    "CreateVFSStorageActionResult",
-    "DeleteVFSStorageAction",
-    "DeleteVFSStorageActionResult",
+    "PurgeVFSStorageAction",
+    "ResolveVFSStorageByNameAction",
     "GetVFSStorageAction",
-    "GetVFSStorageActionResult",
     "ListVFSStorageAction",
-    "ListVFSStorageActionResult",
     "SearchVFSStoragesAction",
-    "SearchVFSStoragesActionResult",
     "UpdateVFSStorageAction",
-    "UpdateVFSStorageActionResult",
 ]
