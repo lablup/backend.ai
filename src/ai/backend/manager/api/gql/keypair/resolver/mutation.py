@@ -93,9 +93,8 @@ async def update_my_keypair(
         added_version="26.4.2",
         description="Switch the main access key for the current user. The target keypair must be active and owned by the user.",
     ),
-    name="switchMyMainAccessKey",
 )
-async def switch_my_default_access_key(
+async def switch_my_main_access_key(
     info: Info[StrawberryGQLContext],
     input: SwitchMyMainAccessKeyInputGQL,
 ) -> SwitchMyMainAccessKeyPayloadGQL | None:
