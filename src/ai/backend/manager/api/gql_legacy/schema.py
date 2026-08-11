@@ -2116,6 +2116,10 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
     ) -> KeyPairResourcePolicy:
         ctx: GraphQueryContext = info.context
         client_access_key = ctx.access_key
+        # Naming a policy reads someone else's tier, so it stays with the roles that
+        # may already list them all. Omitting the name reads one's own, as before.
+        if name is not None and ctx.user["role"] not in (UserRole.SUPERADMIN, UserRole.ADMIN):
+            raise InsufficientPrivilege("Only admins may read a keypair resource policy by name.")
         if name is None:
             loader = ctx.dataloader_manager.get_loader(
                 ctx,
@@ -2156,6 +2160,9 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
     ) -> UserResourcePolicy:
         ctx: GraphQueryContext = info.context
         user_uuid = ctx.user["uuid"]
+        # Same rule as the keypair policy: a name reads someone else's tier.
+        if name is not None and ctx.user["role"] not in (UserRole.SUPERADMIN, UserRole.ADMIN):
+            raise InsufficientPrivilege("Only admins may read a user resource policy by name.")
         if name is None:
             loader = ctx.dataloader_manager.get_loader(
                 ctx,

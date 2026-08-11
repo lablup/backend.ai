@@ -87,7 +87,10 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
-            description="Keypairs assigned to this resource policy.",
+            description=(
+                "Keypairs assigned to this resource policy. Superadmin only — the policy "
+                "node itself is readable by its own holder."
+            ),
         )
     )  # type: ignore[misc]
     async def keypairs(
@@ -127,9 +130,15 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
             KeyPairEdge,
             KeyPairGQL,
         )
+        from ai.backend.manager.api.gql.utils import check_admin_only
         from ai.backend.manager.repositories.keypair.types import (
             KeypairResourcePolicyKeypairOperationScope,
         )
+
+        # The node this field hangs off is also returned by `my_keypair_resource_policy_v2`,
+        # which any authenticated user may call. Without this gate that reach — from one's
+        # own policy to every keypair sharing it — enumerates other users.
+        check_admin_only()
 
         result = await info.context.adapters.user.gql_search_keypairs_by_resource_policy(
             scope=KeypairResourcePolicyKeypairOperationScope(resource_policy_name=self.name),
