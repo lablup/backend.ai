@@ -19,11 +19,11 @@
 #   coordinator by compose service DNS (container-side ports), the manager
 #   API via host.docker.internal (webserver only), and their bind addresses
 #   are forced to 0.0.0.0 so the published ports work.
-# - The install directory is bind-mounted at the SAME absolute path (path
-#   parity) only where files must resolve on the host: the agent and
-#   storage-proxy hand paths under it to the host Docker daemon (scratch
-#   roots, IPC sockets, vfolder trees), and manager-cli passes fixture files
-#   under it to one-off commands.
+# - No service mounts the install directory wholesale. The daemon-visible
+#   state lives under fixed system paths mounted with host==container path
+#   parity: /var/lib/backend.ai + /tmp/backend.ai (agent) and /vfroot/local
+#   (agent + storage-proxy). Only manager-cli — the installer's one-off
+#   tool — carries the install-directory mount, for fixture files.
 # - The manager exchanges the RPC keypair through {{BASE_PATH}}/fixtures
 #   mounted at /app/fixtures, where its entrypoint generates it.
 # - The storage-proxy runs as the installing user ({{UID}}:{{GID}}), matching
@@ -100,10 +100,17 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc/machine-id:/etc/machine-id:ro
       - {{BASE_PATH}}/agent.toml:/etc/backend.ai/agent.toml:ro
-      # path parity: scratch roots, IPC sockets, vfolder tree, plugin var
-      # state under the install directory are handed to the host daemon
-      - {{BASE_PATH}}:{{BASE_PATH}}
-      - /var/lib/backend.ai/krunner:/var/lib/backend.ai/krunner
+      # path parity (host path == container path) for everything the agent
+      # hands to the host Docker daemon — all under fixed system paths, so
+      # the install directory itself is never mounted:
+      #   /var/lib/backend.ai: scratches, plugin var state, image commits,
+      #                        and the krunner share the entrypoint fills
+      #   /tmp/backend.ai:     agent<->kernel IPC sockets
+      #   /vfroot/local:       vfolder volumes (files created by the
+      #                        storage-proxy, bind-mounted into kernels)
+      - /var/lib/backend.ai:/var/lib/backend.ai
+      - /tmp/backend.ai:/tmp/backend.ai
+      - /vfroot/local:/vfroot/local
     restart: unless-stopped
 
   webserver:
@@ -137,8 +144,11 @@ services:
     volumes:
       - {{BASE_PATH}}/storage-proxy.toml:/etc/backend.ai/storage-proxy.toml:ro
       # path parity: the vfolder tree it manages becomes kernel bind-mount
-      # sources on the host; also covers its TLS material and IPC dir
-      - {{BASE_PATH}}:{{BASE_PATH}}
+      # sources on the host (chowned to the installing user by the
+      # installer's root one-off)
+      - /vfroot/local:/vfroot/local
+      # the self-signed TLS material for the manager-facing API
+      - {{BASE_PATH}}/configs/storage-proxy:{{BASE_PATH}}/configs/storage-proxy:ro
     restart: unless-stopped
 
   appproxy-coordinator:

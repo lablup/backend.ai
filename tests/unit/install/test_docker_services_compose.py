@@ -26,10 +26,23 @@ CLI_ONLY_SERVICES = {"manager-cli"}
 # must reach halfstack at 127.0.0.1.
 HOST_NET_SERVICES = {"manager", "manager-cli", "agent"}
 
-# Services carrying the base_path parity mount: the agent and storage-proxy
-# hand paths under it to the host Docker daemon; manager-cli passes fixture
-# files under it to one-off commands.
-PARITY_SERVICES = {"manager-cli", "agent", "storage-proxy"}
+# The ONLY service carrying the install-directory parity mount: the
+# installer's one-off tool, which passes fixture files under it to CLI
+# commands. The running services never see the install directory wholesale —
+# their daemon-visible state lives under fixed system paths.
+PARITY_SERVICES = {"manager-cli"}
+
+# Fixed system-path parity mounts (host path == container path).
+SYSTEM_MOUNTS = {
+    "agent": {
+        "/var/lib/backend.ai:/var/lib/backend.ai",
+        "/tmp/backend.ai:/tmp/backend.ai",
+        "/vfroot/local:/vfroot/local",
+    },
+    "storage-proxy": {
+        "/vfroot/local:/vfroot/local",
+    },
+}
 
 # service -> (installer-side config filename, image default-command target)
 CONFIG_MOUNTS = {
@@ -222,6 +235,24 @@ def test_rendered_compose_parity_mounts(template: str) -> None:
     assert f"{BASE_PATH}/fixtures:/app/fixtures" in services["manager"]["volumes"]
 
 
+def test_rendered_compose_system_path_parity_mounts(template: str) -> None:
+    doc = render(template, enable_gpu=False)
+    services = doc["services"]
+    for name, expected in SYSTEM_MOUNTS.items():
+        assert expected <= set(services[name]["volumes"]), name
+    # the agent's /var/lib/backend.ai mount covers the krunner share — no
+    # separate mount, and no other service touches the system state paths
+    for name, service in services.items():
+        if name in SYSTEM_MOUNTS:
+            continue
+        for volume in service["volumes"]:
+            assert not volume.startswith("/var/lib/backend.ai"), (name, volume)
+            assert not volume.startswith("/vfroot"), (name, volume)
+    # the storage-proxy reads its self-signed TLS material read-only
+    ssl_mount = f"{BASE_PATH}/configs/storage-proxy:{BASE_PATH}/configs/storage-proxy:ro"
+    assert ssl_mount in services["storage-proxy"]["volumes"]
+
+
 def test_rendered_compose_elevated_services(template: str) -> None:
     doc = render(template, enable_gpu=False)
     services = doc["services"]
@@ -232,9 +263,9 @@ def test_rendered_compose_elevated_services(template: str) -> None:
     agent = services["agent"]
     assert agent["pid"] == "host"
     assert agent["cgroup"] == "host"
-    krunner_mount = f"{KRUNNER_SHARED_PATH}:{KRUNNER_SHARED_PATH}"
-    assert krunner_mount in agent["volumes"]
+    # the krunner share is covered by the agent's /var/lib/backend.ai mount
     assert str(DockerContext.KRUNNER_SHARED_PATH) == KRUNNER_SHARED_PATH
+    assert str(DockerContext.KRUNNER_SHARED_PATH.parent) == "/var/lib/backend.ai"
     # the GPU reservation stays commented out without a CUDA accelerator
     assert "deploy" not in agent
 
