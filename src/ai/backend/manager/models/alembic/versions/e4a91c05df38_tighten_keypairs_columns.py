@@ -22,8 +22,13 @@ Create Date: 2026-08-06 13:10:00.000000
 
 """
 
+import logging
+
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.engine import Connection
+
+log = logging.getLogger("alembic.runtime.migration")
 
 # revision identifiers, used by Alembic.
 revision = "e4a91c05df38"
@@ -41,29 +46,48 @@ _TIGHTENED = (
 )
 
 
+def _delete_keypairs_without_secret_key(bind: Connection) -> None:
+    doomed = bind.execute(
+        sa.text("""
+            SELECT k.access_key, k.user_id, u.email
+            FROM keypairs k LEFT JOIN users u ON u."uuid" = k."user"
+            WHERE k.secret_key IS NULL
+            ORDER BY k.access_key
+        """)
+    ).all()
+    if not doomed:
+        return
+
+    log.warning(
+        "Deleting %d keypair(s) with no secret key — they cannot sign a request, so nothing"
+        " can be authenticated or running under them:",
+        len(doomed),
+    )
+    for access_key, user_id, email in doomed:
+        log.warning("  %s (owner: %s)", access_key, email or user_id or "<unknown>")
+
+    keys = [row.access_key for row in doomed]
+    bind.execute(
+        sa.text("DELETE FROM permissions WHERE scope_type = 'keypair' AND scope_id = ANY(:keys)"),
+        {"keys": keys},
+    )
+    bind.execute(
+        sa.text("""
+            DELETE FROM association_scopes_entities
+            WHERE (entity_type = 'keypair' AND entity_id = ANY(:keys))
+               OR (scope_type = 'keypair' AND scope_id = ANY(:keys))
+        """),
+        {"keys": keys},
+    )
+    bind.execute(
+        sa.text("DELETE FROM keypairs WHERE access_key = ANY(:keys)"),
+        {"keys": keys},
+    )
+
+
 def upgrade() -> None:
     bind = op.get_bind()
-    orphan_access_keys = (
-        bind.execute(sa.text("DELETE FROM keypairs WHERE secret_key IS NULL RETURNING access_key"))
-        .scalars()
-        .all()
-    )
-    if orphan_access_keys:
-        keys = list(orphan_access_keys)
-        bind.execute(
-            sa.text(
-                "DELETE FROM permissions WHERE scope_type = 'keypair' AND scope_id = ANY(:keys)"
-            ),
-            {"keys": keys},
-        )
-        bind.execute(
-            sa.text("""
-                DELETE FROM association_scopes_entities
-                WHERE (entity_type = 'keypair' AND entity_id = ANY(:keys))
-                   OR (scope_type = 'keypair' AND scope_id = ANY(:keys))
-            """),
-            {"keys": keys},
-        )
+    _delete_keypairs_without_secret_key(bind)
     bind.execute(
         sa.text("""
             UPDATE keypairs
