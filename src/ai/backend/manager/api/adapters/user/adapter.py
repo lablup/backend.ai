@@ -541,7 +541,9 @@ class UserAdapter(BaseAdapter):
         )
         updater: Updater[UserRow] = Updater(spec=updater_spec, pk_value=user_id)
         if not isinstance(input.main_access_key, Sentinel) and input.main_access_key is not None:
-            await self.switch_default_access_key_for(user_id, input.main_access_key)
+            await self.switch_default_access_key(
+                user_id, input.main_access_key, require_active=False
+            )
         result = await self._processors.user.modify_user_by_id.wait_for_complete(
             ModifyUserByIdAction(user_id=user_id, updater=updater)
         )
@@ -695,25 +697,20 @@ class UserAdapter(BaseAdapter):
         return UpdateMyKeypairPayload(keypair=self._keypair_data_to_node(result.keypair))
 
     async def switch_default_access_key(
-        self, user_id: UUID, access_key: str
+        self, user_id: UUID, access_key: str, *, require_active: bool = True
     ) -> SwitchMyMainAccessKeyPayload:
-        """Switch the default keypair of the user making the request."""
-        result = await self._processors.user.switch_default_access_key.wait_for_complete(
-            SwitchDefaultAccessKeyAction(user_uuid=user_id, access_key=access_key)
-        )
-        return SwitchMyMainAccessKeyPayload(success=result.success)
+        """Move a user's default keypair marker onto ``access_key``.
 
-    async def switch_default_access_key_for(self, user_id: UUID, access_key: str) -> None:
-        """Move another user's default keypair marker, as a user update may ask.
-
-        Deactivating a user turns all of their keypairs inactive, so an administrator
-        editing such a user has no active keypair to choose.
+        ``require_active`` is what separates the two callers: a user picking their own
+        default must pick a usable keypair, while deactivating a user turns all of theirs
+        inactive, and an administrator editing such a user still has to move the marker.
         """
-        await self._processors.user.switch_default_access_key.wait_for_complete(
+        result = await self._processors.user.switch_default_access_key.wait_for_complete(
             SwitchDefaultAccessKeyAction(
-                user_uuid=user_id, access_key=access_key, require_active=False
+                user_uuid=user_id, access_key=access_key, require_active=require_active
             )
         )
+        return SwitchMyMainAccessKeyPayload(success=result.success)
 
     async def search_my_keypairs(
         self,
