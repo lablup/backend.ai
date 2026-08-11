@@ -37,35 +37,8 @@ _REQUIRED = (
 _TIGHTENED = (*_REQUIRED, *_BACKFILLED)
 
 
-def _delete_keypairs_missing_a_required_value(bind: Connection) -> None:
-    any_missing = " OR ".join(f"keypairs.{column} IS NULL" for column in _REQUIRED)
-    which_missing = ", ".join(
-        f"CASE WHEN keypairs.{column} IS NULL THEN '{column}' END" for column in _REQUIRED
-    )
-    doomed = bind.execute(
-        sa.text(f"""
-            SELECT
-                keypairs.access_key,
-                users.email,
-                array_remove(ARRAY[{which_missing}], NULL) AS missing
-            FROM keypairs LEFT JOIN users ON users."uuid" = keypairs."user"
-            WHERE {any_missing}
-            ORDER BY keypairs.access_key
-        """)
-    ).all()
-    if not doomed:
-        return
-
-    log.warning(
-        "Deleting %d keypair(s) with a null in a column that has no default to backfill from:",
-        len(doomed),
-    )
-    for access_key, email, missing in doomed:
-        log.warning(
-            "  %s (owner: %s) missing %s", access_key, email or "<unknown>", ", ".join(missing)
-        )
-
-    keys = [row.access_key for row in doomed]
+def _delete_keypairs(bind: Connection, keys: list[str]) -> None:
+    """Delete keypairs along with the RBAC rows a keypair delete normally takes with it."""
     bind.execute(
         sa.text("DELETE FROM permissions WHERE scope_type = 'keypair' AND scope_id = ANY(:keys)"),
         {"keys": keys},
@@ -86,7 +59,26 @@ def _delete_keypairs_missing_a_required_value(bind: Connection) -> None:
 
 def upgrade() -> None:
     bind = op.get_bind()
-    _delete_keypairs_missing_a_required_value(bind)
+    for column in _REQUIRED:
+        doomed = bind.execute(
+            sa.text(f"""
+                SELECT keypairs.access_key, users.email
+                FROM keypairs LEFT JOIN users ON users."uuid" = keypairs."user"
+                WHERE keypairs.{column} IS NULL
+                ORDER BY keypairs.access_key
+            """)
+        ).all()
+        if not doomed:
+            continue
+        log.warning(
+            "Deleting %d keypair(s) with no %s — the column has no default to backfill from:",
+            len(doomed),
+            column,
+        )
+        for access_key, email in doomed:
+            log.warning("  %s (owner: %s)", access_key, email or "<unknown>")
+        _delete_keypairs(bind, [row.access_key for row in doomed])
+
     for column, default in _BACKFILLED.items():
         bind.execute(sa.text(f"UPDATE keypairs SET {column} = {default} WHERE {column} IS NULL"))
 
