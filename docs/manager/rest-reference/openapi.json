@@ -30737,7 +30737,7 @@
               }
             ],
             "default": 1,
-            "description": "Set the primary API access key. Set to null to clear.",
+            "description": "Set the primary API access key. It cannot be cleared; null is ignored.",
             "title": "Main Access Key"
           },
           "container_uid": {
