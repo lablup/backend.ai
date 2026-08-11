@@ -1155,7 +1155,7 @@ class UserDBSource:
             if default_kp_row:
                 keypair_creator = KeyPairCreator(
                     is_active=True,
-                    is_admin=default_kp_row.is_admin or False,
+                    is_admin=default_kp_row.is_admin,
                     resource_policy=default_kp_row.resource_policy,
                     rate_limit=default_kp_row.rate_limit or DEFAULT_KEYPAIR_RATE_LIMIT,
                 )

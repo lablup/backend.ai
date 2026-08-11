@@ -380,10 +380,11 @@ class TestScalingGroupRepositoryDB:
             db_sess.add(project_resource_policy)
 
             # Create user
+            test_user_email = f"test-{uuid.uuid4().hex[:8]}@example.com"
             user = UserRow(
                 uuid=test_user_uuid,
                 username=f"test-user-{uuid.uuid4().hex[:8]}",
-                email=f"test-{uuid.uuid4().hex[:8]}@example.com",
+                email=test_user_email,
                 password=PasswordInfo(
                     password="test_password",
                     algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
@@ -1181,8 +1182,12 @@ class TestScalingGroupRepositoryDB:
             )
             db_sess.add(keypair_policy)
 
+            owner_email = await db_sess.scalar(
+                sa.select(UserRow.email).where(UserRow.uuid == test_user_uuid)
+            )
             keypair = KeyPairRow(
                 user=test_user_uuid,
+                user_id=owner_email,
                 access_key=access_key,
                 secret_key=f"SK{uuid.uuid4().hex}",
                 is_active=True,
