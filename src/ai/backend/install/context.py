@@ -1891,6 +1891,10 @@ class Context(metaclass=ABCMeta):
         )
 
     async def prepare_local_vfolder_host(self) -> None:
+        await self._prepare_local_vfolder_files()
+        await self._grant_local_vfolder_host()
+
+    async def _prepare_local_vfolder_files(self) -> None:
         service = self.install_info.service_config
         volume_root = Path(self.install_info.base_path / service.vfolder_relpath)
         volume_root.mkdir(parents=True, exist_ok=True)
@@ -1899,6 +1903,8 @@ class Context(metaclass=ABCMeta):
         scratch_root = Path(self.install_info.base_path / "scratches")
         scratch_root.mkdir(parents=True, exist_ok=True)
         await asyncio.sleep(0)
+
+    async def _grant_local_vfolder_host(self) -> None:
         async with aiotools.closing_async(await self.get_db_connection()) as conn:
             default_vfolder_host_perms = [
                 "create-vfolder",
@@ -2334,11 +2340,13 @@ class DockerContext(Context):
       sharing its "half" network, with depends_on health gating), the
       manager API address becomes ``host.docker.internal``, and bind
       addresses become ``0.0.0.0``.
-    - The install target directory is bind-mounted at the identical absolute
-      path (path parity) only where files must resolve on the host: the
-      agent and storage-proxy (paths handed to the host Docker daemon) and
-      manager-cli (fixture files passed to one-off commands, which keeps
-      ``working_dir`` at the install directory for the relative-path CLI
+    - No running service mounts the install directory. The daemon-visible
+      state lives under fixed system paths with host==container path parity:
+      ``/var/lib/backend.ai`` + ``/tmp/backend.ai`` (agent) and
+      ``/vfroot/local`` (agent + storage-proxy; the volume dir is chowned to
+      the installing user by a root one-off). Only manager-cli — the
+      installer's one-off tool — mounts the install directory, for fixture
+      files (keeping ``working_dir`` there for relative-path CLI
       invocations). The manager exchanges the RPC keypair through
       ``<base_path>/fixtures`` mounted at ``/app/fixtures``.
     - The storage-proxy runs as the installing user (uid/gid substituted into
@@ -2351,9 +2359,21 @@ class DockerContext(Context):
 
     SERVICES_COMPOSE_FILENAME = "docker-compose.services.yml"
     HALFSTACK_COMPOSE_FILENAME = "docker-compose.halfstack.current.yml"
+    # Fixed system paths for the daemon-visible state, so NO service has to
+    # bind-mount the (home-directory-resident) install directory:
+    # - /var/lib/backend.ai: agent scratches / plugin var state / image
+    #   commits / krunner share (root-owned; the agent runs as root)
+    # - /tmp/backend.ai: agent<->kernel IPC sockets
+    # - /vfroot/local/volume1: the local vfolder volume (chowned to the
+    #   installing user for the non-root storage-proxy by a root one-off)
+    SYSTEM_STATE_PATH = Path("/var/lib/backend.ai")
+    SYSTEM_TMP_PATH = Path("/tmp/backend.ai")
+    VFROOT_MOUNT_PATH = Path("/vfroot/local")
+    VFROOT_VOLUME_PATH = Path("/vfroot/local/volume1")
     # Must match the agent image entrypoint's krunner share location
     # (env-overridable there via BACKENDAI_KRUNNER_SHARED; the entrypoint
-    # fails fast when the share is not mounted).
+    # fails fast when the share is not mounted). Covered by the
+    # SYSTEM_STATE_PATH mount of the agent.
     KRUNNER_SHARED_PATH = Path("/var/lib/backend.ai/krunner")
     # Alias for the host as seen from the bridge-networked service containers
     # (mapped to the host gateway via `extra_hosts` on the webserver, the one
@@ -2380,17 +2400,17 @@ class DockerContext(Context):
             local_proxy_port=15050,
             loopback_aliases=("127.0.0.1", "0.0.0.0"),
         )
-        base_path = info.base_path
         service = info.service_config
         # The agent hands these paths to the host Docker daemon as kernel
-        # bind-mount sources, so they must be absolute; the base_path parity
-        # mount in the generated compose file makes them host-resolvable.
-        service.agent_ipc_base_path = str(base_path / "ipc" / "agent")
-        service.agent_var_base_path = str(base_path / "var" / "agent")
-        # The storage-proxy runs as the (non-root) installing user with the
-        # image's default working directory, so its IPC dir must be an
-        # absolute, pre-created, user-owned path under the parity mount.
-        service.storage_proxy_ipc_base_path = str(base_path / "ipc" / "storage-proxy")
+        # bind-mount sources, so they must be absolute paths under the fixed
+        # system mounts (NOT the install directory, which no service mounts
+        # wholesale).
+        service.agent_ipc_base_path = str(self.SYSTEM_TMP_PATH / "ipc" / "agent")
+        service.agent_var_base_path = str(self.SYSTEM_STATE_PATH / "agent")
+        # The storage-proxy's IPC sockets are consumed by nothing outside its
+        # own container, so an absolute container-local path suffices (its
+        # non-root user can always write under the container's /tmp).
+        service.storage_proxy_ipc_base_path = str(self.SYSTEM_TMP_PATH / "ipc" / "storage-proxy")
         return info
 
     @override
@@ -2623,23 +2643,12 @@ class DockerContext(Context):
     async def install(self) -> None:
         base_path = self.install_info.base_path
         base_path.mkdir(parents=True, exist_ok=True)
-        # Pre-create the parity-mounted directories under base_path (owned by
-        # the installing user) so the root-owned service containers do not
-        # have to create them.
-        service = self.install_info.service_config
-        for subdir in (
-            Path(service.agent_ipc_base_path),
-            Path(service.agent_var_base_path),
-            Path(service.storage_proxy_ipc_base_path),
-            base_path / "scratches",
-            base_path / service.vfolder_relpath,
-        ):
-            subdir.mkdir(parents=True, exist_ok=True)
-        # The krunner share lives under /var/lib, which is typically not
-        # writable by the installing user — do NOT create it here. The Docker
-        # daemon (running as root) creates missing bind-mount source
-        # directories automatically when the agent container starts. Only
-        # refuse an obviously hostile pre-existing state.
+        # The daemon-visible state lives under fixed root-owned system paths
+        # (/var/lib/backend.ai, /tmp/backend.ai, /vfroot/local) — the Docker
+        # daemon creates missing bind-mount sources automatically, and the
+        # storage-proxy's user-owned volume dir is chowned by a root one-off
+        # after the images are pulled. Only refuse an obviously hostile
+        # pre-existing krunner-share state here.
         if self.KRUNNER_SHARED_PATH.is_symlink():
             raise RuntimeError(
                 f"Refusing to use the krunner share at {self.KRUNNER_SHARED_PATH}: "
@@ -2664,6 +2673,49 @@ class DockerContext(Context):
                 f"Check that lablup/backend.ai-* images exist for version "
                 f"{self.dist_info.version}."
             )
+
+        await self._bootstrap_vfroot()
+
+    async def _bootstrap_vfroot(self) -> None:
+        """
+        Create the local vfolder volume directory and hand it to the
+        installing user. The installer runs unprivileged and /vfroot is
+        root territory, so this goes through a root one-off container of the
+        storage-proxy service: starting it makes the Docker daemon create
+        the missing bind-mount source, and the ``--user 0`` override lets it
+        chown the volume dir to the uid/gid the storage-proxy service runs
+        as.
+        """
+        self.log_header("Preparing the vfolder volume root...")
+        exit_code = await self.run_exec([
+            *self.docker_sudo,
+            *self._services_compose_args(),
+            "run",
+            "--rm",
+            "--no-deps",
+            "--quiet-pull",
+            "--user",
+            "0",
+            "storage-proxy",
+            "sh",
+            "-c",
+            f"mkdir -p {self.VFROOT_VOLUME_PATH} && "
+            f"chown {os.getuid()}:{os.getgid()} {self.VFROOT_VOLUME_PATH}",
+        ])
+        if exit_code != 0:
+            raise RuntimeError(
+                f"Failed to prepare the vfolder volume at {self.VFROOT_VOLUME_PATH} "
+                f"(exit {exit_code})."
+            )
+
+    @override
+    async def _prepare_local_vfolder_files(self) -> None:
+        # The volume root was created and chowned by _bootstrap_vfroot(); the
+        # scratch root is agent-managed under the root-owned system state
+        # path, so no host-side mkdir here.
+        version_txt = self.VFROOT_VOLUME_PATH / "version.txt"
+        if not version_txt.exists():
+            version_txt.write_text("3")
 
     async def configure(self) -> None:
         self.log_header("Configuring manager...")
@@ -2706,26 +2758,26 @@ class DockerContext(Context):
     async def _fixup_agent_paths(self) -> None:
         """
         Rewrite the remaining relative paths of the generated ``agent.toml``
-        to absolute paths under the parity-mounted install directory. The
-        containerized agent hands these to the host Docker daemon as kernel
-        bind-mount sources, so container-relative paths would not resolve.
+        to absolute paths under the fixed system mounts. The containerized
+        agent hands these to the host Docker daemon as kernel bind-mount
+        sources, so container-relative (or unmounted) paths would not
+        resolve.
         """
-        base_path = self.install_info.base_path
-        toml_path = base_path / "agent.toml"
+        toml_path = self.install_info.base_path / "agent.toml"
         self.sed_in_place_multi(
             toml_path,
             [
                 (
                     re.compile(r"^scratch-root = .*$", flags=re.MULTILINE),
-                    f'scratch-root = "{base_path / "scratches"}"',
+                    f'scratch-root = "{self.SYSTEM_STATE_PATH / "scratches"}"',
                 ),
                 (
                     re.compile(r"^mount-path = .*$", flags=re.MULTILINE),
-                    f'mount-path = "{base_path / "vfolder" / "local"}"',
+                    f'mount-path = "{self.VFROOT_MOUNT_PATH}"',
                 ),
                 (
                     re.compile(r"^image-commit-path = .*$", flags=re.MULTILINE),
-                    f'image-commit-path = "{base_path / "tmp" / "backend.ai" / "commit"}"',
+                    f'image-commit-path = "{self.SYSTEM_STATE_PATH / "commit"}"',
                 ),
             ],
         )
@@ -2792,7 +2844,7 @@ class DockerContext(Context):
             data["api"]["manager"]["ssl-privkey"] = str(
                 base_path / "configs" / "storage-proxy" / "ssl" / "manager-api-selfsigned.key.pem"
             )
-            data["volume"]["volume1"]["path"] = str(base_path / service.vfolder_relpath)
+            data["volume"]["volume1"]["path"] = str(self.VFROOT_VOLUME_PATH)
             fixup_otel(data)
 
         def fixup_coordinator(data: Any) -> None:
