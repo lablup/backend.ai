@@ -114,6 +114,22 @@ def _project_membership_join(base_table: sa.Table | sa.sql.Join) -> sa.sql.Join:
     )
 
 
+def _default_access_key() -> sa.ScalarSelect[str]:
+    """The owner's default keypair, as a correlated subquery.
+
+    A join would replace the statement's FROM, and minilang resolves its field specs against
+    ``select.froms[0]``.
+    """
+    from ai.backend.manager.models.keypair import keypairs
+
+    return (
+        sa.select(keypairs.c.access_key)
+        .where((keypairs.c.user == users.c.uuid) & keypairs.c.is_default)
+        .correlate(users)
+        .scalar_subquery()
+    )
+
+
 @graphene_federation.key("id")
 class UserNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
@@ -241,6 +257,7 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", dtparse),
         "sudo_session_enabled": ("sudo_session_enabled", None),
+        "main_access_key": (ORMFieldItem(_default_access_key()), None),
     }
 
     # External table filter specifications
@@ -271,6 +288,7 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", None),
         "sudo_session_enabled": ("sudo_session_enabled", None),
+        "main_access_key": (ORMFieldItem(_default_access_key()), None),
     }
 
     @staticmethod
@@ -526,22 +544,6 @@ class UserGroup(graphene.ObjectType):  # type: ignore[misc]
             )
 
 
-def _default_access_key() -> sa.ScalarSelect[str]:
-    """The owner's default keypair, as a correlated subquery.
-
-    A join would replace the statement's FROM, and minilang resolves its field specs against
-    ``select.froms[0]``.
-    """
-    from ai.backend.manager.models.keypair import keypairs
-
-    return (
-        sa.select(keypairs.c.access_key)
-        .where((keypairs.c.user == users.c.uuid) & keypairs.c.is_default)
-        .correlate(users)
-        .scalar_subquery()
-    )
-
-
 class User(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (Item,)
@@ -707,6 +709,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", dtparse),
         "sudo_session_enabled": ("sudo_session_enabled", None),
+        "main_access_key": (ORMFieldItem(_default_access_key()), None),
     }
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {
@@ -726,6 +729,7 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         "totp_activated": ("totp_activated", None),
         "totp_activated_at": ("totp_activated_at", None),
         "sudo_session_enabled": ("sudo_session_enabled", None),
+        "main_access_key": (ORMFieldItem(_default_access_key()), None),
     }
 
     @classmethod
