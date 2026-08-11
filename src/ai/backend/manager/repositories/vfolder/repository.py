@@ -308,17 +308,19 @@ class VfolderRepository:
                 sa.select(UserRow)
                 .where(UserRow.uuid == user_uuid)
                 .options(
-                    selectinload(UserRow.main_keypair).selectinload(KeyPairRow.resource_policy_row)
+                    selectinload(UserRow.default_keypair).selectinload(
+                        KeyPairRow.resource_policy_row
+                    )
                 )
             )
             if user_row is None:
                 raise UserNotFound(f"User with UUID {user_uuid} not found.")
-            if user_row.main_keypair is None:
+            if user_row.default_keypair is None:
                 raise ObjectNotFound(object_name="User keypair")
-            if user_row.main_keypair.resource_policy_row is None:
+            if user_row.default_keypair.resource_policy_row is None:
                 raise ObjectNotFound(object_name="User keypair resource policy")
 
-            return user_row.main_keypair.resource_policy_row.allowed_vfolder_hosts
+            return user_row.default_keypair.resource_policy_row.allowed_vfolder_hosts
 
     @vfolder_repository_resilience.apply()
     async def get_user_with_keypair_policy_vfolder_hosts(
@@ -2101,18 +2103,23 @@ class VfolderRepository:
                 sa.select(UserRow)
                 .where(UserRow.uuid == user_uuid)
                 .options(
-                    selectinload(UserRow.main_keypair).selectinload(KeyPairRow.resource_policy_row)
+                    selectinload(UserRow.default_keypair).selectinload(
+                        KeyPairRow.resource_policy_row
+                    )
                 )
             )
             if user_row is None:
                 raise UserNotFound(f"User with UUID {user_uuid} not found.")
-            if user_row.main_keypair is None or user_row.main_keypair.resource_policy_row is None:
+            if (
+                user_row.default_keypair is None
+                or user_row.default_keypair.resource_policy_row is None
+            ):
                 resource_policy: Mapping[str, Any] = {
                     "allowed_vfolder_hosts": VFolderHostPermissionMap(),
                 }
             else:
                 resource_policy = {
-                    "allowed_vfolder_hosts": user_row.main_keypair.resource_policy_row.allowed_vfolder_hosts,
+                    "allowed_vfolder_hosts": user_row.default_keypair.resource_policy_row.allowed_vfolder_hosts,
                 }
             conn = await db_session.connection()
             return await get_allowed_vfolder_hosts_by_user(

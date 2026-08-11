@@ -544,7 +544,7 @@ class AuthDBSource:
                 sa.select(UserRow)
                 .where(UserRow.uuid == user_uuid)
                 .options(
-                    joinedload(UserRow.main_keypair).joinedload(KeyPairRow.resource_policy_row),
+                    joinedload(UserRow.default_keypair).joinedload(KeyPairRow.resource_policy_row),
                     selectinload(UserRow.keypairs).joinedload(KeyPairRow.resource_policy_row),
                 )
             )

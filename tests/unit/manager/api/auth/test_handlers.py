@@ -34,6 +34,10 @@ from ai.backend.common.dto.manager.auth.request import (
     VerifyAuthRequest,
 )
 from ai.backend.manager.api.rest.auth.handler import AuthHandler
+from ai.backend.manager.api.rest.middleware.auth import (
+    TRUSTED_PROXY_NETWORKS_KEY,
+    parse_trusted_proxy_networks,
+)
 from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.models.user import UserRole, UserStatus
@@ -120,12 +124,21 @@ class TestGetMyIp:
     def _make_mock_request(
         xff: str | None = None,
         remote: str | None = None,
-        trusted_proxies_enabled: bool = False,
+        trusted_proxies: list[str] | None = None,
+        peer: str | None = None,
     ) -> MagicMock:
         mock_request = MagicMock(spec=web.Request)
         mock_request.headers.get.return_value = xff
         mock_request.remote = remote
-        mock_request.app.get.return_value = trusted_proxies_enabled
+        mock_request.config_dict = {
+            TRUSTED_PROXY_NETWORKS_KEY: parse_trusted_proxy_networks(trusted_proxies or [])
+        }
+        if peer is None:
+            mock_request.transport = None
+        else:
+            transport = MagicMock()
+            transport.get_extra_info.return_value = (peer, 54321)
+            mock_request.transport = transport
         return mock_request
 
     async def test_returns_client_ip_from_x_forwarded_for(
@@ -176,15 +189,15 @@ class TestGetMyIp:
         assert isinstance(data, dict)
         assert data["client_ip"] == "1.2.3.4"
 
-    async def test_returns_remote_when_trusted_proxies_enabled(
+    async def test_skips_trusted_hops_when_trusted_proxies_configured(
         self,
         handler: AuthHandler,
     ) -> None:
-        """When XForwardedStrict is active, use request.remote directly."""
+        """With trusted proxies, every trailing trusted hop is skipped."""
         mock_request = self._make_mock_request(
             xff="1.2.3.4, 10.0.0.1",
-            remote="1.2.3.4",
-            trusted_proxies_enabled=True,
+            trusted_proxies=["10.0.0.0/8"],
+            peer="10.0.0.2",
         )
         request_ctx = RequestCtx(request=mock_request)
 

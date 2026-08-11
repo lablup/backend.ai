@@ -129,6 +129,7 @@ class TestCreateUserIfNotExists:
             ).fetchone()
             assert row is not None
             assert row.access_key == user.main_access_key
+            assert row.is_default is True
 
     async def test_returns_existing_user_without_duplicate(
         self,
