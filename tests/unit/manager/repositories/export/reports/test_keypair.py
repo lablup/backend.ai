@@ -57,6 +57,7 @@ class TestKeypairFieldDefinitions:
             "access_key",
             "is_active",
             "is_admin",
+            "is_default",
             "created_at",
             "modified_at",
             "last_used",
@@ -163,6 +164,7 @@ class TestFieldJoinAssignments:
             "access_key",
             "is_active",
             "is_admin",
+            "is_default",
         ]
         for key in basic_keys:
             field = fields_by_key[key]

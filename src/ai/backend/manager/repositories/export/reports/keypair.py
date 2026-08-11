@@ -99,6 +99,13 @@ KEYPAIR_FIELDS: list[ExportFieldDef] = [
         column=KeyPairRow.is_admin,
     ),
     ExportFieldDef(
+        key="is_default",
+        name="Default",
+        description="Whether this is the owner's default keypair",
+        field_type=ExportFieldType.BOOLEAN,
+        column=KeyPairRow.is_default,
+    ),
+    ExportFieldDef(
         key="created_at",
         name="Created At",
         description="Keypair creation time",
