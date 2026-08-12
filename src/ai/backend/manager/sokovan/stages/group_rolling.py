@@ -74,8 +74,8 @@ def build_group_rolling_stage(
     )
     task_spec = ReconcilerTaskSpec(
         reconcile_type=reconcile_type,
-        if_needed_event_factory=DoReconcileProcessIfNeededEvent,
-        process_event_factory=DoReconcileProcessEvent,
+        if_needed_event_factory=lambda t: DoReconcileProcessIfNeededEvent(reconcile_type=t),
+        process_event_factory=lambda t: DoReconcileProcessEvent(reconcile_type=t),
         short_interval=5.0,
         long_interval=30.0,
     )

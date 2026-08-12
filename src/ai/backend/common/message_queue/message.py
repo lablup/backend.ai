@@ -2,7 +2,7 @@ from typing import Final, Self
 
 from pydantic import BaseModel, ConfigDict
 
-from .payload import AnycastPayload
+from .payload import AnycastMessagePayload
 
 _DEFAULT_MAX_RETRIES: Final[int] = 3
 
@@ -15,7 +15,7 @@ class MQMessage(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     msg_id: MessageId
-    payload: AnycastPayload
+    payload: AnycastMessagePayload
 
     def retry(self) -> Self | None:
         """

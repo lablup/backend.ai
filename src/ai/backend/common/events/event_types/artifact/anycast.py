@@ -33,7 +33,6 @@ class ModelMetadataInfo:
     size: int
 
 
-@dataclass
 class ModelVerifyingEvent(BaseArtifactEvent):
     """
     Mark the model revision's status to verifying.
@@ -72,7 +71,6 @@ class ModelVerifyingEvent(BaseArtifactEvent):
         return None
 
 
-@dataclass
 class ModelImportDoneEvent(BaseArtifactEvent):
     model_id: str
     revision: str
@@ -129,7 +127,6 @@ class ModelImportDoneEvent(BaseArtifactEvent):
         return None
 
 
-@dataclass
 class ModelMetadataFetchDoneEvent(BaseArtifactEvent):
     model: ModelMetadataInfo
 

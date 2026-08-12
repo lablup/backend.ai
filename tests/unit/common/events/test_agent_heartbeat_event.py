@@ -118,7 +118,7 @@ class TestAgentHeartbeatEvent:
         expected_slot_keys: dict[SlotName, SlotTypes],
     ) -> None:
         """Test event serialization and deserialization with different slot key formats (backward compatibility)."""
-        event = AgentHeartbeatEvent(AgentInfo.model_validate(agent_info_dict))
+        event = AgentHeartbeatEvent(agent_info=AgentInfo.model_validate(agent_info_dict))
 
         serialized = event.serialize()
         deserialized = AgentHeartbeatEvent.deserialize(serialized)

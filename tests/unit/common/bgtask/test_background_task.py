@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import enum
 from collections.abc import AsyncIterator
-from dataclasses import asdict
 from typing import Any
 from uuid import uuid4
 
@@ -168,8 +167,7 @@ async def test_background_task(
         # since assertions inside the handler does not affect the test result
         # because the handlers are executed inside a separate asyncio task.
         update_handler_ctx["event_name"] = event.event_name()
-        # type checker complains event is not a subclass of AttrsInstance, but it definitely is...
-        update_body = asdict(event)
+        update_body = event.model_dump()
         update_handler_ctx.update(**update_body)
 
     async def done_sub(
@@ -179,7 +177,7 @@ async def test_background_task(
     ) -> None:
         done_handler_ctx["context"] = context
         done_handler_ctx["event_name"] = event.event_name()
-        update_body = asdict(event)
+        update_body = event.model_dump()
         done_handler_ctx.update(**update_body)
 
     async def _mock_task(reporter: Any) -> str:
@@ -235,7 +233,7 @@ async def test_background_task_fail(
     ) -> None:
         fail_handler_ctx["context"] = context
         fail_handler_ctx["event_name"] = event.event_name()
-        update_body = asdict(event)
+        update_body = event.model_dump()
         fail_handler_ctx.update(**update_body)
 
     async def _mock_task(reporter: Any) -> None:

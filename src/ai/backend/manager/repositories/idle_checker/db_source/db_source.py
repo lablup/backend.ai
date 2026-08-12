@@ -67,7 +67,7 @@ from ai.backend.manager.repositories.idle_checker.creators import (
     SessionIdleCheckCreatorSpec,
 )
 from ai.backend.manager.repositories.idle_checker.purgers import (
-    SessionIdleCheckBatchPurgerSpec,
+    SessionIdleCheckSyncPurgerSpec,
 )
 from ai.backend.manager.repositories.idle_checker.types import (
     ExpiredIdleCheckBatchData,
@@ -431,7 +431,7 @@ class IdleCheckerDBSource:
                 for pair_batch in batched(pairs_to_delete, _ASSIGNMENT_DELETE_BATCH_SIZE):
                     await w.batch_purge(
                         BatchPurger(
-                            spec=SessionIdleCheckBatchPurgerSpec(pair_batch),
+                            spec=SessionIdleCheckSyncPurgerSpec(pair_batch),
                             batch_size=_ASSIGNMENT_DELETE_BATCH_SIZE,
                         )
                     )

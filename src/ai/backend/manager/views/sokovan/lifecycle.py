@@ -21,7 +21,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.data.network.types import NetworkType
-from ai.backend.manager.data.session.types import SessionInfo
+from ai.backend.manager.data.session.types import SchedulingResult, SessionInfo
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.kernel import MainKernelNotFound, TooManyKernelsFound
 
@@ -300,6 +300,26 @@ class SessionRunningData:
     occupying_slots: ResourceSlot
 
 
+@dataclass(frozen=True)
+class LastPhase:
+    """The session's last scheduling-history record of the phase in progress.
+
+    Absent when the session has no record of that phase yet. Read by the
+    coordinator's failure classification: ``attempts`` against the retry
+    budget, ``started_at`` against the timeout, and ``result`` to tell an
+    attempt from a skip.
+
+    Attributes:
+        attempts: How many times the phase was recorded, skips included
+        started_at: When the phase was first recorded
+        result: What the record ended in
+    """
+
+    attempts: int
+    started_at: datetime
+    result: SchedulingResult
+
+
 @dataclass
 class SessionWithKernels:
     """
@@ -311,16 +331,13 @@ class SessionWithKernels:
     Attributes:
         session_info: Session information including lifecycle data
         kernel_infos: List of kernels belonging to this session
-        phase_attempts: Number of attempts for current phase from scheduling history
-                       (used for failure classification: give_up when >= max_retries)
-        phase_started_at: When the current phase started from scheduling history
-                         (used for failure classification: expired when timeout exceeded)
+        last_phase: The session's last record of the phase being processed,
+                   or None when it has none yet
     """
 
     session_info: SessionInfo
     kernel_infos: list[KernelInfo]
-    phase_attempts: int = 0
-    phase_started_at: datetime | None = None
+    last_phase: LastPhase | None = None
 
     @property
     def main_kernel(self) -> KernelInfo:

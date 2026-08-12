@@ -5,7 +5,10 @@ from typing import Self, override
 
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.message_queue.abc import AbstractBroadcaster
-from ai.backend.common.message_queue.payload import BroadcastPayload, CachedBroadcastPayload
+from ai.backend.common.message_queue.payload import (
+    BroadcastMessagePayload,
+    CachedBroadcastMessagePayload,
+)
 from ai.backend.common.types import RedisTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
@@ -59,7 +62,7 @@ class RedisBroadcaster(AbstractBroadcaster):
         return cls(client, channel)
 
     @override
-    async def broadcast(self, payload: BroadcastPayload) -> None:
+    async def broadcast(self, payload: BroadcastMessagePayload) -> None:
         """
         Broadcast a message to all subscribers.
 
@@ -79,7 +82,7 @@ class RedisBroadcaster(AbstractBroadcaster):
         log.debug("Message broadcasted to channel {}", self._channel)
 
     @override
-    async def broadcast_with_cache(self, cache_id: str, payload: BroadcastPayload) -> None:
+    async def broadcast_with_cache(self, cache_id: str, payload: BroadcastMessagePayload) -> None:
         """
         Broadcast a message with caching support.
 
@@ -102,7 +105,7 @@ class RedisBroadcaster(AbstractBroadcaster):
         )
 
     @override
-    async def fetch_cached_broadcast_message(self, cache_id: str) -> BroadcastPayload | None:
+    async def fetch_cached_broadcast_message(self, cache_id: str) -> BroadcastMessagePayload | None:
         """
         Retrieve a cached broadcast message.
 
@@ -131,7 +134,7 @@ class RedisBroadcaster(AbstractBroadcaster):
         return payload
 
     @override
-    async def broadcast_batch(self, events: list[CachedBroadcastPayload]) -> None:
+    async def broadcast_batch(self, events: list[CachedBroadcastMessagePayload]) -> None:
         """
         Broadcast multiple messages in a batch.
 

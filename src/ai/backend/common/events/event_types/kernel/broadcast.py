@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping
-from dataclasses import dataclass, field
 from typing import Any, Self, override
+
+from pydantic import Field
 
 from ai.backend.common.events.types import AbstractBroadcastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
@@ -12,7 +13,6 @@ from ai.backend.common.types import KernelId, SessionId
 from .types import KernelLifecycleEventReason
 
 
-@dataclass
 class BaseKernelEvent(AbstractBroadcastEvent):
     kernel_id: KernelId
 
@@ -26,7 +26,6 @@ class BaseKernelEvent(AbstractBroadcastEvent):
         return str(self.kernel_id)
 
 
-@dataclass
 class KernelLifecycleEvent(BaseKernelEvent):
     session_id: SessionId
     reason: str = ""
@@ -36,9 +35,8 @@ class KernelLifecycleEvent(BaseKernelEvent):
         return None
 
 
-@dataclass
 class KernelCreationEvent(KernelLifecycleEvent):
-    creation_info: Mapping[str, Any] = field(default_factory=dict)
+    creation_info: Mapping[str, Any] = Field(default_factory=dict)
 
     @override
     def serialize(self) -> tuple[Any, ...]:
@@ -64,7 +62,6 @@ class KernelCreationEvent(KernelLifecycleEvent):
         return None
 
 
-@dataclass
 class KernelPreparingBroadcastEvent(KernelCreationEvent):
     @classmethod
     @override
@@ -72,7 +69,6 @@ class KernelPreparingBroadcastEvent(KernelCreationEvent):
         return "kernel_preparing"
 
 
-@dataclass
 class KernelPullingBroadcastEvent(KernelCreationEvent):
     @classmethod
     @override
@@ -80,7 +76,6 @@ class KernelPullingBroadcastEvent(KernelCreationEvent):
         return "kernel_pulling"
 
 
-@dataclass
 class KernelCreatingBroadcastEvent(KernelCreationEvent):
     @classmethod
     @override
@@ -119,7 +114,6 @@ class KernelCancelledBroadcastEvent(KernelLifecycleEvent):
         return "kernel_cancelled"
 
 
-@dataclass
 class KernelTerminationEvent(BaseKernelEvent):
     session_id: SessionId
     reason: KernelLifecycleEventReason = KernelLifecycleEventReason.UNKNOWN
@@ -138,7 +132,7 @@ class KernelTerminationEvent(BaseKernelEvent):
     @override
     def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
-            KernelId(uuid.UUID(value[0])),
+            kernel_id=KernelId(uuid.UUID(value[0])),
             session_id=SessionId(uuid.UUID(value[1])),
             reason=value[2],
             exit_code=value[3],

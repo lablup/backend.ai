@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any, Self, override
 
 from ai.backend.common.events.types import AbstractBroadcastEvent, EventDomain
@@ -23,7 +22,6 @@ class BaseVolumeEvent(AbstractBroadcastEvent):
         return None
 
 
-@dataclass
 class DoVolumeMountEvent(BaseVolumeEvent):
     # Let storage proxies and agents find the real path of volume
     # with their mount_path or mount_prefix.
@@ -76,7 +74,6 @@ class DoVolumeMountEvent(BaseVolumeEvent):
         return "do_volume_mount"
 
 
-@dataclass
 class DoVolumeUnmountEvent(BaseVolumeEvent):
     # Let storage proxies and agents find the real path of volume
     # with their mount_path or mount_prefix.
@@ -119,7 +116,6 @@ class DoVolumeUnmountEvent(BaseVolumeEvent):
         return "do_volume_unmount"
 
 
-@dataclass
 class BaseAgentVolumeMountEvent(BaseVolumeEvent):
     node_id: str
     node_type: VolumeMountableNodeType
@@ -141,11 +137,11 @@ class BaseAgentVolumeMountEvent(BaseVolumeEvent):
     @override
     def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
-            value[0],
-            VolumeMountableNodeType(value[1]),
-            value[2],
-            QuotaScopeID.parse(value[3]),
-            value[4],
+            node_id=value[0],
+            node_type=VolumeMountableNodeType(value[1]),
+            mount_path=value[2],
+            quota_scope_id=QuotaScopeID.parse(value[3]),
+            err_msg=value[4],
         )
 
 

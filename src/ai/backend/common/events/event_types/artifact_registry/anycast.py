@@ -7,9 +7,6 @@ from ai.backend.common.events.user_event.user_event import UserEvent
 class DoScanReservoirRegistryEvent(AbstractAnycastEvent):
     """Event to trigger reservoir registry scanning."""
 
-    def __init__(self) -> None:
-        pass
-
     @override
     def serialize(self) -> tuple[Any, ...]:
         return ()
