@@ -180,8 +180,10 @@ namespace is invisible to the host daemon — use `hostdir`.
 example** — it uses different image names, includes no agent or storage-proxy,
 and runs on a bridge network. The authoritative reference is the compose file
 the **DOCKER install mode** of `backend.ai-installer` generates at
-`<install-dir>/docker-compose.services.yml` (rendered from
-`src/ai/backend/install/configs/docker-compose.services.yml`). Its contract:
+`<install-dir>/docker-compose.yaml` (rendered from the
+`src/ai/backend/install/configs/docker-compose.services.yml` template — the
+standard output name means a bare `docker compose` in the install directory
+addresses the deployment). Its contract:
 
 - Every service reads its generated config from the image's default
   `/etc/backend.ai/*` path via a per-file read-only mount and runs the
