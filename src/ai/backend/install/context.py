@@ -2654,6 +2654,10 @@ class DockerContext(Context):
     async def install(self) -> None:
         base_path = self.install_info.base_path
         base_path.mkdir(parents=True, exist_ok=True)
+        # Operator staging dir for extra plugin wheels (e.g. accelerator
+        # plugins), mounted read-only at /app/wheelhouse of the manager and
+        # agent containers.
+        (base_path / "wheelhouse").mkdir(exist_ok=True)
         # The daemon-visible state lives under fixed root-owned system paths
         # (/var/lib/backend.ai, /tmp/backend.ai, /vfroot/local) — the Docker
         # daemon creates missing bind-mount sources automatically, and the
