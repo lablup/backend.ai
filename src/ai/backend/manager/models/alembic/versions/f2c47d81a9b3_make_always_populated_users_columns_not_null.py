@@ -22,7 +22,8 @@ depends_on = None
 
 
 def _backfill_flags(bind: Connection) -> None:
-    """The two flags never had a default, so a row that predates one carries NULL."""
+    """need_password_change never had a default; totp_activated only lacks one in a
+    database built from the model metadata, which carried the stale annotation."""
     bind.execute(
         sa.text("UPDATE users SET need_password_change = false WHERE need_password_change IS NULL")
     )
