@@ -51,7 +51,7 @@ from pydantic import (
     ValidationError,
     field_validator,
 )
-from pydantic_core import ErrorDetails
+from pydantic_core import ErrorDetails, core_schema
 from redis.asyncio import Redis
 
 from .defs import UNKNOWN_CONTAINER_ID, RedisRole
@@ -1499,7 +1499,6 @@ class QuotaScopeID:
         handler: Any,
     ) -> Any:
         """Provide Pydantic core schema for QuotaScopeID serialization/deserialization."""
-        from pydantic_core import core_schema
 
         def validate_quota_scope_id(v: Any) -> QuotaScopeID:
             if isinstance(v, QuotaScopeID):
@@ -1564,7 +1563,6 @@ class VFolderID:
         handler: Any,
     ) -> Any:
         """Provide Pydantic core schema for VFolderID serialization/deserialization."""
-        from pydantic_core import core_schema
 
         def validate_vfolder_id(v: Any) -> VFolderID:
             if isinstance(v, VFolderID):
