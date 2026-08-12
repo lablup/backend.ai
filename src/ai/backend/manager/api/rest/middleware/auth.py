@@ -644,11 +644,10 @@ async def _query_auth_context_by_access_key(
         )
         if user_row is None:
             return None
-        if user_row.role is None or user_row.domain_name is None or user_row.domain_id is None:
+        if user_row.domain_name is None or user_row.domain_id is None:
             missing_fields = [
                 name
                 for name, value in (
-                    ("role", user_row.role),
                     ("domain_name", user_row.domain_name),
                     ("domain_id", user_row.domain_id),
                 )
