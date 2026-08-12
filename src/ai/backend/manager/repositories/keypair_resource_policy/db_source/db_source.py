@@ -47,7 +47,7 @@ class KeypairResourcePolicyDBSource:
 
     @keypair_resource_policy_db_source_resilience.apply()
     async def get_by_user_id(self, user_id: UUID) -> KeyPairResourcePolicyData:
-        """Retrieves the keypair resource policy assigned to a user's main keypair."""
+        """Retrieves the keypair resource policy assigned to a user's default keypair."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = (
                 sa.select(KeyPairResourcePolicyRow)

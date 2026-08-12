@@ -333,7 +333,7 @@ class VfolderRepository:
         A user can hold multiple keypairs, each pointing to its own keypair
         resource policy. This method unions ``allowed_vfolder_hosts`` across
         every active keypair so that the host-permission check reflects the
-        full set of hosts available to the user (rather than only the main
+        full set of hosts available to the user (rather than only the default
         keypair).
 
         Implementation note: a single LEFT OUTER JOIN is used (instead of an
@@ -2093,7 +2093,7 @@ class VfolderRepository:
         """
         Resolve all storage hosts and per-host permissions accessible to a user.
 
-        Internally fetches the user's main keypair resource policy and unions
+        Internally fetches the user's default keypair resource policy and unions
         domain/group/keypair allowed vfolder hosts. Returns the host permission
         map without filtering against currently mountable volumes — callers that
         depend on volume availability must intersect with ``StorageSessionManager``.

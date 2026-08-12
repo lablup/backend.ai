@@ -1,7 +1,7 @@
 """
 Tests for ``IdleCheckerHost.do_idle_check()`` against a real database.
 
-The idle policy is resolved through the user's main keypair — the one marked
+The idle policy is resolved through the user's default keypair — the one marked
 ``keypairs.is_default`` — instead of the kernel's own ``access_key``, which a
 keypair deletion can leave orphaned. A kernel whose policy cannot be resolved,
 or whose checker raises, must not stop the remaining kernels of the same cycle
@@ -300,9 +300,9 @@ class TestDoIdleCheck:
         *,
         domain_name: str,
         user_resource_policy_name: str,
-        main_keypair_idle_timeout: int | None,
+        default_keypair_idle_timeout: int | None,
     ) -> tuple[uuid.UUID, AccessKey | None]:
-        """Create a user; ``None`` idle timeout leaves the user without a main keypair."""
+        """Create a user; ``None`` idle timeout leaves the user without a default keypair."""
         user_uuid = uuid.uuid4()
         async with db.begin_session() as db_sess:
             db_sess.add(
@@ -317,10 +317,10 @@ class TestDoIdleCheck:
                 )
             )
             await db_sess.flush()
-        if main_keypair_idle_timeout is None:
+        if default_keypair_idle_timeout is None:
             return user_uuid, None
         access_key = await self._create_keypair(
-            db, user_uuid=user_uuid, idle_timeout=main_keypair_idle_timeout, is_default=True
+            db, user_uuid=user_uuid, idle_timeout=default_keypair_idle_timeout, is_default=True
         )
         return user_uuid, access_key
 
@@ -440,7 +440,7 @@ class TestDoIdleCheck:
         host.add_checker(checker)
         return host
 
-    async def test_policy_resolved_via_main_keypair(
+    async def test_policy_resolved_via_default_keypair(
         self,
         db: ExtendedAsyncSAEngine,
         domain: tuple[DomainID, str],
@@ -448,14 +448,14 @@ class TestDoIdleCheck:
         group_id: uuid.UUID,
         user_resource_policy_name: str,
     ) -> None:
-        """A kernel created with a secondary keypair uses the main keypair's policy."""
-        user_uuid, main_access_key = await self._create_user(
+        """A kernel created with a secondary keypair uses the default keypair's policy."""
+        user_uuid, default_access_key = await self._create_user(
             db,
             domain_name=domain[1],
             user_resource_policy_name=user_resource_policy_name,
-            main_keypair_idle_timeout=600,
+            default_keypair_idle_timeout=600,
         )
-        assert main_access_key is not None
+        assert default_access_key is not None
         secondary_access_key = await self._create_keypair(db, user_uuid=user_uuid, idle_timeout=30)
         kernel_id = await self._create_running_kernel(
             db,
@@ -485,7 +485,7 @@ class TestDoIdleCheck:
             db,
             domain_name=domain[1],
             user_resource_policy_name=user_resource_policy_name,
-            main_keypair_idle_timeout=600,
+            default_keypair_idle_timeout=600,
         )
         kernel_id = await self._create_running_kernel(
             db,
@@ -511,19 +511,19 @@ class TestDoIdleCheck:
         user_resource_policy_name: str,
         caplog: pytest.LogCaptureFixture,
     ) -> None:
-        """A user without a main access key never blocks the rest of the cycle,
+        """A user without a default access key never blocks the rest of the cycle,
         and its missing policy is warned about only once."""
         policyless_uuid, _ = await self._create_user(
             db,
             domain_name=domain[1],
             user_resource_policy_name=user_resource_policy_name,
-            main_keypair_idle_timeout=None,
+            default_keypair_idle_timeout=None,
         )
         normal_uuid, normal_access_key = await self._create_user(
             db,
             domain_name=domain[1],
             user_resource_policy_name=user_resource_policy_name,
-            main_keypair_idle_timeout=600,
+            default_keypair_idle_timeout=600,
         )
         assert normal_access_key is not None
         orphan_access_key = AccessKey(f"AKDELETED{uuid.uuid4().hex[:11]}")
@@ -573,7 +573,7 @@ class TestDoIdleCheck:
             db,
             domain_name=domain[1],
             user_resource_policy_name=user_resource_policy_name,
-            main_keypair_idle_timeout=600,
+            default_keypair_idle_timeout=600,
         )
         assert access_key is not None
         kernel_ids = [

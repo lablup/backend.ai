@@ -1596,7 +1596,7 @@ class SessionService:
             owner = await self._user_repository.get_user_by_uuid(action.owner_id)
             if owner.default_access_key is None:
                 raise InternalServerError(
-                    f"Delegated owner {action.owner_id} has no main access key configured"
+                    f"Delegated owner {action.owner_id} has no default access key configured"
                 )
             if owner.role is None:
                 raise InternalServerError(
