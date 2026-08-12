@@ -13,7 +13,7 @@ from aiodocker.exceptions import DockerError
 
 from ai.backend.agent.docker.agent import (
     DockerKernelCreationContext,
-    parse_distro_from_ldd_output,
+    _parse_distro_from_ldd_output,
 )
 
 LDD_PRELOAD_ERROR_LINES = "\n".join([
@@ -54,7 +54,7 @@ class TestParseDistroFromLddOutput:
     def test_glibc_version_on_first_line(self) -> None:
         output = f"ldd (GNU libc) 2.35\n{LDD_GLIBC_TRAILER}"
 
-        assert parse_distro_from_ldd_output(output) == "ubuntu22.04"
+        assert _parse_distro_from_ldd_output(output) == "ubuntu22.04"
 
     def test_glibc_version_after_ld_preload_errors(self) -> None:
         output = "\n".join([
@@ -63,50 +63,55 @@ class TestParseDistroFromLddOutput:
             LDD_GLIBC_TRAILER,
         ])
 
-        assert parse_distro_from_ldd_output(output) == "ubuntu24.04"
+        assert _parse_distro_from_ldd_output(output) == "ubuntu24.04"
 
     def test_glibc_version_with_carriage_returns(self) -> None:
         output = "ERROR: ld.so: ignored.\r\nldd (Ubuntu GLIBC 2.31-0ubuntu9) 2.31\r\n"
 
-        assert parse_distro_from_ldd_output(output) == "ubuntu20.04"
+        assert _parse_distro_from_ldd_output(output) == "ubuntu20.04"
 
     def test_glibc_version_with_patch_component(self) -> None:
         output = "ldd (GNU libc) 2.39.1"
 
-        assert parse_distro_from_ldd_output(output) == "ubuntu24.04"
+        assert _parse_distro_from_ldd_output(output) == "ubuntu24.04"
 
     def test_unknown_glibc_version_falls_back_to_lower_known_version(self) -> None:
         output = "ldd (GNU libc) 2.33"
 
-        assert parse_distro_from_ldd_output(output) == "ubuntu20.04"
+        assert _parse_distro_from_ldd_output(output) == "ubuntu20.04"
+
+    def test_glibc_version_without_minor_component(self) -> None:
+        output = "ldd (GNU libc) 2"
+
+        assert _parse_distro_from_ldd_output(output) == "centos7.6"
 
     def test_glibc_version_older_than_known_versions(self) -> None:
         output = "ldd (GNU libc) 2.12"
 
-        assert parse_distro_from_ldd_output(output) == "centos7.6"
+        assert _parse_distro_from_ldd_output(output) == "centos7.6"
 
     def test_glibc_version_newer_than_known_versions(self) -> None:
         output = "ldd (GNU libc) 2.41"
 
-        assert parse_distro_from_ldd_output(output) == "ubuntu24.04"
+        assert _parse_distro_from_ldd_output(output) == "ubuntu24.04"
 
     def test_musl_banner_on_first_line(self) -> None:
         output = "musl libc (x86_64)\nVersion 1.2.4\nDynamic Program Loader"
 
-        assert parse_distro_from_ldd_output(output) == "alpine3.8"
+        assert _parse_distro_from_ldd_output(output) == "alpine3.8"
 
     def test_musl_banner_after_ld_preload_errors(self) -> None:
         output = f"{LDD_PRELOAD_ERROR_LINES}\nmusl libc (x86_64)\nVersion 1.2.4"
 
-        assert parse_distro_from_ldd_output(output) == "alpine3.8"
+        assert _parse_distro_from_ldd_output(output) == "alpine3.8"
 
     def test_returns_none_when_no_libc_banner_found(self) -> None:
         output = f"{LDD_PRELOAD_ERROR_LINES}\nldd: command not found"
 
-        assert parse_distro_from_ldd_output(output) is None
+        assert _parse_distro_from_ldd_output(output) is None
 
     def test_returns_none_for_empty_output(self) -> None:
-        assert parse_distro_from_ldd_output("") is None
+        assert _parse_distro_from_ldd_output("") is None
 
 
 @pytest.fixture

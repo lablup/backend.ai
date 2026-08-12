@@ -166,7 +166,7 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 eof_sentinel = Sentinel.TOKEN
 
-LDD_GLIBC_REGEX = re.compile(r"^ldd \([^\)]+\) (\d+\.\d+)[\d\.]*$")
+LDD_GLIBC_REGEX = re.compile(r"^ldd \([^\)]+\) (\d+(?:\.\d+)?)[\d\.]*$")
 LDD_MUSL_REGEX = re.compile(r"^musl libc .+$")
 
 known_glibc_distros: Final[dict[float, str]] = {
@@ -180,7 +180,7 @@ known_glibc_distros: Final[dict[float, str]] = {
 }
 
 
-def parse_distro_from_ldd_output(output: str) -> str | None:
+def _parse_distro_from_ldd_output(output: str) -> str | None:
     for line in output.splitlines():
         stripped_line = line.strip()
         if m := LDD_GLIBC_REGEX.search(stripped_line):
@@ -1770,7 +1770,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             await container.stop()
             await container.delete()
             log.debug("response: {}", container_log)
-            distro = parse_distro_from_ldd_output("\n".join(container_log))
+            distro = _parse_distro_from_ldd_output("\n".join(container_log))
             if distro is None:
                 raise RuntimeError("Could not determine the C library variant.")
             await self.valkey_stat_client.set_image_distro(image_id, distro)
