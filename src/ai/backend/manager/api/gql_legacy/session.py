@@ -499,7 +499,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         if vf_nodes:
             async with ctx.db.connect() as db_conn:
                 user = ctx.user
-                client_ctx = ClientContext(ctx.db, user["domain_name"], user["uuid"], user["role"])
+                client_ctx = ClientContext(ctx.db, user.domain_name, user.uuid, user.role)
                 permission_ctx = await get_vfolder_permission_ctx(
                     db_conn, client_ctx, SystemScope(), VFolderRBACPermission.READ_ATTRIBUTE
                 )
@@ -719,7 +719,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
     ) -> Self | None:
         graph_ctx: GraphQueryContext = info.context
         user = graph_ctx.user
-        client_ctx = ClientContext(graph_ctx.db, user["domain_name"], user["uuid"], user["role"])
+        client_ctx = ClientContext(graph_ctx.db, user.domain_name, user.uuid, user.role)
         _, session_id = id
         async with graph_ctx.db.connect() as db_conn:
             permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope_id, permission)
@@ -786,9 +786,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         )
         async with graph_ctx.db.connect() as db_conn:
             user = graph_ctx.user
-            client_ctx = ClientContext(
-                graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
-            )
+            client_ctx = ClientContext(graph_ctx.db, user.domain_name, user.uuid, user.role)
             permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope_id, permission)
             cond = permission_ctx.query_condition
             if cond is None:

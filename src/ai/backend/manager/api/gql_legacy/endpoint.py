@@ -225,14 +225,14 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):  # type: ignore[misc]
             rule_row = await EndpointAutoScalingRuleRow.get(
                 db_session, _rule_id, load_endpoint=True
             )
-            match graph_ctx.user["role"]:
+            match graph_ctx.user.role:
                 case UserRole.SUPERADMIN:
                     pass
                 case UserRole.ADMIN:
-                    if rule_row.endpoint_row.domain != graph_ctx.user["domain_name"]:
+                    if rule_row.endpoint_row.domain != graph_ctx.user.domain_name:
                         raise GenericForbidden
                 case UserRole.USER:
-                    if rule_row.endpoint_row.created_user != graph_ctx.user["uuid"]:
+                    if rule_row.endpoint_row.created_user != graph_ctx.user.uuid:
                         raise GenericForbidden
 
             return cls.from_row(graph_ctx, rule_row)
@@ -295,14 +295,14 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):  # type: ignore[misc]
             except NoResultFound as e:
                 raise ObjectNotFound(object_name="Endpoint") from e
 
-            match graph_ctx.user["role"]:
+            match graph_ctx.user.role:
                 case UserRole.SUPERADMIN:
                     pass
                 case UserRole.ADMIN:
-                    if row.domain != graph_ctx.user["domain_name"]:
+                    if row.domain != graph_ctx.user.domain_name:
                         raise GenericForbidden
                 case UserRole.USER:
-                    if row.created_user != graph_ctx.user["uuid"]:
+                    if row.created_user != graph_ctx.user.uuid:
                         raise GenericForbidden
 
             query = query.filter(EndpointAutoScalingRuleRow.endpoint == _endpoint_id)

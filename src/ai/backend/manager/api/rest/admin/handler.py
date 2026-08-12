@@ -6,7 +6,6 @@ Strawberry v2 is served at ``POST /admin/gql/strawberry`` via ``handle_gql_straw
 
 from __future__ import annotations
 
-import dataclasses
 import logging
 import traceback
 from http import HTTPStatus
@@ -115,8 +114,7 @@ class AdminHandler:
             dataloader_manager=DataLoaderManager(),
             config_provider=gql_deps.config_provider,
             etcd=gql_deps.etcd,
-            # The legacy Graphene context still reads a mapping; BA-7188 types it.
-            user=dataclasses.asdict(request["user"]),
+            user=request["user"],
             access_key=request["keypair"].access_key,
             db=gql_deps.db,
             valkey_stat=gql_deps.valkey_stat,
