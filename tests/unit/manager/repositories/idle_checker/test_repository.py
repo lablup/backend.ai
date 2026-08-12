@@ -1132,6 +1132,7 @@ class TestSessionIdleCheckExclusion:
                         expire_at=expire_at,
                         last_status=phase,
                         last_message=f"{phase.value} judgment",
+                        updated_at=datetime(2026, 1, 1, tzinfo=UTC),
                     )
                 )
             # A pair the user excluded by hand.
@@ -1363,6 +1364,8 @@ class TestSessionIdleCheckExclusion:
             )
         assert excluded_row is not None
         assert excluded_row.last_status is IdleCheckPhase.NOT_CHECKED
+        # The grace period restarts from this write, not from the seeded row's age.
+        assert excluded_row.updated_at > datetime(2026, 1, 1, tzinfo=UTC)
         assert active_row is not None
         assert active_row.last_status is IdleCheckPhase.NOT_CHECKED
         assert untouched_row is not None

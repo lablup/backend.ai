@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any, override
 
 from ai.backend.common.data.idle_checker.types import IdleCheckPhase
@@ -69,6 +70,7 @@ class SessionIdleCheckExcludeUpserterSpec(UpserterSpec[SessionIdleCheckRow]):
             "last_message": "Excluded from idle checks.",
             "is_manual": True,
             "manually_triggered_by": self.user_id,
+            "updated_at": datetime.now(UTC),
         }
 
 
@@ -125,4 +127,5 @@ class SessionIdleCheckIncludeUpserterSpec(UpserterSpec[SessionIdleCheckRow]):
             "last_message": "Not checked yet.",
             "is_manual": True,
             "manually_triggered_by": self.user_id,
+            "updated_at": datetime.now(UTC),
         }

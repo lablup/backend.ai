@@ -61,7 +61,7 @@ class ExcludeSessionIdleChecksActionResult(BaseBulkActionResult):
                 BulkEntityResult(
                     entity_id=pair.session_id,
                     status=failure.status,
-                    description=failure.description,
+                    description=f"{failure.description} (checker {pair.checker_id})",
                     error_code=failure.error_code,
                 )
             )
