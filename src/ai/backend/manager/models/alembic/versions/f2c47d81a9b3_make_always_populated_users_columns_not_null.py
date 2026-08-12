@@ -14,6 +14,7 @@ Create Date: 2026-08-12 11:20:00.000000
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.engine import Connection
 
 # revision identifiers, used by Alembic.
 revision = "f2c47d81a9b3"
@@ -23,8 +24,8 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade() -> None:
-    bind = op.get_bind()
+def _repair_existing_rows(bind: Connection) -> None:
+    """Fill in what predates the guarantees, raising on what cannot be filled in."""
     bind.execute(
         sa.text("UPDATE users SET need_password_change = false WHERE need_password_change IS NULL")
     )
@@ -46,6 +47,10 @@ def upgrade() -> None:
             "Assign each one a domain (or delete the account) and run the migration again: "
             "SELECT uuid, email FROM users WHERE domain_name IS NULL;"
         )
+
+
+def upgrade() -> None:
+    _repair_existing_rows(op.get_bind())
 
     op.alter_column("users", "domain_name", existing_type=sa.String(length=64), nullable=False)
     op.alter_column("users", "role", existing_type=sa.String(length=64), nullable=False)
