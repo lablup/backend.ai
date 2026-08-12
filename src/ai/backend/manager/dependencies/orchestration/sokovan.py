@@ -201,10 +201,6 @@ class SokovanOrchestratorDependency(
         # Reconciler coordinator: sokovan owns its stage assembly (DI just passes deps).
         reconciler_coordinator, reconciler_task_specs = build_reconciler_coordinator(
             replica_group_repository=setup_input.replica_group_repository,
-            idle_checker_repository=setup_input.idle_checker_repository,
-            metric_repository=setup_input.metric_repository,
-            scheduling_controller=setup_input.scheduling_controller,
-            valkey_live=setup_input.valkey_live,
             valkey_schedule=setup_input.valkey_schedule,
             lock_factory=setup_input.distributed_lock_factory,
             config_provider=setup_input.config_provider,
