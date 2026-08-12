@@ -92,6 +92,7 @@ class TestLoginSessionForce:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                     name=domain_name,
                     description="test",
                     is_active=True,
@@ -137,6 +138,7 @@ class TestLoginSessionForce:
                 role=UserRole.USER,
                 resource_policy="test-user-policy",
                 need_password_change=False,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
             )
             db_sess.add(user)
             await db_sess.flush()

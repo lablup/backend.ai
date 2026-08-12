@@ -83,6 +83,7 @@ class TestResolveUserAndActiveAccessKey:
         async with db.begin_session() as sess:
             sess.add(
                 DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                     name=domain_name,
                     is_active=True,
                     total_resource_slots=ResourceSlot(),
@@ -117,6 +118,7 @@ class TestResolveUserAndActiveAccessKey:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy,
+                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 )
             )
             await sess.flush()

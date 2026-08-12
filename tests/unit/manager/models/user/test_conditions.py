@@ -444,6 +444,7 @@ class TestUserNestedSearchIntegration:
             ]:
                 session.add(
                     DomainRow(
+                        id=uuid.uuid5(uuid.NAMESPACE_DNS, dn),
                         name=dn,
                         description=desc,
                         is_active=active,
@@ -494,6 +495,7 @@ class TestUserNestedSearchIntegration:
                         domain_name=dom,
                         role=UserRole.USER,
                         resource_policy=urp.name,
+                        domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, dom),
                     )
                 )
             await session.flush()

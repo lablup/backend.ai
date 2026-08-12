@@ -103,6 +103,7 @@ class TestModelCardCreatorResourceRequirements:
     ) -> DomainRow:
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, f"test-domain-{uuid.uuid4().hex[:8]}"),
                 name=f"test-domain-{uuid.uuid4().hex[:8]}",
                 description="Test domain",
                 is_active=True,

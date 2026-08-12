@@ -171,6 +171,7 @@ async def user_uuid(
                 password=password_info,
                 domain_name=domain_name,
                 resource_policy=user_resource_policy,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
             )
         )
     yield user_id

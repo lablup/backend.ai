@@ -259,6 +259,7 @@ class TestGroupNestedSearchIntegration:
                 (inactive_domain, False, "Archived department"),
             ]:
                 domain = DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                     name=domain_name,
                     description=desc,
                     is_active=is_active,
@@ -591,6 +592,7 @@ class TestGroupUserNestedSearchIntegration:
 
         async with db_with_cleanup.begin_session() as session:
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Test domain",
                 is_active=True,

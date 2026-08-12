@@ -187,6 +187,7 @@ class TestVfolderRepository:
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Test domain for vfolder",
                 is_active=True,
@@ -269,6 +270,7 @@ class TestVfolderRepository:
                 domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_user_resource_policy_name,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -399,6 +401,7 @@ class TestVfolderRepositoryAllowedVfolderHosts:
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -481,6 +484,7 @@ class TestVfolderRepositoryAllowedVfolderHosts:
                 domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_user_resource_policy_name,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -675,6 +679,7 @@ class TestVfolderRepositoryPurge:
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -737,6 +742,7 @@ class TestVfolderRepositoryPurge:
                 domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_user_resource_policy_name,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -1053,6 +1059,7 @@ class TestVfolderRepositoryDeleteForever:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -1110,6 +1117,7 @@ class TestVfolderRepositoryDeleteForever:
                     domain_name=test_domain_name,
                     role=UserRole.USER,
                     resource_policy=test_user_resource_policy_name,
+                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
                 )
             )
             await db_sess.flush()
@@ -1948,6 +1956,7 @@ class TestVFolderRepositoryTrashAndRestore:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                     name=domain_name,
                     description="test",
                     is_active=True,
@@ -1984,6 +1993,7 @@ class TestVFolderRepositoryTrashAndRestore:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=policy_name,
+                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 )
             )
             await db_sess.flush()

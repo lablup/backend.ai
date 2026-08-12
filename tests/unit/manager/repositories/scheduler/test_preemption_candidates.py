@@ -110,6 +110,7 @@ async def _create_extra_user(
                 status=UserStatus.ACTIVE,
                 domain_name=domain_name,
                 resource_policy=user_resource_policy,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
             )
         )
         await db_sess.flush()

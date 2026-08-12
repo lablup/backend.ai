@@ -164,6 +164,7 @@ class TestPersistentNetworkNotRecreated:
                     status=UserStatus.ACTIVE,
                     domain_name=domain_name,
                     resource_policy=user_policy_name,
+                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 )
             )
             db_sess.add(

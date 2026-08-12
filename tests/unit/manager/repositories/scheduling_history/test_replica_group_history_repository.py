@@ -166,6 +166,7 @@ class TestReplicaGroupHistoryRepository:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                     name=domain_name,
                     description="Test domain",
                     is_active=True,

@@ -150,6 +150,7 @@ class TestSessionGroupRow:
             email=f"user-{uuid.uuid4().hex[:8]}@example.com",
             domain_name=domain.name,
             resource_policy=user_policy.name,
+            domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain.name),
         )
         project = GroupRow(
             id=uuid.uuid4(),

@@ -118,6 +118,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -311,6 +312,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
                 domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_user_resource_policy_name,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -533,6 +535,7 @@ class TestUpdateRouteStatusBulkWithHistory:
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -726,6 +729,7 @@ class TestUpdateRouteStatusBulkWithHistory:
                 domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_user_resource_policy_name,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -987,6 +991,7 @@ class TestDeploymentHistoryMergeLogic:
             # Create domain
             db_sess.add(
                 DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -1059,6 +1064,7 @@ class TestDeploymentHistoryMergeLogic:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy_name,
+                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 )
             )
 
@@ -1303,6 +1309,7 @@ class TestRouteHistoryMergeLogic:
             # Create domain
             db_sess.add(
                 DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -1375,6 +1382,7 @@ class TestRouteHistoryMergeLogic:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy_name,
+                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 )
             )
 

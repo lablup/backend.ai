@@ -1893,6 +1893,7 @@ async def scope_name_seed(
                     email=f"{username}@example.com",
                     domain_name=domain_name,
                     resource_policy=f"urp-{unique}",
+                    domain_id=domain_id,
                 ),
             ])
         yield _ScopeNameSeed(

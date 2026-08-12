@@ -314,6 +314,7 @@ class TestDoIdleCheck:
                     status=UserStatus.ACTIVE,
                     domain_name=domain_name,
                     resource_policy=user_resource_policy_name,
+                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 )
             )
             await db_sess.flush()

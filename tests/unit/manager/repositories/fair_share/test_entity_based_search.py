@@ -607,6 +607,7 @@ class TestSearchDomainFairSharesEntityBased:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                     name=domain_name,
                     description="Domain not in any RG",
                     is_active=True,

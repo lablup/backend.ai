@@ -69,7 +69,7 @@ async def domain_name(
     """Create DomainRow and return its name."""
     name = "test-domain"
     async with database_with_usage_tables.begin_session() as db_sess:
-        db_sess.add(DomainRow(name=name))
+        db_sess.add(DomainRow(id=uuid.uuid5(uuid.NAMESPACE_DNS, name), name=name))
     yield name
 
 
@@ -163,6 +163,7 @@ async def user_uuid(
                 password=password_info,
                 domain_name=domain_name,
                 resource_policy=user_resource_policy,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
             )
         )
     yield user_id

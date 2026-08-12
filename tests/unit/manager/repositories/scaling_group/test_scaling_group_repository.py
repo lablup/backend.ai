@@ -353,6 +353,7 @@ class TestScalingGroupRepositoryDB:
         async with db_with_cleanup.begin_session() as db_sess:
             # Create domain
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain),
                 name=test_domain,
                 description="Test domain for cascade delete",
                 is_active=True,

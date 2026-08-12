@@ -254,6 +254,7 @@ class TestAuthRepository:
                 role=UserRole.USER,
                 resource_policy=user_resource_policy.name,
                 need_password_change=False,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, default_domain.name),
             )
             db_sess.add(user)
             await db_sess.flush()

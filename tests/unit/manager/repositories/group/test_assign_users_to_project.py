@@ -107,6 +107,7 @@ class TestAssignUsersToProject:
         async with db_with_cleanup.begin_session() as session:
             session.add(
                 DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -129,6 +130,7 @@ class TestAssignUsersToProject:
         async with db_with_cleanup.begin_session() as session:
             session.add(
                 DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                     name=domain_name,
                     description="Other domain",
                     is_active=True,
@@ -224,6 +226,7 @@ class TestAssignUsersToProject:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=policy_name,
+                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 )
             )
             await VirtualScopeSeeder().seed_user_scope(session, user_uuid)
@@ -508,6 +511,7 @@ class TestUnassignUsersFromProject:
         async with db_with_cleanup.begin_session() as session:
             session.add(
                 DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -603,6 +607,7 @@ class TestUnassignUsersFromProject:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=policy_name,
+                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 )
             )
             await VirtualScopeSeeder().seed_user_scope(session, user_uuid)

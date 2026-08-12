@@ -222,6 +222,7 @@ class TestSearchRoles:
         async with db_with_rbac_tables.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                     name=domain_name,
                     description="domain for by_assigned_user_id test",
                     is_active=True,
@@ -257,6 +258,7 @@ class TestSearchRoles:
                         domain_name=domain_name,
                         role=UserRole.USER,
                         resource_policy=policy_name,
+                        domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                     )
                 )
             await db_sess.flush()

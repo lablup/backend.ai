@@ -120,7 +120,13 @@ class TestEndpointSearchInProject:
 
         async with db_with_cleanup.begin_session() as db_sess:
             # Domain
-            db_sess.add(DomainRow(name=domain_name, total_resource_slots=ResourceSlot()))
+            db_sess.add(
+                DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    name=domain_name,
+                    total_resource_slots=ResourceSlot(),
+                )
+            )
             await db_sess.flush()
 
             # Scaling group

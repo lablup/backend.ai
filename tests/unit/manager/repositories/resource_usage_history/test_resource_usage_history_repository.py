@@ -152,6 +152,7 @@ class TestResourceUsageHistoryRepository:
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Test domain for usage history",
                 is_active=True,
@@ -235,6 +236,7 @@ class TestResourceUsageHistoryRepository:
                 domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=policy_name,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
             )
             db_sess.add(user)
             await db_sess.commit()

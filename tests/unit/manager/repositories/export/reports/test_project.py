@@ -775,6 +775,7 @@ class TestProjectExportExecuteStreamingDB:
         async with db_engine.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                     name=domain_name,
                     description="",
                     is_active=True,
@@ -1049,6 +1050,7 @@ class TestGlobalContainerRegistryExport:
         async with db_engine.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                     name=domain_name,
                     description="",
                     is_active=True,

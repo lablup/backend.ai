@@ -203,6 +203,7 @@ class TestSessionRepository:
                 resource_policy=user_resource_policy.name,
                 allowed_client_ip=None,
                 totp_key=None,
+                domain_id=test_domain_id,
             )
             db_sess.add(user)
 
@@ -702,6 +703,7 @@ class TestBatchPopulateSessionOccupiedSlots:
                 resource_policy=user_resource_policy.name,
                 allowed_client_ip=None,
                 totp_key=None,
+                domain_id=test_domain_id,
             )
             db_sess.add(user)
 
@@ -989,6 +991,7 @@ class TestGetTemplateInfoById:
         async with db.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                     name=domain_name,
                     description="Test domain",
                     is_active=True,

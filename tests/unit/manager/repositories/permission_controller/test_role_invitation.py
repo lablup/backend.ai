@@ -104,6 +104,7 @@ async def domain_name(db: ExtendedAsyncSAEngine) -> str:
     async with db.begin_session() as s:
         s.add(
             DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, name),
                 name=name,
                 description="",
                 is_active=True,
@@ -158,6 +159,7 @@ async def _add_user(
                 domain_name=domain_name,
                 role=UserRole.USER,
                 resource_policy=policy,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
             )
         )
         await s.commit()

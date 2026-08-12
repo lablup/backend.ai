@@ -444,7 +444,11 @@ class TestContainerRegistryRepository:
         group_ids: list[str] = []
         async with db_with_cleanup.begin_session() as session:
             # Create domain
-            domain = DomainRow(name=domain_name, total_resource_slots=ResourceSlot())
+            domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                name=domain_name,
+                total_resource_slots=ResourceSlot(),
+            )
             session.add(domain)
 
             # Create project resource policy

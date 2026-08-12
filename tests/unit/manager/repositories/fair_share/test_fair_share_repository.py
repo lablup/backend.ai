@@ -250,6 +250,7 @@ class TestFairShareRepository:
                 domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=policy_name,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -420,6 +421,7 @@ class TestFairShareRepository:
         async with db_with_cleanup.begin_session() as db_sess:
             for name in domain_names:
                 domain = DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, name),
                     name=name,
                     description="Test domain",
                     is_active=True,
@@ -634,6 +636,7 @@ class TestFairShareRepository:
         # Create domain row (required for the fair share row's domain_name column)
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -762,6 +765,7 @@ class TestFairShareRepository:
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Domain not in any RG",
                 is_active=True,

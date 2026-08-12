@@ -110,6 +110,7 @@ class TestInvitationGettersUsernameFallback:
                 domain_name=domain_name,
                 role=UserRole.USER,
                 resource_policy=resource_policy,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
             )
             session.add(user)
             await session.flush()

@@ -1,3 +1,4 @@
+import uuid
 from collections.abc import AsyncGenerator
 from typing import Any
 from uuid import UUID, uuid4
@@ -111,6 +112,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Test domain for quota scope",
                 is_active=True,
@@ -133,6 +135,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Other test domain",
                 is_active=True,
@@ -194,6 +197,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
                 domain_name=test_domain_name,
                 role=UserRole.ADMIN,
                 resource_policy=test_resource_policy_name,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -228,6 +232,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
                 domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -262,6 +267,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
                 domain_name=other_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, other_domain_name),
             )
             db_sess.add(user)
             await db_sess.flush()

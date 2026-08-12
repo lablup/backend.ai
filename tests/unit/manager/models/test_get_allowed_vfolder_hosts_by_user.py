@@ -7,6 +7,7 @@ focus of this test module.
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncGenerator
 from uuid import UUID, uuid4
 
@@ -118,6 +119,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
                 DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, name),
                     name=name,
                     description="",
                     is_active=True,
@@ -185,6 +187,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_resource_policy,
+                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 )
             )
             await sess.flush()

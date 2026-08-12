@@ -24,6 +24,7 @@ is empty STILL resolves the user's accessible auto-mount vfolders into
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
@@ -151,6 +152,7 @@ class TestAutoMountVFolderResolution:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                     name=domain_name,
                     description="",
                     is_active=True,
@@ -224,6 +226,7 @@ class TestAutoMountVFolderResolution:
                     status=UserStatus.ACTIVE,
                     status_info="active",
                     resource_policy=test_user_resource_policy_name,
+                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
                 )
             )
             await db_sess.flush()

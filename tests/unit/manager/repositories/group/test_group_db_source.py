@@ -180,6 +180,7 @@ class TestGroupDBSourceDeleteEndpoints:
                 domain_name=test_domain,
                 role=UserRole.USER,
                 resource_policy=policy_name,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain),
             )
             session.add(user)
             await session.commit()

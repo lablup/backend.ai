@@ -139,6 +139,7 @@ class TestBulkUpsertDomainFairShare:
 
             for name in domain_names:
                 domain = DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, name),
                     name=name,
                     description="Test domain",
                     is_active=True,
@@ -182,6 +183,7 @@ class TestBulkUpsertDomainFairShare:
 
             for name in domain_names:
                 domain = DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, name),
                     name=name,
                     description="Test domain",
                     is_active=True,
@@ -237,6 +239,7 @@ class TestBulkUpsertDomainFairShare:
 
             for name in domain_names:
                 domain = DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, name),
                     name=name,
                     description="Test domain",
                     is_active=True,
@@ -443,6 +446,7 @@ class TestBulkUpsertProjectFairShare:
             db_sess.add(sg)
 
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -508,6 +512,7 @@ class TestBulkUpsertProjectFairShare:
             db_sess.add(sg)
 
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -694,6 +699,7 @@ class TestBulkUpsertUserFairShare:
             db_sess.add(sg)
 
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -751,6 +757,7 @@ class TestBulkUpsertUserFairShare:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy_name,
+                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 )
                 db_sess.add(user)
             await db_sess.commit()
@@ -791,6 +798,7 @@ class TestBulkUpsertUserFairShare:
             db_sess.add(sg)
 
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -848,6 +856,7 @@ class TestBulkUpsertUserFairShare:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy_name,
+                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 )
                 db_sess.add(user)
             await db_sess.flush()
@@ -900,6 +909,7 @@ class TestBulkUpsertUserFairShare:
             db_sess.add(sg)
 
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -957,6 +967,7 @@ class TestBulkUpsertUserFairShare:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy_name,
+                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 )
                 db_sess.add(user)
             await db_sess.commit()

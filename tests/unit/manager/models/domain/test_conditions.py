@@ -419,6 +419,7 @@ class TestDomainNestedSearchIntegration:
                 (domain_beta, False, "Archived department"),
             ]:
                 domain = DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                     name=domain_name,
                     description=desc,
                     is_active=is_active,
@@ -506,6 +507,7 @@ class TestDomainNestedSearchIntegration:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy.name,
+                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 )
                 session.add(user)
                 keypair_data.append((email, user_uuid))

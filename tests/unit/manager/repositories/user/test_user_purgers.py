@@ -319,6 +319,7 @@ class TestUserPurgersIntegration:
                 domain_name=sample_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, sample_domain.domain_name),
             )
             session.add(user)
             await session.flush()
@@ -688,6 +689,7 @@ class TestUserSessionGroupPurger:
             domain_name=domain.name,
             role=UserRole.USER,
             resource_policy=user_policy.name,
+            domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain.name),
         )
         project = GroupRow(
             id=uuid.uuid4(),

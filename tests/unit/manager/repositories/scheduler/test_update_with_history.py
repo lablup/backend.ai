@@ -226,6 +226,7 @@ class TestUpdateWithHistory:
                 status=UserStatus.ACTIVE,
                 domain_name=test_domain_name,
                 resource_policy=test_user_resource_policy_name,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
             )
             db_sess.add(user)
             await db_sess.flush()

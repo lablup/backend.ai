@@ -8,6 +8,7 @@ returned by the membership lookup.
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncGenerator
 from typing import Any
 from unittest.mock import AsyncMock
@@ -123,6 +124,7 @@ class TestShareVfolderWithUsersMembership:
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
                 DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, DOMAIN_NAME_FIXED),
                     name=DOMAIN_NAME_FIXED,
                     description="",
                     is_active=True,
@@ -234,6 +236,7 @@ class TestShareVfolderWithUsersMembership:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_resource_policy,
+                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 )
             )
             await sess.flush()
@@ -294,6 +297,7 @@ class TestShareVfolderWithUsersMembership:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_resource_policy,
+                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 )
             )
             sess.add(
@@ -337,6 +341,7 @@ class TestShareVfolderWithUsersMembership:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_resource_policy,
+                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 )
             )
             await sess.flush()
@@ -367,6 +372,7 @@ class TestShareVfolderWithUsersMembership:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_resource_policy,
+                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 )
             )
             sess.add(
@@ -457,6 +463,7 @@ class TestShareVfolderWithUsersMembership:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_resource_policy,
+                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 )
             )
             sess.add(

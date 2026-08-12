@@ -107,6 +107,7 @@ class TestSearchUsersAssignedToRole:
 
         async with db_with_tables.begin_session() as db_sess:
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, "test-domain"),
                 name="test-domain",
                 description="Test domain",
                 is_active=True,
@@ -144,6 +145,7 @@ class TestSearchUsersAssignedToRole:
                     resource_policy="test-policy",
                     status=UserStatus.ACTIVE,
                     need_password_change=False,
+                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, "test-domain"),
                 )
                 db_sess.add(user)
                 await db_sess.flush()

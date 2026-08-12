@@ -119,6 +119,7 @@ class TestDeploymentAutoScalingPolicyRow:
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -173,6 +174,7 @@ class TestDeploymentAutoScalingPolicyRow:
                 status=UserStatus.ACTIVE,
                 status_info="active",
                 resource_policy=test_user_resource_policy.name,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain.name),
             )
             db_sess.add(user)
             await db_sess.flush()

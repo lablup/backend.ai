@@ -96,7 +96,13 @@ async def db_with_cleanup(
 async def test_domain(db_with_cleanup: ExtendedAsyncSAEngine) -> str:
     name = f"test-domain-{uuid.uuid4().hex[:8]}"
     async with db_with_cleanup.begin_session() as sess:
-        sess.add(DomainRow(name=name, total_resource_slots=ResourceSlot()))
+        sess.add(
+            DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, name),
+                name=name,
+                total_resource_slots=ResourceSlot(),
+            )
+        )
         await sess.flush()
     return name
 

@@ -410,7 +410,13 @@ async def seed_data(
     Yields the database_engine for convenience.
     """
     async with database_engine.begin_session() as sess:
-        sess.add(DomainRow(name="default", total_resource_slots=ResourceSlot({})))
+        sess.add(
+            DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, "default"),
+                name="default",
+                total_resource_slots=ResourceSlot({}),
+            )
+        )
         sess.add(
             UserResourcePolicyRow(
                 name="default",

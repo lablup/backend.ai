@@ -94,7 +94,13 @@ class TestLegacyExtraMountsHydration:
     async def domain_name(self, db_with_cleanup: ExtendedAsyncSAEngine, suffix: str) -> str:
         name = f"d-{suffix}"
         async with db_with_cleanup.begin_session() as db_sess:
-            db_sess.add(DomainRow(name=name, total_resource_slots=ResourceSlot()))
+            db_sess.add(
+                DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, name),
+                    name=name,
+                    total_resource_slots=ResourceSlot(),
+                )
+            )
         return name
 
     @pytest.fixture

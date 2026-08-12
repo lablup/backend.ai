@@ -5,6 +5,7 @@ Tests the repository layer with real database operations.
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncGenerator, Callable, Coroutine
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -488,7 +489,8 @@ class TestImageRepositoryLastUsedAt:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> DomainRow:
-        domain = DomainRow(name=f"test-{uuid4()}")
+        name = f"test-{uuid4()}"
+        domain = DomainRow(id=uuid.uuid5(uuid.NAMESPACE_DNS, name), name=name)
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(domain)
             await db_sess.flush()
@@ -557,6 +559,7 @@ class TestImageRepositoryLastUsedAt:
             email=f"test-{uuid4().hex[:8]}@example.com",
             domain_name=domain.name,
             resource_policy=user_policy.name,
+            domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain.name),
         )
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(user)

@@ -186,6 +186,7 @@ class TestSessionUniqueNamePerUser:
             email=f"user-a-{uuid.uuid4().hex[:8]}@example.com",
             domain_name=domain.name,
             resource_policy=user_policy.name,
+            domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain.name),
         )
 
         async with database_with_tables.begin_session() as db_sess:
@@ -207,6 +208,7 @@ class TestSessionUniqueNamePerUser:
             email=f"user-b-{uuid.uuid4().hex[:8]}@example.com",
             domain_name=domain.name,
             resource_policy=user_policy.name,
+            domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain.name),
         )
 
         async with database_with_tables.begin_session() as db_sess:

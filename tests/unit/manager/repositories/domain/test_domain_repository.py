@@ -246,6 +246,7 @@ class TestDomainRepository:
         domain_name = f"inactive-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_default_resource_policies.begin_session() as session:
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Test domain for purging",
                 is_active=False,
@@ -267,6 +268,7 @@ class TestDomainRepository:
         domain_name = f"domain-with-user-{uuid.uuid4().hex[:8]}"
         async with db_with_default_resource_policies.begin_session() as session:
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Test domain with users",
                 is_active=False,
@@ -297,6 +299,7 @@ class TestDomainRepository:
                 domain_name=domain_name,
                 role=UserRole.USER,
                 resource_policy="default",
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
             )
             session.add(user)
             await session.commit()
@@ -310,6 +313,7 @@ class TestDomainRepository:
         domain_name = f"domain-with-group-{uuid.uuid4().hex[:8]}"
         async with db_with_default_resource_policies.begin_session() as session:
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Test domain with groups",
                 is_active=False,
@@ -409,6 +413,7 @@ class TestDomainRepository:
                 domain_name=domain_name,
                 role=UserRole.USER,
                 resource_policy="default",
+                domain_id=domain_id,
             )
             session.add(user)
 

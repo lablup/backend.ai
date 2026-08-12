@@ -7,6 +7,7 @@ See: https://github.com/lablup/backend.ai/pull/10482
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncGenerator
 from uuid import UUID, uuid4
 
@@ -148,6 +149,7 @@ class TestImagePermissionContextNonGlobalRegistry:
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
                 DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, DOMAIN_NAME),
                     name=DOMAIN_NAME,
                     is_active=True,
                     total_resource_slots=ResourceSlot(),
@@ -189,6 +191,7 @@ class TestImagePermissionContextNonGlobalRegistry:
                     domain_name=domain,
                     role=UserRole.USER,
                     resource_policy=USER_RESOURCE_POLICY_NAME,
+                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain),
                 )
             )
             await sess.commit()

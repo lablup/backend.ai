@@ -129,6 +129,7 @@ class TestSearchDomainScopes:
         async with db_with_scope_tables.begin_session() as db_sess:
             for name in domain_names:
                 domain = DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, name),
                     name=name,
                     description=f"Test domain: {name}",
                     is_active=True,
@@ -149,6 +150,7 @@ class TestSearchDomainScopes:
         async with db_with_scope_tables.begin_session() as db_sess:
             for name in domain_names:
                 domain = DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, name),
                     name=name,
                     description=f"Test domain: {name}",
                     is_active=True,
@@ -385,6 +387,7 @@ class TestSearchProjectScopes:
 
         async with db_with_scope_tables.begin_session() as db_sess:
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Test domain for projects",
                 is_active=True,
@@ -601,6 +604,7 @@ class TestSearchUserScopes:
 
         async with db_with_scope_tables.begin_session() as db_sess:
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Test domain for users",
                 is_active=True,
@@ -647,6 +651,7 @@ class TestSearchUserScopes:
                     resource_policy=policy_name,
                     status=UserStatus.ACTIVE,
                     need_password_change=False,
+                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 )
                 db_sess.add(user)
                 user_ids.append(user_id)
@@ -676,6 +681,7 @@ class TestSearchUserScopes:
                     resource_policy=policy_name,
                     status=UserStatus.ACTIVE,
                     need_password_change=False,
+                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 )
                 db_sess.add(user)
                 user_ids.append(user_id)
@@ -868,6 +874,7 @@ class TestSearchScopesEmptyResult:
         async with db_with_scope_tables.begin_session() as db_sess:
             for name in domain_names:
                 domain = DomainRow(
+                    id=uuid.uuid5(uuid.NAMESPACE_DNS, name),
                     name=name,
                     description=f"Test domain: {name}",
                     is_active=True,

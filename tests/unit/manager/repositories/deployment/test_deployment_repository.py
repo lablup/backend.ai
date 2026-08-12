@@ -399,6 +399,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -1487,6 +1488,7 @@ class TestDeploymentRevisionOperations:
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -1585,6 +1587,7 @@ class TestDeploymentRevisionOperations:
                 domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -2246,6 +2249,7 @@ class TestDeploymentPolicyOperations:
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -2344,6 +2348,7 @@ class TestDeploymentPolicyOperations:
                 domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -2579,6 +2584,7 @@ class TestSearchDeploymentPolicies:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -2665,6 +2671,7 @@ class TestSearchDeploymentPolicies:
                 domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -2965,6 +2972,7 @@ class TestRouteOperations:
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -3063,6 +3071,7 @@ class TestRouteOperations:
                 domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -3416,6 +3425,7 @@ class TestDeploymentRepositoryDuplicateName:
         """Create test domain."""
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, f"test-domain-{uuid.uuid4().hex[:8]}"),
                 name=f"test-domain-{uuid.uuid4().hex[:8]}",
                 description="Test domain",
                 is_active=True,
@@ -3547,6 +3557,7 @@ class TestDeploymentRepositoryDuplicateName:
                 domain_name=test_domain.name,
                 role=UserRole.USER,
                 resource_policy=default_user_policy.name,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain.name),
             )
             db_sess.add(user)
             await db_sess.commit()

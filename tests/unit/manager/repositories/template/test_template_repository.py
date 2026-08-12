@@ -87,6 +87,7 @@ class TestTemplateRepository:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as session:
             domain = DomainRow(
+                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -162,6 +163,7 @@ class TestTemplateRepository:
                 domain_name=test_domain,
                 role=UserRole.USER,
                 resource_policy=default_user_resource_policy,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain),
             )
             session.add(user)
             await session.commit()
@@ -190,6 +192,7 @@ class TestTemplateRepository:
                 domain_name=test_domain,
                 role=UserRole.SUPERADMIN,
                 resource_policy=default_user_resource_policy,
+                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain),
             )
             session.add(user)
             await session.commit()
