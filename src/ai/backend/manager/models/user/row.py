@@ -111,7 +111,7 @@ class UserRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "users"
 
     uuid: Mapped[UserID] = mapped_column(
-        "uuid", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "uuid", GUID(UserID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     username: Mapped[str] = mapped_column(
         "username", sa.String(length=64), unique=True, nullable=False
@@ -148,12 +148,12 @@ class UserRow(LifecycleTimestampsMixin, Base):
         "integration_id", sa.String(length=512), nullable=True
     )
     #: Deprecated: use ``domain_id``.
-    domain_name: Mapped[str] = mapped_column(
+    domain_name: Mapped[str | None] = mapped_column(
         "domain_name",
         sa.String(length=64),
         sa.ForeignKey("domains.name"),
         index=True,
-        nullable=False,
+        nullable=True,
     )
     domain_id: Mapped[DomainID] = mapped_column(
         "domain_id",
