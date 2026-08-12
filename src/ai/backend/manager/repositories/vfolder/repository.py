@@ -1072,8 +1072,6 @@ class VfolderRepository:
             user_row = await session.scalar(sa.select(UserRow).where(UserRow.uuid == user_id))
             if not user_row:
                 return None
-            if user_row.role is None or user_row.domain_name is None:
-                return None
             return user_row.role, user_row.domain_name
 
     @vfolder_repository_resilience.apply()
