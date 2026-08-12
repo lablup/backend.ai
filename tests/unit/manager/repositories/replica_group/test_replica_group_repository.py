@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.schema.deployment import (
@@ -71,6 +72,11 @@ from ai.backend.manager.repositories.replica_group.types import (
 )
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
+
+
+@pytest.fixture
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 def _running_route(
@@ -188,6 +194,7 @@ class TestReplicaGroupRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> DeploymentID:
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         user_policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
@@ -199,6 +206,7 @@ class TestReplicaGroupRepository:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -248,6 +256,7 @@ class TestReplicaGroupRepository:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy_name,
+                    domain_id=domain_id,
                 )
             )
             db_sess.add(

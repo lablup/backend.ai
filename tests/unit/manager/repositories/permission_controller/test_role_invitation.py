@@ -7,6 +7,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.actions.action.rbac_role_invitation import (
     CreateRoleInvitationByEmailAction,
@@ -49,6 +50,7 @@ from ai.backend.manager.repositories.permission_controller.db_source.db_source i
     PermissionDBSource,
 )
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 # ── shared fixtures ──────────────────────────────────────────────
 
@@ -99,11 +101,15 @@ async def db(
 
 
 @pytest.fixture
-async def domain_name(db: ExtendedAsyncSAEngine) -> str:
+async def domain_name(
+    db: ExtendedAsyncSAEngine,
+) -> DomainFixtureData:
+    domain_id = DomainID(uuid.uuid4())
     name = f"dom-{uuid.uuid4().hex[:8]}"
     async with db.begin_session() as s:
         s.add(
             DomainRow(
+                id=domain_id,
                 name=name,
                 description="",
                 is_active=True,
@@ -115,7 +121,7 @@ async def domain_name(db: ExtendedAsyncSAEngine) -> str:
             )
         )
         await s.commit()
-    return name
+    return DomainFixtureData(domain_name=DomainName(name), domain_id=domain_id)
 
 
 @pytest.fixture
@@ -137,7 +143,7 @@ async def user_policy(db: ExtendedAsyncSAEngine) -> str:
 
 async def _add_user(
     db: ExtendedAsyncSAEngine,
-    domain_name: str,
+    domain_name: DomainFixtureData,
     policy: str,
     pw: PasswordInfo,
     email: str,
@@ -155,9 +161,10 @@ async def _add_user(
                 description="",
                 status=UserStatus.ACTIVE,
                 status_info="",
-                domain_name=domain_name,
+                domain_name=domain_name.domain_name,
                 role=UserRole.USER,
                 resource_policy=policy,
+                domain_id=domain_name.domain_id,
             )
         )
         await s.commit()
@@ -167,7 +174,7 @@ async def _add_user(
 @pytest.fixture
 async def inviter(
     db: ExtendedAsyncSAEngine,
-    domain_name: str,
+    domain_name: DomainFixtureData,
     user_policy: str,
     password_info: PasswordInfo,
 ) -> uuid.UUID:
@@ -182,7 +189,7 @@ def invitee_email() -> str:
 @pytest.fixture
 async def invitee(
     db: ExtendedAsyncSAEngine,
-    domain_name: str,
+    domain_name: DomainFixtureData,
     user_policy: str,
     password_info: PasswordInfo,
     invitee_email: str,

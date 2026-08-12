@@ -24,6 +24,7 @@ is empty STILL resolves the user's accessible auto-mount vfolders into
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
@@ -33,7 +34,7 @@ import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.identifier.domain import DomainName
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.types import BinarySize, QuotaScopeID, ResourceSlot
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -77,6 +78,7 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -142,15 +144,17 @@ class TestAutoMountVFolderResolution:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+    ) -> DomainFixtureData:
+        domain_id = DomainID(uuid.uuid4())
         """Create a test domain that allows mounting on the noop host."""
         domain_name = f"test-domain-{uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="",
                     is_active=True,
@@ -160,7 +164,7 @@ class TestAutoMountVFolderResolution:
                 )
             )
             await db_sess.flush()
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def test_user_resource_policy_name(
@@ -205,7 +209,7 @@ class TestAutoMountVFolderResolution:
     async def test_user(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
     ) -> UUID:
         """Create a test user that owns the auto-mount vfolder."""
@@ -219,11 +223,12 @@ class TestAutoMountVFolderResolution:
                     password=_password_info(),
                     need_password_change=False,
                     full_name="Test User",
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     role=UserRole.USER,
                     status=UserStatus.ACTIVE,
                     status_info="active",
                     resource_policy=test_user_resource_policy_name,
+                    domain_id=test_domain.domain_id,
                 )
             )
             await db_sess.flush()
@@ -233,7 +238,7 @@ class TestAutoMountVFolderResolution:
     async def test_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_project_resource_policy_name: str,
     ) -> UUID:
         """Create a test group used as the session's project scope."""
@@ -245,7 +250,7 @@ class TestAutoMountVFolderResolution:
                     name=f"g-{group_id.hex[:6]}",
                     description="",
                     is_active=True,
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     resource_policy=test_project_resource_policy_name,
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts={NOOP_VFOLDER_HOST: ["mount-in-session"]},
@@ -258,7 +263,7 @@ class TestAutoMountVFolderResolution:
     async def automount_vfolder_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_user: UUID,
     ) -> UUID:
         """Create a dot-prefixed (auto-mount) vfolder owned by ``test_user``."""
@@ -268,7 +273,7 @@ class TestAutoMountVFolderResolution:
                 VFolderRow(
                     id=vfolder_id,
                     host=NOOP_VFOLDER_HOST,
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     quota_scope_id=QuotaScopeID.parse(f"user:{test_user}"),
                     name=AUTOMOUNT_VFOLDER_NAME,
                     creator=f"{test_user.hex[:6]}@example.com",
@@ -321,7 +326,7 @@ class TestAutoMountVFolderResolution:
     async def test_automount_resolved_without_explicit_mount_requests(
         self,
         scheduler_repository: SchedulerRepository,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_user: UUID,
         test_group: UUID,
         automount_vfolder_id: UUID,
@@ -342,7 +347,7 @@ class TestAutoMountVFolderResolution:
                 ),
             ),
             scope=SessionScopeDraft(
-                domain_name=DomainName(test_domain_name),
+                domain_name=DomainName(test_domain.domain_name),
                 project_id=ProjectID(test_group),
                 resource_group_name=None,
             ),

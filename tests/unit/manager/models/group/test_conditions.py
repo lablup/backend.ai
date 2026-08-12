@@ -11,6 +11,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
@@ -82,6 +83,11 @@ _WITH_TABLES: list[TableOrORM] = [
     RoutingRow,
     ResourcePresetRow,
 ]
+
+
+@pytest.fixture
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 class TestGroupConditionsDomainNestedFilters:
@@ -244,6 +250,7 @@ class TestGroupNestedSearchIntegration:
     async def two_domains_with_projects(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: DomainID,
     ) -> dict[str, list[uuid.UUID]]:
         """Create two domains (active/inactive) each with one project.
 
@@ -259,6 +266,7 @@ class TestGroupNestedSearchIntegration:
                 (inactive_domain, False, "Archived department"),
             ]:
                 domain = DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description=desc,
                     is_active=is_active,
@@ -581,6 +589,7 @@ class TestGroupUserNestedSearchIntegration:
     async def projects_with_users(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: DomainID,
     ) -> dict[str, dict[str, Any]]:
         """Create a domain with two projects, each associated with one user.
 
@@ -591,6 +600,7 @@ class TestGroupUserNestedSearchIntegration:
 
         async with db_with_cleanup.begin_session() as session:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,

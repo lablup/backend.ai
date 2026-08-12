@@ -73,6 +73,7 @@ from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.domain.updaters import DomainUpdaterSpec
 from ai.backend.manager.types import TriState
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 class TestDomainRepository:
@@ -240,12 +241,15 @@ class TestDomainRepository:
 
     @pytest.fixture
     async def inactive_domain(
-        self, db_with_default_resource_policies: ExtendedAsyncSAEngine
-    ) -> str:
+        self,
+        db_with_default_resource_policies: ExtendedAsyncSAEngine,
+    ) -> DomainFixtureData:
+        domain_id = DomainID(uuid.uuid4())
         """Create an inactive domain for purge testing."""
         domain_name = f"inactive-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_default_resource_policies.begin_session() as session:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain for purging",
                 is_active=False,
@@ -257,16 +261,18 @@ class TestDomainRepository:
             )
             session.add(domain)
             await session.commit()
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def domain_with_user(
         self, db_with_default_resource_policies: ExtendedAsyncSAEngine
     ) -> str:
         """Create an inactive domain with a user for purge testing."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"domain-with-user-{uuid.uuid4().hex[:8]}"
         async with db_with_default_resource_policies.begin_session() as session:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain with users",
                 is_active=False,
@@ -297,6 +303,7 @@ class TestDomainRepository:
                 domain_name=domain_name,
                 role=UserRole.USER,
                 resource_policy="default",
+                domain_id=domain_id,
             )
             session.add(user)
             await session.commit()
@@ -304,12 +311,13 @@ class TestDomainRepository:
 
     @pytest.fixture
     async def domain_with_group(
-        self, db_with_default_resource_policies: ExtendedAsyncSAEngine
+        self, db_with_default_resource_policies: ExtendedAsyncSAEngine, domain_id: DomainID
     ) -> str:
         """Create an inactive domain with a group for purge testing."""
         domain_name = f"domain-with-group-{uuid.uuid4().hex[:8]}"
         async with db_with_default_resource_policies.begin_session() as session:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain with groups",
                 is_active=False,
@@ -409,6 +417,7 @@ class TestDomainRepository:
                 domain_name=domain_name,
                 role=UserRole.USER,
                 resource_policy="default",
+                domain_id=domain_id,
             )
             session.add(user)
 
@@ -618,15 +627,17 @@ class TestDomainRepository:
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
-        inactive_domain: str,
+        inactive_domain: DomainFixtureData,
     ) -> None:
         """Test successful domain purging"""
         # Purge domain (should succeed since no users/groups/kernels)
-        await domain_repository.purge_domain(inactive_domain)
+        await domain_repository.purge_domain(inactive_domain.domain_name)
 
         # Verify domain is completely removed
         async with db_with_default_resource_policies.begin() as conn:
-            result = await conn.execute(sa.select(domains).where(domains.c.name == inactive_domain))
+            result = await conn.execute(
+                sa.select(domains).where(domains.c.name == inactive_domain.domain_name)
+            )
             domain_row = result.first()
             assert domain_row is None
 

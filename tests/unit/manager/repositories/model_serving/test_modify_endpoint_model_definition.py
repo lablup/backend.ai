@@ -18,7 +18,7 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.session_group import SessionGroupID
@@ -57,6 +57,7 @@ from ai.backend.manager.repositories.model_serving.repository import ModelServin
 from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
 from ai.backend.manager.types import TriState
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 OLD_MODEL_DEF = {
     "models": [{"name": "old-snapshot", "model_path": "/models/old"}],
@@ -104,12 +105,22 @@ class TestModifyEndpointModelDefinitionRefresh:
             yield database_connection
 
     @pytest.fixture()
-    async def test_domain(self, db_with_cleanup: ExtendedAsyncSAEngine) -> str:
+    async def test_domain(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> DomainFixtureData:
+        domain_id = DomainID(uuid.uuid4())
         name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as sess:
-            sess.add(DomainRow(name=name, total_resource_slots=ResourceSlot()))
+            sess.add(
+                DomainRow(
+                    id=domain_id,
+                    name=name,
+                    total_resource_slots=ResourceSlot(),
+                )
+            )
             await sess.flush()
-        return name
+        return DomainFixtureData(domain_name=DomainName(name), domain_id=domain_id)
 
     @pytest.fixture()
     async def test_scaling_group(self, db_with_cleanup: ExtendedAsyncSAEngine) -> str:
@@ -125,7 +136,7 @@ class TestModifyEndpointModelDefinitionRefresh:
 
     @pytest.fixture()
     async def test_user_id(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, test_domain: str
+        self, db_with_cleanup: ExtendedAsyncSAEngine, test_domain: DomainFixtureData
     ) -> uuid.UUID:
         user_id = uuid.uuid4()
         email = f"test-{uuid.uuid4().hex[:8]}@test.com"
@@ -151,7 +162,7 @@ class TestModifyEndpointModelDefinitionRefresh:
                         rounds=1,
                         salt_size=16,
                     ),
-                    domain_name=test_domain,
+                    domain_name=test_domain.domain_name,
                     resource_policy="default",
                     role=UserRole.SUPERADMIN,
                     status=UserStatus.ACTIVE,
@@ -190,7 +201,7 @@ class TestModifyEndpointModelDefinitionRefresh:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
     ) -> uuid.UUID:
         group_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as sess:
@@ -207,7 +218,7 @@ class TestModifyEndpointModelDefinitionRefresh:
                 GroupRow(
                     id=group_id,
                     name=f"test-grp-{uuid.uuid4().hex[:8]}",
-                    domain_name=test_domain,
+                    domain_name=test_domain.domain_name,
                     total_resource_slots=ResourceSlot(),
                     resource_policy="default",
                 )
@@ -253,7 +264,7 @@ class TestModifyEndpointModelDefinitionRefresh:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_user_id: uuid.UUID,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         test_group_id: uuid.UUID,
         test_scaling_group: str,
         test_image_id: uuid.UUID,
@@ -269,7 +280,7 @@ class TestModifyEndpointModelDefinitionRefresh:
                     name=f"test-ep-{uuid.uuid4().hex[:8]}",
                     created_user=test_user_id,
                     session_owner=test_user_id,
-                    domain=test_domain,
+                    domain=test_domain.domain_name,
                     project=test_group_id,
                     resource_group=test_scaling_group,
                     lifecycle_stage=EndpointLifecycle.READY,

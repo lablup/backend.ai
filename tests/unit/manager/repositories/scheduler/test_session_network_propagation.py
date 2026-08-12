@@ -51,6 +51,11 @@ from ai.backend.manager.repositories.scheduler.db_source.db_source import Schedu
 from ai.backend.testutils.db import with_tables
 
 
+@pytest.fixture
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
+
+
 class TestPersistentNetworkNotRecreated:
     @pytest.fixture
     async def db_with_cleanup(
@@ -164,6 +169,7 @@ class TestPersistentNetworkNotRecreated:
                     status=UserStatus.ACTIVE,
                     domain_name=domain_name,
                     resource_policy=user_policy_name,
+                    domain_id=domain_id,
                 )
             )
             db_sess.add(

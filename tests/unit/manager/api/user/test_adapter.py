@@ -520,7 +520,7 @@ class TestUserAdapterConversion:
         assert dto.container_gids == [1000, 1001]
 
     def test_convert_to_dto_with_nulls(self) -> None:
-        """Test converting UserData with optional fields as None"""
+        """Test converting UserData with every optional field as None"""
         user_id = uuid4()
 
         user_data = UserData(
@@ -537,7 +537,7 @@ class TestUserAdapterConversion:
             created_at=None,
             modified_at=None,
             domain_name="default",
-            domain_id=None,
+            domain_id=DomainID(uuid4()),
             role=DataUserRole.USER,
             resource_policy="default",
             allowed_client_ip=None,

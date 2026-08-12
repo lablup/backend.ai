@@ -7,6 +7,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
@@ -21,6 +22,7 @@ from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 _ORM_CLUSTER = (
     AgentRow,
@@ -69,11 +71,13 @@ class TestResolveGroupNameOrId:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+    ) -> DomainFixtureData:
+        domain_id = DomainID(uuid.uuid4())
         """Create a test domain."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as session:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -85,13 +89,13 @@ class TestResolveGroupNameOrId:
             )
             session.add(domain)
             await session.commit()
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def test_group_uuid(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         test_resource_policy: str,
     ) -> uuid.UUID:
         """Create a test group and return its UUID."""
@@ -102,7 +106,7 @@ class TestResolveGroupNameOrId:
                 name="test-group",
                 description="Test group",
                 is_active=True,
-                domain_name=test_domain,
+                domain_name=test_domain.domain_name,
                 total_resource_slots=ResourceSlot.from_user_input({"cpu": "2", "mem": "4g"}, None),
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
                 integration_id=None,
@@ -115,87 +119,93 @@ class TestResolveGroupNameOrId:
     async def test_resolve_with_uuid_object(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         test_group_uuid: uuid.UUID,
     ) -> None:
         """Test resolve_group_name_or_id() with uuid.UUID object input."""
         async with db_with_cleanup.begin_readonly() as conn:
-            result = await resolve_group_name_or_id(conn, test_domain, test_group_uuid)
+            result = await resolve_group_name_or_id(conn, test_domain.domain_name, test_group_uuid)
             assert result == test_group_uuid
 
     async def test_resolve_with_uuid_string(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         test_group_uuid: uuid.UUID,
     ) -> None:
         """Test resolve_group_name_or_id() with UUID string input (BA-5411 fix)."""
         uuid_string = str(test_group_uuid)
         async with db_with_cleanup.begin_readonly() as conn:
-            result = await resolve_group_name_or_id(conn, test_domain, uuid_string)
+            result = await resolve_group_name_or_id(conn, test_domain.domain_name, uuid_string)
             # Should resolve by ID, not by name
             assert result == test_group_uuid
 
     async def test_resolve_with_group_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         test_group_uuid: uuid.UUID,
     ) -> None:
         """Test resolve_group_name_or_id() with plain group name input."""
         group_name = "test-group"
         async with db_with_cleanup.begin_readonly() as conn:
-            result = await resolve_group_name_or_id(conn, test_domain, group_name)
+            result = await resolve_group_name_or_id(conn, test_domain.domain_name, group_name)
             # Should resolve by name
             assert result == test_group_uuid
 
     async def test_resolve_with_invalid_uuid_string_treated_as_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         test_group_uuid: uuid.UUID,
     ) -> None:
         """Test resolve_group_name_or_id() with invalid UUID-like string (treated as name)."""
         invalid_uuid_string = "550e8400-xxxx-41d4-a716-446655440000"
         async with db_with_cleanup.begin_readonly() as conn:
-            result = await resolve_group_name_or_id(conn, test_domain, invalid_uuid_string)
+            result = await resolve_group_name_or_id(
+                conn, test_domain.domain_name, invalid_uuid_string
+            )
             # Should be treated as a name (not found)
             assert result is None
 
     async def test_resolve_with_nonexistent_group_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         test_group_uuid: uuid.UUID,
     ) -> None:
         """Test resolve_group_name_or_id() with nonexistent group name."""
         async with db_with_cleanup.begin_readonly() as conn:
-            result = await resolve_group_name_or_id(conn, test_domain, "nonexistent-group")
+            result = await resolve_group_name_or_id(
+                conn, test_domain.domain_name, "nonexistent-group"
+            )
             # Should return None for nonexistent group
             assert result is None
 
     async def test_resolve_with_nonexistent_uuid(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         test_group_uuid: uuid.UUID,
     ) -> None:
         """Test resolve_group_name_or_id() with nonexistent UUID."""
         nonexistent_uuid = uuid.uuid4()
         async with db_with_cleanup.begin_readonly() as conn:
-            result = await resolve_group_name_or_id(conn, test_domain, nonexistent_uuid)
+            result = await resolve_group_name_or_id(conn, test_domain.domain_name, nonexistent_uuid)
             # Should return None for nonexistent UUID
             assert result is None
 
     async def test_resolve_with_nonexistent_uuid_string(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         test_group_uuid: uuid.UUID,
     ) -> None:
         """Test resolve_group_name_or_id() with nonexistent UUID string (BA-5411)."""
         nonexistent_uuid_string = str(uuid.uuid4())
         async with db_with_cleanup.begin_readonly() as conn:
-            result = await resolve_group_name_or_id(conn, test_domain, nonexistent_uuid_string)
+            result = await resolve_group_name_or_id(
+                conn, test_domain.domain_name, nonexistent_uuid_string
+            )
             # Should return None for nonexistent UUID string
             assert result is None

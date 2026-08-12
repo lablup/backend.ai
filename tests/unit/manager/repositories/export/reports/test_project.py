@@ -13,6 +13,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.api.rest.export.adapter import ExportAdapter
@@ -65,6 +66,11 @@ class _ProjectWithMixedRegistries:
     unassociated_project_id: uuid.UUID
     global_registry_id: uuid.UUID
     scoped_registry_id: uuid.UUID
+
+
+@pytest.fixture
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 class TestProjectReportDefinition:
@@ -763,6 +769,7 @@ class TestProjectExportExecuteStreamingDB:
     async def project_with_rg_and_registry(
         self,
         db_engine: ExtendedAsyncSAEngine,
+        domain_id: DomainID,
     ) -> AsyncGenerator[_ProjectWithRgAndRegistry, None]:
         """Create a project associated with a scaling group and a container registry."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -775,6 +782,7 @@ class TestProjectExportExecuteStreamingDB:
         async with db_engine.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="",
                     is_active=True,
@@ -1033,6 +1041,7 @@ class TestGlobalContainerRegistryExport:
     async def project_with_mixed_registries(
         self,
         db_engine: ExtendedAsyncSAEngine,
+        domain_id: DomainID,
     ) -> AsyncGenerator[_ProjectWithMixedRegistries, None]:
         """Create two projects: one with both global and scoped registries, one with no associations.
 
@@ -1049,6 +1058,7 @@ class TestGlobalContainerRegistryExport:
         async with db_engine.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="",
                     is_active=True,
