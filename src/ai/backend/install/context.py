@@ -2348,8 +2348,8 @@ class DockerContext(Context):
       its "half" network, with depends_on health gating), the redis address
       is the host's public IP + published port everywhere (it is shared
       across both network profiles via etcd), the manager API address
-      becomes ``host.docker.internal``, and bind addresses become
-      ``0.0.0.0``.
+      becomes the host's public facing address (the host-network manager
+      binds 0.0.0.0), and bind addresses become ``0.0.0.0``.
     - No running service mounts the install directory. The daemon-visible
       state lives under fixed system paths with host==container path parity:
       ``/var/lib/backend.ai`` + ``/tmp/backend.ai`` (agent) and
@@ -2389,10 +2389,6 @@ class DockerContext(Context):
     # fails fast when the share is not mounted). Covered by the
     # SYSTEM_STATE_PATH mount of the agent.
     KRUNNER_SHARED_PATH = Path("/var/lib/backend.ai/krunner")
-    # Alias for the host as seen from the bridge-networked service containers
-    # (mapped to the host gateway via `extra_hosts` on the webserver, the one
-    # bridge service that must reach a host-network process: the manager API).
-    HOST_ALIAS = "host.docker.internal"
     # Compose service DNS names of the halfstack members (same project via
     # the include: in the services compose file); bridge services address
     # them with the CONTAINER-side ports, not the host-published ones.
@@ -2462,7 +2458,7 @@ class DockerContext(Context):
             raise PrerequisiteError(
                 "DOCKER install mode requires a non-loopback public facing "
                 "address: the bridge-networked service containers reach the "
-                "shared redis through it.",
+                "shared redis and the manager API through it.",
                 instruction="Re-run with a routable host IP as the public facing address.",
             )
         if self.install_variable.with_harbor:
@@ -2859,9 +2855,8 @@ class DockerContext(Context):
 
         - halfstack and coordinator addresses become compose service DNS
           names with container-side ports (same project, same network),
-        - the manager API address (a host-network process) becomes
-          ``host.docker.internal`` — the webserver's ``extra_hosts`` entry
-          maps it to the host gateway, and
+        - the manager API address (a host-network process bound on 0.0.0.0)
+          becomes the host's public facing address, and
         - bind addresses become ``0.0.0.0`` so the published container ports
           actually receive traffic,
 
@@ -2890,7 +2885,10 @@ class DockerContext(Context):
                 data["otel"]["endpoint"] = f"http://{self.HALF_OTEL}:4317"
 
         def fixup_webserver(data: Any) -> None:
-            data["api"]["endpoint"] = f"http://{self.HOST_ALIAS}:{service.manager_addr.face.port}"
+            data["api"]["endpoint"] = (
+                f"http://{self.install_variable.public_facing_address}"
+                f":{service.manager_addr.face.port}"
+            )
             fixup_otel(data)
 
         def fixup_storage_proxy(data: Any) -> None:

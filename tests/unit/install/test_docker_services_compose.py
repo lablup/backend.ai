@@ -75,7 +75,6 @@ UID = 1000
 GID = 1001
 
 KRUNNER_SHARED_PATH = "/var/lib/backend.ai/krunner"
-HOST_GATEWAY_ALIAS = "host.docker.internal:host-gateway"
 
 
 @pytest.fixture
@@ -133,13 +132,10 @@ def test_rendered_compose_networking_split(template: str) -> None:
         else:
             assert "network_mode" not in service, f"{name} must stay on the bridge network"
             assert set(service["ports"]) == EXPECTED_PORTS[name], name
-        # Only the webserver talks to a host-network process (the manager
-        # API); everything else uses compose service DNS in the unified
-        # project, so no other service needs the host-gateway alias.
-        if name == "webserver":
-            assert HOST_GATEWAY_ALIAS in service["extra_hosts"]
-        else:
-            assert "extra_hosts" not in service, name
+        # Host-network processes (the manager API) and the shared redis are
+        # addressed by the host's public facing address, so no service
+        # needs a host-gateway alias.
+        assert "extra_hosts" not in service, name
 
 
 def test_rendered_compose_bridge_services_join_halfstack_network(template: str) -> None:
