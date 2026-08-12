@@ -195,11 +195,13 @@ addresses the deployment). Its contract:
 - Host networking is granted only to the manager and the agent (and the
   `manager-cli` one-off tool). The other services join the halfstack's
   `half` bridge network with published ports and `depends_on` health gating;
-  their generated configs get halfstack/coordinator addresses rewritten to
-  compose service DNS names (container-side ports), the manager API
-  rewritten to `host.docker.internal` (mapped via `extra_hosts:
-  host-gateway` on the webserver), and bind addresses forced to `0.0.0.0` —
-  while announce/advertised addresses are untouched.
+  their generated configs get DB/etcd addresses rewritten to compose
+  service DNS names (container-side ports), redis addressed by the host
+  public IP + published port everywhere (it is shared across both network
+  profiles via the etcd `config/redis/addr`), the manager API rewritten to
+  `host.docker.internal` (mapped via `extra_hosts: host-gateway` on the
+  webserver), and bind addresses forced to `0.0.0.0` — while
+  announce/advertised addresses are untouched.
 - **No running service mounts the install directory.** The daemon-visible
   state lives under fixed system paths with host==container path parity:
   `/var/lib/backend.ai` + `/tmp/backend.ai` (agent) and `/vfroot/local`
