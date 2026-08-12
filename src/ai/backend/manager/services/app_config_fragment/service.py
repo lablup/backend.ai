@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from ai.backend.common.data.app_config.types import MAX_APP_CONFIG_FRAGMENT_BYTES
+from ai.backend.common.json import dump_json
+from ai.backend.manager.errors.app_config import AppConfigFragmentTooLarge
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
@@ -53,6 +56,13 @@ class AppConfigFragmentService:
     async def bulk_upsert(
         self, action: BulkUpsertAppConfigFragmentsAction
     ) -> BulkUpsertAppConfigFragmentsActionResult:
+        for spec in action.upserter_specs:
+            config_size = len(dump_json(spec.config))
+            if config_size > MAX_APP_CONFIG_FRAGMENT_BYTES:
+                raise AppConfigFragmentTooLarge(
+                    f"App config {spec.config_name!r} is {config_size} bytes, over the "
+                    f"{MAX_APP_CONFIG_FRAGMENT_BYTES} byte limit."
+                )
         result = await self._repository.bulk_upsert(action.upserter_specs)
         return BulkUpsertAppConfigFragmentsActionResult(
             items=result.items, failed=result.failed, _scope=action.scope

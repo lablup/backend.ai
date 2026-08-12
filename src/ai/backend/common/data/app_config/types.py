@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import enum
+from typing import Final
 
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.common.identifier.app_config import AppConfigScopeID
 
-__all__ = ("AppConfigScopeType",)
+__all__ = (
+    "MAX_APP_CONFIG_FRAGMENT_BYTES",
+    "AppConfigScopeType",
+)
+
+#: Upper bound on one fragment's config document, measured on its compact JSON encoding.
+MAX_APP_CONFIG_FRAGMENT_BYTES: Final[int] = 64 * 1024
 
 
 class AppConfigScopeType(enum.StrEnum):

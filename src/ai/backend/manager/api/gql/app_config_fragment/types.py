@@ -12,7 +12,10 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
-from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import (
+    MAX_APP_CONFIG_FRAGMENT_BYTES,
+    AppConfigScopeType,
+)
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AppConfigFragmentFilter as AppConfigFragmentFilterDTO,
 )
@@ -85,7 +88,12 @@ __all__ = (
 )
 class AppConfigFragmentUpsertItemGQL(PydanticInputMixin[AppConfigFragmentUpsertItemDTO]):
     config_name: str = gql_field(description="Registered config name.")
-    config: JSON = gql_field(description="The fragment's JSON config document.")
+    config: JSON = gql_field(
+        description=(
+            "The fragment's JSON config document, at most "
+            f"{MAX_APP_CONFIG_FRAGMENT_BYTES} bytes once serialized."
+        )
+    )
 
 
 @gql_pydantic_input(
