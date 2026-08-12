@@ -23,6 +23,31 @@ __all__ = ["ScheduleResult"]
 
 
 @dataclass
+<<<<<<< HEAD
+=======
+class PreemptionPlanEntry:
+    """One session's preemption plan: it reserved its resources and the
+    listed victims must be preempted before it can start."""
+
+    session_id: SessionId
+    victim_session_ids: tuple[SessionId, ...]
+
+
+@dataclass
+class SchedulingSkip:
+    """A session that was not attempted this pass.
+
+    Distinct from a :class:`SchedulingFailure`: nothing was tried, so no
+    retry pressure (and no eventual deprioritization) may be charged to it.
+    """
+
+    session_id: SessionId
+    # Human-readable skip reason (transition reason / pending queue)
+    msg: str
+
+
+@dataclass
+>>>>>>> 99e8e59f (fix(BA-7328): stop scheduling past a resource-exhausted session (#13707))
 class ScheduleResult:
     """Result of a scheduling operation."""
 
@@ -31,6 +56,16 @@ class ScheduleResult:
     # Sessions whose scheduling attempt failed this pass (predicate failure,
     # no suitable agent, etc.), as reported by the provisioner.
     scheduling_failures: list[SchedulingFailure]
+<<<<<<< HEAD
+=======
+    # Sessions that reserved their resources via a preemption plan this pass.
+    reserved_session_ids: list[SessionId]
+    # The preemption plans backing those reservations.
+    preemption_plan: list[PreemptionPlanEntry]
+    # Sessions left unattempted because an earlier session exhausted the
+    # group's resources, in sequencing order.
+    scheduling_skips: list[SchedulingSkip] = field(default_factory=list)
+>>>>>>> 99e8e59f (fix(BA-7328): stop scheduling past a resource-exhausted session (#13707))
 
     def success_count(self) -> int:
         """Get the count of successfully scheduled sessions."""

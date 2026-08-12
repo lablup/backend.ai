@@ -39,11 +39,24 @@ from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.start_sessions impo
 from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.terminate_sessions import (
     TerminateSessionsLifecycleHandler,
 )
+<<<<<<< HEAD
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 
 if TYPE_CHECKING:
     pass
 
+=======
+from ai.backend.manager.sokovan.scheduler.results import ScheduleResult, SchedulingSkip
+from ai.backend.manager.views.sokovan.allocation import SchedulingFailure
+from ai.backend.manager.views.sokovan.lifecycle import (
+    SessionsForPullWithImages,
+    SessionsForStartWithImages,
+    SessionWithKernels,
+)
+from ai.backend.manager.views.sokovan.session import (
+    TerminatingSessionData,
+)
+>>>>>>> 99e8e59f (fix(BA-7328): stop scheduling past a resource-exhausted session (#13707))
 
 # =============================================================================
 # ScheduleSessionsLifecycleHandler Tests (SC-SS-001 ~ SC-SS-005)
@@ -247,6 +260,55 @@ class TestScheduleSessionsLifecycleHandler:
         }
         for skipped in result.skipped:
             assert skipped.reason == "not-scheduled-this-cycle"
+
+    async def test_unattempted_sessions_reported_as_skipped(
+        self,
+        handler: ScheduleSessionsLifecycleHandler,
+        mock_provisioner: AsyncMock,
+        mock_repository: AsyncMock,
+        pending_sessions_multiple: list[SessionWithKernels],
+    ) -> None:
+        """SC-SS-008: Sessions left unattempted behind a blocked one are skipped.
+
+        Given: Multiple PENDING sessions in the scaling group
+        When: Provisioner fails the first on exhausted resources and reports
+              the rest as skips
+        Then: Only the attempted session is a failure; the rest are skipped
+              with the provisioner's reason (no retry pressure charged)
+        """
+        # Arrange
+        blocked_session, *rest = pending_sessions_multiple
+        mock_repository.get_scheduling_data.return_value = MagicMock()
+        mock_provisioner.schedule_resource_group.return_value = ScheduleResult(
+            scheduled_session_ids=[],
+            scheduling_failures=[
+                SchedulingFailure(
+                    session_id=blocked_session.session_info.identity.id,
+                    msg="no agents can be allocated",
+                )
+            ],
+            reserved_session_ids=[],
+            preemption_plan=[],
+            scheduling_skips=[
+                SchedulingSkip(
+                    session_id=session.session_info.identity.id,
+                    msg="not attempted: resources exhausted",
+                )
+                for session in rest
+            ],
+        )
+
+        # Act
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), pending_sessions_multiple)
+
+        # Assert
+        assert len(result.successes) == 0
+        assert [f.session_id for f in result.failures] == [blocked_session.session_info.identity.id]
+        assert {s.session_id for s in result.skipped} == {
+            session.session_info.identity.id for session in rest
+        }
+        for skipped in result.skipped:
+            assert skipped.reason == "not attempted: resources exhausted"
 
     async def test_empty_session_list_returns_empty_result(
         self,
