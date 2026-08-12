@@ -528,7 +528,7 @@ class TestUserAdapterConversion:
             uuid=user_id,
             username="minimal",
             email="minimal@example.com",
-            need_password_change=None,
+            need_password_change=False,
             full_name=None,
             description=None,
             is_active=True,
@@ -538,10 +538,10 @@ class TestUserAdapterConversion:
             modified_at=None,
             domain_name=None,
             domain_id=None,
-            role=None,
+            role=DataUserRole.USER,
             resource_policy="default",
             allowed_client_ip=None,
-            totp_activated=None,
+            totp_activated=False,
             totp_activated_at=None,
             sudo_session_enabled=False,
             default_access_key=None,
@@ -557,7 +557,7 @@ class TestUserAdapterConversion:
         assert dto.id == user_id
         assert dto.username == "minimal"
         assert dto.email == "minimal@example.com"
-        assert dto.need_password_change is None
+        assert dto.need_password_change is False
         assert dto.full_name is None
         assert dto.description is None
         assert dto.status == UserStatusDTO.ACTIVE
@@ -565,10 +565,10 @@ class TestUserAdapterConversion:
         assert dto.created_at is None
         assert dto.modified_at is None
         assert dto.domain_name is None
-        assert dto.role is None
+        assert dto.role == UserRoleDTO.USER
         assert dto.resource_policy == "default"
         assert dto.allowed_client_ip is None
-        assert dto.totp_activated is None
+        assert dto.totp_activated is False
         assert dto.sudo_session_enabled is False
         assert dto.main_access_key is None
         assert dto.container_uid is None

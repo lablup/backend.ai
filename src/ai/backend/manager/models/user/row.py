@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import ipaddress
 import logging
-import uuid as uuid_mod
 from collections.abc import Sequence
 from datetime import datetime
 from typing import (
@@ -28,6 +27,7 @@ from sqlalchemy.sql.expression import SQLColumnExpression
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.scope import ScopeID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -110,8 +110,8 @@ def _get_default_keypair_join_condition() -> Any:
 class UserRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "users"
 
-    uuid: Mapped[uuid_mod.UUID] = mapped_column(
-        "uuid", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    uuid: Mapped[UserID] = mapped_column(
+        "uuid", GUID(UserID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     username: Mapped[str] = mapped_column(
         "username", sa.String(length=64), unique=True, nullable=False
@@ -120,8 +120,12 @@ class UserRow(LifecycleTimestampsMixin, Base):
         "email", sa.String(length=64), index=True, nullable=False, unique=True
     )
     password: Mapped[str | None] = mapped_column("password", PasswordColumn(), nullable=True)
-    need_password_change: Mapped[bool | None] = mapped_column(
-        "need_password_change", sa.Boolean, nullable=True
+    need_password_change: Mapped[bool] = mapped_column(
+        "need_password_change",
+        sa.Boolean,
+        server_default=sa.false(),
+        default=False,
+        nullable=False,
     )
     password_changed_at: Mapped[datetime] = mapped_column(
         "password_changed_at",
@@ -158,15 +162,15 @@ class UserRow(LifecycleTimestampsMixin, Base):
         index=True,
         nullable=True,
     )
-    role: Mapped[UserRole | None] = mapped_column(
-        "role", EnumValueType(UserRole), default=UserRole.USER, nullable=True
+    role: Mapped[UserRole] = mapped_column(
+        "role", EnumValueType(UserRole), default=UserRole.USER, nullable=False
     )
     allowed_client_ip: Mapped[
         list[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]] | None
     ] = mapped_column("allowed_client_ip", pgsql.ARRAY(IPColumn), nullable=True)
     totp_key: Mapped[str | None] = mapped_column("totp_key", sa.String(length=32), nullable=True)
-    totp_activated: Mapped[bool | None] = mapped_column(
-        "totp_activated", sa.Boolean, server_default=sa.false(), default=False, nullable=True
+    totp_activated: Mapped[bool] = mapped_column(
+        "totp_activated", sa.Boolean, server_default=sa.false(), default=False, nullable=False
     )
     totp_activated_at: Mapped[datetime | None] = mapped_column(
         "totp_activated_at", sa.DateTime(timezone=True), nullable=True

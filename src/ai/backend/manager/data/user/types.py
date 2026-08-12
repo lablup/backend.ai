@@ -72,7 +72,7 @@ class UserData:
     uuid: UUID = field(compare=False)  # legacy
     username: str
     email: str
-    need_password_change: bool | None
+    need_password_change: bool
     full_name: str | None
     description: str | None
     is_active: bool  # legacy
@@ -82,10 +82,10 @@ class UserData:
     modified_at: datetime | None = field(compare=False)
     domain_name: str | None
     domain_id: DomainID | None
-    role: UserRole | None
+    role: UserRole
     resource_policy: str
     allowed_client_ip: list[str] | None
-    totp_activated: bool | None
+    totp_activated: bool
     totp_activated_at: datetime | None = field(compare=False)
     sudo_session_enabled: bool
     default_access_key: str | None = field(compare=False)
