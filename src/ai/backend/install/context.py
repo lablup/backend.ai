@@ -2658,7 +2658,7 @@ class DockerContext(Context):
         # (/var/lib/backend.ai, /tmp/backend.ai, /vfroot/local) — the Docker
         # daemon creates missing bind-mount sources automatically, and the
         # storage-proxy's user-owned volume dir is chowned by a root one-off
-        # after the images are pulled. Only refuse an obviously hostile
+        # during configure(), once its config files exist to be mounted. Only refuse an obviously hostile
         # pre-existing krunner-share state here.
         if self.KRUNNER_SHARED_PATH.is_symlink():
             raise RuntimeError(
@@ -2684,8 +2684,6 @@ class DockerContext(Context):
                 f"Check that lablup/backend.ai-* images exist for version "
                 f"{self.dist_info.version}."
             )
-
-        await self._bootstrap_vfroot()
 
     async def _bootstrap_vfroot(self) -> None:
         """
@@ -2764,6 +2762,13 @@ class DockerContext(Context):
         # it to overwrite them with the real coordinator address and secret.
         await self.configure_appproxy_fixture()
         self.log_header("Preparing vfolder volumes...")
+        # The bootstrap runs a one-off container of the storage-proxy
+        # SERVICE, whose definition bind-mounts the generated config file and
+        # TLS directory — so it must run only after configure_storage_proxy()
+        # has written them (a compose run against missing bind-mount sources
+        # makes the Docker daemon create root-owned directories in their
+        # place, the same trap as the coordinator schema one-off).
+        await self._bootstrap_vfroot()
         await self.prepare_local_vfolder_host()
 
     @override
