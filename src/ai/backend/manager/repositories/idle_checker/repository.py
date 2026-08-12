@@ -3,15 +3,18 @@ from __future__ import annotations
 from collections.abc import Collection, Sequence
 
 from ai.backend.common.data.idle_checker.types import IdleCheckPhase
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
-from ai.backend.common.identifier.session import SessionID
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData, IdleCheckerData
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
+from ai.backend.manager.models.idle_checker.row import (
+    IdleCheckerBindingRow,
+    IdleCheckerRow,
+    SessionIdleCheckRow,
+)
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
+    BulkUpserter,
     Creator,
     Purger,
     Updater,
@@ -128,17 +131,15 @@ class IdleCheckerRepository:
 
     async def batch_exclude_session_idle_checks(
         self,
-        checker_id: IdleCheckerID,
-        session_ids: Sequence[SessionID],
+        upserter: BulkUpserter[SessionIdleCheckRow],
     ) -> SessionIdleCheckBatchResult:
-        return await self._db_source.batch_exclude_session_idle_checks(checker_id, session_ids)
+        return await self._db_source.batch_exclude_session_idle_checks(upserter)
 
     async def batch_include_session_idle_checks(
         self,
-        checker_id: IdleCheckerID,
-        session_ids: Sequence[SessionID],
+        upserter: BulkUpserter[SessionIdleCheckRow],
     ) -> SessionIdleCheckBatchResult:
-        return await self._db_source.batch_include_session_idle_checks(checker_id, session_ids)
+        return await self._db_source.batch_include_session_idle_checks(upserter)
 
     async def batch_apply_session_idle_check_judgments(
         self,

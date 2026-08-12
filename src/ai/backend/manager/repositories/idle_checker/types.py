@@ -13,7 +13,6 @@ import sqlalchemy as sa
 from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSpec, IdleCheckPhase
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
-from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.models.clauses import QueryCondition
@@ -82,11 +81,11 @@ class IdleCheckBatchData:
 
 @dataclass(frozen=True)
 class SessionIdleCheckBatchResult:
-    """Per-session outcome of a batch exclusion/inclusion: the sessions the write
+    """Per-pair outcome of a batch exclusion/inclusion: the pairs the write
     was applied to and, for each failed one, the exception saying why."""
 
-    success: Sequence[SessionID]
-    errors: Mapping[SessionID, Exception]
+    success: Sequence[SessionIdleCheckPair]
+    errors: Mapping[SessionIdleCheckPair, Exception]
 
 
 @dataclass(frozen=True)

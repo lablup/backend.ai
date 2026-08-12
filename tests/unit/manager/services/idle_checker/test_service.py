@@ -16,17 +16,33 @@ from ai.backend.common.data.idle_checker.types import (
     UtilizationThresholdEntry,
 )
 from ai.backend.common.exception import PrometheusQueryPresetInvalidLabel
+from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
-from ai.backend.common.types import SessionTypes
+from ai.backend.common.identifier.user import UserID
+from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
 from ai.backend.manager.repositories.base import Creator, Updater
 from ai.backend.manager.repositories.idle_checker.creators import IdleCheckerCreatorSpec
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
+from ai.backend.manager.repositories.idle_checker.types import (
+    SessionIdleCheckBatchResult,
+    SessionIdleCheckPair,
+)
 from ai.backend.manager.repositories.idle_checker.updaters import IdleCheckerUpdaterSpec
+from ai.backend.manager.repositories.idle_checker.upserters import (
+    SessionIdleCheckExcludeUpserterSpec,
+    SessionIdleCheckIncludeUpserterSpec,
+)
 from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
 from ai.backend.manager.services.idle_checker.actions.create import CreateIdleCheckerAction
+from ai.backend.manager.services.idle_checker.actions.exclude_sessions import (
+    ExcludeSessionIdleChecksAction,
+)
+from ai.backend.manager.services.idle_checker.actions.include_sessions import (
+    IncludeSessionIdleChecksAction,
+)
 from ai.backend.manager.services.idle_checker.actions.update import UpdateIdleCheckerAction
 from ai.backend.manager.services.idle_checker.service import IdleCheckerService
 from ai.backend.manager.types import OptionalState
@@ -191,3 +207,69 @@ class TestIdleCheckerSpecLabelValidation:
 
         preset_repository.get_by_id.assert_not_awaited()
         repository.update.assert_awaited_once()
+
+
+class TestSessionIdleCheckUpserterAssembly:
+    @pytest.fixture()
+    def repository(self) -> MagicMock:
+        repository = MagicMock(spec=IdleCheckerRepository)
+        empty_result = SessionIdleCheckBatchResult(success=[], errors={})
+        repository.batch_exclude_session_idle_checks = AsyncMock(return_value=empty_result)
+        repository.batch_include_session_idle_checks = AsyncMock(return_value=empty_result)
+        return repository
+
+    @pytest.fixture()
+    def service(self, repository: MagicMock) -> IdleCheckerService:
+        return IdleCheckerService(repository, MagicMock(spec=PrometheusQueryPresetRepository))
+
+    async def test_exclude_assembles_deduplicated_manual_specs(
+        self,
+        service: IdleCheckerService,
+        repository: MagicMock,
+    ) -> None:
+        checker_id = IdleCheckerID(uuid4())
+        user_id = UserID(uuid4())
+        first_pair = SessionIdleCheckPair(session_id=SessionId(uuid4()), checker_id=checker_id)
+        second_pair = SessionIdleCheckPair(session_id=SessionId(uuid4()), checker_id=checker_id)
+
+        await service.exclude_sessions(
+            ExcludeSessionIdleChecksAction(
+                targets=[first_pair, second_pair, first_pair],
+                user_id=user_id,
+            )
+        )
+
+        repository.batch_exclude_session_idle_checks.assert_awaited_once()
+        (upserter,) = repository.batch_exclude_session_idle_checks.await_args.args
+        assert [spec.session_id for spec in upserter.specs] == [
+            first_pair.session_id,
+            second_pair.session_id,
+        ]
+        for spec in upserter.specs:
+            assert isinstance(spec, SessionIdleCheckExcludeUpserterSpec)
+            assert spec.checker_id == checker_id
+            assert spec.user_id == user_id
+
+    async def test_include_assembles_include_specs(
+        self,
+        service: IdleCheckerService,
+        repository: MagicMock,
+    ) -> None:
+        checker_id = IdleCheckerID(uuid4())
+        user_id = UserID(uuid4())
+        pair = SessionIdleCheckPair(session_id=SessionId(uuid4()), checker_id=checker_id)
+
+        await service.include_sessions(
+            IncludeSessionIdleChecksAction(
+                targets=[pair],
+                user_id=user_id,
+            )
+        )
+
+        repository.batch_include_session_idle_checks.assert_awaited_once()
+        (upserter,) = repository.batch_include_session_idle_checks.await_args.args
+        spec = upserter.specs[0]
+        assert isinstance(spec, SessionIdleCheckIncludeUpserterSpec)
+        assert spec.session_id == pair.session_id
+        assert spec.checker_id == checker_id
+        assert spec.user_id == user_id

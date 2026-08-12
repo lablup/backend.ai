@@ -18,7 +18,6 @@ from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.idle_checker.types import (
@@ -33,7 +32,6 @@ from ai.backend.manager.errors.idle_checker import (
     IdleCheckerAssignmentScopeNotFound,
     IdleCheckerNotFound,
 )
-from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.group.row import GroupRow
@@ -83,12 +81,12 @@ from ai.backend.manager.repositories.idle_checker.types import (
     SessionIdleCheckPair,
 )
 from ai.backend.manager.repositories.idle_checker.updaters import (
-    SessionIdleCheckIncludeBatchUpdaterSpec,
     SessionIdleCheckJudgmentBatchUpdaterSpec,
     SessionIdleCheckPhaseBatchUpdaterSpec,
 )
 from ai.backend.manager.repositories.idle_checker.upserters import (
     SessionIdleCheckExcludeUpserterSpec,
+    SessionIdleCheckIncludeUpserterSpec,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
@@ -458,86 +456,69 @@ class IdleCheckerDBSource:
 
     async def batch_exclude_session_idle_checks(
         self,
-        checker_id: IdleCheckerID,
-        session_ids: Sequence[SessionID],
+        upserter: BulkUpserter[SessionIdleCheckRow],
     ) -> SessionIdleCheckBatchResult:
-        """Exclude the sessions' pairs, one savepoint-isolated upsert per row.
+        """Apply the pre-assembled exclusion upserts, one savepoint-isolated upsert per row.
 
-        Session existence is enforced per row by the session_id foreign key (the
-        spec maps the violation to SessionNotFound), so a failing row lands in
-        ``failed`` with its reason instead of failing the batch.
+        Session and checker existence are enforced per row by the foreign keys (the
+        spec maps the violations to SessionNotFound / IdleCheckerNotFound), so a
+        failing row lands in ``failed`` with its reason instead of failing the batch.
         """
         async with self._ops.write_ops() as w:
-            checker = await w.query(Querier(row_class=IdleCheckerRow, pk_value=checker_id))
-            if checker is None:
-                raise IdleCheckerNotFound(str(checker_id))
             result = await w.bulk_upsert_partial(
-                BulkUpserter(
-                    specs=[
-                        SessionIdleCheckExcludeUpserterSpec(
-                            session_id=session_id,
-                            checker_id=checker_id,
-                        )
-                        for session_id in dict.fromkeys(session_ids)
-                    ]
-                ),
+                upserter,
                 index_elements=["session_id", "idle_checker_id"],
             )
-            return SessionIdleCheckBatchResult(
-                success=[SessionID(row.session_id) for row in result.successes],
-                errors={
-                    cast(SessionIdleCheckExcludeUpserterSpec, error.spec).session_id: (
-                        error.exception
+            success: list[SessionIdleCheckPair] = []
+            for row in result.successes:
+                success.append(
+                    SessionIdleCheckPair(
+                        session_id=row.session_id,
+                        checker_id=row.idle_checker_id,
                     )
-                    for error in result.errors
-                },
-            )
+                )
+            errors: dict[SessionIdleCheckPair, Exception] = {}
+            for error in result.errors:
+                spec = cast(SessionIdleCheckExcludeUpserterSpec, error.spec)
+                pair = SessionIdleCheckPair(
+                    session_id=SessionId(spec.session_id),
+                    checker_id=spec.checker_id,
+                )
+                errors[pair] = error.exception
+            return SessionIdleCheckBatchResult(success=success, errors=errors)
 
     async def batch_include_session_idle_checks(
         self,
-        checker_id: IdleCheckerID,
-        session_ids: Sequence[SessionID],
+        upserter: BulkUpserter[SessionIdleCheckRow],
     ) -> SessionIdleCheckBatchResult:
-        """Re-include the existing sessions' pairs.
+        """Apply the pre-assembled re-inclusion upserts, one savepoint-isolated upsert per row.
 
-        Unknown session ids are reported as failed rather than failing the batch;
-        both partitions come back in request order, deduplicated.
+        Session and checker existence are enforced per row by the foreign keys (the
+        spec maps the violations to SessionNotFound / IdleCheckerNotFound), so a
+        failing row lands in ``failed`` with its reason instead of failing the batch.
         """
         async with self._ops.write_ops() as w:
-            checker = await w.query(Querier(row_class=IdleCheckerRow, pk_value=checker_id))
-            if checker is None:
-                raise IdleCheckerNotFound(str(checker_id))
-            querier = BatchQuerier(
-                pagination=NoPagination(),
-                conditions=[
-                    SessionConditions.by_ids([SessionId(session_id) for session_id in session_ids])
-                ],
+            result = await w.bulk_upsert_partial(
+                upserter,
+                index_elements=["session_id", "idle_checker_id"],
             )
-            rows = (await w.batch_query_in_global(sa.select(SessionRow.id), querier)).rows
-            existing = {SessionID(row.id) for row in rows}
-            unique_session_ids = list(dict.fromkeys(session_ids))
-            targets = [session_id for session_id in unique_session_ids if session_id in existing]
-            # Only rows exclusion wrote are reset, so re-including twice is a
-            # no-op, pairs without a row stay absent, and other phases are untouched.
-            for id_batch in batched(targets, _IDLE_CHECK_UPDATE_BATCH_SIZE):
-                pair_values = [(SessionId(session_id), checker_id) for session_id in id_batch]
-                await w.batch_update(
-                    BatchUpdater(
-                        spec=SessionIdleCheckIncludeBatchUpdaterSpec(),
-                        conditions=[
-                            SessionIdleCheckConditions.by_pairs(pair_values),
-                            SessionIdleCheckConditions.by_status_equals(IdleCheckPhase.EXCLUDED),
-                        ],
+            success: list[SessionIdleCheckPair] = []
+            for row in result.successes:
+                success.append(
+                    SessionIdleCheckPair(
+                        session_id=row.session_id,
+                        checker_id=row.idle_checker_id,
                     )
                 )
-            return SessionIdleCheckBatchResult(
-                success=targets,
-                errors={
-                    session_id: SessionNotFound(str(session_id))
-                    for session_id in unique_session_ids
-                    if session_id not in existing
-                },
-            )
+            errors: dict[SessionIdleCheckPair, Exception] = {}
+            for error in result.errors:
+                spec = cast(SessionIdleCheckIncludeUpserterSpec, error.spec)
+                pair = SessionIdleCheckPair(
+                    session_id=SessionId(spec.session_id),
+                    checker_id=spec.checker_id,
+                )
+                errors[pair] = error.exception
+            return SessionIdleCheckBatchResult(success=success, errors=errors)
 
     async def batch_apply_session_idle_check_judgments(
         self,
