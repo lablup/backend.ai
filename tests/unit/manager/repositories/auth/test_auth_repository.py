@@ -91,8 +91,8 @@ class ResourcePolicyTestData:
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 class TestAuthRepository:
@@ -613,7 +613,7 @@ class TestAuthRepository:
         default_domain: DomainTestData,
         keypair_resource_policy: ResourcePolicyTestData,
         signup_user_spec: UserCreatorSpec,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> None:
         result = await auth_repository.create_user_with_keypair(
             signup_user_spec,

@@ -7,6 +7,7 @@ from decimal import Decimal
 
 import pytest
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -34,8 +35,8 @@ from ai.backend.testutils.db import with_tables
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 @pytest.fixture
@@ -70,7 +71,7 @@ async def database_with_usage_tables(
 @pytest.fixture
 async def domain_name(
     database_with_usage_tables: ExtendedAsyncSAEngine,
-    domain_id: uuid.UUID,
+    domain_id: DomainID,
 ) -> AsyncGenerator[str, None]:
     """Create DomainRow and return its name."""
     name = "test-domain"

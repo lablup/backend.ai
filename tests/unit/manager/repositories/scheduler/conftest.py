@@ -102,8 +102,8 @@ _AGENT_ADDR = "127.0.0.1:6001"
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 @pytest.fixture

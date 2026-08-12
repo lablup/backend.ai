@@ -34,7 +34,7 @@ import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.identifier.domain import DomainName
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.types import BinarySize, QuotaScopeID, ResourceSlot
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -92,8 +92,8 @@ AUTOMOUNT_VFOLDER_NAME = ".config"
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 def _password_info() -> PasswordInfo:
@@ -151,7 +151,7 @@ class TestAutoMountVFolderResolution:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> str:
         """Create a test domain that allows mounting on the noop host."""
         domain_name = f"test-domain-{uuid4().hex[:8]}"

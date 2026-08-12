@@ -150,8 +150,8 @@ class DeploymentPolicyPurgerSpec(PurgerSpec[DeploymentPolicyRow]):
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 def create_test_password_info(password: str) -> PasswordInfo:
@@ -1487,7 +1487,7 @@ class TestDeploymentRevisionOperations:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> str:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -2249,7 +2249,7 @@ class TestDeploymentPolicyOperations:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> str:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -2587,7 +2587,7 @@ class TestSearchDeploymentPolicies:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> str:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
@@ -2974,7 +2974,7 @@ class TestRouteOperations:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> str:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -3430,7 +3430,7 @@ class TestDeploymentRepositoryDuplicateName:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> DomainRow:
         """Create test domain."""
         async with db_with_cleanup.begin_session() as db_sess:
@@ -3753,7 +3753,7 @@ class TestDeploymentRepositoryDuplicateName:
         test_scaling_group: ScalingGroupRow,
         test_user: UserRow,
         test_image_id: uuid.UUID,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> None:
         creator = self._create_endpoint_creator(
             name=f"placement-{uuid.uuid4().hex[:8]}",

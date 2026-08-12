@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.errors.deployment import (
@@ -39,11 +40,6 @@ class UserSeed:
     user_uuid: uuid.UUID
     domain_name: str
     keypairs: list[KeypairSpec]
-
-
-@pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
 
 
 class TestResolveUserAndActiveAccessKey:
@@ -81,6 +77,7 @@ class TestResolveUserAndActiveAccessKey:
         )
 
     async def _seed(self, db: ExtendedAsyncSAEngine, spec: UserSeed) -> None:
+        domain_id = DomainID(uuid.uuid4())
         domain_name = spec.domain_name
         user_policy = f"user-policy-{uuid.uuid4().hex[:8]}"
         kp_policy = f"kp-policy-{uuid.uuid4().hex[:8]}"

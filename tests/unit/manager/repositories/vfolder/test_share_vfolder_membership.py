@@ -16,6 +16,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import (
     BinarySize,
     ResourceSlot,
@@ -67,8 +68,8 @@ DOMAIN_NAME_FIXED = "test-domain-share"
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 def _password() -> PasswordInfo:
@@ -124,7 +125,7 @@ class TestShareVfolderWithUsersMembership:
 
     @pytest.fixture
     async def domain_name(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: uuid.UUID
+        self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: DomainID
     ) -> AsyncGenerator[str, None]:
         async with db_with_cleanup.begin_session() as sess:
             sess.add(

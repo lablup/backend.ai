@@ -20,6 +20,7 @@ import pytest
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -123,8 +124,8 @@ class _Routes:
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 class TestObserverCycleRouteScope:
@@ -152,7 +153,7 @@ class TestObserverCycleRouteScope:
 
     @pytest.fixture
     async def domain(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, suffix: str, domain_id: uuid.UUID
+        self, db_with_cleanup: ExtendedAsyncSAEngine, suffix: str, domain_id: DomainID
     ) -> str:
         name = f"d-{suffix}"
         async with db_with_cleanup.begin_session() as db_sess:

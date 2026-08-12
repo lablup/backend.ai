@@ -88,8 +88,8 @@ from ai.backend.testutils.db import with_tables
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 class TestGroupRepositoryCreateResourcePolicyValidation:
@@ -124,7 +124,7 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> str:
         """Create test domain."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -1388,7 +1388,7 @@ class TestGroupRowVFolderHostPermissionMap:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> str:
         """Create test domain."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"

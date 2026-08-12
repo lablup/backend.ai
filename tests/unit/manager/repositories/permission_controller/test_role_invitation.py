@@ -7,6 +7,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.actions.action.rbac_role_invitation import (
     CreateRoleInvitationByEmailAction,
@@ -54,8 +55,8 @@ from ai.backend.testutils.db import with_tables
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 @pytest.fixture
@@ -104,7 +105,7 @@ async def db(
 
 
 @pytest.fixture
-async def domain_name(db: ExtendedAsyncSAEngine, domain_id: uuid.UUID) -> str:
+async def domain_name(db: ExtendedAsyncSAEngine, domain_id: DomainID) -> str:
     name = f"dom-{uuid.uuid4().hex[:8]}"
     async with db.begin_session() as s:
         s.add(

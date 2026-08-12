@@ -65,8 +65,8 @@ NEW_MODEL_DEF = {"models": [{"name": "updated-from-disk"}]}
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 class TestModifyEndpointModelDefinitionRefresh:
@@ -109,9 +109,7 @@ class TestModifyEndpointModelDefinitionRefresh:
             yield database_connection
 
     @pytest.fixture()
-    async def test_domain(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: uuid.UUID
-    ) -> str:
+    async def test_domain(self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: DomainID) -> str:
         name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as sess:
             sess.add(

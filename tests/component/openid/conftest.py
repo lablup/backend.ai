@@ -31,6 +31,7 @@ from authlib.jose import jwt as jose_jwt  # pants: no-infer-dep
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import (
     ResourceSlot,
@@ -85,8 +86,8 @@ IDP_ISSUER = "https://idp.example.com"
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 @pytest.fixture(scope="session")
@@ -408,7 +409,7 @@ async def database_engine(
 @pytest.fixture
 async def seed_data(
     database_engine: ExtendedAsyncSAEngine,
-    domain_id: uuid.UUID,
+    domain_id: DomainID,
 ) -> AsyncIterator[ExtendedAsyncSAEngine]:
     """
     Insert the minimum seed data that the openid plugin's DB operations

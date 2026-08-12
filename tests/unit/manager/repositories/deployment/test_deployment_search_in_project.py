@@ -12,6 +12,7 @@ import pytest
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -62,11 +63,6 @@ class TestData:
     endpoint_ids_in_b: list[uuid.UUID]
 
 
-@pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
-
-
 class TestEndpointSearchInProject:
     """Test cases for search_deployments_in_project in DeploymentRepository."""
 
@@ -111,10 +107,10 @@ class TestEndpointSearchInProject:
     async def test_data(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
     ) -> AsyncGenerator[TestData, None]:
         """Create two projects with endpoints: 2 in project A, 1 in project B."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = DomainID(uuid.uuid4())
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         user_policy_name = f"test-upolicy-{uuid.uuid4().hex[:8]}"
         project_policy_name = f"test-ppolicy-{uuid.uuid4().hex[:8]}"

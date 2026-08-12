@@ -14,6 +14,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.data.permission.permission_defs import ImagePermission
@@ -60,8 +61,8 @@ _ORM_CLUSTER = (
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 class TestImagePermissionContextNonGlobalRegistry:
@@ -150,7 +151,7 @@ class TestImagePermissionContextNonGlobalRegistry:
             yield database_connection
 
     @pytest.fixture
-    async def domain(self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: uuid.UUID) -> str:
+    async def domain(self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: DomainID) -> str:
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
                 DomainRow(

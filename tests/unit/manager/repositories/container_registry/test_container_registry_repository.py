@@ -12,6 +12,7 @@ import sqlalchemy as sa
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.common.exception import ContainerRegistryGroupsAlreadyAssociated
 from ai.backend.common.identifier.container_registry import ContainerRegistryID
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
@@ -116,8 +117,8 @@ class _RegistryWithGroups:
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 class TestContainerRegistryRepository:
@@ -437,7 +438,7 @@ class TestContainerRegistryRepository:
 
     @pytest.fixture
     async def creator_spec_with_allowed_groups(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: uuid.UUID
+        self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: DomainID
     ) -> tuple[ContainerRegistryCreatorSpec, list[str]]:
         """Fixture that provides a creator spec with allowed_groups for creating registries."""
         registry_name = "registry-with-groups-" + str(uuid.uuid4())[:8]

@@ -13,6 +13,7 @@ import sqlalchemy as sa
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import AccessKey, BinarySize, ResourceSlot
@@ -61,8 +62,8 @@ from ai.backend.testutils.db import with_tables
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 def create_test_password_info(password: str) -> PasswordInfo:
@@ -117,7 +118,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> str:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -535,7 +536,7 @@ class TestUpdateRouteStatusBulkWithHistory:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> str:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"

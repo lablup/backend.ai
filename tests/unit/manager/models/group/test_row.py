@@ -7,6 +7,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
@@ -29,8 +30,8 @@ _ORM_CLUSTER = (
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 class TestResolveGroupNameOrId:
@@ -74,7 +75,7 @@ class TestResolveGroupNameOrId:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> str:
         """Create a test domain."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"

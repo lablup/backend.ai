@@ -46,8 +46,8 @@ class _OwnershipScope:
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 class TestSessionGroupSchema:
@@ -59,7 +59,7 @@ class TestSessionGroupSchema:
         assert columns["placement_direction"].nullable is False
         assert columns["placement_enforcement"].nullable is False
 
-    def test_ownership_axes_match_sessions_and_endpoints(self, domain_id: uuid.UUID) -> None:
+    def test_ownership_axes_match_sessions_and_endpoints(self, domain_id: DomainID) -> None:
         columns = SessionGroupRow.__table__.columns
 
         targets = {
@@ -180,7 +180,7 @@ class TestSessionGroupRow:
         )
 
     async def test_placement_policy_round_trips(
-        self, db: ExtendedAsyncSAEngine, scope: _OwnershipScope, domain_id: uuid.UUID
+        self, db: ExtendedAsyncSAEngine, scope: _OwnershipScope, domain_id: DomainID
     ) -> None:
         group_id = SessionGroupID(uuid.uuid4())
         async with db.begin_session() as sess:

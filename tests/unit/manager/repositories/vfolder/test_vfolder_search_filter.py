@@ -10,6 +10,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import BinarySize, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
@@ -36,11 +37,6 @@ from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.repositories.vfolder.types import UserVFolderOperationScope
 from ai.backend.testutils.db import with_tables
-
-
-@pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
 
 
 class TestVfolderSearchFilter:
@@ -92,6 +88,7 @@ class TestVfolderSearchFilter:
           - vf_shared_clone (cloneable=True, shared to user_a via permission)
           - vf_noclone_b (cloneable=False, NOT shared)
         """
+        domain_id = DomainID(uuid.uuid4())
         domain_name = "test-domain"
         user_a_id = uuid.uuid4()
         user_b_id = uuid.uuid4()

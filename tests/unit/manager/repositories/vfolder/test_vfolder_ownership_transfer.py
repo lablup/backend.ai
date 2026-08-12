@@ -15,6 +15,7 @@ from typing import NamedTuple
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import (
     BinarySize,
     ResourceSlot,
@@ -67,8 +68,8 @@ VFOLDER_HOST = "local:volume1"
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 class UserWithKeypair(NamedTuple):
@@ -120,7 +121,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> str:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:

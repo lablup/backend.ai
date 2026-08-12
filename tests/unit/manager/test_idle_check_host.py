@@ -113,8 +113,8 @@ _IDLE_ROWS: list[TableOrORM] = [
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 class _RecordingChecker(BaseIdleChecker):

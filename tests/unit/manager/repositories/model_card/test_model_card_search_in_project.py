@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.errors.common import GenericForbidden
@@ -53,8 +54,8 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 class TestSearchInProjectMembership:
@@ -96,7 +97,7 @@ class TestSearchInProjectMembership:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> DomainRow:
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(

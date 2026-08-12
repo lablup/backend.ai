@@ -15,6 +15,7 @@ import sqlalchemy as sa
 from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     BinarySize,
@@ -104,8 +105,8 @@ from ai.backend.testutils.db import with_tables
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 class TestVfolderRepository:
@@ -186,7 +187,7 @@ class TestVfolderRepository:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> AsyncGenerator[str, None]:
         """Create test domain and return domain name"""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -401,7 +402,7 @@ class TestVfolderRepositoryAllowedVfolderHosts:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> str:
         """Create test domain."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -680,7 +681,7 @@ class TestVfolderRepositoryPurge:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> str:
         """Create test domain."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -1062,7 +1063,7 @@ class TestVfolderRepositoryDeleteForever:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> str:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
@@ -1463,7 +1464,7 @@ class TestVfolderRepositoryDeleteForever:
         self,
         db: ExtendedAsyncSAEngine,
         domain_name: str,
-    ) -> uuid.UUID:
+    ) -> DomainID:
         async with db.begin_readonly_session() as session:
             return (
                 await session.execute(sa.select(DomainRow.id).where(DomainRow.name == domain_name))
@@ -1476,7 +1477,7 @@ class TestVfolderRepositoryDeleteForever:
         vfolder_id: uuid.UUID,
         quota_scope_id: str,
         domain_name: str,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
         group_id: uuid.UUID,
         user_id: uuid.UUID,
         sgroup_id: uuid.UUID,
@@ -1568,7 +1569,7 @@ class TestVfolderRepositoryDeleteForever:
         vfolder_id: uuid.UUID,
         quota_scope_id: str,
         domain_name: str,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
         group_id: uuid.UUID,
         user_id: uuid.UUID,
         sgroup_id: uuid.UUID,

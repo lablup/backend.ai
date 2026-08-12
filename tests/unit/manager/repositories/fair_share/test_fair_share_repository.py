@@ -71,8 +71,8 @@ RESOURCE_GROUP_ID = ResourceGroupID(uuid.uuid4())
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 class TestFairShareRepository:
@@ -418,7 +418,7 @@ class TestFairShareRepository:
         fair_share_repository: FairShareRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group: str,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> None:
         """Test searching domain fair shares with BatchQuerier"""
         # Create multiple domain fair shares
@@ -629,7 +629,7 @@ class TestFairShareRepository:
         self,
         fair_share_repository: FairShareRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> None:
         """Test upsert domain fair share when scaling group does not exist.
 
@@ -766,7 +766,7 @@ class TestFairShareRepository:
     async def domain_not_in_rg(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> str:
         """Create a domain NOT associated with any scaling group."""
         domain_name = f"no-rg-domain-{uuid.uuid4().hex[:8]}"

@@ -76,8 +76,8 @@ from ai.backend.testutils.db import with_tables
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 class TestDomainRepository:
@@ -245,7 +245,7 @@ class TestDomainRepository:
 
     @pytest.fixture
     async def inactive_domain(
-        self, db_with_default_resource_policies: ExtendedAsyncSAEngine, domain_id: uuid.UUID
+        self, db_with_default_resource_policies: ExtendedAsyncSAEngine, domain_id: DomainID
     ) -> str:
         """Create an inactive domain for purge testing."""
         domain_name = f"inactive-domain-{uuid.uuid4().hex[:8]}"
@@ -312,7 +312,7 @@ class TestDomainRepository:
 
     @pytest.fixture
     async def domain_with_group(
-        self, db_with_default_resource_policies: ExtendedAsyncSAEngine, domain_id: uuid.UUID
+        self, db_with_default_resource_policies: ExtendedAsyncSAEngine, domain_id: DomainID
     ) -> str:
         """Create an inactive domain with a group for purge testing."""
         domain_name = f"domain-with-group-{uuid.uuid4().hex[:8]}"

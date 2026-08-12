@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import (
     BinarySize,
     QuotaScopeID,
@@ -57,11 +58,6 @@ from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-
-
-@pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
 
 
 def _password_info() -> PasswordInfo:
@@ -165,6 +161,7 @@ class TestPrepareVFolderMountsSubpathFlow:
 
         Yields ``(user_uuid, domain_name, group_id, vfolder_id)``.
         """
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid4().hex[:8]}"
         user_policy_name = f"test-user-pol-{uuid4().hex[:8]}"
         project_policy_name = f"test-proj-pol-{uuid4().hex[:8]}"

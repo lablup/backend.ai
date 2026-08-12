@@ -70,8 +70,8 @@ class SessionTestData:
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 @pytest.fixture
@@ -963,7 +963,7 @@ class TestGetTemplateInfoById:
 
     @pytest.fixture
     async def active_template(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: uuid.UUID
+        self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: DomainID
     ) -> tuple[uuid.UUID, str]:
         """Insert an active session_template. Returns (template_id, name)."""
         return await self._create_template(
@@ -972,7 +972,7 @@ class TestGetTemplateInfoById:
 
     @pytest.fixture
     async def inactive_template(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: uuid.UUID
+        self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: DomainID
     ) -> tuple[uuid.UUID, str]:
         """Insert an inactive session_template. Returns (template_id, name)."""
         return await self._create_template(
@@ -985,7 +985,7 @@ class TestGetTemplateInfoById:
         *,
         is_active: bool,
         name: str,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> tuple[uuid.UUID, str]:
         """Create prerequisite rows and insert a session_template.
 

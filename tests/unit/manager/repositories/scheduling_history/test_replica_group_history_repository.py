@@ -20,6 +20,7 @@ from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     ReplicaGroupHistoryOrderField,
 )
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
@@ -94,11 +95,6 @@ class _IdConditionCase:
     expected_count: Callable[[_ReplicaGroupHistorySeed], int]
 
 
-@pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
-
-
 class TestReplicaGroupHistoryRepository:
     """Test cases for the replica-group history searches (read-only)"""
 
@@ -145,7 +141,6 @@ class TestReplicaGroupHistoryRepository:
     async def replica_group_history_seed(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
     ) -> _ReplicaGroupHistorySeed:
         """Seed a deployment, two replica groups, and a fixed set of history rows.
 
@@ -154,6 +149,7 @@ class TestReplicaGroupHistoryRepository:
         project, scaling group and user the endpoint points at.
         """
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = DomainID(uuid.uuid4())
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         user_policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
         project_policy_name = f"test-proj-policy-{uuid.uuid4().hex[:8]}"

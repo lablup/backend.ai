@@ -22,6 +22,7 @@ from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiv
 from ai.backend.common.config import DefaultModelDefinition, ModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.session_group import SessionGroupID
@@ -60,8 +61,8 @@ from ai.backend.testutils.db import with_tables
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 @pytest.fixture
@@ -98,7 +99,7 @@ async def db_with_cleanup(
 
 
 @pytest.fixture
-async def test_domain(db_with_cleanup: ExtendedAsyncSAEngine, domain_id: uuid.UUID) -> str:
+async def test_domain(db_with_cleanup: ExtendedAsyncSAEngine, domain_id: DomainID) -> str:
     name = f"test-domain-{uuid.uuid4().hex[:8]}"
     async with db_with_cleanup.begin_session() as sess:
         sess.add(

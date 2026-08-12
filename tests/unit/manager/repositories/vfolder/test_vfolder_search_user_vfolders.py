@@ -11,6 +11,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import BinarySize, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
@@ -37,11 +38,6 @@ from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.repositories.vfolder.types import UserVFolderOperationScope
 from ai.backend.testutils.db import with_tables
-
-
-@pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
 
 
 class TestVfolderSearchUserVfolders:
@@ -83,6 +79,7 @@ class TestVfolderSearchUserVfolders:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
         """Create two users with vfolders: user_a has 2 vfolders, user_b has 1 (all GROUP-owned)."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = "test-domain"
         user_a_id = uuid.uuid4()
         user_b_id = uuid.uuid4()
@@ -307,6 +304,7 @@ class TestVfolderSearchUserVfolders:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
         """Create a user with both USER-owned and GROUP-owned vfolders."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = "test-domain"
         user_id = uuid.uuid4()
         project_id = uuid.uuid4()
@@ -505,6 +503,7 @@ class TestVfolderSearchUserVfolders:
         - vfolder_shared: owned by user_b, user_a has READ_ATTRIBUTE permission
         - vfolder_no_access: owned by user_b, user_a has no permission
         """
+        domain_id = DomainID(uuid.uuid4())
         domain_name = "test-domain"
         user_a_id = uuid.uuid4()
         user_b_id = uuid.uuid4()

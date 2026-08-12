@@ -12,6 +12,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -54,8 +55,8 @@ from ai.backend.testutils.db import with_tables
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 def create_test_password_info(password: str) -> PasswordInfo:
@@ -118,7 +119,7 @@ class TestDeploymentAutoScalingPolicyRow:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> AsyncGenerator[DomainRow, None]:
         """Create test domain."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"

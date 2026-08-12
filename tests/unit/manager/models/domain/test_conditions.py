@@ -10,6 +10,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
@@ -51,11 +52,6 @@ from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.domain.db_source import DomainDBSource
 from ai.backend.testutils.db import TableOrORM, with_tables
-
-
-@pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
 
 
 def _make_password_info() -> PasswordInfo:
@@ -414,6 +410,7 @@ class TestDomainNestedSearchIntegration:
 
         Returns mapping of domain_name -> {project_name, username, email}.
         """
+        domain_id = DomainID(uuid.uuid4())
         domain_alpha = f"domain-alpha-{uuid.uuid4().hex[:8]}"
         domain_beta = f"domain-beta-{uuid.uuid4().hex[:8]}"
         result: dict[str, dict[str, str]] = {}

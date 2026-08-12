@@ -8,6 +8,7 @@ from collections.abc import AsyncGenerator
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
@@ -58,8 +59,8 @@ from ai.backend.testutils.db import with_tables
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 class TestRoleAssignment:
@@ -112,9 +113,7 @@ class TestRoleAssignment:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: uuid.UUID
-    ) -> str:
+    async def test_domain(self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: DomainID) -> str:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as session:
             session.add(

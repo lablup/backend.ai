@@ -79,8 +79,8 @@ EMPTY_RESOURCE_GROUP_ID = ResourceGroupID(uuid.uuid4())
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 class TestSearchDomainFairSharesEntityBased:
@@ -251,7 +251,7 @@ class TestSearchDomainFairSharesEntityBased:
     async def two_scaling_groups_with_domains(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> TwoScalingGroupsFixture:
         """Create two scaling groups, each with one domain."""
         rg1 = f"rg1-{uuid.uuid4().hex[:8]}"
@@ -534,7 +534,7 @@ class TestSearchDomainFairSharesEntityBased:
         fair_share_repository: FairShareRepository,
         scaling_group: str,
         domain_without_record: str,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> None:
         """RG-context domain_name filter should include entities without fair share records.
 
@@ -608,7 +608,7 @@ class TestSearchDomainFairSharesEntityBased:
     async def domain_not_in_rg(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> str:
         """Create a domain NOT associated with any scaling group."""
         domain_name = f"no-rg-domain-{uuid.uuid4().hex[:8]}"

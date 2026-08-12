@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.login_session_types import (
@@ -52,11 +53,6 @@ class SampleUserData:
     access_key: str
 
 
-@pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
-
-
 class TestLoginSessionForce:
     """Tests for verify_credential and create_login_session with force option."""
 
@@ -88,6 +84,7 @@ class TestLoginSessionForce:
         self, db_with_cleanup: ExtendedAsyncSAEngine
     ) -> AsyncGenerator[SampleUserData, None]:
         """Create a user with domain, resource policies, and keypair."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4()}"
         user_uuid = uuid.uuid4()
         email = f"test-{uuid.uuid4()}@example.com"

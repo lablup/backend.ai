@@ -10,6 +10,7 @@ from decimal import Decimal
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.domain import DomainRow
@@ -79,8 +80,8 @@ class UserFairShareTestContext:
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 class TestBulkUpsertDomainFairShare:
@@ -123,7 +124,7 @@ class TestBulkUpsertDomainFairShare:
     async def context_all_new_domains(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> DomainFairShareTestContext:
         """Scenario: All domains are new (no existing fair share records)."""
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
@@ -167,7 +168,7 @@ class TestBulkUpsertDomainFairShare:
     async def context_all_existing_domains(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> DomainFairShareTestContext:
         """Scenario: All domains already have fair share records."""
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
@@ -223,7 +224,7 @@ class TestBulkUpsertDomainFairShare:
     async def context_mixed_domains(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> DomainFairShareTestContext:
         """Scenario: Mix of new and existing domains."""
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
@@ -433,7 +434,7 @@ class TestBulkUpsertProjectFairShare:
     async def context_all_new_projects(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> ProjectFairShareTestContext:
         """Scenario: All projects are new (no existing fair share records)."""
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
@@ -499,7 +500,7 @@ class TestBulkUpsertProjectFairShare:
     async def context_all_existing_projects(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> ProjectFairShareTestContext:
         """Scenario: All projects already have fair share records."""
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"

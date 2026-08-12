@@ -12,6 +12,7 @@ import pytest
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -59,8 +60,8 @@ from ai.backend.testutils.db import with_tables
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 def create_test_password_info(password: str = "test_password") -> PasswordInfo:
@@ -127,7 +128,7 @@ class TestSearchDomainScopes:
     async def sample_domains(
         self,
         db_with_scope_tables: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> list[str]:
         """Create sample domains for testing."""
         domain_names = ["test-domain-alpha", "test-domain-beta", "prod-domain"]
@@ -149,7 +150,7 @@ class TestSearchDomainScopes:
     async def sample_domains_for_pagination(
         self,
         db_with_scope_tables: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> list[str]:
         """Create 15 sample domains for pagination testing."""
         domain_names = [f"domain-{i:02d}" for i in range(15)]
@@ -387,7 +388,7 @@ class TestSearchProjectScopes:
     async def sample_domain_with_policy(
         self,
         db_with_scope_tables: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> tuple[str, str]:
         """Create a sample domain and project resource policy for projects."""
         domain_name = "test-domain-for-projects"
@@ -605,7 +606,7 @@ class TestSearchUserScopes:
     async def sample_domain_with_user_policy(
         self,
         db_with_scope_tables: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> tuple[str, str]:
         """Create a sample domain and user resource policy for users."""
         domain_name = "test-domain-for-users"
@@ -876,7 +877,7 @@ class TestSearchScopesEmptyResult:
     async def sample_domains(
         self,
         db_with_scope_tables: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> list[str]:
         """Create sample domains for testing."""
         domain_names = ["test-domain-alpha", "test-domain-beta", "prod-domain"]

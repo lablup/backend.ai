@@ -22,6 +22,7 @@ from ai.backend.common.data.permission.types import (
     RBACElementType,
     ScopeType,
 )
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.models.agent import AgentRow
@@ -73,11 +74,6 @@ class CreatedRole:
     role_id: uuid.UUID
     role_name: str
     created_at: datetime
-
-
-@pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
 
 
 class TestSearchRoles:
@@ -212,6 +208,7 @@ class TestSearchRoles:
 
         Returns ``(assigned_user_id, unassigned_user_id, created_roles)``.
         """
+        domain_id = DomainID(uuid.uuid4())
         assigned_user_id = uuid.uuid4()
         unassigned_user_id = uuid.uuid4()
 

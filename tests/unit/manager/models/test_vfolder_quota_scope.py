@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import BinarySize, QuotaScopeID, ResourceSlot
 from ai.backend.manager.data.permission.types import (
     EntityType as PermissionEntityType,
@@ -57,8 +58,8 @@ from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
 
 
 @pytest.fixture
-def domain_id() -> uuid.UUID:
-    return uuid.uuid4()
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
 
 
 class TestEnsureQuotaScopeAccessibleByUser:
@@ -111,7 +112,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> AsyncGenerator[str, None]:
         """Create test domain and return domain name"""
         domain_name = f"test-domain-{uuid4().hex[:8]}"
@@ -135,7 +136,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
     async def other_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: uuid.UUID,
+        domain_id: DomainID,
     ) -> AsyncGenerator[str, None]:
         """Create other test domain and return domain name"""
         domain_name = f"test-domain-{uuid4().hex[:8]}"
