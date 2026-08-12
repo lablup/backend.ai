@@ -491,7 +491,7 @@ class IdleCheckerDBSource:
         self,
         upserter: BulkUpserter[SessionIdleCheckRow],
     ) -> SessionIdleCheckBatchResult:
-        """Apply the pre-assembled re-inclusion upserts, one savepoint-isolated upsert per row.
+        """Apply the pre-assembled inclusion upserts, one savepoint-isolated upsert per row.
 
         Session and checker existence are enforced per row by the foreign keys (the
         spec maps the violations to SessionNotFound / IdleCheckerNotFound), so a

@@ -50,7 +50,7 @@ class IncludeSessionIdleChecksActionResult(BaseBulkActionResult):
             BulkEntityResult(
                 entity_id=pair.session_id,
                 status=OperationStatus.SUCCESS,
-                description=f"Re-included into idle checks by checker {pair.checker_id}.",
+                description=f"Included into idle checks by checker {pair.checker_id}.",
                 error_code=None,
             )
             for pair in self.success
