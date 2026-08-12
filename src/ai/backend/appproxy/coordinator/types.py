@@ -172,8 +172,8 @@ class CircuitManager:
         )
         try:
             evt = AppProxyCircuitCreatedEvent(
-                authority,
-                [SerializableCircuit(**circuit.dump_model())],
+                target_worker_authority=authority,
+                circuits=[SerializableCircuit(**circuit.dump_model())],
             )
             await self.event_producer.broadcast_event(evt)
             try:

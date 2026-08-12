@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncGenerator
-from dataclasses import dataclass
 from typing import Any, override
 
 import msgpack
@@ -16,11 +15,11 @@ from ai.backend.common.events.types import (
 )
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.message_queue.message import MQMessage
-from ai.backend.common.message_queue.payload import AnycastPayload, BroadcastPayload
+from ai.backend.common.message_queue.payload import AnycastMessagePayload, BroadcastMessagePayload
+from ai.backend.common.message_queue.types import MessageName
 from ai.backend.common.types import AgentId
 
 
-@dataclass
 class DummyAnycastEvent(AbstractAnycastEvent):
     value: int
 
@@ -31,7 +30,7 @@ class DummyAnycastEvent(AbstractAnycastEvent):
     @classmethod
     @override
     def deserialize(cls, value: tuple[Any, ...]) -> DummyAnycastEvent:
-        return cls(value[0])
+        return cls(value=value[0])
 
     @classmethod
     @override
@@ -52,7 +51,6 @@ class DummyAnycastEvent(AbstractAnycastEvent):
         return "test_anycast"
 
 
-@dataclass
 class DummyBroadcastEvent(AbstractBroadcastEvent):
     value: int
 
@@ -63,7 +61,7 @@ class DummyBroadcastEvent(AbstractBroadcastEvent):
     @classmethod
     @override
     def deserialize(cls, value: tuple[Any, ...]) -> DummyBroadcastEvent:
-        return cls(value[0])
+        return cls(value=value[0])
 
     @classmethod
     @override
@@ -87,17 +85,17 @@ class DummyBroadcastEvent(AbstractBroadcastEvent):
 def _make_anycast_mq_message(event: AbstractAnycastEvent) -> MQMessage:
     return MQMessage(
         msg_id=b"test-msg-id",
-        payload=AnycastPayload(
-            name=event.event_name(),
+        payload=AnycastMessagePayload(
+            name=MessageName(event.event_name()),
             source="i-test",
             body=msgpack.packb(event.serialize()),
         ),
     )
 
 
-def _make_broadcast_payload(event: AbstractBroadcastEvent) -> BroadcastPayload:
-    return BroadcastPayload(
-        name=event.event_name(),
+def _make_broadcast_payload(event: AbstractBroadcastEvent) -> BroadcastMessagePayload:
+    return BroadcastMessagePayload(
+        name=MessageName(event.event_name()),
         source="i-test",
         body=msgpack.packb(event.serialize()),
     )
@@ -109,7 +107,7 @@ class StubMessageQueue:
     def __init__(
         self,
         anycast_messages: list[MQMessage] | None = None,
-        broadcast_messages: list[BroadcastPayload] | None = None,
+        broadcast_messages: list[BroadcastMessagePayload] | None = None,
     ) -> None:
         self._anycast_messages = anycast_messages or []
         self._broadcast_messages = broadcast_messages or []
@@ -119,7 +117,7 @@ class StubMessageQueue:
         for msg in self._anycast_messages:
             yield msg
 
-    async def subscribe_queue(self) -> AsyncGenerator[BroadcastPayload, None]:
+    async def subscribe_queue(self) -> AsyncGenerator[BroadcastMessagePayload, None]:
         for msg in self._broadcast_messages:
             yield msg
 

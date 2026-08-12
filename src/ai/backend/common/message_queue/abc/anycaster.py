@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from ai.backend.common.message_queue.payload import AnycastPayload
+from ai.backend.common.message_queue.payload import AnycastMessagePayload
 
 
 class AbstractAnycaster(ABC):
@@ -12,7 +12,7 @@ class AbstractAnycaster(ABC):
     """
 
     @abstractmethod
-    async def anycast(self, payload: AnycastPayload) -> None:
+    async def anycast(self, payload: AnycastMessagePayload) -> None:
         """
         Send a message to the anycast queue.
 

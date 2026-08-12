@@ -352,7 +352,7 @@ async def check_worker_lost(
                 and worker_map[worker_id_str].status == WorkerStatus.ALIVE
             ):
                 await root_ctx.event_producer.anycast_event(
-                    WorkerLostEvent(worker_id_str, "heartbeat timeout")
+                    WorkerLostEvent(worker_id=worker_id_str, reason="heartbeat timeout")
                 )
     except Exception:
         log.exception("check_worker_lost(): exception:")

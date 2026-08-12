@@ -7,8 +7,9 @@ import pytest
 from ai.backend.common import redis_helper
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.message_queue.message import MQMessage
-from ai.backend.common.message_queue.payload import AnycastPayload, BroadcastPayload
+from ai.backend.common.message_queue.payload import AnycastMessagePayload, BroadcastMessagePayload
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
+from ai.backend.common.message_queue.types import MessageName
 from ai.backend.common.types import (
     HostPortPair,
     RedisConnectionInfo,
@@ -88,7 +89,9 @@ async def redis_queue(
 
 async def test_send_and_consume(redis_queue: RedisQueue) -> None:
     # Test message sending and consuming
-    test_payload = AnycastPayload(name="test-event", source="i-test", body=b"body")
+    test_payload = AnycastMessagePayload(
+        name=MessageName("test-event"), source="i-test", body=b"body"
+    )
 
     # Send message
     await redis_queue.send(test_payload)
@@ -103,10 +106,12 @@ async def test_send_and_consume(redis_queue: RedisQueue) -> None:
 
 async def test_subscribe(redis_queue: RedisQueue) -> None:
     # Test message subscription
-    test_payload = BroadcastPayload(name="test-event", source="i-test", body=b"body")
+    test_payload = BroadcastMessagePayload(
+        name=MessageName("test-event"), source="i-test", body=b"body"
+    )
 
     # Create task to subscribe
-    received_messages: list[BroadcastPayload] = []
+    received_messages: list[BroadcastMessagePayload] = []
 
     async def subscriber() -> None:
         async for message in redis_queue.subscribe_queue():
@@ -129,10 +134,12 @@ async def test_subscribe(redis_queue: RedisQueue) -> None:
 
 async def test_broadcast_with_cache(redis_queue: RedisQueue) -> None:
     # Test broadcasting with cache
-    test_payload = BroadcastPayload(name="test-event", source="i-test", body=b"body")
+    test_payload = BroadcastMessagePayload(
+        name=MessageName("test-event"), source="i-test", body=b"body"
+    )
     cache_id = f"test-cache-id-{random.randint(1000, 9999)}"
 
-    received_messages: list[BroadcastPayload] = []
+    received_messages: list[BroadcastMessagePayload] = []
 
     async def subscriber() -> None:
         async for message in redis_queue.subscribe_queue():
@@ -160,7 +167,9 @@ async def test_broadcast_with_cache(redis_queue: RedisQueue) -> None:
 
 async def test_done(redis_queue: RedisQueue) -> None:
     # Test message acknowledgment
-    test_payload = AnycastPayload(name="test-event", source="i-test", body=b"body")
+    test_payload = AnycastMessagePayload(
+        name=MessageName("test-event"), source="i-test", body=b"body"
+    )
 
     # Send message
     await redis_queue.send(test_payload)

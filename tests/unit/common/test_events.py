@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
 from types import TracebackType
 from typing import Any, override
 
@@ -22,7 +21,6 @@ from ai.backend.common.message_queue.redis_queue import RedisQueue
 from ai.backend.common.types import AgentId
 
 
-@dataclass
 class DummyBroadcastEvent(AbstractBroadcastEvent):
     value: int
 
@@ -33,7 +31,7 @@ class DummyBroadcastEvent(AbstractBroadcastEvent):
     @classmethod
     @override
     def deserialize(cls, value: tuple[Any, ...]) -> DummyBroadcastEvent:
-        return cls(value[0] + 1)
+        return cls(value=value[0] + 1)
 
     @classmethod
     @override
@@ -90,7 +88,9 @@ async def test_dispatch(test_valkey_stream_mq: RedisQueue, test_node_id: str) ->
     await asyncio.sleep(0.1)
 
     # Dispatch the event
-    await producer.broadcast_event(DummyBroadcastEvent(999), source_override=AgentId("i-test"))
+    await producer.broadcast_event(
+        DummyBroadcastEvent(value=999), source_override=AgentId("i-test")
+    )
     await asyncio.sleep(0.2)
     assert records == {"async", "sync"}
 
@@ -133,7 +133,7 @@ async def test_error_on_dispatch(test_valkey_stream_mq: RedisQueue, test_node_id
     await dispatcher.start()
     await asyncio.sleep(0.1)
 
-    await producer.broadcast_event(DummyBroadcastEvent(0), source_override=AgentId("i-test"))
+    await producer.broadcast_event(DummyBroadcastEvent(value=0), source_override=AgentId("i-test"))
     await asyncio.sleep(0.5)
     assert len(exception_log) == 2
     assert "ZeroDivisionError" in exception_log

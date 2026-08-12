@@ -14,7 +14,6 @@ from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.types import SessionId
 
 
-@dataclass
 class BaseSessionEvent(AbstractBroadcastEvent):
     session_id: SessionId
 
@@ -32,7 +31,6 @@ class BaseSessionEvent(AbstractBroadcastEvent):
         return None
 
 
-@dataclass
 class DoTerminateSessionEvent(BaseSessionEvent):
     reason: KernelLifecycleEventReason
 
@@ -47,8 +45,8 @@ class DoTerminateSessionEvent(BaseSessionEvent):
     @override
     def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
-            SessionId(uuid.UUID(value[0])),
-            value[1],
+            session_id=SessionId(uuid.UUID(value[0])),
+            reason=value[1],
         )
 
     @classmethod
@@ -57,7 +55,6 @@ class DoTerminateSessionEvent(BaseSessionEvent):
         return "do_terminate_session"
 
 
-@dataclass
 class SessionCreationEvent(BaseSessionEvent):
     creation_id: str
     reason: KernelLifecycleEventReason = KernelLifecycleEventReason.UNKNOWN
@@ -74,9 +71,9 @@ class SessionCreationEvent(BaseSessionEvent):
     @override
     def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
-            SessionId(uuid.UUID(value[0])),
-            value[1],
-            value[2],
+            session_id=SessionId(uuid.UUID(value[0])),
+            creation_id=value[1],
+            reason=value[2],
         )
 
     @override
@@ -84,7 +81,6 @@ class SessionCreationEvent(BaseSessionEvent):
         return None
 
 
-@dataclass
 class SessionEnqueuedBroadcastEvent(SessionCreationEvent):
     @classmethod
     @override
@@ -92,7 +88,6 @@ class SessionEnqueuedBroadcastEvent(SessionCreationEvent):
         return "session_enqueued"
 
 
-@dataclass
 class SessionCheckingPrecondBroadcastEvent(SessionCreationEvent):
     @classmethod
     @override
@@ -100,7 +95,6 @@ class SessionCheckingPrecondBroadcastEvent(SessionCreationEvent):
         return "session_checking_precondition"
 
 
-@dataclass
 class SessionCancelledBroadcastEvent(SessionCreationEvent):
     @classmethod
     @override
@@ -108,7 +102,6 @@ class SessionCancelledBroadcastEvent(SessionCreationEvent):
         return "session_cancelled"
 
 
-@dataclass
 class SessionTerminationEvent(BaseSessionEvent):
     reason: str = ""
 
@@ -123,8 +116,8 @@ class SessionTerminationEvent(BaseSessionEvent):
     @override
     def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
-            SessionId(uuid.UUID(value[0])),
-            value[1],
+            session_id=SessionId(uuid.UUID(value[0])),
+            reason=value[1],
         )
 
     @override
@@ -132,7 +125,6 @@ class SessionTerminationEvent(BaseSessionEvent):
         return None
 
 
-@dataclass
 class SessionTerminatingBroadcastEvent(SessionTerminationEvent):
     @classmethod
     @override
@@ -140,7 +132,6 @@ class SessionTerminatingBroadcastEvent(SessionTerminationEvent):
         return "session_terminating"
 
 
-@dataclass
 class SessionTerminatedBroadcastEvent(SessionTerminationEvent):
     @classmethod
     @override
@@ -148,7 +139,6 @@ class SessionTerminatedBroadcastEvent(SessionTerminationEvent):
         return "session_terminated"
 
 
-@dataclass
 class SessionResultEvent(BaseSessionEvent):
     reason: KernelLifecycleEventReason = KernelLifecycleEventReason.UNKNOWN
     exit_code: int = -1
@@ -165,9 +155,9 @@ class SessionResultEvent(BaseSessionEvent):
     @override
     def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
-            SessionId(uuid.UUID(value[0])),
-            value[1],
-            value[2],
+            session_id=SessionId(uuid.UUID(value[0])),
+            reason=value[1],
+            exit_code=value[2],
         )
 
     @override
@@ -175,7 +165,6 @@ class SessionResultEvent(BaseSessionEvent):
         return None
 
 
-@dataclass
 class SessionSuccessBroadcastEvent(SessionResultEvent):
     @classmethod
     @override
@@ -183,7 +172,6 @@ class SessionSuccessBroadcastEvent(SessionResultEvent):
         return "session_success"
 
 
-@dataclass
 class SessionFailureBroadcastEvent(SessionResultEvent):
     @classmethod
     @override
@@ -199,7 +187,6 @@ class SessionSchedulingEventData:
     creation_id: str
 
 
-@dataclass
 class SchedulingBroadcastEvent(AbstractBroadcastEvent):
     """Individual scheduling event for a session status transition."""
 

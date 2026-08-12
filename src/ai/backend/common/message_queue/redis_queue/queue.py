@@ -13,9 +13,9 @@ from ai.backend.common.message_queue.abc import (
 from ai.backend.common.message_queue.abc.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.message import MessageId, MQMessage
 from ai.backend.common.message_queue.payload import (
-    AnycastPayload,
-    BroadcastPayload,
-    CachedBroadcastPayload,
+    AnycastMessagePayload,
+    BroadcastMessagePayload,
+    CachedBroadcastMessagePayload,
 )
 from ai.backend.common.types import RedisTarget
 
@@ -104,7 +104,7 @@ class RedisQueue(AbstractMessageQueue):
     # Anycaster methods
 
     @override
-    async def send(self, payload: AnycastPayload) -> None:
+    async def send(self, payload: AnycastMessagePayload) -> None:
         """
         Send a message to the anycast queue.
         If the queue is full, the oldest message will be removed.
@@ -115,7 +115,7 @@ class RedisQueue(AbstractMessageQueue):
     # Broadcaster methods
 
     @override
-    async def broadcast(self, payload: BroadcastPayload) -> None:
+    async def broadcast(self, payload: BroadcastMessagePayload) -> None:
         """
         Broadcast a message to all subscribers.
         The message will be delivered to all subscribers.
@@ -123,7 +123,7 @@ class RedisQueue(AbstractMessageQueue):
         await self._broadcaster.broadcast(payload)
 
     @override
-    async def broadcast_with_cache(self, cache_id: str, payload: BroadcastPayload) -> None:
+    async def broadcast_with_cache(self, cache_id: str, payload: BroadcastMessagePayload) -> None:
         """
         Broadcast a message to all subscribers with cache.
         The message will be delivered to all subscribers.
@@ -131,7 +131,7 @@ class RedisQueue(AbstractMessageQueue):
         await self._broadcaster.broadcast_with_cache(cache_id, payload)
 
     @override
-    async def fetch_cached_broadcast_message(self, cache_id: str) -> BroadcastPayload | None:
+    async def fetch_cached_broadcast_message(self, cache_id: str) -> BroadcastMessagePayload | None:
         """
         Fetch a cached broadcast message by cache_id.
         This method retrieves the cached message from the broadcast channel.
@@ -139,7 +139,7 @@ class RedisQueue(AbstractMessageQueue):
         return await self._broadcaster.fetch_cached_broadcast_message(cache_id)
 
     @override
-    async def broadcast_batch(self, events: list[CachedBroadcastPayload]) -> None:
+    async def broadcast_batch(self, events: list[CachedBroadcastMessagePayload]) -> None:
         """
         Broadcast multiple messages in a batch with optional caching.
         This method broadcasts multiple messages to all subscribers.
@@ -174,7 +174,7 @@ class RedisQueue(AbstractMessageQueue):
     # Subscriber methods
 
     @override
-    async def subscribe_queue(self) -> AsyncGenerator[BroadcastPayload, None]:  # type: ignore
+    async def subscribe_queue(self) -> AsyncGenerator[BroadcastMessagePayload, None]:  # type: ignore
         """
         Subscribe to broadcast messages.
         """

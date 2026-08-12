@@ -555,7 +555,7 @@ class BaseIdleChecker(AbstractIdleChecker, AbstractIdleCheckReporter):
     @override
     async def callback_idle_session(self, session_id: SessionId) -> None:
         await self._event_producer.anycast_event(
-            DoTerminateSessionEvent(session_id, self.terminate_reason())
+            DoTerminateSessionEvent(session_id=session_id, reason=self.terminate_reason())
         )
 
 

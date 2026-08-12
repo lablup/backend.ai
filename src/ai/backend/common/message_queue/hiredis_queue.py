@@ -15,7 +15,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 
 from .exceptions import InvalidMessagePayloadError
 from .message import MessageId, MQMessage
-from .payload import AnycastPayload, BroadcastPayload, CachedBroadcastPayload
+from .payload import AnycastMessagePayload, BroadcastMessagePayload, CachedBroadcastMessagePayload
 from .queue import AbstractMessageQueue
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -42,7 +42,7 @@ class HiRedisQueue(AbstractMessageQueue):
     _target: RedisTarget
     _db: int
     _consume_queue: asyncio.Queue[MQMessage]
-    _subscribe_queue: asyncio.Queue[BroadcastPayload]
+    _subscribe_queue: asyncio.Queue[BroadcastMessagePayload]
     _anycast_stream_key: str
     _broadcast_channel: str
     _group_name: str
@@ -78,7 +78,7 @@ class HiRedisQueue(AbstractMessageQueue):
             )
 
     @override
-    async def send(self, payload: AnycastPayload) -> None:
+    async def send(self, payload: AnycastMessagePayload) -> None:
         async with RedisConnection(self._target, db=self._db) as client:
             pieces = _make_pieces(payload.to_stream_fields())
             await client.execute([
@@ -91,7 +91,7 @@ class HiRedisQueue(AbstractMessageQueue):
             ])
 
     @override
-    async def broadcast(self, payload: BroadcastPayload) -> None:
+    async def broadcast(self, payload: BroadcastMessagePayload) -> None:
         async with RedisConnection(self._target, db=self._db) as client:
             payload_bytes = payload.to_json()
             await client.execute([
@@ -101,7 +101,7 @@ class HiRedisQueue(AbstractMessageQueue):
             ])
 
     @override
-    async def broadcast_with_cache(self, cache_id: str, payload: BroadcastPayload) -> None:
+    async def broadcast_with_cache(self, cache_id: str, payload: BroadcastMessagePayload) -> None:
         async with RedisConnection(self._target, db=self._db) as client:
             payload_bytes = payload.to_json()
             await client.pipeline([
@@ -123,17 +123,17 @@ class HiRedisQueue(AbstractMessageQueue):
             ])
 
     @override
-    async def fetch_cached_broadcast_message(self, cache_id: str) -> BroadcastPayload | None:
+    async def fetch_cached_broadcast_message(self, cache_id: str) -> BroadcastMessagePayload | None:
         if self._closed:
             raise RuntimeError("Queue is closed")
         async with RedisConnection(self._target, db=self._db) as client:
             reply = await client.execute(["GET", cache_id])
             if reply is None:
                 return None
-            return BroadcastPayload.from_json(reply)
+            return BroadcastMessagePayload.from_json(reply)
 
     @override
-    async def broadcast_batch(self, events: list[CachedBroadcastPayload]) -> None:
+    async def broadcast_batch(self, events: list[CachedBroadcastMessagePayload]) -> None:
         """
         Broadcast multiple messages in a batch with optional caching.
         This method broadcasts multiple messages to all subscribers.
@@ -187,7 +187,7 @@ class HiRedisQueue(AbstractMessageQueue):
             except asyncio.CancelledError:
                 break
 
-    async def subscribe_queue(self) -> AsyncGenerator[BroadcastPayload, None]:  # type: ignore
+    async def subscribe_queue(self) -> AsyncGenerator[BroadcastMessagePayload, None]:  # type: ignore
         while not self._closed:
             try:
                 yield await self._subscribe_queue.get()
@@ -255,7 +255,7 @@ class HiRedisQueue(AbstractMessageQueue):
             for stream_msg in reply.values():
                 for msg_id, messages in stream_msg:
                     try:
-                        payload = AnycastPayload.from_stream_fields(_make_payload(messages))
+                        payload = AnycastMessagePayload.from_stream_fields(_make_payload(messages))
                     except InvalidMessagePayloadError as e:
                         # A malformed message can never be handled, so discard it right away.
                         log.warning("Discarding malformed message {}: {}", msg_id, e)
@@ -324,7 +324,7 @@ class HiRedisQueue(AbstractMessageQueue):
             for stream_msg in reply.values():
                 for msg_id, messages in stream_msg:
                     try:
-                        payload = AnycastPayload.from_stream_fields(_make_payload(messages))
+                        payload = AnycastMessagePayload.from_stream_fields(_make_payload(messages))
                     except InvalidMessagePayloadError as e:
                         # Leave it unacked: the auto-claim loop discards it once retries run out.
                         log.warning("Skipping malformed message {}: {}", msg_id, e)
@@ -353,7 +353,7 @@ class HiRedisQueue(AbstractMessageQueue):
                     continue
                 _, channel, payload_bytes = reply
                 try:
-                    payload = BroadcastPayload.from_json(payload_bytes)
+                    payload = BroadcastMessagePayload.from_json(payload_bytes)
                 except InvalidMessagePayloadError as e:
                     log.warning("Dropping malformed broadcast message: {}", e)
                     continue

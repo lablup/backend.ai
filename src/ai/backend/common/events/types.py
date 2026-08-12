@@ -1,9 +1,13 @@
 import enum
 from abc import ABC, abstractmethod
-from typing import Self, final, override
+from typing import Any, ClassVar, Self, final, override
 
-from ai.backend.common.message_queue.payload import BroadcastPayload
+from pydantic import BaseModel, ConfigDict
 
+from ai.backend.common.message_queue.payload import BroadcastMessagePayload
+from ai.backend.common.message_queue.types import MessageName
+
+from .message import EventMessage
 from .user_event.user_event import UserEvent
 
 __all__ = (
@@ -57,7 +61,38 @@ class DeliveryPattern(enum.StrEnum):
     ANYCAST = "anycast"
 
 
-class AbstractEvent(ABC):
+class AbstractEvent(BaseModel, ABC):
+    """
+    The base of every event.
+
+    An event is a Pydantic model, so its own fields are the message body: the
+    conversion to and from `EventMessage` below is the same for every event and is
+    written once here. An event that must never cross the message queue overrides
+    them to refuse.
+
+    Unknown fields are ignored rather than rejected, which is what lets a producer
+    add a field without breaking a consumer running an older version — the whole
+    reason the body is named fields instead of a positional tuple.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    def to_message(self) -> EventMessage:
+        """
+        Render this event as the message it is handed to the queue as.
+        """
+        return EventMessage(
+            name=MessageName(self.event_name()),
+            payload=self.model_dump_json(),
+        )
+
+    @classmethod
+    def from_message(cls, message: EventMessage) -> Self:
+        """
+        Reconstruct the event from the message it was rendered as.
+        """
+        return cls.model_validate_json(message.payload)
+
     @classmethod
     @abstractmethod
     def delivery_pattern(cls) -> DeliveryPattern:
@@ -130,10 +165,11 @@ class AbstractBroadcastEvent(AbstractEvent):
     An event that should be broadcasted to all subscribers.
     """
 
-    _register_dict: dict[str, type["AbstractBroadcastEvent"]] = {}
+    _register_dict: ClassVar[dict[str, type["AbstractBroadcastEvent"]]] = {}
 
     @override
-    def __init_subclass__(cls) -> None:
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
         try:
             name = cls.event_name()
             if name in cls._register_dict:
@@ -144,7 +180,7 @@ class AbstractBroadcastEvent(AbstractEvent):
             return
 
     @classmethod
-    def deserialize_from_wrapper(cls, payload: BroadcastPayload) -> "AbstractBroadcastEvent":
+    def deserialize_from_wrapper(cls, payload: BroadcastMessagePayload) -> "AbstractBroadcastEvent":
         """
         Deserialize the event from its broadcast payload.
         """

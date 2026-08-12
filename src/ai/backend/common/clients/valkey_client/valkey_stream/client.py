@@ -20,9 +20,9 @@ from ai.backend.common.clients.valkey_client.client import (
 )
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.message_queue.payload import (
-    AnycastPayload,
-    BroadcastPayload,
-    CachedBroadcastPayload,
+    AnycastMessagePayload,
+    BroadcastMessagePayload,
+    CachedBroadcastMessagePayload,
 )
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
@@ -214,7 +214,7 @@ class ValkeyStreamClient:
     async def enqueue_stream_message(
         self,
         stream_key: str,
-        payload: AnycastPayload,
+        payload: AnycastMessagePayload,
     ) -> None:
         """
         Enqueue a message to the Valkey stream.
@@ -239,7 +239,7 @@ class ValkeyStreamClient:
         stream_key: str,
         group_name: str,
         message_id: bytes,
-        payload: AnycastPayload,
+        payload: AnycastMessagePayload,
     ) -> None:
         """
         Requeue a message in the consumer group.
@@ -310,7 +310,7 @@ class ValkeyStreamClient:
     async def broadcast(
         self,
         channel: str,
-        payload: BroadcastPayload,
+        payload: BroadcastMessagePayload,
     ) -> None:
         """
         Broadcast a message to a channel.
@@ -327,7 +327,7 @@ class ValkeyStreamClient:
         self,
         channel: str,
         cache_id: str,
-        payload: BroadcastPayload,
+        payload: BroadcastMessagePayload,
         expiry_seconds: int = _DEFAULT_CACHE_EXPIRATION,
     ) -> None:
         """
@@ -353,7 +353,7 @@ class ValkeyStreamClient:
     async def fetch_cached_broadcast_message(
         self,
         cache_id: str,
-    ) -> BroadcastPayload | None:
+    ) -> BroadcastMessagePayload | None:
         """
         Fetch a cached broadcast message by its ID.
 
@@ -365,13 +365,13 @@ class ValkeyStreamClient:
             result = await conn.get(cache_id)
         if not result:
             return None
-        return BroadcastPayload.from_json(result)
+        return BroadcastMessagePayload.from_json(result)
 
     @valkey_stream_resilience.apply()
     async def broadcast_batch(
         self,
         channel: str,
-        events: list[CachedBroadcastPayload],
+        events: list[CachedBroadcastMessagePayload],
         expiry_seconds: int = _DEFAULT_CACHE_EXPIRATION,
     ) -> None:
         """
@@ -405,7 +405,7 @@ class ValkeyStreamClient:
     @valkey_stream_resilience.apply()
     async def receive_broadcast_message(
         self,
-    ) -> BroadcastPayload:
+    ) -> BroadcastMessagePayload:
         """
         Receive a broadcast message from a channel.
         This method blocks until a message is received.
@@ -415,7 +415,7 @@ class ValkeyStreamClient:
         """
         async with self._client.client() as conn:
             message = await conn.get_pubsub_message()
-        return BroadcastPayload.from_json(cast(bytes | str, message.message))
+        return BroadcastMessagePayload.from_json(cast(bytes | str, message.message))
 
     def _create_batch(self, is_atomic: bool = False) -> Batch:
         """

@@ -14,7 +14,7 @@ from ai.backend.common.types import BackendAISchema
 __all__ = ("NotificationTriggeredEvent",)
 
 
-class NotificationTriggeredEvent(AbstractAnycastEvent, BackendAISchema):
+class NotificationTriggeredEvent(BackendAISchema, AbstractAnycastEvent):
     """
     Event triggered when a notification needs to be processed.
     This is an anycast event ensuring only one handler processes each notification.

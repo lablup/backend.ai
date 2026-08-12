@@ -104,11 +104,11 @@ class SchedulerTaskSpec:
 
     def create_if_needed_event(self) -> DoSokovanProcessIfNeededEvent:
         """Create event for checking if processing is needed."""
-        return DoSokovanProcessIfNeededEvent(self.schedule_type.value)
+        return DoSokovanProcessIfNeededEvent(schedule_type=self.schedule_type.value)
 
     def create_process_event(self) -> DoSokovanProcessScheduleEvent:
         """Create event for forced processing."""
-        return DoSokovanProcessScheduleEvent(self.schedule_type.value)
+        return DoSokovanProcessScheduleEvent(schedule_type=self.schedule_type.value)
 
     @property
     def short_task_name(self) -> str:

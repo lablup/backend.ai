@@ -87,7 +87,7 @@ class TaskCancelledResult(TaskResult):
 
     @override
     def to_broadcast_event(self, task_id: uuid.UUID) -> BaseBgtaskDoneEvent:
-        return BgtaskCancelledEvent(task_id, self.message)
+        return BgtaskCancelledEvent(task_id=task_id, message=self.message)
 
     @override
     def status(self) -> BgtaskStatus:
@@ -114,7 +114,7 @@ class TaskFailedResult(TaskResult):
 
     @override
     def to_broadcast_event(self, task_id: uuid.UUID) -> BaseBgtaskDoneEvent:
-        return BgtaskFailedEvent(task_id, repr(self.exception))
+        return BgtaskFailedEvent(task_id=task_id, message=repr(self.exception))
 
     @override
     def status(self) -> BgtaskStatus:

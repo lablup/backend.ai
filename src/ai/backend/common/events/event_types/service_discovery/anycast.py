@@ -53,7 +53,7 @@ class BaseServiceDiscoveryEvent(AbstractAnycastEvent):
         return None
 
 
-class ServiceRegisteredEvent(BaseServiceDiscoveryEvent, BackendAISchema):
+class ServiceRegisteredEvent(BackendAISchema, BaseServiceDiscoveryEvent):
     """Event emitted when a service instance registers or sends a heartbeat.
 
     Contains full service metadata and endpoint information.
@@ -131,7 +131,7 @@ class DoSweepStaleServicesEvent(BaseServiceDiscoveryEvent):
         return cls()
 
 
-class ServiceDeregisteredEvent(BaseServiceDiscoveryEvent, BackendAISchema):
+class ServiceDeregisteredEvent(BackendAISchema, BaseServiceDiscoveryEvent):
     """Event emitted when a service instance is deregistered."""
 
     instance_id: str = Field(description="Unique instance identifier.")
