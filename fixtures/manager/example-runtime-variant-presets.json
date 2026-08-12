@@ -780,6 +780,21 @@
       }
     },
     {
+      "runtime_variant_name": "vllm",
+      "name": "enable-prompt-tokens-details",
+      "description": "Report prompt token details (e.g. cached tokens) in usage responses.",
+      "rank": 3000,
+      "preset_target": "args",
+      "value_type": "flag",
+      "default_value": null,
+      "key": "--enable-prompt-tokens-details",
+      "category": "monitoring",
+      "display_name": "Enable Prompt Tokens Details",
+      "ui_option": {
+        "ui_type": "checkbox"
+      }
+    },
+    {
       "runtime_variant_name": "sglang",
       "name": "model",
       "description": "HuggingFace model name or local path.",
