@@ -563,7 +563,7 @@ class ModelServingRepository:
     @model_serving_repository_resilience.apply()
     async def get_user_with_keypair(self, user_id: uuid.UUID) -> Any | None:
         """
-        Get user with their main access key.
+        Get the user row joined with one of their keypairs.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             query = (

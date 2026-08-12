@@ -3,7 +3,7 @@
 The resource-side counterpart of ``PendingSessionCountLimitRule``: the
 total resource slots parked in a user's pending queue are bounded at
 enqueue time by the ``max_pending_session_resource_slots`` ceiling of
-the user's main keypair policy. Only the slot names the policy lists
+the user's default keypair policy. Only the slot names the policy lists
 are capped; slots absent from the policy stay unbounded.
 """
 

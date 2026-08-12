@@ -1,7 +1,7 @@
 """Per-user scheduling-priority cap rule.
 
 Bounds the *global* scheduler ``priority`` a user may declare at enqueue
-time via the ``max_priority`` ceiling of the user's main keypair policy.
+time via the ``max_priority`` ceiling of the user's default keypair policy.
 The scope-local ``job_priority`` only ranks the owner's own sessions and
 is therefore deliberately left uncapped.
 """

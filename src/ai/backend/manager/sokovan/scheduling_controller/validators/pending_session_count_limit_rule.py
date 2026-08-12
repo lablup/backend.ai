@@ -5,7 +5,7 @@ session limits are deliberately NOT enforced here: an over-limit session
 simply waits in the queue and is admitted by the scheduler-side
 ``ResourcePolicyValidator`` once an existing session finishes. What must
 be bounded at enqueue is the queue itself, via the
-``max_pending_session_count`` ceiling of the user's main keypair policy.
+``max_pending_session_count`` ceiling of the user's default keypair policy.
 """
 
 from __future__ import annotations

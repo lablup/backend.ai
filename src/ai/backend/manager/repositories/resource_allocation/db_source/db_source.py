@@ -90,7 +90,7 @@ class ResourceAllocationDBSource:
             result = await session.execute(query)
             row = result.first()
             if row is None:
-                raise PermissionError(f"No main keypair found for user (id: {user_id})")
+                raise PermissionError(f"No default keypair found for user (id: {user_id})")
             return KeypairContextData(
                 access_key=AccessKey(row.access_key),
                 resource_policy={
