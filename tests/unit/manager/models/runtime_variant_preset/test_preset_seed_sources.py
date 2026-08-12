@@ -9,7 +9,6 @@ different set depending on how the database was created.
 
 from __future__ import annotations
 
-import ast
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,19 +17,16 @@ from typing import Any
 import pytest
 
 import ai.backend.install
-import ai.backend.manager.models
+from ai.backend.manager.models.alembic.versions import (
+    e7b3a1f9c2d4_seed_runtime_variant_presets_data as snapshot_seed,
+)
+from ai.backend.manager.models.alembic.versions import (
+    fb5befb44035_seed_enable_prompt_tokens_details_preset as prompt_tokens_seed,
+)
 
 _MANAGER_FIXTURE_PATH = Path("fixtures/manager/example-runtime-variant-presets.json")
 _INSTALLER_FIXTURE_PATH = (
     Path(ai.backend.install.__file__).parent / "fixtures" / "example-runtime-variant-presets.json"
-)
-_VERSIONS_DIR = Path(ai.backend.manager.models.__file__).parent / "alembic" / "versions"
-
-# A seed migration embeds its rows as literals, so a new one has to be listed
-# here to stay covered. Until it is, the tests below report it as drift.
-_SNAPSHOT_MIGRATION = _VERSIONS_DIR / "e7b3a1f9c2d4_seed_runtime_variant_presets_data.py"
-_SINGLE_ROW_MIGRATIONS = (
-    _VERSIONS_DIR / "fb5befb44035_seed_enable_prompt_tokens_details_preset.py",
 )
 
 
@@ -38,22 +34,6 @@ _SINGLE_ROW_MIGRATIONS = (
 class _PresetKey:
     runtime_variant_name: str
     name: str
-
-
-def _module_literals(path: Path) -> dict[str, Any]:
-    """Module-level literal assignments of a revision, read without importing it."""
-    literals: dict[str, Any] = {}
-    for node in ast.parse(path.read_text()).body:
-        if not isinstance(node, ast.Assign):
-            continue
-        target = node.targets[0]
-        if not isinstance(target, ast.Name):
-            continue
-        try:
-            literals[target.id] = ast.literal_eval(node.value)
-        except ValueError:
-            continue
-    return literals
 
 
 class TestPresetSeedSources:
@@ -69,15 +49,13 @@ class TestPresetSeedSources:
 
     @pytest.fixture
     def seeded_presets(self) -> dict[_PresetKey, dict[str, Any]]:
-        rows: list[dict[str, Any]] = json.loads(
-            _module_literals(_SNAPSHOT_MIGRATION)["_SEED_DATA_JSON"]
-        )
-        for path in _SINGLE_ROW_MIGRATIONS:
-            literals = _module_literals(path)
-            rows.append({
-                "runtime_variant_name": literals["_VARIANT_NAME"],
-                **literals["_PRESET_ROW"],
-            })
+        # A seed migration keeps its rows as module literals, so a new one has to
+        # be added here to stay covered. Until it is, the tests report it as drift.
+        rows: list[dict[str, Any]] = list(snapshot_seed._SEED_DATA)
+        rows.append({
+            "runtime_variant_name": prompt_tokens_seed._VARIANT_NAME,
+            **prompt_tokens_seed._PRESET_ROW,
+        })
         return {_PresetKey(row["runtime_variant_name"], row["name"]): row for row in rows}
 
     def test_installer_fixture_mirrors_the_manager_fixture(
