@@ -1,5 +1,8 @@
 from uuid import UUID, uuid4
 
+import pytest
+from pydantic import ValidationError
+
 from ai.backend.common.contexts.user import current_user, triggered_user
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.identifier.domain import DomainID
@@ -132,37 +135,13 @@ class TestMessageMetadata:
         assert metadata.user.is_admin is True
         assert metadata.user.is_superadmin is True
 
-    def test_deserialize_with_legacy_user_id_field(self) -> None:
-        # Test backward compatibility - remove user_id if present
-        data = {
-            "request_id": "req-legacy",
-            "user_id": "should-be-removed",
-            "user": {
-                "user_id": "99999999-8888-7777-6666-555544443333",
-                "is_authorized": True,
-                "is_admin": False,
-                "is_superadmin": False,
-                "role": "user",
-                "domain_name": "default",
-                "domain_id": "11111111-2222-3333-4444-555555555555",
-            },
-        }
-        serialized = dump_json(data)
-
-        metadata = MessageMetadata.deserialize(serialized)
-        assert metadata.user is not None
-        assert metadata.request_id == "req-legacy"
-        assert hasattr(metadata, "user_id") is False  # user_id field should be removed
-        assert str(metadata.user.user_id) == "99999999-8888-7777-6666-555544443333"
-
     def test_deserialize_with_invalid_user_data(self) -> None:
-        # Test when user is not a dict
+        # A user entry that is not an object is a malformed message, not an absent user.
         data = {"request_id": "req-invalid", "user": "invalid-user-data"}
         serialized = dump_json(data)
 
-        metadata = MessageMetadata.deserialize(serialized)
-        assert metadata.request_id == "req-invalid"
-        assert metadata.user is None
+        with pytest.raises(ValidationError):
+            MessageMetadata.deserialize(serialized)
 
     def test_deserialize_with_no_user(self) -> None:
         data = {"request_id": "req-no-user"}

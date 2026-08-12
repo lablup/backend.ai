@@ -85,11 +85,11 @@ class RouteTaskSpec:
 
     def create_if_needed_event(self) -> DoRouteLifecycleIfNeededEvent:
         """Create event for checking if processing is needed."""
-        return DoRouteLifecycleIfNeededEvent(self.lifecycle_type.value)
+        return DoRouteLifecycleIfNeededEvent(lifecycle_type=self.lifecycle_type.value)
 
     def create_process_event(self) -> DoRouteLifecycleEvent:
         """Create event for forced processing."""
-        return DoRouteLifecycleEvent(self.lifecycle_type.value)
+        return DoRouteLifecycleEvent(lifecycle_type=self.lifecycle_type.value)
 
     @property
     def short_task_name(self) -> str:

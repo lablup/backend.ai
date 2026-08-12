@@ -197,11 +197,15 @@ class DeploymentTaskSpec:
 
     def create_if_needed_event(self) -> DoDeploymentLifecycleIfNeededEvent:
         """Create event for checking if processing is needed."""
-        return DoDeploymentLifecycleIfNeededEvent(self.lifecycle_type.value, sub_step=self.sub_step)
+        return DoDeploymentLifecycleIfNeededEvent(
+            lifecycle_type=self.lifecycle_type.value, sub_step=self.sub_step
+        )
 
     def create_process_event(self) -> DoDeploymentLifecycleEvent:
         """Create event for forced processing."""
-        return DoDeploymentLifecycleEvent(self.lifecycle_type.value, sub_step=self.sub_step)
+        return DoDeploymentLifecycleEvent(
+            lifecycle_type=self.lifecycle_type.value, sub_step=self.sub_step
+        )
 
     @property
     def _suffix(self) -> str:

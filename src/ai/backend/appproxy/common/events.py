@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
 from typing import Any, Self, override
 
 from pydantic import TypeAdapter
@@ -13,7 +12,6 @@ from .types import RouteInfo
 from .types import SerializableCircuit as Circuit
 
 
-@dataclass
 class AppProxyCircuitEvent(AbstractBroadcastEvent):
     target_worker_authority: str
     circuits: list[Circuit]
@@ -47,7 +45,6 @@ class AppProxyCircuitEvent(AbstractBroadcastEvent):
         return None
 
 
-@dataclass
 class AppProxyCircuitRouteUpdatedEvent(AbstractBroadcastEvent):
     target_worker_authority: str
     circuit: Circuit
@@ -89,7 +86,6 @@ class AppProxyCircuitRouteUpdatedEvent(AbstractBroadcastEvent):
         return None
 
 
-@dataclass
 class GenericWorkerEvent(AbstractAnycastEvent):
     worker_id: str
     reason: str
@@ -104,7 +100,7 @@ class GenericWorkerEvent(AbstractAnycastEvent):
     @classmethod
     @override
     def deserialize(cls, value: tuple[Any, ...]) -> Self:
-        return cls(value[0], value[1])
+        return cls(worker_id=value[0], reason=value[1])
 
     @classmethod
     @override

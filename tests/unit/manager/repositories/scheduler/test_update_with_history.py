@@ -648,7 +648,11 @@ class TestUpdateWithHistory:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_session_id: SessionId,
     ) -> None:
-        """Test that repeated calls with same phase+error_code+to_status merge (increment attempts)."""
+        """Test that repeated calls with same phase+error_code+to_status merge (increment attempts).
+
+        Neither ``from_status`` nor which attempt result was recorded is part
+        of the merge key — only attempt-vs-skip is (see the skip test below).
+        """
         db_source = ScheduleDBSource(db_with_cleanup)
 
         # First call - creates history record
@@ -757,6 +761,70 @@ class TestUpdateWithHistory:
             records = (await db_sess.execute(history_stmt)).scalars().all()
             assert len(records) == 1
             assert records[0].attempts == 3
+
+    async def test_update_with_history_no_merge_skipped_after_failure(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_session_id: SessionId,
+    ) -> None:
+        """Skips are counted, but on their own record.
+
+        Skips must be visible and countable, while ``attempts`` on the
+        attempt record stays the number the give-up (deprioritization)
+        classification is allowed to see.
+        """
+        db_source = ScheduleDBSource(db_with_cleanup)
+
+        updater = BatchUpdater(
+            spec=SessionStatusBatchUpdaterSpec(
+                to_status=SessionStatus.PENDING,
+                status_changed_at=datetime.now(tzutc()),
+                reason="attempted",
+            ),
+            conditions=[lambda: SessionRow.id.in_([test_session_id])],
+        )
+        await db_source.update_with_history(
+            updater,
+            BulkCreator(
+                specs=[
+                    SessionSchedulingHistoryCreatorSpec(
+                        session_id=test_session_id,
+                        phase="schedule",
+                        result=SchedulingResult.NEED_RETRY,
+                        message="No resources available",
+                        to_status=SessionStatus.PENDING,
+                    )
+                ]
+            ),
+        )
+
+        # Same phase and to_status, but nothing was attempted these two cycles
+        for _ in range(2):
+            await db_source.update_with_history(
+                updater,
+                BulkCreator(
+                    specs=[
+                        SessionSchedulingHistoryCreatorSpec(
+                            session_id=test_session_id,
+                            phase="schedule",
+                            result=SchedulingResult.SKIPPED,
+                            message="Not attempted",
+                            to_status=SessionStatus.PENDING,
+                        )
+                    ]
+                ),
+            )
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            history_stmt = sa.select(SessionSchedulingHistoryRow).where(
+                SessionSchedulingHistoryRow.session_id == test_session_id
+            )
+            records = (await db_sess.execute(history_stmt)).scalars().all()
+            attempts_by_result = {r.result: r.attempts for r in records}
+            # The skips are counted on their own record...
+            assert attempts_by_result[str(SchedulingResult.SKIPPED)] == 2
+            # ...and the attempt record keeps the count give-up may see
+            assert attempts_by_result[str(SchedulingResult.NEED_RETRY)] == 1
 
     async def test_update_with_history_no_merge_different_phase(
         self,

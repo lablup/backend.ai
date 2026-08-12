@@ -10,7 +10,7 @@ import glide
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.message_queue.abc import AbstractSubscriber
 from ai.backend.common.message_queue.exceptions import InvalidMessagePayloadError
-from ai.backend.common.message_queue.payload import BroadcastPayload
+from ai.backend.common.message_queue.payload import BroadcastMessagePayload
 from ai.backend.common.types import RedisTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
@@ -26,7 +26,7 @@ class RedisSubscriber(AbstractSubscriber):
     """
 
     _client: ValkeyStreamClient
-    _subscribe_queue: asyncio.Queue[BroadcastPayload]
+    _subscribe_queue: asyncio.Queue[BroadcastMessagePayload]
     _channels: set[str]
     _closed: bool
     _loop_task: asyncio.Task[Any] | None
@@ -69,7 +69,7 @@ class RedisSubscriber(AbstractSubscriber):
         return cls(client, channels)
 
     @override
-    async def subscribe_queue(self) -> AsyncGenerator[BroadcastPayload, None]:  # type: ignore[override]
+    async def subscribe_queue(self) -> AsyncGenerator[BroadcastMessagePayload, None]:  # type: ignore[override]
         """
         Subscribe to broadcast messages.
 
@@ -78,7 +78,7 @@ class RedisSubscriber(AbstractSubscriber):
         acknowledgment.
 
         Yields:
-            BroadcastPayload: Broadcast messages from subscribed channels
+            BroadcastMessagePayload: Broadcast messages from subscribed channels
 
         Raises:
             RuntimeError: If the subscriber is closed

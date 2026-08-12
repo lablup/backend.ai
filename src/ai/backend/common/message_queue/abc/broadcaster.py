@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from ai.backend.common.message_queue.payload import BroadcastPayload, CachedBroadcastPayload
+from ai.backend.common.message_queue.payload import (
+    BroadcastMessagePayload,
+    CachedBroadcastMessagePayload,
+)
 
 
 class AbstractBroadcaster(ABC):
@@ -12,7 +15,7 @@ class AbstractBroadcaster(ABC):
     """
 
     @abstractmethod
-    async def broadcast(self, payload: BroadcastPayload) -> None:
+    async def broadcast(self, payload: BroadcastMessagePayload) -> None:
         """
         Broadcast a message to all subscribers.
 
@@ -25,7 +28,7 @@ class AbstractBroadcaster(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def broadcast_with_cache(self, cache_id: str, payload: BroadcastPayload) -> None:
+    async def broadcast_with_cache(self, cache_id: str, payload: BroadcastMessagePayload) -> None:
         """
         Broadcast a message with caching support.
 
@@ -39,7 +42,7 @@ class AbstractBroadcaster(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def fetch_cached_broadcast_message(self, cache_id: str) -> BroadcastPayload | None:
+    async def fetch_cached_broadcast_message(self, cache_id: str) -> BroadcastMessagePayload | None:
         """
         Retrieve a cached broadcast message.
 
@@ -55,7 +58,7 @@ class AbstractBroadcaster(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def broadcast_batch(self, events: list[CachedBroadcastPayload]) -> None:
+    async def broadcast_batch(self, events: list[CachedBroadcastMessagePayload]) -> None:
         """
         Broadcast multiple messages in a batch.
 

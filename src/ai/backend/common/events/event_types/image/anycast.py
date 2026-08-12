@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from typing import Any, Self, override
 
 from ai.backend.common.docker import ImageRef
@@ -7,7 +6,6 @@ from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.types import AgentId
 
 
-@dataclass
 class BaseImageEvent(AbstractAnycastEvent):
     image: str
     agent_id: AgentId
@@ -26,7 +24,6 @@ class BaseImageEvent(AbstractAnycastEvent):
         return None
 
 
-@dataclass
 class ImagePullStartedEvent(BaseImageEvent):
     timestamp: float
     image_ref: ImageRef | None = None
@@ -67,7 +64,6 @@ class ImagePullStartedEvent(BaseImageEvent):
         return "image_pull_started"
 
 
-@dataclass
 class ImagePullFinishedEvent(BaseImageEvent):
     timestamp: float
     msg: str | None = None
@@ -109,7 +105,6 @@ class ImagePullFinishedEvent(BaseImageEvent):
         return "image_pull_finished"
 
 
-@dataclass
 class ImagePullFailedEvent(BaseImageEvent):
     msg: str
     image_ref: ImageRef | None = None

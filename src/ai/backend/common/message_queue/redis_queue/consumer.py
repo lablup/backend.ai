@@ -18,7 +18,7 @@ from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.message_queue.abc import AbstractConsumer
 from ai.backend.common.message_queue.exceptions import InvalidMessagePayloadError
 from ai.backend.common.message_queue.message import MessageId, MQMessage
-from ai.backend.common.message_queue.payload import AnycastPayload
+from ai.backend.common.message_queue.payload import AnycastMessagePayload
 from ai.backend.common.types import RedisTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
@@ -293,7 +293,7 @@ class RedisConsumer(AbstractConsumer):
 
         for msg in payload:
             try:
-                anycast_payload = AnycastPayload.from_stream_fields(msg.payload)
+                anycast_payload = AnycastMessagePayload.from_stream_fields(msg.payload)
             except InvalidMessagePayloadError as e:
                 # Leave it unacked: the auto-claim loop discards it once retries run out.
                 log.warning("Skipping malformed message {}: {}", msg.msg_id, e)
@@ -370,7 +370,7 @@ class RedisConsumer(AbstractConsumer):
 
         for msg in message.messages:
             try:
-                payload = AnycastPayload.from_stream_fields(msg.payload)
+                payload = AnycastMessagePayload.from_stream_fields(msg.payload)
             except InvalidMessagePayloadError as e:
                 # A malformed message can never be handled, so discard it right away.
                 log.warning("Discarding malformed message {}: {}", msg.msg_id, e)
