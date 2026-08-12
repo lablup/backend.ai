@@ -18,7 +18,6 @@ from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.identifier.virtual_scope import VirtualScopeID
-from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     EntityType as PermEntityType,
@@ -136,8 +135,6 @@ class TestCheckPermissionViaVirtualScope:
         role_status: RoleStatus,
     ) -> None:
         async with db.begin_session() as db_sess:
-            domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-            db_sess.add(DomainRow(name=domain_name, total_resource_slots=ResourceSlot()))
             policy = UserResourcePolicyRow(
                 name="test-rbac-policy",
                 max_vfolder_count=0,
@@ -154,7 +151,6 @@ class TestCheckPermissionViaVirtualScope:
                 status=UserStatus.ACTIVE,
                 need_password_change=False,
                 sudo_session_enabled=False,
-                domain_name=domain_name,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -175,8 +171,6 @@ class TestCheckPermissionViaVirtualScope:
         """Materialize: virtual scope, scope binding, entity membership, and a
         permission granting ``spec.granted`` at the bound scope."""
         async with db.begin_session() as db_sess:
-            domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-            db_sess.add(DomainRow(name=domain_name, total_resource_slots=ResourceSlot()))
             db_sess.add(
                 VirtualScopeRow(
                     id=ids.virtual_scope_id,

@@ -15,7 +15,6 @@ from ai.backend.common.data.permission.types import (
     RBACElementType,
     RelationType,
 )
-from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.permission.role import (
     PermissionResolutionKey,
     ScopeChainPermissionCheckInput,
@@ -129,8 +128,6 @@ class TestCheckPermissionWithScopeChain:
     ) -> ScopeChainFixture:
         """Create a user with an active role (no permissions yet)."""
         async with db_with_rbac_tables.begin_session() as db_sess:
-            domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-            db_sess.add(DomainRow(name=domain_name, total_resource_slots=ResourceSlot()))
             policy = UserResourcePolicyRow(
                 name="test-rbac-policy",
                 max_vfolder_count=0,
@@ -147,7 +144,6 @@ class TestCheckPermissionWithScopeChain:
                 status=UserStatus.ACTIVE,
                 need_password_change=False,
                 sudo_session_enabled=False,
-                domain_name=domain_name,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -177,8 +173,6 @@ class TestCheckPermissionWithScopeChain:
     ) -> None:
         """VFOLDER belongs to PROJECT (auto edge)."""
         async with db_with_rbac_tables.begin_session() as db_sess:
-            domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-            db_sess.add(DomainRow(name=domain_name, total_resource_slots=ResourceSlot()))
             assoc = AssociationScopesEntitiesRow(
                 scope_type=ScopeType.PROJECT,
                 scope_id=fixture_ids.project_id,
@@ -197,8 +191,6 @@ class TestCheckPermissionWithScopeChain:
     ) -> None:
         """PROJECT belongs to DOMAIN (auto edge)."""
         async with db_with_rbac_tables.begin_session() as db_sess:
-            domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-            db_sess.add(DomainRow(name=domain_name, total_resource_slots=ResourceSlot()))
             assoc = AssociationScopesEntitiesRow(
                 scope_type=ScopeType.DOMAIN,
                 scope_id=fixture_ids.domain_id,
@@ -217,8 +209,6 @@ class TestCheckPermissionWithScopeChain:
     ) -> None:
         """VFOLDER referenced by PROJECT (ref edge)."""
         async with db_with_rbac_tables.begin_session() as db_sess:
-            domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-            db_sess.add(DomainRow(name=domain_name, total_resource_slots=ResourceSlot()))
             assoc = AssociationScopesEntitiesRow(
                 scope_type=ScopeType.PROJECT,
                 scope_id=fixture_ids.project_id,
@@ -247,8 +237,6 @@ class TestCheckPermissionWithScopeChain:
                 raise TypeError(f"Expected PermissionEntry, got {type(entry).__name__}: {entry!r}")
             scope_type, scope_id = scope_map[entry.scope_key]
             async with db_with_rbac_tables.begin_session() as db_sess:
-                domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-                db_sess.add(DomainRow(name=domain_name, total_resource_slots=ResourceSlot()))
                 perm = PermissionRow(
                     role_id=fixture_ids.role_id,
                     scope_type=scope_type,
@@ -407,8 +395,6 @@ class TestCheckPermissionWithScopeChain:
     ) -> ScopeChainFixture:
         """Create a user with an inactive role."""
         async with db_with_rbac_tables.begin_session() as db_sess:
-            domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-            db_sess.add(DomainRow(name=domain_name, total_resource_slots=ResourceSlot()))
             policy = UserResourcePolicyRow(
                 name="test-rbac-policy",
                 max_vfolder_count=0,
@@ -425,7 +411,6 @@ class TestCheckPermissionWithScopeChain:
                 status=UserStatus.ACTIVE,
                 need_password_change=False,
                 sudo_session_enabled=False,
-                domain_name=domain_name,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -598,8 +583,6 @@ class TestCheckPermissionWithScopeChain:
     ) -> ScopeChainFixture:
         """Create a user with a deleted role."""
         async with db_with_rbac_tables.begin_session() as db_sess:
-            domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-            db_sess.add(DomainRow(name=domain_name, total_resource_slots=ResourceSlot()))
             policy = UserResourcePolicyRow(
                 name="test-rbac-policy",
                 max_vfolder_count=0,
@@ -616,7 +599,6 @@ class TestCheckPermissionWithScopeChain:
                 status=UserStatus.ACTIVE,
                 need_password_change=False,
                 sudo_session_enabled=False,
-                domain_name=domain_name,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -669,8 +651,6 @@ class TestCheckPermissionWithScopeChain:
     ) -> ScopeChainFixture:
         """Create a role with permission but do NOT assign it to the user."""
         async with db_with_rbac_tables.begin_session() as db_sess:
-            domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-            db_sess.add(DomainRow(name=domain_name, total_resource_slots=ResourceSlot()))
             role = RoleRow(
                 id=fixture_ids.role_id,
                 name="unassigned-role",
@@ -715,8 +695,6 @@ class TestCheckPermissionWithScopeChain:
         """Create a user with two active roles. Returns (fixture, second_role_id)."""
         second_role_id = uuid.uuid4()
         async with db_with_rbac_tables.begin_session() as db_sess:
-            domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-            db_sess.add(DomainRow(name=domain_name, total_resource_slots=ResourceSlot()))
             policy = UserResourcePolicyRow(
                 name="test-rbac-policy",
                 max_vfolder_count=0,
@@ -733,7 +711,6 @@ class TestCheckPermissionWithScopeChain:
                 status=UserStatus.ACTIVE,
                 need_password_change=False,
                 sudo_session_enabled=False,
-                domain_name=domain_name,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -784,8 +761,6 @@ class TestCheckPermissionWithScopeChain:
             role_id = role_map[role_key]
             scope_type, scope_id = scope_map[scope_key]
             async with db_with_rbac_tables.begin_session() as db_sess:
-                domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-                db_sess.add(DomainRow(name=domain_name, total_resource_slots=ResourceSlot()))
                 perm = PermissionRow(
                     role_id=role_id,
                     scope_type=scope_type,
@@ -844,8 +819,6 @@ class TestCheckPermissionWithScopeChain:
     ) -> None:
         """PROJECT referenced by DOMAIN (ref edge)."""
         async with db_with_rbac_tables.begin_session() as db_sess:
-            domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-            db_sess.add(DomainRow(name=domain_name, total_resource_slots=ResourceSlot()))
             assoc = AssociationScopesEntitiesRow(
                 scope_type=ScopeType.DOMAIN,
                 scope_id=fixture_ids.domain_id,
@@ -924,8 +897,6 @@ class TestCheckPermissionWithScopeChain:
     ) -> None:
         """DOMAIN belongs to USER scope (auto edge) — 3rd level."""
         async with db_with_rbac_tables.begin_session() as db_sess:
-            domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-            db_sess.add(DomainRow(name=domain_name, total_resource_slots=ResourceSlot()))
             assoc = AssociationScopesEntitiesRow(
                 scope_type=ScopeType.USER,
                 scope_id=fixture_ids.user_scope_id,
@@ -1009,8 +980,6 @@ class TestCheckPermissionWithScopeChain:
         other_role_id = uuid.uuid4()
 
         async with db_with_rbac_tables.begin_session() as db_sess:
-            domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-            db_sess.add(DomainRow(name=domain_name, total_resource_slots=ResourceSlot()))
             policy = UserResourcePolicyRow(
                 name="test-rbac-policy",
                 max_vfolder_count=0,
@@ -1027,7 +996,6 @@ class TestCheckPermissionWithScopeChain:
                 status=UserStatus.ACTIVE,
                 need_password_change=False,
                 sudo_session_enabled=False,
-                domain_name=domain_name,
             )
             db_sess.add(other_user)
             await db_sess.flush()
@@ -1239,8 +1207,6 @@ class TestCheckPermissionWithScopeChain:
     ) -> None:
         """Create a cycle: vfolder -> project -> domain -> project (back-edge)."""
         async with db_with_rbac_tables.begin_session() as db_sess:
-            domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-            db_sess.add(DomainRow(name=domain_name, total_resource_slots=ResourceSlot()))
             # vfolder -> project (AUTO)
             db_sess.add(
                 AssociationScopesEntitiesRow(

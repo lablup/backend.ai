@@ -480,7 +480,7 @@ class TestUserAdapterConversion:
             status_info="OK",
             created_at=now,
             modified_at=now,
-            domain_name="default",
+            domain_name=None,
             domain_id=DomainID(uuid4()),
             role=DataUserRole.USER,
             resource_policy="default",
@@ -508,7 +508,7 @@ class TestUserAdapterConversion:
         assert dto.status_info == "OK"
         assert dto.created_at == now
         assert dto.modified_at == now
-        assert dto.domain_name == "default"
+        assert dto.domain_name is None
         assert dto.role == UserRoleDTO.USER
         assert dto.resource_policy == "default"
         assert dto.allowed_client_ip == ["10.0.0.1"]

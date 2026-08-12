@@ -35,7 +35,6 @@ def _backfill(bind: Connection) -> None:
 def upgrade() -> None:
     _backfill(op.get_bind())
 
-    op.alter_column("users", "domain_name", existing_type=sa.String(length=64), nullable=False)
     op.alter_column("users", "role", existing_type=sa.String(length=64), nullable=False)
     op.alter_column(
         "users",
@@ -48,7 +47,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.alter_column("users", "domain_name", existing_type=sa.String(length=64), nullable=True)
     op.alter_column("users", "role", existing_type=sa.String(length=64), nullable=True)
     op.alter_column(
         "users",

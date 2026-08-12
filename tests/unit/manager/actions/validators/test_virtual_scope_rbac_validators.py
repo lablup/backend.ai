@@ -37,7 +37,6 @@ from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.common.identifier.virtual_scope import VirtualScopeID
-from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.action.base import BaseActionTriggerMeta
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
@@ -236,8 +235,6 @@ async def _seed_user_with_role(
     suffix = user_id.hex[:8]
     policy_name = f"policy-{suffix}"
     async with db.begin_session() as db_sess:
-        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-        db_sess.add(DomainRow(name=domain_name, total_resource_slots=ResourceSlot()))
         db_sess.add(
             UserResourcePolicyRow(
                 name=policy_name,
@@ -256,7 +253,6 @@ async def _seed_user_with_role(
                 status=UserStatus.ACTIVE,
                 need_password_change=False,
                 sudo_session_enabled=False,
-                domain_name=domain_name,
             )
         )
         await db_sess.flush()
@@ -289,8 +285,6 @@ async def _grant_permission(
     cannot express.
     """
     async with db.begin_session() as db_sess:
-        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-        db_sess.add(DomainRow(name=domain_name, total_resource_slots=ResourceSlot()))
         db_sess.add(
             PermissionRow(
                 role_id=role_id,
@@ -320,8 +314,6 @@ async def _seed_vs_chain(
     entity membership per id: ``owner scope -> VS(owner) -> entities``."""
     vs_id = VirtualScopeID(uuid.uuid4())
     async with db.begin_session() as db_sess:
-        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-        db_sess.add(DomainRow(name=domain_name, total_resource_slots=ResourceSlot()))
         db_sess.add(
             VirtualScopeRow(
                 id=vs_id,
