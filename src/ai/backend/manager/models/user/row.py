@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import ipaddress
 import logging
-import uuid as uuid_mod
 from collections.abc import Sequence
 from datetime import datetime
 from typing import (
@@ -28,6 +27,7 @@ from sqlalchemy.sql.expression import SQLColumnExpression
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.scope import ScopeID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -110,7 +110,7 @@ def _get_default_keypair_join_condition() -> Any:
 class UserRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "users"
 
-    uuid: Mapped[uuid_mod.UUID] = mapped_column(
+    uuid: Mapped[UserID] = mapped_column(
         "uuid", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     username: Mapped[str] = mapped_column(
