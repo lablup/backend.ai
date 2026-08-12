@@ -536,7 +536,7 @@ class TestUserAdapterConversion:
             status_info=None,
             created_at=None,
             modified_at=None,
-            domain_name="default",
+            domain_name=None,
             domain_id=DomainID(uuid4()),
             role=DataUserRole.USER,
             resource_policy="default",
@@ -564,7 +564,7 @@ class TestUserAdapterConversion:
         assert dto.status_info is None
         assert dto.created_at is None
         assert dto.modified_at is None
-        assert dto.domain_name == "default"
+        assert dto.domain_name is None
         assert dto.role == UserRoleDTO.USER
         assert dto.resource_policy == "default"
         assert dto.allowed_client_ip is None

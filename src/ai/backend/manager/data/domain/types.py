@@ -32,6 +32,7 @@ class DomainData:
     name: str
     description: str | None
     is_active: bool
+    is_default: bool
     created_at: datetime = field(compare=False)
     modified_at: datetime = field(compare=False)
     total_resource_slots: ResourceSlot

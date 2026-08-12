@@ -24,6 +24,7 @@ def _make_domain_node(
     integration_name: str | None = "integration-123",
     allowed_docker_registries: list[str] | None = None,
     is_active: bool = True,
+    is_default: bool = False,
     created_at: datetime | None = None,
     modified_at: datetime | None = None,
 ) -> DomainNode:
@@ -40,6 +41,7 @@ def _make_domain_node(
         ),
         lifecycle=DomainLifecycleInfo(
             is_active=is_active,
+            is_default=is_default,
             created_at=created_at or now,
             modified_at=modified_at or now,
         ),
@@ -59,6 +61,7 @@ class TestDomainV2GQL:
             integration_name="integration-123",
             allowed_docker_registries=["docker.io", "ghcr.io"],
             is_active=True,
+            is_default=False,
             created_at=created,
             modified_at=modified,
         )
@@ -102,6 +105,7 @@ class TestDomainV2GQL:
             description=None,
             integration_name=None,
             is_active=False,
+            is_default=False,
         )
 
         domain_gql = DomainV2GQL.from_pydantic(dto)

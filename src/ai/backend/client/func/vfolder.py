@@ -474,7 +474,7 @@ class VFolderByName(BaseFunction):
 
                 params = {"token": download_info["token"]}
                 if dst_dir is not None:
-                    params["dst_dir"] = dst_dir
+                    params["dst_dir"] = str(dst_dir)
                 download_url = URL(overriden_url).with_query(params)
             await self._download_file(
                 file_path, download_url, chunk_size, max_retries, show_progress
@@ -514,7 +514,7 @@ class VFolderByName(BaseFunction):
                         )
                 params = {"token": upload_info["token"]}
                 if dst_dir is not None:
-                    params["dst_dir"] = dst_dir
+                    params["dst_dir"] = str(dst_dir)
                 upload_url = URL(overriden_url).with_query(params)
             tus_client = client.TusClient()
             if basedir:

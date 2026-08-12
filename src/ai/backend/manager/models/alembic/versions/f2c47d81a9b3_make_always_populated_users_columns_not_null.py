@@ -13,8 +13,6 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.engine import Connection
 
-from ai.backend.manager.models.base import GUID
-
 # revision identifiers, used by Alembic.
 revision = "f2c47d81a9b3"
 down_revision = "dfab9fd24208"
@@ -37,7 +35,6 @@ def _backfill(bind: Connection) -> None:
 def upgrade() -> None:
     _backfill(op.get_bind())
 
-    op.alter_column("users", "domain_id", existing_type=GUID(), nullable=False)
     op.alter_column("users", "role", existing_type=sa.String(length=64), nullable=False)
     op.alter_column(
         "users",
@@ -50,7 +47,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.alter_column("users", "domain_id", existing_type=GUID(), nullable=True)
     op.alter_column("users", "role", existing_type=sa.String(length=64), nullable=True)
     op.alter_column(
         "users",

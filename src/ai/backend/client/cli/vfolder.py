@@ -309,6 +309,16 @@ def info(name: str) -> None:
     ),
 )
 @click.option(
+    "-d",
+    "--dst-dir",
+    type=Path,
+    default=None,
+    help=(
+        "The destination directory inside the virtual folder. "
+        "[default: the root of the virtual folder]"
+    ),
+)
+@click.option(
     "-r",
     "--recursive",
     is_flag=True,
@@ -338,6 +348,7 @@ def upload(
     name: str,
     filenames: tuple[Path, ...],
     base_dir: Path | None,
+    dst_dir: Path | None,
     recursive: bool,
     chunk_size: int,
     override_storage_proxy: dict[str, str] | None,
@@ -355,6 +366,7 @@ def upload(
             _ = session.VFolder(name).upload(
                 filenames,
                 basedir=base_dir,
+                dst_dir=dst_dir,
                 recursive=recursive,
                 chunk_size=chunk_size,
                 show_progress=True,
