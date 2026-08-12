@@ -6,7 +6,7 @@ since ``bae1a7326e8a``. The marker records it instead, the way
 it back so the marker always names one.
 
 Revision ID: b9e3a7c14f28
-Revises: dfab9fd24208
+Revises: f2c47d81a9b3
 Create Date: 2026-08-12 19:40:00.000000
 
 """
@@ -16,7 +16,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "b9e3a7c14f28"
-down_revision = "dfab9fd24208"
+down_revision = "f2c47d81a9b3"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
