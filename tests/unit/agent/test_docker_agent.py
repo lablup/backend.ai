@@ -1,5 +1,5 @@
 """
-Unit tests for `DockerKernelCreationContext` helpers.
+Unit tests for `ai.backend.agent.docker.agent` helpers.
 """
 
 from __future__ import annotations
@@ -11,7 +11,25 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from aiodocker.exceptions import DockerError
 
-from ai.backend.agent.docker.agent import DockerKernelCreationContext
+from ai.backend.agent.docker.agent import (
+    DockerKernelCreationContext,
+    parse_distro_from_ldd_output,
+)
+
+LDD_PRELOAD_ERROR_LINES = "\n".join([
+    "ERROR: ld.so: object '/opt/kernel/libbaihook.so' from LD_PRELOAD cannot be preloaded"
+    " (file too short): ignored.",
+    "ERROR: ld.so: object '/opt/kernel/libnvmlhook.ubuntu18.04.x86_64.so' from LD_PRELOAD cannot"
+    " be preloaded (file too short): ignored.",
+    "ERROR: ld.so: object '/opt/kernel/libcudahook.ubuntu18.04.x86_64.so' from /etc/ld.so.preload"
+    " cannot be preloaded (file too short): ignored.",
+])
+LDD_GLIBC_TRAILER = "\n".join([
+    "Copyright (C) 2024 Free Software Foundation, Inc.",
+    "This is free software; see the source for copying conditions.  There is NO",
+    "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+    "Written by Roland McGrath and Ulrich Drepper.",
+])
 
 
 def _make_container_show_response(networks: dict[str, dict[str, Any] | None]) -> dict[str, Any]:
@@ -30,6 +48,65 @@ def _make_docker_mock(network_get: AsyncMock | None = None) -> MagicMock:
     docker.networks = MagicMock()
     docker.networks.get = network_get if network_get is not None else AsyncMock()
     return docker
+
+
+class TestParseDistroFromLddOutput:
+    def test_glibc_version_on_first_line(self) -> None:
+        output = f"ldd (GNU libc) 2.35\n{LDD_GLIBC_TRAILER}"
+
+        assert parse_distro_from_ldd_output(output) == "ubuntu22.04"
+
+    def test_glibc_version_after_ld_preload_errors(self) -> None:
+        output = "\n".join([
+            LDD_PRELOAD_ERROR_LINES,
+            "ldd (Ubuntu GLIBC 2.39-0ubuntu8.7) 2.39",
+            LDD_GLIBC_TRAILER,
+        ])
+
+        assert parse_distro_from_ldd_output(output) == "ubuntu24.04"
+
+    def test_glibc_version_with_carriage_returns(self) -> None:
+        output = "ERROR: ld.so: ignored.\r\nldd (Ubuntu GLIBC 2.31-0ubuntu9) 2.31\r\n"
+
+        assert parse_distro_from_ldd_output(output) == "ubuntu20.04"
+
+    def test_glibc_version_with_patch_component(self) -> None:
+        output = "ldd (GNU libc) 2.39.1"
+
+        assert parse_distro_from_ldd_output(output) == "ubuntu24.04"
+
+    def test_unknown_glibc_version_falls_back_to_lower_known_version(self) -> None:
+        output = "ldd (GNU libc) 2.33"
+
+        assert parse_distro_from_ldd_output(output) == "ubuntu20.04"
+
+    def test_glibc_version_older_than_known_versions(self) -> None:
+        output = "ldd (GNU libc) 2.12"
+
+        assert parse_distro_from_ldd_output(output) == "centos7.6"
+
+    def test_glibc_version_newer_than_known_versions(self) -> None:
+        output = "ldd (GNU libc) 2.41"
+
+        assert parse_distro_from_ldd_output(output) == "ubuntu24.04"
+
+    def test_musl_banner_on_first_line(self) -> None:
+        output = "musl libc (x86_64)\nVersion 1.2.4\nDynamic Program Loader"
+
+        assert parse_distro_from_ldd_output(output) == "alpine3.8"
+
+    def test_musl_banner_after_ld_preload_errors(self) -> None:
+        output = f"{LDD_PRELOAD_ERROR_LINES}\nmusl libc (x86_64)\nVersion 1.2.4"
+
+        assert parse_distro_from_ldd_output(output) == "alpine3.8"
+
+    def test_returns_none_when_no_libc_banner_found(self) -> None:
+        output = f"{LDD_PRELOAD_ERROR_LINES}\nldd: command not found"
+
+        assert parse_distro_from_ldd_output(output) is None
+
+    def test_returns_none_for_empty_output(self) -> None:
+        assert parse_distro_from_ldd_output("") is None
 
 
 @pytest.fixture

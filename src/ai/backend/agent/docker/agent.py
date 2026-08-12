@@ -166,7 +166,7 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 eof_sentinel = Sentinel.TOKEN
 
-LDD_GLIBC_REGEX = re.compile(r"^ldd \([^\)]+\) ([\d\.]+)$")
+LDD_GLIBC_REGEX = re.compile(r"^ldd \([^\)]+\) (\d+\.\d+)[\d\.]*$")
 LDD_MUSL_REGEX = re.compile(r"^musl libc .+$")
 
 known_glibc_distros: Final[dict[float, str]] = {
@@ -178,6 +178,23 @@ known_glibc_distros: Final[dict[float, str]] = {
     2.35: "ubuntu22.04",
     2.39: "ubuntu24.04",
 }
+
+
+def parse_distro_from_ldd_output(output: str) -> str | None:
+    for line in output.splitlines():
+        stripped_line = line.strip()
+        if m := LDD_GLIBC_REGEX.search(stripped_line):
+            version = float(m.group(1))
+            if version in known_glibc_distros:
+                return known_glibc_distros[version]
+            for idx, known_version in enumerate(known_glibc_distros.keys()):
+                if version < known_version:
+                    return list(known_glibc_distros.values())[max(idx - 1, 0)]
+            return list(known_glibc_distros.values())[-1]
+        if LDD_MUSL_REGEX.search(stripped_line):
+            return "alpine3.8"
+    return None
+
 
 deeplearning_image_keys = {
     "tensorflow",
@@ -1753,21 +1770,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             await container.stop()
             await container.delete()
             log.debug("response: {}", container_log)
-            version_lines = container_log[0].splitlines()
-            if m := LDD_GLIBC_REGEX.search(version_lines[0]):
-                version = float(m.group(1))
-                if version in known_glibc_distros:
-                    distro = known_glibc_distros[version]
-                else:
-                    for idx, known_version in enumerate(known_glibc_distros.keys()):
-                        if version < known_version:
-                            distro = list(known_glibc_distros.values())[idx - 1]
-                            break
-                    else:
-                        distro = list(known_glibc_distros.values())[-1]
-            elif m := LDD_MUSL_REGEX.search(version_lines[0]):
-                distro = "alpine3.8"
-            else:
+            distro = parse_distro_from_ldd_output("\n".join(container_log))
+            if distro is None:
                 raise RuntimeError("Could not determine the C library variant.")
             await self.valkey_stat_client.set_image_distro(image_id, distro)
             return distro
