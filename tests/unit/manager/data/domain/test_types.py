@@ -17,6 +17,7 @@ def _make_domain_data() -> DomainData:
         name="default",
         description=None,
         is_active=True,
+        is_default=False,
         created_at=now,
         modified_at=now,
         total_resource_slots=ResourceSlot(),

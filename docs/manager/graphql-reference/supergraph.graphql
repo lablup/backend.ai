@@ -6789,6 +6789,11 @@ type DomainLifecycleInfo
   """
   isActive: Boolean!
 
+  """
+  Whether this is the default domain. Added in 26.9.0. At most one domain carries the marker.
+  """
+  isDefault: Boolean!
+
   """Timestamp when the domain was created."""
   createdAt: DateTime!
 

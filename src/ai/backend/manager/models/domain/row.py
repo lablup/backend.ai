@@ -73,6 +73,7 @@ def row_to_data(row: DomainRow | Row[Any]) -> DomainData:
         name=row.name,
         description=row.description,
         is_active=row.is_active,
+        is_default=row.is_default,
         created_at=row.created_at,
         modified_at=row.modified_at,
         total_resource_slots=row.total_resource_slots,

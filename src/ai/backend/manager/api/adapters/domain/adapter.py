@@ -396,6 +396,7 @@ class DomainAdapter(BaseAdapter):
             ),
             lifecycle=DomainLifecycleInfo(
                 is_active=data.is_active,
+                is_default=data.is_default,
                 created_at=data.created_at,
                 modified_at=data.modified_at,
             ),
