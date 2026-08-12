@@ -56,6 +56,9 @@ services:
       - {{BASE_PATH}}/manager.toml:/etc/backend.ai/manager.toml:ro
       # the image entrypoint generates the RPC keypair here at first start
       - {{BASE_PATH}}/fixtures:/app/fixtures
+      # staging dir for extra plugin wheels (e.g. accelerator plugins):
+      # install them with `docker exec <svc> pip install /app/wheelhouse/*.whl`
+      - {{BASE_PATH}}/wheelhouse:/app/wheelhouse:ro
     restart: unless-stopped
 
   # Non-privileged twin of the manager used only for one-off management
@@ -111,6 +114,9 @@ services:
       - /var/lib/backend.ai:/var/lib/backend.ai
       - /tmp/backend.ai:/tmp/backend.ai
       - /vfroot/local:/vfroot/local
+      # staging dir for extra plugin wheels (e.g. accelerator plugins):
+      # install them with `docker exec <svc> pip install /app/wheelhouse/*.whl`
+      - {{BASE_PATH}}/wheelhouse:/app/wheelhouse:ro
     restart: unless-stopped
 
   webserver:
