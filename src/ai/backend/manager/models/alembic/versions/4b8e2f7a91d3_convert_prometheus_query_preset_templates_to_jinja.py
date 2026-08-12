@@ -26,7 +26,6 @@ down_revision = "37d711158a8c"
 branch_labels = None
 depends_on = None
 
-_PLACEHOLDER_NAMES = frozenset({"labels", "window", "group_by"})
 _BRACE_BLOCK_RE = re.compile(r"\{([^{}]*)\}")
 
 
@@ -43,7 +42,7 @@ def _escape_non_placeholders(template: str) -> str:
         inside_escaped_braces = (
             text.rfind("{{", 0, start) > text.rfind("}}", 0, start) and text.find("}}", end) != -1
         )
-        if name not in _PLACEHOLDER_NAMES:
+        if name not in ("labels", "window", "group_by"):
             return match.group(0) if already_wrapped else "{{" + name + "}}"
         if name != "labels":
             return match.group(0)
@@ -62,7 +61,12 @@ def _to_jinja(template: str) -> str:
         parsed = list(string.Formatter().parse(_escape_non_placeholders(template)))
     except ValueError:
         return template
-    if not any(field in _PLACEHOLDER_NAMES for _, field, _, _ in parsed):
+    has_placeholder = False
+    for _literal, field, _spec, _conv in parsed:
+        if field in ("labels", "window", "group_by"):
+            has_placeholder = True
+            break
+    if not has_placeholder:
         try:
             jinja2.Environment().parse(template)
             return template
@@ -73,7 +77,9 @@ def _to_jinja(template: str) -> str:
         out += literal
         if field is not None:
             if out.endswith("{"):
-                out += " "  # `{` directly before `{{` breaks the Jinja lexer
+                # `{` directly before `{{` breaks the Jinja lexer (`{{{` lexes as `{{` + `{`).
+                # So we add a space: `metric{` + `{{ labels }}` → `metric{ {{ labels }}`
+                out += " "
             out += "{{ " + field + " }}"
     return out
 
@@ -83,13 +89,15 @@ def upgrade() -> None:
     rows = conn.execute(sa.text("SELECT id, query_template FROM prometheus_query_presets")).all()
     for row_id, template in rows:
         converted = _to_jinja(template)
-        if converted != template:
-            conn.execute(
-                sa.text(
-                    "UPDATE prometheus_query_presets SET query_template = :template WHERE id = :id"
-                ),
-                parameters={"template": converted, "id": row_id},
-            )
+        # Skip if the template is already Jinja or otherwise unchanged by the conversion.
+        if converted == template:
+            continue
+        conn.execute(
+            sa.text(
+                "UPDATE prometheus_query_presets SET query_template = :template WHERE id = :id"
+            ),
+            parameters={"template": converted, "id": row_id},
+        )
 
 
 def downgrade() -> None:
