@@ -775,14 +775,14 @@ class ExcludeSessionIdleChecksInputGQL(PydanticInputMixin[ExcludeSessionIdleChec
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        description="Input for re-including previously excluded session pairs into idle checks.",
+        description="Input for including session pairs into idle checks.",
         added_version=NEXT_RELEASE_VERSION,
     ),
     name="IncludeSessionIdleChecksInput",
 )
 class IncludeSessionIdleChecksInputGQL(PydanticInputMixin[IncludeSessionIdleChecksInputDTO]):
     targets: list[SessionIdleCheckTargetInputGQL] = gql_field(
-        description="Checker-session pairs to re-include; checks restart from the initial grace period."
+        description="Checker-session pairs to include; checks start from the initial grace period."
     )
 
 
@@ -816,7 +816,7 @@ class ExcludeSessionIdleChecksFailureInfoGQL:
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Why one pair could not be re-included into idle checks.",
+        description="Why one pair could not be included into idle checks.",
     ),
     model=IncludeSessionIdleChecksFailureInfoDTO,
     name="IncludeSessionIdleChecksFailureInfo",
@@ -824,7 +824,7 @@ class ExcludeSessionIdleChecksFailureInfoGQL:
 class IncludeSessionIdleChecksFailureInfoGQL:
     checker_id: ID = gql_field(description="Idle checker of the pair the failure applies to.")
     session_id: ID = gql_field(description="Session of the pair the failure applies to.")
-    message: str = gql_field(description="Why the pair was not re-included.")
+    message: str = gql_field(description="Why the pair was not included.")
 
 
 @gql_pydantic_type(
@@ -847,15 +847,15 @@ class ExcludeSessionIdleChecksPayloadGQL:
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Payload returned after re-including session pairs into idle checks.",
+        description="Payload returned after including session pairs into idle checks.",
     ),
     model=IncludeSessionIdleChecksPayloadDTO,
     name="IncludeSessionIdleChecksPayload",
 )
 class IncludeSessionIdleChecksPayloadGQL:
     success: list[SessionIdleCheckTargetInfoGQL] = gql_field(
-        description="Pairs successfully re-included."
+        description="Pairs successfully included."
     )
     failed: list[IncludeSessionIdleChecksFailureInfoGQL] = gql_field(
-        description="Pairs that could not be re-included."
+        description="Pairs that could not be included."
     )

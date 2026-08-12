@@ -312,7 +312,7 @@ class ExcludeSessionIdleChecksPayload(BaseResponseModel):
 
 
 class IncludeSessionIdleChecksFailureInfo(BaseResponseModel):
-    """Why one pair could not be re-included into idle checks."""
+    """Why one pair could not be included into idle checks."""
 
     checker_id: IdleCheckerID = Field(
         description=f"Added in {NEXT_RELEASE_VERSION}. Idle checker of the pair the failure applies to."
@@ -321,18 +321,18 @@ class IncludeSessionIdleChecksFailureInfo(BaseResponseModel):
         description=f"Added in {NEXT_RELEASE_VERSION}. Session of the pair the failure applies to."
     )
     message: str = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Why the pair was not re-included."
+        description=f"Added in {NEXT_RELEASE_VERSION}. Why the pair was not included."
     )
 
 
 class IncludeSessionIdleChecksPayload(BaseResponseModel):
-    """Payload for idle-check re-inclusion with per-pair partial success."""
+    """Payload for idle-check inclusion with per-pair partial success."""
 
     success: list[SessionIdleCheckTargetInfo] = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs successfully re-included."
+        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs successfully included."
     )
     failed: list[IncludeSessionIdleChecksFailureInfo] = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs that could not be re-included."
+        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs that could not be included."
     )
 
 

@@ -29392,10 +29392,10 @@
         "type": "object"
       },
       "IncludeSessionIdleChecksInput": {
-        "description": "Input for re-including previously excluded session pairs into idle checks.",
+        "description": "Input for including session pairs into idle checks.",
         "properties": {
           "targets": {
-            "description": "Added in 26.9.0. Checker-session pairs to re-include; checks restart from the initial grace period.",
+            "description": "Added in 26.9.0. Checker-session pairs to include; checks start from the initial grace period.",
             "items": {
               "$ref": "#/components/schemas/SessionIdleCheckTargetInput"
             },
@@ -52040,7 +52040,7 @@
           }
         },
         "parameters": [],
-        "description": "Re-include previously excluded checker-session pairs into idle checks.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Include checker-session pairs into idle checks.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/sessions/{session_id}/services/start": {

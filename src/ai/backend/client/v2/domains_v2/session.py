@@ -180,7 +180,7 @@ class V2SessionClient(BaseDomainClient):
         self,
         request: IncludeSessionIdleChecksInput,
     ) -> IncludeSessionIdleChecksPayload:
-        """Re-include previously excluded checker-session pairs into idle checks."""
+        """Include checker-session pairs into idle checks."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/include-idle-checks",

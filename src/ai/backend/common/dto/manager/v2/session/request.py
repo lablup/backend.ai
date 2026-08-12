@@ -408,12 +408,12 @@ class ExcludeSessionIdleChecksInput(BaseRequestModel):
 
 
 class IncludeSessionIdleChecksInput(BaseRequestModel):
-    """Input for re-including previously excluded session pairs into idle checks."""
+    """Input for including session pairs into idle checks."""
 
     targets: list[SessionIdleCheckTargetInput] = Field(
         description=(
-            f"Added in {NEXT_RELEASE_VERSION}. Checker-session pairs to re-include; "
-            "checks restart from the initial grace period."
+            f"Added in {NEXT_RELEASE_VERSION}. Checker-session pairs to include; "
+            "checks start from the initial grace period."
         )
     )
 

@@ -6218,9 +6218,7 @@ type ImportArtifactsPayload {
   tasks: [ArtifactRevisionImportTask!]!
 }
 
-"""
-Added in 26.9.0. Why one pair could not be re-included into idle checks.
-"""
+"""Added in 26.9.0. Why one pair could not be included into idle checks."""
 type IncludeSessionIdleChecksFailureInfo {
   """Idle checker of the pair the failure applies to."""
   checkerId: ID!
@@ -6228,28 +6226,26 @@ type IncludeSessionIdleChecksFailureInfo {
   """Session of the pair the failure applies to."""
   sessionId: ID!
 
-  """Why the pair was not re-included."""
+  """Why the pair was not included."""
   message: String!
 }
 
-"""
-Added in 26.9.0. Input for re-including previously excluded session pairs into idle checks.
-"""
+"""Added in 26.9.0. Input for including session pairs into idle checks."""
 input IncludeSessionIdleChecksInput {
   """
-  Checker-session pairs to re-include; checks restart from the initial grace period.
+  Checker-session pairs to include; checks start from the initial grace period.
   """
   targets: [SessionIdleCheckTargetInput!]!
 }
 
 """
-Added in 26.9.0. Payload returned after re-including session pairs into idle checks.
+Added in 26.9.0. Payload returned after including session pairs into idle checks.
 """
 type IncludeSessionIdleChecksPayload {
-  """Pairs successfully re-included."""
+  """Pairs successfully included."""
   success: [SessionIdleCheckTargetInfo!]!
 
-  """Pairs that could not be re-included."""
+  """Pairs that could not be included."""
   failed: [IncludeSessionIdleChecksFailureInfo!]!
 }
 
@@ -9035,7 +9031,7 @@ type Mutation {
   excludeSessionIdleChecks(input: ExcludeSessionIdleChecksInput!): ExcludeSessionIdleChecksPayload
 
   """
-  Added in 26.9.0. Re-include previously excluded checker-session pairs into idle checks, restarting from the initial grace period. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
+  Added in 26.9.0. Include checker-session pairs into idle checks, resetting them so checks start from the initial grace period. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
   """
   includeSessionIdleChecks(input: IncludeSessionIdleChecksInput!): IncludeSessionIdleChecksPayload
 }

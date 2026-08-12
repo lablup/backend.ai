@@ -275,7 +275,7 @@ def exclude_idle_checks(targets: tuple[str, ...]) -> None:
 @session.command(name="include-idle-checks")
 @click.argument("targets", nargs=-1, required=True)
 def include_idle_checks(targets: tuple[str, ...]) -> None:
-    """Re-include previously excluded checker-session pairs into idle checks.
+    """Include checker-session pairs into idle checks.
 
     Each TARGET is a CHECKER_ID:SESSION_ID pair.
     """

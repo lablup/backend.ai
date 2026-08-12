@@ -163,7 +163,7 @@ class V2SessionHandler:
         self,
         body: BodyParam[IncludeSessionIdleChecksInput],
     ) -> APIResponse:
-        """Re-include previously excluded checker-session pairs into idle checks."""
+        """Include checker-session pairs into idle checks."""
         result = await self._adapter.include_idle_checks(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 

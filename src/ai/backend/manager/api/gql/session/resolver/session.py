@@ -241,8 +241,8 @@ async def exclude_session_idle_checks(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Re-include previously excluded checker-session pairs into idle checks, "
-            "restarting from the initial grace period. Per-session RBAC permission "
+            "Include checker-session pairs into idle checks, resetting them so checks "
+            "start from the initial grace period. Per-session RBAC permission "
             "is enforced by the bulk validator; any denial fails the whole request."
         ),
     ),
@@ -251,7 +251,7 @@ async def include_session_idle_checks(
     input: IncludeSessionIdleChecksInputGQL,
     info: Info[StrawberryGQLContext],
 ) -> IncludeSessionIdleChecksPayloadGQL | None:
-    """Re-include one or more checker-session pairs into idle checks."""
+    """Include one or more checker-session pairs into idle checks."""
     payload = await info.context.adapters.session.include_idle_checks(input.to_pydantic())
     return IncludeSessionIdleChecksPayloadGQL(
         success=[
