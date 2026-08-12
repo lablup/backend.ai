@@ -39,6 +39,7 @@ from ai.backend.manager.data.session.types import (
 )
 from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
 from ai.backend.manager.models.kernel.conditions import KernelConditions
+from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import BulkCreator
@@ -58,6 +59,7 @@ from ai.backend.manager.sokovan.scheduling_controller import SchedulingControlle
 from ai.backend.manager.types import DistributedLockFactory
 from ai.backend.manager.views.sokovan.lifecycle import (
     KernelCreationInfo,
+    LastPhase,
     SessionWithKernels,
 )
 from ai.backend.manager.views.sokovan.result import PromotionSpec
@@ -140,7 +142,8 @@ class FailureClassificationResult:
 
     Classification priority (first match wins):
     1. give_up: per-handler ``max_retry_count`` is set AND
-       ``phase_attempts`` reached it. ``None`` means "no retry limit"
+       the last phase record's ``attempts`` reached it. ``None`` means
+       "no retry limit"
        — give-up never fires.
     2. expired: per-handler ``timeout`` is set AND phase elapsed time
        exceeded it. ``None`` means "no timeout" — expired never fires.
@@ -745,19 +748,11 @@ class ScheduleCoordinator:
         # Extract session IDs for recorder entity_ids
         session_ids = [s.session_info.identity.id for s in sessions]
 
-        # Populate phase_attempts and phase_started_at from scheduling history for failure classification
+        # Carry the last phase record onto the sessions for failure classification
         # Get last history records (regardless of phase), then compare phase at application level
         history_map = await self._repository.get_last_session_histories(session_ids)
         handler_name = handler.name()
-        for session in sessions:
-            history = history_map.get(session.session_info.identity.id)
-            # Only use history data if the last history is for the current phase
-            if history and history.phase == handler_name:
-                session.phase_attempts = history.attempts
-                session.phase_started_at = history.created_at
-            else:
-                session.phase_attempts = 0
-                session.phase_started_at = None
+        self._populate_phase_history(sessions, history_map, handler_name)
 
         # Create recorder scoped to this resource group
         recorder_scope = f"{schedule_type.value}:{resource_group_id}"
@@ -801,6 +796,30 @@ class ScheduleCoordinator:
                     schedule_type.value,
                     resource_group_id,
                 )
+
+    def _populate_phase_history(
+        self,
+        sessions: list[SessionWithKernels],
+        history_map: Mapping[SessionId, SessionSchedulingHistoryRow],
+        handler_name: str,
+    ) -> None:
+        """Carry this phase's last history record onto the sessions.
+
+        Only the last record counts, and only while it is still this phase's;
+        anything else leaves the session without one. Skips are carried like
+        any other record — ``LastPhase.result`` says what was counted, and the
+        give-up rule in :meth:`_classify_failures` is what excludes skips.
+        """
+        for session in sessions:
+            history = history_map.get(session.session_info.identity.id)
+            if history and history.phase == handler_name:
+                session.last_phase = LastPhase(
+                    attempts=history.attempts,
+                    started_at=history.created_at,
+                    result=SchedulingResult(history.result),
+                )
+            else:
+                session.last_phase = None
 
     async def _process_promotion_resource_group(
         self,
@@ -1120,7 +1139,7 @@ class ScheduleCoordinator:
             handler: The lifecycle handler that produced the result
             result: Execution result containing successes, failures, and skipped
             records: Mapping of session IDs to their execution records for sub_steps
-            sessions: Original sessions with phase_attempts for failure classification
+            sessions: Original sessions with last_phase for failure classification
 
         Returns:
             FailureClassificationResult if there were failures, None otherwise.
@@ -1230,13 +1249,15 @@ class ScheduleCoordinator:
         is ``None``; ``expired`` never fires when ``timeout`` is ``None``.
 
         Classification priority (first match wins):
-        1. give_up: max_retry_count set AND phase_attempts >= max_retry_count
+        1. give_up: max_retry_count set AND last_phase.attempts >= max_retry_count,
+           and those attempts are not skips (a session queued behind a blocked
+           one was never attempted, so it may not be given up on)
         2. expired: timeout set AND phase elapsed > timeout
         3. need_retry: default
 
         Args:
             failures: Failed session transition info
-            sessions: Original sessions with phase_attempts and phase_started_at populated
+            sessions: Original sessions with last_phase populated
             current_time: Current database time for timeout comparison
             handler_name: ``SessionLifecycleHandler.name()`` for resolving
                 per-handler policy from ``SessionHandlerOptions``
@@ -1257,14 +1278,21 @@ class ScheduleCoordinator:
                 continue
 
             policy = session.session_info.handler_options.resolve(handler_name)
+            last_phase = session.last_phase
 
-            # 1. Check max retries exceeded → give_up
-            if policy.is_retry_exhausted(session.phase_attempts):
+            # 1. Check max retries exceeded → give_up.
+            # A skip is recorded like any other result but is not an attempt:
+            # a session queued behind a blocked one may not be given up on for
+            # work it never got to do.
+            attempts = last_phase.attempts if last_phase is not None else 0
+            was_skipped = last_phase is not None and last_phase.result == SchedulingResult.SKIPPED
+            if not was_skipped and policy.is_retry_exhausted(attempts):
                 give_up_failures.append(failure)
                 continue
 
             # 2. Check timeout exceeded → expired
-            if policy.is_timed_out(session.phase_started_at, current_time):
+            started_at = last_phase.started_at if last_phase is not None else None
+            if policy.is_timed_out(started_at, current_time):
                 expired_failures.append(failure)
                 continue
 

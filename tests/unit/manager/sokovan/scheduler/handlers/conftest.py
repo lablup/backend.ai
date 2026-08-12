@@ -87,8 +87,6 @@ def _create_session(
     kernel_status: KernelStatus = KernelStatus.PENDING,
     session_type: SessionTypes = SessionTypes.INTERACTIVE,
     cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
-    phase_attempts: int = 0,
-    phase_started_at: datetime | None = None,
 ) -> SessionWithKernels:
     """Create SessionWithKernels with sensible defaults."""
     sid = session_id or SessionId(uuid4())
@@ -238,8 +236,6 @@ def _create_session(
     return SessionWithKernels(
         session_info=session_info,
         kernel_infos=kernel_infos,
-        phase_attempts=phase_attempts,
-        phase_started_at=phase_started_at,
     )
 
 

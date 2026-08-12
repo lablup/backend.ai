@@ -51,6 +51,7 @@ from ai.backend.manager.views.sokovan.snapshot import (
 from ai.backend.manager.views.sokovan.workload import (
     KernelWorkload,
     ResourceRequest,
+    SessionDependencyInfo,
     SessionGroupPolicy,
     SessionPlacement,
     SessionWorkload,
@@ -72,6 +73,9 @@ def _make_workload(
     priority: int = 0,
     cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
     session_group: SessionGroupPolicy | None = None,
+    architecture: str = "x86_64",
+    session_type: SessionTypes = SessionTypes.INTERACTIVE,
+    requested_starts_at: datetime | None = None,
 ) -> SessionWorkload:
     if kernel_slots is None:
         kernel_slots = [{"cpu": "1", "mem": "1024"}]
@@ -91,7 +95,7 @@ def _make_workload(
             kernels=[
                 KernelWorkload(
                     kernel_id=KernelId(uuid.uuid4()),
-                    architecture=ArchName("x86_64"),
+                    architecture=ArchName(architecture),
                     requested_slots=ResourceRequest(
                         slots={
                             ResourceSlotName(name): Decimal(amount)
@@ -107,8 +111,8 @@ def _make_workload(
         ),
         priority=priority,
         job_priority=0,
-        session_type=SessionTypes.INTERACTIVE,
-        requested_starts_at=None,
+        session_type=session_type,
+        requested_starts_at=requested_starts_at,
         is_preemptible=False,
     )
 
@@ -141,16 +145,23 @@ def _make_scheduling_data(
     agents: list[AgentMeta] | None = None,
     scheduler: str = "fifo",
     agent_selection_strategy: AgentSelectionStrategy = AgentSelectionStrategy.CONCENTRATED,
+    session_dependencies: Mapping[SessionId, list[SessionDependencyInfo]] | None = None,
+    resource_policy: ResourcePolicySnapshot | None = None,
+    max_container_count: int | None = None,
 ) -> SchedulingData:
     if agents is None:
         agents = [_make_agent_meta()]
+    if resource_policy is None:
+        resource_policy = ResourcePolicySnapshot(by_user={}, by_project={}, by_domain={})
     return SchedulingData(
         resource_group=ResourceGroupMeta(id=RESOURCE_GROUP_ID, name=RESOURCE_GROUP_NAME),
         workloads=workloads,
         system_snapshot=SystemSnapshot(
             resource_group=ResourceGroupScopeSnapshot(
                 resources=ResourceGroupResource(agents=agents),
-                session_dependencies=SessionDependencySnapshot(by_session={}),
+                session_dependencies=SessionDependencySnapshot(
+                    by_session=session_dependencies or {}
+                ),
                 policy=ResourceGroupSchedulingPolicy(
                     scheduler=scheduler,
                     agent_selection_strategy=agent_selection_strategy,
@@ -159,8 +170,8 @@ def _make_scheduling_data(
             ),
             global_scope=GlobalScopeSnapshot(
                 occupancy=ResourceOccupancySnapshot(by_user={}, by_project={}, by_domain={}),
-                resource_policy=ResourcePolicySnapshot(by_user={}, by_project={}, by_domain={}),
-                agent_limit=AgentLimit(max_container_count=None),
+                resource_policy=resource_policy,
+                agent_limit=AgentLimit(max_container_count=max_container_count),
             ),
             observed_at=datetime.now(UTC),
         ),
