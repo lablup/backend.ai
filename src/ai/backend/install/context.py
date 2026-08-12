@@ -2343,11 +2343,13 @@ class DockerContext(Context):
       manager-cli, the installer's one-off tool); the other services run on
       the compose project's bridge network with published ports, and
       ``_fixup_bridge_service_addresses`` rewrites their generated configs:
-      halfstack/coordinator addresses become compose service DNS names (the
-      halfstack definition is MERGED into the single generated compose file,
-      sharing its "half" network, with depends_on health gating), the
-      manager API address becomes ``host.docker.internal``, and bind
-      addresses become ``0.0.0.0``.
+      DB/etcd addresses become compose service DNS names (the halfstack
+      definition is MERGED into the single generated compose file, sharing
+      its "half" network, with depends_on health gating), the redis address
+      is the host's public IP + published port everywhere (it is shared
+      across both network profiles via etcd), the manager API address
+      becomes ``host.docker.internal``, and bind addresses become
+      ``0.0.0.0``.
     - No running service mounts the install directory. The daemon-visible
       state lives under fixed system paths with host==container path parity:
       ``/var/lib/backend.ai`` + ``/tmp/backend.ai`` (agent) and
@@ -2395,7 +2397,6 @@ class DockerContext(Context):
     # the include: in the services compose file); bridge services address
     # them with the CONTAINER-side ports, not the host-published ones.
     HALF_DB = "backendai-half-db"
-    HALF_REDIS = "backendai-half-redis"
     HALF_ETCD = "backendai-half-etcd"
     HALF_OTEL = "backendai-half-otel-collector"
 
@@ -2413,6 +2414,20 @@ class DockerContext(Context):
             loopback_aliases=("127.0.0.1", "0.0.0.0"),
         )
         service = info.service_config
+        # The redis address is consumed from BOTH network profiles — the
+        # host-network manager/agent read it from etcd (config/redis/addr)
+        # and the bridge services from their generated configs — so its face
+        # must be reachable from both: the host's public IP with the
+        # host-published port.
+        halfstack = info.halfstack_config
+        if halfstack.redis_addr is not None:
+            halfstack.redis_addr = ServerAddr(
+                bind=halfstack.redis_addr.bind,
+                face=HostPortPair(
+                    self.install_variable.public_facing_address,
+                    halfstack.redis_addr.bind.port,
+                ),
+            )
         # The agent hands these paths to the host Docker daemon as kernel
         # bind-mount sources, so they must be absolute paths under the fixed
         # system mounts (NOT the install directory, which no service mounts
@@ -2437,6 +2452,18 @@ class DockerContext(Context):
                 "rely on host-network, host-PID, and host-cgroup semantics that "
                 "Docker Desktop on macOS cannot provide.",
                 instruction="Use a Linux host, or the PACKAGE install mode on macOS.",
+            )
+        if self.install_variable.public_facing_address in (
+            "127.0.0.1",
+            "localhost",
+            "::1",
+            "0.0.0.0",
+        ):
+            raise PrerequisiteError(
+                "DOCKER install mode requires a non-loopback public facing "
+                "address: the bridge-networked service containers reach the "
+                "shared redis through it.",
+                instruction="Re-run with a routable host IP as the public facing address.",
             )
         if self.install_variable.with_harbor:
             raise PrerequisiteError(
@@ -2864,7 +2891,6 @@ class DockerContext(Context):
 
         def fixup_webserver(data: Any) -> None:
             data["api"]["endpoint"] = f"http://{self.HOST_ALIAS}:{service.manager_addr.face.port}"
-            data["session"]["redis"]["addr"] = f"{self.HALF_REDIS}:6379"
             fixup_otel(data)
 
         def fixup_storage_proxy(data: Any) -> None:
@@ -2884,13 +2910,9 @@ class DockerContext(Context):
         def fixup_coordinator(data: Any) -> None:
             data["db"]["addr"]["host"] = self.HALF_DB
             data["db"]["addr"]["port"] = 5432
-            data["redis"]["addr"]["host"] = self.HALF_REDIS
-            data["redis"]["addr"]["port"] = 6379
             fixup_otel(data)
 
         def fixup_worker(data: Any) -> None:
-            data["redis"]["addr"]["host"] = self.HALF_REDIS
-            data["redis"]["addr"]["port"] = 6379
             data["proxy_worker"]["coordinator_endpoint"] = (
                 f"http://appproxy-coordinator:{service.appproxy_coordinator_addr.bind.port}"
             )
