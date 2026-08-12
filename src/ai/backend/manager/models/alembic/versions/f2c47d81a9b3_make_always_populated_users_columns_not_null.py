@@ -5,12 +5,15 @@ creation fails when it does not exist, and the three remaining columns fall
 back to a value when the spec leaves them out. No update path can write NULL —
 they all travel as ``OptionalState``.
 
-Rows that predate those guarantees are repaired first: the three columns with
-an obvious value are backfilled, and ``domain_id`` is re-derived from
-``domain_name`` the way ``c1a7d3f05e28`` did, which is what a row missing it
-after that migration needs. A row with no ``domain_name`` cannot be repaired —
-there is nothing to derive the domain from — so the migration stops and names
-the count instead of guessing or deleting.
+Rows that predate those guarantees are repaired where the value is obvious:
+the two flags default to false, and ``domain_id`` is re-derived from
+``domain_name`` the way ``c1a7d3f05e28`` did. A missing domain or role is not
+repaired — picking a domain would be a guess and picking a role would hand out
+or take away privileges — so the migration stops and names the count instead.
+
+``totp_activated`` has been NOT NULL in the database since ``ac4e179c57fe``;
+the column here is only for databases created from the model metadata, which
+carried the nullable annotation this revision corrects.
 
 Revision ID: f2c47d81a9b3
 Revises: c8d51e7a3b62
@@ -39,7 +42,6 @@ _COLUMNS = (
 
 def upgrade() -> None:
     conn = op.get_bind()
-    conn.execute(sa.text("UPDATE users SET role = 'user' WHERE role IS NULL"))
     conn.execute(
         sa.text("UPDATE users SET need_password_change = false WHERE need_password_change IS NULL")
     )
@@ -54,19 +56,29 @@ def upgrade() -> None:
     )
 
     stranded = conn.execute(
-        sa.text("SELECT count(*) FROM users WHERE domain_name IS NULL OR domain_id IS NULL")
+        sa.text("""
+            SELECT count(*) FROM users
+            WHERE domain_name IS NULL OR domain_id IS NULL OR role IS NULL
+        """)
     ).scalar_one()
     if stranded:
         raise RuntimeError(
-            f"{stranded} user(s) have no domain, and this migration cannot pick one for them. "
-            "Assign each a domain (or delete the account) and run the migration again: "
-            "SELECT uuid, email FROM users WHERE domain_name IS NULL OR domain_id IS NULL;"
+            f"{stranded} user(s) have no domain or no role, and this migration cannot pick either "
+            "for them. Fill both in (or delete the account) and run the migration again: "
+            "SELECT uuid, email, domain_name, role FROM users "
+            "WHERE domain_name IS NULL OR domain_id IS NULL OR role IS NULL;"
         )
 
     for name, type_ in _COLUMNS:
         op.alter_column("users", name, existing_type=type_, nullable=False)
+    op.alter_column(
+        "users", "need_password_change", existing_type=sa.Boolean(), server_default=sa.false()
+    )
 
 
 def downgrade() -> None:
+    op.alter_column(
+        "users", "need_password_change", existing_type=sa.Boolean(), server_default=None
+    )
     for name, type_ in _COLUMNS:
         op.alter_column("users", name, existing_type=type_, nullable=True)
