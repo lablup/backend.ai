@@ -672,7 +672,7 @@ async def _query_auth_context_by_access_key(
             ),
             keypair=AuthenticatedKeypair(
                 access_key=AccessKey(keypair_row.access_key),
-                secret_key=SecretKey(keypair_row.secret_key) if keypair_row.secret_key else None,
+                secret_key=SecretKey(keypair_row.secret_key),
                 is_admin=bool(keypair_row.is_admin),
                 rate_limit=keypair_row.rate_limit,
                 resource_policy=keypair_row.resource_policy_row.to_dataclass(),
@@ -701,9 +701,6 @@ async def _authenticate_via_jwt(
 
         if context is None:
             raise AuthorizationFailed("Access key not found in database")
-        if context.keypair.secret_key is None:
-            raise InternalServerError(f"The keypair has no secret key (access_key={access_key})")
-
         jwt_validator.validate_token(jwt_token, context.keypair.secret_key)
 
         log.trace("JWT authentication succeeded for access_key={}", access_key)
@@ -736,9 +733,6 @@ async def _authenticate_via_hmac(
 
     if context is None:
         raise AuthorizationFailed("Access key not found in HMAC")
-    if context.keypair.secret_key is None:
-        raise InternalServerError(f"The keypair has no secret key (access_key={access_key})")
-
     my_signature = await sign_request(sign_method, request, context.keypair.secret_key)
 
     if not secrets.compare_digest(my_signature, signature):
