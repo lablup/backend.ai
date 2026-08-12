@@ -9,7 +9,7 @@ import pytest
 from aiohttp import web
 
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
-from ai.backend.common.types import AccessKey, DefaultForUnspecified, ResourceSlot
+from ai.backend.common.types import AccessKey, DefaultForUnspecified, ResourceSlot, SecretKey
 from ai.backend.manager.api.rest.ratelimit.handler import _rlim_window, make_rlim_middleware
 from ai.backend.manager.data.auth.types import AuthenticatedKeypair
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
@@ -91,7 +91,7 @@ class TestRlimMiddleware:
             request = MagicMock(spec=web.Request)
             keypair = AuthenticatedKeypair(
                 access_key=AccessKey("AKIAIOSFODNN7EXAMPLE"),
-                secret_key=None,
+                secret_key=SecretKey("TESTSECRET"),
                 is_admin=False,
                 rate_limit=rate_limit,
                 resource_policy=_keypair_resource_policy(),

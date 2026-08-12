@@ -20,7 +20,7 @@ from ai.backend.common.dto.manager.model_serving.request import (
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.identifier.vfolder import VFolderUUID
-from ai.backend.common.types import AccessKey, DefaultForUnspecified, ResourceSlot
+from ai.backend.common.types import AccessKey, DefaultForUnspecified, ResourceSlot, SecretKey
 from ai.backend.manager.api.rest.service.handler import ServiceHandler
 from ai.backend.manager.data.auth.types import AuthenticatedKeypair, AuthenticatedUser
 from ai.backend.manager.data.resource.types import (
@@ -45,7 +45,7 @@ def _make_request(
     return {
         "keypair": AuthenticatedKeypair(
             access_key=AccessKey("TESTACCESSKEY01"),
-            secret_key=None,
+            secret_key=SecretKey("TESTSECRET"),
             is_admin=False,
             rate_limit=None,
             resource_policy=keypair_resource_policy,

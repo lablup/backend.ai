@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
-from ai.backend.common.types import AccessKey, DefaultForUnspecified, ResourceSlot
+from ai.backend.common.types import AccessKey, DefaultForUnspecified, ResourceSlot, SecretKey
 from ai.backend.manager.data.auth.types import AuthenticatedKeypair, AuthenticatedUser
 from ai.backend.manager.data.resource.types import (
     KeyPairResourcePolicyData,
@@ -31,7 +31,7 @@ def mock_authenticated_request() -> MagicMock:
         ),
         "keypair": AuthenticatedKeypair(
             access_key=AccessKey("TESTKEY"),
-            secret_key=None,
+            secret_key=SecretKey("TESTSECRET"),
             is_admin=False,
             rate_limit=None,
             resource_policy=KeyPairResourcePolicyData(

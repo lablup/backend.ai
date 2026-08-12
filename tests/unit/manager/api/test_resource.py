@@ -31,7 +31,13 @@ from ai.backend.common.dto.manager.resource.request import (
 )
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
-from ai.backend.common.types import AccessKey, DefaultForUnspecified, ResourceSlot, SlotQuantity
+from ai.backend.common.types import (
+    AccessKey,
+    DefaultForUnspecified,
+    ResourceSlot,
+    SecretKey,
+    SlotQuantity,
+)
 from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
 from ai.backend.manager.api.rest.resource.handler import ResourceHandler
 from ai.backend.manager.data.auth.types import AuthenticatedKeypair, AuthenticatedUser
@@ -143,7 +149,7 @@ def authorized_request(mock_root_ctx: MagicMock) -> MagicMock:
         ),
         "keypair": AuthenticatedKeypair(
             access_key=AccessKey("AKTEST"),
-            secret_key=None,
+            secret_key=SecretKey("TESTSECRET"),
             is_admin=False,
             rate_limit=None,
             resource_policy=_keypair_resource_policy(),
@@ -174,7 +180,7 @@ def superadmin_request(mock_root_ctx: MagicMock) -> MagicMock:
         ),
         "keypair": AuthenticatedKeypair(
             access_key=AccessKey("AKTEST"),
-            secret_key=None,
+            secret_key=SecretKey("TESTSECRET"),
             is_admin=False,
             rate_limit=None,
             resource_policy=_keypair_resource_policy(),
@@ -356,7 +362,7 @@ class TestCheckPresets:
         storage: dict[str, Any] = {
             "keypair": AuthenticatedKeypair(
                 access_key=AccessKey("AKTEST"),
-                secret_key=None,
+                secret_key=SecretKey("TESTSECRET"),
                 is_admin=False,
                 rate_limit=None,
                 resource_policy=_keypair_resource_policy(),
@@ -415,7 +421,7 @@ class TestCheckPresets:
         storage: dict[str, Any] = {
             "keypair": AuthenticatedKeypair(
                 access_key=AccessKey("AKTEST"),
-                secret_key=None,
+                secret_key=SecretKey("TESTSECRET"),
                 is_admin=False,
                 rate_limit=None,
                 resource_policy=_keypair_resource_policy(),
