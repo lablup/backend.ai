@@ -162,7 +162,7 @@ def setup_successful_auth(
         active_sessions=[],
     )
 
-    # Step 2: get_user_row_by_uuid returns a user row with a main keypair
+    # Step 2: get_user_row_by_uuid returns a user row with a default keypair
     mock_user_row = MagicMock()
     mock_user_row.get_default_keypair_row.return_value = _make_mock_keypair_row()
     mock_auth_repository.get_user_row_by_uuid.return_value = mock_user_row
