@@ -1,8 +1,5 @@
 """make the always-populated users columns NOT NULL
 
-``bae1a7326e8a`` filled ``domain_name`` for every account except
-``admin@lablup.com``, so that one can still be empty. It joins the default
-domain here, and anything still without one stops the migration.
 ``totp_activated`` is already NOT NULL in migrated databases; the column is
 here for the ones built from the model metadata.
 
@@ -24,33 +21,16 @@ branch_labels = None
 depends_on = None
 
 
-def _repair_existing_rows(bind: Connection) -> None:
-    """Fill in what predates the guarantees, raising on what cannot be filled in."""
+def _backfill_flags(bind: Connection) -> None:
+    """The two flags never had a default, so a row that predates one carries NULL."""
     bind.execute(
         sa.text("UPDATE users SET need_password_change = false WHERE need_password_change IS NULL")
     )
     bind.execute(sa.text("UPDATE users SET totp_activated = false WHERE totp_activated IS NULL"))
-    bind.execute(
-        sa.text("""
-            UPDATE users SET domain_name = 'default'
-            WHERE domain_name IS NULL
-              AND EXISTS (SELECT 1 FROM domains WHERE name = 'default')
-        """)
-    )
-
-    stranded = bind.execute(
-        sa.text("SELECT count(*) FROM users WHERE domain_name IS NULL")
-    ).scalar_one()
-    if stranded:
-        raise RuntimeError(
-            f"{stranded} user(s) have no domain and there is no default domain to move them to. "
-            "Assign each one a domain (or delete the account) and run the migration again: "
-            "SELECT uuid, email FROM users WHERE domain_name IS NULL;"
-        )
 
 
 def upgrade() -> None:
-    _repair_existing_rows(op.get_bind())
+    _backfill_flags(op.get_bind())
 
     op.alter_column("users", "domain_name", existing_type=sa.String(length=64), nullable=False)
     op.alter_column("users", "role", existing_type=sa.String(length=64), nullable=False)
