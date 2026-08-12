@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
@@ -40,7 +41,7 @@ class V2ResourceAllocationHandler:
         req: RequestCtx,
     ) -> APIResponse:
         """Get keypair resource usage for the current user."""
-        resource_policy = req.request["keypair"]["resource_policy"]
+        resource_policy = dataclasses.asdict(req.request["keypair"].resource_policy)
         result = await self._adapter.my_keypair_usage(
             access_key=ctx.access_key,
             resource_policy=resource_policy,
@@ -84,7 +85,7 @@ class V2ResourceAllocationHandler:
         req: RequestCtx,
     ) -> APIResponse:
         """Get effective assignable resources for the current user."""
-        resource_policy = req.request["keypair"]["resource_policy"]
+        resource_policy = dataclasses.asdict(req.request["keypair"].resource_policy)
         result = await self._adapter.effective_allocation(
             input=body.parsed,
             access_key=ctx.access_key,
@@ -109,7 +110,7 @@ class V2ResourceAllocationHandler:
         req: RequestCtx,
     ) -> APIResponse:
         """Check which resource presets are available for session creation."""
-        resource_policy = req.request["keypair"]["resource_policy"]
+        resource_policy = dataclasses.asdict(req.request["keypair"].resource_policy)
         result = await self._adapter.check_preset_availability(
             input=body.parsed,
             access_key=ctx.access_key,

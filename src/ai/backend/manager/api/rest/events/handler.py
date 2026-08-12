@@ -86,7 +86,7 @@ class EventsHandler:
         session_name = params.session_name
         session_id = params.session_id
         scope = params.scope
-        user_role = request["user"]["role"]
+        user_role = request["user"].role
         user_uuid = user_ctx.user_uuid
         access_key = params.owner_access_key
         if access_key is None:
@@ -135,7 +135,7 @@ class EventsHandler:
         filters = {
             "user_role": user_role,
             "user_uuid": user_uuid,
-            "domain_name": request["user"]["domain_name"],
+            "domain_name": request["user"].domain_name,
             "group_id": group_id,
             "session_name": session_name,
             "session_id": resolved_session_id,

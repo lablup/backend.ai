@@ -31,7 +31,7 @@ async def initialize_otp_activation(request: web.Request) -> web.Response:
     root_app = request.app["_root_app"]
     db = root_app["_db"]
     ctx = cast(PrivateContext, request.app["context"])
-    email = request["user"]["email"]
+    email = request["user"].email
     log.info("TOTP.INITIALIZE_OTP_ACTIVATION()")
     async with db.begin_readonly() as conn:
         query = (
@@ -75,7 +75,7 @@ async def initialize_otp_activation(request: web.Request) -> web.Response:
 async def finalize_otp_activation(request: web.Request, params: Any) -> web.Response:
     root_app = request.app["_root_app"]
     db = root_app["_db"]
-    email = request["user"]["email"]
+    email = request["user"].email
     log.info("TOTP.FINALIZE_OTP_ACTIVATION(otp: {})", params["otp"])
 
     async with db.begin_readonly() as conn:
@@ -111,7 +111,7 @@ async def finalize_otp_activation(request: web.Request, params: Any) -> web.Resp
 async def deactivate_totp(request: web.Request) -> web.Response:
     root_app = request.app["_root_app"]
     db = root_app["_db"]
-    email = request["user"]["email"]
+    email = request["user"].email
     if "email" in request.query:
         if not request["is_admin"]:
             raise GenericForbidden

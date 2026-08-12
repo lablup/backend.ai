@@ -63,9 +63,9 @@ def _vfolder_resolver(
             except ValueError:
                 result = await vfolder_processors.get_accessible_vfolder.wait_for_complete(
                     GetAccessibleVFolderAction(
-                        user_uuid=request["user"]["uuid"],
-                        user_role=request["user"]["role"],
-                        domain_name=request["user"]["domain_name"],
+                        user_uuid=request["user"].uuid,
+                        user_role=request["user"].role,
+                        domain_name=request["user"].domain_name,
                         is_admin=request["is_admin"],
                         perm=perm,
                         folder_id_or_name=piece,
