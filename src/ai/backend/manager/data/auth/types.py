@@ -86,7 +86,7 @@ class AuthenticatedKeypair:
     """The keypair the request authenticated with, limited to what request handling reads."""
 
     access_key: AccessKey
-    secret_key: SecretKey | None
+    secret_key: SecretKey
     is_admin: bool
     rate_limit: int | None
     resource_policy: KeyPairResourcePolicyData
