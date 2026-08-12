@@ -12,7 +12,9 @@ from ai.backend.common.dto.manager.v2.scheduler.request import ComputeScheduleIn
 from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
     EnqueueSessionInput,
+    ExcludeSessionIdleChecksInput,
     GetSessionLogsQuery,
+    IncludeSessionIdleChecksInput,
     ShutdownSessionServiceInput,
     StartSessionServiceInput,
     TerminateSessionsInput,
@@ -147,6 +149,22 @@ class V2SessionHandler:
     ) -> APIResponse:
         """Terminate one or more sessions."""
         result = await self._adapter.terminate(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def exclude_idle_checks(
+        self,
+        body: BodyParam[ExcludeSessionIdleChecksInput],
+    ) -> APIResponse:
+        """Exclude checker-session pairs from idle checks."""
+        result = await self._adapter.exclude_idle_checks(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def include_idle_checks(
+        self,
+        body: BodyParam[IncludeSessionIdleChecksInput],
+    ) -> APIResponse:
+        """Re-include previously excluded checker-session pairs into idle checks."""
+        result = await self._adapter.include_idle_checks(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def start_service(

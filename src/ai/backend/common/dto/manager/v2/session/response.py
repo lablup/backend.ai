@@ -14,15 +14,23 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.identifier.idle_checker import IdleCheckerID
+from ai.backend.common.identifier.session import SessionID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionId
 
 __all__ = (
     "AdminSearchSessionsPayload",
     "CommitSessionPayload",
     "DestroySessionPayload",
+    "ExcludeSessionIdleChecksFailureInfo",
+    "ExcludeSessionIdleChecksPayload",
     "ExecutePayload",
+    "IncludeSessionIdleChecksFailureInfo",
+    "IncludeSessionIdleChecksPayload",
     "RestartSessionPayload",
     "SearchSessionsPayload",
+    "SessionIdleCheckTargetInfo",
     "SessionLifecycleInfo",
     "SessionLifecycleInfoGQLDTO",
     "SessionLogsPayload",
@@ -264,6 +272,67 @@ class TerminateSessionsPayload(BaseResponseModel):
     )
     skipped: list[SessionId] = Field(
         default_factory=list, description="Sessions already terminated or not found."
+    )
+
+
+class SessionIdleCheckTargetInfo(BaseResponseModel):
+    """One (checker, session) pair an idle-check exclusion or inclusion applied to."""
+
+    checker_id: IdleCheckerID = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Idle checker UUID of the pair."
+    )
+    session_id: SessionID = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Session UUID of the pair."
+    )
+
+
+class ExcludeSessionIdleChecksFailureInfo(BaseResponseModel):
+    """Why one pair could not be excluded from idle checks."""
+
+    checker_id: IdleCheckerID = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Idle checker of the pair the failure applies to."
+    )
+    session_id: SessionID = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Session of the pair the failure applies to."
+    )
+    message: str = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Why the pair was not excluded."
+    )
+
+
+class ExcludeSessionIdleChecksPayload(BaseResponseModel):
+    """Payload for idle-check exclusion with per-pair partial success."""
+
+    success: list[SessionIdleCheckTargetInfo] = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs successfully excluded."
+    )
+    failed: list[ExcludeSessionIdleChecksFailureInfo] = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs that could not be excluded."
+    )
+
+
+class IncludeSessionIdleChecksFailureInfo(BaseResponseModel):
+    """Why one pair could not be re-included into idle checks."""
+
+    checker_id: IdleCheckerID = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Idle checker of the pair the failure applies to."
+    )
+    session_id: SessionID = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Session of the pair the failure applies to."
+    )
+    message: str = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Why the pair was not re-included."
+    )
+
+
+class IncludeSessionIdleChecksPayload(BaseResponseModel):
+    """Payload for idle-check re-inclusion with per-pair partial success."""
+
+    success: list[SessionIdleCheckTargetInfo] = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs successfully re-included."
+    )
+    failed: list[IncludeSessionIdleChecksFailureInfo] = Field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Pairs that could not be re-included."
     )
 
 

@@ -49,6 +49,8 @@ from ai.backend.common.dto.manager.v2.scheduler.response import (
 from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
     EnqueueSessionInput,
+    ExcludeSessionIdleChecksInput,
+    IncludeSessionIdleChecksInput,
     SessionFilter,
     SessionOrder,
     ShutdownSessionServiceInput,
@@ -59,6 +61,8 @@ from ai.backend.common.dto.manager.v2.session.request import (
 from ai.backend.common.dto.manager.v2.session.response import (
     AdminSearchSessionsPayload,
     EnqueueSessionPayload,
+    ExcludeSessionIdleChecksPayload,
+    IncludeSessionIdleChecksPayload,
     SessionLifecycleInfoGQLDTO,
     SessionLogsPayload,
     SessionMetadataInfoGQLDTO,
@@ -985,6 +989,20 @@ class SessionAdapter(BaseAdapter):
             force_terminated=result.force_terminated,
             skipped=result.skipped,
         )
+
+    async def exclude_idle_checks(
+        self, input: ExcludeSessionIdleChecksInput
+    ) -> ExcludeSessionIdleChecksPayload:
+        """Exclude sessions from a checker's idle checks."""
+        # Wired to the idle-checker service by BA-7120 (#13328).
+        raise NotImplementedError
+
+    async def include_idle_checks(
+        self, input: IncludeSessionIdleChecksInput
+    ) -> IncludeSessionIdleChecksPayload:
+        """Re-include previously excluded sessions into a checker's idle checks."""
+        # Wired to the idle-checker service by BA-7120 (#13328).
+        raise NotImplementedError
 
     # -------------------------------------------------------------------------
     # Service management

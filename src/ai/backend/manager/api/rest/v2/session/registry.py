@@ -88,6 +88,18 @@ def register_v2_session_routes(
     )
     registry.add(
         "POST",
+        "/exclude-idle-checks",
+        handler.exclude_idle_checks,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/include-idle-checks",
+        handler.include_idle_checks,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
         "/{session_id}/services/start",
         handler.start_service,
         middlewares=[auth_required],

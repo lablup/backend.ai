@@ -29350,6 +29350,65 @@
         "title": "TerminateSessionsInput",
         "type": "object"
       },
+      "SessionIdleCheckTargetInput": {
+        "description": "One (checker, session) pair targeted by an idle-check exclusion or inclusion.",
+        "properties": {
+          "checker_id": {
+            "description": "Added in 26.9.0. Idle checker UUID of the pair.",
+            "format": "uuid",
+            "title": "Checker Id",
+            "type": "string"
+          },
+          "session_id": {
+            "description": "Added in 26.9.0. Session UUID of the pair.",
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "checker_id",
+          "session_id"
+        ],
+        "title": "SessionIdleCheckTargetInput",
+        "type": "object"
+      },
+      "ExcludeSessionIdleChecksInput": {
+        "description": "Input for excluding session pairs from idle checks.",
+        "properties": {
+          "targets": {
+            "description": "Added in 26.9.0. Checker-session pairs to exclude.",
+            "items": {
+              "$ref": "#/components/schemas/SessionIdleCheckTargetInput"
+            },
+            "title": "Targets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "targets"
+        ],
+        "title": "ExcludeSessionIdleChecksInput",
+        "type": "object"
+      },
+      "IncludeSessionIdleChecksInput": {
+        "description": "Input for re-including previously excluded session pairs into idle checks.",
+        "properties": {
+          "targets": {
+            "description": "Added in 26.9.0. Checker-session pairs to re-include; checks restart from the initial grace period.",
+            "items": {
+              "$ref": "#/components/schemas/SessionIdleCheckTargetInput"
+            },
+            "title": "Targets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "targets"
+        ],
+        "title": "IncludeSessionIdleChecksInput",
+        "type": "object"
+      },
       "StartSessionServiceInput": {
         "description": "Input for starting an app service within a session.",
         "properties": {
@@ -51924,6 +51983,64 @@
         },
         "parameters": [],
         "description": "Terminate one or more sessions.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/sessions/exclude-idle-checks": {
+      "post": {
+        "operationId": "v2/sessions.exclude_idle_checks",
+        "tags": [
+          "v2/sessions"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExcludeSessionIdleChecksInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Exclude checker-session pairs from idle checks.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/sessions/include-idle-checks": {
+      "post": {
+        "operationId": "v2/sessions.include_idle_checks",
+        "tags": [
+          "v2/sessions"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncludeSessionIdleChecksInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Re-include previously excluded checker-session pairs into idle checks.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/sessions/{session_id}/services/start": {

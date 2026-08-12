@@ -5286,6 +5286,35 @@ input EnvironmentVariablesInput {
   entries: [EnvironmentVariableEntryInput!]!
 }
 
+"""Added in 26.9.0. Why one pair could not be excluded from idle checks."""
+type ExcludeSessionIdleChecksFailureInfo {
+  """Idle checker of the pair the failure applies to."""
+  checkerId: ID!
+
+  """Session of the pair the failure applies to."""
+  sessionId: ID!
+
+  """Why the pair was not excluded."""
+  message: String!
+}
+
+"""Added in 26.9.0. Input for excluding session pairs from idle checks."""
+input ExcludeSessionIdleChecksInput {
+  """Checker-session pairs to exclude."""
+  targets: [SessionIdleCheckTargetInput!]!
+}
+
+"""
+Added in 26.9.0. Payload returned after excluding session pairs from idle checks.
+"""
+type ExcludeSessionIdleChecksPayload {
+  """Pairs successfully excluded."""
+  success: [SessionIdleCheckTargetInfo!]!
+
+  """Pairs that could not be excluded."""
+  failed: [ExcludeSessionIdleChecksFailureInfo!]!
+}
+
 """Added in 26.3.0. Options for executing a query definition."""
 input ExecuteQueryDefinitionOptionsInput {
   """Label key-value pairs to filter by."""
@@ -6187,6 +6216,41 @@ type ImportArtifactsPayload {
 
   """List of import tasks created."""
   tasks: [ArtifactRevisionImportTask!]!
+}
+
+"""
+Added in 26.9.0. Why one pair could not be re-included into idle checks.
+"""
+type IncludeSessionIdleChecksFailureInfo {
+  """Idle checker of the pair the failure applies to."""
+  checkerId: ID!
+
+  """Session of the pair the failure applies to."""
+  sessionId: ID!
+
+  """Why the pair was not re-included."""
+  message: String!
+}
+
+"""
+Added in 26.9.0. Input for re-including previously excluded session pairs into idle checks.
+"""
+input IncludeSessionIdleChecksInput {
+  """
+  Checker-session pairs to re-include; checks restart from the initial grace period.
+  """
+  targets: [SessionIdleCheckTargetInput!]!
+}
+
+"""
+Added in 26.9.0. Payload returned after re-including session pairs into idle checks.
+"""
+type IncludeSessionIdleChecksPayload {
+  """Pairs successfully re-included."""
+  success: [SessionIdleCheckTargetInfo!]!
+
+  """Pairs that could not be re-included."""
+  failed: [IncludeSessionIdleChecksFailureInfo!]!
 }
 
 """
@@ -8964,6 +9028,16 @@ type Mutation {
   Added in 26.4.4. Terminate one or more sessions by ID. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
   """
   terminateSessionsV2(sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload
+
+  """
+  Added in 26.9.0. Exclude checker-session pairs from idle checks. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
+  """
+  excludeSessionIdleChecks(input: ExcludeSessionIdleChecksInput!): ExcludeSessionIdleChecksPayload
+
+  """
+  Added in 26.9.0. Re-include previously excluded checker-session pairs into idle checks, restarting from the initial grace period. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
+  """
+  includeSessionIdleChecks(input: IncludeSessionIdleChecksInput!): IncludeSessionIdleChecksPayload
 }
 
 """
@@ -14340,6 +14414,28 @@ enum SessionFailurePolicy {
   STRICT
   BOOT_ALL
   TOLERANT
+}
+
+"""
+Added in 26.9.0. One (checker, session) pair an idle-check exclusion or inclusion applied to.
+"""
+type SessionIdleCheckTargetInfo {
+  """Idle checker UUID of the pair."""
+  checkerId: ID!
+
+  """Session UUID of the pair."""
+  sessionId: ID!
+}
+
+"""
+Added in 26.9.0. One (checker, session) pair targeted by an idle-check exclusion or inclusion.
+"""
+input SessionIdleCheckTargetInput {
+  """Idle checker UUID of the pair."""
+  checkerId: ID!
+
+  """Session UUID of the pair."""
+  sessionId: ID!
 }
 
 """
