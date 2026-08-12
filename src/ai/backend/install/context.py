@@ -2343,7 +2343,7 @@ class DockerContext(Context):
       manager-cli, the installer's one-off tool); the other services run on
       the compose project's bridge network with published ports, and
       ``_fixup_bridge_service_addresses`` rewrites their generated configs:
-      DB/etcd addresses become compose service DNS names (the halfstack
+      DB/etcd/apollo-router addresses become compose service DNS names (the halfstack
       definition is MERGED into the single generated compose file, sharing
       its "half" network, with depends_on health gating), the redis address
       is the host's public IP + published port everywhere (it is shared
@@ -2394,6 +2394,7 @@ class DockerContext(Context):
     # them with the CONTAINER-side ports, not the host-published ones.
     HALF_DB = "backendai-half-db"
     HALF_ETCD = "backendai-half-etcd"
+    HALF_APOLLO = "backendai-half-apollo-router"
     HALF_OTEL = "backendai-half-otel-collector"
 
     # Halfstack service names active under the current profiles, recorded
@@ -2889,6 +2890,7 @@ class DockerContext(Context):
                 f"http://{self.install_variable.public_facing_address}"
                 f":{service.manager_addr.face.port}"
             )
+            data["apollo-router"]["endpoint"] = f"http://{self.HALF_APOLLO}:4000"
             fixup_otel(data)
 
         def fixup_storage_proxy(data: Any) -> None:
