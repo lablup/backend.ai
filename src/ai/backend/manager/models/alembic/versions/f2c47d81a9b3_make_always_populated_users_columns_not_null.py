@@ -27,13 +27,6 @@ depends_on = None
 
 log = logging.getLogger("alembic.runtime.migration")
 
-_COLUMNS = (
-    ("domain_name", sa.String(length=64)),
-    ("role", sa.String(length=64)),
-    ("need_password_change", sa.Boolean()),
-    ("totp_activated", sa.Boolean()),
-)
-
 
 def _delete_users(bind: Connection, user_ids: list[str]) -> None:
     """Delete users along with the rows a user delete normally takes with it."""
@@ -89,16 +82,26 @@ def upgrade() -> None:
             log.warning("  %s (%s)", user_id, email or "<unknown>")
         _delete_users(bind, [row.uuid for row in doomed])
 
-    for name, type_ in _COLUMNS:
-        op.alter_column("users", name, existing_type=type_, nullable=False)
+    op.alter_column("users", "domain_name", existing_type=sa.String(length=64), nullable=False)
+    op.alter_column("users", "role", existing_type=sa.String(length=64), nullable=False)
     op.alter_column(
-        "users", "need_password_change", existing_type=sa.Boolean(), server_default=sa.false()
+        "users",
+        "need_password_change",
+        existing_type=sa.Boolean(),
+        nullable=False,
+        server_default=sa.false(),
     )
+    op.alter_column("users", "totp_activated", existing_type=sa.Boolean(), nullable=False)
 
 
 def downgrade() -> None:
+    op.alter_column("users", "domain_name", existing_type=sa.String(length=64), nullable=True)
+    op.alter_column("users", "role", existing_type=sa.String(length=64), nullable=True)
     op.alter_column(
-        "users", "need_password_change", existing_type=sa.Boolean(), server_default=None
+        "users",
+        "need_password_change",
+        existing_type=sa.Boolean(),
+        nullable=True,
+        server_default=None,
     )
-    for name, type_ in _COLUMNS:
-        op.alter_column("users", name, existing_type=type_, nullable=True)
+    op.alter_column("users", "totp_activated", existing_type=sa.Boolean(), nullable=True)
