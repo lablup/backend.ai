@@ -144,6 +144,11 @@ services:
     # the installing user: vfolder files keep the same ownership as in
     # PACKAGE mode (the chown watcher, which needs root, is not used here)
     user: "{{UID}}:{{GID}}"
+    environment:
+      # the default ./run/prometheus resolves under the root-owned /app,
+      # which the non-root user cannot create — use a container-local
+      # writable path instead
+      - BACKENDAI_PROMETHEUS_DIR=/tmp/backend.ai/run/prometheus
     ports:
       - "6021:6021"  # ServiceConfig.storage_proxy_client_facing_addr
       - "6022:6022"  # ServiceConfig.storage_proxy_manager_facing_addr
