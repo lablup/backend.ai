@@ -10,7 +10,6 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
-from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.error_log.types import (
     ErrorLogData,
@@ -55,7 +54,6 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.error_log import ErrorLogCreatorSpec, ErrorLogRepository
 from ai.backend.testutils.db import with_tables
-from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 class TestErrorLogRepository:
@@ -98,17 +96,15 @@ class TestErrorLogRepository:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain(
+    async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> DomainFixtureData:
-        domain_id = DomainID(uuid.uuid4())
+    ) -> str:
         """Create test domain and return domain name"""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
-                id=domain_id,
                 name=domain_name,
                 description="Test domain for error log",
                 is_active=True,
@@ -119,7 +115,7 @@ class TestErrorLogRepository:
             db_sess.add(domain)
             await db_sess.commit()
 
-        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
+        return domain_name
 
     @pytest.fixture
     async def test_resource_policy_name(
@@ -146,7 +142,7 @@ class TestErrorLogRepository:
     async def test_user_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: DomainFixtureData,
+        test_domain_name: str,
         test_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test user and return user UUID"""
@@ -168,10 +164,9 @@ class TestErrorLogRepository:
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                domain_name=test_domain.domain_name,
+                domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
-                domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
             await db_sess.commit()

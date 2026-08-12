@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import AsyncGenerator
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
@@ -11,7 +10,6 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import (
     BinarySize,
     QuotaScopeID,
@@ -161,7 +159,6 @@ class TestPrepareVFolderMountsSubpathFlow:
 
         Yields ``(user_uuid, domain_name, group_id, vfolder_id)``.
         """
-        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid4().hex[:8]}"
         user_policy_name = f"test-user-pol-{uuid4().hex[:8]}"
         project_policy_name = f"test-proj-pol-{uuid4().hex[:8]}"
@@ -171,7 +168,6 @@ class TestPrepareVFolderMountsSubpathFlow:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
-                    id=domain_id,
                     name=domain_name,
                     description="",
                     is_active=True,
@@ -211,7 +207,6 @@ class TestPrepareVFolderMountsSubpathFlow:
                     status=UserStatus.ACTIVE,
                     status_info="active",
                     resource_policy=user_policy_name,
-                    domain_id=domain_id,
                 )
             )
             db_sess.add(

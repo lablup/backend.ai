@@ -184,7 +184,6 @@ class TestSessionSearchInProject:
                     resource_policy="default",
                     allowed_client_ip=None,
                     totp_key=None,
-                    domain_id=test_domain_id,
                 )
             )
             await db_sess.flush()

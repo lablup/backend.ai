@@ -155,12 +155,12 @@ class UserRow(LifecycleTimestampsMixin, Base):
         index=True,
         nullable=False,
     )
-    domain_id: Mapped[DomainID] = mapped_column(
+    domain_id: Mapped[DomainID | None] = mapped_column(
         "domain_id",
         GUID,
         sa.ForeignKey("domains.id"),
         index=True,
-        nullable=False,
+        nullable=True,
     )
     role: Mapped[UserRole] = mapped_column(
         "role", EnumValueType(UserRole), default=UserRole.USER, nullable=False

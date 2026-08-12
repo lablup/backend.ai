@@ -12,7 +12,6 @@ import pytest
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -57,11 +56,6 @@ from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
 from ai.backend.testutils.db import with_tables
-
-
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
 
 
 def create_test_password_info(password: str = "test_password") -> PasswordInfo:
@@ -128,7 +122,6 @@ class TestSearchDomainScopes:
     async def sample_domains(
         self,
         db_with_scope_tables: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> list[str]:
         """Create sample domains for testing."""
         domain_names = ["test-domain-alpha", "test-domain-beta", "prod-domain"]
@@ -136,7 +129,6 @@ class TestSearchDomainScopes:
         async with db_with_scope_tables.begin_session() as db_sess:
             for name in domain_names:
                 domain = DomainRow(
-                    id=domain_id,
                     name=name,
                     description=f"Test domain: {name}",
                     is_active=True,
@@ -150,7 +142,6 @@ class TestSearchDomainScopes:
     async def sample_domains_for_pagination(
         self,
         db_with_scope_tables: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> list[str]:
         """Create 15 sample domains for pagination testing."""
         domain_names = [f"domain-{i:02d}" for i in range(15)]
@@ -158,7 +149,6 @@ class TestSearchDomainScopes:
         async with db_with_scope_tables.begin_session() as db_sess:
             for name in domain_names:
                 domain = DomainRow(
-                    id=domain_id,
                     name=name,
                     description=f"Test domain: {name}",
                     is_active=True,
@@ -388,7 +378,6 @@ class TestSearchProjectScopes:
     async def sample_domain_with_policy(
         self,
         db_with_scope_tables: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> tuple[str, str]:
         """Create a sample domain and project resource policy for projects."""
         domain_name = "test-domain-for-projects"
@@ -396,7 +385,6 @@ class TestSearchProjectScopes:
 
         async with db_with_scope_tables.begin_session() as db_sess:
             domain = DomainRow(
-                id=domain_id,
                 name=domain_name,
                 description="Test domain for projects",
                 is_active=True,
@@ -606,7 +594,6 @@ class TestSearchUserScopes:
     async def sample_domain_with_user_policy(
         self,
         db_with_scope_tables: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> tuple[str, str]:
         """Create a sample domain and user resource policy for users."""
         domain_name = "test-domain-for-users"
@@ -614,7 +601,6 @@ class TestSearchUserScopes:
 
         async with db_with_scope_tables.begin_session() as db_sess:
             domain = DomainRow(
-                id=domain_id,
                 name=domain_name,
                 description="Test domain for users",
                 is_active=True,
@@ -661,7 +647,6 @@ class TestSearchUserScopes:
                     resource_policy=policy_name,
                     status=UserStatus.ACTIVE,
                     need_password_change=False,
-                    domain_id=domain_id,
                 )
                 db_sess.add(user)
                 user_ids.append(user_id)
@@ -691,7 +676,6 @@ class TestSearchUserScopes:
                     resource_policy=policy_name,
                     status=UserStatus.ACTIVE,
                     need_password_change=False,
-                    domain_id=domain_id,
                 )
                 db_sess.add(user)
                 user_ids.append(user_id)
@@ -877,7 +861,6 @@ class TestSearchScopesEmptyResult:
     async def sample_domains(
         self,
         db_with_scope_tables: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> list[str]:
         """Create sample domains for testing."""
         domain_names = ["test-domain-alpha", "test-domain-beta", "prod-domain"]
@@ -885,7 +868,6 @@ class TestSearchScopesEmptyResult:
         async with db_with_scope_tables.begin_session() as db_sess:
             for name in domain_names:
                 domain = DomainRow(
-                    id=domain_id,
                     name=name,
                     description=f"Test domain: {name}",
                     is_active=True,

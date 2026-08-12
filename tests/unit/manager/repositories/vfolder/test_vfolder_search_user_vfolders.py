@@ -11,7 +11,6 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import BinarySize, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
@@ -79,7 +78,6 @@ class TestVfolderSearchUserVfolders:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
         """Create two users with vfolders: user_a has 2 vfolders, user_b has 1 (all GROUP-owned)."""
-        domain_id = DomainID(uuid.uuid4())
         domain_name = "test-domain"
         user_a_id = uuid.uuid4()
         user_b_id = uuid.uuid4()
@@ -91,7 +89,6 @@ class TestVfolderSearchUserVfolders:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
-                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -143,7 +140,6 @@ class TestVfolderSearchUserVfolders:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy="default",
-                    domain_id=domain_id,
                 )
             )
             db_sess.add(
@@ -158,7 +154,6 @@ class TestVfolderSearchUserVfolders:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy="default",
-                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()
@@ -304,7 +299,6 @@ class TestVfolderSearchUserVfolders:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
         """Create a user with both USER-owned and GROUP-owned vfolders."""
-        domain_id = DomainID(uuid.uuid4())
         domain_name = "test-domain"
         user_id = uuid.uuid4()
         project_id = uuid.uuid4()
@@ -314,7 +308,6 @@ class TestVfolderSearchUserVfolders:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
-                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -365,7 +358,6 @@ class TestVfolderSearchUserVfolders:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy="default",
-                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()
@@ -503,7 +495,6 @@ class TestVfolderSearchUserVfolders:
         - vfolder_shared: owned by user_b, user_a has READ_ATTRIBUTE permission
         - vfolder_no_access: owned by user_b, user_a has no permission
         """
-        domain_id = DomainID(uuid.uuid4())
         domain_name = "test-domain"
         user_a_id = uuid.uuid4()
         user_b_id = uuid.uuid4()
@@ -515,7 +506,6 @@ class TestVfolderSearchUserVfolders:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
-                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -566,7 +556,6 @@ class TestVfolderSearchUserVfolders:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy="default",
-                    domain_id=domain_id,
                 )
             )
             db_sess.add(
@@ -581,7 +570,6 @@ class TestVfolderSearchUserVfolders:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy="default",
-                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()

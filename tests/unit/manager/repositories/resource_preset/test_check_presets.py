@@ -20,7 +20,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.identifier.domain import DomainID, DomainName
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
@@ -93,7 +93,6 @@ from ai.backend.manager.repositories.resource_preset.types import (
     CheckPresetsResult,
 )
 from ai.backend.testutils.db import with_tables
-from ai.backend.testutils.fixtures import DomainFixtureData
 from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
 
 
@@ -175,12 +174,11 @@ class TestCheckPresetsOccupiedSlots:
         return ResourceGroupID(uuid.uuid4())
 
     @pytest.fixture
-    async def test_domain(
+    async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-    ) -> AsyncGenerator[DomainFixtureData, None]:
-        domain_id = DomainID(uuid.uuid4())
+    ) -> AsyncGenerator[str, None]:
         """Create test domain and return domain name"""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
@@ -197,7 +195,7 @@ class TestCheckPresetsOccupiedSlots:
             await db_sess.flush()
 
         try:
-            yield DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
+            yield domain_name
         finally:
             # Cleanup handled by db_with_cleanup
             pass
@@ -206,7 +204,7 @@ class TestCheckPresetsOccupiedSlots:
     async def test_scaling_group_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: DomainFixtureData,
+        test_domain_name: str,
         test_domain_id: DomainID,
         test_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[str, None]:
@@ -299,7 +297,7 @@ class TestCheckPresetsOccupiedSlots:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: DomainFixtureData,
+        test_domain_name: str,
         test_resource_policy_name: str,
         test_user_uuid: uuid.UUID,
     ) -> AsyncGenerator[uuid.UUID, None]:
@@ -310,7 +308,7 @@ class TestCheckPresetsOccupiedSlots:
             group = GroupRow(
                 id=group_id,
                 name=f"test-group-{group_id.hex[:8]}",
-                domain_name=test_domain.domain_name,
+                domain_name=test_domain_name,
                 total_resource_slots=ResourceSlot({
                     "cpu": Decimal("500"),
                     "mem": Decimal("524288"),
@@ -360,7 +358,7 @@ class TestCheckPresetsOccupiedSlots:
     async def test_user_uuid(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: DomainFixtureData,
+        test_domain_name: str,
         test_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
         """Create test user and return user UUID"""
@@ -379,10 +377,9 @@ class TestCheckPresetsOccupiedSlots:
                 username=f"testuser-{user_uuid.hex[:8]}",
                 email=f"test-{user_uuid.hex[:8]}@example.com",
                 password=password_info,
-                domain_name=test_domain.domain_name,
+                domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
-                domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -623,7 +620,7 @@ class TestCheckPresetsOccupiedSlots:
         repository: ResourcePresetRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-        test_domain: DomainFixtureData,
+        test_domain_name: str,
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_resource_policy_name: str,
@@ -650,7 +647,7 @@ class TestCheckPresetsOccupiedSlots:
                 status_data={},
                 created_at=datetime.now(tzutc()),
                 domain_id=test_domain_id,
-                domain_name=test_domain.domain_name,
+                domain_name=test_domain_name,
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
                 access_key=test_keypair_access_key,
@@ -670,7 +667,7 @@ class TestCheckPresetsOccupiedSlots:
                 agent=test_agent_id,
                 scaling_group=test_scaling_group_name,
                 resource_group_id=test_scaling_group_id,
-                domain_name=test_domain.domain_name,
+                domain_name=test_domain_name,
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
                 access_key=test_keypair_access_key,
@@ -746,7 +743,7 @@ class TestCheckPresetsOccupiedSlots:
             access_key=test_keypair_access_key,
             user_id=test_user_uuid,
             group_name=group_name,
-            domain_name=test_domain.domain_name,
+            domain_name=test_domain_name,
             resource_policy=resource_policy_dict,
             scaling_group=test_scaling_group_name,
         )
@@ -763,7 +760,7 @@ class TestCheckPresetsOccupiedSlots:
         repository: ResourcePresetRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-        test_domain: DomainFixtureData,
+        test_domain_name: str,
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_resource_policy_name: str,
@@ -789,7 +786,7 @@ class TestCheckPresetsOccupiedSlots:
                 status_data={},
                 created_at=datetime.now(tzutc()),
                 domain_id=test_domain_id,
-                domain_name=test_domain.domain_name,
+                domain_name=test_domain_name,
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
                 access_key=test_keypair_access_key,
@@ -809,7 +806,7 @@ class TestCheckPresetsOccupiedSlots:
                 agent=test_agent_id,
                 scaling_group=test_scaling_group_name,
                 resource_group_id=test_scaling_group_id,
-                domain_name=test_domain.domain_name,
+                domain_name=test_domain_name,
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
                 access_key=test_keypair_access_key,
@@ -882,7 +879,7 @@ class TestCheckPresetsOccupiedSlots:
             access_key=test_keypair_access_key,
             user_id=test_user_uuid,
             group_name=group_name,
-            domain_name=test_domain.domain_name,
+            domain_name=test_domain_name,
             resource_policy=resource_policy_dict,
             scaling_group=test_scaling_group_name,
         )
@@ -899,7 +896,7 @@ class TestCheckPresetsOccupiedSlots:
         repository: ResourcePresetRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-        test_domain: DomainFixtureData,
+        test_domain_name: str,
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_resource_policy_name: str,
@@ -925,7 +922,7 @@ class TestCheckPresetsOccupiedSlots:
                 status_data={},
                 created_at=datetime.now(tzutc()),
                 domain_id=test_domain_id,
-                domain_name=test_domain.domain_name,
+                domain_name=test_domain_name,
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
                 access_key=test_keypair_access_key,
@@ -945,7 +942,7 @@ class TestCheckPresetsOccupiedSlots:
                 agent=test_agent_id,
                 scaling_group=test_scaling_group_name,
                 resource_group_id=test_scaling_group_id,
-                domain_name=test_domain.domain_name,
+                domain_name=test_domain_name,
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
                 access_key=test_keypair_access_key,
@@ -1010,7 +1007,7 @@ class TestCheckPresetsOccupiedSlots:
             access_key=test_keypair_access_key,
             user_id=test_user_uuid,
             group_name=group_name,
-            domain_name=test_domain.domain_name,
+            domain_name=test_domain_name,
             resource_policy=resource_policy_dict,
             scaling_group=test_scaling_group_name,
         )
@@ -1027,7 +1024,7 @@ class TestCheckPresetsOccupiedSlots:
         repository: ResourcePresetRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-        test_domain: DomainFixtureData,
+        test_domain_name: str,
         test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_resource_policy_name: str,
@@ -1091,7 +1088,7 @@ class TestCheckPresetsOccupiedSlots:
                 status_data={},
                 created_at=datetime.now(tzutc()),
                 domain_id=test_domain_id,
-                domain_name=test_domain.domain_name,
+                domain_name=test_domain_name,
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
                 access_key=test_keypair_access_key,
@@ -1111,7 +1108,7 @@ class TestCheckPresetsOccupiedSlots:
                 agent=agent_id,
                 scaling_group=test_scaling_group_name,
                 resource_group_id=test_scaling_group_id,
-                domain_name=test_domain.domain_name,
+                domain_name=test_domain_name,
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
                 access_key=test_keypair_access_key,
@@ -1186,7 +1183,7 @@ class TestCheckPresetsOccupiedSlots:
             access_key=test_keypair_access_key,
             user_id=test_user_uuid,
             group_name=group_name,
-            domain_name=test_domain.domain_name,
+            domain_name=test_domain_name,
             resource_policy=resource_policy_dict,
             scaling_group=test_scaling_group_name,
         )
@@ -1202,7 +1199,7 @@ class TestCheckPresetsOccupiedSlots:
     async def test_non_alive_agents_excluded_from_remaining_calculation(
         self,
         repository: ResourcePresetRepository,
-        test_domain: DomainFixtureData,
+        test_domain_name: str,
         test_scaling_group_name: str,
         test_group_name: str,
         test_user_uuid: uuid.UUID,
@@ -1218,7 +1215,7 @@ class TestCheckPresetsOccupiedSlots:
             access_key=test_keypair_access_key,
             user_id=test_user_uuid,
             group_name=test_group_name,
-            domain_name=test_domain.domain_name,
+            domain_name=test_domain_name,
             resource_policy=test_resource_policy_dict,
             scaling_group=test_scaling_group_name,
         )
@@ -1334,7 +1331,7 @@ class TestCheckPresetsZeroValues:
     async def test_scaling_group_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: DomainFixtureData,
+        test_domain_name: str,
         test_domain_id: DomainID,
         test_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[str, None]:
@@ -1425,7 +1422,7 @@ class TestCheckPresetsZeroValues:
     async def test_user_uuid(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: DomainFixtureData,
+        test_domain_name: str,
         test_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
         """Create test user and return user UUID."""
@@ -1444,10 +1441,9 @@ class TestCheckPresetsZeroValues:
                 username=f"testuser-zero-{user_uuid.hex[:8]}",
                 email=f"test-zero-{user_uuid.hex[:8]}@example.com",
                 password=password_info,
-                domain_name=test_domain.domain_name,
+                domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
-                domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -1461,7 +1457,7 @@ class TestCheckPresetsZeroValues:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: DomainFixtureData,
+        test_domain_name: str,
         test_resource_policy_name: str,
         test_user_uuid: uuid.UUID,
     ) -> AsyncGenerator[uuid.UUID, None]:
@@ -1472,7 +1468,7 @@ class TestCheckPresetsZeroValues:
             group = GroupRow(
                 id=group_id,
                 name=f"test-group-zero-{group_id.hex[:8]}",
-                domain_name=test_domain.domain_name,
+                domain_name=test_domain_name,
                 total_resource_slots=ResourceSlot({
                     "cpu": Decimal("500"),
                     "mem": Decimal("524288"),
@@ -1640,7 +1636,7 @@ class TestCheckPresetsZeroValues:
         self,
         repository: ResourcePresetRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: DomainFixtureData,
+        test_domain_name: str,
         test_scaling_group_name: str,
         test_resource_policy_name: str,
         test_group_id: uuid.UUID,
@@ -1687,7 +1683,7 @@ class TestCheckPresetsZeroValues:
             access_key=test_keypair_access_key,
             user_id=test_user_uuid,
             group_name=group_name,
-            domain_name=test_domain.domain_name,
+            domain_name=test_domain_name,
             resource_policy=resource_policy_dict,
             scaling_group=test_scaling_group_name,
         )

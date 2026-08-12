@@ -163,7 +163,6 @@ async def session_info(
             password=create_test_password_info("test_password"),
             domain_name=domain_name,
             resource_policy=resource_policy_name,
-            domain_id=domain_id,
         )
         db_sess.add(user)
 

@@ -236,7 +236,6 @@ class TestUserRepository:
                 domain_name=sample_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy,
-                domain_id=sample_domain.domain_id,
             )
             session.add(user)
             session.add(VirtualScopeRow(scope_type=ScopeType.USER.value, scope_id=user_uuid))
@@ -266,7 +265,6 @@ class TestUserRepository:
                 domain_name=sample_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy,
-                domain_id=sample_domain.domain_id,
             )
             session.add(user)
             await session.commit()
@@ -1385,7 +1383,6 @@ class TestUserDataConversion:
             container_uid=None,
             container_main_gid=None,
             container_gids=None,
-            domain_id=uuid.uuid4(),
         )
 
         user_data = user_row.to_data()
@@ -1423,7 +1420,6 @@ class TestUserDataConversion:
             container_uid=None,
             container_main_gid=None,
             container_gids=None,
-            domain_id=uuid.uuid4(),
         )
 
         user_data = user_row.to_data()
@@ -1455,7 +1451,6 @@ class TestUserDataConversion:
             container_uid=None,
             container_main_gid=None,
             container_gids=None,
-            domain_id=uuid.uuid4(),
         )
 
         user_data = user_row.to_data()

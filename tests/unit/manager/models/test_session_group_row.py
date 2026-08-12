@@ -45,11 +45,6 @@ class _OwnershipScope:
     resource_group_name: str
 
 
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
-
-
 class TestSessionGroupSchema:
     """Column contracts the scheduler and the retention sweep rely on."""
 
@@ -59,7 +54,7 @@ class TestSessionGroupSchema:
         assert columns["placement_direction"].nullable is False
         assert columns["placement_enforcement"].nullable is False
 
-    def test_ownership_axes_match_sessions_and_endpoints(self, domain_id: DomainID) -> None:
+    def test_ownership_axes_match_sessions_and_endpoints(self) -> None:
         columns = SessionGroupRow.__table__.columns
 
         targets = {
@@ -129,7 +124,6 @@ class TestSessionGroupRow:
 
     @pytest.fixture
     async def scope(self, db: ExtendedAsyncSAEngine) -> AsyncIterator[_OwnershipScope]:
-        domain_id = DomainID(uuid.uuid4())
         domain = DomainRow(id=DomainID(uuid.uuid4()), name=f"test-{uuid.uuid4().hex[:8]}")
         scaling_group = ScalingGroupRow(
             id=ResourceGroupID(uuid.uuid4()),
@@ -156,7 +150,6 @@ class TestSessionGroupRow:
             email=f"user-{uuid.uuid4().hex[:8]}@example.com",
             domain_name=domain.name,
             resource_policy=user_policy.name,
-            domain_id=domain_id,
         )
         project = GroupRow(
             id=uuid.uuid4(),
@@ -181,7 +174,7 @@ class TestSessionGroupRow:
         )
 
     async def test_placement_policy_round_trips(
-        self, db: ExtendedAsyncSAEngine, scope: _OwnershipScope, domain_id: DomainID
+        self, db: ExtendedAsyncSAEngine, scope: _OwnershipScope
     ) -> None:
         group_id = SessionGroupID(uuid.uuid4())
         async with db.begin_session() as sess:

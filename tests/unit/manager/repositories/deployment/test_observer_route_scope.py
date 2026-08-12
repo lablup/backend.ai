@@ -20,7 +20,6 @@ import pytest
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -68,7 +67,6 @@ from ai.backend.manager.sokovan.deployment.route.handlers.observer import (
 )
 from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
 from ai.backend.testutils.db import TableOrORM, with_tables
-from ai.backend.testutils.fixtures import DomainFixtureData
 
 # Tables `RoutingRow` transitively requires for its FK constraints to be
 # created. We do NOT populate most of these — only the rows the routes
@@ -148,22 +146,11 @@ class TestObserverCycleRouteScope:
         return uuid.uuid4().hex[:8]
 
     @pytest.fixture
-    async def domain(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        suffix: str,
-    ) -> DomainFixtureData:
-        domain_id = DomainID(uuid.uuid4())
+    async def domain(self, db_with_cleanup: ExtendedAsyncSAEngine, suffix: str) -> str:
         name = f"d-{suffix}"
         async with db_with_cleanup.begin_session() as db_sess:
-            db_sess.add(
-                DomainRow(
-                    id=domain_id,
-                    name=name,
-                    total_resource_slots=ResourceSlot(),
-                )
-            )
-        return DomainFixtureData(domain_name=DomainName(name), domain_id=domain_id)
+            db_sess.add(DomainRow(name=name, total_resource_slots=ResourceSlot()))
+        return name
 
     @pytest.fixture
     async def scaling_group(self, db_with_cleanup: ExtendedAsyncSAEngine, suffix: str) -> str:
@@ -217,7 +204,7 @@ class TestObserverCycleRouteScope:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         suffix: str,
-        domain: DomainFixtureData,
+        domain: str,
         user_resource_policy: str,
     ) -> UUID:
         user_id = uuid.uuid4()
@@ -233,7 +220,7 @@ class TestObserverCycleRouteScope:
                         rounds=1,
                         salt_size=16,
                     ),
-                    domain_name=domain.domain_name,
+                    domain_name=domain,
                     resource_policy=user_resource_policy,
                     role=UserRole.USER,
                     status=UserStatus.ACTIVE,
@@ -246,7 +233,7 @@ class TestObserverCycleRouteScope:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         suffix: str,
-        domain: DomainFixtureData,
+        domain: str,
         project_resource_policy: str,
     ) -> UUID:
         project_id = uuid.uuid4()
@@ -255,7 +242,7 @@ class TestObserverCycleRouteScope:
                 GroupRow(
                     id=project_id,
                     name=f"g-{suffix}",
-                    domain_name=domain.domain_name,
+                    domain_name=domain,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=project_resource_policy,
                 )
@@ -271,7 +258,7 @@ class TestObserverCycleRouteScope:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         suffix: str,
-        domain: DomainFixtureData,
+        domain: str,
         scaling_group: str,
         user: UUID,
         project: UUID,
@@ -285,7 +272,7 @@ class TestObserverCycleRouteScope:
                     name=f"ep-{suffix}",
                     created_user=user,
                     session_owner=user,
-                    domain=domain.domain_name,
+                    domain=domain,
                     project=project,
                     resource_group=scaling_group,
                     lifecycle_stage=EndpointLifecycle.CREATED,
@@ -297,14 +284,14 @@ class TestObserverCycleRouteScope:
     @pytest.fixture
     def environment(
         self,
-        domain: DomainFixtureData,
+        domain: str,
         user: UUID,
         project: UUID,
         endpoint: DeploymentID,
         revision_id: UUID,
     ) -> _Environment:
         return _Environment(
-            domain=domain.domain_name,
+            domain=domain,
             user_id=user,
             project_id=project,
             endpoint_id=endpoint,

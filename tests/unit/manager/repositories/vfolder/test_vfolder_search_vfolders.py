@@ -10,7 +10,6 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import BinarySize, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
@@ -75,7 +74,6 @@ class TestVfolderSearchVfolders:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
         """Create two projects with vfolders: project_a has 2 vfolders, project_b has 1."""
-        domain_id = DomainID(uuid.uuid4())
         domain_name = "test-domain"
         user_id = uuid.uuid4()
         project_a_id = uuid.uuid4()
@@ -87,7 +85,6 @@ class TestVfolderSearchVfolders:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
-                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -139,7 +136,6 @@ class TestVfolderSearchVfolders:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy="default",
-                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()
@@ -220,7 +216,6 @@ class TestVfolderSearchVfolders:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
         """Create domain, user, keypair, and project rows but NO vfolders."""
-        domain_id = DomainID(uuid.uuid4())
         domain_name = "test-domain"
         user_id = uuid.uuid4()
         project_a_id = uuid.uuid4()
@@ -228,7 +223,6 @@ class TestVfolderSearchVfolders:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
-                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -280,7 +274,6 @@ class TestVfolderSearchVfolders:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy="default",
-                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()

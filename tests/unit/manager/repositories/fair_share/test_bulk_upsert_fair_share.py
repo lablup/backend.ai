@@ -10,7 +10,6 @@ from decimal import Decimal
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.domain import DomainRow
@@ -79,11 +78,6 @@ class UserFairShareTestContext:
     existing_weights: dict[uuid.UUID, Decimal]
 
 
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
-
-
 class TestBulkUpsertDomainFairShare:
     """Tests for bulk upsert domain fair share operations."""
 
@@ -124,7 +118,6 @@ class TestBulkUpsertDomainFairShare:
     async def context_all_new_domains(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> DomainFairShareTestContext:
         """Scenario: All domains are new (no existing fair share records)."""
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
@@ -146,7 +139,6 @@ class TestBulkUpsertDomainFairShare:
 
             for name in domain_names:
                 domain = DomainRow(
-                    id=domain_id,
                     name=name,
                     description="Test domain",
                     is_active=True,
@@ -168,7 +160,6 @@ class TestBulkUpsertDomainFairShare:
     async def context_all_existing_domains(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> DomainFairShareTestContext:
         """Scenario: All domains already have fair share records."""
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
@@ -191,7 +182,6 @@ class TestBulkUpsertDomainFairShare:
 
             for name in domain_names:
                 domain = DomainRow(
-                    id=domain_id,
                     name=name,
                     description="Test domain",
                     is_active=True,
@@ -224,7 +214,6 @@ class TestBulkUpsertDomainFairShare:
     async def context_mixed_domains(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> DomainFairShareTestContext:
         """Scenario: Mix of new and existing domains."""
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
@@ -248,7 +237,6 @@ class TestBulkUpsertDomainFairShare:
 
             for name in domain_names:
                 domain = DomainRow(
-                    id=domain_id,
                     name=name,
                     description="Test domain",
                     is_active=True,
@@ -434,7 +422,6 @@ class TestBulkUpsertProjectFairShare:
     async def context_all_new_projects(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> ProjectFairShareTestContext:
         """Scenario: All projects are new (no existing fair share records)."""
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
@@ -456,7 +443,6 @@ class TestBulkUpsertProjectFairShare:
             db_sess.add(sg)
 
             domain = DomainRow(
-                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -500,7 +486,6 @@ class TestBulkUpsertProjectFairShare:
     async def context_all_existing_projects(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> ProjectFairShareTestContext:
         """Scenario: All projects already have fair share records."""
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
@@ -523,7 +508,6 @@ class TestBulkUpsertProjectFairShare:
             db_sess.add(sg)
 
             domain = DomainRow(
-                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -690,7 +674,6 @@ class TestBulkUpsertUserFairShare:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> UserFairShareTestContext:
         """Scenario: All users are new (no existing fair share records)."""
-        domain_id = DomainID(uuid.uuid4())
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
         rg_id = ResourceGroupID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -711,7 +694,6 @@ class TestBulkUpsertUserFairShare:
             db_sess.add(sg)
 
             domain = DomainRow(
-                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -769,7 +751,6 @@ class TestBulkUpsertUserFairShare:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy_name,
-                    domain_id=domain_id,
                 )
                 db_sess.add(user)
             await db_sess.commit()
@@ -789,7 +770,6 @@ class TestBulkUpsertUserFairShare:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> UserFairShareTestContext:
         """Scenario: All users already have fair share records."""
-        domain_id = DomainID(uuid.uuid4())
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
         rg_id = ResourceGroupID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -811,7 +791,6 @@ class TestBulkUpsertUserFairShare:
             db_sess.add(sg)
 
             domain = DomainRow(
-                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -869,7 +848,6 @@ class TestBulkUpsertUserFairShare:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy_name,
-                    domain_id=domain_id,
                 )
                 db_sess.add(user)
             await db_sess.flush()
@@ -902,7 +880,6 @@ class TestBulkUpsertUserFairShare:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> UserFairShareTestContext:
         """Scenario: Users to be set with null weight (use default)."""
-        domain_id = DomainID(uuid.uuid4())
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
         rg_id = ResourceGroupID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -923,7 +900,6 @@ class TestBulkUpsertUserFairShare:
             db_sess.add(sg)
 
             domain = DomainRow(
-                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -981,7 +957,6 @@ class TestBulkUpsertUserFairShare:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy_name,
-                    domain_id=domain_id,
                 )
                 db_sess.add(user)
             await db_sess.commit()

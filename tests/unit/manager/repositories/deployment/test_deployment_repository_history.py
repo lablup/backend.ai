@@ -13,7 +13,6 @@ import sqlalchemy as sa
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import AccessKey, BinarySize, ResourceSlot
@@ -59,7 +58,6 @@ from ai.backend.manager.repositories.scheduling_history.creators import (
 )
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
-from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 def create_test_password_info(password: str) -> PasswordInfo:
@@ -111,435 +109,15 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> DomainFixtureData:
-        domain_id = DomainID(uuid.uuid4())
-        """Create test domain and return domain name."""
-        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            domain = DomainRow(
-                id=domain_id,
-                name=domain_name,
-                description="Test domain",
-                is_active=True,
-                total_resource_slots=ResourceSlot(),
-                allowed_vfolder_hosts={},
-                allowed_docker_registries=[],
-            )
-            db_sess.add(domain)
-            await db_sess.commit()
-
-        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
-
-    @pytest.fixture
-    async def test_scaling_group_name(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
-        """Create test scaling group and return name."""
-        sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            sgroup = ScalingGroupRow(
-                name=sgroup_name,
-                description="Test scaling group",
-                is_active=True,
-                driver="static",
-                driver_opts={},
-                scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
-            )
-            db_sess.add(sgroup)
-            await db_sess.commit()
-
-        return sgroup_name
-
-    @pytest.fixture
-    async def test_container_registry_id(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> uuid.UUID:
-        """Create test container registry and return registry ID."""
-        registry_id = uuid.uuid4()
-        registry_name = f"test-registry-{uuid.uuid4().hex[:8]}"
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            registry = ContainerRegistryRow(
-                id=registry_id,
-                url="https://test-registry.example.com",
-                registry_name=registry_name,
-                type=ContainerRegistryType.DOCKER,
-                project=None,
-                is_global=True,
-            )
-            db_sess.add(registry)
-            await db_sess.commit()
-
-        return registry_id
-
-    @pytest.fixture
-    async def test_image_id(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_container_registry_id: uuid.UUID,
-    ) -> uuid.UUID:
-        """Create test image and return image ID."""
-        image_id = uuid.uuid4()
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            # Get registry name
-            registry_result = await db_sess.execute(
-                sa.select(ContainerRegistryRow.registry_name).where(
-                    ContainerRegistryRow.id == test_container_registry_id
-                )
-            )
-            registry_name = registry_result.scalar_one()
-            image_name = f"{registry_name}/test-image:latest"
-
-            image = ImageRow(
-                name=image_name,
-                project=None,
-                architecture="x86_64",
-                registry_id=test_container_registry_id,
-                is_local=False,
-                registry=registry_name,
-                image="test-image",
-                tag="latest",
-                config_digest="sha256:" + "a" * 64,
-                size_bytes=100000000,
-                type=ImageType.COMPUTE,
-                accelerators=None,
-                labels={},
-                resources={"cpu": {"min": "1"}, "mem": {"min": "1073741824"}},
-                status=ImageStatus.ALIVE,
-            )
-            image.id = ImageID(image_id)
-            db_sess.add(image)
-            await db_sess.commit()
-
-        return image_id
-
-    @pytest.fixture
-    async def test_user_resource_policy_name(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
-        """Create test user resource policy and return policy name."""
-        policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            policy = UserResourcePolicyRow(
-                name=policy_name,
-                max_vfolder_count=10,
-                max_quota_scope_size=int(BinarySize.from_str("100GiB")),
-                max_session_count_per_model_session=10,
-                max_customized_image_count=10,
-            )
-            db_sess.add(policy)
-            await db_sess.commit()
-
-        return policy_name
-
-    @pytest.fixture
-    async def test_keypair_resource_policy_name(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
-        """Create test keypair resource policy and return policy name."""
-        policy_name = f"test-kp-policy-{uuid.uuid4().hex[:8]}"
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            policy = KeyPairResourcePolicyRow(
-                name=policy_name,
-                total_resource_slots=ResourceSlot({
-                    "cpu": Decimal("100"),
-                    "mem": Decimal("102400"),
-                }),
-                max_concurrent_sessions=10,
-                max_concurrent_sftp_sessions=2,
-                max_pending_session_count=5,
-                max_pending_session_resource_slots=ResourceSlot({
-                    "cpu": Decimal("50"),
-                    "mem": Decimal("51200"),
-                }),
-                max_containers_per_session=10,
-                idle_timeout=3600,
-            )
-            db_sess.add(policy)
-            await db_sess.commit()
-
-        return policy_name
-
-    @pytest.fixture
-    async def test_project_resource_policy_name(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
-        """Create test project resource policy and return policy name."""
-        policy_name = f"test-proj-policy-{uuid.uuid4().hex[:8]}"
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            policy = ProjectResourcePolicyRow(
-                name=policy_name,
-                max_vfolder_count=10,
-                max_quota_scope_size=int(BinarySize.from_str("100GiB")),
-                max_network_count=5,
-            )
-            db_sess.add(policy)
-            await db_sess.commit()
-
-        return policy_name
-
-    @pytest.fixture
-    async def test_user_uuid(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: DomainFixtureData,
-        test_user_resource_policy_name: str,
-    ) -> uuid.UUID:
-        """Create test user and return user UUID."""
-        user_uuid = uuid.uuid4()
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            user = UserRow(
-                uuid=user_uuid,
-                username=f"test-user-{uuid.uuid4().hex[:8]}",
-                email=f"test-{uuid.uuid4().hex[:8]}@example.com",
-                password=create_test_password_info("testpass123"),
-                need_password_change=False,
-                status=UserStatus.ACTIVE,
-                status_info="active",
-                domain_name=test_domain.domain_name,
-                role=UserRole.USER,
-                resource_policy=test_user_resource_policy_name,
-                domain_id=test_domain.domain_id,
-            )
-            db_sess.add(user)
-            await db_sess.commit()
-
-        return user_uuid
-
-    @pytest.fixture
-    async def test_keypair(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_user_uuid: uuid.UUID,
-        test_keypair_resource_policy_name: str,
-    ) -> AccessKey:
-        """Create test keypair and return access key."""
-        access_key = AccessKey(f"AKIATEST{uuid.uuid4().hex[:12].upper()}")
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            # Get user email for user_id field
-            user_result = await db_sess.execute(
-                sa.select(UserRow.email).where(UserRow.uuid == test_user_uuid)
-            )
-            user_email = user_result.scalar_one()
-
-            keypair = KeyPairRow(
-                access_key=access_key,
-                secret_key="dummy-secret",
-                user_id=user_email,
-                user=test_user_uuid,
-                is_active=True,
-                resource_policy=test_keypair_resource_policy_name,
-            )
-            db_sess.add(keypair)
-            await db_sess.commit()
-
-        return access_key
-
-    @pytest.fixture
-    async def test_group_id(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: DomainFixtureData,
-        test_project_resource_policy_name: str,
-    ) -> uuid.UUID:
-        """Create test group and return group ID."""
-        group_id = uuid.uuid4()
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
-                id=group_id,
-                name=f"test-group-{uuid.uuid4().hex[:8]}",
-                domain_name=test_domain.domain_name,
-                resource_policy=test_project_resource_policy_name,
-            )
-            db_sess.add(group)
-            await db_sess.commit()
-
-        return group_id
-
-    @pytest.fixture
-    async def test_pending_endpoint_id(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: DomainFixtureData,
-        test_scaling_group_name: str,
-        test_group_id: uuid.UUID,
-        test_user_uuid: uuid.UUID,
-        test_keypair: AccessKey,
-        test_image_id: uuid.UUID,
-    ) -> DeploymentID:
-        """Create test endpoint in PENDING state and return endpoint ID."""
-        endpoint_id = DeploymentID(uuid.uuid4())
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            endpoint = EndpointRow(
-                id=endpoint_id,
-                name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
-                created_user=test_user_uuid,
-                session_owner=test_user_uuid,
-                domain=test_domain.domain_name,
-                project=test_group_id,
-                resource_group=test_scaling_group_name,
-                desired_replicas=1,
-                url="http://test.example.com",
-                open_to_public=False,
-                lifecycle_stage=EndpointLifecycle.PENDING,
-            )
-            db_sess.add(endpoint)
-            await db_sess.commit()
-
-        return endpoint_id
-
-    @pytest.fixture
-    def deployment_repository(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> DeploymentRepository:
-        """Create DeploymentRepository instance with database and mocked dependencies."""
-        storage_manager = MagicMock()
-        valkey_stat = MagicMock()
-        valkey_live = MagicMock()
-        valkey_schedule = MagicMock()
-
-        return DeploymentRepository(
-            db=db_with_cleanup,
-            storage_manager=storage_manager,
-            valkey_stat=valkey_stat,
-            valkey_live=valkey_live,
-            valkey_schedule=valkey_schedule,
-        )
-
-    async def test_updates_status_and_creates_history_atomically(
-        self,
-        deployment_repository: DeploymentRepository,
-        test_pending_endpoint_id: DeploymentID,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> None:
-        """Status update and history are created in the same transaction."""
-        # Test transition from PENDING to CREATED
-        batch_updaters = [
-            BatchUpdater(
-                spec=EndpointLifecycleBatchUpdaterSpec(lifecycle_stage=EndpointLifecycle.CREATED),
-                conditions=[
-                    DeploymentConditions.by_ids([test_pending_endpoint_id]),
-                    DeploymentConditions.by_lifecycle_stages([EndpointLifecycle.PENDING]),
-                ],
-            )
-        ]
-        history_specs = [
-            DeploymentHistoryCreatorSpec(
-                deployment_id=test_pending_endpoint_id,
-                phase="check_pending",
-                result=SchedulingResult.SUCCESS,
-                message="Test completed successfully",
-                from_status=EndpointLifecycle.PENDING,
-                to_status=EndpointLifecycle.CREATED,
-            )
-        ]
-
-        updated_count = await deployment_repository.update_endpoint_lifecycle_bulk_with_history(
-            batch_updaters,
-            new_history_specs=history_specs,
-            merge_history_ids=[],
-        )
-
-        assert updated_count == 1
-
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            # Verify status update
-            stmt = sa.select(EndpointRow).where(EndpointRow.id == test_pending_endpoint_id)
-            endpoint = (await db_sess.execute(stmt)).scalar_one()
-            assert endpoint.lifecycle_stage == EndpointLifecycle.CREATED
-
-            # Verify history record
-            history_stmt = sa.select(DeploymentHistoryRow).where(
-                DeploymentHistoryRow.deployment_id == test_pending_endpoint_id
-            )
-            histories = (await db_sess.execute(history_stmt)).scalars().all()
-            assert len(histories) == 1
-            assert histories[0].phase == "check_pending"
-            assert histories[0].result == str(SchedulingResult.SUCCESS)
-
-    async def test_returns_zero_when_no_batch_updaters(
-        self,
-        deployment_repository: DeploymentRepository,
-    ) -> None:
-        """Empty batch_updaters returns 0."""
-        result = await deployment_repository.update_endpoint_lifecycle_bulk_with_history(
-            [],
-            new_history_specs=[],
-            merge_history_ids=[],
-        )
-        assert result == 0
-
-
-class TestUpdateRouteStatusBulkWithHistory:
-    """Tests for update_route_status_bulk_with_history method."""
-
-    @pytest.fixture
-    async def db_with_cleanup(
-        self,
-        database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database connection with tables created."""
-        async with with_tables(
-            database_connection,
-            [
-                # FK order: parent -> child
-                DomainRow,
-                ScalingGroupRow,
-                ResourcePresetRow,  # ScalingGroupRow relationship dependency
-                AgentRow,
-                ContainerRegistryRow,
-                ImageRow,
-                UserResourcePolicyRow,
-                ProjectResourcePolicyRow,
-                KeyPairResourcePolicyRow,
-                RoleRow,
-                UserRoleRow,  # UserRow relationship dependency
-                UserRow,
-                KeyPairRow,
-                GroupRow,
-                VFolderRow,
-                SessionRow,
-                EndpointRow,
-                ReplicaGroupRow,
-                RoutingRow,
-                DeploymentHistoryRow,
-                RouteHistoryRow,
-            ],
-        ):
-            yield database_connection
-
-    @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> str:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
-                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -715,7 +293,7 @@ class TestUpdateRouteStatusBulkWithHistory:
     async def test_user_uuid(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: DomainFixtureData,
+        test_domain_name: str,
         test_user_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test user and return user UUID."""
@@ -730,10 +308,9 @@ class TestUpdateRouteStatusBulkWithHistory:
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                domain_name=test_domain.domain_name,
+                domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_user_resource_policy_name,
-                domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -774,7 +351,7 @@ class TestUpdateRouteStatusBulkWithHistory:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: DomainFixtureData,
+        test_domain_name: str,
         test_project_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test group and return group ID."""
@@ -784,7 +361,422 @@ class TestUpdateRouteStatusBulkWithHistory:
             group = GroupRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
-                domain_name=test_domain.domain_name,
+                domain_name=test_domain_name,
+                resource_policy=test_project_resource_policy_name,
+            )
+            db_sess.add(group)
+            await db_sess.commit()
+
+        return group_id
+
+    @pytest.fixture
+    async def test_pending_endpoint_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_scaling_group_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_keypair: AccessKey,
+        test_image_id: uuid.UUID,
+    ) -> DeploymentID:
+        """Create test endpoint in PENDING state and return endpoint ID."""
+        endpoint_id = DeploymentID(uuid.uuid4())
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            endpoint = EndpointRow(
+                id=endpoint_id,
+                name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
+                created_user=test_user_uuid,
+                session_owner=test_user_uuid,
+                domain=test_domain_name,
+                project=test_group_id,
+                resource_group=test_scaling_group_name,
+                desired_replicas=1,
+                url="http://test.example.com",
+                open_to_public=False,
+                lifecycle_stage=EndpointLifecycle.PENDING,
+            )
+            db_sess.add(endpoint)
+            await db_sess.commit()
+
+        return endpoint_id
+
+    @pytest.fixture
+    def deployment_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> DeploymentRepository:
+        """Create DeploymentRepository instance with database and mocked dependencies."""
+        storage_manager = MagicMock()
+        valkey_stat = MagicMock()
+        valkey_live = MagicMock()
+        valkey_schedule = MagicMock()
+
+        return DeploymentRepository(
+            db=db_with_cleanup,
+            storage_manager=storage_manager,
+            valkey_stat=valkey_stat,
+            valkey_live=valkey_live,
+            valkey_schedule=valkey_schedule,
+        )
+
+    async def test_updates_status_and_creates_history_atomically(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_pending_endpoint_id: DeploymentID,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Status update and history are created in the same transaction."""
+        # Test transition from PENDING to CREATED
+        batch_updaters = [
+            BatchUpdater(
+                spec=EndpointLifecycleBatchUpdaterSpec(lifecycle_stage=EndpointLifecycle.CREATED),
+                conditions=[
+                    DeploymentConditions.by_ids([test_pending_endpoint_id]),
+                    DeploymentConditions.by_lifecycle_stages([EndpointLifecycle.PENDING]),
+                ],
+            )
+        ]
+        history_specs = [
+            DeploymentHistoryCreatorSpec(
+                deployment_id=test_pending_endpoint_id,
+                phase="check_pending",
+                result=SchedulingResult.SUCCESS,
+                message="Test completed successfully",
+                from_status=EndpointLifecycle.PENDING,
+                to_status=EndpointLifecycle.CREATED,
+            )
+        ]
+
+        updated_count = await deployment_repository.update_endpoint_lifecycle_bulk_with_history(
+            batch_updaters,
+            new_history_specs=history_specs,
+            merge_history_ids=[],
+        )
+
+        assert updated_count == 1
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            # Verify status update
+            stmt = sa.select(EndpointRow).where(EndpointRow.id == test_pending_endpoint_id)
+            endpoint = (await db_sess.execute(stmt)).scalar_one()
+            assert endpoint.lifecycle_stage == EndpointLifecycle.CREATED
+
+            # Verify history record
+            history_stmt = sa.select(DeploymentHistoryRow).where(
+                DeploymentHistoryRow.deployment_id == test_pending_endpoint_id
+            )
+            histories = (await db_sess.execute(history_stmt)).scalars().all()
+            assert len(histories) == 1
+            assert histories[0].phase == "check_pending"
+            assert histories[0].result == str(SchedulingResult.SUCCESS)
+
+    async def test_returns_zero_when_no_batch_updaters(
+        self,
+        deployment_repository: DeploymentRepository,
+    ) -> None:
+        """Empty batch_updaters returns 0."""
+        result = await deployment_repository.update_endpoint_lifecycle_bulk_with_history(
+            [],
+            new_history_specs=[],
+            merge_history_ids=[],
+        )
+        assert result == 0
+
+
+class TestUpdateRouteStatusBulkWithHistory:
+    """Tests for update_route_status_bulk_with_history method."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database connection with tables created."""
+        async with with_tables(
+            database_connection,
+            [
+                # FK order: parent -> child
+                DomainRow,
+                ScalingGroupRow,
+                ResourcePresetRow,  # ScalingGroupRow relationship dependency
+                AgentRow,
+                ContainerRegistryRow,
+                ImageRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                RoleRow,
+                UserRoleRow,  # UserRow relationship dependency
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                VFolderRow,
+                SessionRow,
+                EndpointRow,
+                ReplicaGroupRow,
+                RoutingRow,
+                DeploymentHistoryRow,
+                RouteHistoryRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    async def test_domain_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        """Create test domain and return domain name."""
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            domain = DomainRow(
+                name=domain_name,
+                description="Test domain",
+                is_active=True,
+                total_resource_slots=ResourceSlot(),
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=[],
+            )
+            db_sess.add(domain)
+            await db_sess.commit()
+
+        return domain_name
+
+    @pytest.fixture
+    async def test_scaling_group_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        """Create test scaling group and return name."""
+        sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            sgroup = ScalingGroupRow(
+                name=sgroup_name,
+                description="Test scaling group",
+                is_active=True,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+            )
+            db_sess.add(sgroup)
+            await db_sess.commit()
+
+        return sgroup_name
+
+    @pytest.fixture
+    async def test_container_registry_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> uuid.UUID:
+        """Create test container registry and return registry ID."""
+        registry_id = uuid.uuid4()
+        registry_name = f"test-registry-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            registry = ContainerRegistryRow(
+                id=registry_id,
+                url="https://test-registry.example.com",
+                registry_name=registry_name,
+                type=ContainerRegistryType.DOCKER,
+                project=None,
+                is_global=True,
+            )
+            db_sess.add(registry)
+            await db_sess.commit()
+
+        return registry_id
+
+    @pytest.fixture
+    async def test_image_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_container_registry_id: uuid.UUID,
+    ) -> uuid.UUID:
+        """Create test image and return image ID."""
+        image_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            # Get registry name
+            registry_result = await db_sess.execute(
+                sa.select(ContainerRegistryRow.registry_name).where(
+                    ContainerRegistryRow.id == test_container_registry_id
+                )
+            )
+            registry_name = registry_result.scalar_one()
+            image_name = f"{registry_name}/test-image:latest"
+
+            image = ImageRow(
+                name=image_name,
+                project=None,
+                architecture="x86_64",
+                registry_id=test_container_registry_id,
+                is_local=False,
+                registry=registry_name,
+                image="test-image",
+                tag="latest",
+                config_digest="sha256:" + "a" * 64,
+                size_bytes=100000000,
+                type=ImageType.COMPUTE,
+                accelerators=None,
+                labels={},
+                resources={"cpu": {"min": "1"}, "mem": {"min": "1073741824"}},
+                status=ImageStatus.ALIVE,
+            )
+            image.id = ImageID(image_id)
+            db_sess.add(image)
+            await db_sess.commit()
+
+        return image_id
+
+    @pytest.fixture
+    async def test_user_resource_policy_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        """Create test user resource policy and return policy name."""
+        policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy = UserResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=10,
+                max_quota_scope_size=int(BinarySize.from_str("100GiB")),
+                max_session_count_per_model_session=10,
+                max_customized_image_count=10,
+            )
+            db_sess.add(policy)
+            await db_sess.commit()
+
+        return policy_name
+
+    @pytest.fixture
+    async def test_keypair_resource_policy_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        """Create test keypair resource policy and return policy name."""
+        policy_name = f"test-kp-policy-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy = KeyPairResourcePolicyRow(
+                name=policy_name,
+                total_resource_slots=ResourceSlot({
+                    "cpu": Decimal("100"),
+                    "mem": Decimal("102400"),
+                }),
+                max_concurrent_sessions=10,
+                max_concurrent_sftp_sessions=2,
+                max_pending_session_count=5,
+                max_pending_session_resource_slots=ResourceSlot({
+                    "cpu": Decimal("50"),
+                    "mem": Decimal("51200"),
+                }),
+                max_containers_per_session=10,
+                idle_timeout=3600,
+            )
+            db_sess.add(policy)
+            await db_sess.commit()
+
+        return policy_name
+
+    @pytest.fixture
+    async def test_project_resource_policy_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        """Create test project resource policy and return policy name."""
+        policy_name = f"test-proj-policy-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy = ProjectResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=10,
+                max_quota_scope_size=int(BinarySize.from_str("100GiB")),
+                max_network_count=5,
+            )
+            db_sess.add(policy)
+            await db_sess.commit()
+
+        return policy_name
+
+    @pytest.fixture
+    async def test_user_uuid(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_user_resource_policy_name: str,
+    ) -> uuid.UUID:
+        """Create test user and return user UUID."""
+        user_uuid = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            user = UserRow(
+                uuid=user_uuid,
+                username=f"test-user-{uuid.uuid4().hex[:8]}",
+                email=f"test-{uuid.uuid4().hex[:8]}@example.com",
+                password=create_test_password_info("testpass123"),
+                need_password_change=False,
+                status=UserStatus.ACTIVE,
+                status_info="active",
+                domain_name=test_domain_name,
+                role=UserRole.USER,
+                resource_policy=test_user_resource_policy_name,
+            )
+            db_sess.add(user)
+            await db_sess.commit()
+
+        return user_uuid
+
+    @pytest.fixture
+    async def test_keypair(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_user_uuid: uuid.UUID,
+        test_keypair_resource_policy_name: str,
+    ) -> AccessKey:
+        """Create test keypair and return access key."""
+        access_key = AccessKey(f"AKIATEST{uuid.uuid4().hex[:12].upper()}")
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            # Get user email for user_id field
+            user_result = await db_sess.execute(
+                sa.select(UserRow.email).where(UserRow.uuid == test_user_uuid)
+            )
+            user_email = user_result.scalar_one()
+
+            keypair = KeyPairRow(
+                access_key=access_key,
+                secret_key="dummy-secret",
+                user_id=user_email,
+                user=test_user_uuid,
+                is_active=True,
+                resource_policy=test_keypair_resource_policy_name,
+            )
+            db_sess.add(keypair)
+            await db_sess.commit()
+
+        return access_key
+
+    @pytest.fixture
+    async def test_group_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_project_resource_policy_name: str,
+    ) -> uuid.UUID:
+        """Create test group and return group ID."""
+        group_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            group = GroupRow(
+                id=group_id,
+                name=f"test-group-{uuid.uuid4().hex[:8]}",
+                domain_name=test_domain_name,
                 resource_policy=test_project_resource_policy_name,
             )
             db_sess.add(group)
@@ -796,7 +788,7 @@ class TestUpdateRouteStatusBulkWithHistory:
     async def test_endpoint_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: DomainFixtureData,
+        test_domain_name: str,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -812,7 +804,7 @@ class TestUpdateRouteStatusBulkWithHistory:
                 name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
                 created_user=test_user_uuid,
                 session_owner=test_user_uuid,
-                domain=test_domain.domain_name,
+                domain=test_domain_name,
                 project=test_group_id,
                 resource_group=test_scaling_group_name,
                 desired_replicas=1,
@@ -830,7 +822,7 @@ class TestUpdateRouteStatusBulkWithHistory:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_endpoint_id: DeploymentID,
-        test_domain: DomainFixtureData,
+        test_domain_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
     ) -> uuid.UUID:
@@ -843,7 +835,7 @@ class TestUpdateRouteStatusBulkWithHistory:
                 endpoint=test_endpoint_id,
                 session=None,
                 session_owner=test_user_uuid,
-                domain=test_domain.domain_name,
+                domain=test_domain_name,
                 project=test_group_id,
                 status=RouteStatus.PROVISIONING,
                 traffic_ratio=1.0,
@@ -979,7 +971,6 @@ class TestDeploymentHistoryMergeLogic:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> tuple[DeploymentID, uuid.UUID]:
         """Create test endpoint with existing history record."""
-        domain_id = DomainID(uuid.uuid4())
         endpoint_id = DeploymentID(uuid.uuid4())
         history_id = uuid.uuid4()
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -996,7 +987,6 @@ class TestDeploymentHistoryMergeLogic:
             # Create domain
             db_sess.add(
                 DomainRow(
-                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -1069,7 +1059,6 @@ class TestDeploymentHistoryMergeLogic:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy_name,
-                    domain_id=domain_id,
                 )
             )
 
@@ -1297,7 +1286,6 @@ class TestRouteHistoryMergeLogic:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> tuple[DeploymentID, uuid.UUID, uuid.UUID]:
         """Create test route with existing history record."""
-        domain_id = DomainID(uuid.uuid4())
         endpoint_id = DeploymentID(uuid.uuid4())
         route_id = uuid.uuid4()
         history_id = uuid.uuid4()
@@ -1315,7 +1303,6 @@ class TestRouteHistoryMergeLogic:
             # Create domain
             db_sess.add(
                 DomainRow(
-                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -1388,7 +1375,6 @@ class TestRouteHistoryMergeLogic:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy_name,
-                    domain_id=domain_id,
                 )
             )
 

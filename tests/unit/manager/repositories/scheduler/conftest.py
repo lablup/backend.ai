@@ -19,7 +19,7 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.identifier.domain import DomainID, DomainName
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.types import (
@@ -70,7 +70,6 @@ from ai.backend.manager.views.sokovan.allocation import (
 )
 from ai.backend.manager.views.sokovan.lifecycle import KernelCreationInfo
 from ai.backend.testutils.db import with_tables
-from ai.backend.testutils.fixtures import DomainFixtureData
 
 # Tables required to satisfy FK constraints for ScheduleDBSource, in dependency order.
 _SCHEDULER_ROWS: list[type] = [
@@ -122,11 +121,10 @@ def test_scaling_group_id() -> ResourceGroupID:
 
 
 @pytest.fixture
-async def test_domain(
+async def test_domain_name(
     db_with_cleanup: ExtendedAsyncSAEngine,
     test_domain_id: DomainID,
-) -> AsyncGenerator[DomainFixtureData, None]:
-    domain_id = DomainID(uuid.uuid4())
+) -> AsyncGenerator[str, None]:
     domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
     async with db_with_cleanup.begin_session() as db_sess:
         db_sess.add(
@@ -140,7 +138,7 @@ async def test_domain(
             )
         )
         await db_sess.flush()
-    yield DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
+    yield domain_name
 
 
 @pytest.fixture
@@ -234,7 +232,7 @@ async def test_keypair_resource_policy_name(
 @pytest.fixture
 async def test_user_uuid(
     db_with_cleanup: ExtendedAsyncSAEngine,
-    test_domain: DomainFixtureData,
+    test_domain_name: str,
     test_user_resource_policy_name: str,
 ) -> AsyncGenerator[uuid.UUID, None]:
     user_uuid = uuid.uuid4()
@@ -246,9 +244,8 @@ async def test_user_uuid(
                 username=f"test-user-{uuid.uuid4().hex[:8]}",
                 role=UserRole.USER,
                 status=UserStatus.ACTIVE,
-                domain_name=test_domain.domain_name,
+                domain_name=test_domain_name,
                 resource_policy=test_user_resource_policy_name,
-                domain_id=test_domain.domain_id,
             )
         )
         await db_sess.flush()
@@ -283,7 +280,7 @@ async def test_access_key(
 @pytest.fixture
 async def test_group_id(
     db_with_cleanup: ExtendedAsyncSAEngine,
-    test_domain: DomainFixtureData,
+    test_domain_name: str,
     test_resource_policy_name: str,
 ) -> AsyncGenerator[uuid.UUID, None]:
     group_id = uuid.uuid4()
@@ -294,7 +291,7 @@ async def test_group_id(
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 description="Test group",
                 is_active=True,
-                domain_name=test_domain.domain_name,
+                domain_name=test_domain_name,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 resource_policy=test_resource_policy_name,

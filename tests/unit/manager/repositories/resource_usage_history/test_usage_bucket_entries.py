@@ -15,7 +15,6 @@ from decimal import Decimal
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.fair_share import (
@@ -51,7 +50,6 @@ from ai.backend.manager.repositories.resource_usage_history.db_source.db_source 
     ResourceUsageHistoryDBSource,
 )
 from ai.backend.testutils.db import with_tables
-from ai.backend.testutils.fixtures import DomainFixtureData
 
 RESOURCE_GROUP_ID = ResourceGroupID(uuid.UUID("00000000-0000-0000-0000-000000000001"))
 
@@ -94,15 +92,13 @@ class TestUsageBucketEntries:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain(
+    async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> DomainFixtureData:
-        domain_id = DomainID(uuid.uuid4())
+    ) -> str:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
-                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -112,7 +108,7 @@ class TestUsageBucketEntries:
             )
             db_sess.add(domain)
             await db_sess.commit()
-        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
+        return domain_name
 
     @pytest.fixture
     async def db_source(
@@ -125,7 +121,7 @@ class TestUsageBucketEntries:
         self,
         db_source: ResourceUsageHistoryDBSource,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: DomainFixtureData,
+        test_domain_name: str,
     ) -> None:
         """Verify that incrementing domain buckets also writes normalized entries."""
         resource_usage = ResourceSlot({"cpu": Decimal("600"), "mem": Decimal("1228800000")})
@@ -137,7 +133,7 @@ class TestUsageBucketEntries:
             project_usage_deltas={},
             domain_usage_deltas={
                 DomainUsageBucketKey(
-                    domain_name=test_domain.domain_name,
+                    domain_name=test_domain_name,
                     resource_group="default",
                     resource_group_id=resource_group_id,
                     period_date=period,
@@ -172,13 +168,13 @@ class TestUsageBucketEntries:
         self,
         db_source: ResourceUsageHistoryDBSource,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: DomainFixtureData,
+        test_domain_name: str,
     ) -> None:
         """Verify that multiple increments accumulate amount and duration."""
         period = date(2024, 1, 15)
         resource_group_id = ResourceGroupID(uuid.uuid4())
         key = DomainUsageBucketKey(
-            domain_name=test_domain.domain_name,
+            domain_name=test_domain_name,
             resource_group="default",
             resource_group_id=resource_group_id,
             period_date=period,
@@ -224,7 +220,7 @@ class TestUsageBucketEntries:
 
             stored_resource_group_id = await db_sess.scalar(
                 sa.select(DomainUsageBucketRow.resource_group_id).where(
-                    DomainUsageBucketRow.domain_name == test_domain.domain_name,
+                    DomainUsageBucketRow.domain_name == test_domain_name,
                     DomainUsageBucketRow.resource_group == "default",
                     DomainUsageBucketRow.period_start == period,
                 )
@@ -235,7 +231,7 @@ class TestUsageBucketEntries:
         self,
         db_source: ResourceUsageHistoryDBSource,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: DomainFixtureData,
+        test_domain_name: str,
     ) -> None:
         """Verify that incrementing user buckets also writes normalized entries."""
         user_uuid = uuid.uuid4()
@@ -249,7 +245,7 @@ class TestUsageBucketEntries:
                 UserUsageBucketKey(
                     user_uuid=user_uuid,
                     project_id=project_id,
-                    domain_name=test_domain.domain_name,
+                    domain_name=test_domain_name,
                     resource_group="default",
                     resource_group_id=resource_group_id,
                     period_date=period,
@@ -284,7 +280,7 @@ class TestUsageBucketEntries:
         self,
         db_source: ResourceUsageHistoryDBSource,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: DomainFixtureData,
+        test_domain_name: str,
     ) -> None:
         """Verify that aggregation queries read from normalized entries."""
         period1 = date(2024, 1, 15)
@@ -297,13 +293,13 @@ class TestUsageBucketEntries:
             project_usage_deltas={},
             domain_usage_deltas={
                 DomainUsageBucketKey(
-                    domain_name=test_domain.domain_name,
+                    domain_name=test_domain_name,
                     resource_group="default",
                     resource_group_id=resource_group_id,
                     period_date=period1,
                 ): ResourceSlot({"cpu": Decimal("600")}),
                 DomainUsageBucketKey(
-                    domain_name=test_domain.domain_name,
+                    domain_name=test_domain_name,
                     resource_group="default",
                     resource_group_id=resource_group_id,
                     period_date=period2,
@@ -319,6 +315,6 @@ class TestUsageBucketEntries:
             lookback_end=date(2024, 1, 17),
         )
 
-        assert test_domain.domain_name in aggregated
+        assert test_domain_name in aggregated
         # 600 + 900 = 1500 CPU-seconds summed across buckets
-        assert aggregated[test_domain.domain_name]["cpu"] == Decimal("1500")
+        assert aggregated[test_domain_name]["cpu"] == Decimal("1500")

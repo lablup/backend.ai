@@ -7,14 +7,12 @@ See: https://github.com/lablup/backend.ai/pull/10482
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import AsyncGenerator
 from uuid import UUID, uuid4
 
 import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.data.permission.permission_defs import ImagePermission
@@ -46,7 +44,6 @@ from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
-from ai.backend.testutils.fixtures import DomainFixtureData
 
 DOMAIN_NAME = "test-domain"
 REGISTRY_URL = "https://cr.test.io"
@@ -72,7 +69,7 @@ class TestImagePermissionContextNonGlobalRegistry:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         name: str,
-        domain: DomainFixtureData,
+        domain: str,
         user: UserRow,
     ) -> UUID:
         project_id = uuid4()
@@ -81,7 +78,7 @@ class TestImagePermissionContextNonGlobalRegistry:
                 GroupRow(
                     id=project_id,
                     name=name,
-                    domain_name=domain.domain_name,
+                    domain_name=domain,
                     is_active=True,
                     resource_policy=PROJECT_RESOURCE_POLICY_NAME,
                 )
@@ -147,15 +144,10 @@ class TestImagePermissionContextNonGlobalRegistry:
             yield database_connection
 
     @pytest.fixture
-    async def domain(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> DomainFixtureData:
-        domain_id = DomainID(uuid.uuid4())
+    async def domain(self, db_with_cleanup: ExtendedAsyncSAEngine) -> str:
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
                 DomainRow(
-                    id=domain_id,
                     name=DOMAIN_NAME,
                     is_active=True,
                     total_resource_slots=ResourceSlot(),
@@ -173,12 +165,10 @@ class TestImagePermissionContextNonGlobalRegistry:
                 )
             )
             await sess.commit()
-        return DomainFixtureData(domain_name=DomainName(DOMAIN_NAME), domain_id=domain_id)
+        return DOMAIN_NAME
 
     @pytest.fixture
-    async def user(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, domain: DomainFixtureData
-    ) -> UserRow:
+    async def user(self, db_with_cleanup: ExtendedAsyncSAEngine, domain: str) -> UserRow:
         user_id = uuid4()
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
@@ -196,10 +186,9 @@ class TestImagePermissionContextNonGlobalRegistry:
                     uuid=user_id,
                     username="testuser",
                     email="testuser@test.io",
-                    domain_name=domain.domain_name,
+                    domain_name=domain,
                     role=UserRole.USER,
                     resource_policy=USER_RESOURCE_POLICY_NAME,
-                    domain_id=domain.domain_id,
                 )
             )
             await sess.commit()
@@ -209,21 +198,21 @@ class TestImagePermissionContextNonGlobalRegistry:
 
     @pytest.fixture
     async def queried_project(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, domain: DomainFixtureData, user: UserRow
+        self, db_with_cleanup: ExtendedAsyncSAEngine, domain: str, user: UserRow
     ) -> UUID:
         """The project used as the query scope."""
         return await self._create_project(db_with_cleanup, "queried-project", domain, user)
 
     @pytest.fixture
     async def other_associated_project(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, domain: DomainFixtureData, user: UserRow
+        self, db_with_cleanup: ExtendedAsyncSAEngine, domain: str, user: UserRow
     ) -> UUID:
         """Another project associated with the non-global registry, but NOT the query scope."""
         return await self._create_project(db_with_cleanup, "other-associated-project", domain, user)
 
     @pytest.fixture
     async def unassociated_project(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, domain: DomainFixtureData, user: UserRow
+        self, db_with_cleanup: ExtendedAsyncSAEngine, domain: str, user: UserRow
     ) -> UUID:
         """A project with NO association to the non-global registry."""
         return await self._create_project(db_with_cleanup, "unassociated-project", domain, user)

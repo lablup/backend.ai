@@ -45,11 +45,6 @@ from ai.backend.manager.views.sokovan.workload import PreemptionScopeKey
 from .conftest import create_pending_session_with_kernels
 
 
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
-
-
 def _user_key(user_uuid: uuid.UUID) -> PreemptionScopeKey:
     """Snapshot key of an owner under the default (user) victim scope."""
     return PreemptionScopeKey(user_uuid)
@@ -115,7 +110,6 @@ async def _create_extra_user(
                 status=UserStatus.ACTIVE,
                 domain_name=domain_name,
                 resource_policy=user_resource_policy,
-                domain_id=domain_id,
             )
         )
         await db_sess.flush()

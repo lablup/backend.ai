@@ -13,7 +13,6 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.models.agent import AgentRow
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
@@ -103,13 +102,11 @@ class TestSearchUsersAssignedToRole:
         db_with_tables: ExtendedAsyncSAEngine,
     ) -> list[CreatedUserAssignment]:
         """Create domain, policy, role, users, and role assignments."""
-        domain_id = DomainID(uuid.uuid4())
         created: list[CreatedUserAssignment] = []
         base_time = datetime(2026, 1, 1, tzinfo=UTC)
 
         async with db_with_tables.begin_session() as db_sess:
             domain = DomainRow(
-                id=domain_id,
                 name="test-domain",
                 description="Test domain",
                 is_active=True,
@@ -147,7 +144,6 @@ class TestSearchUsersAssignedToRole:
                     resource_policy="test-policy",
                     status=UserStatus.ACTIVE,
                     need_password_change=False,
-                    domain_id=domain_id,
                 )
                 db_sess.add(user)
                 await db_sess.flush()

@@ -15,7 +15,6 @@ from uuid import UUID
 import pytest
 
 from ai.backend.common.data.permission.types import EntityType, RelationType, ScopeType
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -91,7 +90,6 @@ ALL_ROWS: list[TableOrORM] = [
 @dataclass
 class SeedData:
     domain_name: str
-    domain_id: DomainID
     group_id: UUID
     group_name: str
     user_uuid: UUID
@@ -142,7 +140,6 @@ class TestQueryUserinfo:
     async def seed(self, db: ExtendedAsyncSAEngine) -> AsyncGenerator[SeedData, None]:
         """Create a normal user who is a member of a group."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-        domain_id = DomainID(uuid.uuid4())
         group_id = uuid.uuid4()
         group_name = f"test-group-{uuid.uuid4().hex[:8]}"
         user_uuid = uuid.uuid4()
@@ -154,7 +151,6 @@ class TestQueryUserinfo:
         async with db.begin_session() as sess:
             sess.add(
                 DomainRow(
-                    id=domain_id,
                     name=domain_name,
                     is_active=True,
                     total_resource_slots=ResourceSlot(),
@@ -198,7 +194,6 @@ class TestQueryUserinfo:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy,
-                    domain_id=domain_id,
                 )
             )
             await sess.flush()
@@ -254,7 +249,6 @@ class TestQueryUserinfo:
 
         yield SeedData(
             domain_name=domain_name,
-            domain_id=domain_id,
             group_id=group_id,
             group_name=group_name,
             user_uuid=user_uuid,
@@ -290,7 +284,6 @@ class TestQueryUserinfo:
     ) -> AsyncGenerator[ExtraUserData, None]:
         """A user belonging to an inactive domain."""
         domain = f"inactive-{uuid.uuid4().hex[:8]}"
-        domain_id = DomainID(uuid.uuid4())
         user_uuid = uuid.uuid4()
         ak = AccessKey(f"AK{uuid.uuid4().hex[:16]}")
         user_policy = f"inactive-up-{uuid.uuid4().hex[:8]}"
@@ -298,7 +291,6 @@ class TestQueryUserinfo:
         async with db.begin_session() as sess:
             sess.add(
                 DomainRow(
-                    id=domain_id,
                     name=domain,
                     is_active=False,
                     total_resource_slots=ResourceSlot(),
@@ -325,7 +317,6 @@ class TestQueryUserinfo:
                     domain_name=domain,
                     role=UserRole.USER,
                     resource_policy=user_policy,
-                    domain_id=domain_id,
                 )
             )
             await sess.flush()
@@ -359,7 +350,6 @@ class TestQueryUserinfo:
                     domain_name=seed.domain_name,
                     role=UserRole.SUPERADMIN,
                     resource_policy=seed.user_policy_name,
-                    domain_id=seed.domain_id,
                 )
             )
             await sess.flush()
@@ -544,7 +534,6 @@ class TestQueryUserinfoFromSession:
     @pytest.fixture
     async def seed(self, db: ExtendedAsyncSAEngine) -> AsyncGenerator[SeedData, None]:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-        domain_id = DomainID(uuid.uuid4())
         group_id = uuid.uuid4()
         group_name = f"test-group-{uuid.uuid4().hex[:8]}"
         user_uuid = uuid.uuid4()
@@ -556,7 +545,6 @@ class TestQueryUserinfoFromSession:
         async with db.begin_session() as sess:
             sess.add(
                 DomainRow(
-                    id=domain_id,
                     name=domain_name,
                     is_active=True,
                     total_resource_slots=ResourceSlot(),
@@ -600,7 +588,6 @@ class TestQueryUserinfoFromSession:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy,
-                    domain_id=domain_id,
                 )
             )
             await sess.flush()
@@ -656,7 +643,6 @@ class TestQueryUserinfoFromSession:
 
         yield SeedData(
             domain_name=domain_name,
-            domain_id=domain_id,
             group_id=group_id,
             group_name=group_name,
             user_uuid=user_uuid,

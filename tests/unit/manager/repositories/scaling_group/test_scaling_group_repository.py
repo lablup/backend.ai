@@ -9,7 +9,6 @@ import sqlalchemy as sa
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import ScalingGroupConflict
 from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import (
     AccessKey,
@@ -104,11 +103,6 @@ from ai.backend.manager.repositories.scaling_group.updaters import (
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
-
-
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
 
 
 class TestScalingGroupRepositoryDB:
@@ -345,7 +339,6 @@ class TestScalingGroupRepositoryDB:
     async def test_user_domain_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> AsyncGenerator[tuple[uuid.UUID, str, uuid.UUID], None]:
         """Create test user, domain, and group for cascade delete testing.
 
@@ -360,7 +353,6 @@ class TestScalingGroupRepositoryDB:
         async with db_with_cleanup.begin_session() as db_sess:
             # Create domain
             domain = DomainRow(
-                id=domain_id,
                 name=test_domain,
                 description="Test domain for cascade delete",
                 is_active=True,

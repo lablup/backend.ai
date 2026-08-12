@@ -6,7 +6,7 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.identifier.domain import DomainID, DomainName
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -34,7 +34,6 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
-from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 @pytest.fixture
@@ -71,6 +70,11 @@ async def database_with_resource_slot_tables(
 
 
 @pytest.fixture
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
+
+
+@pytest.fixture
 def scaling_group_id() -> ResourceGroupID:
     return ResourceGroupID(uuid.uuid4())
 
@@ -78,12 +82,12 @@ def scaling_group_id() -> ResourceGroupID:
 @pytest.fixture
 async def domain_name(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[DomainFixtureData, None]:
-    domain_id = DomainID(uuid.uuid4())
+    domain_id: DomainID,
+) -> AsyncGenerator[str, None]:
     name = "test-domain"
     async with database_with_resource_slot_tables.begin_session() as db_sess:
         db_sess.add(DomainRow(id=domain_id, name=name))
-    yield DomainFixtureData(domain_name=DomainName(name), domain_id=domain_id)
+    yield name
 
 
 @pytest.fixture
@@ -148,7 +152,7 @@ async def project_resource_policy(
 @pytest.fixture
 async def user_uuid(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
-    domain_name: DomainFixtureData,
+    domain_name: str,
     user_resource_policy: str,
 ) -> AsyncGenerator[uuid.UUID, None]:
     user_id = uuid.uuid4()
@@ -165,9 +169,8 @@ async def user_uuid(
                 username="testuser",
                 email="test@example.com",
                 password=password_info,
-                domain_name=domain_name.domain_name,
+                domain_name=domain_name,
                 resource_policy=user_resource_policy,
-                domain_id=domain_name.domain_id,
             )
         )
     yield user_id
@@ -176,7 +179,7 @@ async def user_uuid(
 @pytest.fixture
 async def project_id(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
-    domain_name: DomainFixtureData,
+    domain_name: str,
     project_resource_policy: str,
 ) -> AsyncGenerator[uuid.UUID, None]:
     group_id = uuid.uuid4()
@@ -185,7 +188,7 @@ async def project_id(
             GroupRow(
                 id=group_id,
                 name="test-project",
-                domain_name=domain_name.domain_name,
+                domain_name=domain_name,
                 resource_policy=project_resource_policy,
             )
         )
@@ -222,7 +225,8 @@ async def agent_id(
 @pytest.fixture
 async def kernel_id(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
-    domain_name: DomainFixtureData,
+    domain_id: DomainID,
+    domain_name: str,
     project_id: uuid.UUID,
     user_uuid: uuid.UUID,
     scaling_group_id: ResourceGroupID,
@@ -235,8 +239,8 @@ async def kernel_id(
         db_sess.add(
             SessionRow(
                 id=sid,
-                domain_id=domain_name.domain_id,
-                domain_name=domain_name.domain_name,
+                domain_id=domain_id,
+                domain_name=domain_name,
                 group_id=project_id,
                 resource_group_id=scaling_group_id,
                 scaling_group_name=scaling_group,
@@ -250,7 +254,7 @@ async def kernel_id(
             KernelRow(
                 id=kid,
                 session_id=sid,
-                domain_name=domain_name.domain_name,
+                domain_name=domain_name,
                 group_id=project_id,
                 user_uuid=user_uuid,
                 occupied_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1073741824")}),

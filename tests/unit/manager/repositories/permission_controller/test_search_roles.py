@@ -22,7 +22,6 @@ from ai.backend.common.data.permission.types import (
     RBACElementType,
     ScopeType,
 )
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.models.agent import AgentRow
@@ -208,7 +207,6 @@ class TestSearchRoles:
 
         Returns ``(assigned_user_id, unassigned_user_id, created_roles)``.
         """
-        domain_id = DomainID(uuid.uuid4())
         assigned_user_id = uuid.uuid4()
         unassigned_user_id = uuid.uuid4()
 
@@ -224,7 +222,6 @@ class TestSearchRoles:
         async with db_with_rbac_tables.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
-                    id=domain_id,
                     name=domain_name,
                     description="domain for by_assigned_user_id test",
                     is_active=True,
@@ -260,7 +257,6 @@ class TestSearchRoles:
                         domain_name=domain_name,
                         role=UserRole.USER,
                         resource_policy=policy_name,
-                        domain_id=domain_id,
                     )
                 )
             await db_sess.flush()

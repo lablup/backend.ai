@@ -70,11 +70,6 @@ class SessionTestData:
 
 
 @pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
-
-
-@pytest.fixture
 def test_domain_id() -> DomainID:
     return DomainID(uuid.uuid4())
 
@@ -208,7 +203,6 @@ class TestSessionRepository:
                 resource_policy=user_resource_policy.name,
                 allowed_client_ip=None,
                 totp_key=None,
-                domain_id=test_domain_id,
             )
             db_sess.add(user)
 
@@ -708,7 +702,6 @@ class TestBatchPopulateSessionOccupiedSlots:
                 resource_policy=user_resource_policy.name,
                 allowed_client_ip=None,
                 totp_key=None,
-                domain_id=test_domain_id,
             )
             db_sess.add(user)
 
@@ -963,20 +956,18 @@ class TestGetTemplateInfoById:
 
     @pytest.fixture
     async def active_template(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: DomainID
+        self, db_with_cleanup: ExtendedAsyncSAEngine
     ) -> tuple[uuid.UUID, str]:
         """Insert an active session_template. Returns (template_id, name)."""
-        return await self._create_template(
-            db_with_cleanup, is_active=True, name="test-template", domain_id=domain_id
-        )
+        return await self._create_template(db_with_cleanup, is_active=True, name="test-template")
 
     @pytest.fixture
     async def inactive_template(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: DomainID
+        self, db_with_cleanup: ExtendedAsyncSAEngine
     ) -> tuple[uuid.UUID, str]:
         """Insert an inactive session_template. Returns (template_id, name)."""
         return await self._create_template(
-            db_with_cleanup, is_active=False, name="inactive-template", domain_id=domain_id
+            db_with_cleanup, is_active=False, name="inactive-template"
         )
 
     async def _create_template(
@@ -985,7 +976,6 @@ class TestGetTemplateInfoById:
         *,
         is_active: bool,
         name: str,
-        domain_id: DomainID,
     ) -> tuple[uuid.UUID, str]:
         """Create prerequisite rows and insert a session_template.
 
@@ -999,7 +989,6 @@ class TestGetTemplateInfoById:
         async with db.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
-                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,

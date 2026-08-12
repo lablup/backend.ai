@@ -20,7 +20,6 @@ from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     ReplicaGroupHistoryOrderField,
 )
 from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
@@ -149,7 +148,6 @@ class TestReplicaGroupHistoryRepository:
         project, scaling group and user the endpoint points at.
         """
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-        domain_id = DomainID(uuid.uuid4())
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         user_policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
         project_policy_name = f"test-proj-policy-{uuid.uuid4().hex[:8]}"
@@ -168,7 +166,6 @@ class TestReplicaGroupHistoryRepository:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
-                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
