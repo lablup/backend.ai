@@ -1,19 +1,8 @@
 """make the always-populated users columns NOT NULL
 
-Creation fills all five: the domain is resolved before the insert and the
-creation fails when it does not exist, and the three remaining columns fall
-back to a value when the spec leaves them out. No update path can write NULL —
-they all travel as ``OptionalState``.
-
-Rows that predate those guarantees are repaired where the value is obvious:
-the two flags default to false, and ``domain_id`` is re-derived from
-``domain_name`` the way ``c1a7d3f05e28`` did. A missing domain or role is not
-repaired — picking a domain would be a guess and picking a role would hand out
-or take away privileges — so the migration stops and names the count instead.
-
-``totp_activated`` has been NOT NULL in the database since ``ac4e179c57fe``;
-the column here is only for databases created from the model metadata, which
-carried the nullable annotation this revision corrects.
+A missing domain or role is reported, not guessed. ``totp_activated`` is
+already NOT NULL in migrated databases; the column is here for the ones built
+from the model metadata.
 
 Revision ID: f2c47d81a9b3
 Revises: c8d51e7a3b62
