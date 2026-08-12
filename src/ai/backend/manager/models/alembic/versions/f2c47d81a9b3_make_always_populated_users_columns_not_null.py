@@ -2,7 +2,7 @@
 
 ``bae1a7326e8a`` filled ``domain_name`` for every account except
 ``admin@lablup.com``, so that one can still be empty. It joins the default
-domain here, and is deleted only when there is no default domain to join.
+domain here, and anything still without one stops the migration.
 ``totp_activated`` is already NOT NULL in migrated databases; the column is
 here for the ones built from the model metadata.
 
@@ -12,11 +12,8 @@ Create Date: 2026-08-12 11:20:00.000000
 
 """
 
-import logging
-
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.engine import Connection
 
 # revision identifiers, used by Alembic.
 revision = "f2c47d81a9b3"
@@ -24,36 +21,6 @@ down_revision = "c8d51e7a3b62"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
-
-log = logging.getLogger("alembic.runtime.migration")
-
-
-def _delete_users(bind: Connection, user_ids: list[str]) -> None:
-    """Delete users along with the rows a user delete normally takes with it."""
-    bind.execute(
-        sa.text("DELETE FROM permissions WHERE scope_type = 'user' AND scope_id = ANY(:ids)"),
-        {"ids": user_ids},
-    )
-    bind.execute(
-        sa.text("""
-            DELETE FROM association_scopes_entities
-            WHERE (entity_type = 'user' AND entity_id = ANY(:ids))
-               OR (scope_type = 'user' AND scope_id = ANY(:ids))
-        """),
-        {"ids": user_ids},
-    )
-    bind.execute(
-        sa.text("DELETE FROM user_roles WHERE user_id::text = ANY(:ids)"),
-        {"ids": user_ids},
-    )
-    bind.execute(
-        sa.text('DELETE FROM keypairs WHERE "user"::text = ANY(:ids)'),
-        {"ids": user_ids},
-    )
-    bind.execute(
-        sa.text("DELETE FROM users WHERE uuid::text = ANY(:ids)"),
-        {"ids": user_ids},
-    )
 
 
 def upgrade() -> None:
@@ -70,17 +37,15 @@ def upgrade() -> None:
         """)
     )
 
-    doomed = bind.execute(
-        sa.text("SELECT uuid::text AS uuid, email FROM users WHERE domain_name IS NULL")
-    ).all()
-    if doomed:
-        log.warning(
-            "Deleting %d user(s) with no domain — there is no default domain to move them to:",
-            len(doomed),
+    stranded = bind.execute(
+        sa.text("SELECT count(*) FROM users WHERE domain_name IS NULL")
+    ).scalar_one()
+    if stranded:
+        raise RuntimeError(
+            f"{stranded} user(s) have no domain and there is no default domain to move them to. "
+            "Assign each one a domain (or delete the account) and run the migration again: "
+            "SELECT uuid, email FROM users WHERE domain_name IS NULL;"
         )
-        for user_id, email in doomed:
-            log.warning("  %s (%s)", user_id, email or "<unknown>")
-        _delete_users(bind, [row.uuid for row in doomed])
 
     op.alter_column("users", "domain_name", existing_type=sa.String(length=64), nullable=False)
     op.alter_column("users", "role", existing_type=sa.String(length=64), nullable=False)
