@@ -1097,7 +1097,7 @@
           },
           "config": {
             "additionalProperties": true,
-            "description": "The fragment's JSON config document.",
+            "description": "The fragment's JSON config document, at most 65536 bytes once serialized.",
             "title": "Config",
             "type": "object"
           }
