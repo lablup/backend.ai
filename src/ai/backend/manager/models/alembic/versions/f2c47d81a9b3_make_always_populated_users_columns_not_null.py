@@ -21,17 +21,19 @@ branch_labels = None
 depends_on = None
 
 
-def _backfill_flags(bind: Connection) -> None:
-    """need_password_change never had a default; totp_activated only lacks one in a
-    database built from the model metadata, which carried the stale annotation."""
+def _backfill(bind: Connection) -> None:
+    """Each of the three falls back to the value creation gives it. need_password_change
+    never had a default; totp_activated only lacks one in a database built from the model
+    metadata, which carried the stale annotation."""
     bind.execute(
         sa.text("UPDATE users SET need_password_change = false WHERE need_password_change IS NULL")
     )
     bind.execute(sa.text("UPDATE users SET totp_activated = false WHERE totp_activated IS NULL"))
+    bind.execute(sa.text("UPDATE users SET role = 'user' WHERE role IS NULL"))
 
 
 def upgrade() -> None:
-    _backfill_flags(op.get_bind())
+    _backfill(op.get_bind())
 
     op.alter_column("users", "domain_name", existing_type=sa.String(length=64), nullable=False)
     op.alter_column("users", "role", existing_type=sa.String(length=64), nullable=False)
