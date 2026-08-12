@@ -14167,9 +14167,7 @@ type PresetModelServiceConfig
   """Single-string command to start the model service."""
   command: String
 
-  """
-  Deprecated. Command to start the model service. Do not set together with `command`; when both are set, `command` takes precedence and this field is ignored.
-  """
+  """Command to start the model service."""
   startCommand: [String!] @deprecated(reason: "Use `command` instead.")
 
   """
