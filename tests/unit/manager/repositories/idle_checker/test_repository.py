@@ -36,9 +36,13 @@ from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerRow,
     SessionIdleCheckRow,
 )
-from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
+from ai.backend.manager.models.resource_policy import (
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.repositories.idle_checker.types import (
@@ -193,6 +197,8 @@ class TestFetchJudgmentBatch:
             [
                 ProjectResourcePolicyRow,
                 DomainRow,
+                UserResourcePolicyRow,
+                UserRow,
                 GroupRow,
                 ScalingGroupRow,
                 SessionRow,
@@ -672,6 +678,7 @@ class TestFetchJudgmentBatch:
         assert row.expire_at is None
         assert row.last_status is IdleCheckPhase.NOT_CHECKED
         assert row.last_message == "Not checked yet."
+        assert row.is_manual is False
 
     async def test_disabled_binding_deletes_non_expired_rows(
         self,
@@ -843,6 +850,8 @@ class TestFetchExpiredIdleChecks:
             [
                 ProjectResourcePolicyRow,
                 DomainRow,
+                UserResourcePolicyRow,
+                UserRow,
                 GroupRow,
                 ScalingGroupRow,
                 SessionRow,
@@ -1005,6 +1014,7 @@ class ExclusionRows:
     excluded_session_id: SessionId
     untouched_session_id: SessionId
     unassigned_session_id: SessionId
+    user_excluded_session_id: SessionId
     checker_id: IdleCheckerID
 
 
@@ -1019,6 +1029,8 @@ class TestSessionIdleCheckExclusion:
             [
                 ProjectResourcePolicyRow,
                 DomainRow,
+                UserResourcePolicyRow,
+                UserRow,
                 GroupRow,
                 ScalingGroupRow,
                 SessionRow,
@@ -1044,6 +1056,7 @@ class TestSessionIdleCheckExclusion:
             excluded_session_id=SessionId(uuid.uuid4()),
             untouched_session_id=SessionId(uuid.uuid4()),
             unassigned_session_id=SessionId(uuid.uuid4()),
+            user_excluded_session_id=SessionId(uuid.uuid4()),
             checker_id=IdleCheckerID(uuid.uuid4()),
         )
         check_specs = (
@@ -1065,6 +1078,11 @@ class TestSessionIdleCheckExclusion:
             db_sess.add(
                 _expired_check_session_row(scope, rows.unassigned_session_id, SessionStatus.RUNNING)
             )
+            db_sess.add(
+                _expired_check_session_row(
+                    scope, rows.user_excluded_session_id, SessionStatus.RUNNING
+                )
+            )
             db_sess.add(_expired_check_checker_row(rows.checker_id))
             await db_sess.flush()
             for session_id, phase, expire_at in check_specs:
@@ -1077,6 +1095,17 @@ class TestSessionIdleCheckExclusion:
                         last_message=f"{phase.value} judgment",
                     )
                 )
+            # A pair the user excluded by hand.
+            db_sess.add(
+                SessionIdleCheckRow(
+                    session_id=rows.user_excluded_session_id,
+                    idle_checker_id=rows.checker_id,
+                    expire_at=None,
+                    last_status=IdleCheckPhase.EXCLUDED,
+                    last_message="Excluded from idle checks.",
+                    is_manual=True,
+                )
+            )
         return rows
 
     async def test_exclude_overwrites_any_phase(
@@ -1299,3 +1328,33 @@ class TestSessionIdleCheckExclusion:
                 IdleCheckerID(uuid.uuid4()),
                 [SessionID(exclusion_rows.active_session_id)],
             )
+
+    async def test_sync_delete_spares_user_managed_rows(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        exclusion_rows: ExclusionRows,
+    ) -> None:
+        """Assignment sync only cleans its own rows; user-written rows survive."""
+        await repository.sync_session_idle_check_assignments(
+            [],
+            [
+                SessionIdleCheckPair(
+                    exclusion_rows.user_excluded_session_id, exclusion_rows.checker_id
+                ),
+                SessionIdleCheckPair(exclusion_rows.active_session_id, exclusion_rows.checker_id),
+            ],
+        )
+
+        async with database.begin_readonly_session() as db_sess:
+            user_row = await db_sess.get(
+                SessionIdleCheckRow,
+                (exclusion_rows.user_excluded_session_id, exclusion_rows.checker_id),
+            )
+            system_row = await db_sess.get(
+                SessionIdleCheckRow,
+                (exclusion_rows.active_session_id, exclusion_rows.checker_id),
+            )
+        assert user_row is not None
+        assert user_row.is_manual is True
+        assert system_row is None

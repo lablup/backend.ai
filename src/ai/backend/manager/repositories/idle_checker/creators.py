@@ -94,4 +94,6 @@ class SessionIdleCheckCreatorSpec(CreatorSpec[SessionIdleCheckRow]):
             expire_at=None,
             last_status=IdleCheckPhase.NOT_CHECKED,
             last_message="Not checked yet.",
+            is_manual=False,
+            manually_triggered_by=None,
         )

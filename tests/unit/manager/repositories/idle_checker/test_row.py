@@ -28,9 +28,13 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.idle_checker.row import IdleCheckerRow, SessionIdleCheckRow
-from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
+from ai.backend.manager.models.resource_policy import (
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
 
@@ -52,6 +56,8 @@ class TestSessionIdleCheckRow:
             [
                 ProjectResourcePolicyRow,
                 DomainRow,
+                UserResourcePolicyRow,
+                UserRow,
                 GroupRow,
                 ScalingGroupRow,
                 SessionRow,
