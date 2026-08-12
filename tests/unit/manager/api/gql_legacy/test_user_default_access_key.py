@@ -46,13 +46,17 @@ class TestMainAccessKeySpecs:
         [
             _SpecCase(
                 name="user",
-                statement=sa.select(users, _default_access_key().label("default_access_key")).select_from(users),
+                statement=sa.select(
+                    users, _default_access_key().label("default_access_key")
+                ).select_from(users),
                 filter_spec=dict(User._queryfilter_fieldspec),
                 order_spec=dict(User._queryorder_colmap),
             ),
             _SpecCase(
                 name="user-group-scoped",
-                statement=sa.select(users, _default_access_key().label("default_access_key")).select_from(users),
+                statement=sa.select(
+                    users, _default_access_key().label("default_access_key")
+                ).select_from(users),
                 filter_spec={
                     key: ("users_" + spec[0], spec[1]) if isinstance(spec[0], str) else spec
                     for key, spec in User._queryfilter_fieldspec.items()
@@ -85,13 +89,17 @@ class TestMainAccessKeySpecs:
         [
             _SpecCase(
                 name="user",
-                statement=sa.select(users, _default_access_key().label("default_access_key")).select_from(users),
+                statement=sa.select(
+                    users, _default_access_key().label("default_access_key")
+                ).select_from(users),
                 filter_spec=dict(User._queryfilter_fieldspec),
                 order_spec=dict(User._queryorder_colmap),
             ),
             _SpecCase(
                 name="user-group-scoped",
-                statement=sa.select(users, _default_access_key().label("default_access_key")).select_from(users),
+                statement=sa.select(
+                    users, _default_access_key().label("default_access_key")
+                ).select_from(users),
                 filter_spec={
                     key: ("users_" + spec[0], spec[1]) if isinstance(spec[0], str) else spec
                     for key, spec in User._queryfilter_fieldspec.items()
