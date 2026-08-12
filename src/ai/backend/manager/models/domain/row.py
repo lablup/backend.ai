@@ -85,6 +85,15 @@ def row_to_data(row: DomainRow | Row[Any]) -> DomainData:
 
 class DomainRow(CreatedAtMixin, Base):
     __tablename__ = "domains"
+    __table_args__ = (
+        # Partial unique index: at most one domain may have is_default = true.
+        sa.Index(
+            "uq_domains_is_default",
+            "is_default",
+            unique=True,
+            postgresql_where=sa.text("is_default"),
+        ),
+    )
 
     name: Mapped[str] = mapped_column(
         "name", SlugType(length=64, allow_unicode=True, allow_dot=True), primary_key=True
@@ -98,6 +107,9 @@ class DomainRow(CreatedAtMixin, Base):
     )
     description: Mapped[str | None] = mapped_column("description", sa.String(length=512))
     is_active: Mapped[bool] = mapped_column("is_active", sa.Boolean, default=True, nullable=False)
+    is_default: Mapped[bool] = mapped_column(
+        "is_default", sa.Boolean, nullable=False, default=False, server_default=sa.false()
+    )
     modified_at: Mapped[datetime] = mapped_column(
         "modified_at",
         sa.DateTime(timezone=True),
