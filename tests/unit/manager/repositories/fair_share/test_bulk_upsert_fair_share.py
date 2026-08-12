@@ -690,6 +690,7 @@ class TestBulkUpsertUserFairShare:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> UserFairShareTestContext:
         """Scenario: All users are new (no existing fair share records)."""
+        domain_id = DomainID(uuid.uuid4())
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
         rg_id = ResourceGroupID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -788,6 +789,7 @@ class TestBulkUpsertUserFairShare:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> UserFairShareTestContext:
         """Scenario: All users already have fair share records."""
+        domain_id = DomainID(uuid.uuid4())
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
         rg_id = ResourceGroupID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -900,6 +902,7 @@ class TestBulkUpsertUserFairShare:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> UserFairShareTestContext:
         """Scenario: Users to be set with null weight (use default)."""
+        domain_id = DomainID(uuid.uuid4())
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
         rg_id = ResourceGroupID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"

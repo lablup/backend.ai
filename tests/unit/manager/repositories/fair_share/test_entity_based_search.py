@@ -20,7 +20,7 @@ from decimal import Decimal
 import pytest
 
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
-from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
@@ -73,14 +73,10 @@ from ai.backend.manager.repositories.fair_share.types import (
     UserFairShareOperationScope,
 )
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 RESOURCE_GROUP_ID = ResourceGroupID(uuid.uuid4())
 EMPTY_RESOURCE_GROUP_ID = ResourceGroupID(uuid.uuid4())
-
-
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
 
 
 class TestSearchDomainFairSharesEntityBased:
@@ -148,12 +144,13 @@ class TestSearchDomainFairSharesEntityBased:
         return FairShareRepository(db_with_cleanup)
 
     @pytest.fixture
-    async def domain_with_record(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         scaling_group: str,
         fair_share_repository: FairShareRepository,
-    ) -> str:
+    ) -> DomainFixtureData:
+        domain_id = DomainID(uuid.uuid4())
         """Create a domain with fair share record."""
         domain_name = f"domain-with-record-{uuid.uuid4().hex[:8]}"
         domain_id = DomainID(uuid.uuid4())
@@ -185,7 +182,7 @@ class TestSearchDomainFairSharesEntityBased:
                 )
             )
         )
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def domain_without_record(
@@ -397,7 +394,7 @@ class TestSearchDomainFairSharesEntityBased:
         self,
         fair_share_repository: FairShareRepository,
         scaling_group: str,
-        domain_with_record: str,
+        test_domain: DomainFixtureData,
     ) -> None:
         """Domain with fair share record should have complete details with use_default=False."""
         scope = DomainFairShareOperationScope(resource_group_id=RESOURCE_GROUP_ID)
@@ -411,7 +408,7 @@ class TestSearchDomainFairSharesEntityBased:
 
         assert result.total_count == 1
         assert len(result.items) == 1
-        assert result.items[0].domain_name == domain_with_record
+        assert result.items[0].domain_name == test_domain.domain_name
         assert result.items[0].resource_group == scaling_group
         # Details always present
         # From DB record (not default)
@@ -449,7 +446,7 @@ class TestSearchDomainFairSharesEntityBased:
         self,
         fair_share_repository: FairShareRepository,
         scaling_group: str,
-        domain_with_record: str,
+        test_domain: DomainFixtureData,
         domain_without_record: str,
     ) -> None:
         """Search should return both domains with complete data (record vs default)."""
@@ -466,17 +463,17 @@ class TestSearchDomainFairSharesEntityBased:
         assert len(result.items) == 2
 
         result_domains = {d.domain_name: d for d in result.items}
-        assert domain_with_record in result_domains
+        assert test_domain.domain_name in result_domains
         assert domain_without_record in result_domains
 
         # Both have details
 
         # Different use_default values
-        assert result_domains[domain_with_record].data.use_default is False
+        assert result_domains[test_domain.domain_name].data.use_default is False
         assert result_domains[domain_without_record].data.use_default is True
 
         # Different metadata presence
-        assert result_domains[domain_with_record].data.metadata is not None
+        assert result_domains[test_domain.domain_name].data.metadata is not None
         assert result_domains[domain_without_record].data.metadata is None
 
     async def test_returns_all_domains_regardless_of_rg_membership(
@@ -564,7 +561,7 @@ class TestSearchDomainFairSharesEntityBased:
         self,
         fair_share_repository: FairShareRepository,
         scaling_group: str,
-        domain_with_record: str,
+        test_domain: DomainFixtureData,
         domain_without_record: str,
     ) -> None:
         """RG-context filter should return both domains (with and without records)."""
@@ -592,14 +589,14 @@ class TestSearchDomainFairSharesEntityBased:
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
                 RGDomainFairShareConditions.by_domain_name_equals(
-                    StringMatchSpec(domain_with_record, case_insensitive=False, negated=False)
+                    StringMatchSpec(test_domain.domain_name, case_insensitive=False, negated=False)
                 ),
             ],
             orders=[],
         )
         result_with = await fair_share_repository.search_rg_domain_fair_shares(scope, querier_with)
         assert result_with.total_count == 1
-        assert result_with.items[0].domain_name == domain_with_record
+        assert result_with.items[0].domain_name == test_domain.domain_name
         assert result_with.items[0].data.use_default is False
 
     # ==================== BA-4682: Non-RG-member entity search regression ====================
@@ -631,7 +628,7 @@ class TestSearchDomainFairSharesEntityBased:
         self,
         fair_share_repository: FairShareRepository,
         scaling_group: str,
-        domain_with_record: str,
+        test_domain: DomainFixtureData,
         domain_not_in_rg: str,
     ) -> None:
         """BA-4682: Domain not in any RG should appear in search results with defaults."""
@@ -646,10 +643,10 @@ class TestSearchDomainFairSharesEntityBased:
 
         assert result.total_count == 2
         result_domains = {d.domain_name: d for d in result.items}
-        assert domain_with_record in result_domains
+        assert test_domain.domain_name in result_domains
         assert domain_not_in_rg in result_domains
         # Domain in RG with record: use_default=False
-        assert result_domains[domain_with_record].data.use_default is False
+        assert result_domains[test_domain.domain_name].data.use_default is False
         # Domain not in any RG: use_default=True (defaults from queried RG)
         assert result_domains[domain_not_in_rg].data.use_default is True
 

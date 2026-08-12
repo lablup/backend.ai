@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.types import BinarySize, QuotaScopeID, ResourceSlot
 from ai.backend.manager.data.permission.types import (
     EntityType as PermissionEntityType,
@@ -54,12 +54,8 @@ from ai.backend.manager.models.virtual_scope.entity_membership import EntityMemb
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
-
-
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
 
 
 class TestEnsureQuotaScopeAccessibleByUser:
@@ -109,11 +105,11 @@ class TestEnsureQuotaScopeAccessibleByUser:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[DomainFixtureData, None]:
+        domain_id = DomainID(uuid.uuid4())
         """Create test domain and return domain name"""
         domain_name = f"test-domain-{uuid4().hex[:8]}"
 
@@ -130,7 +126,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
             db_sess.add(domain)
             await db_sess.flush()
 
-        yield domain_name
+        yield DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def other_domain_name(
@@ -181,7 +177,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
     async def domain_admin_user(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_resource_policy_name: str,
     ) -> AsyncGenerator[UUID, None]:
         """Create admin user and return user UUID"""
@@ -202,10 +198,10 @@ class TestEnsureQuotaScopeAccessibleByUser:
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 role=UserRole.ADMIN,
                 resource_policy=test_resource_policy_name,
-                domain_id=domain_id,
+                domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -216,7 +212,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
     async def regular_user(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_resource_policy_name: str,
     ) -> AsyncGenerator[UUID, None]:
         """Create regular user and return user UUID"""
@@ -237,10 +233,10 @@ class TestEnsureQuotaScopeAccessibleByUser:
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
-                domain_id=domain_id,
+                domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -255,6 +251,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
         test_resource_policy_name: str,
     ) -> AsyncGenerator[UUID, None]:
         """Create user in other domain and return user UUID"""
+        domain_id = DomainID(uuid.uuid4())
         user_uuid = uuid4()
         password_info = PasswordInfo(
             password="dummy",
@@ -286,13 +283,13 @@ class TestEnsureQuotaScopeAccessibleByUser:
     async def domain_user_data_dict(
         self,
         domain_admin_user: UUID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
     ) -> dict[str, Any]:
         """Return user dict for domain admin user"""
         return {
             "uuid": domain_admin_user,
             "role": UserRole.ADMIN,
-            "domain_name": test_domain_name,
+            "domain_name": test_domain.domain_name,
         }
 
     @pytest.fixture
@@ -319,7 +316,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
     async def test_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_project_resource_policy_name: str,
     ) -> AsyncGenerator[UUID, None]:
         """Create test group and return group UUID"""
@@ -329,7 +326,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
             group = GroupRow(
                 id=group_uuid,
                 name=f"test_group_{group_uuid.hex[:8]}",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 resource_policy=test_project_resource_policy_name,
                 description="",
                 is_active=True,
@@ -397,13 +394,13 @@ class TestEnsureQuotaScopeAccessibleByUser:
     def regular_user_data_dict(
         self,
         regular_user: UUID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
     ) -> dict[str, Any]:
         """User dict for a regular user (USER role)."""
         return {
             "uuid": regular_user,
             "role": UserRole.USER,
-            "domain_name": test_domain_name,
+            "domain_name": test_domain.domain_name,
         }
 
     @pytest.fixture
@@ -432,7 +429,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         regular_user: UUID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_project_resource_policy_name: str,
     ) -> AsyncGenerator[UUID, None]:
         """Insert a separate group in the same domain plus an ASE row for regular_user."""
@@ -442,7 +439,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
                 GroupRow(
                     id=other_group_id,
                     name=f"other_group_{other_group_id.hex[:8]}",
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     resource_policy=test_project_resource_policy_name,
                     description="",
                     is_active=True,

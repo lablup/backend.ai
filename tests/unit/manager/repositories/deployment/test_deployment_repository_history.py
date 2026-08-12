@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import AccessKey, BinarySize, ResourceSlot
@@ -59,11 +59,7 @@ from ai.backend.manager.repositories.scheduling_history.creators import (
 )
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
-
-
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 def create_test_password_info(password: str) -> PasswordInfo:
@@ -115,11 +111,11 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
-    ) -> str:
+    ) -> DomainFixtureData:
+        domain_id = DomainID(uuid.uuid4())
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
@@ -136,7 +132,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
             db_sess.add(domain)
             await db_sess.commit()
 
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def test_scaling_group_name(
@@ -301,7 +297,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
     async def test_user_uuid(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test user and return user UUID."""
@@ -316,10 +312,10 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=test_user_resource_policy_name,
-                domain_id=domain_id,
+                domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -360,7 +356,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_project_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test group and return group ID."""
@@ -370,7 +366,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
             group = GroupRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 resource_policy=test_project_resource_policy_name,
             )
             db_sess.add(group)
@@ -382,7 +378,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
     async def test_pending_endpoint_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -398,7 +394,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
                 name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
                 created_user=test_user_uuid,
                 session_owner=test_user_uuid,
-                domain=test_domain_name,
+                domain=test_domain.domain_name,
                 project=test_group_id,
                 resource_group=test_scaling_group_name,
                 desired_replicas=1,
@@ -719,7 +715,7 @@ class TestUpdateRouteStatusBulkWithHistory:
     async def test_user_uuid(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test user and return user UUID."""
@@ -734,10 +730,10 @@ class TestUpdateRouteStatusBulkWithHistory:
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=test_user_resource_policy_name,
-                domain_id=domain_id,
+                domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -778,7 +774,7 @@ class TestUpdateRouteStatusBulkWithHistory:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_project_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test group and return group ID."""
@@ -788,7 +784,7 @@ class TestUpdateRouteStatusBulkWithHistory:
             group = GroupRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 resource_policy=test_project_resource_policy_name,
             )
             db_sess.add(group)
@@ -800,7 +796,7 @@ class TestUpdateRouteStatusBulkWithHistory:
     async def test_endpoint_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -816,7 +812,7 @@ class TestUpdateRouteStatusBulkWithHistory:
                 name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
                 created_user=test_user_uuid,
                 session_owner=test_user_uuid,
-                domain=test_domain_name,
+                domain=test_domain.domain_name,
                 project=test_group_id,
                 resource_group=test_scaling_group_name,
                 desired_replicas=1,
@@ -834,7 +830,7 @@ class TestUpdateRouteStatusBulkWithHistory:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_endpoint_id: DeploymentID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
     ) -> uuid.UUID:
@@ -847,7 +843,7 @@ class TestUpdateRouteStatusBulkWithHistory:
                 endpoint=test_endpoint_id,
                 session=None,
                 session_owner=test_user_uuid,
-                domain=test_domain_name,
+                domain=test_domain.domain_name,
                 project=test_group_id,
                 status=RouteStatus.PROVISIONING,
                 traffic_ratio=1.0,
@@ -983,6 +979,7 @@ class TestDeploymentHistoryMergeLogic:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> tuple[DeploymentID, uuid.UUID]:
         """Create test endpoint with existing history record."""
+        domain_id = DomainID(uuid.uuid4())
         endpoint_id = DeploymentID(uuid.uuid4())
         history_id = uuid.uuid4()
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -1300,6 +1297,7 @@ class TestRouteHistoryMergeLogic:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> tuple[DeploymentID, uuid.UUID, uuid.UUID]:
         """Create test route with existing history record."""
+        domain_id = DomainID(uuid.uuid4())
         endpoint_id = DeploymentID(uuid.uuid4())
         route_id = uuid.uuid4()
         history_id = uuid.uuid4()

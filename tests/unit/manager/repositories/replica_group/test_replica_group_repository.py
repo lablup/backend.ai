@@ -194,6 +194,7 @@ class TestReplicaGroupRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> DeploymentID:
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         user_policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"

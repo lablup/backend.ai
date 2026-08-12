@@ -181,7 +181,7 @@ class TestDeploymentAutoScalingPolicyRow:
                 status=UserStatus.ACTIVE,
                 status_info="active",
                 resource_policy=test_user_resource_policy.name,
-                domain_id=domain_id,
+                domain_id=test_domain.id,
             )
             db_sess.add(user)
             await db_sess.flush()

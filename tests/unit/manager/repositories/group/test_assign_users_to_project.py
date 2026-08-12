@@ -8,7 +8,7 @@ from collections.abc import AsyncGenerator
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
@@ -47,12 +47,8 @@ from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRo
 from ai.backend.manager.repositories.group.db_source import GroupDBSource
 from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
-
-
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
 
 
 class TestAssignUsersToProject:
@@ -108,8 +104,8 @@ class TestAssignUsersToProject:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
-    ) -> str:
+    ) -> DomainFixtureData:
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as session:
             session.add(
@@ -126,7 +122,7 @@ class TestAssignUsersToProject:
                 )
             )
             await session.commit()
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def other_domain(
@@ -175,7 +171,7 @@ class TestAssignUsersToProject:
     async def test_project(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
     ) -> ProjectID:
         project_id = ProjectID(uuid.uuid4())
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
@@ -194,7 +190,7 @@ class TestAssignUsersToProject:
                     name=f"test-project-{project_id.hex[:8]}",
                     description="Test project",
                     is_active=True,
-                    domain_name=test_domain,
+                    domain_name=test_domain.domain_name,
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts=VFolderHostPermissionMap(),
                     integration_id=None,
@@ -218,6 +214,7 @@ class TestAssignUsersToProject:
         policy_name: str,
         password_info: PasswordInfo,
     ) -> UserID:
+        domain_id = DomainID(uuid.uuid4())
         user_uuid = UserID(uuid.uuid4())
         async with db.begin_session() as session:
             session.add(
@@ -245,24 +242,24 @@ class TestAssignUsersToProject:
     async def same_domain_user_1(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         user_resource_policy: str,
         test_password_info: PasswordInfo,
     ) -> UserID:
         return await self._create_user(
-            db_with_cleanup, test_domain, user_resource_policy, test_password_info
+            db_with_cleanup, test_domain.domain_name, user_resource_policy, test_password_info
         )
 
     @pytest.fixture
     async def same_domain_user_2(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         user_resource_policy: str,
         test_password_info: PasswordInfo,
     ) -> UserID:
         return await self._create_user(
-            db_with_cleanup, test_domain, user_resource_policy, test_password_info
+            db_with_cleanup, test_domain.domain_name, user_resource_policy, test_password_info
         )
 
     @pytest.fixture
@@ -557,7 +554,7 @@ class TestUnassignUsersFromProject:
     async def test_project(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
     ) -> ProjectID:
         project_id = ProjectID(uuid.uuid4())
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
@@ -576,7 +573,7 @@ class TestUnassignUsersFromProject:
                     name=f"test-project-{project_id.hex[:8]}",
                     description="Test project",
                     is_active=True,
-                    domain_name=test_domain,
+                    domain_name=test_domain.domain_name,
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts=VFolderHostPermissionMap(),
                     integration_id=None,
@@ -600,6 +597,7 @@ class TestUnassignUsersFromProject:
         policy_name: str,
         password_info: PasswordInfo,
     ) -> UserID:
+        domain_id = DomainID(uuid.uuid4())
         user_uuid = UserID(uuid.uuid4())
         async with db.begin_session() as session:
             session.add(
@@ -627,24 +625,24 @@ class TestUnassignUsersFromProject:
     async def same_domain_user_1(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         user_resource_policy: str,
         test_password_info: PasswordInfo,
     ) -> UserID:
         return await self._create_user(
-            db_with_cleanup, test_domain, user_resource_policy, test_password_info
+            db_with_cleanup, test_domain.domain_name, user_resource_policy, test_password_info
         )
 
     @pytest.fixture
     async def same_domain_user_2(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain: str,
+        test_domain: DomainFixtureData,
         user_resource_policy: str,
         test_password_info: PasswordInfo,
     ) -> UserID:
         return await self._create_user(
-            db_with_cleanup, test_domain, user_resource_policy, test_password_info
+            db_with_cleanup, test_domain.domain_name, user_resource_policy, test_password_info
         )
 
     @pytest.fixture

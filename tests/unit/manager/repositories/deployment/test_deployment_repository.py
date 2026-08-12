@@ -21,7 +21,7 @@ from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
@@ -128,6 +128,7 @@ from ai.backend.manager.repositories.deployment.updaters import (
 from ai.backend.manager.repositories.deployment.upserters import DeploymentPolicyUpserterSpec
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 @dataclass
@@ -147,11 +148,6 @@ class DeploymentPolicyPurgerSpec(PurgerSpec[DeploymentPolicyRow]):
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:
         return ()
-
-
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
 
 
 def create_test_password_info(password: str) -> PasswordInfo:
@@ -253,11 +249,12 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         return ResourceGroupID(uuid.uuid4())
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-    ) -> str:
+    ) -> DomainFixtureData:
+        domain_id = DomainID(uuid.uuid4())
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
@@ -274,7 +271,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             db_sess.add(domain)
             await db_sess.commit()
 
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def test_scaling_group_name(
@@ -386,7 +383,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
     async def test_user_uuid(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test user and return user UUID."""
@@ -401,10 +398,10 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
-                domain_id=domain_id,
+                domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -435,7 +432,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_project_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test group and return group ID."""
@@ -445,7 +442,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             group = GroupRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 resource_policy=test_project_resource_policy_name,
             )
             db_sess.add(group)
@@ -490,7 +487,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         test_access_key: AccessKey,
         test_scaling_group_name: str,
         test_scaling_group_id: ResourceGroupID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_domain_id: DomainID,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
@@ -504,7 +501,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 name=f"test-session-{uuid.uuid4().hex[:8]}",
                 session_type=SessionTypes.INTERACTIVE,
                 domain_id=test_domain_id,
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
                 access_key=test_access_key,
@@ -533,7 +530,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         test_access_key: AccessKey,
         test_scaling_group_name: str,
         test_scaling_group_id: ResourceGroupID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
     ) -> tuple[uuid.UUID, str, int]:
@@ -573,7 +570,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 service_ports=service_ports,
                 occupied_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
                 requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
                 mounts=[],
@@ -599,7 +596,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         test_access_key: AccessKey,
         test_scaling_group_name: str,
         test_scaling_group_id: ResourceGroupID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
     ) -> uuid.UUID:
@@ -637,7 +634,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 service_ports=service_ports,
                 occupied_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
                 requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
                 mounts=[],
@@ -658,7 +655,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
     async def test_endpoint_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_name: str,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
@@ -719,7 +716,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
                 created_user=test_user_uuid,
                 session_owner=test_user_uuid,
-                domain=test_domain_name,
+                domain=test_domain.domain_name,
                 project=test_group_id,
                 resource_group=test_scaling_group_name,
                 desired_replicas=1,
@@ -763,7 +760,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_endpoint_id: DeploymentID,
         test_session_id: SessionId,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
     ) -> uuid.UUID:
@@ -776,7 +773,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 endpoint=test_endpoint_id,
                 session=test_session_id,
                 session_owner=test_user_uuid,
-                domain=test_domain_name,
+                domain=test_domain.domain_name,
                 project=test_group_id,
                 traffic_ratio=1.0,
                 revision=uuid.uuid4(),
@@ -839,7 +836,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_endpoint_id: DeploymentID,
         test_session_id: SessionId,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
         test_kernel_without_inference_port: uuid.UUID,
@@ -853,7 +850,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 endpoint=test_endpoint_id,
                 session=test_session_id,
                 session_owner=test_user_uuid,
-                domain=test_domain_name,
+                domain=test_domain.domain_name,
                 project=test_group_id,
                 traffic_ratio=1.0,
                 revision=uuid.uuid4(),
@@ -892,7 +889,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         self,
         deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_domain_id: DomainID,
         test_scaling_group_name: str,
         test_scaling_group_id: ResourceGroupID,
@@ -958,7 +955,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                     name=f"endpoint-{i}",
                     created_user=test_user_uuid,
                     session_owner=test_user_uuid,
-                    domain=test_domain_name,
+                    domain=test_domain.domain_name,
                     project=test_group_id,
                     resource_group=test_scaling_group_name,
                     desired_replicas=1,
@@ -997,7 +994,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                     name=f"session-{i}",
                     session_type=SessionTypes.INTERACTIVE,
                     domain_id=test_domain_id,
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     group_id=test_group_id,
                     user_uuid=test_user_uuid,
                     access_key=test_access_key,
@@ -1045,7 +1042,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                     service_ports=service_ports,
                     occupied_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
                     requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     group_id=test_group_id,
                     user_uuid=test_user_uuid,
                     mounts=[],
@@ -1066,7 +1063,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                     endpoint=endpoint_id,
                     session=session_id,
                     session_owner=test_user_uuid,
-                    domain=test_domain_name,
+                    domain=test_domain.domain_name,
                     project=test_group_id,
                     traffic_ratio=1.0,
                     revision=uuid.uuid4(),
@@ -1575,7 +1572,7 @@ class TestDeploymentRevisionOperations:
     async def test_user_uuid(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test user and return user UUID."""
@@ -1590,10 +1587,10 @@ class TestDeploymentRevisionOperations:
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
-                domain_id=domain_id,
+                domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -1604,7 +1601,7 @@ class TestDeploymentRevisionOperations:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_project_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test group and return group ID."""
@@ -1614,7 +1611,7 @@ class TestDeploymentRevisionOperations:
             group = GroupRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 resource_policy=test_project_resource_policy_name,
             )
             db_sess.add(group)
@@ -1662,7 +1659,7 @@ class TestDeploymentRevisionOperations:
     async def test_endpoint_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_name: str,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
@@ -1677,7 +1674,7 @@ class TestDeploymentRevisionOperations:
                 name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
                 created_user=test_user_uuid,
                 session_owner=test_user_uuid,
-                domain=test_domain_name,
+                domain=test_domain.domain_name,
                 project=test_group_id,
                 resource_group=test_scaling_group_name,
                 replicas=1,
@@ -1695,7 +1692,7 @@ class TestDeploymentRevisionOperations:
     async def test_vfolder_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_user_uuid: uuid.UUID,
     ) -> VFolderUUID:
         """Create a vfolder that satisfies the deployment_revisions model FK."""
@@ -1705,7 +1702,7 @@ class TestDeploymentRevisionOperations:
                 VFolderRow(
                     id=vfolder_id,
                     host="local:volume1",
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     quota_scope_id=QuotaScopeID.parse(f"user:{test_user_uuid}"),
                     name=f"model-vfolder-{uuid.uuid4().hex[:8]}",
                     creator="test@example.com",
@@ -2337,7 +2334,7 @@ class TestDeploymentPolicyOperations:
     async def test_user_uuid(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test user and return user UUID."""
@@ -2352,10 +2349,10 @@ class TestDeploymentPolicyOperations:
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
-                domain_id=domain_id,
+                domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -2366,7 +2363,7 @@ class TestDeploymentPolicyOperations:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_project_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test group and return group ID."""
@@ -2376,7 +2373,7 @@ class TestDeploymentPolicyOperations:
             group = GroupRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 resource_policy=test_project_resource_policy_name,
             )
             db_sess.add(group)
@@ -2388,7 +2385,7 @@ class TestDeploymentPolicyOperations:
     async def test_endpoint_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_name: str,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
@@ -2402,7 +2399,7 @@ class TestDeploymentPolicyOperations:
                 name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
                 created_user=test_user_uuid,
                 session_owner=test_user_uuid,
-                domain=test_domain_name,
+                domain=test_domain.domain_name,
                 project=test_group_id,
                 resource_group=test_scaling_group_name,
                 desired_replicas=1,
@@ -2663,7 +2660,7 @@ class TestSearchDeploymentPolicies:
     async def test_user_uuid(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_resource_policy_name: str,
     ) -> uuid.UUID:
         user_uuid = uuid.uuid4()
@@ -2676,10 +2673,10 @@ class TestSearchDeploymentPolicies:
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
-                domain_id=domain_id,
+                domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -2689,7 +2686,7 @@ class TestSearchDeploymentPolicies:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_project_resource_policy_name: str,
     ) -> uuid.UUID:
         group_id = uuid.uuid4()
@@ -2697,7 +2694,7 @@ class TestSearchDeploymentPolicies:
             group = GroupRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 resource_policy=test_project_resource_policy_name,
             )
             db_sess.add(group)
@@ -2708,7 +2705,7 @@ class TestSearchDeploymentPolicies:
     async def sample_endpoint_ids(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_name: str,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
@@ -2723,7 +2720,7 @@ class TestSearchDeploymentPolicies:
                     name=f"test-endpoint-{i}-{uuid.uuid4().hex[:8]}",
                     created_user=test_user_uuid,
                     session_owner=test_user_uuid,
-                    domain=test_domain_name,
+                    domain=test_domain.domain_name,
                     project=test_group_id,
                     resource_group=test_scaling_group_name,
                     desired_replicas=1,
@@ -3062,7 +3059,7 @@ class TestRouteOperations:
     async def test_user_uuid(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test user and return user UUID."""
@@ -3077,10 +3074,10 @@ class TestRouteOperations:
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
-                domain_id=domain_id,
+                domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -3091,7 +3088,7 @@ class TestRouteOperations:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_project_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test group and return group ID."""
@@ -3101,7 +3098,7 @@ class TestRouteOperations:
             group = GroupRow(
                 id=group_id,
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 resource_policy=test_project_resource_policy_name,
             )
             db_sess.add(group)
@@ -3113,7 +3110,7 @@ class TestRouteOperations:
     async def test_endpoint_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_scaling_group_name: str,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
@@ -3127,7 +3124,7 @@ class TestRouteOperations:
                 name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
                 created_user=test_user_uuid,
                 session_owner=test_user_uuid,
-                domain=test_domain_name,
+                domain=test_domain.domain_name,
                 project=test_group_id,
                 resource_group=test_scaling_group_name,
                 desired_replicas=1,
@@ -3183,7 +3180,7 @@ class TestRouteOperations:
         deployment_repository: DeploymentRepository,
         test_endpoint_id: DeploymentID,
         test_user_uuid: uuid.UUID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_group_id: uuid.UUID,
         test_replica_group_id: ReplicaGroupID,
     ) -> None:
@@ -3191,7 +3188,7 @@ class TestRouteOperations:
         spec = RouteCreatorSpec(
             deployment_id=test_endpoint_id,
             session_owner_id=test_user_uuid,
-            domain=test_domain_name,
+            domain=test_domain.domain_name,
             project_id=test_group_id,
             revision_id=DeploymentRevisionID(uuid.uuid4()),
             health_check=None,
@@ -3220,7 +3217,7 @@ class TestRouteOperations:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_endpoint_id: DeploymentID,
         test_user_uuid: uuid.UUID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_group_id: uuid.UUID,
         test_replica_group_id: ReplicaGroupID,
     ) -> None:
@@ -3229,7 +3226,7 @@ class TestRouteOperations:
         spec = RouteCreatorSpec(
             deployment_id=test_endpoint_id,
             session_owner_id=test_user_uuid,
-            domain=test_domain_name,
+            domain=test_domain.domain_name,
             project_id=test_group_id,
             revision_id=DeploymentRevisionID(uuid.uuid4()),
             health_check=None,
@@ -3272,7 +3269,7 @@ class TestRouteOperations:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_endpoint_id: DeploymentID,
         test_user_uuid: uuid.UUID,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_group_id: uuid.UUID,
         test_replica_group_id: ReplicaGroupID,
     ) -> None:
@@ -3281,7 +3278,7 @@ class TestRouteOperations:
         spec = RouteCreatorSpec(
             deployment_id=test_endpoint_id,
             session_owner_id=test_user_uuid,
-            domain=test_domain_name,
+            domain=test_domain.domain_name,
             project_id=test_group_id,
             revision_id=DeploymentRevisionID(uuid.uuid4()),
             health_check=None,
@@ -3567,7 +3564,7 @@ class TestDeploymentRepositoryDuplicateName:
                 domain_name=test_domain.name,
                 role=UserRole.USER,
                 resource_policy=default_user_policy.name,
-                domain_id=domain_id,
+                domain_id=test_domain.id,
             )
             db_sess.add(user)
             await db_sess.commit()

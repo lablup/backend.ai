@@ -6,7 +6,7 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -30,11 +30,7 @@ from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGro
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
-
-
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 @pytest.fixture
@@ -66,15 +62,15 @@ async def database_with_fair_share_tables(
 
 
 @pytest.fixture
-async def domain_name(
+async def test_domain(
     database_with_fair_share_tables: ExtendedAsyncSAEngine,
-    domain_id: DomainID,
-) -> AsyncGenerator[str, None]:
+) -> AsyncGenerator[DomainFixtureData, None]:
+    domain_id = DomainID(uuid.uuid4())
     """Create DomainRow and return its name."""
     name = "test-domain"
     async with database_with_fair_share_tables.begin_session() as db_sess:
         db_sess.add(DomainRow(id=domain_id, name=name))
-    yield name
+    yield DomainFixtureData(domain_name=DomainName(name), domain_id=domain_id)
 
 
 @pytest.fixture
@@ -147,7 +143,7 @@ async def project_resource_policy(
 @pytest.fixture
 async def user_uuid(
     database_with_fair_share_tables: ExtendedAsyncSAEngine,
-    domain_name: str,
+    test_domain: DomainFixtureData,
     user_resource_policy: str,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create UserRow and return its UUID."""
@@ -165,9 +161,9 @@ async def user_uuid(
                 username="testuser",
                 email="test@example.com",
                 password=password_info,
-                domain_name=domain_name,
+                domain_name=test_domain.domain_name,
                 resource_policy=user_resource_policy,
-                domain_id=domain_id,
+                domain_id=test_domain.domain_id,
             )
         )
     yield user_id
@@ -176,7 +172,7 @@ async def user_uuid(
 @pytest.fixture
 async def project_id(
     database_with_fair_share_tables: ExtendedAsyncSAEngine,
-    domain_name: str,
+    test_domain: DomainFixtureData,
     project_resource_policy: str,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create GroupRow and return its ID."""
@@ -186,7 +182,7 @@ async def project_id(
             GroupRow(
                 id=group_id,
                 name="test-project",
-                domain_name=domain_name,
+                domain_name=test_domain.domain_name,
                 resource_policy=project_resource_policy,
             )
         )
@@ -196,13 +192,13 @@ async def project_id(
 @pytest.fixture
 async def domain_fair_share_id(
     database_with_fair_share_tables: ExtendedAsyncSAEngine,
-    domain_name: str,
+    test_domain: DomainFixtureData,
     scaling_group: str,
     resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create DomainFairShareRow and return its ID."""
     row = DomainFairShareRow(
-        domain_name=domain_name,
+        domain_name=test_domain.domain_name,
         resource_group=scaling_group,
         resource_group_id=resource_group_id,
         weight=Decimal("1.0"),
@@ -221,13 +217,13 @@ async def domain_fair_share_id(
 @pytest.fixture
 async def domain_fair_share_with_usage_id(
     database_with_fair_share_tables: ExtendedAsyncSAEngine,
-    domain_name: str,
+    test_domain: DomainFixtureData,
     scaling_group: str,
     resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create DomainFairShareRow with calculated usage values and return its ID."""
     row = DomainFairShareRow(
-        domain_name=domain_name,
+        domain_name=test_domain.domain_name,
         resource_group=scaling_group,
         resource_group_id=resource_group_id,
         weight=Decimal("2.0"),
@@ -247,14 +243,14 @@ async def domain_fair_share_with_usage_id(
 async def project_fair_share_id(
     database_with_fair_share_tables: ExtendedAsyncSAEngine,
     project_id: uuid.UUID,
-    domain_name: str,
+    test_domain: DomainFixtureData,
     scaling_group: str,
     resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create ProjectFairShareRow and return its ID."""
     row = ProjectFairShareRow(
         project_id=project_id,
-        domain_name=domain_name,
+        domain_name=test_domain.domain_name,
         resource_group=scaling_group,
         resource_group_id=resource_group_id,
         weight=Decimal("1.0"),
@@ -275,7 +271,7 @@ async def user_fair_share_id(
     database_with_fair_share_tables: ExtendedAsyncSAEngine,
     user_uuid: uuid.UUID,
     project_id: uuid.UUID,
-    domain_name: str,
+    test_domain: DomainFixtureData,
     scaling_group: str,
     resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
@@ -283,7 +279,7 @@ async def user_fair_share_id(
     row = UserFairShareRow(
         user_uuid=user_uuid,
         project_id=project_id,
-        domain_name=domain_name,
+        domain_name=test_domain.domain_name,
         resource_group=scaling_group,
         resource_group_id=resource_group_id,
         weight=Decimal("1.0"),
@@ -304,7 +300,7 @@ async def user_fair_share_with_large_usage_id(
     database_with_fair_share_tables: ExtendedAsyncSAEngine,
     user_uuid: uuid.UUID,
     project_id: uuid.UUID,
-    domain_name: str,
+    test_domain: DomainFixtureData,
     scaling_group: str,
     resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
@@ -312,7 +308,7 @@ async def user_fair_share_with_large_usage_id(
     row = UserFairShareRow(
         user_uuid=user_uuid,
         project_id=project_id,
-        domain_name=domain_name,
+        domain_name=test_domain.domain_name,
         resource_group=scaling_group,
         resource_group_id=resource_group_id,
         weight=Decimal("1.0"),

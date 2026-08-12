@@ -14,7 +14,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.data.permission.permission_defs import ImagePermission
@@ -46,6 +46,7 @@ from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 DOMAIN_NAME = "test-domain"
 REGISTRY_URL = "https://cr.test.io"
@@ -60,11 +61,6 @@ _ORM_CLUSTER = (
 )
 
 
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
-
-
 class TestImagePermissionContextNonGlobalRegistry:
     """Tests for ImagePermissionContextBuilder with non-global registry access control."""
 
@@ -76,7 +72,7 @@ class TestImagePermissionContextNonGlobalRegistry:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         name: str,
-        domain: str,
+        test_domain: DomainFixtureData,
         user: UserRow,
     ) -> UUID:
         project_id = uuid4()
@@ -85,7 +81,7 @@ class TestImagePermissionContextNonGlobalRegistry:
                 GroupRow(
                     id=project_id,
                     name=name,
-                    domain_name=domain,
+                    domain_name=test_domain.domain_name,
                     is_active=True,
                     resource_policy=PROJECT_RESOURCE_POLICY_NAME,
                 )
@@ -151,7 +147,11 @@ class TestImagePermissionContextNonGlobalRegistry:
             yield database_connection
 
     @pytest.fixture
-    async def domain(self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: DomainID) -> str:
+    async def test_domain(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> DomainFixtureData:
+        domain_id = DomainID(uuid.uuid4())
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
                 DomainRow(
@@ -173,10 +173,12 @@ class TestImagePermissionContextNonGlobalRegistry:
                 )
             )
             await sess.commit()
-        return DOMAIN_NAME
+        return DomainFixtureData(domain_name=DomainName(DOMAIN_NAME), domain_id=domain_id)
 
     @pytest.fixture
-    async def user(self, db_with_cleanup: ExtendedAsyncSAEngine, domain: str) -> UserRow:
+    async def user(
+        self, db_with_cleanup: ExtendedAsyncSAEngine, test_domain: DomainFixtureData
+    ) -> UserRow:
         user_id = uuid4()
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
@@ -194,10 +196,10 @@ class TestImagePermissionContextNonGlobalRegistry:
                     uuid=user_id,
                     username="testuser",
                     email="testuser@test.io",
-                    domain_name=domain,
+                    domain_name=test_domain.domain_name,
                     role=UserRole.USER,
                     resource_policy=USER_RESOURCE_POLICY_NAME,
-                    domain_id=domain_id,
+                    domain_id=test_domain.domain_id,
                 )
             )
             await sess.commit()
@@ -207,24 +209,28 @@ class TestImagePermissionContextNonGlobalRegistry:
 
     @pytest.fixture
     async def queried_project(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, domain: str, user: UserRow
+        self, db_with_cleanup: ExtendedAsyncSAEngine, test_domain: DomainFixtureData, user: UserRow
     ) -> UUID:
         """The project used as the query scope."""
-        return await self._create_project(db_with_cleanup, "queried-project", domain, user)
+        return await self._create_project(db_with_cleanup, "queried-project", test_domain, user)
 
     @pytest.fixture
     async def other_associated_project(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, domain: str, user: UserRow
+        self, db_with_cleanup: ExtendedAsyncSAEngine, test_domain: DomainFixtureData, user: UserRow
     ) -> UUID:
         """Another project associated with the non-global registry, but NOT the query scope."""
-        return await self._create_project(db_with_cleanup, "other-associated-project", domain, user)
+        return await self._create_project(
+            db_with_cleanup, "other-associated-project", test_domain, user
+        )
 
     @pytest.fixture
     async def unassociated_project(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, domain: str, user: UserRow
+        self, db_with_cleanup: ExtendedAsyncSAEngine, test_domain: DomainFixtureData, user: UserRow
     ) -> UUID:
         """A project with NO association to the non-global registry."""
-        return await self._create_project(db_with_cleanup, "unassociated-project", domain, user)
+        return await self._create_project(
+            db_with_cleanup, "unassociated-project", test_domain, user
+        )
 
     @pytest.fixture
     async def global_registry_id(self, db_with_cleanup: ExtendedAsyncSAEngine) -> UUID:

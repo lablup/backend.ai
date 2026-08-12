@@ -658,6 +658,7 @@ class TestUserSessionGroupPurger:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_password_info: PasswordInfo,
     ) -> _PlacementScope:
+        domain_id = DomainID(uuid.uuid4())
         domain = DomainRow(
             id=DomainID(uuid.uuid4()),
             name=f"test-domain-{uuid.uuid4().hex[:8]}",

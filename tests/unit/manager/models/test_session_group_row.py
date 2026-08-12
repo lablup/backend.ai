@@ -129,6 +129,7 @@ class TestSessionGroupRow:
 
     @pytest.fixture
     async def scope(self, db: ExtendedAsyncSAEngine) -> AsyncIterator[_OwnershipScope]:
+        domain_id = DomainID(uuid.uuid4())
         domain = DomainRow(id=DomainID(uuid.uuid4()), name=f"test-{uuid.uuid4().hex[:8]}")
         scaling_group = ScalingGroupRow(
             id=ResourceGroupID(uuid.uuid4()),
