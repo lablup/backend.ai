@@ -22,7 +22,6 @@ depends_on = None
 
 _COLUMNS = (
     ("domain_name", sa.String(length=64)),
-    ("domain_id", sa.dialects.postgresql.UUID(as_uuid=True)),
     ("role", sa.String(length=64)),
     ("need_password_change", sa.Boolean()),
     ("totp_activated", sa.Boolean()),
@@ -35,27 +34,15 @@ def upgrade() -> None:
         sa.text("UPDATE users SET need_password_change = false WHERE need_password_change IS NULL")
     )
     conn.execute(sa.text("UPDATE users SET totp_activated = false WHERE totp_activated IS NULL"))
-    conn.execute(
-        sa.text("""
-            UPDATE users u
-            SET domain_id = d.id
-            FROM domains d
-            WHERE u.domain_id IS NULL AND u.domain_name = d.name
-        """)
-    )
-
     stranded = conn.execute(
-        sa.text("""
-            SELECT count(*) FROM users
-            WHERE domain_name IS NULL OR domain_id IS NULL OR role IS NULL
-        """)
+        sa.text("SELECT count(*) FROM users WHERE domain_name IS NULL OR role IS NULL")
     ).scalar_one()
     if stranded:
         raise RuntimeError(
             f"{stranded} user(s) have no domain or no role, and this migration cannot pick either "
             "for them. Fill both in (or delete the account) and run the migration again: "
             "SELECT uuid, email, domain_name, role FROM users "
-            "WHERE domain_name IS NULL OR domain_id IS NULL OR role IS NULL;"
+            "WHERE domain_name IS NULL OR role IS NULL;"
         )
 
     for name, type_ in _COLUMNS:
