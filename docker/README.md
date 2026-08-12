@@ -195,7 +195,7 @@ addresses the deployment). Its contract:
 - Host networking is granted only to the manager and the agent (and the
   `manager-cli` one-off tool). The other services join the halfstack's
   `half` bridge network with published ports and `depends_on` health gating;
-  their generated configs get DB/etcd addresses rewritten to compose
+  their generated configs get DB/etcd/apollo-router addresses rewritten to compose
   service DNS names (container-side ports), redis addressed by the host
   public IP + published port everywhere (it is shared across both network
   profiles via the etcd `config/redis/addr`), the manager API rewritten to
