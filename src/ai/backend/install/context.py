@@ -876,9 +876,7 @@ class Context(metaclass=ABCMeta):
                 ),
             ],
         )
-        Path(self.install_info.service_config.agent_var_base_path).mkdir(
-            parents=True, exist_ok=True
-        )
+        self._ensure_agent_var_base_path()
         if accelerator is not None:
             if accelerator == Accelerator.CUDA:
                 plugin_list = ['"ai.backend.accelerator.cuda_open"']
@@ -1011,6 +1009,16 @@ class Context(metaclass=ABCMeta):
                     ),
                 ),
             ],
+        )
+
+    def _ensure_agent_var_base_path(self) -> None:
+        """
+        Create the agent's var-base-path host-side. Overridden to a no-op by
+        install modes whose var-base-path lives under a root-owned system
+        path the unprivileged installer cannot (and need not) create.
+        """
+        Path(self.install_info.service_config.agent_var_base_path).mkdir(
+            parents=True, exist_ok=True
         )
 
     async def configure_storage_proxy(self) -> None:
@@ -2757,6 +2765,14 @@ class DockerContext(Context):
         await self.configure_appproxy_fixture()
         self.log_header("Preparing vfolder volumes...")
         await self.prepare_local_vfolder_host()
+
+    @override
+    def _ensure_agent_var_base_path(self) -> None:
+        # /var/lib/backend.ai is root territory the unprivileged installer
+        # cannot create — and does not need to: the Docker daemon creates the
+        # mount source when the agent container starts, and the agent (root
+        # in its container) creates its own subdirectories at runtime.
+        pass
 
     async def _fixup_agent_paths(self) -> None:
         """
