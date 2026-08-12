@@ -152,7 +152,6 @@ def sample_agent_info() -> AgentInfo:
         addr="tcp://192.168.1.100:6001",
         public_key=PublicKey(b"test-public-key"),
         public_host="192.168.1.100",
-        images=b"\x82\xc4\x00\x00",  # msgpack compressed data
         region="us-west-1",
         architecture="x86_64",
         compute_plugins={DeviceName("cpu"): {}},
@@ -342,7 +341,6 @@ class TestAgentService:
             addr="tcp://192.168.1.200:6001",
             public_key=PublicKey(b"gpu-node-key"),
             public_host="192.168.1.200",
-            images=b"\x82\xc4\x00\x00",
             region="us-west-2",
             architecture="x86_64",
             compute_plugins={DeviceName("cpu"): {}},

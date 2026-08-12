@@ -12,7 +12,6 @@ import sys
 import time
 import traceback
 import weakref
-import zlib
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from collections.abc import (
@@ -86,7 +85,6 @@ from ai.backend.agent.tasks import (
     ScanImagesTask,
     SyncContainerLifecyclesTask,
 )
-from ai.backend.common import msgpack
 from ai.backend.common.asyncio import cancel_tasks, current_loop
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
@@ -99,7 +97,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import ModelConfig, ModelDefinition
 from ai.backend.common.cron import LocalCron, PeriodicTask
-from ai.backend.common.data.agent.types import AgentInfo, ImageOpts
+from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.data.image.types import InstalledImageInfo, ScannedImage
 from ai.backend.common.defs import (
     REDIS_BGTASK_DB,
@@ -1296,13 +1294,6 @@ class AbstractAgent[
                     }
                     for key, computer in self.computers.items()
                 },
-                images=zlib.compress(
-                    msgpack.packb([
-                        (str(canonical), image_info.digest)
-                        for canonical, image_info in self.images.items()
-                    ])
-                ),
-                images_opts=ImageOpts(compression="zlib"),  # compression: zlib or None
                 architecture=get_arch_name(),
                 auto_terminate_abusing_kernel=self.local_config.agent.force_terminate_abusing_containers,
             )

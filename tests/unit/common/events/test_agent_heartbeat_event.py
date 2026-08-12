@@ -41,10 +41,8 @@ class TestAgentHeartbeatEvent:
                     "compute_plugins": {
                         DeviceName("cpu"): {"version": "1.0.0"},
                     },
-                    "images": b"",
                     "architecture": "x86_64",
                     "auto_terminate_abusing_kernel": False,
-                    "images_opts": {"compression": "zlib"},
                 },
                 {
                     SlotName("cpu"): SlotTypes.COUNT,
@@ -71,10 +69,8 @@ class TestAgentHeartbeatEvent:
                     "compute_plugins": {
                         DeviceName("cpu"): {"version": "1.0.0"},
                     },
-                    "images": b"",
                     "architecture": "x86_64",
                     "auto_terminate_abusing_kernel": False,
-                    "images_opts": {"compression": "zlib"},
                 },
                 {
                     SlotName("cpu"): SlotTypes.COUNT,
@@ -105,10 +101,8 @@ class TestAgentHeartbeatEvent:
                     "compute_plugins": {
                         DeviceName("cpu"): {"version": "1.0.0"},
                     },
-                    "images": b"",
                     "architecture": "x86_64",
                     "auto_terminate_abusing_kernel": False,
-                    "images_opts": {"compression": "zlib"},
                 },
                 {
                     SlotName("cpu"): SlotTypes.COUNT,

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import base64
-from typing import Annotated, Any
+from typing import Any
 
-from pydantic import AliasChoices, BeforeValidator, Field, PlainSerializer, field_validator
+from pydantic import field_validator
 
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
@@ -14,30 +13,6 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
-
-
-def _decode_images(value: Any) -> Any:
-    """Turn the JSON form of `images` back into bytes, passing bytes through untouched."""
-    if isinstance(value, str):
-        return base64.b64decode(value, validate=True)
-    return value
-
-
-# zlib-compressed msgpack, so not valid UTF-8: JSON carries it as base64, and only JSON,
-# leaving the msgpack path to pack the raw bytes as before.
-PackedImages = Annotated[
-    bytes,
-    BeforeValidator(_decode_images),
-    PlainSerializer(
-        lambda value: base64.b64encode(value).decode("ascii"),
-        return_type=str,
-        when_used="json",
-    ),
-]
-
-
-class ImageOpts(BackendAISchema):
-    compression: str
 
 
 class AgentInfo(BackendAISchema):
@@ -51,13 +26,8 @@ class AgentInfo(BackendAISchema):
     slot_key_and_units: dict[ResourceSlotName, SlotTypes]
     version: str
     compute_plugins: dict[DeviceName, dict[str, Any]]
-    images: PackedImages
     architecture: str
     auto_terminate_abusing_kernel: bool
-    images_opts: ImageOpts = Field(
-        default_factory=lambda: ImageOpts(compression="zlib"),
-        validation_alias=AliasChoices("images.opts", "images_opts", "imagesOpts"),
-    )
 
     @field_validator("slot_key_and_units", mode="before")
     @classmethod
