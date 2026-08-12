@@ -73,6 +73,11 @@ from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 def _running_route(
     endpoint_row: EndpointRow,
     group_id: ReplicaGroupID,
@@ -199,7 +204,7 @@ class TestReplicaGroupRepository:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
-                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -249,7 +254,7 @@ class TestReplicaGroupRepository:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy_name,
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    domain_id=domain_id,
                 )
             )
             db_sess.add(

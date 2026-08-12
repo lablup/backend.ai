@@ -53,6 +53,11 @@ from ai.backend.manager.repositories.domain.db_source import DomainDBSource
 from ai.backend.testutils.db import TableOrORM, with_tables
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 def _make_password_info() -> PasswordInfo:
     return PasswordInfo(
         password="test_password",
@@ -419,7 +424,7 @@ class TestDomainNestedSearchIntegration:
                 (domain_beta, False, "Archived department"),
             ]:
                 domain = DomainRow(
-                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    id=domain_id,
                     name=domain_name,
                     description=desc,
                     is_active=is_active,
@@ -507,7 +512,7 @@ class TestDomainNestedSearchIntegration:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy.name,
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    domain_id=domain_id,
                 )
                 session.add(user)
                 keypair_data.append((email, user_uuid))

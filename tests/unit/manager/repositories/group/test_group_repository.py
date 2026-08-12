@@ -87,6 +87,11 @@ from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 class TestGroupRepositoryCreateResourcePolicyValidation:
     """Tests for resource_policy validation in GroupRepository.create()"""
 
@@ -119,13 +124,14 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: uuid.UUID,
     ) -> str:
         """Create test domain."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as session:
             domain = DomainRow(
-                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -382,7 +388,7 @@ class TestGroupRepository:
                 domain_name=test_domain,
                 role=UserRole.USER,
                 resource_policy=default_user_resource_policy,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain),
+                domain_id=domain_id,
             )
             session.add(user)
             await session.commit()
@@ -416,7 +422,7 @@ class TestGroupRepository:
                     domain_name=test_domain,
                     role=UserRole.USER,
                     resource_policy=default_user_resource_policy,
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain),
+                    domain_id=domain_id,
                 )
                 session.add(user)
                 session.add(VirtualScopeRow(scope_type=ScopeType.USER.value, scope_id=user_uuid))
@@ -1382,13 +1388,14 @@ class TestGroupRowVFolderHostPermissionMap:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: uuid.UUID,
     ) -> str:
         """Create test domain."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as session:
             domain = DomainRow(
-                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,

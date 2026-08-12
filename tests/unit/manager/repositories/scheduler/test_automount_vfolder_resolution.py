@@ -91,6 +91,11 @@ NOOP_VFOLDER_HOST = "proxy:noop"
 AUTOMOUNT_VFOLDER_NAME = ".config"
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 def _password_info() -> PasswordInfo:
     return PasswordInfo(
         password="dummy",
@@ -146,13 +151,14 @@ class TestAutoMountVFolderResolution:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: uuid.UUID,
     ) -> str:
         """Create a test domain that allows mounting on the noop host."""
         domain_name = f"test-domain-{uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
-                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    id=domain_id,
                     name=domain_name,
                     description="",
                     is_active=True,
@@ -226,7 +232,7 @@ class TestAutoMountVFolderResolution:
                     status=UserStatus.ACTIVE,
                     status_info="active",
                     resource_policy=test_user_resource_policy_name,
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
+                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()

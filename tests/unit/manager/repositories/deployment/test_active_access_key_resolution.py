@@ -41,6 +41,11 @@ class UserSeed:
     keypairs: list[KeypairSpec]
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 class TestResolveUserAndActiveAccessKey:
     """Tests for DeploymentDBSource._resolve_user_and_active_access_key.
 
@@ -83,7 +88,7 @@ class TestResolveUserAndActiveAccessKey:
         async with db.begin_session() as sess:
             sess.add(
                 DomainRow(
-                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    id=domain_id,
                     name=domain_name,
                     is_active=True,
                     total_resource_slots=ResourceSlot(),
@@ -118,7 +123,7 @@ class TestResolveUserAndActiveAccessKey:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy,
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    domain_id=domain_id,
                 )
             )
             await sess.flush()

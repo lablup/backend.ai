@@ -36,6 +36,11 @@ from ai.backend.manager.repositories.vfolder.admin_repository import VFolderAdmi
 from ai.backend.testutils.db import with_tables
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 class TestVfolderSearchVfolders:
     """Tests for VFolderAdminRepository.search_vfolders()"""
 
@@ -85,7 +90,7 @@ class TestVfolderSearchVfolders:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
-                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -137,7 +142,7 @@ class TestVfolderSearchVfolders:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy="default",
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()
@@ -225,7 +230,7 @@ class TestVfolderSearchVfolders:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
-                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -277,7 +282,7 @@ class TestVfolderSearchVfolders:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy="default",
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()

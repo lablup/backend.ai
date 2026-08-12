@@ -63,6 +63,11 @@ from ai.backend.manager.repositories.scheduler.db_source.db_source import Schedu
 from ai.backend.testutils.db import with_tables
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 class TestEnqueueSessionSchedulingHistory:
     """Test that enqueue_session() creates scheduling history records."""
 
@@ -235,7 +240,7 @@ class TestEnqueueSessionSchedulingHistory:
                 status=UserStatus.ACTIVE,
                 domain_name=test_domain_name,
                 resource_policy=test_user_resource_policy_name,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
+                domain_id=domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -495,7 +500,7 @@ class TestMarkTerminatingSchedulingHistory:
                 status=UserStatus.ACTIVE,
                 domain_name=test_domain_name,
                 resource_policy=test_user_resource_policy_name,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
+                domain_id=domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()

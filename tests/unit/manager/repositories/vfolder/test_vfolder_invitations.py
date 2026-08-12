@@ -10,6 +10,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.vfolder.types import (
@@ -93,6 +94,7 @@ class TestInvitationGettersUsernameFallback:
         db: ExtendedAsyncSAEngine,
         *,
         domain_name: str,
+        domain_id: DomainID,
         resource_policy: str,
         email: str,
         username: str | None,
@@ -110,7 +112,7 @@ class TestInvitationGettersUsernameFallback:
                 domain_name=domain_name,
                 role=UserRole.USER,
                 resource_policy=resource_policy,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                domain_id=domain_id,
             )
             session.add(user)
             await session.flush()
@@ -127,6 +129,7 @@ class TestInvitationGettersUsernameFallback:
         return await self._create_user(
             db_with_cleanup,
             domain_name=sample_domain.domain_name,
+            domain_id=sample_domain.domain_id,
             resource_policy=user_resource_policy,
             email=f"inviter-{uuid.uuid4().hex[:8]}@example.com",
             username=f"inviter-{uuid.uuid4().hex[:8]}",
@@ -142,6 +145,7 @@ class TestInvitationGettersUsernameFallback:
         return await self._create_user(
             db_with_cleanup,
             domain_name=sample_domain.domain_name,
+            domain_id=sample_domain.domain_id,
             resource_policy=user_resource_policy,
             email=f"invitee-{uuid.uuid4().hex[:8]}@example.com",
             username=f"invitee-{uuid.uuid4().hex[:8]}",

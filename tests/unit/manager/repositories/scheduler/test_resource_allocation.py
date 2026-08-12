@@ -63,6 +63,11 @@ from ai.backend.manager.views.sokovan.lifecycle import KernelCreationInfo
 from ai.backend.testutils.db import with_tables
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 def _make_creation_info(
     cpu: str = "2",
     mem: str = "4096",
@@ -255,7 +260,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
                     status=UserStatus.ACTIVE,
                     domain_name=test_domain_name,
                     resource_policy=test_user_resource_policy_name,
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
+                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()

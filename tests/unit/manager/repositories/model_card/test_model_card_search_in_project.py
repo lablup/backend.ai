@@ -52,6 +52,11 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 class TestSearchInProjectMembership:
     """Verify virtual-scope-based membership gating in search_in_project."""
 
@@ -91,10 +96,11 @@ class TestSearchInProjectMembership:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: uuid.UUID,
     ) -> DomainRow:
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
-                id=uuid.uuid5(uuid.NAMESPACE_DNS, f"test-domain-{uuid.uuid4().hex[:8]}"),
+                id=domain_id,
                 name=f"test-domain-{uuid.uuid4().hex[:8]}",
                 description="Test domain",
                 is_active=True,

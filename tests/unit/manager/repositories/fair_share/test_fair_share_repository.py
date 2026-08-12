@@ -70,6 +70,11 @@ from ai.backend.testutils.db import with_tables
 RESOURCE_GROUP_ID = ResourceGroupID(uuid.uuid4())
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 class TestFairShareRepository:
     """Test cases for FairShareRepository"""
 
@@ -250,7 +255,7 @@ class TestFairShareRepository:
                 domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=policy_name,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
+                domain_id=domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -413,6 +418,7 @@ class TestFairShareRepository:
         fair_share_repository: FairShareRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group: str,
+        domain_id: uuid.UUID,
     ) -> None:
         """Test searching domain fair shares with BatchQuerier"""
         # Create multiple domain fair shares
@@ -421,7 +427,7 @@ class TestFairShareRepository:
         async with db_with_cleanup.begin_session() as db_sess:
             for name in domain_names:
                 domain = DomainRow(
-                    id=uuid.uuid5(uuid.NAMESPACE_DNS, name),
+                    id=domain_id,
                     name=name,
                     description="Test domain",
                     is_active=True,
@@ -623,6 +629,7 @@ class TestFairShareRepository:
         self,
         fair_share_repository: FairShareRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: uuid.UUID,
     ) -> None:
         """Test upsert domain fair share when scaling group does not exist.
 
@@ -636,7 +643,7 @@ class TestFairShareRepository:
         # Create domain row (required for the fair share row's domain_name column)
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
-                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -759,13 +766,14 @@ class TestFairShareRepository:
     async def domain_not_in_rg(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: uuid.UUID,
     ) -> str:
         """Create a domain NOT associated with any scaling group."""
         domain_name = f"no-rg-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
-                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                id=domain_id,
                 name=domain_name,
                 description="Domain not in any RG",
                 is_active=True,

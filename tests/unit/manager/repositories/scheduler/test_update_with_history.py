@@ -51,6 +51,11 @@ from ai.backend.manager.repositories.scheduling_history.creators import (
 from ai.backend.testutils.db import with_tables
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 class TestUpdateWithHistory:
     """Test suite for update_with_history functionality."""
 
@@ -226,7 +231,7 @@ class TestUpdateWithHistory:
                 status=UserStatus.ACTIVE,
                 domain_name=test_domain_name,
                 resource_policy=test_user_resource_policy_name,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
+                domain_id=domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()

@@ -102,6 +102,11 @@ _AGENT_ADDR = "127.0.0.1:6001"
 
 
 @pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
+@pytest.fixture
 async def db_with_cleanup(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
@@ -246,7 +251,7 @@ async def test_user_uuid(
                 status=UserStatus.ACTIVE,
                 domain_name=test_domain_name,
                 resource_policy=test_user_resource_policy_name,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
+                domain_id=domain_id,
             )
         )
         await db_sess.flush()

@@ -66,6 +66,11 @@ REQUESTER_EMAIL = "requester@example.com"
 DOMAIN_NAME_FIXED = "test-domain-share"
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 def _password() -> PasswordInfo:
     return PasswordInfo(
         password="dummy",
@@ -119,12 +124,12 @@ class TestShareVfolderWithUsersMembership:
 
     @pytest.fixture
     async def domain_name(
-        self, db_with_cleanup: ExtendedAsyncSAEngine
+        self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: uuid.UUID
     ) -> AsyncGenerator[str, None]:
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
                 DomainRow(
-                    id=uuid.uuid5(uuid.NAMESPACE_DNS, DOMAIN_NAME_FIXED),
+                    id=domain_id,
                     name=DOMAIN_NAME_FIXED,
                     description="",
                     is_active=True,
@@ -236,7 +241,7 @@ class TestShareVfolderWithUsersMembership:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_resource_policy,
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    domain_id=domain_id,
                 )
             )
             await sess.flush()
@@ -297,7 +302,7 @@ class TestShareVfolderWithUsersMembership:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_resource_policy,
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    domain_id=domain_id,
                 )
             )
             sess.add(
@@ -341,7 +346,7 @@ class TestShareVfolderWithUsersMembership:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_resource_policy,
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    domain_id=domain_id,
                 )
             )
             await sess.flush()
@@ -372,7 +377,7 @@ class TestShareVfolderWithUsersMembership:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_resource_policy,
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    domain_id=domain_id,
                 )
             )
             sess.add(
@@ -463,7 +468,7 @@ class TestShareVfolderWithUsersMembership:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_resource_policy,
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    domain_id=domain_id,
                 )
             )
             sess.add(

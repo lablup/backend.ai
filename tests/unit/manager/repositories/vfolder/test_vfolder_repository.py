@@ -103,6 +103,11 @@ from ai.backend.manager.repositories.vfolder.updaters import VFolderTrashUpdater
 from ai.backend.testutils.db import with_tables
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 class TestVfolderRepository:
     """Test cases for VfolderRepository"""
 
@@ -181,13 +186,14 @@ class TestVfolderRepository:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: uuid.UUID,
     ) -> AsyncGenerator[str, None]:
         """Create test domain and return domain name"""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
-                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                id=domain_id,
                 name=domain_name,
                 description="Test domain for vfolder",
                 is_active=True,
@@ -270,7 +276,7 @@ class TestVfolderRepository:
                 domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_user_resource_policy_name,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
+                domain_id=domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -395,13 +401,14 @@ class TestVfolderRepositoryAllowedVfolderHosts:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: uuid.UUID,
     ) -> str:
         """Create test domain."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
-                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -484,7 +491,7 @@ class TestVfolderRepositoryAllowedVfolderHosts:
                 domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_user_resource_policy_name,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
+                domain_id=domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -673,13 +680,14 @@ class TestVfolderRepositoryPurge:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: uuid.UUID,
     ) -> str:
         """Create test domain."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
-                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -742,7 +750,7 @@ class TestVfolderRepositoryPurge:
                 domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_user_resource_policy_name,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
+                domain_id=domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -1054,12 +1062,13 @@ class TestVfolderRepositoryDeleteForever:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: uuid.UUID,
     ) -> str:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
-                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -1117,7 +1126,7 @@ class TestVfolderRepositoryDeleteForever:
                     domain_name=test_domain_name,
                     role=UserRole.USER,
                     resource_policy=test_user_resource_policy_name,
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
+                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()
@@ -1956,7 +1965,7 @@ class TestVFolderRepositoryTrashAndRestore:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
-                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    id=domain_id,
                     name=domain_name,
                     description="test",
                     is_active=True,
@@ -1993,7 +2002,7 @@ class TestVFolderRepositoryTrashAndRestore:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=policy_name,
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()

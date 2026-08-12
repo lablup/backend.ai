@@ -75,6 +75,11 @@ class CreatedRole:
     created_at: datetime
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 class TestSearchRoles:
     """Tests for searching roles with filtering and ordering."""
 
@@ -222,7 +227,7 @@ class TestSearchRoles:
         async with db_with_rbac_tables.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
-                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    id=domain_id,
                     name=domain_name,
                     description="domain for by_assigned_user_id test",
                     is_active=True,
@@ -258,7 +263,7 @@ class TestSearchRoles:
                         domain_name=domain_name,
                         role=UserRole.USER,
                         resource_policy=policy_name,
-                        domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                        domain_id=domain_id,
                     )
                 )
             await db_sess.flush()

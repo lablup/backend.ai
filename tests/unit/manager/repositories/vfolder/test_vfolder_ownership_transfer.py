@@ -66,6 +66,11 @@ from ai.backend.testutils.db import with_tables
 VFOLDER_HOST = "local:volume1"
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 class UserWithKeypair(NamedTuple):
     user_id: uuid.UUID
     email: str
@@ -115,11 +120,12 @@ class TestVFolderOwnershipTransferRBACCleanup:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: uuid.UUID,
     ) -> str:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
-                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -281,7 +287,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 domain_name=domain_name,
                 role=UserRole.USER,
                 resource_policy=user_policy_name,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                domain_id=domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()

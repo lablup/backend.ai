@@ -149,6 +149,11 @@ class DeploymentPolicyPurgerSpec(PurgerSpec[DeploymentPolicyRow]):
         return ()
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 def create_test_password_info(password: str) -> PasswordInfo:
     """Create a PasswordInfo object for testing with default PBKDF2 algorithm."""
     return PasswordInfo(
@@ -399,7 +404,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
+                domain_id=domain_id,
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -1482,13 +1487,14 @@ class TestDeploymentRevisionOperations:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: uuid.UUID,
     ) -> str:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
-                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -1587,7 +1593,7 @@ class TestDeploymentRevisionOperations:
                 domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
+                domain_id=domain_id,
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -2243,13 +2249,14 @@ class TestDeploymentPolicyOperations:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: uuid.UUID,
     ) -> str:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
-                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -2348,7 +2355,7 @@ class TestDeploymentPolicyOperations:
                 domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
+                domain_id=domain_id,
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -2580,11 +2587,12 @@ class TestSearchDeploymentPolicies:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: uuid.UUID,
     ) -> str:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
-                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -2671,7 +2679,7 @@ class TestSearchDeploymentPolicies:
                 domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
+                domain_id=domain_id,
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -2966,13 +2974,14 @@ class TestRouteOperations:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: uuid.UUID,
     ) -> str:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
-                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -3071,7 +3080,7 @@ class TestRouteOperations:
                 domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
+                domain_id=domain_id,
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -3421,11 +3430,12 @@ class TestDeploymentRepositoryDuplicateName:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: uuid.UUID,
     ) -> DomainRow:
         """Create test domain."""
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
-                id=uuid.uuid5(uuid.NAMESPACE_DNS, f"test-domain-{uuid.uuid4().hex[:8]}"),
+                id=domain_id,
                 name=f"test-domain-{uuid.uuid4().hex[:8]}",
                 description="Test domain",
                 is_active=True,
@@ -3557,7 +3567,7 @@ class TestDeploymentRepositoryDuplicateName:
                 domain_name=test_domain.name,
                 role=UserRole.USER,
                 resource_policy=default_user_policy.name,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain.name),
+                domain_id=domain_id,
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -3743,6 +3753,7 @@ class TestDeploymentRepositoryDuplicateName:
         test_scaling_group: ScalingGroupRow,
         test_user: UserRow,
         test_image_id: uuid.UUID,
+        domain_id: uuid.UUID,
     ) -> None:
         creator = self._create_endpoint_creator(
             name=f"placement-{uuid.uuid4().hex[:8]}",

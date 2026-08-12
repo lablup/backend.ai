@@ -62,6 +62,11 @@ class TestData:
     endpoint_ids_in_b: list[uuid.UUID]
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 class TestEndpointSearchInProject:
     """Test cases for search_deployments_in_project in DeploymentRepository."""
 
@@ -106,6 +111,7 @@ class TestEndpointSearchInProject:
     async def test_data(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: uuid.UUID,
     ) -> AsyncGenerator[TestData, None]:
         """Create two projects with endpoints: 2 in project A, 1 in project B."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -122,7 +128,7 @@ class TestEndpointSearchInProject:
             # Domain
             db_sess.add(
                 DomainRow(
-                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    id=domain_id,
                     name=domain_name,
                     total_resource_slots=ResourceSlot(),
                 )

@@ -82,6 +82,11 @@ _WITH_TABLES: list[TableOrORM] = [
 ]
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 class TestUserConditionsIntegrationNameFilters:
     """Tests for integration_name filter conditions in UserConditions."""
 
@@ -444,7 +449,7 @@ class TestUserNestedSearchIntegration:
             ]:
                 session.add(
                     DomainRow(
-                        id=uuid.uuid5(uuid.NAMESPACE_DNS, dn),
+                        id=domain_id,
                         name=dn,
                         description=desc,
                         is_active=active,
@@ -495,7 +500,7 @@ class TestUserNestedSearchIntegration:
                         domain_name=dom,
                         role=UserRole.USER,
                         resource_policy=urp.name,
-                        domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, dom),
+                        domain_id=domain_id,
                     )
                 )
             await session.flush()

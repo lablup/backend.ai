@@ -59,6 +59,11 @@ _ORM_CLUSTER = (
 )
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 class TestImagePermissionContextNonGlobalRegistry:
     """Tests for ImagePermissionContextBuilder with non-global registry access control."""
 
@@ -145,11 +150,11 @@ class TestImagePermissionContextNonGlobalRegistry:
             yield database_connection
 
     @pytest.fixture
-    async def domain(self, db_with_cleanup: ExtendedAsyncSAEngine) -> str:
+    async def domain(self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: uuid.UUID) -> str:
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
                 DomainRow(
-                    id=uuid.uuid5(uuid.NAMESPACE_DNS, DOMAIN_NAME),
+                    id=domain_id,
                     name=DOMAIN_NAME,
                     is_active=True,
                     total_resource_slots=ResourceSlot(),
@@ -191,7 +196,7 @@ class TestImagePermissionContextNonGlobalRegistry:
                     domain_name=domain,
                     role=UserRole.USER,
                     resource_policy=USER_RESOURCE_POLICY_NAME,
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain),
+                    domain_id=domain_id,
                 )
             )
             await sess.commit()

@@ -49,6 +49,11 @@ from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 class TestAssignUsersToProject:
     """Tests for GroupDBSource.assign_users_to_project"""
 
@@ -102,12 +107,13 @@ class TestAssignUsersToProject:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: uuid.UUID,
     ) -> str:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as session:
             session.add(
                 DomainRow(
-                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -125,12 +131,13 @@ class TestAssignUsersToProject:
     async def other_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: uuid.UUID,
     ) -> str:
         domain_name = f"other-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as session:
             session.add(
                 DomainRow(
-                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    id=domain_id,
                     name=domain_name,
                     description="Other domain",
                     is_active=True,
@@ -226,7 +233,7 @@ class TestAssignUsersToProject:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=policy_name,
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    domain_id=domain_id,
                 )
             )
             await VirtualScopeSeeder().seed_user_scope(session, user_uuid)
@@ -506,12 +513,13 @@ class TestUnassignUsersFromProject:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: uuid.UUID,
     ) -> str:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as session:
             session.add(
                 DomainRow(
-                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -607,7 +615,7 @@ class TestUnassignUsersFromProject:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=policy_name,
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    domain_id=domain_id,
                 )
             )
             await VirtualScopeSeeder().seed_user_scope(session, user_uuid)

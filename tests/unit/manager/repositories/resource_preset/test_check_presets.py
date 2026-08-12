@@ -96,6 +96,11 @@ from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 def _qty(slots: list[SlotQuantity], name: str) -> Decimal:
     """Find a SlotQuantity by slot_name and return its quantity."""
     return next(
@@ -380,7 +385,7 @@ class TestCheckPresetsOccupiedSlots:
                 domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
+                domain_id=domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -1445,7 +1450,7 @@ class TestCheckPresetsZeroValues:
                 domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
+                domain_id=domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()

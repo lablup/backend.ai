@@ -59,6 +59,11 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 def _password_info() -> PasswordInfo:
     return PasswordInfo(
         password="dummy",
@@ -169,7 +174,7 @@ class TestPrepareVFolderMountsSubpathFlow:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
-                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    id=domain_id,
                     name=domain_name,
                     description="",
                     is_active=True,
@@ -209,7 +214,7 @@ class TestPrepareVFolderMountsSubpathFlow:
                     status=UserStatus.ACTIVE,
                     status_info="active",
                     resource_policy=user_policy_name,
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    domain_id=domain_id,
                 )
             )
             db_sess.add(

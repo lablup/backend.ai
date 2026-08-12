@@ -56,6 +56,11 @@ from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 class TestEnsureQuotaScopeAccessibleByUser:
     """Test cases for ensure_quota_scope_accessible_by_user function"""
 
@@ -106,13 +111,14 @@ class TestEnsureQuotaScopeAccessibleByUser:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: uuid.UUID,
     ) -> AsyncGenerator[str, None]:
         """Create test domain and return domain name"""
         domain_name = f"test-domain-{uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
-                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                id=domain_id,
                 name=domain_name,
                 description="Test domain for quota scope",
                 is_active=True,
@@ -129,13 +135,14 @@ class TestEnsureQuotaScopeAccessibleByUser:
     async def other_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: uuid.UUID,
     ) -> AsyncGenerator[str, None]:
         """Create other test domain and return domain name"""
         domain_name = f"test-domain-{uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
-                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                id=domain_id,
                 name=domain_name,
                 description="Other test domain",
                 is_active=True,
@@ -197,7 +204,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
                 domain_name=test_domain_name,
                 role=UserRole.ADMIN,
                 resource_policy=test_resource_policy_name,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
+                domain_id=domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -232,7 +239,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
                 domain_name=test_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
+                domain_id=domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()
@@ -267,7 +274,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
                 domain_name=other_domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, other_domain_name),
+                domain_id=domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()

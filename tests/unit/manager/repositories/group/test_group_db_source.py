@@ -62,6 +62,11 @@ class MultipleEndpointsWithSessionsFixtureData:
     session_ids: list[uuid.UUID]
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 class TestGroupDBSourceDeleteEndpoints:
     """Test cases for GroupDBSource._delete_group_endpoints"""
 
@@ -180,7 +185,7 @@ class TestGroupDBSourceDeleteEndpoints:
                 domain_name=test_domain,
                 role=UserRole.USER,
                 resource_policy=policy_name,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain),
+                domain_id=domain_id,
             )
             session.add(user)
             await session.commit()

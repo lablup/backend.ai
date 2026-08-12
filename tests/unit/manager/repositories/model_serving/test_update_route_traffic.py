@@ -60,6 +60,11 @@ from ai.backend.testutils.db import with_tables
 
 
 @pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
+@pytest.fixture
 async def db_with_cleanup(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
@@ -93,12 +98,12 @@ async def db_with_cleanup(
 
 
 @pytest.fixture
-async def test_domain(db_with_cleanup: ExtendedAsyncSAEngine) -> str:
+async def test_domain(db_with_cleanup: ExtendedAsyncSAEngine, domain_id: uuid.UUID) -> str:
     name = f"test-domain-{uuid.uuid4().hex[:8]}"
     async with db_with_cleanup.begin_session() as sess:
         sess.add(
             DomainRow(
-                id=uuid.uuid5(uuid.NAMESPACE_DNS, name),
+                id=domain_id,
                 name=name,
                 total_resource_slots=ResourceSlot(),
             )

@@ -112,6 +112,11 @@ _IDLE_ROWS: list[TableOrORM] = [
 ]
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 class _RecordingChecker(BaseIdleChecker):
     """Records which kernels were checked and with which policy."""
 
@@ -314,7 +319,7 @@ class TestDoIdleCheck:
                     status=UserStatus.ACTIVE,
                     domain_name=domain_name,
                     resource_policy=user_resource_policy_name,
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()

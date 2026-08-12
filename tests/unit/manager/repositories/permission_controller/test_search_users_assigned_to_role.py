@@ -47,6 +47,11 @@ _ORM_CLUSTER = (
 )
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 def create_test_password_info(password: str = "test_password") -> PasswordInfo:
     return PasswordInfo(
         password=password,
@@ -107,7 +112,7 @@ class TestSearchUsersAssignedToRole:
 
         async with db_with_tables.begin_session() as db_sess:
             domain = DomainRow(
-                id=uuid.uuid5(uuid.NAMESPACE_DNS, "test-domain"),
+                id=domain_id,
                 name="test-domain",
                 description="Test domain",
                 is_active=True,
@@ -145,7 +150,7 @@ class TestSearchUsersAssignedToRole:
                     resource_policy="test-policy",
                     status=UserStatus.ACTIVE,
                     need_password_change=False,
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, "test-domain"),
+                    domain_id=domain_id,
                 )
                 db_sess.add(user)
                 await db_sess.flush()

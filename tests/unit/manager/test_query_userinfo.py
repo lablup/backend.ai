@@ -111,6 +111,11 @@ class ExtraUserData:
 
 
 @pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
+@pytest.fixture
 async def database_connection(
     postgres_container: tuple[str, HostPortPairModel],
 ) -> AsyncIterator[ExtendedAsyncSAEngine]:
@@ -151,7 +156,7 @@ class TestQueryUserinfo:
         async with db.begin_session() as sess:
             sess.add(
                 DomainRow(
-                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    id=domain_id,
                     name=domain_name,
                     is_active=True,
                     total_resource_slots=ResourceSlot(),
@@ -195,7 +200,7 @@ class TestQueryUserinfo:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy,
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    domain_id=domain_id,
                 )
             )
             await sess.flush()
@@ -293,7 +298,7 @@ class TestQueryUserinfo:
         async with db.begin_session() as sess:
             sess.add(
                 DomainRow(
-                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain),
+                    id=domain_id,
                     name=domain,
                     is_active=False,
                     total_resource_slots=ResourceSlot(),
@@ -320,7 +325,7 @@ class TestQueryUserinfo:
                     domain_name=domain,
                     role=UserRole.USER,
                     resource_policy=user_policy,
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain),
+                    domain_id=domain_id,
                 )
             )
             await sess.flush()
@@ -354,7 +359,7 @@ class TestQueryUserinfo:
                     domain_name=seed.domain_name,
                     role=UserRole.SUPERADMIN,
                     resource_policy=seed.user_policy_name,
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, seed.domain_name),
+                    domain_id=domain_id,
                 )
             )
             await sess.flush()
@@ -550,7 +555,7 @@ class TestQueryUserinfoFromSession:
         async with db.begin_session() as sess:
             sess.add(
                 DomainRow(
-                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    id=domain_id,
                     name=domain_name,
                     is_active=True,
                     total_resource_slots=ResourceSlot(),
@@ -594,7 +599,7 @@ class TestQueryUserinfoFromSession:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy,
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    domain_id=domain_id,
                 )
             )
             await sess.flush()

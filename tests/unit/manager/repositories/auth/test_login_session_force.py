@@ -52,6 +52,11 @@ class SampleUserData:
     access_key: str
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 class TestLoginSessionForce:
     """Tests for verify_credential and create_login_session with force option."""
 
@@ -92,7 +97,7 @@ class TestLoginSessionForce:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
-                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    id=domain_id,
                     name=domain_name,
                     description="test",
                     is_active=True,
@@ -138,7 +143,7 @@ class TestLoginSessionForce:
                 role=UserRole.USER,
                 resource_policy="test-user-policy",
                 need_password_change=False,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                domain_id=domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()

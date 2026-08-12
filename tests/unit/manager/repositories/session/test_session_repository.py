@@ -70,6 +70,11 @@ class SessionTestData:
 
 
 @pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
+@pytest.fixture
 def test_domain_id() -> DomainID:
     return DomainID(uuid.uuid4())
 
@@ -958,18 +963,20 @@ class TestGetTemplateInfoById:
 
     @pytest.fixture
     async def active_template(
-        self, db_with_cleanup: ExtendedAsyncSAEngine
+        self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: uuid.UUID
     ) -> tuple[uuid.UUID, str]:
         """Insert an active session_template. Returns (template_id, name)."""
-        return await self._create_template(db_with_cleanup, is_active=True, name="test-template")
+        return await self._create_template(
+            db_with_cleanup, is_active=True, name="test-template", domain_id=domain_id
+        )
 
     @pytest.fixture
     async def inactive_template(
-        self, db_with_cleanup: ExtendedAsyncSAEngine
+        self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: uuid.UUID
     ) -> tuple[uuid.UUID, str]:
         """Insert an inactive session_template. Returns (template_id, name)."""
         return await self._create_template(
-            db_with_cleanup, is_active=False, name="inactive-template"
+            db_with_cleanup, is_active=False, name="inactive-template", domain_id=domain_id
         )
 
     async def _create_template(
@@ -978,6 +985,7 @@ class TestGetTemplateInfoById:
         *,
         is_active: bool,
         name: str,
+        domain_id: uuid.UUID,
     ) -> tuple[uuid.UUID, str]:
         """Create prerequisite rows and insert a session_template.
 
@@ -991,7 +999,7 @@ class TestGetTemplateInfoById:
         async with db.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
-                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,

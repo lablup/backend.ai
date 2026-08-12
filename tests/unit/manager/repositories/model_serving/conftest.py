@@ -86,7 +86,7 @@ def sample_user() -> UserRow:
         created_at=datetime.now(UTC),
         modified_at=datetime.now(UTC),
         sudo_session_enabled=False,
-        domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, "default"),
+        domain_id=uuid.uuid4(),
     )
 
 
@@ -109,7 +109,7 @@ def sample_admin_user() -> UserRow:
         created_at=datetime.now(UTC),
         modified_at=datetime.now(UTC),
         sudo_session_enabled=True,
-        domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, "default"),
+        domain_id=uuid.uuid4(),
     )
 
 
@@ -132,7 +132,7 @@ def sample_superadmin_user() -> UserRow:
         created_at=datetime.now(UTC),
         modified_at=datetime.now(UTC),
         sudo_session_enabled=True,
-        domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, "default"),
+        domain_id=uuid.uuid4(),
     )
 
 

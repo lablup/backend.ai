@@ -53,6 +53,11 @@ from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.testutils.db import with_tables
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 def create_test_password_info(password: str) -> PasswordInfo:
     """Create a PasswordInfo object for testing with default PBKDF2 algorithm."""
     return PasswordInfo(
@@ -113,13 +118,14 @@ class TestDeploymentAutoScalingPolicyRow:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: uuid.UUID,
     ) -> AsyncGenerator[DomainRow, None]:
         """Create test domain."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
-                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -174,7 +180,7 @@ class TestDeploymentAutoScalingPolicyRow:
                 status=UserStatus.ACTIVE,
                 status_info="active",
                 resource_policy=test_user_resource_policy.name,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain.name),
+                domain_id=domain_id,
             )
             db_sess.add(user)
             await db_sess.flush()

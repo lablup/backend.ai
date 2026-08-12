@@ -164,7 +164,7 @@ class TestGroupPurgersIntegration:
                 domain_name=sample_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, sample_domain.domain_name),
+                domain_id=sample_domain.domain_id,
             )
             session.add(user)
             await session.flush()

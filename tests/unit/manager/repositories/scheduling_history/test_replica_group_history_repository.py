@@ -94,6 +94,11 @@ class _IdConditionCase:
     expected_count: Callable[[_ReplicaGroupHistorySeed], int]
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 class TestReplicaGroupHistoryRepository:
     """Test cases for the replica-group history searches (read-only)"""
 
@@ -140,6 +145,7 @@ class TestReplicaGroupHistoryRepository:
     async def replica_group_history_seed(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: uuid.UUID,
     ) -> _ReplicaGroupHistorySeed:
         """Seed a deployment, two replica groups, and a fixed set of history rows.
 
@@ -166,7 +172,7 @@ class TestReplicaGroupHistoryRepository:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
-                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,

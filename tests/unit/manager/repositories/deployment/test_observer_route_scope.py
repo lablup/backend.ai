@@ -122,6 +122,11 @@ class _Routes:
     terminating_id: ReplicaID
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 class TestObserverCycleRouteScope:
     """Regression test for BA-6093.
 
@@ -146,12 +151,14 @@ class TestObserverCycleRouteScope:
         return uuid.uuid4().hex[:8]
 
     @pytest.fixture
-    async def domain(self, db_with_cleanup: ExtendedAsyncSAEngine, suffix: str) -> str:
+    async def domain(
+        self, db_with_cleanup: ExtendedAsyncSAEngine, suffix: str, domain_id: uuid.UUID
+    ) -> str:
         name = f"d-{suffix}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
-                    id=uuid.uuid5(uuid.NAMESPACE_DNS, name),
+                    id=domain_id,
                     name=name,
                     total_resource_slots=ResourceSlot(),
                 )

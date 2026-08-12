@@ -86,6 +86,11 @@ _BASE_TABLES: list[TableOrORM] = [
 ]
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 class TestCancelFreesResourceAllocations:
     @pytest.fixture
     async def db_with_cleanup(
@@ -230,7 +235,7 @@ class TestCancelFreesResourceAllocations:
                     status=UserStatus.ACTIVE,
                     domain_name=test_domain_name,
                     resource_policy=test_user_resource_policy_name,
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, test_domain_name),
+                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()

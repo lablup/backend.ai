@@ -84,6 +84,11 @@ _WITH_TABLES: list[TableOrORM] = [
 ]
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 class TestGroupConditionsDomainNestedFilters:
     """Tests for Domain nested filter conditions in GroupConditions."""
 
@@ -244,6 +249,7 @@ class TestGroupNestedSearchIntegration:
     async def two_domains_with_projects(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: uuid.UUID,
     ) -> dict[str, list[uuid.UUID]]:
         """Create two domains (active/inactive) each with one project.
 
@@ -259,7 +265,7 @@ class TestGroupNestedSearchIntegration:
                 (inactive_domain, False, "Archived department"),
             ]:
                 domain = DomainRow(
-                    id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    id=domain_id,
                     name=domain_name,
                     description=desc,
                     is_active=is_active,
@@ -582,6 +588,7 @@ class TestGroupUserNestedSearchIntegration:
     async def projects_with_users(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: uuid.UUID,
     ) -> dict[str, dict[str, Any]]:
         """Create a domain with two projects, each associated with one user.
 
@@ -592,7 +599,7 @@ class TestGroupUserNestedSearchIntegration:
 
         async with db_with_cleanup.begin_session() as session:
             domain = DomainRow(
-                id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,

@@ -54,6 +54,11 @@ from ai.backend.testutils.db import with_tables
 
 
 @pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
+@pytest.fixture
 def password_info() -> PasswordInfo:
     return PasswordInfo(
         password="pw",
@@ -99,12 +104,12 @@ async def db(
 
 
 @pytest.fixture
-async def domain_name(db: ExtendedAsyncSAEngine) -> str:
+async def domain_name(db: ExtendedAsyncSAEngine, domain_id: uuid.UUID) -> str:
     name = f"dom-{uuid.uuid4().hex[:8]}"
     async with db.begin_session() as s:
         s.add(
             DomainRow(
-                id=uuid.uuid5(uuid.NAMESPACE_DNS, name),
+                id=domain_id,
                 name=name,
                 description="",
                 is_active=True,
@@ -159,7 +164,7 @@ async def _add_user(
                 domain_name=domain_name,
                 role=UserRole.USER,
                 resource_policy=policy,
-                domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                domain_id=domain_id,
             )
         )
         await s.commit()

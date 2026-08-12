@@ -68,6 +68,11 @@ HOSTS_C: VFolderHostPermissionMap = VFolderHostPermissionMap({
 })
 
 
+@pytest.fixture
+def domain_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
 def _password() -> PasswordInfo:
     return PasswordInfo(
         password="dummy",
@@ -113,13 +118,13 @@ class TestGetAllowedVFolderHostsByUserMembership:
 
     @pytest.fixture
     async def domain_name(
-        self, db_with_cleanup: ExtendedAsyncSAEngine
+        self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: uuid.UUID
     ) -> AsyncGenerator[str, None]:
         name = f"test-domain-{uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
                 DomainRow(
-                    id=uuid.uuid5(uuid.NAMESPACE_DNS, name),
+                    id=domain_id,
                     name=name,
                     description="",
                     is_active=True,
@@ -187,7 +192,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_resource_policy,
-                    domain_id=uuid.uuid5(uuid.NAMESPACE_DNS, domain_name),
+                    domain_id=domain_id,
                 )
             )
             await sess.flush()
