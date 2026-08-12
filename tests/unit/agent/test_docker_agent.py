@@ -51,67 +51,81 @@ def _make_docker_mock(network_get: AsyncMock | None = None) -> MagicMock:
 
 
 class TestParseDistroFromLddOutput:
-    def test_glibc_version_on_first_line(self) -> None:
-        output = f"ldd (GNU libc) 2.35\n{LDD_GLIBC_TRAILER}"
+    @pytest.mark.parametrize(
+        ("output", "expected"),
+        [
+            pytest.param(
+                f"ldd (GNU libc) 2.35\n{LDD_GLIBC_TRAILER}",
+                "ubuntu22.04",
+                id="glibc-banner-on-first-line",
+            ),
+            pytest.param(
+                "\n".join([
+                    LDD_PRELOAD_ERROR_LINES,
+                    "ldd (Ubuntu GLIBC 2.39-0ubuntu8.7) 2.39",
+                    LDD_GLIBC_TRAILER,
+                ]),
+                "ubuntu24.04",
+                id="glibc-banner-after-ld-preload-errors",
+            ),
+            pytest.param(
+                "ERROR: ld.so: ignored.\r\nldd (Ubuntu GLIBC 2.31-0ubuntu9) 2.31\r\n",
+                "ubuntu20.04",
+                id="glibc-banner-with-carriage-returns",
+            ),
+            pytest.param(
+                "ldd (GNU libc) 2.39.1",
+                "ubuntu24.04",
+                id="glibc-version-with-patch-component",
+            ),
+            pytest.param(
+                "ldd (GNU libc) 2",
+                "centos7.6",
+                id="glibc-version-without-minor-component",
+            ),
+            pytest.param(
+                "ldd (GNU libc) 2.33",
+                "ubuntu20.04",
+                id="glibc-version-between-known-versions",
+            ),
+            pytest.param(
+                "ldd (GNU libc) 2.12",
+                "centos7.6",
+                id="glibc-version-older-than-known-versions",
+            ),
+            pytest.param(
+                "ldd (GNU libc) 2.41",
+                "ubuntu24.04",
+                id="glibc-version-newer-than-known-versions",
+            ),
+            pytest.param(
+                "musl libc (x86_64)\nVersion 1.2.4\nDynamic Program Loader",
+                "alpine3.8",
+                id="musl-banner-on-first-line",
+            ),
+            pytest.param(
+                f"{LDD_PRELOAD_ERROR_LINES}\nmusl libc (x86_64)\nVersion 1.2.4",
+                "alpine3.8",
+                id="musl-banner-after-ld-preload-errors",
+            ),
+        ],
+    )
+    def test_detects_distro_from_libc_banner(self, output: str, expected: str) -> None:
+        assert _parse_distro_from_ldd_output(output) == expected
 
-        assert _parse_distro_from_ldd_output(output) == "ubuntu22.04"
-
-    def test_glibc_version_after_ld_preload_errors(self) -> None:
-        output = "\n".join([
-            LDD_PRELOAD_ERROR_LINES,
-            "ldd (Ubuntu GLIBC 2.39-0ubuntu8.7) 2.39",
-            LDD_GLIBC_TRAILER,
-        ])
-
-        assert _parse_distro_from_ldd_output(output) == "ubuntu24.04"
-
-    def test_glibc_version_with_carriage_returns(self) -> None:
-        output = "ERROR: ld.so: ignored.\r\nldd (Ubuntu GLIBC 2.31-0ubuntu9) 2.31\r\n"
-
-        assert _parse_distro_from_ldd_output(output) == "ubuntu20.04"
-
-    def test_glibc_version_with_patch_component(self) -> None:
-        output = "ldd (GNU libc) 2.39.1"
-
-        assert _parse_distro_from_ldd_output(output) == "ubuntu24.04"
-
-    def test_unknown_glibc_version_falls_back_to_lower_known_version(self) -> None:
-        output = "ldd (GNU libc) 2.33"
-
-        assert _parse_distro_from_ldd_output(output) == "ubuntu20.04"
-
-    def test_glibc_version_without_minor_component(self) -> None:
-        output = "ldd (GNU libc) 2"
-
-        assert _parse_distro_from_ldd_output(output) == "centos7.6"
-
-    def test_glibc_version_older_than_known_versions(self) -> None:
-        output = "ldd (GNU libc) 2.12"
-
-        assert _parse_distro_from_ldd_output(output) == "centos7.6"
-
-    def test_glibc_version_newer_than_known_versions(self) -> None:
-        output = "ldd (GNU libc) 2.41"
-
-        assert _parse_distro_from_ldd_output(output) == "ubuntu24.04"
-
-    def test_musl_banner_on_first_line(self) -> None:
-        output = "musl libc (x86_64)\nVersion 1.2.4\nDynamic Program Loader"
-
-        assert _parse_distro_from_ldd_output(output) == "alpine3.8"
-
-    def test_musl_banner_after_ld_preload_errors(self) -> None:
-        output = f"{LDD_PRELOAD_ERROR_LINES}\nmusl libc (x86_64)\nVersion 1.2.4"
-
-        assert _parse_distro_from_ldd_output(output) == "alpine3.8"
-
-    def test_returns_none_when_no_libc_banner_found(self) -> None:
-        output = f"{LDD_PRELOAD_ERROR_LINES}\nldd: command not found"
-
+    @pytest.mark.parametrize(
+        "output",
+        [
+            pytest.param("", id="empty-output"),
+            pytest.param(
+                f"{LDD_PRELOAD_ERROR_LINES}\nldd: command not found",
+                id="no-libc-banner",
+            ),
+            pytest.param("ldd (GNU libc)", id="banner-without-version"),
+        ],
+    )
+    def test_returns_none_without_libc_banner(self, output: str) -> None:
         assert _parse_distro_from_ldd_output(output) is None
-
-    def test_returns_none_for_empty_output(self) -> None:
-        assert _parse_distro_from_ldd_output("") is None
 
 
 @pytest.fixture
