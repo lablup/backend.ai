@@ -66,7 +66,7 @@ class DomainLifecycleInfo(BackendAISchema):
     )
     is_default: bool = Field(
         description=(
-            f"Whether this is the default domain. Added in {NEXT_RELEASE_VERSION}. "
+            f"Added in {NEXT_RELEASE_VERSION}. Whether this is the default domain. "
             "At most one domain carries the marker."
         ),
     )
