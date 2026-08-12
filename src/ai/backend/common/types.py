@@ -460,6 +460,40 @@ class SlotName(UserString):
     def is_accelerator(self) -> bool:
         return self.major_type in ("device", "devices", "share", "shares")
 
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        source_type: Any,
+        handler: Any,
+    ) -> Any:
+        """Provide Pydantic core schema for SlotName serialization/deserialization.
+
+        Serialization is JSON-only, so a Python-mode ``model_dump()`` still yields the
+        ``SlotName`` instance that existing callers of dumped models expect.
+        """
+        from pydantic_core import core_schema
+
+        def validate_slot_name(v: Any) -> SlotName:
+            if isinstance(v, SlotName):
+                return v
+            if isinstance(v, str):
+                return cls(v)
+            raise ValueError(f"Invalid SlotName: {v}")
+
+        # Accept both SlotName objects and plain strings.
+        return core_schema.no_info_after_validator_function(
+            validate_slot_name,
+            core_schema.union_schema([
+                core_schema.is_instance_schema(cls),
+                core_schema.str_schema(),
+            ]),
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                lambda v: str(v),
+                return_schema=core_schema.str_schema(),
+                when_used="json",
+            ),
+        )
+
 
 def _validate_slot_name(v: Any) -> SlotName:
     """Validator for SlotName fields."""
@@ -1383,6 +1417,39 @@ class ResourceSlot(UserDict[str, Decimal]):
 
     def to_json(self) -> Mapping[str, str]:
         return {k: _stringify_number(Decimal(v)) for k, v in self.data.items() if v is not None}
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        source_type: Any,
+        handler: Any,
+    ) -> Any:
+        """Provide Pydantic core schema for ResourceSlot serialization/deserialization.
+
+        Serialization is JSON-only, so a Python-mode ``model_dump()`` still yields the
+        ``ResourceSlot`` instance that existing callers of dumped models expect.
+        """
+        from pydantic_core import core_schema
+
+        def validate_resource_slot(v: Any) -> ResourceSlot:
+            if isinstance(v, ResourceSlot):
+                return v
+            if isinstance(v, Mapping):
+                return cls.from_json(v)
+            raise ValueError(f"Invalid ResourceSlot: {v}")
+
+        # Accept both ResourceSlot objects and slot-name-to-value mappings.
+        return core_schema.no_info_after_validator_function(
+            validate_resource_slot,
+            core_schema.union_schema([
+                core_schema.is_instance_schema(cls),
+                core_schema.dict_schema(core_schema.str_schema(), core_schema.any_schema()),
+            ]),
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                lambda v: v.to_json(),
+                when_used="json",
+            ),
+        )
 
     def has_intrinsic_slots(self) -> bool:
         return all(k in self.data.keys() for k in [name.value for name in IntrinsicSlotNames])

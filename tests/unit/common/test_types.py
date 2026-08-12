@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Any, override
 
 import pytest
+from pydantic import BaseModel
 from typeguard import TypeCheckError
 
 from ai.backend.common.configs.redis import RedisConfig
@@ -697,3 +698,56 @@ class TestSafePrintRedisConfig:
             # The helper masks a copy; the caller's config keeps its credentials.
             assert secret in str(redis_config)
         assert printed.count(REDIS_PASSWORD_MASK) == case.expected_mask_count
+
+
+class _SlotCarrier(BaseModel):
+    slots: ResourceSlot
+    units: dict[SlotName, SlotTypes]
+
+
+class TestResourceSlotPydanticSchema:
+    """`ResourceSlot` and `SlotName` as fields of a Pydantic model.
+
+    Both predate Pydantic and are a `UserDict` / `UserString`, so a model carrying them
+    could be validated but not serialized to JSON. JSON serialization converts them;
+    Python-mode `model_dump()` deliberately does not, because existing callers of dumped
+    models rely on getting the objects back.
+    """
+
+    @pytest.fixture
+    def carrier(self) -> _SlotCarrier:
+        return _SlotCarrier(
+            slots=ResourceSlot({"cpu": "4", "mem": "8192"}),
+            units={SlotName("cpu"): SlotTypes.COUNT, SlotName("mem"): SlotTypes.BYTES},
+        )
+
+    def test_json_round_trip_preserves_values_and_types(self, carrier: _SlotCarrier) -> None:
+        restored = _SlotCarrier.model_validate_json(carrier.model_dump_json())
+
+        assert type(restored.slots) is ResourceSlot
+        assert restored.slots == carrier.slots
+        assert all(type(value) is Decimal for value in restored.slots.values())
+        assert all(type(key) is SlotName for key in restored.units)
+        assert restored.units == carrier.units
+
+    def test_python_dump_keeps_the_objects(self, carrier: _SlotCarrier) -> None:
+        dumped = carrier.model_dump()
+
+        assert type(dumped["slots"]) is ResourceSlot
+        assert all(type(key) is SlotName for key in dumped["units"])
+
+    def test_mappings_and_strings_are_accepted_as_input(self) -> None:
+        carrier = _SlotCarrier.model_validate({
+            "slots": {"cpu": "4", "mem": "8192"},
+            "units": {"cpu": "count", "mem": "bytes"},
+        })
+
+        assert carrier.slots == ResourceSlot({"cpu": "4", "mem": "8192"})
+        assert all(type(key) is SlotName for key in carrier.units)
+
+    def test_json_schema_can_be_generated(self) -> None:
+        # Building the schema used to raise, which kept any carrying model out of
+        # generated API documentation.
+        properties = _SlotCarrier.model_json_schema()["properties"]
+
+        assert properties["slots"]["type"] == "object"
