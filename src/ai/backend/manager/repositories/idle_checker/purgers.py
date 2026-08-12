@@ -80,6 +80,7 @@ class SessionIdleCheckBatchPurgerSpec(BatchPurgerSpec[SessionIdleCheckRow]):
                 SessionIdleCheckRow.idle_checker_id,
             ).in_(pair_values),
             SessionIdleCheckRow.last_status != IdleCheckPhase.IDLE_EXPIRED,
+            sa.not_(SessionIdleCheckRow.is_manual),
         )
 
     @override
