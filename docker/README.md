@@ -99,7 +99,7 @@ Shared prerequisites:
 | halfstack services (PostgreSQL, Valkey/Redis, etcd) | all | the reference definitions live in `docker-compose.halfstack-main.yml` |
 | `supergraph.graphql` + a GraphQL gateway (e.g. `ghcr.io/graphql-hive/gateway`) | GraphQL federation | the supergraph schema is generated per release (`scripts/generate-graphql-schema.sh`); the gateway composes manager subgraphs |
 | RPC auth key distribution | manager, agent | the agent needs the manager's RPC **public** key to authenticate RPC calls — e.g. share the parity-mounted fixtures directory across nodes, or mount a common key directory at `/etc/backend.ai/keys:ro` |
-| `wheelhouse/` mount at `/app/wheelhouse` (optional) | manager, agent | an operator convention only — nothing in the images consumes it automatically; to add extra plugin wheels (e.g. accelerator plugins), the operator must `docker exec <container> pip install /app/wheelhouse/*.whl` or build a derived image |
+| `wheelhouse/` mount at `/app/wheelhouse` | manager, agent | staging dir for extra plugin wheels (e.g. accelerator plugins) — the DOCKER install mode creates and mounts `<install-dir>/wheelhouse` read-only by default; nothing in the images consumes it automatically, so install with `docker exec <container> pip install /app/wheelhouse/*.whl` or build a derived image |
 
 ## Container privileges
 

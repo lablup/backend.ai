@@ -253,6 +253,18 @@ def test_rendered_compose_system_path_parity_mounts(template: str) -> None:
     assert ssl_mount in services["storage-proxy"]["volumes"]
 
 
+def test_rendered_compose_wheelhouse_mounts(template: str) -> None:
+    doc = render(template, enable_gpu=False)
+    services = doc["services"]
+    wheelhouse = f"{BASE_PATH}/wheelhouse:/app/wheelhouse:ro"
+    # plugin-wheel staging dir: manager and agent only
+    for name, service in services.items():
+        if name in ("manager", "agent"):
+            assert wheelhouse in service["volumes"], name
+        else:
+            assert not any("wheelhouse" in v for v in service["volumes"]), name
+
+
 def test_rendered_compose_elevated_services(template: str) -> None:
     doc = render(template, enable_gpu=False)
     services = doc["services"]
