@@ -68,7 +68,7 @@ class IdleCheckerPurgerSpec(PurgerSpec[IdleCheckerRow]):
 
 
 @dataclass
-class SessionIdleCheckBatchPurgerSpec(BatchPurgerSpec[SessionIdleCheckRow]):
+class SessionIdleCheckSyncPurgerSpec(BatchPurgerSpec[SessionIdleCheckRow]):
     pairs: Sequence[SessionIdleCheckPair]
 
     @override
