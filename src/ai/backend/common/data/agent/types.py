@@ -1,11 +1,39 @@
 from __future__ import annotations
 
-from typing import Any
+import base64
+from typing import Annotated, Any
 
-from pydantic import AliasChoices, ConfigDict, Field, field_validator
+from pydantic import AliasChoices, BeforeValidator, Field, PlainSerializer, field_validator
 
 from ai.backend.common.auth import PublicKey
-from ai.backend.common.types import BackendAISchema, DeviceName, ResourceSlot, SlotName, SlotTypes
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.types import (
+    BackendAISchema,
+    DeviceName,
+    ResourceSlotEntry,
+    SlotName,
+    SlotTypes,
+)
+
+
+def _decode_images(value: Any) -> Any:
+    """Turn the JSON form of `images` back into bytes, passing bytes through untouched."""
+    if isinstance(value, str):
+        return base64.b64decode(value, validate=True)
+    return value
+
+
+# zlib-compressed msgpack, so not valid UTF-8: JSON carries it as base64, and only JSON,
+# leaving the msgpack path to pack the raw bytes as before.
+PackedImages = Annotated[
+    bytes,
+    BeforeValidator(_decode_images),
+    PlainSerializer(
+        lambda value: base64.b64encode(value).decode("ascii"),
+        return_type=str,
+        when_used="json",
+    ),
+]
 
 
 class ImageOpts(BackendAISchema):
@@ -19,11 +47,11 @@ class AgentInfo(BackendAISchema):
     addr: str
     public_key: PublicKey | None
     public_host: str
-    available_resource_slots: ResourceSlot
-    slot_key_and_units: dict[SlotName, SlotTypes]
+    available_resource_slots: list[ResourceSlotEntry]
+    slot_key_and_units: dict[ResourceSlotName, SlotTypes]
     version: str
     compute_plugins: dict[DeviceName, dict[str, Any]]
-    images: bytes
+    images: PackedImages
     architecture: str
     auto_terminate_abusing_kernel: bool
     images_opts: ImageOpts = Field(
@@ -31,18 +59,12 @@ class AgentInfo(BackendAISchema):
         validation_alias=AliasChoices("images.opts", "images_opts", "imagesOpts"),
     )
 
-    # Pydantic model configuration
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
     @field_validator("slot_key_and_units", mode="before")
     @classmethod
     def normalize_slot_keys(
         cls, value: dict[str | SlotName, SlotTypes]
-    ) -> dict[SlotName, SlotTypes]:
-        """Convert string keys to SlotName instances for backward compatibility with older agent versions."""
+    ) -> dict[ResourceSlotName, SlotTypes]:
+        """Accept `SlotName` keys from older agent versions, which sent the legacy form."""
         if not isinstance(value, dict):
             raise ValueError("slot_key_and_units must be a dictionary")
-        normalized = {}
-        for key, val in value.items():
-            normalized[SlotName(key)] = val
-        return normalized
+        return {ResourceSlotName(str(key)): val for key, val in value.items()}

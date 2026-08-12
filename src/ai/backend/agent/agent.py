@@ -175,6 +175,7 @@ from ai.backend.common.exception import (
     ConfigurationError,
     VolumeMountFailed,
 )
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.json import (
     dump_json,
     dump_json_str,
@@ -216,6 +217,7 @@ from ai.backend.common.types import (
     MountTypes,
     RedisTarget,
     ResourceSlot,
+    ResourceSlotEntry,
     Sentinel,
     ServicePort,
     ServicePortProtocols,
@@ -1267,13 +1269,13 @@ class AbstractAgent[
         """
         Send my status information and available kernel images to the manager(s).
         """
-        slot_key_and_units: dict[SlotName, SlotTypes] = {}
+        slot_key_and_units: dict[ResourceSlotName, SlotTypes] = {}
         res_slots: dict[SlotName, Decimal] = {}
         try:
             for cctx in self.computers.values():
                 for slot_key, slot_type in cctx.instance.slot_types:
                     # TODO: Need to fix when cctx.instance.slot_types receives str instead of SlotName
-                    slot_key_and_units[SlotName(slot_key)] = slot_type
+                    slot_key_and_units[ResourceSlotName(str(slot_key))] = slot_type
                     res_slots[SlotName(slot_key)] = Decimal(str(self.slots.get(slot_key, 0)))
             agent_info = AgentInfo(
                 ip=str(self.rpc_addr.host),
@@ -1282,7 +1284,9 @@ class AbstractAgent[
                 addr=f"tcp://{self.rpc_addr}",
                 public_key=self.agent_public_key,
                 public_host=str(self._get_public_host()),
-                available_resource_slots=ResourceSlot(res_slots),
+                available_resource_slots=ResourceSlotEntry.from_resource_slot(
+                    ResourceSlot(res_slots)
+                ),
                 slot_key_and_units=slot_key_and_units,
                 version=VERSION,
                 compute_plugins={
