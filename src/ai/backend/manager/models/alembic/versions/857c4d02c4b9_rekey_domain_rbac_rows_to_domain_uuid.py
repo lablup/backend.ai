@@ -18,7 +18,7 @@ that would collide with an existing UUID-keyed duplicate are dropped instead,
 and all inserts use ``ON CONFLICT DO NOTHING``.
 
 Revision ID: 857c4d02c4b9
-Revises: f2d658cac56b
+Revises: b93d1c47af52
 Create Date: 2026-07-27 15:42:17.472002
 
 """
@@ -28,7 +28,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "857c4d02c4b9"
-down_revision = "f2d658cac56b"
+down_revision = "b93d1c47af52"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
