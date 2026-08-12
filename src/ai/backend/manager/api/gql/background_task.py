@@ -8,13 +8,11 @@ from enum import StrEnum
 import strawberry
 from strawberry import Info
 
-from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.common.dto.manager.v2.background_task import (
     BackgroundTaskEventPayloadNode,
     BgtaskEventTypeDTO,
 )
 from ai.backend.common.events.event_types.bgtask.broadcast import (
-    BgtaskAlreadyDoneEvent,
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
     BgtaskFailedEvent,
@@ -107,29 +105,6 @@ class BackgroundTaskEventPayloadGQL:
         )
         return cls.from_pydantic(dto)  # type: ignore[attr-defined, no-any-return]
 
-    @classmethod
-    def from_already_done_event(
-        cls, event: BgtaskAlreadyDoneEvent
-    ) -> BackgroundTaskEventPayloadGQL:
-        """Create payload from BgtaskAlreadyDoneEvent based on its status."""
-        match event.task_status:
-            case BgtaskStatus.DONE | BgtaskStatus.PARTIAL_SUCCESS:
-                event_type_dto = BgtaskEventTypeDTO.DONE
-            case BgtaskStatus.CANCELLED:
-                event_type_dto = BgtaskEventTypeDTO.CANCELLED
-            case BgtaskStatus.FAILED:
-                event_type_dto = BgtaskEventTypeDTO.FAILED
-            case _:
-                log.warning("Unknown task status in BgtaskAlreadyDoneEvent: {}", event.task_status)
-                event_type_dto = BgtaskEventTypeDTO.FAILED
-
-        dto = BackgroundTaskEventPayloadNode(
-            task_id=str(event.task_id),
-            event_type=event_type_dto,
-            message=event.message or "",
-        )
-        return cls.from_pydantic(dto)  # type: ignore[attr-defined, no-any-return]
-
 
 @gql_subscription(
     BackendAIGQLMeta(
@@ -195,9 +170,6 @@ async def background_task_events(
                 is_close_event = True
             elif isinstance(event, BgtaskFailedEvent):
                 payload = BackgroundTaskEventPayloadGQL.from_failed_event(event)
-                is_close_event = True
-            elif isinstance(event, BgtaskAlreadyDoneEvent):
-                payload = BackgroundTaskEventPayloadGQL.from_already_done_event(event)
                 is_close_event = True
             else:
                 log.warning(

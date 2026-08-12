@@ -66,9 +66,9 @@ class AbstractEvent(BaseModel, ABC):
     The base of every event.
 
     An event is a Pydantic model, so its own fields are the message body: the
-    conversion to and from `EventMessage` below is the same for every event and is
-    written once here. An event that must never cross the message queue overrides
-    them to refuse.
+    conversion to and from `EventMessage` below is the same for every event, is
+    written once here, and is final — no event may redefine how its body is
+    rendered.
 
     Unknown fields are ignored rather than rejected, which is what lets a producer
     add a field without breaking a consumer running an older version — the whole
@@ -77,6 +77,7 @@ class AbstractEvent(BaseModel, ABC):
 
     model_config = ConfigDict(extra="ignore")
 
+    @final
     def to_message(self) -> EventMessage:
         """
         Render this event as the message it is handed to the queue as.
@@ -86,6 +87,7 @@ class AbstractEvent(BaseModel, ABC):
             payload=self.model_dump_json(),
         )
 
+    @final
     @classmethod
     def from_message(cls, message: EventMessage) -> Self:
         """
