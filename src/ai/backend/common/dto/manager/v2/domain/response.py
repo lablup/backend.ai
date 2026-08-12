@@ -12,6 +12,7 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import BackendAISchema
 
 __all__ = (
@@ -61,6 +62,12 @@ class DomainLifecycleInfo(BackendAISchema):
         description=(
             "Whether the domain is active. "
             "Inactive domains cannot create new projects or perform operations."
+        ),
+    )
+    is_default: bool = Field(
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Whether this is the default domain. "
+            "At most one domain carries the marker."
         ),
     )
     created_at: datetime = Field(

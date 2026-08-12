@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.domain.response import (
 from ai.backend.common.dto.manager.v2.domain.response import (
     DomainRegistryInfo as DomainRegistryInfoDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -86,6 +87,9 @@ class DomainLifecycleInfoGQL:
 
     is_active: bool = gql_field(
         description="Whether the domain is active. Inactive domains cannot create new projects or perform operations."
+    )
+    is_default: bool = gql_field(
+        description=f"Added in {NEXT_RELEASE_VERSION}. Whether this is the default domain. At most one domain carries the marker."
     )
     created_at: datetime = gql_field(description="Timestamp when the domain was created.")
     modified_at: datetime = gql_field(description="Timestamp when the domain was last modified.")

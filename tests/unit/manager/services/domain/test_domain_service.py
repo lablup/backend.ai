@@ -47,6 +47,7 @@ def _make_domain_data(
     name: str = "test-domain",
     description: str | None = None,
     is_active: bool = True,
+    is_default: bool = False,
 ) -> DomainData:
     now = datetime.now(tz=UTC)
     return DomainData(
@@ -54,6 +55,7 @@ def _make_domain_data(
         name=name,
         description=description,
         is_active=is_active,
+        is_default=is_default,
         created_at=now,
         modified_at=now,
         total_resource_slots=ResourceSlot(),

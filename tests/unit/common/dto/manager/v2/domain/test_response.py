@@ -35,6 +35,7 @@ def make_domain_node(name: str = "test-domain", domain_id: DomainID | None = Non
         ),
         lifecycle=DomainLifecycleInfo(
             is_active=True,
+            is_default=False,
             created_at=now,
             modified_at=now,
         ),
@@ -94,18 +95,24 @@ class TestDomainLifecycleInfo:
 
     def test_creation_with_all_fields(self) -> None:
         now = datetime.now(tz=UTC)
-        info = DomainLifecycleInfo(is_active=True, created_at=now, modified_at=now)
+        info = DomainLifecycleInfo(
+            is_active=True, is_default=False, created_at=now, modified_at=now
+        )
         assert info.is_active is True
         assert info.created_at == now
 
     def test_inactive_domain(self) -> None:
         now = datetime.now(tz=UTC)
-        info = DomainLifecycleInfo(is_active=False, created_at=now, modified_at=now)
+        info = DomainLifecycleInfo(
+            is_active=False, is_default=False, created_at=now, modified_at=now
+        )
         assert info.is_active is False
 
     def test_round_trip(self) -> None:
         now = datetime.now(tz=UTC)
-        info = DomainLifecycleInfo(is_active=True, created_at=now, modified_at=now)
+        info = DomainLifecycleInfo(
+            is_active=True, is_default=False, created_at=now, modified_at=now
+        )
         json_data = info.model_dump_json()
         restored = DomainLifecycleInfo.model_validate_json(json_data)
         assert restored.is_active is True
