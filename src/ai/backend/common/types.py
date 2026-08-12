@@ -51,7 +51,7 @@ from pydantic import (
     ValidationError,
     field_validator,
 )
-from pydantic_core import ErrorDetails
+from pydantic_core import ErrorDetails, core_schema
 from redis.asyncio import Redis
 
 from .defs import UNKNOWN_CONTAINER_ID, RedisRole
@@ -471,7 +471,6 @@ class SlotName(UserString):
         Serialization is JSON-only, so a Python-mode ``model_dump()`` still yields the
         ``SlotName`` instance that existing callers of dumped models expect.
         """
-        from pydantic_core import core_schema
 
         def validate_slot_name(v: Any) -> SlotName:
             if isinstance(v, SlotName):
@@ -1429,7 +1428,6 @@ class ResourceSlot(UserDict[str, Decimal]):
         Serialization is JSON-only, so a Python-mode ``model_dump()`` still yields the
         ``ResourceSlot`` instance that existing callers of dumped models expect.
         """
-        from pydantic_core import core_schema
 
         def validate_resource_slot(v: Any) -> ResourceSlot:
             if isinstance(v, ResourceSlot):
@@ -1566,7 +1564,6 @@ class QuotaScopeID:
         handler: Any,
     ) -> Any:
         """Provide Pydantic core schema for QuotaScopeID serialization/deserialization."""
-        from pydantic_core import core_schema
 
         def validate_quota_scope_id(v: Any) -> QuotaScopeID:
             if isinstance(v, QuotaScopeID):
@@ -1631,7 +1628,6 @@ class VFolderID:
         handler: Any,
     ) -> Any:
         """Provide Pydantic core schema for VFolderID serialization/deserialization."""
-        from pydantic_core import core_schema
 
         def validate_vfolder_id(v: Any) -> VFolderID:
             if isinstance(v, VFolderID):
