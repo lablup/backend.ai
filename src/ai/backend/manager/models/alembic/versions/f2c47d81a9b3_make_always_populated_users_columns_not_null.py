@@ -23,24 +23,16 @@ branch_labels = None
 depends_on = None
 
 
-def _backfill(bind: Connection) -> None:
-    """The flags never had a default, and c1a7d3f05e28 could only fill domain_id where
-    domain_name matched a domain."""
+def _backfill_flags(bind: Connection) -> None:
+    """The two flags never had a default, so a row that predates one carries NULL."""
     bind.execute(
         sa.text("UPDATE users SET need_password_change = false WHERE need_password_change IS NULL")
     )
     bind.execute(sa.text("UPDATE users SET totp_activated = false WHERE totp_activated IS NULL"))
-    bind.execute(
-        sa.text("""
-            UPDATE users u SET domain_id = d.id
-            FROM domains d
-            WHERE u.domain_id IS NULL AND u.domain_name = d.name
-        """)
-    )
 
 
 def upgrade() -> None:
-    _backfill(op.get_bind())
+    _backfill_flags(op.get_bind())
 
     op.alter_column("users", "domain_name", existing_type=sa.String(length=64), nullable=False)
     op.alter_column("users", "domain_id", existing_type=GUID(), nullable=False)
