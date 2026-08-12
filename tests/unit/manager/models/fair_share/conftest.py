@@ -62,7 +62,7 @@ async def database_with_fair_share_tables(
 
 
 @pytest.fixture
-async def test_domain(
+async def domain_name(
     database_with_fair_share_tables: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[DomainFixtureData, None]:
     domain_id = DomainID(uuid.uuid4())
@@ -143,7 +143,7 @@ async def project_resource_policy(
 @pytest.fixture
 async def user_uuid(
     database_with_fair_share_tables: ExtendedAsyncSAEngine,
-    test_domain: DomainFixtureData,
+    domain_name: DomainFixtureData,
     user_resource_policy: str,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create UserRow and return its UUID."""
@@ -161,9 +161,9 @@ async def user_uuid(
                 username="testuser",
                 email="test@example.com",
                 password=password_info,
-                domain_name=test_domain.domain_name,
+                domain_name=domain_name.domain_name,
                 resource_policy=user_resource_policy,
-                domain_id=test_domain.domain_id,
+                domain_id=domain_name.domain_id,
             )
         )
     yield user_id
@@ -172,7 +172,7 @@ async def user_uuid(
 @pytest.fixture
 async def project_id(
     database_with_fair_share_tables: ExtendedAsyncSAEngine,
-    test_domain: DomainFixtureData,
+    domain_name: DomainFixtureData,
     project_resource_policy: str,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create GroupRow and return its ID."""
@@ -182,7 +182,7 @@ async def project_id(
             GroupRow(
                 id=group_id,
                 name="test-project",
-                domain_name=test_domain.domain_name,
+                domain_name=domain_name.domain_name,
                 resource_policy=project_resource_policy,
             )
         )
@@ -192,13 +192,13 @@ async def project_id(
 @pytest.fixture
 async def domain_fair_share_id(
     database_with_fair_share_tables: ExtendedAsyncSAEngine,
-    test_domain: DomainFixtureData,
+    domain_name: DomainFixtureData,
     scaling_group: str,
     resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create DomainFairShareRow and return its ID."""
     row = DomainFairShareRow(
-        domain_name=test_domain.domain_name,
+        domain_name=domain_name.domain_name,
         resource_group=scaling_group,
         resource_group_id=resource_group_id,
         weight=Decimal("1.0"),
@@ -217,13 +217,13 @@ async def domain_fair_share_id(
 @pytest.fixture
 async def domain_fair_share_with_usage_id(
     database_with_fair_share_tables: ExtendedAsyncSAEngine,
-    test_domain: DomainFixtureData,
+    domain_name: DomainFixtureData,
     scaling_group: str,
     resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create DomainFairShareRow with calculated usage values and return its ID."""
     row = DomainFairShareRow(
-        domain_name=test_domain.domain_name,
+        domain_name=domain_name.domain_name,
         resource_group=scaling_group,
         resource_group_id=resource_group_id,
         weight=Decimal("2.0"),
@@ -243,14 +243,14 @@ async def domain_fair_share_with_usage_id(
 async def project_fair_share_id(
     database_with_fair_share_tables: ExtendedAsyncSAEngine,
     project_id: uuid.UUID,
-    test_domain: DomainFixtureData,
+    domain_name: DomainFixtureData,
     scaling_group: str,
     resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create ProjectFairShareRow and return its ID."""
     row = ProjectFairShareRow(
         project_id=project_id,
-        domain_name=test_domain.domain_name,
+        domain_name=domain_name.domain_name,
         resource_group=scaling_group,
         resource_group_id=resource_group_id,
         weight=Decimal("1.0"),
@@ -271,7 +271,7 @@ async def user_fair_share_id(
     database_with_fair_share_tables: ExtendedAsyncSAEngine,
     user_uuid: uuid.UUID,
     project_id: uuid.UUID,
-    test_domain: DomainFixtureData,
+    domain_name: DomainFixtureData,
     scaling_group: str,
     resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
@@ -279,7 +279,7 @@ async def user_fair_share_id(
     row = UserFairShareRow(
         user_uuid=user_uuid,
         project_id=project_id,
-        domain_name=test_domain.domain_name,
+        domain_name=domain_name.domain_name,
         resource_group=scaling_group,
         resource_group_id=resource_group_id,
         weight=Decimal("1.0"),
@@ -300,7 +300,7 @@ async def user_fair_share_with_large_usage_id(
     database_with_fair_share_tables: ExtendedAsyncSAEngine,
     user_uuid: uuid.UUID,
     project_id: uuid.UUID,
-    test_domain: DomainFixtureData,
+    domain_name: DomainFixtureData,
     scaling_group: str,
     resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
@@ -308,7 +308,7 @@ async def user_fair_share_with_large_usage_id(
     row = UserFairShareRow(
         user_uuid=user_uuid,
         project_id=project_id,
-        domain_name=test_domain.domain_name,
+        domain_name=domain_name.domain_name,
         resource_group=scaling_group,
         resource_group_id=resource_group_id,
         weight=Decimal("1.0"),

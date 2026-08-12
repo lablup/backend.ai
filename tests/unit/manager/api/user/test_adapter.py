@@ -537,7 +537,7 @@ class TestUserAdapterConversion:
             created_at=None,
             modified_at=None,
             domain_name="default",
-            domain_id=None,
+            domain_id=DomainID(uuid4()),
             role=DataUserRole.USER,
             resource_policy="default",
             allowed_client_ip=None,

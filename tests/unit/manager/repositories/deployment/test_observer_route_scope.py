@@ -148,7 +148,7 @@ class TestObserverCycleRouteScope:
         return uuid.uuid4().hex[:8]
 
     @pytest.fixture
-    async def test_domain(
+    async def domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         suffix: str,
@@ -217,7 +217,7 @@ class TestObserverCycleRouteScope:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         suffix: str,
-        test_domain: DomainFixtureData,
+        domain: DomainFixtureData,
         user_resource_policy: str,
     ) -> UUID:
         user_id = uuid.uuid4()
@@ -233,7 +233,7 @@ class TestObserverCycleRouteScope:
                         rounds=1,
                         salt_size=16,
                     ),
-                    domain_name=test_domain.domain_name,
+                    domain_name=domain.domain_name,
                     resource_policy=user_resource_policy,
                     role=UserRole.USER,
                     status=UserStatus.ACTIVE,
@@ -246,7 +246,7 @@ class TestObserverCycleRouteScope:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         suffix: str,
-        test_domain: DomainFixtureData,
+        domain: DomainFixtureData,
         project_resource_policy: str,
     ) -> UUID:
         project_id = uuid.uuid4()
@@ -255,7 +255,7 @@ class TestObserverCycleRouteScope:
                 GroupRow(
                     id=project_id,
                     name=f"g-{suffix}",
-                    domain_name=test_domain.domain_name,
+                    domain_name=domain.domain_name,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=project_resource_policy,
                 )
@@ -271,7 +271,7 @@ class TestObserverCycleRouteScope:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         suffix: str,
-        test_domain: DomainFixtureData,
+        domain: DomainFixtureData,
         scaling_group: str,
         user: UUID,
         project: UUID,
@@ -285,7 +285,7 @@ class TestObserverCycleRouteScope:
                     name=f"ep-{suffix}",
                     created_user=user,
                     session_owner=user,
-                    domain=test_domain.domain_name,
+                    domain=domain.domain_name,
                     project=project,
                     resource_group=scaling_group,
                     lifecycle_stage=EndpointLifecycle.CREATED,
@@ -297,14 +297,14 @@ class TestObserverCycleRouteScope:
     @pytest.fixture
     def environment(
         self,
-        test_domain: DomainFixtureData,
+        domain: DomainFixtureData,
         user: UUID,
         project: UUID,
         endpoint: DeploymentID,
         revision_id: UUID,
     ) -> _Environment:
         return _Environment(
-            domain=test_domain.domain_name,
+            domain=domain.domain_name,
             user_id=user,
             project_id=project,
             endpoint_id=endpoint,

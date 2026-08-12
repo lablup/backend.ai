@@ -240,7 +240,7 @@ class TestDomainRepository:
         return UserInfo(id=uuid.uuid4(), role=UserRole.SUPERADMIN, domain_name="default")
 
     @pytest.fixture
-    async def test_domain(
+    async def inactive_domain(
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
     ) -> DomainFixtureData:
@@ -627,16 +627,16 @@ class TestDomainRepository:
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
-        test_domain: DomainFixtureData,
+        inactive_domain: DomainFixtureData,
     ) -> None:
         """Test successful domain purging"""
         # Purge domain (should succeed since no users/groups/kernels)
-        await domain_repository.purge_domain(test_domain.domain_name)
+        await domain_repository.purge_domain(inactive_domain.domain_name)
 
         # Verify domain is completely removed
         async with db_with_default_resource_policies.begin() as conn:
             result = await conn.execute(
-                sa.select(domains).where(domains.c.name == test_domain.domain_name)
+                sa.select(domains).where(domains.c.name == inactive_domain.domain_name)
             )
             domain_row = result.first()
             assert domain_row is None
