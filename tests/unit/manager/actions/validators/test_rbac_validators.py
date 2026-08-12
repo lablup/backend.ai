@@ -31,6 +31,7 @@ from ai.backend.common.data.permission.types import (
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.action.base import BaseActionTriggerMeta
 from ai.backend.manager.actions.action.bulk import BaseBulkAction
 from ai.backend.manager.actions.action.scope import BaseScopeAction
@@ -208,6 +209,8 @@ async def _seed_user_with_role(
     suffix = user_id.hex[:8]
     policy_name = f"policy-{suffix}"
     async with db.begin_session() as db_sess:
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        db_sess.add(DomainRow(name=domain_name, total_resource_slots=ResourceSlot()))
         db_sess.add(
             UserResourcePolicyRow(
                 name=policy_name,
@@ -226,6 +229,7 @@ async def _seed_user_with_role(
                 status=UserStatus.ACTIVE,
                 need_password_change=False,
                 sudo_session_enabled=False,
+                domain_name=domain_name,
             )
         )
         await db_sess.flush()
@@ -251,6 +255,8 @@ async def _grant_permission(
     operation: OperationType,
 ) -> None:
     async with db.begin_session() as db_sess:
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        db_sess.add(DomainRow(name=domain_name, total_resource_slots=ResourceSlot()))
         db_sess.add(
             PermissionRow(
                 role_id=role_id,
