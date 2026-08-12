@@ -351,10 +351,10 @@ class BackgroundTaskManager:
 
     def _convert_bgtask_to_event(
         self, task_id: uuid.UUID, bgtask_result: DispatchResult[Any] | str | None
-    ) -> BaseBgtaskDoneEvent[Any]:
+    ) -> BaseBgtaskDoneEvent:
         # legacy
         if bgtask_result is None or isinstance(bgtask_result, str):
-            return BgtaskDoneEvent(task_id, bgtask_result)
+            return BgtaskDoneEvent(task_id=task_id, message=bgtask_result)
 
         message = bgtask_result.message()
         if bgtask_result.has_error():
@@ -368,7 +368,7 @@ class BackgroundTaskManager:
         func: BackgroundTask,
         task_id: uuid.UUID,
         **kwargs: Any,
-    ) -> BaseBgtaskDoneEvent[Any]:
+    ) -> BaseBgtaskDoneEvent:
         reporter = ProgressReporter(self._event_producer, task_id)
         bgtask_result = await func(reporter, **kwargs)
         return self._convert_bgtask_to_event(task_id, bgtask_result)
@@ -379,7 +379,7 @@ class BackgroundTaskManager:
         task_id: uuid.UUID,
         task_name: str | None,
         **kwargs: Any,
-    ) -> BaseBgtaskDoneEvent[Any]:
+    ) -> BaseBgtaskDoneEvent:
         self._metric_observer.observe_bgtask_started(task_name=task_name or func.__name__)
         start_time = time.perf_counter()
         task_name = task_name or func.__name__
@@ -399,13 +399,13 @@ class BackgroundTaskManager:
             )
             log.warning("Task {} ({}): cancelled", task_id, task_name)
             msg = "Task cancelled"
-            return BgtaskCancelledEvent(task_id, msg)
+            return BgtaskCancelledEvent(task_id=task_id, message=msg)
         except BackendAIError as e:
             status = BgtaskStatus.FAILED
             error_code = e.error_code()
             log.exception("Task {} ({}): BackendAIError: {}", task_id, task_name, e)
             msg = repr(e)
-            return BgtaskFailedEvent(task_id, msg)
+            return BgtaskFailedEvent(task_id=task_id, message=msg)
         except Exception as e:
             status = BgtaskStatus.FAILED
             error_code = ErrorCode(
@@ -415,7 +415,7 @@ class BackgroundTaskManager:
             )
             log.exception("Task {} ({}): unhandled error: {}", task_id, task_name, e)
             msg = repr(e)
-            return BgtaskFailedEvent(task_id, msg)
+            return BgtaskFailedEvent(task_id=task_id, message=msg)
         finally:
             duration = time.perf_counter() - start_time
             self._metric_observer.observe_bgtask_done(

@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
 from typing import Any, Self, override
 
 from pydantic import TypeAdapter
 
-from ai.backend.common.events.payload import AnycastEventPayload, BroadcastEventPayload
 from ai.backend.common.events.types import AbstractAnycastEvent, AbstractBroadcastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
 
@@ -14,53 +12,9 @@ from .types import RouteInfo
 from .types import SerializableCircuit as Circuit
 
 
-class AppProxyCircuitEventPayload(BroadcastEventPayload):
+class AppProxyCircuitEvent(AbstractBroadcastEvent):
     target_worker_authority: str
     circuits: list[Circuit]
-
-
-class AppProxyCircuitRouteUpdatedEventPayload(BroadcastEventPayload):
-    target_worker_authority: str
-    circuit: Circuit
-    routes: list[RouteInfo]
-
-
-class GenericWorkerEventPayload(AnycastEventPayload):
-    worker_id: str
-    reason: str
-
-
-class CheckWorkerLostEventPayload(AnycastEventPayload):
-    """The worker-lost check carries no arguments."""
-
-
-class CheckUnusedPortEventPayload(AnycastEventPayload):
-    """The unused-port check carries no arguments."""
-
-
-class ReconcileTraefikRoutesEventPayload(AnycastEventPayload):
-    """The traefik reconcile trigger carries no arguments."""
-
-
-@dataclass
-class AppProxyCircuitEvent(AbstractBroadcastEvent[AppProxyCircuitEventPayload]):
-    target_worker_authority: str
-    circuits: list[Circuit]
-
-    @override
-    def to_payload(self) -> AppProxyCircuitEventPayload:
-        return AppProxyCircuitEventPayload(
-            target_worker_authority=self.target_worker_authority,
-            circuits=self.circuits,
-        )
-
-    @classmethod
-    @override
-    def from_payload(cls, payload: AppProxyCircuitEventPayload) -> Self:
-        return cls(
-            target_worker_authority=payload.target_worker_authority,
-            circuits=payload.circuits,
-        )
 
     @override
     def serialize(self) -> tuple[Any, ...]:
@@ -91,30 +45,10 @@ class AppProxyCircuitEvent(AbstractBroadcastEvent[AppProxyCircuitEventPayload]):
         return None
 
 
-@dataclass
-class AppProxyCircuitRouteUpdatedEvent(
-    AbstractBroadcastEvent[AppProxyCircuitRouteUpdatedEventPayload]
-):
+class AppProxyCircuitRouteUpdatedEvent(AbstractBroadcastEvent):
     target_worker_authority: str
     circuit: Circuit
     routes: list[RouteInfo]
-
-    @override
-    def to_payload(self) -> AppProxyCircuitRouteUpdatedEventPayload:
-        return AppProxyCircuitRouteUpdatedEventPayload(
-            target_worker_authority=self.target_worker_authority,
-            circuit=self.circuit,
-            routes=self.routes,
-        )
-
-    @classmethod
-    @override
-    def from_payload(cls, payload: AppProxyCircuitRouteUpdatedEventPayload) -> Self:
-        return cls(
-            target_worker_authority=payload.target_worker_authority,
-            circuit=payload.circuit,
-            routes=payload.routes,
-        )
 
     @override
     def serialize(self) -> tuple[Any, ...]:
@@ -152,25 +86,9 @@ class AppProxyCircuitRouteUpdatedEvent(
         return None
 
 
-@dataclass
-class GenericWorkerEvent(AbstractAnycastEvent[GenericWorkerEventPayload]):
+class GenericWorkerEvent(AbstractAnycastEvent):
     worker_id: str
     reason: str
-
-    @override
-    def to_payload(self) -> GenericWorkerEventPayload:
-        return GenericWorkerEventPayload(
-            worker_id=self.worker_id,
-            reason=self.reason,
-        )
-
-    @classmethod
-    @override
-    def from_payload(cls, payload: GenericWorkerEventPayload) -> Self:
-        return cls(
-            worker_id=payload.worker_id,
-            reason=payload.reason,
-        )
 
     @override
     def serialize(self) -> tuple[Any, ...]:
@@ -182,7 +100,7 @@ class GenericWorkerEvent(AbstractAnycastEvent[GenericWorkerEventPayload]):
     @classmethod
     @override
     def deserialize(cls, value: tuple[Any, ...]) -> Self:
-        return cls(value[0], value[1])
+        return cls(worker_id=value[0], reason=value[1])
 
     @classmethod
     @override
@@ -233,16 +151,7 @@ class WorkerTerminatedEvent(GenericWorkerEvent):
         return "worker_terminated"
 
 
-class DoCheckWorkerLostEvent(AbstractAnycastEvent[CheckWorkerLostEventPayload]):
-    @override
-    def to_payload(self) -> CheckWorkerLostEventPayload:
-        return CheckWorkerLostEventPayload()
-
-    @classmethod
-    @override
-    def from_payload(cls, payload: CheckWorkerLostEventPayload) -> Self:
-        return cls()
-
+class DoCheckWorkerLostEvent(AbstractAnycastEvent):
     @override
     def serialize(self) -> tuple[Any, ...]:
         return tuple()
@@ -271,16 +180,7 @@ class DoCheckWorkerLostEvent(AbstractAnycastEvent[CheckWorkerLostEventPayload]):
         return None
 
 
-class DoCheckUnusedPortEvent(AbstractAnycastEvent[CheckUnusedPortEventPayload]):
-    @override
-    def to_payload(self) -> CheckUnusedPortEventPayload:
-        return CheckUnusedPortEventPayload()
-
-    @classmethod
-    @override
-    def from_payload(cls, payload: CheckUnusedPortEventPayload) -> Self:
-        return cls()
-
+class DoCheckUnusedPortEvent(AbstractAnycastEvent):
     @override
     def serialize(self) -> tuple[Any, ...]:
         return tuple()
@@ -309,22 +209,13 @@ class DoCheckUnusedPortEvent(AbstractAnycastEvent[CheckUnusedPortEventPayload]):
         return None
 
 
-class DoReconcileTraefikRoutesEvent(AbstractAnycastEvent[ReconcileTraefikRoutesEventPayload]):
+class DoReconcileTraefikRoutesEvent(AbstractAnycastEvent):
     """Periodic trigger emitted by the coordinator leader cron to reconcile
     every active inference circuit's routing config against the live Circuit
     DB state. Acts as a safety net against missed propagation events so that
     the etcd-based Traefik provider eventually converges on the DB-backed
     source of truth.
     """
-
-    @override
-    def to_payload(self) -> ReconcileTraefikRoutesEventPayload:
-        return ReconcileTraefikRoutesEventPayload()
-
-    @classmethod
-    @override
-    def from_payload(cls, payload: ReconcileTraefikRoutesEventPayload) -> Self:
-        return cls()
 
     @override
     def serialize(self) -> tuple[Any, ...]:

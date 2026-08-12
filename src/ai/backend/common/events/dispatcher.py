@@ -56,8 +56,8 @@ class _EventHandlerType(enum.StrEnum):
 
 
 TEvent = TypeVar("TEvent", bound="AbstractEvent")
-TSubscirbedEvent = TypeVar("TSubscirbedEvent", bound=AbstractBroadcastEvent[Any])
-TConsumedEvent = TypeVar("TConsumedEvent", bound=AbstractAnycastEvent[Any])
+TSubscirbedEvent = TypeVar("TSubscirbedEvent", bound=AbstractBroadcastEvent)
+TConsumedEvent = TypeVar("TConsumedEvent", bound=AbstractAnycastEvent)
 TEventCov = TypeVar("TEventCov", bound="AbstractEvent")
 TContext = TypeVar("TContext")
 
@@ -679,7 +679,7 @@ class EventProducer:
 
     async def anycast_event(
         self,
-        event: AbstractAnycastEvent[Any],
+        event: AbstractAnycastEvent,
         source_override: AgentId | None = None,
     ) -> None:
         if self._closed:
@@ -707,7 +707,7 @@ class EventProducer:
 
     async def broadcast_event(
         self,
-        event: AbstractBroadcastEvent[Any],
+        event: AbstractBroadcastEvent,
         source_override: AgentId | None = None,
     ) -> None:
         if self._closed:
@@ -735,7 +735,7 @@ class EventProducer:
     async def broadcast_event_with_cache(
         self,
         cache_id: str,
-        event: AbstractBroadcastEvent[Any],
+        event: AbstractBroadcastEvent,
     ) -> None:
         """
         Broadcast a message to all subscribers with cache.
@@ -763,7 +763,7 @@ class EventProducer:
 
     async def broadcast_events_batch(
         self,
-        events: Sequence[AbstractBroadcastEvent[Any]],
+        events: Sequence[AbstractBroadcastEvent],
     ) -> None:
         """
         Broadcast multiple events in a batch with optional caching.
@@ -803,8 +803,8 @@ class EventProducer:
 
     async def anycast_and_broadcast_event(
         self,
-        anycast_event: AbstractAnycastEvent[Any],
-        broadcast_event: AbstractBroadcastEvent[Any],
+        anycast_event: AbstractAnycastEvent,
+        broadcast_event: AbstractBroadcastEvent,
     ) -> None:
         """
         Send both anycast and broadcast events.

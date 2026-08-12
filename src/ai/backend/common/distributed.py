@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Callable
-from typing import Any, Final
+from typing import Final
 
 from aiomonitor.task import preserve_termination_log
 
@@ -28,7 +28,7 @@ class GlobalTimer:
         self,
         dist_lock: AbstractDistributedLock,
         event_producer: EventProducer,
-        event_factory: Callable[[], AbstractAnycastEvent[Any]],
+        event_factory: Callable[[], AbstractAnycastEvent],
         interval: float = 10.0,
         initial_delay: float = 0.0,
         *,

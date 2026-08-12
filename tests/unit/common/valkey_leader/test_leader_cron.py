@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, cast, override
+from typing import cast, override
 from unittest.mock import AsyncMock, MagicMock, create_autospec
 
 import pytest
@@ -91,7 +91,7 @@ async def leader_cron(mock_tasks: list[MockTask]) -> LeaderCron:
 
 @pytest.fixture
 async def event_tasks(
-    mock_event_producer: AsyncMock, mock_event: AbstractAnycastEvent[Any]
+    mock_event_producer: AsyncMock, mock_event: AbstractAnycastEvent
 ) -> list[EventProducerTask]:
     """Create EventProducerTask instances."""
     tasks = []
@@ -314,7 +314,7 @@ class TestLeaderCron:
         await leader_cron.stop()
 
     async def test_mixed_task_types(
-        self, mock_event_producer: AsyncMock, mock_event: AbstractAnycastEvent[Any]
+        self, mock_event_producer: AsyncMock, mock_event: AbstractAnycastEvent
     ) -> None:
         """Test LeaderCron with mixed PeriodicTask types."""
         # Create different types of tasks

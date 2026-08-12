@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping
-from dataclasses import dataclass, field
 from typing import Any, Self, override
 
-from pydantic import Field as PydanticField
+from pydantic import Field
 
-from ai.backend.common.events.payload import AnycastEventPayload
 from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.types import KernelId, SessionId
@@ -15,33 +13,7 @@ from ai.backend.common.types import KernelId, SessionId
 from .types import KernelLifecycleEventReason
 
 
-class KernelLifecycleEventPayload(AnycastEventPayload):
-    kernel_id: KernelId
-    session_id: SessionId
-    reason: str = ""
-
-
-class KernelCreationEventPayload(AnycastEventPayload):
-    kernel_id: KernelId
-    session_id: SessionId
-    reason: str = ""
-    creation_info: Mapping[str, Any] = PydanticField(default_factory=dict)
-
-
-class KernelTerminationEventPayload(AnycastEventPayload):
-    kernel_id: KernelId
-    session_id: SessionId
-    reason: KernelLifecycleEventReason = KernelLifecycleEventReason.UNKNOWN
-    exit_code: int = -1
-
-
-class SyncKernelLogsEventPayload(AnycastEventPayload):
-    kernel_id: KernelId
-    container_id: str
-
-
-@dataclass
-class BaseKernelEvent[TPayload: AnycastEventPayload](AbstractAnycastEvent[TPayload]):
+class BaseKernelEvent(AbstractAnycastEvent):
     kernel_id: KernelId
 
     @classmethod
@@ -54,8 +26,7 @@ class BaseKernelEvent[TPayload: AnycastEventPayload](AbstractAnycastEvent[TPaylo
         return str(self.kernel_id)
 
 
-@dataclass
-class KernelLifecycleEvent[TPayload: AnycastEventPayload](BaseKernelEvent[TPayload]):
+class KernelLifecycleEvent(BaseKernelEvent):
     session_id: SessionId
     reason: str = ""
 
@@ -64,28 +35,8 @@ class KernelLifecycleEvent[TPayload: AnycastEventPayload](BaseKernelEvent[TPaylo
         return None
 
 
-@dataclass
-class KernelCreationEvent(KernelLifecycleEvent[KernelCreationEventPayload]):
-    creation_info: Mapping[str, Any] = field(default_factory=dict)
-
-    @override
-    def to_payload(self) -> KernelCreationEventPayload:
-        return KernelCreationEventPayload(
-            kernel_id=self.kernel_id,
-            session_id=self.session_id,
-            reason=self.reason,
-            creation_info=self.creation_info,
-        )
-
-    @classmethod
-    @override
-    def from_payload(cls, payload: KernelCreationEventPayload) -> Self:
-        return cls(
-            kernel_id=payload.kernel_id,
-            session_id=payload.session_id,
-            reason=payload.reason,
-            creation_info=payload.creation_info,
-        )
+class KernelCreationEvent(KernelLifecycleEvent):
+    creation_info: Mapping[str, Any] = Field(default_factory=dict)
 
     @override
     def serialize(self) -> tuple[Any, ...]:
@@ -111,7 +62,6 @@ class KernelCreationEvent(KernelLifecycleEvent[KernelCreationEventPayload]):
         return None
 
 
-@dataclass
 class KernelPreparingAnycastEvent(KernelCreationEvent):
     @classmethod
     @override
@@ -119,7 +69,6 @@ class KernelPreparingAnycastEvent(KernelCreationEvent):
         return "kernel_preparing"
 
 
-@dataclass
 class KernelPullingAnycastEvent(KernelCreationEvent):
     @classmethod
     @override
@@ -127,7 +76,6 @@ class KernelPullingAnycastEvent(KernelCreationEvent):
         return "kernel_pulling"
 
 
-@dataclass
 class KernelCreatingAnycastEvent(KernelCreationEvent):
     @classmethod
     @override
@@ -142,24 +90,7 @@ class KernelStartedAnycastEvent(KernelCreationEvent):
         return "kernel_started"
 
 
-class KernelCancelledAnycastEvent(KernelLifecycleEvent[KernelLifecycleEventPayload]):
-    @override
-    def to_payload(self) -> KernelLifecycleEventPayload:
-        return KernelLifecycleEventPayload(
-            kernel_id=self.kernel_id,
-            session_id=self.session_id,
-            reason=self.reason,
-        )
-
-    @classmethod
-    @override
-    def from_payload(cls, payload: KernelLifecycleEventPayload) -> Self:
-        return cls(
-            kernel_id=payload.kernel_id,
-            session_id=payload.session_id,
-            reason=payload.reason,
-        )
-
+class KernelCancelledAnycastEvent(KernelLifecycleEvent):
     @override
     def serialize(self) -> tuple[Any, ...]:
         return (
@@ -183,30 +114,10 @@ class KernelCancelledAnycastEvent(KernelLifecycleEvent[KernelLifecycleEventPaylo
         return "kernel_cancelled"
 
 
-@dataclass
-class KernelTerminationEvent(BaseKernelEvent[KernelTerminationEventPayload]):
+class KernelTerminationEvent(BaseKernelEvent):
     session_id: SessionId
     reason: KernelLifecycleEventReason = KernelLifecycleEventReason.UNKNOWN
     exit_code: int = -1
-
-    @override
-    def to_payload(self) -> KernelTerminationEventPayload:
-        return KernelTerminationEventPayload(
-            kernel_id=self.kernel_id,
-            session_id=self.session_id,
-            reason=self.reason,
-            exit_code=self.exit_code,
-        )
-
-    @classmethod
-    @override
-    def from_payload(cls, payload: KernelTerminationEventPayload) -> Self:
-        return cls(
-            kernel_id=payload.kernel_id,
-            session_id=payload.session_id,
-            reason=payload.reason,
-            exit_code=payload.exit_code,
-        )
 
     @override
     def serialize(self) -> tuple[Any, ...]:
@@ -221,7 +132,7 @@ class KernelTerminationEvent(BaseKernelEvent[KernelTerminationEventPayload]):
     @override
     def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
-            KernelId(uuid.UUID(value[0])),
+            kernel_id=KernelId(uuid.UUID(value[0])),
             session_id=SessionId(uuid.UUID(value[1])),
             reason=value[2],
             exit_code=value[3],
@@ -250,24 +161,8 @@ class KernelTerminatedAnycastEvent(KernelTerminationEvent):
         return "kernel_terminated"
 
 
-@dataclass
-class DoSyncKernelLogsEvent(BaseKernelEvent[SyncKernelLogsEventPayload]):
+class DoSyncKernelLogsEvent(BaseKernelEvent):
     container_id: str
-
-    @override
-    def to_payload(self) -> SyncKernelLogsEventPayload:
-        return SyncKernelLogsEventPayload(
-            kernel_id=self.kernel_id,
-            container_id=self.container_id,
-        )
-
-    @classmethod
-    @override
-    def from_payload(cls, payload: SyncKernelLogsEventPayload) -> Self:
-        return cls(
-            kernel_id=payload.kernel_id,
-            container_id=payload.container_id,
-        )
 
     @override
     def serialize(self) -> tuple[Any, ...]:
@@ -280,8 +175,8 @@ class DoSyncKernelLogsEvent(BaseKernelEvent[SyncKernelLogsEventPayload]):
     @override
     def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
-            KernelId(uuid.UUID(value[0])),
-            value[1],
+            kernel_id=KernelId(uuid.UUID(value[0])),
+            container_id=value[1],
         )
 
     @override

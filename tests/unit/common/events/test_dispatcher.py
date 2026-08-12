@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncGenerator
-from dataclasses import dataclass
-from typing import Any, Self, override
+from typing import Any, override
 
 import msgpack
 import pytest
 
 from ai.backend.common.events.dispatcher import EventDispatcher
-from ai.backend.common.events.payload import AnycastEventPayload, BroadcastEventPayload
 from ai.backend.common.events.types import (
     AbstractAnycastEvent,
     AbstractBroadcastEvent,
@@ -22,22 +20,8 @@ from ai.backend.common.message_queue.types import MessageName
 from ai.backend.common.types import AgentId
 
 
-class DummyAnycastEventPayload(AnycastEventPayload):
+class DummyAnycastEvent(AbstractAnycastEvent):
     value: int
-
-
-@dataclass
-class DummyAnycastEvent(AbstractAnycastEvent[DummyAnycastEventPayload]):
-    value: int
-
-    @override
-    def to_payload(self) -> DummyAnycastEventPayload:
-        return DummyAnycastEventPayload(value=self.value)
-
-    @classmethod
-    @override
-    def from_payload(cls, payload: DummyAnycastEventPayload) -> Self:
-        return cls(value=payload.value)
 
     @override
     def serialize(self) -> tuple[Any, ...]:
@@ -46,7 +30,7 @@ class DummyAnycastEvent(AbstractAnycastEvent[DummyAnycastEventPayload]):
     @classmethod
     @override
     def deserialize(cls, value: tuple[Any, ...]) -> DummyAnycastEvent:
-        return cls(value[0])
+        return cls(value=value[0])
 
     @classmethod
     @override
@@ -67,22 +51,8 @@ class DummyAnycastEvent(AbstractAnycastEvent[DummyAnycastEventPayload]):
         return "test_anycast"
 
 
-class DummyBroadcastEventPayload(BroadcastEventPayload):
+class DummyBroadcastEvent(AbstractBroadcastEvent):
     value: int
-
-
-@dataclass
-class DummyBroadcastEvent(AbstractBroadcastEvent[DummyBroadcastEventPayload]):
-    value: int
-
-    @override
-    def to_payload(self) -> DummyBroadcastEventPayload:
-        return DummyBroadcastEventPayload(value=self.value)
-
-    @classmethod
-    @override
-    def from_payload(cls, payload: DummyBroadcastEventPayload) -> Self:
-        return cls(value=payload.value)
 
     @override
     def serialize(self) -> tuple[Any, ...]:
@@ -91,7 +61,7 @@ class DummyBroadcastEvent(AbstractBroadcastEvent[DummyBroadcastEventPayload]):
     @classmethod
     @override
     def deserialize(cls, value: tuple[Any, ...]) -> DummyBroadcastEvent:
-        return cls(value[0])
+        return cls(value=value[0])
 
     @classmethod
     @override
@@ -112,7 +82,7 @@ class DummyBroadcastEvent(AbstractBroadcastEvent[DummyBroadcastEventPayload]):
         return "test_broadcast"
 
 
-def _make_anycast_mq_message(event: AbstractAnycastEvent[Any]) -> MQMessage:
+def _make_anycast_mq_message(event: AbstractAnycastEvent) -> MQMessage:
     return MQMessage(
         msg_id=b"test-msg-id",
         payload=AnycastMessagePayload(
@@ -123,7 +93,7 @@ def _make_anycast_mq_message(event: AbstractAnycastEvent[Any]) -> MQMessage:
     )
 
 
-def _make_broadcast_payload(event: AbstractBroadcastEvent[Any]) -> BroadcastMessagePayload:
+def _make_broadcast_payload(event: AbstractBroadcastEvent) -> BroadcastMessagePayload:
     return BroadcastMessagePayload(
         name=MessageName(event.event_name()),
         source="i-test",

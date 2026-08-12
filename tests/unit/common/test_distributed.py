@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
 from pathlib import Path
-from typing import Any, Literal, Self, override
+from typing import Any, Literal, override
 
 import aiotools
 import pytest
@@ -24,7 +24,6 @@ from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventProducer,
 )
-from ai.backend.common.events.payload import AnycastEventPayload
 from ai.backend.common.events.types import (
     AbstractAnycastEvent,
     EventDomain,
@@ -72,22 +71,8 @@ def dslice(start: Decimal, stop: Decimal, num: int) -> Iterable[Decimal]:
     yield from (start + step * Decimal(tick) for tick in range(num))
 
 
-class NoopAnycastEventPayload(AnycastEventPayload):
+class NoopAnycastEvent(AbstractAnycastEvent):
     test_case_ns: str
-
-
-@dataclass
-class NoopAnycastEvent(AbstractAnycastEvent[NoopAnycastEventPayload]):
-    test_case_ns: str
-
-    @override
-    def to_payload(self) -> NoopAnycastEventPayload:
-        return NoopAnycastEventPayload(test_case_ns=self.test_case_ns)
-
-    @classmethod
-    @override
-    def from_payload(cls, payload: NoopAnycastEventPayload) -> Self:
-        return cls(test_case_ns=payload.test_case_ns)
 
     @override
     def serialize(self) -> tuple[Any, ...]:
@@ -96,7 +81,7 @@ class NoopAnycastEvent(AbstractAnycastEvent[NoopAnycastEventPayload]):
     @classmethod
     @override
     def deserialize(cls, value: tuple[Any, ...]) -> NoopAnycastEvent:
-        return cls(value[0])
+        return cls(test_case_ns=value[0])
 
     @classmethod
     @override
@@ -166,7 +151,7 @@ async def run_timer(
     timer = GlobalTimer(
         lock_factory(),
         event_producer,
-        lambda: NoopAnycastEvent(test_case_ns),
+        lambda: NoopAnycastEvent(test_case_ns=test_case_ns),
         interval=interval,
     )
     try:
@@ -231,7 +216,7 @@ def etcd_timer_node_process(
             timer = GlobalTimer(
                 dist_lock,
                 event_producer,
-                lambda: NoopAnycastEvent(timer_ctx.test_case_ns),
+                lambda: NoopAnycastEvent(test_case_ns=timer_ctx.test_case_ns),
                 timer_ctx.interval,
             )
             try:
@@ -326,7 +311,7 @@ class TimerNode(threading.Thread):
         timer = GlobalTimer(
             self.lock_factory(),
             event_producer,
-            lambda: NoopAnycastEvent(self.test_case_ns),
+            lambda: NoopAnycastEvent(test_case_ns=self.test_case_ns),
             interval=self.interval,
         )
         try:
@@ -537,7 +522,7 @@ async def test_global_timer_join_leave(
         timer = GlobalTimer(
             FileLock(lock_path, timeout=0, debug=True),
             event_producer,
-            lambda: NoopAnycastEvent(test_case_ns),
+            lambda: NoopAnycastEvent(test_case_ns=test_case_ns),
             0.01,
         )
         await timer.join()

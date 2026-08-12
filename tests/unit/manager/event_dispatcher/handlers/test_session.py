@@ -253,7 +253,7 @@ class TestSessionActivityMarkers:
 
     async def test_session_started_initializes_marker(self, session_id: SessionId) -> None:
         handler, _mock_registry, mock_valkey_live = _make_handler(_make_mock_db(AsyncMock()))
-        event = SessionStartedAnycastEvent(session_id, "creation-id")
+        event = SessionStartedAnycastEvent(session_id=session_id, creation_id="creation-id")
 
         await handler.handle_session_started(None, AgentId("i-test"), event)
 
@@ -261,7 +261,7 @@ class TestSessionActivityMarkers:
 
     async def test_session_terminated_deletes_marker(self, session_id: SessionId) -> None:
         handler, _mock_registry, mock_valkey_live = _make_handler(_make_mock_db(AsyncMock()))
-        event = SessionTerminatedAnycastEvent(session_id, "user-requested")
+        event = SessionTerminatedAnycastEvent(session_id=session_id, reason="user-requested")
 
         with patch.object(handler, "invoke_session_callback", new=AsyncMock()):
             await handler.handle_session_terminated(None, AgentId("i-test"), event)
@@ -270,7 +270,7 @@ class TestSessionActivityMarkers:
 
     async def test_execution_started_marks_session_active(self, session_id: SessionId) -> None:
         handler, _mock_registry, mock_valkey_live = _make_handler(_make_mock_db(AsyncMock()))
-        event = ExecutionStartedAnycastEvent(session_id)
+        event = ExecutionStartedAnycastEvent(session_id=session_id)
 
         await handler.handle_execution_started(None, AgentId("i-test"), event)
 
@@ -294,7 +294,7 @@ class TestSessionActivityMarkers:
         ],
     ) -> None:
         handler, _mock_registry, mock_valkey_live = _make_handler(_make_mock_db(AsyncMock()))
-        event = event_cls(session_id)
+        event = event_cls(session_id=session_id)
 
         await handler.handle_execution_ended(None, AgentId("i-test"), event)
 

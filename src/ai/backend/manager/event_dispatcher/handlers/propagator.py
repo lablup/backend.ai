@@ -1,5 +1,3 @@
-from typing import Any
-
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.types import AgentId
@@ -16,7 +14,7 @@ class PropagatorEventHandler:
         self,
         _context: None,
         _source: AgentId,
-        event: AbstractBroadcastEvent[Any],
+        event: AbstractBroadcastEvent,
     ) -> None:
         # Generate events to propagate (default implementation returns [self])
         individual_events = event.generate_events()
@@ -27,7 +25,7 @@ class PropagatorEventHandler:
         self,
         _context: None,
         _source: AgentId,
-        event: AbstractBroadcastEvent[Any],
+        event: AbstractBroadcastEvent,
     ) -> None:
         # Generate events to propagate (default implementation returns [self])
         individual_events = event.generate_events()

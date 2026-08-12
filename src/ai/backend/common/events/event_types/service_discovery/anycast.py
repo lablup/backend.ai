@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Self, override
+from typing import Any, override
 
 from pydantic import Field
 
-from ai.backend.common.events.payload import AnycastEventPayload
 from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.json import dump_json_str, load_json
@@ -37,27 +36,7 @@ class ServiceEndpointInfo(BackendAISchema):
     )
 
 
-class ServiceRegisteredEventPayload(AnycastEventPayload):
-    instance_id: str
-    service_group: str
-    display_name: str
-    version: str
-    labels: dict[str, str] = Field(default_factory=dict)
-    endpoints: list[ServiceEndpointInfo] = Field(default_factory=list)
-    startup_time: datetime
-    config_hash: str = ""
-
-
-class ServiceDeregisteredEventPayload(AnycastEventPayload):
-    instance_id: str
-    service_group: str
-
-
-class SweepStaleServicesEventPayload(AnycastEventPayload):
-    """The sweep trigger carries no arguments."""
-
-
-class BaseServiceDiscoveryEvent[TPayload: AnycastEventPayload](AbstractAnycastEvent[TPayload]):
+class BaseServiceDiscoveryEvent(AbstractAnycastEvent):
     """Base class for service discovery events."""
 
     @classmethod
@@ -74,9 +53,7 @@ class BaseServiceDiscoveryEvent[TPayload: AnycastEventPayload](AbstractAnycastEv
         return None
 
 
-class ServiceRegisteredEvent(
-    BackendAISchema, BaseServiceDiscoveryEvent[ServiceRegisteredEventPayload]
-):
+class ServiceRegisteredEvent(BackendAISchema, BaseServiceDiscoveryEvent):
     """Event emitted when a service instance registers or sends a heartbeat.
 
     Contains full service metadata and endpoint information.
@@ -104,33 +81,6 @@ class ServiceRegisteredEvent(
     @override
     def event_name(cls) -> str:
         return "service_registered"
-
-    @override
-    def to_payload(self) -> ServiceRegisteredEventPayload:
-        return ServiceRegisteredEventPayload(
-            instance_id=self.instance_id,
-            service_group=self.service_group,
-            display_name=self.display_name,
-            version=self.version,
-            labels=self.labels,
-            endpoints=self.endpoints,
-            startup_time=self.startup_time,
-            config_hash=self.config_hash,
-        )
-
-    @classmethod
-    @override
-    def from_payload(cls, payload: ServiceRegisteredEventPayload) -> Self:
-        return cls(
-            instance_id=payload.instance_id,
-            service_group=payload.service_group,
-            display_name=payload.display_name,
-            version=payload.version,
-            labels=payload.labels,
-            endpoints=payload.endpoints,
-            startup_time=payload.startup_time,
-            config_hash=payload.config_hash,
-        )
 
     @override
     def serialize(self) -> tuple[bytes, ...]:
@@ -163,22 +113,13 @@ class ServiceRegisteredEvent(
         )
 
 
-class DoSweepStaleServicesEvent(BaseServiceDiscoveryEvent[SweepStaleServicesEventPayload]):
+class DoSweepStaleServicesEvent(BaseServiceDiscoveryEvent):
     """Event to trigger sweeping stale services in the catalog."""
 
     @classmethod
     @override
     def event_name(cls) -> str:
         return "do_sweep_stale_services"
-
-    @override
-    def to_payload(self) -> SweepStaleServicesEventPayload:
-        return SweepStaleServicesEventPayload()
-
-    @classmethod
-    @override
-    def from_payload(cls, payload: SweepStaleServicesEventPayload) -> Self:
-        return cls()
 
     @override
     def serialize(self) -> tuple[bytes, ...]:
@@ -190,9 +131,7 @@ class DoSweepStaleServicesEvent(BaseServiceDiscoveryEvent[SweepStaleServicesEven
         return cls()
 
 
-class ServiceDeregisteredEvent(
-    BackendAISchema, BaseServiceDiscoveryEvent[ServiceDeregisteredEventPayload]
-):
+class ServiceDeregisteredEvent(BackendAISchema, BaseServiceDiscoveryEvent):
     """Event emitted when a service instance is deregistered."""
 
     instance_id: str = Field(description="Unique instance identifier.")
@@ -202,21 +141,6 @@ class ServiceDeregisteredEvent(
     @override
     def event_name(cls) -> str:
         return "service_deregistered"
-
-    @override
-    def to_payload(self) -> ServiceDeregisteredEventPayload:
-        return ServiceDeregisteredEventPayload(
-            instance_id=self.instance_id,
-            service_group=self.service_group,
-        )
-
-    @classmethod
-    @override
-    def from_payload(cls, payload: ServiceDeregisteredEventPayload) -> Self:
-        return cls(
-            instance_id=payload.instance_id,
-            service_group=payload.service_group,
-        )
 
     @override
     def serialize(self) -> tuple[bytes, ...]:

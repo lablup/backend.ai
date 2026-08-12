@@ -12,6 +12,7 @@ Abstraction over Redis streams (anycast) and pub/sub (broadcast). Prefer `RedisQ
 - **Consumers must call `done(msg_id)` after handling** — otherwise the message is redelivered after the idle timeout, then discarded past max retries.
 - Subscribers do not ack (broadcast may be lost by design).
 - Anycast carries `AnycastMessagePayload`, broadcast carries `BroadcastMessagePayload`. Do not mix, and do not hand-build the wire mapping — the payload models own the encoding.
+- An event's own body reaches this layer as `EventMessage` (`common/events/message.py`) — `name` plus the already-serialized `payload`. This layer adds `source`, `metadata`, and `retry_count`; an event never supplies them.
 - `legacy_source` / `legacy_body` are on the way out. Construct them by their wire keys (`source=` / `body=`) and do not add new readers of them — new code goes through `payload`.
 - Decode received messages with `from_stream_fields()` / `from_json()`; they raise `InvalidMessagePayloadError` instead of failing later at field access.
 - Configure only the streams/channels you use (`consume_stream_keys=None` / `subscribe_channels=None`) to avoid idle background loops.

@@ -7,7 +7,6 @@ from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
     VerificationStepResult,
 )
-from ai.backend.common.events.payload import AnycastEventPayload
 from ai.backend.common.events.types import (
     AbstractAnycastEvent,
     EventDomain,
@@ -15,7 +14,7 @@ from ai.backend.common.events.types import (
 from ai.backend.common.events.user_event.user_event import UserEvent
 
 
-class BaseArtifactEvent[TPayload: AnycastEventPayload](AbstractAnycastEvent[TPayload]):
+class BaseArtifactEvent(AbstractAnycastEvent):
     @classmethod
     @override
     def event_domain(cls) -> EventDomain:
@@ -34,29 +33,7 @@ class ModelMetadataInfo:
     size: int
 
 
-class ModelVerifyingEventPayload(AnycastEventPayload):
-    model_id: str
-    revision: str
-    registry_type: ArtifactRegistryType
-    registry_name: str
-
-
-class ModelImportDoneEventPayload(AnycastEventPayload):
-    model_id: str
-    revision: str
-    registry_type: ArtifactRegistryType
-    registry_name: str
-    success: bool
-    digest: str | None = None
-    verification_result: VerificationStepResult | None = None
-
-
-class ModelMetadataFetchDoneEventPayload(AnycastEventPayload):
-    model: ModelMetadataInfo
-
-
-@dataclass
-class ModelVerifyingEvent(BaseArtifactEvent[ModelVerifyingEventPayload]):
+class ModelVerifyingEvent(BaseArtifactEvent):
     """
     Mark the model revision's status to verifying.
     """
@@ -70,25 +47,6 @@ class ModelVerifyingEvent(BaseArtifactEvent[ModelVerifyingEventPayload]):
     @override
     def event_name(cls) -> str:
         return "model_verifying"
-
-    @override
-    def to_payload(self) -> ModelVerifyingEventPayload:
-        return ModelVerifyingEventPayload(
-            model_id=self.model_id,
-            revision=self.revision,
-            registry_type=self.registry_type,
-            registry_name=self.registry_name,
-        )
-
-    @classmethod
-    @override
-    def from_payload(cls, payload: ModelVerifyingEventPayload) -> Self:
-        return cls(
-            model_id=payload.model_id,
-            revision=payload.revision,
-            registry_type=payload.registry_type,
-            registry_name=payload.registry_name,
-        )
 
     @override
     def serialize(self) -> tuple[Any, ...]:
@@ -113,8 +71,7 @@ class ModelVerifyingEvent(BaseArtifactEvent[ModelVerifyingEventPayload]):
         return None
 
 
-@dataclass
-class ModelImportDoneEvent(BaseArtifactEvent[ModelImportDoneEventPayload]):
+class ModelImportDoneEvent(BaseArtifactEvent):
     model_id: str
     revision: str
     registry_type: ArtifactRegistryType
@@ -127,31 +84,6 @@ class ModelImportDoneEvent(BaseArtifactEvent[ModelImportDoneEventPayload]):
     @override
     def event_name(cls) -> str:
         return "model_import_done"
-
-    @override
-    def to_payload(self) -> ModelImportDoneEventPayload:
-        return ModelImportDoneEventPayload(
-            model_id=self.model_id,
-            revision=self.revision,
-            registry_type=self.registry_type,
-            registry_name=self.registry_name,
-            success=self.success,
-            digest=self.digest,
-            verification_result=self.verification_result,
-        )
-
-    @classmethod
-    @override
-    def from_payload(cls, payload: ModelImportDoneEventPayload) -> Self:
-        return cls(
-            model_id=payload.model_id,
-            revision=payload.revision,
-            registry_type=payload.registry_type,
-            registry_name=payload.registry_name,
-            success=payload.success,
-            digest=payload.digest,
-            verification_result=payload.verification_result,
-        )
 
     @override
     def serialize(self) -> tuple[Any, ...]:
@@ -195,27 +127,13 @@ class ModelImportDoneEvent(BaseArtifactEvent[ModelImportDoneEventPayload]):
         return None
 
 
-@dataclass
-class ModelMetadataFetchDoneEvent(BaseArtifactEvent[ModelMetadataFetchDoneEventPayload]):
+class ModelMetadataFetchDoneEvent(BaseArtifactEvent):
     model: ModelMetadataInfo
 
     @classmethod
     @override
     def event_name(cls) -> str:
         return "models_metadata_fetch_done"
-
-    @override
-    def to_payload(self) -> ModelMetadataFetchDoneEventPayload:
-        return ModelMetadataFetchDoneEventPayload(
-            model=self.model,
-        )
-
-    @classmethod
-    @override
-    def from_payload(cls, payload: ModelMetadataFetchDoneEventPayload) -> Self:
-        return cls(
-            model=payload.model,
-        )
 
     @override
     def serialize(self) -> tuple[Any, ...]:
