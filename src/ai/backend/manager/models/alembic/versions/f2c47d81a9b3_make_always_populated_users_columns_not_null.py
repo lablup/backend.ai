@@ -21,7 +21,7 @@ branch_labels = None
 depends_on = None
 
 
-def _backfill_flags(bind: Connection) -> None:
+def _backfill(bind: Connection) -> None:
     """The two flags never had a default, so a row that predates one carries NULL."""
     bind.execute(
         sa.text("UPDATE users SET need_password_change = false WHERE need_password_change IS NULL")
@@ -30,7 +30,7 @@ def _backfill_flags(bind: Connection) -> None:
 
 
 def upgrade() -> None:
-    _backfill_flags(op.get_bind())
+    _backfill(op.get_bind())
 
     op.alter_column("users", "domain_name", existing_type=sa.String(length=64), nullable=False)
     op.alter_column("users", "role", existing_type=sa.String(length=64), nullable=False)
