@@ -2365,7 +2365,11 @@ class DockerContext(Context):
       mount are skipped.
     """
 
-    SERVICES_COMPOSE_FILENAME = "docker-compose.services.yml"
+    # Bundled template resource name; the rendered+merged deployment file is
+    # written under the de-facto standard name so a bare `docker compose`
+    # from the install directory addresses the deployment without -f.
+    SERVICES_COMPOSE_TEMPLATE = "docker-compose.services.yml"
+    SERVICES_COMPOSE_FILENAME = "docker-compose.yaml"
     HALFSTACK_COMPOSE_FILENAME = "docker-compose.halfstack.current.yml"
     # Fixed system paths for the daemon-visible state, so NO service has to
     # bind-mount the (home-directory-resident) install directory:
@@ -2621,9 +2625,11 @@ class DockerContext(Context):
                 target[key] = value
 
     async def generate_services_compose(self) -> Path:
-        compose_path = self.copy_config(self.SERVICES_COMPOSE_FILENAME)
+        with self.resource_path("ai.backend.install.configs", self.SERVICES_COMPOSE_TEMPLATE) as p:
+            template = Path(p).read_text()
+        compose_path = self.install_info.base_path / self.SERVICES_COMPOSE_FILENAME
         rendered = self.render_services_compose(
-            compose_path.read_text(),
+            template,
             base_path=self.install_info.base_path,
             version=self.dist_info.version,
             enable_gpu=self.install_info.accelerator == Accelerator.CUDA,
