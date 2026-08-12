@@ -385,23 +385,26 @@ async def pick_worker(
             Worker.filtered_apps_only & (Worker.accepted_traffics.contains(app_mode))
         )
     result = await session.execute(worker_query)
-    sorted_workers: list[Worker] = [
-        f
-        for f in sorted(
-            result.scalars().all(),
-            key=lambda f: (
-                -1
-                if f.frontend_mode == FrontendMode.WILDCARD_DOMAIN
-                else (f.available_slots - f.occupied_slots) * -1
-            ),
-            reverse=True,
-        )
-        if f.frontend_mode == FrontendMode.WILDCARD_DOMAIN
-        or (f.available_slots - f.occupied_slots) > 0
-    ]
-    if not sorted_workers:
+    workers = result.scalars().all()
+
+    candidates: list[Worker] = []
+    for candidate in workers:
+        is_wildcard = candidate.frontend_mode == FrontendMode.WILDCARD_DOMAIN
+        remaining_slots = candidate.available_slots - candidate.occupied_slots
+        if is_wildcard or remaining_slots > 0:
+            candidates.append(candidate)
+
+    if not candidates:
         raise WorkerNotAvailable
-    worker = sorted_workers[0]
+
+    def priority(worker: Worker) -> tuple[int, int]:
+        # Prioritize wildcard domain workers first, then by remaining slots (descending)
+        if worker.frontend_mode == FrontendMode.WILDCARD_DOMAIN:
+            # Use only occupied_slots for wildcard workers since available_slots is -1
+            return (1, -worker.occupied_slots)
+        return (0, worker.available_slots - worker.occupied_slots)
+
+    worker = max(candidates, key=priority)
     return await Worker.get(
         session,
         worker.id,
