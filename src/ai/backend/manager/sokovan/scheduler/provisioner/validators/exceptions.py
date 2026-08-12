@@ -120,7 +120,7 @@ class UserResourceQuotaExceeded(SchedulingValidationError):
 
     @override
     def summary(self) -> str:
-        return f"Your main-keypair resource quota is exceeded. ({_format_slots(self._quota_slots)})"
+        return f"Your default-keypair resource quota is exceeded. ({_format_slots(self._quota_slots)})"
 
     @override
     def error_code(self) -> ErrorCode:

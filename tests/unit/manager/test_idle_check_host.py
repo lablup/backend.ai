@@ -1,7 +1,7 @@
 """
 Tests for ``IdleCheckerHost.do_idle_check()`` against a real database.
 
-The idle policy is resolved through the user's main keypair — the one marked
+The idle policy is resolved through the user's default keypair — the one marked
 ``keypairs.is_default`` — instead of the kernel's own ``access_key``, which a
 keypair deletion can leave orphaned. A kernel whose policy cannot be resolved,
 or whose checker raises, must not stop the remaining kernels of the same cycle

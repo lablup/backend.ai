@@ -77,7 +77,7 @@ class SlotTypeInfo:
 class UserEnqueuePolicy:
     """Per-user gates applied at session enqueue.
 
-    Sourced from the user's main-keypair resource policy row until
+    Sourced from the user's default-keypair resource policy row until
     user-level policy columns exist; carries only the fields the
     enqueue path actually consumes.
     """
