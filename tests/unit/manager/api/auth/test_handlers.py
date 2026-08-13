@@ -279,6 +279,7 @@ class TestAuthorize:
         assert isinstance(data, dict)
         assert data["data"]["access_key"] == authorize_result.authorization_result.access_key
         assert data["data"]["secret_key"] == authorize_result.authorization_result.secret_key
+        assert data["data"]["user_id"] == str(authorize_result.authorization_result.user_id)
 
     async def test_passes_params_to_action(
         self,

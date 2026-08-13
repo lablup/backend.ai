@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID, uuid4
+
 from ai.backend.common.dto.manager.auth.types import (
     AuthResponseType,
     AuthSuccessResponse,
@@ -9,6 +11,7 @@ from ai.backend.common.dto.manager.auth.types import (
     TwoFactorType,
     parse_auth_response,
 )
+from ai.backend.common.identifier.user import UserID
 
 
 def test_auth_token_type_values() -> None:
@@ -119,6 +122,37 @@ def test_parse_auth_response_success() -> None:
     result = parse_auth_response(data)
     assert isinstance(result, AuthSuccessResponse)
     assert result.access_key == "AK"
+    assert result.user_id is None
+
+
+def test_parse_auth_response_success_with_user_id() -> None:
+    data = {
+        "response_type": "success",
+        "access_key": "AK",
+        "secret_key": "SK",
+        "role": "user",
+        "status": "active",
+        "session_token": "test_token",
+        "user_id": "12345678-1234-5678-1234-567812345678",
+    }
+    result = parse_auth_response(data)
+    assert isinstance(result, AuthSuccessResponse)
+    assert result.user_id == UUID("12345678-1234-5678-1234-567812345678")
+
+
+def test_auth_success_response_to_dict_serializes_user_id() -> None:
+    user_id = UserID(uuid4())
+    resp = AuthSuccessResponse(
+        response_type=AuthResponseType.SUCCESS,
+        access_key="AK",
+        secret_key="SK",
+        role="user",
+        status="active",
+        session_token="test_token",
+        user_id=user_id,
+    )
+    d = resp.to_dict()
+    assert d["user_id"] == str(user_id)
 
 
 def test_parse_auth_response_two_factor_registration() -> None:

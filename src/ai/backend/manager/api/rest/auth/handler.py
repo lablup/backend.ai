@@ -46,6 +46,7 @@ from ai.backend.common.dto.manager.auth.types import (
     AuthSuccessResponse,
     AuthTokenType,
 )
+from ai.backend.common.identifier.user import UserID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.middleware.auth import extract_client_ip
 from ai.backend.manager.dto.context import RequestCtx, UserContext
@@ -168,6 +169,7 @@ class AuthHandler:
             role=auth_result.role,
             status=auth_result.status,
             session_token=auth_result.session_token,
+            user_id=UserID(auth_result.user_id),
         )
         resp = AuthorizeResponse(data=data)
         return APIResponse.build(HTTPStatus.OK, resp)
