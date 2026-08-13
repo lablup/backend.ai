@@ -36,10 +36,7 @@ from ai.backend.agent.affinity_map import AffinityPolicy
 from ai.backend.agent.stats import StatModes
 from ai.backend.agent.types import AgentBackend
 from ai.backend.agent.utils import get_arch_name
-from ai.backend.common.config import (
-    BaseConfigSchema,
-    reject_experimental_redis_event_dispatcher,
-)
+from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.configs import (
     EtcdConfig,
     OTELConfig,
@@ -1152,12 +1149,6 @@ class CommonAgentConfig(BaseConfigSchema):
             raise ValueError("Cannot use link-local IP address as the RPC listening host.")
         return rpc_listen_addr
 
-    @model_validator(mode="before")
-    @classmethod
-    def _reject_experimental_redis_event_dispatcher(cls, values: Any) -> Any:
-        reject_experimental_redis_event_dispatcher(values)
-        return values
-
 
 class OverridableAgentConfig(BaseConfigSchema):
     """
@@ -2080,6 +2071,8 @@ class DockerExtraConfig(BaseConfigSchema):
     """
     For checking additional Docker configurations
     """
+
+    model_config = ConfigDict(extra="ignore")
 
     swarm_enabled: Annotated[
         bool,

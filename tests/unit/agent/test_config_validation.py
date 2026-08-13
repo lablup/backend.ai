@@ -33,6 +33,8 @@ from ai.backend.logging.types import LogLevel
 
 RawConfigT = dict[str, Any]
 
+CONFIG_LOGGER = "ai.backend.common.config"
+
 
 CONTEXT_DEFAULT_DEBUG = False
 CONTEXT_DEFAULT_LOG_LEVEL = LogLevel.DEBUG
@@ -579,9 +581,10 @@ class TestAgentUnifiedConfigValidation:
         assert config.agent.backend == AgentBackend.KUBERNETES
         assert config.container.scratch_type == ScratchType.K8S_NFS
 
-    def test_removed_experimental_dispatcher_key_is_rejected_when_enabled(
+    def test_unknown_agent_field_is_warned_and_dropped(
         self,
         default_raw_config: RawConfigT,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         raw_config = {
             **default_raw_config,
@@ -590,27 +593,30 @@ class TestAgentUnifiedConfigValidation:
                 "use-experimental-redis-event-dispatcher": True,
             },
         }
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
-            AgentUnifiedConfig.model_validate(raw_config)
+        with caplog.at_level("WARNING", logger=CONFIG_LOGGER):
+            config = AgentUnifiedConfig.model_validate(raw_config)
 
-        assert "The 'use-experimental-redis-event-dispatcher' option has been removed." in str(
-            exc_info.value
-        )
+        warnings = [r.getMessage() for r in caplog.records if r.name == CONFIG_LOGGER]
+        assert any("use-experimental-redis-event-dispatcher" in m for m in warnings)
+        assert not hasattr(config.agent, "use_experimental_redis_event_dispatcher")
+        assert "use-experimental-redis-event-dispatcher" not in config.agent.model_fields_set
 
-    def test_removed_experimental_dispatcher_key_is_ignored_when_disabled(
+    def test_docker_backend_validation_emits_no_unknown_field_warning(
         self,
         default_raw_config: RawConfigT,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         raw_config = {
             **default_raw_config,
-            "agent": {
-                **default_raw_config["agent"],
-                "use-experimental-redis-event-dispatcher": False,
-            },
+            "agent": {**default_raw_config["agent"], "backend": AgentBackend.DOCKER},
+            "container": {"scratch-type": ScratchType.HOSTDIR},
         }
         config = AgentUnifiedConfig.model_validate(raw_config)
 
-        assert not hasattr(config.agent, "use_experimental_redis_event_dispatcher")
+        with caplog.at_level("WARNING", logger=CONFIG_LOGGER):
+            config.validate_agent_specific_config()
+
+        assert [r.getMessage() for r in caplog.records if r.name == CONFIG_LOGGER] == []
 
     def test_kubernetes_backend_with_other_scratch_types(
         self,

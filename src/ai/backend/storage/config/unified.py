@@ -13,10 +13,7 @@ from pydantic import (
     model_validator,
 )
 
-from ai.backend.common.config import (
-    BaseConfigSchema,
-    reject_experimental_redis_event_dispatcher,
-)
+from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.configs import (
     EtcdConfig,
     OTELConfig,
@@ -784,12 +781,6 @@ class StorageProxyConfig(BaseConfigSchema):
             added_version="25.12.0",
         ),
     ]
-
-    @model_validator(mode="before")
-    @classmethod
-    def _reject_experimental_redis_event_dispatcher(cls, values: Any) -> Any:
-        reject_experimental_redis_event_dispatcher(values)
-        return values
 
 
 class PresignedUploadConfig(BaseConfigSchema):

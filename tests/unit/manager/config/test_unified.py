@@ -1,9 +1,9 @@
 import pytest
-from pydantic import ValidationError
 
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.manager.config.unified import ManagerConfig, MetricConfig
+
+CONFIG_LOGGER = "ai.backend.common.config"
 
 
 def test_config_validation_supports_field_name_and_alias() -> None:
@@ -14,20 +14,32 @@ def test_config_validation_supports_field_name_and_alias() -> None:
     assert config.address == HostPortPair(host="127.0.0.1", port=9090)
 
 
-class TestRemovedExperimentalRedisEventDispatcher:
+def _unknown_field_warnings(caplog: pytest.LogCaptureFixture) -> list[str]:
+    return [r.getMessage() for r in caplog.records if r.name == CONFIG_LOGGER]
+
+
+class TestUnknownFieldWarning:
     @pytest.mark.parametrize(
-        "alias",
-        ["use-experimental-redis-event-dispatcher", "use_experimental_redis_event_dispatcher"],
+        "unknown_key",
+        ["use-experimental-redis-event-dispatcher", "totally-made-up-key"],
     )
-    def test_enabled_flag_is_rejected(self, alias: str) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
-            ManagerConfig.model_validate({alias: True}, by_name=True)
+    def test_unknown_field_is_warned_and_dropped(
+        self,
+        unknown_key: str,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        with caplog.at_level("WARNING", logger=CONFIG_LOGGER):
+            config = ManagerConfig.model_validate({unknown_key: True}, by_name=True)
 
-        assert f"The '{alias}' option has been removed." in str(exc_info.value)
+        warnings = _unknown_field_warnings(caplog)
+        assert any(unknown_key in m and "ManagerConfig" in m for m in warnings)
+        assert not hasattr(config, unknown_key.replace("-", "_"))
+        assert unknown_key not in config.model_dump()
+        assert unknown_key not in config.model_fields_set
 
-    def test_disabled_flag_is_ignored(self) -> None:
-        config = ManagerConfig.model_validate(
-            {"use-experimental-redis-event-dispatcher": False}, by_name=True
-        )
+    def test_known_field_emits_no_warning(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level("WARNING", logger=CONFIG_LOGGER):
+            config = ManagerConfig.model_validate({"num-proc": 2}, by_name=True)
 
-        assert not hasattr(config, "use_experimental_redis_event_dispatcher")
+        assert _unknown_field_warnings(caplog) == []
+        assert config.num_proc == 2
