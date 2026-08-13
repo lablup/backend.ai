@@ -802,31 +802,6 @@ async def _resolve_effective_user(
     return await _load_user_data(db, target_user_id)
 
 
-def _apply_auth_context(request: web.Request, context: _AuthContext) -> UserData:
-    """Expose the auth context to handlers and build the caller's ``UserData``."""
-    is_admin = context.user.role in (UserRole.ADMIN, UserRole.SUPERADMIN)
-    is_superadmin = context.user.role == UserRole.SUPERADMIN
-    keypair_map = dataclasses.asdict(context.keypair)
-    del keypair_map["secret_key"]
-    request.update({
-        "is_authorized": True,
-        "is_admin": is_admin,
-        "is_superadmin": is_superadmin,
-        # Handlers still read these two as mappings.
-        "user": dataclasses.asdict(context.user),
-        "keypair": keypair_map,
-    })
-    return UserData(
-        user_id=context.user.uuid,
-        is_authorized=True,
-        is_admin=is_admin,
-        is_superadmin=is_superadmin,
-        role=context.user.role,
-        domain_name=context.user.domain_name,
-        domain_id=context.user.domain_id,
-    )
-
-
 def _setup_user_context(
     request: web.Request,
     effective_user: UserData | None,
@@ -980,7 +955,27 @@ def build_auth_middleware(
         authenticated_user: UserData | None = None
         if context is not None:
             validate_ip(request, context.user.allowed_client_ip)
-            authenticated_user = _apply_auth_context(request, context)
+            is_admin = context.user.role in (UserRole.ADMIN, UserRole.SUPERADMIN)
+            is_superadmin = context.user.role == UserRole.SUPERADMIN
+            keypair_map = dataclasses.asdict(context.keypair)
+            del keypair_map["secret_key"]
+            request.update({
+                "is_authorized": True,
+                "is_admin": is_admin,
+                "is_superadmin": is_superadmin,
+                # Handlers still read these two as mappings.
+                "user": dataclasses.asdict(context.user),
+                "keypair": keypair_map,
+            })
+            authenticated_user = UserData(
+                user_id=context.user.uuid,
+                is_authorized=True,
+                is_admin=is_admin,
+                is_superadmin=is_superadmin,
+                role=context.user.role,
+                domain_name=context.user.domain_name,
+                domain_id=context.user.domain_id,
+            )
 
         # The effective user may differ from the caller (impersonation); the DB is touched here.
         effective_user = (
