@@ -395,10 +395,10 @@ class TestVfolderRepositoryAllowedVfolderHosts:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+    ) -> DomainFixtureData:
         """Create test domain."""
         domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -416,7 +416,7 @@ class TestVfolderRepositoryAllowedVfolderHosts:
             db_sess.add(domain)
             await db_sess.flush()
 
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def test_user_resource_policy_name(
@@ -674,10 +674,10 @@ class TestVfolderRepositoryPurge:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+    ) -> DomainFixtureData:
         """Create test domain."""
         domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -695,7 +695,7 @@ class TestVfolderRepositoryPurge:
             db_sess.add(domain)
             await db_sess.flush()
 
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def test_user_resource_policy_name(
@@ -1056,10 +1056,10 @@ class TestVfolderRepositoryDeleteForever:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+    ) -> DomainFixtureData:
         domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
@@ -1075,7 +1075,7 @@ class TestVfolderRepositoryDeleteForever:
                 )
             )
             await db_sess.flush()
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def test_user_resource_policy_name(

@@ -693,11 +693,11 @@ class TestBulkTerminateResourceDeallocation:
         return ResourceGroupID(uuid.uuid4())
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[DomainFixtureData, None]:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -711,7 +711,7 @@ class TestBulkTerminateResourceDeallocation:
                 )
             )
             await db_sess.flush()
-        yield domain_name
+        yield DomainFixtureData(domain_name=DomainName(domain_name), domain_id=test_domain_id)
 
     @pytest.fixture
     async def test_scaling_group_name(
@@ -1151,11 +1151,11 @@ class TestNegativeValueGuard:
         return ResourceGroupID(uuid.uuid4())
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[DomainFixtureData, None]:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -1169,7 +1169,7 @@ class TestNegativeValueGuard:
                 )
             )
             await db_sess.flush()
-        yield domain_name
+        yield DomainFixtureData(domain_name=DomainName(domain_name), domain_id=test_domain_id)
 
     @pytest.fixture
     async def test_scaling_group_name(

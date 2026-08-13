@@ -1480,10 +1480,10 @@ class TestDeploymentRevisionOperations:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+    ) -> DomainFixtureData:
         """Create test domain and return domain name."""
         domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -1501,7 +1501,7 @@ class TestDeploymentRevisionOperations:
             db_sess.add(domain)
             await db_sess.commit()
 
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def test_scaling_group_name(
@@ -2242,10 +2242,10 @@ class TestDeploymentPolicyOperations:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+    ) -> DomainFixtureData:
         """Create test domain and return domain name."""
         domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -2263,7 +2263,7 @@ class TestDeploymentPolicyOperations:
             db_sess.add(domain)
             await db_sess.commit()
 
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def test_scaling_group_name(
@@ -2580,10 +2580,10 @@ class TestSearchDeploymentPolicies:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+    ) -> DomainFixtureData:
         domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
@@ -2598,7 +2598,7 @@ class TestSearchDeploymentPolicies:
             )
             db_sess.add(domain)
             await db_sess.commit()
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def test_scaling_group_name(
@@ -2967,10 +2967,10 @@ class TestRouteOperations:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+    ) -> DomainFixtureData:
         """Create test domain and return domain name."""
         domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -2988,7 +2988,7 @@ class TestRouteOperations:
             db_sess.add(domain)
             await db_sess.commit()
 
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def test_scaling_group_name(

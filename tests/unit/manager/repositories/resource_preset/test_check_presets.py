@@ -1304,11 +1304,11 @@ class TestCheckPresetsZeroValues:
         return ResourceGroupID(uuid.uuid4())
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[DomainFixtureData, None]:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-zero-{uuid.uuid4().hex[:8]}"
 
@@ -1325,7 +1325,7 @@ class TestCheckPresetsZeroValues:
             await db_sess.flush()
 
         try:
-            yield domain_name
+            yield DomainFixtureData(domain_name=DomainName(domain_name), domain_id=test_domain_id)
         finally:
             pass
 

@@ -361,11 +361,11 @@ class TestMarkTerminatingSchedulingHistory:
         return ResourceGroupID(uuid.uuid4())
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[DomainFixtureData, None]:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
@@ -381,7 +381,7 @@ class TestMarkTerminatingSchedulingHistory:
             db_sess.add(domain)
             await db_sess.flush()
 
-        yield domain_name
+        yield DomainFixtureData(domain_name=DomainName(domain_name), domain_id=test_domain_id)
 
     @pytest.fixture
     async def test_scaling_group_name(

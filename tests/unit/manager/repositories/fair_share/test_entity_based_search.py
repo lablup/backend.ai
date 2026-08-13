@@ -274,7 +274,6 @@ class TestSearchDomainFairSharesEntityBased:
                 )
             domain_ids = [DomainID(uuid.uuid4()), DomainID(uuid.uuid4())]
             for domain_id, domain_name in zip(domain_ids, [domain1, domain2], strict=True):
-                domain_id = DomainID(uuid.uuid4())
                 db_sess.add(
                     DomainRow(
                         id=domain_id,

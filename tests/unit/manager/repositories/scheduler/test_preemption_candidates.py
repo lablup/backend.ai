@@ -69,7 +69,6 @@ async def _create_allocated_session(
     kernel_status: KernelStatus = KernelStatus.RUNNING,
 ) -> SessionId:
     """A resource-holding session: the shared factory with agents assigned."""
-    domain_id = DomainID(uuid.uuid4())
     session_id, _ = await create_pending_session_with_kernels(
         db,
         domain_id=domain_id,
