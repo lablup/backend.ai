@@ -257,6 +257,7 @@ class TestCheckPermissionWithScopeChain:
             "user_scope": (ScopeType.USER, fixture_ids.user_scope_id),
         }
         for entry in request.param:
+            domain_id = DomainID(uuid.uuid4())
             if not isinstance(entry, PermissionEntry):
                 raise TypeError(f"Expected PermissionEntry, got {type(entry).__name__}: {entry!r}")
             scope_type, scope_id = scope_map[entry.scope_key]
@@ -813,6 +814,7 @@ class TestCheckPermissionWithScopeChain:
             "domain": (ScopeType.DOMAIN, fixture_ids.domain_id),
         }
         for role_key, scope_key, operation in request.param:
+            domain_id = DomainID(uuid.uuid4())
             role_id = role_map[role_key]
             scope_type, scope_id = scope_map[scope_key]
             async with db_with_rbac_tables.begin_session() as db_sess:

@@ -147,7 +147,6 @@ class TestFairShareRepository:
         """Create test domain and return domain name"""
         domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-        domain_id = DomainID(uuid.uuid4())
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
@@ -423,6 +422,7 @@ class TestFairShareRepository:
 
         async with db_with_cleanup.begin_session() as db_sess:
             for name in domain_names:
+                domain_id = DomainID(uuid.uuid4())
                 domain = DomainRow(
                     id=domain_id,
                     name=name,

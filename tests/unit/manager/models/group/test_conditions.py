@@ -707,14 +707,12 @@ class TestGroupUserNestedSearchIntegration:
             assoc_a = AssocGroupUserRow(
                 group_id=proj_a_id,
                 user_id=active_user_id,
-                domain_id=domain_id,
             )
             session.add(assoc_a)
 
             assoc_b = AssocGroupUserRow(
                 group_id=proj_b_id,
                 user_id=inactive_user_id,
-                domain_id=domain_id,
             )
             session.add(assoc_b)
 

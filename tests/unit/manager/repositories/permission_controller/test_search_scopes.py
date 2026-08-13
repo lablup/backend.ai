@@ -130,6 +130,7 @@ class TestSearchDomainScopes:
 
         async with db_with_scope_tables.begin_session() as db_sess:
             for name in domain_names:
+                domain_id = DomainID(uuid.uuid4())
                 domain = DomainRow(
                     id=domain_id,
                     name=name,
@@ -152,6 +153,7 @@ class TestSearchDomainScopes:
 
         async with db_with_scope_tables.begin_session() as db_sess:
             for name in domain_names:
+                domain_id = DomainID(uuid.uuid4())
                 domain = DomainRow(
                     id=domain_id,
                     name=name,
@@ -879,6 +881,7 @@ class TestSearchScopesEmptyResult:
 
         async with db_with_scope_tables.begin_session() as db_sess:
             for name in domain_names:
+                domain_id = DomainID(uuid.uuid4())
                 domain = DomainRow(
                     id=domain_id,
                     name=name,

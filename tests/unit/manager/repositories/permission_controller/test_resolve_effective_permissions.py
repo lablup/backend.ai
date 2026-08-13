@@ -465,6 +465,7 @@ class TestResolveEffectivePermissions:
             "domain": (ScopeType.DOMAIN, fixture_ids.domain_id),
         }
         for entry in request.param:
+            domain_id = DomainID(uuid.uuid4())
             scope_type, scope_id = scope_map[entry.scope_key]
             async with db_with_rbac_tables.begin_session() as db_sess:
                 domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"

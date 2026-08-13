@@ -444,6 +444,7 @@ class TestUserNestedSearchIntegration:
                 (active_domain, True, "Research lab"),
                 (inactive_domain, False, "Archived department"),
             ]:
+                domain_id = DomainID(uuid.uuid4())
                 session.add(
                     DomainRow(
                         id=domain_id,

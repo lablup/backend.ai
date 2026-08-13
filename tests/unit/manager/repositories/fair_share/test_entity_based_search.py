@@ -154,7 +154,6 @@ class TestSearchDomainFairSharesEntityBased:
         """Create a domain with fair share record."""
         domain_id = DomainID(uuid.uuid4())
         domain_name = f"domain-with-record-{uuid.uuid4().hex[:8]}"
-        domain_id = DomainID(uuid.uuid4())
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
@@ -275,6 +274,7 @@ class TestSearchDomainFairSharesEntityBased:
                 )
             domain_ids = [DomainID(uuid.uuid4()), DomainID(uuid.uuid4())]
             for domain_id, domain_name in zip(domain_ids, [domain1, domain2], strict=True):
+                domain_id = DomainID(uuid.uuid4())
                 db_sess.add(
                     DomainRow(
                         id=domain_id,

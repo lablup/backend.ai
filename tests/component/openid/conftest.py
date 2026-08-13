@@ -615,6 +615,9 @@ def insert_user(seed_data: ExtendedAsyncSAEngine) -> Callable[..., Any]:
                     domain_name="default",
                     role=UserRole.USER,
                     resource_policy="default",
+                    domain_id=sa.select(DomainRow.id)
+                    .where(DomainRow.name == "default")
+                    .scalar_subquery(),
                 )
             )
         return user_uuid

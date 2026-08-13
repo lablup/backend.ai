@@ -407,7 +407,6 @@ class TestUserPurgersIntegration:
                 assoc = AssocGroupUserRow(
                     user_id=sample_user.uuid,
                     group_id=group.id,
-                    domain_id=sample_domain.domain_id,
                 )
                 session.add(assoc)
                 associations.append(assoc)

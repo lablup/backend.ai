@@ -420,6 +420,7 @@ class TestDomainNestedSearchIntegration:
                 (domain_alpha, True, "Research lab"),
                 (domain_beta, False, "Archived department"),
             ]:
+                domain_id = DomainID(uuid.uuid4())
                 domain = DomainRow(
                     id=domain_id,
                     name=domain_name,
