@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
@@ -11,6 +12,7 @@ from ai.backend.manager.services.auth.actions.base import AuthAction
 @dataclass
 class ResolveAccessKeyScopeAction(AuthAction):
     requester_access_key: str
+    requester_user_id: UserID
     requester_role: UserRole
     requester_domain: str
     owner_access_key: str | None  # None = self
@@ -29,6 +31,7 @@ class ResolveAccessKeyScopeAction(AuthAction):
 class ResolveAccessKeyScopeResult(BaseActionResult):
     requester_access_key: AccessKey
     owner_access_key: AccessKey
+    owner_user_id: UserID
 
     @override
     def entity_id(self) -> str | None:

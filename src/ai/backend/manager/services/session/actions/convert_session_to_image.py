@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
-from ai.backend.common.types import AccessKey
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionData
@@ -13,7 +13,7 @@ from ai.backend.manager.services.session.base import SessionAction
 @dataclass
 class ConvertSessionToImageAction(SessionAction):
     session_name: str
-    owner_access_key: AccessKey
+    owner_user_id: UserID
     image_name: str
     image_visibility: CustomizedImageVisibilityScope
     image_owner_id: uuid.UUID

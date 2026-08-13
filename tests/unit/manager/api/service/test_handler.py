@@ -16,6 +16,7 @@ import pytest
 from ai.backend.common.dto.manager.model_serving.request import (
     NewServiceRequestModel,
 )
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.api.rest.service.handler import ServiceHandler
@@ -84,6 +85,7 @@ class TestRunValidationUsesKeypairResourcePolicy:
         scope_result = ResolveAccessKeyScopeResult(
             requester_access_key=AccessKey("TESTACCESSKEY01"),
             owner_access_key=AccessKey("TESTACCESSKEY01"),
+            owner_user_id=UserID(uuid.UUID("00000000-0000-0000-0000-000000000001")),
         )
         mock = MagicMock()
         mock.resolve_access_key_scope = MagicMock()

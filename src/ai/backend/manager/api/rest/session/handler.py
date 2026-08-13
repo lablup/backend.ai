@@ -540,6 +540,7 @@ class SessionHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
+                requester_user_id=request["user"]["uuid"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
                 owner_access_key=params.owner_access_key,
@@ -656,6 +657,7 @@ class SessionHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
+                requester_user_id=request["user"]["uuid"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
                 owner_access_key=params.owner_access_key,
@@ -727,6 +729,7 @@ class SessionHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
+                requester_user_id=request["user"]["uuid"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
                 owner_access_key=params.owner_access_key,
@@ -775,6 +778,7 @@ class SessionHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
+                requester_user_id=request["user"]["uuid"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
@@ -793,7 +797,7 @@ class SessionHandler:
         result = await self._session.match_sessions.wait_for_complete(
             MatchSessionsAction(
                 id_or_name_prefix=params.id,
-                owner_access_key=owner_access_key,
+                owner_user_id=scope.owner_user_id,
                 user_id=user.user_id,
             )
         )
@@ -813,6 +817,7 @@ class SessionHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
+                requester_user_id=request["user"]["uuid"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
@@ -861,6 +866,7 @@ class SessionHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
+                requester_user_id=request["user"]["uuid"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
@@ -877,7 +883,7 @@ class SessionHandler:
             result = await self._session.get_session_info.wait_for_complete(
                 GetSessionInfoAction(
                     session_name=session_name,
-                    owner_access_key=owner_access_key,
+                    owner_user_id=scope.owner_user_id,
                 )
             )
         except BackendAIError:
@@ -925,6 +931,7 @@ class SessionHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
+                requester_user_id=request["user"]["uuid"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
                 owner_access_key=params.owner_access_key,
@@ -949,7 +956,7 @@ class SessionHandler:
         result = await self._session.destroy_session.wait_for_complete(
             DestroySessionAction(
                 session_name=session_name,
-                owner_access_key=owner_access_key,
+                owner_user_id=scope.owner_user_id,
                 user_role=user_role,
                 forced=params.forced,
                 recursive=params.recursive,
@@ -972,6 +979,7 @@ class SessionHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
+                requester_user_id=request["user"]["uuid"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
@@ -988,7 +996,7 @@ class SessionHandler:
         result = await self._session.execute_session.wait_for_complete(
             ExecuteSessionAction(
                 session_name=session_name,
-                owner_access_key=owner_access_key,
+                owner_user_id=scope.owner_user_id,
                 api_version=request["api_version"],
                 params=ExecuteSessionActionParams(
                     mode=params.mode,
@@ -1010,6 +1018,7 @@ class SessionHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
+                requester_user_id=request["user"]["uuid"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
@@ -1026,7 +1035,7 @@ class SessionHandler:
             await self._session.interrupt.wait_for_complete(
                 InterruptSessionAction(
                     session_name=session_name,
-                    owner_access_key=owner_access_key,
+                    owner_user_id=scope.owner_user_id,
                 )
             )
         except BackendAIError:
@@ -1049,6 +1058,7 @@ class SessionHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
+                requester_user_id=request["user"]["uuid"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
@@ -1065,7 +1075,7 @@ class SessionHandler:
         action_result = await self._session.complete.wait_for_complete(
             CompleteAction(
                 session_name=session_name,
-                owner_access_key=owner_access_key,
+                owner_user_id=scope.owner_user_id,
                 code=params.code or "",
                 options=params.options or {},
             )
@@ -1124,6 +1134,7 @@ class SessionHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
+                requester_user_id=request["user"]["uuid"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
@@ -1140,7 +1151,7 @@ class SessionHandler:
             await self._session.shutdown_service.wait_for_complete(
                 ShutdownServiceAction(
                     session_name=session_name,
-                    owner_access_key=owner_access_key,
+                    owner_user_id=scope.owner_user_id,
                     service_name=params.service_name,
                 )
             )
@@ -1160,6 +1171,7 @@ class SessionHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
+                requester_user_id=request["user"]["uuid"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
@@ -1176,7 +1188,7 @@ class SessionHandler:
             await self._session.upload_files.wait_for_complete(
                 UploadFilesAction(
                     session_name=session_name,
-                    owner_access_key=owner_access_key,
+                    owner_user_id=scope.owner_user_id,
                     reader=reader,
                 )
             )
@@ -1200,6 +1212,7 @@ class SessionHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
+                requester_user_id=request["user"]["uuid"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
@@ -1216,7 +1229,7 @@ class SessionHandler:
         result = await self._session.download_files.wait_for_complete(
             DownloadFilesAction(
                 user_id=request["user"]["uuid"],
-                owner_access_key=owner_access_key,
+                owner_user_id=scope.owner_user_id,
                 session_name=session_name,
                 files=params.files,
             )
@@ -1238,6 +1251,7 @@ class SessionHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
+                requester_user_id=request["user"]["uuid"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
@@ -1255,7 +1269,7 @@ class SessionHandler:
             DownloadFileAction(
                 user_id=request["user"]["uuid"],
                 session_name=session_name,
-                owner_access_key=owner_access_key,
+                owner_user_id=scope.owner_user_id,
                 file=params.file,
             )
         )
@@ -1276,6 +1290,7 @@ class SessionHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
+                requester_user_id=request["user"]["uuid"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
@@ -1294,7 +1309,7 @@ class SessionHandler:
                 user_id=request["user"]["uuid"],
                 path=params.path,
                 session_name=session_name,
-                owner_access_key=owner_access_key,
+                owner_user_id=scope.owner_user_id,
             )
         )
         return APIResponse.build(HTTPStatus.OK, ListFilesResponse(dict(result.result)))
@@ -1315,6 +1330,7 @@ class SessionHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
+                requester_user_id=request["user"]["uuid"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
@@ -1332,7 +1348,7 @@ class SessionHandler:
             RenameSessionAction(
                 session_name=session_name,
                 new_name=new_name,
-                owner_access_key=owner_access_key,
+                owner_user_id=scope.owner_user_id,
             )
         )
         return web.Response(status=HTTPStatus.NO_CONTENT)
@@ -1352,6 +1368,7 @@ class SessionHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
+                requester_user_id=request["user"]["uuid"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
@@ -1367,7 +1384,7 @@ class SessionHandler:
         action_result = await self._session.commit_session.wait_for_complete(
             CommitSessionAction(
                 session_name=session_name,
-                owner_access_key=owner_access_key,
+                owner_user_id=scope.owner_user_id,
                 filename=params.filename,
             )
         )
@@ -1391,6 +1408,7 @@ class SessionHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
+                requester_user_id=request["user"]["uuid"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
@@ -1406,7 +1424,7 @@ class SessionHandler:
         result = await self._session.convert_session_to_image.wait_for_complete(
             ConvertSessionToImageAction(
                 session_name=session_name,
-                owner_access_key=owner_access_key,
+                owner_user_id=scope.owner_user_id,
                 image_name=params.image_name,
                 image_visibility=params.image_visibility,
                 image_owner_id=request["user"]["uuid"],
@@ -1435,6 +1453,7 @@ class SessionHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
+                requester_user_id=request["user"]["uuid"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
@@ -1453,7 +1472,7 @@ class SessionHandler:
         result = await self._session.get_commit_status.wait_for_complete(
             GetCommitStatusAction(
                 session_name=session_name,
-                owner_access_key=owner_access_key,
+                owner_user_id=scope.owner_user_id,
             )
         )
         return APIResponse.build(
@@ -1475,6 +1494,7 @@ class SessionHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
+                requester_user_id=request["user"]["uuid"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
@@ -1490,7 +1510,7 @@ class SessionHandler:
         result = await self._session.get_abusing_report.wait_for_complete(
             GetAbusingReportAction(
                 session_name=session_name,
-                owner_access_key=owner_access_key,
+                owner_user_id=scope.owner_user_id,
             )
         )
         return APIResponse.build(
@@ -1515,6 +1535,7 @@ class SessionHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
+                requester_user_id=request["user"]["uuid"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
                 owner_access_key=params.owner_access_key,
@@ -1530,7 +1551,7 @@ class SessionHandler:
         result = await self._session.get_status_history.wait_for_complete(
             GetStatusHistoryAction(
                 session_name=session_name,
-                owner_access_key=request["keypair"]["access_key"],
+                owner_user_id=scope.owner_user_id,
             )
         )
         return APIResponse.build(
@@ -1548,16 +1569,16 @@ class SessionHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
+                requester_user_id=request["user"]["uuid"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
             )
         )
-        owner_access_key = scope.owner_access_key
         result = await self._session.get_direct_access_info.wait_for_complete(
             GetDirectAccessInfoAction(
                 session_name=session_name,
-                owner_access_key=owner_access_key,
+                owner_user_id=scope.owner_user_id,
             )
         )
         return APIResponse.build(
@@ -1580,6 +1601,7 @@ class SessionHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
+                requester_user_id=request["user"]["uuid"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
                 owner_access_key=params.owner_access_key,
@@ -1598,7 +1620,7 @@ class SessionHandler:
             result = await self._session.get_container_logs.wait_for_complete(
                 GetContainerLogsAction(
                     session_name=session_name,
-                    owner_access_key=owner_access_key,
+                    owner_user_id=scope.owner_user_id,
                     kernel_id=kernel_id,
                 )
             )
@@ -1642,7 +1664,6 @@ class SessionHandler:
                 domain_name=domain_name,
                 user_role=user_role,
                 kernel_id=KernelId(params.kernel_id),
-                owner_access_key=request["keypair"]["access_key"],
                 request=request,
             )
         )
@@ -1658,6 +1679,7 @@ class SessionHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
+                requester_user_id=request["user"]["uuid"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
                 owner_access_key=None,
@@ -1673,7 +1695,7 @@ class SessionHandler:
         result = await self._session.get_dependency_graph.wait_for_complete(
             GetDependencyGraphAction(
                 root_session_name=root_session_name,
-                owner_access_key=owner_access_key,
+                owner_user_id=scope.owner_user_id,
             )
         )
         return APIResponse.build(

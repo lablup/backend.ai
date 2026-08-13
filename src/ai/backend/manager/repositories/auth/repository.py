@@ -97,7 +97,9 @@ class AuthRepository:
         await self._db_source.modify_ssh_keypair(access_key, public_key, private_key)
 
     @auth_repository_resilience.apply()
-    async def get_delegation_target_by_access_key(self, access_key: str) -> tuple[str, UserRole]:
+    async def get_delegation_target_by_access_key(
+        self, access_key: str
+    ) -> tuple[str, UserRole, UserID]:
         return await self._db_source.fetch_user_info_by_access_key(access_key)
 
     @auth_repository_resilience.apply()

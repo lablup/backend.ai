@@ -20,10 +20,17 @@ class EventsDBSource:
         session_name: str,
         access_key: AccessKey,
     ) -> list[SessionRow]:
+        # The SSE stream is scoped by the owner_access_key wire parameter and
+        # its event filter matches on access_key, so this lookup stays
+        # keypair-scoped unlike the user-scoped SessionRow.match_sessions.
         async with self._db.begin_readonly_session(isolation_level="READ COMMITTED") as db_sess:
-            return await SessionRow.match_sessions(
-                db_sess, session_name, access_key, allow_prefix=False
+            query = (
+                sa.select(SessionRow)
+                .where((SessionRow.name == session_name) & (SessionRow.access_key == access_key))
+                .order_by(sa.desc(SessionRow.created_at))
+                .limit(10)
             )
+            return list((await db_sess.scalars(query)).all())
 
     async def resolve_group_id(self, group_name: str) -> uuid.UUID:
         async with self._db.begin_readonly(isolation_level="READ COMMITTED") as conn:

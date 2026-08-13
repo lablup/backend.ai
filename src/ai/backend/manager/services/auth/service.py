@@ -727,12 +727,14 @@ class AuthService:
             return ResolveAccessKeyScopeResult(
                 requester_access_key=requester_ak,
                 owner_access_key=requester_ak,
+                owner_user_id=action.requester_user_id,
             )
         owner_ak = AccessKey(action.owner_access_key)
         try:
             (
                 owner_domain,
                 owner_role,
+                owner_user_id,
             ) = await self._auth_repository.get_delegation_target_by_access_key(
                 action.owner_access_key,
             )
@@ -750,6 +752,7 @@ class AuthService:
         return ResolveAccessKeyScopeResult(
             requester_access_key=requester_ak,
             owner_access_key=owner_ak,
+            owner_user_id=owner_user_id,
         )
 
     async def resolve_user_id_by_access_key(

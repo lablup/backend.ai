@@ -73,6 +73,7 @@ from ai.backend.common.dto.manager.v2.session.response import (
 from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum, SessionStatusFilter
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.session import SessionID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     AccessKey,
@@ -1011,12 +1012,12 @@ class SessionAdapter(BaseAdapter):
         self,
         session_id: UUID,
         input: ShutdownSessionServiceInput,
-        access_key: str,
+        user_id: UserID,
     ) -> None:
         """Shut down a service in a session."""
         action = ShutdownServiceAction(
             session_name=str(session_id),
-            owner_access_key=AccessKey(access_key),
+            owner_user_id=user_id,
             service_name=input.service,
         )
         await self._processors.session.shutdown_service.wait_for_complete(action)
@@ -1028,13 +1029,13 @@ class SessionAdapter(BaseAdapter):
     async def get_logs(
         self,
         session_id: UUID,
-        access_key: str,
+        user_id: UserID,
         kernel_id: UUID | None = None,
     ) -> SessionLogsPayload:
         """Get container logs for a session."""
         action = GetContainerLogsAction(
             session_name=str(session_id),
-            owner_access_key=AccessKey(access_key),
+            owner_user_id=user_id,
             kernel_id=KernelId(kernel_id) if kernel_id else None,
         )
         result = await self._processors.session.get_container_logs.wait_for_complete(action)
@@ -1049,14 +1050,14 @@ class SessionAdapter(BaseAdapter):
         self,
         session_id: UUID,
         input: UpdateSessionInput,
-        access_key: str,
+        user_id: UserID,
     ) -> UpdateSessionPayload:
         """Update session fields (currently supports rename only)."""
         if input.name is not None:
             action = RenameSessionAction(
                 session_name=str(session_id),
                 new_name=input.name,
-                owner_access_key=AccessKey(access_key),
+                owner_user_id=user_id,
             )
             result = await self._processors.session.rename_session.wait_for_complete(action)
             return UpdateSessionPayload(session=self._session_data_to_node(result.session_data))

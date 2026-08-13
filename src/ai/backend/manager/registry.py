@@ -74,6 +74,7 @@ from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.session import SessionID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
@@ -533,7 +534,7 @@ class AgentRegistry:
                 sess = await SessionRow.get_session(
                     db_session,
                     session_name,
-                    owner_access_key,
+                    UserID(user_scope.user_uuid),
                     kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                 )
                 if sess.main_kernel.image is None:
@@ -763,7 +764,7 @@ class AgentRegistry:
                 await SessionRow.get_session(
                     db_sess,
                     session_name,
-                    owner_access_key,
+                    UserID(user_scope.user_uuid),
                 )
         except SessionNotFound:
             pass
@@ -1632,7 +1633,6 @@ class AgentRegistry:
     async def download_single(
         self,
         session: SessionRow,
-        _access_key: AccessKey,
         filepath: str,
     ) -> bytes:
         kernel = session.main_kernel

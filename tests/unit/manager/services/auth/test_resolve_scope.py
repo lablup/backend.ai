@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.models.user import UserRole
@@ -58,6 +59,7 @@ class TestResolveAccessKeyScope:
     ) -> None:
         action = ResolveAccessKeyScopeAction(
             requester_access_key=REQUESTER_AK,
+            requester_user_id=UserID(REQUESTER_UUID),
             requester_role=UserRole.USER,
             requester_domain="default",
             owner_access_key=None,
@@ -65,6 +67,7 @@ class TestResolveAccessKeyScope:
         result = await auth_service.resolve_access_key_scope(action)
         assert result.requester_access_key == AccessKey(REQUESTER_AK)
         assert result.owner_access_key == AccessKey(REQUESTER_AK)
+        assert result.owner_user_id == UserID(REQUESTER_UUID)
 
     async def test_owner_equals_requester_returns_same_key(
         self,
@@ -72,6 +75,7 @@ class TestResolveAccessKeyScope:
     ) -> None:
         action = ResolveAccessKeyScopeAction(
             requester_access_key=REQUESTER_AK,
+            requester_user_id=UserID(REQUESTER_UUID),
             requester_role=UserRole.ADMIN,
             requester_domain="default",
             owner_access_key=REQUESTER_AK,
@@ -87,9 +91,11 @@ class TestResolveAccessKeyScope:
         mock_auth_repository.get_delegation_target_by_access_key.return_value = (
             "default",
             UserRole.ADMIN,
+            UserID(OWNER_UUID),
         )
         action = ResolveAccessKeyScopeAction(
             requester_access_key=REQUESTER_AK,
+            requester_user_id=UserID(REQUESTER_UUID),
             requester_role=UserRole.USER,
             requester_domain="default",
             owner_access_key=OWNER_AK,
@@ -107,6 +113,7 @@ class TestResolveAccessKeyScope:
         )
         action = ResolveAccessKeyScopeAction(
             requester_access_key=REQUESTER_AK,
+            requester_user_id=UserID(REQUESTER_UUID),
             requester_role=UserRole.SUPERADMIN,
             requester_domain="default",
             owner_access_key="NONEXISTENT_KEY",
@@ -122,9 +129,11 @@ class TestResolveAccessKeyScope:
         mock_auth_repository.get_delegation_target_by_access_key.return_value = (
             "other-domain",
             UserRole.USER,
+            UserID(OWNER_UUID),
         )
         action = ResolveAccessKeyScopeAction(
             requester_access_key=REQUESTER_AK,
+            requester_user_id=UserID(REQUESTER_UUID),
             requester_role=UserRole.ADMIN,
             requester_domain="default",
             owner_access_key=OWNER_AK,

@@ -649,6 +649,7 @@ class ServiceHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
+                requester_user_id=request["user"]["uuid"],
                 requester_role=request["user"]["role"],
                 requester_domain=request["user"]["domain_name"],
                 owner_access_key=params.owner_access_key,

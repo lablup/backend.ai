@@ -5,7 +5,6 @@ from typing import Any, override
 
 from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
 from ai.backend.common.types import (
-    AccessKey,
     KernelId,
     QuotaScopeID,
     VFolderUsageMode,
@@ -566,7 +565,6 @@ class GetTaskLogsAction(VFolderSingleEntityAction):
     domain_name: str
     user_role: UserRole
     kernel_id: KernelId
-    owner_access_key: AccessKey
 
     # TODO: Remove this.
     request: Any

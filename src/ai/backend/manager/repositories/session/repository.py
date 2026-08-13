@@ -10,6 +10,7 @@ from sqlalchemy.orm.strategy_options import _AbstractLoad
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.session import SessionID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -86,14 +87,14 @@ class SessionRepository:
     async def get_session_validated(
         self,
         session_name_or_id: str | SessionId,
-        owner_access_key: AccessKey,
+        owner_user_id: UserID,
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
         eager_loading_op: Sequence[_AbstractLoad] | None = None,
     ) -> SessionRow:
         return await self._db_source.get_session_validated(
             session_name_or_id,
-            owner_access_key,
+            owner_user_id,
             kernel_loading_strategy,
             allow_stale,
             eager_loading_op,
@@ -103,9 +104,9 @@ class SessionRepository:
     async def match_sessions(
         self,
         id_or_name_prefix: str,
-        owner_access_key: AccessKey,
+        owner_user_id: UserID,
     ) -> list[SessionRow]:
-        return await self._db_source.match_sessions(id_or_name_prefix, owner_access_key)
+        return await self._db_source.match_sessions(id_or_name_prefix, owner_user_id)
 
     @session_repository_resilience.apply()
     async def get_template_by_id(
@@ -126,10 +127,10 @@ class SessionRepository:
         self,
         session_name_or_id: str | SessionId,
         new_name: str,
-        owner_access_key: AccessKey,
+        owner_user_id: UserID,
     ) -> SessionRow:
         return await self._db_source.update_session_name(
-            session_name_or_id, new_name, owner_access_key
+            session_name_or_id, new_name, owner_user_id
         )
 
     @session_repository_resilience.apply()
@@ -232,40 +233,40 @@ class SessionRepository:
     async def get_target_session_ids(
         self,
         session_name_or_id: str | uuid.UUID,
-        access_key: AccessKey,
+        owner_user_id: UserID,
         recursive: bool = False,
     ) -> list[SessionId]:
         """
         Get list of session IDs including dependent sessions if recursive.
 
         :param session_name_or_id: Name or ID of the primary session
-        :param access_key: Access key of the session owner
+        :param owner_user_id: UUID of the session owner
         :param recursive: If True, include dependent sessions
         :return: List of session IDs
         """
         return await self._db_source.get_target_session_ids(
-            session_name_or_id, access_key, recursive
+            session_name_or_id, owner_user_id, recursive
         )
 
     @session_repository_resilience.apply()
     async def find_dependency_sessions(
         self,
         session_name_or_id: uuid.UUID | str,
-        access_key: AccessKey,
+        owner_user_id: UserID,
     ) -> dict[str, list[Any] | str]:
-        return await self._db_source.find_dependency_sessions(session_name_or_id, access_key)
+        return await self._db_source.find_dependency_sessions(session_name_or_id, owner_user_id)
 
     @session_repository_resilience.apply()
     async def get_session_with_group(
         self,
         session_name_or_id: str | SessionId,
-        owner_access_key: AccessKey,
+        owner_user_id: UserID,
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
     ) -> SessionRow:
         """Get session with group information eagerly loaded"""
         return await self._db_source.get_session_with_group(
-            session_name_or_id, owner_access_key, kernel_loading_strategy, allow_stale
+            session_name_or_id, owner_user_id, kernel_loading_strategy, allow_stale
         )
 
     @session_repository_resilience.apply()

@@ -270,14 +270,14 @@ class AuthDBSource:
         )
 
     @auth_db_source_resilience.apply()
-    async def fetch_user_info_by_access_key(self, access_key: str) -> tuple[str, UserRole]:
-        """Join keypairs→users to get (domain_name, role) for the owner of *access_key*.
+    async def fetch_user_info_by_access_key(self, access_key: str) -> tuple[str, UserRole, UserID]:
+        """Join keypairs→users to get (domain_name, role, user_id) for the owner of *access_key*.
 
         Raises ``ValueError`` if the access key is unknown.
         """
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select(users.c.domain_name, users.c.role)
+                sa.select(users.c.domain_name, users.c.role, users.c.uuid)
                 .select_from(sa.join(keypairs, users, keypairs.c.user == users.c.uuid))
                 .where(keypairs.c.access_key == access_key)
             )
@@ -285,7 +285,7 @@ class AuthDBSource:
             row = result.first()
             if row is None:
                 raise ValueError("Unknown owner access key")
-            return row.domain_name, row.role
+            return row.domain_name, row.role, UserID(row.uuid)
 
     @auth_db_source_resilience.apply()
     async def fetch_user_id_by_access_key(self, access_key: AccessKey) -> UserID:

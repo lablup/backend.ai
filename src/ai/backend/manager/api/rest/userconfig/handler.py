@@ -30,6 +30,7 @@ from ai.backend.common.dto.manager.config.response import (
     UpdateBootstrapScriptResponse,
     UpdateDotfileResponse,
 )
+from ai.backend.common.identifier.user import UserID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.dotfile.types import DotfileScope
 from ai.backend.manager.dto.context import UserContext
@@ -66,6 +67,7 @@ class UserConfigHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=ctx.access_key,
+                requester_user_id=UserID(ctx.user_uuid),
                 requester_role=ctx.user_role,
                 requester_domain=ctx.user_domain,
                 owner_access_key=params.owner_access_key,
@@ -100,6 +102,7 @@ class UserConfigHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=ctx.access_key,
+                requester_user_id=UserID(ctx.user_uuid),
                 requester_role=ctx.user_role,
                 requester_domain=ctx.user_domain,
                 owner_access_key=params.owner_access_key,
@@ -140,6 +143,7 @@ class UserConfigHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=ctx.access_key,
+                requester_user_id=UserID(ctx.user_uuid),
                 requester_role=ctx.user_role,
                 requester_domain=ctx.user_domain,
                 owner_access_key=params.owner_access_key,
@@ -173,6 +177,7 @@ class UserConfigHandler:
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=ctx.access_key,
+                requester_user_id=UserID(ctx.user_uuid),
                 requester_role=ctx.user_role,
                 requester_domain=ctx.user_domain,
                 owner_access_key=params.owner_access_key,

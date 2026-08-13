@@ -38,6 +38,7 @@ from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.session_group import SessionGroupID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -243,7 +244,7 @@ async def handle_session_exception(
 
 def _build_session_fetch_query(
     base_cond: Any,
-    access_key: AccessKey | None = None,
+    owner_user_id: UserID | None = None,
     *,
     allow_stale: bool = True,
     for_update: bool = False,
@@ -252,8 +253,8 @@ def _build_session_fetch_query(
     eager_loading_op: Sequence[_AbstractLoad] | None = None,
 ) -> sa.sql.Select[Any]:
     cond = base_cond
-    if access_key:
-        cond = cond & (SessionRow.access_key == access_key)
+    if owner_user_id is not None:
+        cond = cond & (SessionRow.user_uuid == owner_user_id)
     if not allow_stale:
         cond = cond & (~SessionRow.status.in_(DEAD_SESSION_STATUSES))
     query = (
@@ -277,7 +278,7 @@ def _build_session_fetch_query(
 async def _match_sessions_by_id(
     db_session: SASession,
     session_id_or_list: SessionId | list[SessionId],
-    access_key: AccessKey | None = None,
+    owner_user_id: UserID | None = None,
     *,
     allow_prefix: bool = False,
     allow_stale: bool = True,
@@ -295,7 +296,7 @@ async def _match_sessions_by_id(
             cond = SessionRow.id == session_id_or_list
     query = _build_session_fetch_query(
         cond,
-        access_key,
+        owner_user_id,
         max_matches=max_matches,
         allow_stale=allow_stale,
         for_update=for_update,
@@ -309,7 +310,7 @@ async def _match_sessions_by_id(
 async def _match_sessions_by_name(
     db_session: SASession,
     session_name: str,
-    access_key: AccessKey,
+    owner_user_id: UserID | None = None,
     *,
     allow_prefix: bool = False,
     allow_stale: bool = True,
@@ -324,7 +325,7 @@ async def _match_sessions_by_name(
         cond = SessionRow.name == session_name
     query = _build_session_fetch_query(
         cond,
-        access_key,
+        owner_user_id,
         max_matches=max_matches,
         allow_stale=allow_stale,
         for_update=for_update,
@@ -942,7 +943,7 @@ class SessionRow(CreatedAtMixin, Base):
         cls,
         db_session: SASession,
         session_reference: str | UUID | list[UUID],
-        access_key: AccessKey | None,
+        owner_user_id: UserID | None,
         *,
         allow_prefix: bool = False,
         allow_stale: bool = True,
@@ -952,7 +953,7 @@ class SessionRow(CreatedAtMixin, Base):
     ) -> list[SessionRow]:
         """
         Match the prefix of session ID or session name among the sessions
-        that belongs to the given access key, and return the list of SessionRow.
+        owned by the given user, and return the list of SessionRow.
         """
 
         if isinstance(session_reference, list):
@@ -997,7 +998,7 @@ class SessionRow(CreatedAtMixin, Base):
         for fetch_func in query_list:
             rows = await fetch_func(
                 db_session,
-                access_key=access_key,
+                owner_user_id=owner_user_id,
                 allow_stale=allow_stale,
                 for_update=for_update,
                 max_matches=max_matches,
@@ -1013,7 +1014,7 @@ class SessionRow(CreatedAtMixin, Base):
         cls,
         db_session: SASession,
         session_name_or_id: str | UUID,
-        access_key: AccessKey | None = None,
+        owner_user_id: UserID | None = None,
         *,
         allow_stale: bool = False,
         for_update: bool = False,
@@ -1022,12 +1023,12 @@ class SessionRow(CreatedAtMixin, Base):
     ) -> SessionRow:
         """
         Retrieve the session information by session's UUID,
-        or session's name paired with access_key.
+        or session's name paired with the owner's user ID.
         This will return the information of the session and the sibling kernel(s).
 
         :param db_session: Database connection to use when fetching row.
         :param session_name_or_id: Name or ID (UUID) of session to look up.
-        :param access_key: Access key used to create session.
+        :param owner_user_id: UUID of the user who owns the session.
         :param allow_stale: If set to True, filter "inactive" sessions as well as "active" ones.
                             Otherwise filter "active" sessions only.
         :param for_update: Apply for_update during executing select query.
@@ -1059,7 +1060,7 @@ class SessionRow(CreatedAtMixin, Base):
         session_list = await cls.match_sessions(
             db_session,
             session_name_or_id,
-            access_key,
+            owner_user_id,
             allow_stale=allow_stale,
             for_update=for_update,
             eager_loading_op=_eager_loading_op,
@@ -1084,7 +1085,7 @@ class SessionRow(CreatedAtMixin, Base):
         cls,
         db_session: SASession,
         session_ids: list[UUID],
-        access_key: AccessKey | None = None,
+        owner_user_id: UserID | None = None,
         *,
         allow_stale: bool = False,
         for_update: bool = False,
@@ -1116,7 +1117,7 @@ class SessionRow(CreatedAtMixin, Base):
         session_list = await cls.match_sessions(
             db_session,
             session_ids,
-            access_key,
+            owner_user_id,
             allow_stale=allow_stale,
             for_update=for_update,
             eager_loading_op=_eager_loading_op,
@@ -1132,7 +1133,7 @@ class SessionRow(CreatedAtMixin, Base):
         cls,
         db_session: SASession,
         session_id: SessionId,
-        access_key: AccessKey | None = None,
+        owner_user_id: UserID | None = None,
         *,
         max_matches: int | None = None,
         allow_stale: bool = True,
@@ -1142,7 +1143,7 @@ class SessionRow(CreatedAtMixin, Base):
         sessions = await _match_sessions_by_id(
             db_session,
             session_id,
-            access_key,
+            owner_user_id,
             max_matches=max_matches,
             allow_stale=allow_stale,
             for_update=for_update,

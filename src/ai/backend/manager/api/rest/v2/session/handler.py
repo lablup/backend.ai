@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.v2.session.request import (
     SessionIdPathParam as SessionIdPathParamDTO,
 )
 from ai.backend.common.identifier.session import SessionID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AgentId, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import (
@@ -166,7 +167,7 @@ class V2SessionHandler:
     ) -> APIResponse:
         """Shut down a service in a session."""
         await self._adapter.shutdown_service(
-            path.parsed.session_id, body.parsed, access_key=user_ctx.access_key
+            path.parsed.session_id, body.parsed, user_id=UserID(user_ctx.user_uuid)
         )
         return APIResponse.no_content(status_code=HTTPStatus.NO_CONTENT)
 
@@ -179,7 +180,7 @@ class V2SessionHandler:
         """Get container logs for a session."""
         result = await self._adapter.get_logs(
             path.parsed.session_id,
-            access_key=user_ctx.access_key,
+            user_id=UserID(user_ctx.user_uuid),
             kernel_id=query.parsed.kernel_id,
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
@@ -192,6 +193,6 @@ class V2SessionHandler:
     ) -> APIResponse:
         """Update a session."""
         result = await self._adapter.update(
-            path.parsed.session_id, body.parsed, access_key=user_ctx.access_key
+            path.parsed.session_id, body.parsed, user_id=UserID(user_ctx.user_uuid)
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
