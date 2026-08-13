@@ -55,7 +55,7 @@ class TestLoginClientTypeService:
             name="webui",
             description="Backend.AI web console.",
             created_at=datetime.now(UTC),
-            modified_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
 
     @pytest.fixture
@@ -188,7 +188,7 @@ class TestLoginClientTypeAdminService:
             name="webui",
             description="Backend.AI web console.",
             created_at=datetime.now(UTC),
-            modified_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
 
     @pytest.fixture
