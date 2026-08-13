@@ -116,11 +116,6 @@ class _RegistryWithGroups:
     group_ids: list[UUID]
 
 
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
-
-
 class TestContainerRegistryRepository:
     """Integration tests for ContainerRegistryRepository using real database"""
 
@@ -438,7 +433,8 @@ class TestContainerRegistryRepository:
 
     @pytest.fixture
     async def creator_spec_with_allowed_groups(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: DomainID
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> tuple[ContainerRegistryCreatorSpec, list[str]]:
         """Fixture that provides a creator spec with allowed_groups for creating registries."""
         registry_name = "registry-with-groups-" + str(uuid.uuid4())[:8]
@@ -450,6 +446,7 @@ class TestContainerRegistryRepository:
         group_ids: list[str] = []
         async with db_with_cleanup.begin_session() as session:
             # Create domain
+            domain_id = DomainID(uuid.uuid4())
             domain = DomainRow(
                 id=domain_id,
                 name=domain_name,

@@ -62,11 +62,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
-
-
 class TestModelCardScanResourceRequirements:
     """Verify scan upsert syncs the normalized requirements table.
 
@@ -125,9 +120,9 @@ class TestModelCardScanResourceRequirements:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> DomainRow:
         async with db_with_cleanup.begin_session() as db_sess:
+            domain_id = DomainID(uuid.uuid4())
             domain = DomainRow(
                 id=domain_id,
                 name=f"test-domain-{uuid.uuid4().hex[:8]}",

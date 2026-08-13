@@ -68,11 +68,6 @@ class _ProjectWithMixedRegistries:
     scoped_registry_id: uuid.UUID
 
 
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
-
-
 class TestProjectReportDefinition:
     """Tests for PROJECT_REPORT definition."""
 
@@ -769,7 +764,6 @@ class TestProjectExportExecuteStreamingDB:
     async def project_with_rg_and_registry(
         self,
         db_engine: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> AsyncGenerator[_ProjectWithRgAndRegistry, None]:
         """Create a project associated with a scaling group and a container registry."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -780,6 +774,7 @@ class TestProjectExportExecuteStreamingDB:
         registry_id = uuid.uuid4()
 
         async with db_engine.begin_session() as db_sess:
+            domain_id = DomainID(uuid.uuid4())
             db_sess.add(
                 DomainRow(
                     id=domain_id,
@@ -1041,7 +1036,6 @@ class TestGlobalContainerRegistryExport:
     async def project_with_mixed_registries(
         self,
         db_engine: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> AsyncGenerator[_ProjectWithMixedRegistries, None]:
         """Create two projects: one with both global and scoped registries, one with no associations.
 
@@ -1056,6 +1050,7 @@ class TestGlobalContainerRegistryExport:
         scoped_registry_id = uuid.uuid4()
 
         async with db_engine.begin_session() as db_sess:
+            domain_id = DomainID(uuid.uuid4())
             db_sess.add(
                 DomainRow(
                     id=domain_id,

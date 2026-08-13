@@ -248,9 +248,9 @@ class TestSearchDomainFairSharesEntityBased:
     async def two_scaling_groups_with_domains(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> TwoScalingGroupsFixture:
         """Create two scaling groups, each with one domain."""
+        domain_id = DomainID(uuid.uuid4())
         rg1 = f"rg1-{uuid.uuid4().hex[:8]}"
         rg2 = f"rg2-{uuid.uuid4().hex[:8]}"
         domain1 = f"domain1-{uuid.uuid4().hex[:8]}"
@@ -531,7 +531,6 @@ class TestSearchDomainFairSharesEntityBased:
         fair_share_repository: FairShareRepository,
         scaling_group: str,
         domain_without_record: str,
-        domain_id: DomainID,
     ) -> None:
         """RG-context domain_name filter should include entities without fair share records.
 
@@ -607,9 +606,9 @@ class TestSearchDomainFairSharesEntityBased:
     async def domain_not_in_rg(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> str:
         """Create a domain NOT associated with any scaling group."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"no-rg-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(

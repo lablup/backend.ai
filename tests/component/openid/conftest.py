@@ -85,11 +85,6 @@ IDP_ISSUER = "https://idp.example.com"
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
-
-
 @pytest.fixture(scope="session")
 def oidc_rsa_key() -> dict[str, Any]:
     """RSA private key used by the mock IdP to sign ID tokens."""
@@ -409,7 +404,6 @@ async def database_engine(
 @pytest.fixture
 async def seed_data(
     database_engine: ExtendedAsyncSAEngine,
-    domain_id: DomainID,
 ) -> AsyncIterator[ExtendedAsyncSAEngine]:
     """
     Insert the minimum seed data that the openid plugin's DB operations
@@ -417,6 +411,7 @@ async def seed_data(
     Yields the database_engine for convenience.
     """
     async with database_engine.begin_session() as sess:
+        domain_id = DomainID(uuid.uuid4())
         sess.add(
             DomainRow(
                 id=domain_id,

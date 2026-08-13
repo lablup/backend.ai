@@ -415,9 +415,9 @@ class TestFairShareRepository:
         fair_share_repository: FairShareRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group: str,
-        domain_id: DomainID,
     ) -> None:
         """Test searching domain fair shares with BatchQuerier"""
+        domain_id = DomainID(uuid.uuid4())
         # Create multiple domain fair shares
         domain_names = [f"domain-{i}-{uuid.uuid4().hex[:8]}" for i in range(3)]
 
@@ -626,13 +626,13 @@ class TestFairShareRepository:
         self,
         fair_share_repository: FairShareRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> None:
         """Test upsert domain fair share when scaling group does not exist.
 
         Regression test for BA-4683: fair share weight updates should succeed
         regardless of resource group membership.
         """
+        domain_id = DomainID(uuid.uuid4())
         non_existent_sg = f"non-existent-sg-{uuid.uuid4().hex[:8]}"
         non_existent_sg_id = ResourceGroupID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
@@ -763,9 +763,9 @@ class TestFairShareRepository:
     async def domain_not_in_rg(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> str:
         """Create a domain NOT associated with any scaling group."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"no-rg-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:

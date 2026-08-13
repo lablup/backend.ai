@@ -18,6 +18,7 @@ from ai.backend.manager.models.resource_usage_history import (
     UserUsageBucketRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 class TestDomainUsageBucketRow:
@@ -56,13 +57,13 @@ class TestDomainUsageBucketRow:
         self,
         database_with_usage_tables: ExtendedAsyncSAEngine,
         domain_usage_bucket_id: uuid.UUID,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         scaling_group: str,
         resource_group_id: ResourceGroupID,
     ) -> None:
         """Duplicate (domain_name, resource_group_id, period_start) should raise IntegrityError."""
         duplicate = DomainUsageBucketRow(
-            domain_name=domain_name,
+            domain_name=domain_fixture.domain_name,
             resource_group=scaling_group,
             resource_group_id=resource_group_id,
             period_start=date(2024, 1, 1),
@@ -100,14 +101,14 @@ class TestProjectUsageBucketRow:
         database_with_usage_tables: ExtendedAsyncSAEngine,
         project_usage_bucket_id: uuid.UUID,
         project_id: uuid.UUID,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         scaling_group: str,
         resource_group_id: ResourceGroupID,
     ) -> None:
         """Duplicate (project_id, resource_group_id, period_start) should raise IntegrityError."""
         duplicate = ProjectUsageBucketRow(
             project_id=project_id,
-            domain_name=domain_name,
+            domain_name=domain_fixture.domain_name,
             resource_group=scaling_group,
             resource_group_id=resource_group_id,
             period_start=date(2024, 1, 1),
@@ -148,7 +149,7 @@ class TestUserUsageBucketRow:
         user_usage_bucket_id: uuid.UUID,
         user_uuid: uuid.UUID,
         project_id: uuid.UUID,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         scaling_group: str,
         resource_group_id: ResourceGroupID,
     ) -> None:
@@ -156,7 +157,7 @@ class TestUserUsageBucketRow:
         duplicate = UserUsageBucketRow(
             user_uuid=user_uuid,
             project_id=project_id,
-            domain_name=domain_name,
+            domain_name=domain_fixture.domain_name,
             resource_group=scaling_group,
             resource_group_id=resource_group_id,
             period_start=date(2024, 1, 1),

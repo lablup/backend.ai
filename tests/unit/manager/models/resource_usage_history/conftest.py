@@ -65,7 +65,7 @@ async def database_with_usage_tables(
 
 
 @pytest.fixture
-async def domain_name(
+async def domain_fixture(
     database_with_usage_tables: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[DomainFixtureData, None]:
     domain_id = DomainID(uuid.uuid4())
@@ -146,7 +146,7 @@ async def project_resource_policy(
 @pytest.fixture
 async def user_uuid(
     database_with_usage_tables: ExtendedAsyncSAEngine,
-    domain_name: DomainFixtureData,
+    domain_fixture: DomainFixtureData,
     user_resource_policy: str,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create UserRow and return its UUID."""
@@ -164,9 +164,9 @@ async def user_uuid(
                 username="testuser",
                 email="test@example.com",
                 password=password_info,
-                domain_name=domain_name.domain_name,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=user_resource_policy,
-                domain_id=domain_name.domain_id,
+                domain_id=domain_fixture.domain_id,
             )
         )
     yield user_id
@@ -175,7 +175,7 @@ async def user_uuid(
 @pytest.fixture
 async def project_id(
     database_with_usage_tables: ExtendedAsyncSAEngine,
-    domain_name: DomainFixtureData,
+    domain_fixture: DomainFixtureData,
     project_resource_policy: str,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create GroupRow and return its ID."""
@@ -185,7 +185,7 @@ async def project_id(
             GroupRow(
                 id=group_id,
                 name="test-project",
-                domain_name=domain_name.domain_name,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=project_resource_policy,
             )
         )
@@ -195,13 +195,13 @@ async def project_id(
 @pytest.fixture
 async def domain_usage_bucket_id(
     database_with_usage_tables: ExtendedAsyncSAEngine,
-    domain_name: DomainFixtureData,
+    domain_fixture: DomainFixtureData,
     scaling_group: str,
     resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create DomainUsageBucketRow and return its ID."""
     row = DomainUsageBucketRow(
-        domain_name=domain_name.domain_name,
+        domain_name=domain_fixture.domain_name,
         resource_group=scaling_group,
         resource_group_id=resource_group_id,
         period_start=date(2024, 1, 1),
@@ -220,13 +220,13 @@ async def domain_usage_bucket_id(
 @pytest.fixture
 async def domain_usage_bucket_with_capacity_id(
     database_with_usage_tables: ExtendedAsyncSAEngine,
-    domain_name: DomainFixtureData,
+    domain_fixture: DomainFixtureData,
     scaling_group: str,
     resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create DomainUsageBucketRow with capacity snapshot and return its ID."""
     row = DomainUsageBucketRow(
-        domain_name=domain_name.domain_name,
+        domain_name=domain_fixture.domain_name,
         resource_group=scaling_group,
         resource_group_id=resource_group_id,
         period_start=date(2024, 1, 1),
@@ -253,14 +253,14 @@ async def domain_usage_bucket_with_capacity_id(
 async def project_usage_bucket_id(
     database_with_usage_tables: ExtendedAsyncSAEngine,
     project_id: uuid.UUID,
-    domain_name: DomainFixtureData,
+    domain_fixture: DomainFixtureData,
     scaling_group: str,
     resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create ProjectUsageBucketRow and return its ID."""
     row = ProjectUsageBucketRow(
         project_id=project_id,
-        domain_name=domain_name.domain_name,
+        domain_name=domain_fixture.domain_name,
         resource_group=scaling_group,
         resource_group_id=resource_group_id,
         period_start=date(2024, 1, 1),
@@ -281,7 +281,7 @@ async def user_usage_bucket_id(
     database_with_usage_tables: ExtendedAsyncSAEngine,
     user_uuid: uuid.UUID,
     project_id: uuid.UUID,
-    domain_name: DomainFixtureData,
+    domain_fixture: DomainFixtureData,
     scaling_group: str,
     resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
@@ -289,7 +289,7 @@ async def user_usage_bucket_id(
     row = UserUsageBucketRow(
         user_uuid=user_uuid,
         project_id=project_id,
-        domain_name=domain_name.domain_name,
+        domain_name=domain_fixture.domain_name,
         resource_group=scaling_group,
         resource_group_id=resource_group_id,
         period_start=date(2024, 1, 1),
@@ -310,7 +310,7 @@ async def kernel_usage_record_id(
     database_with_usage_tables: ExtendedAsyncSAEngine,
     user_uuid: uuid.UUID,
     project_id: uuid.UUID,
-    domain_name: DomainFixtureData,
+    domain_fixture: DomainFixtureData,
     scaling_group: str,
     resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[tuple[uuid.UUID, uuid.UUID, uuid.UUID], None]:
@@ -324,7 +324,7 @@ async def kernel_usage_record_id(
         session_id=session_id,
         user_uuid=user_uuid,
         project_id=project_id,
-        domain_name=domain_name.domain_name,
+        domain_name=domain_fixture.domain_name,
         resource_group=scaling_group,
         resource_group_id=resource_group_id,
         period_start=now,
@@ -343,7 +343,7 @@ async def kernel_usage_record_with_usage_id(
     database_with_usage_tables: ExtendedAsyncSAEngine,
     user_uuid: uuid.UUID,
     project_id: uuid.UUID,
-    domain_name: DomainFixtureData,
+    domain_fixture: DomainFixtureData,
     scaling_group: str,
     resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
@@ -353,7 +353,7 @@ async def kernel_usage_record_with_usage_id(
         session_id=uuid.uuid4(),
         user_uuid=user_uuid,
         project_id=project_id,
-        domain_name=domain_name.domain_name,
+        domain_name=domain_fixture.domain_name,
         resource_group=scaling_group,
         resource_group_id=resource_group_id,
         period_start=datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC),

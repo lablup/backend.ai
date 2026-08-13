@@ -1484,9 +1484,9 @@ class TestDeploymentRevisionOperations:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> str:
         """Create test domain and return domain name."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
@@ -2246,9 +2246,9 @@ class TestDeploymentPolicyOperations:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> str:
         """Create test domain and return domain name."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
@@ -2584,8 +2584,8 @@ class TestSearchDeploymentPolicies:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> str:
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
@@ -2971,9 +2971,9 @@ class TestRouteOperations:
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> str:
         """Create test domain and return domain name."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
@@ -3427,9 +3427,9 @@ class TestDeploymentRepositoryDuplicateName:
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> DomainRow:
         """Create test domain."""
+        domain_id = DomainID(uuid.uuid4())
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
                 id=domain_id,
@@ -3750,7 +3750,6 @@ class TestDeploymentRepositoryDuplicateName:
         test_scaling_group: ScalingGroupRow,
         test_user: UserRow,
         test_image_id: uuid.UUID,
-        domain_id: DomainID,
     ) -> None:
         creator = self._create_endpoint_creator(
             name=f"placement-{uuid.uuid4().hex[:8]}",

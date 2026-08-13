@@ -79,11 +79,6 @@ class UserFairShareTestContext:
     existing_weights: dict[uuid.UUID, Decimal]
 
 
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
-
-
 class TestBulkUpsertDomainFairShare:
     """Tests for bulk upsert domain fair share operations."""
 
@@ -124,7 +119,6 @@ class TestBulkUpsertDomainFairShare:
     async def context_all_new_domains(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> DomainFairShareTestContext:
         """Scenario: All domains are new (no existing fair share records)."""
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
@@ -145,6 +139,7 @@ class TestBulkUpsertDomainFairShare:
             db_sess.add(sg)
 
             for name in domain_names:
+                domain_id = DomainID(uuid.uuid4())
                 domain = DomainRow(
                     id=domain_id,
                     name=name,
@@ -168,7 +163,6 @@ class TestBulkUpsertDomainFairShare:
     async def context_all_existing_domains(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> DomainFairShareTestContext:
         """Scenario: All domains already have fair share records."""
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
@@ -190,6 +184,7 @@ class TestBulkUpsertDomainFairShare:
             db_sess.add(sg)
 
             for name in domain_names:
+                domain_id = DomainID(uuid.uuid4())
                 domain = DomainRow(
                     id=domain_id,
                     name=name,
@@ -224,7 +219,6 @@ class TestBulkUpsertDomainFairShare:
     async def context_mixed_domains(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> DomainFairShareTestContext:
         """Scenario: Mix of new and existing domains."""
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
@@ -247,6 +241,7 @@ class TestBulkUpsertDomainFairShare:
             db_sess.add(sg)
 
             for name in domain_names:
+                domain_id = DomainID(uuid.uuid4())
                 domain = DomainRow(
                     id=domain_id,
                     name=name,
@@ -434,7 +429,6 @@ class TestBulkUpsertProjectFairShare:
     async def context_all_new_projects(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> ProjectFairShareTestContext:
         """Scenario: All projects are new (no existing fair share records)."""
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
@@ -455,6 +449,7 @@ class TestBulkUpsertProjectFairShare:
             )
             db_sess.add(sg)
 
+            domain_id = DomainID(uuid.uuid4())
             domain = DomainRow(
                 id=domain_id,
                 name=domain_name,
@@ -500,7 +495,6 @@ class TestBulkUpsertProjectFairShare:
     async def context_all_existing_projects(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> ProjectFairShareTestContext:
         """Scenario: All projects already have fair share records."""
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
@@ -522,6 +516,7 @@ class TestBulkUpsertProjectFairShare:
             )
             db_sess.add(sg)
 
+            domain_id = DomainID(uuid.uuid4())
             domain = DomainRow(
                 id=domain_id,
                 name=domain_name,
@@ -710,6 +705,7 @@ class TestBulkUpsertUserFairShare:
             )
             db_sess.add(sg)
 
+            domain_id = DomainID(uuid.uuid4())
             domain = DomainRow(
                 id=domain_id,
                 name=domain_name,
@@ -810,6 +806,7 @@ class TestBulkUpsertUserFairShare:
             )
             db_sess.add(sg)
 
+            domain_id = DomainID(uuid.uuid4())
             domain = DomainRow(
                 id=domain_id,
                 name=domain_name,
@@ -922,6 +919,7 @@ class TestBulkUpsertUserFairShare:
             )
             db_sess.add(sg)
 
+            domain_id = DomainID(uuid.uuid4())
             domain = DomainRow(
                 id=domain_id,
                 name=domain_name,

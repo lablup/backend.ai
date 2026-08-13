@@ -93,7 +93,7 @@ class TestLegacyExtraMountsHydration:
         return uuid.uuid4().hex[:8]
 
     @pytest.fixture
-    async def domain_name(
+    async def domain_fixture(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         suffix: str,
@@ -162,7 +162,7 @@ class TestLegacyExtraMountsHydration:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         suffix: str,
-        domain_name: DomainFixtureData,
+        domain_fixture: DomainFixtureData,
         user_resource_policy_name: str,
     ) -> uuid.UUID:
         user_uuid = uuid.uuid4()
@@ -178,7 +178,7 @@ class TestLegacyExtraMountsHydration:
                         rounds=1,
                         salt_size=16,
                     ),
-                    domain_name=domain_name.domain_name,
+                    domain_name=domain_fixture.domain_name,
                     resource_policy=user_resource_policy_name,
                     role=UserRole.USER,
                     status=UserStatus.ACTIVE,
@@ -191,7 +191,7 @@ class TestLegacyExtraMountsHydration:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         suffix: str,
-        domain_name: DomainFixtureData,
+        domain_fixture: DomainFixtureData,
         project_resource_policy_name: str,
     ) -> uuid.UUID:
         project_uuid = uuid.uuid4()
@@ -200,7 +200,7 @@ class TestLegacyExtraMountsHydration:
                 GroupRow(
                     id=project_uuid,
                     name=f"g-{suffix}",
-                    domain_name=domain_name.domain_name,
+                    domain_name=domain_fixture.domain_name,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=project_resource_policy_name,
                 )
@@ -263,7 +263,7 @@ class TestLegacyExtraMountsHydration:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         suffix: str,
-        domain_name: DomainFixtureData,
+        domain_fixture: DomainFixtureData,
         scaling_group_name: str,
         user_id: uuid.UUID,
         project_id: uuid.UUID,
@@ -279,7 +279,7 @@ class TestLegacyExtraMountsHydration:
                 name=f"ep-{suffix}",
                 created_user=user_id,
                 session_owner=user_id,
-                domain=domain_name.domain_name,
+                domain=domain_fixture.domain_name,
                 project=project_id,
                 resource_group=scaling_group_name,
                 url="http://test.example.com",

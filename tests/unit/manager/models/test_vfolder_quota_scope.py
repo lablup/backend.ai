@@ -132,9 +132,9 @@ class TestEnsureQuotaScopeAccessibleByUser:
     async def other_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> AsyncGenerator[str, None]:
         """Create other test domain and return domain name"""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:

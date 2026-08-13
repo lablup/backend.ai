@@ -311,9 +311,11 @@ class TestDomainRepository:
 
     @pytest.fixture
     async def domain_with_group(
-        self, db_with_default_resource_policies: ExtendedAsyncSAEngine, domain_id: DomainID
+        self,
+        db_with_default_resource_policies: ExtendedAsyncSAEngine,
     ) -> str:
         """Create an inactive domain with a group for purge testing."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"domain-with-group-{uuid.uuid4().hex[:8]}"
         async with db_with_default_resource_policies.begin_session() as session:
             domain = DomainRow(

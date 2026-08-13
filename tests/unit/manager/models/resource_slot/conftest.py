@@ -76,7 +76,7 @@ def scaling_group_id() -> ResourceGroupID:
 
 
 @pytest.fixture
-async def domain_name(
+async def domain_fixture(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[DomainFixtureData, None]:
     domain_id = DomainID(uuid.uuid4())
@@ -148,7 +148,7 @@ async def project_resource_policy(
 @pytest.fixture
 async def user_uuid(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
-    domain_name: DomainFixtureData,
+    domain_fixture: DomainFixtureData,
     user_resource_policy: str,
 ) -> AsyncGenerator[uuid.UUID, None]:
     user_id = uuid.uuid4()
@@ -165,9 +165,9 @@ async def user_uuid(
                 username="testuser",
                 email="test@example.com",
                 password=password_info,
-                domain_name=domain_name.domain_name,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=user_resource_policy,
-                domain_id=domain_name.domain_id,
+                domain_id=domain_fixture.domain_id,
             )
         )
     yield user_id
@@ -176,7 +176,7 @@ async def user_uuid(
 @pytest.fixture
 async def project_id(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
-    domain_name: DomainFixtureData,
+    domain_fixture: DomainFixtureData,
     project_resource_policy: str,
 ) -> AsyncGenerator[uuid.UUID, None]:
     group_id = uuid.uuid4()
@@ -185,7 +185,7 @@ async def project_id(
             GroupRow(
                 id=group_id,
                 name="test-project",
-                domain_name=domain_name.domain_name,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=project_resource_policy,
             )
         )
@@ -222,7 +222,7 @@ async def agent_id(
 @pytest.fixture
 async def kernel_id(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
-    domain_name: DomainFixtureData,
+    domain_fixture: DomainFixtureData,
     project_id: uuid.UUID,
     user_uuid: uuid.UUID,
     scaling_group_id: ResourceGroupID,
@@ -235,8 +235,8 @@ async def kernel_id(
         db_sess.add(
             SessionRow(
                 id=sid,
-                domain_id=domain_name.domain_id,
-                domain_name=domain_name.domain_name,
+                domain_id=domain_fixture.domain_id,
+                domain_name=domain_fixture.domain_name,
                 group_id=project_id,
                 resource_group_id=scaling_group_id,
                 scaling_group_name=scaling_group,
@@ -250,7 +250,7 @@ async def kernel_id(
             KernelRow(
                 id=kid,
                 session_id=sid,
-                domain_name=domain_name.domain_name,
+                domain_name=domain_fixture.domain_name,
                 group_id=project_id,
                 user_uuid=user_uuid,
                 occupied_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1073741824")}),
