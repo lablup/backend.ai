@@ -19,12 +19,13 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.identifier.domain import DomainID, DomainName
+from ai.backend.common.identifier.virtual_scope import VirtualScopeID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.data.permission.permission_defs import ImagePermission
-from ai.backend.manager.data.permission.types import EntityType, RelationType
-from ai.backend.manager.data.permission.types import ScopeType as PermissionScopeType
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
 # test registers a domain-cluster row) resolves string relationships against the
@@ -49,9 +50,6 @@ from ai.backend.manager.models.image.row import (
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac import ProjectScope, SystemScope
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -60,6 +58,8 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -121,7 +121,8 @@ async def db_with_cleanup(
             UserRow,
             GroupRow,
             AssocGroupUserRow,
-            AssociationScopesEntitiesRow,
+            VirtualScopeRow,
+            EntityMembershipRow,
             ContainerRegistryRow,
             AssociationContainerRegistriesGroupsRow,
             ImageRow,
@@ -443,18 +444,26 @@ class TestImagePermissionContextSystemScope:
         return await _create_project(db_with_cleanup, "member-project", domain, user)
 
     @pytest.fixture
-    async def scope_association_to_member_project(
+    async def enrollment_in_member_project(
         self, db_with_cleanup: ExtendedAsyncSAEngine, user: UserRow, member_project: UUID
     ) -> None:
+        """Enroll the caller in `member_project` over the virtual-scope chain, the read
+        model the builder consults for project membership."""
+        virtual_scope_id = VirtualScopeID(uuid4())
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
-                AssociationScopesEntitiesRow(
-                    id=uuid4(),
-                    scope_type=PermissionScopeType.PROJECT,
-                    scope_id=str(member_project),
-                    entity_type=EntityType.USER,
-                    entity_id=str(user.uuid),
-                    relation_type=RelationType.AUTO,
+                VirtualScopeRow(
+                    id=virtual_scope_id,
+                    scope_type=PROJECT_SCOPE_TYPE,
+                    scope_id=member_project,
+                )
+            )
+            await sess.flush()
+            sess.add(
+                EntityMembershipRow(
+                    virtual_scope_id=virtual_scope_id,
+                    entity_type=USER_ENTITY_TYPE,
+                    entity_id=user.uuid,
                 )
             )
             await sess.commit()
@@ -492,7 +501,7 @@ class TestImagePermissionContextSystemScope:
         case: _SystemScopeCase,
         global_image_id: UUID,
     ) -> None:
-        """Regression: a caller associated with no project must still get the global-registry
+        """Regression: a caller enrolled in no project must still get the global-registry
         images, carrying the permissions it holds in the system scope.
 
         Before the fix, this raised IndexError from an empty per-project permission map.
@@ -514,10 +523,10 @@ class TestImagePermissionContextSystemScope:
         db_with_cleanup: ExtendedAsyncSAEngine,
         client_ctx: ClientContext,
         case: _SystemScopeCase,
-        scope_association_to_member_project: None,
+        enrollment_in_member_project: None,
         global_image_id: UUID,
     ) -> None:
-        """A caller associated with a project sees the global-registry images carrying the
+        """A caller enrolled in a project sees the global-registry images carrying the
         permissions it holds in that project."""
         async with db_with_cleanup.begin_readonly_session() as db_session:
             builder = ImagePermissionContextBuilder(db_session)
