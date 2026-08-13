@@ -20,6 +20,6 @@ class LoginClientTypeOrders:
         return col.asc() if ascending else col.desc()
 
     @staticmethod
-    def modified_at(ascending: bool = True) -> QueryOrder:
+    def updated_at(ascending: bool = True) -> QueryOrder:
         col = LoginClientTypeRow.updated_at
         return col.asc() if ascending else col.desc()

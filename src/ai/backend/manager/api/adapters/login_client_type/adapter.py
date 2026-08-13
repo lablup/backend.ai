@@ -89,7 +89,7 @@ class LoginClientTypeAdapter(BaseAdapter):
                 case LoginClientTypeOrderField.CREATED_AT:
                     result.append(LoginClientTypeOrders.created_at(ascending))
                 case LoginClientTypeOrderField.MODIFIED_AT:
-                    result.append(LoginClientTypeOrders.modified_at(ascending))
+                    result.append(LoginClientTypeOrders.updated_at(ascending))
         return result
 
     # --- Non-admin methods ---
@@ -213,9 +213,9 @@ class LoginClientTypeAdapter(BaseAdapter):
 
         if filter.modified_at is not None:
             condition = filter.modified_at.build_query_condition(
-                before_factory=LoginClientTypeConditions.by_modified_at_before,
-                after_factory=LoginClientTypeConditions.by_modified_at_after,
-                equals_factory=LoginClientTypeConditions.by_modified_at_equals,
+                before_factory=LoginClientTypeConditions.by_updated_at_before,
+                after_factory=LoginClientTypeConditions.by_updated_at_after,
+                equals_factory=LoginClientTypeConditions.by_updated_at_equals,
             )
             if condition is not None:
                 conditions.append(condition)

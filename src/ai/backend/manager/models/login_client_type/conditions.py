@@ -150,24 +150,24 @@ class LoginClientTypeConditions:
 
         return inner
 
-    # --- modified_at datetime filters ---
+    # --- updated_at datetime filters ---
 
     @staticmethod
-    def by_modified_at_before(dt: datetime) -> QueryCondition:
+    def by_updated_at_before(dt: datetime) -> QueryCondition:
         def inner() -> sa.ColumnElement[bool]:
             return LoginClientTypeRow.updated_at < dt
 
         return inner
 
     @staticmethod
-    def by_modified_at_after(dt: datetime) -> QueryCondition:
+    def by_updated_at_after(dt: datetime) -> QueryCondition:
         def inner() -> sa.ColumnElement[bool]:
             return LoginClientTypeRow.updated_at > dt
 
         return inner
 
     @staticmethod
-    def by_modified_at_equals(dt: datetime) -> QueryCondition:
+    def by_updated_at_equals(dt: datetime) -> QueryCondition:
         def inner() -> sa.ColumnElement[bool]:
             return LoginClientTypeRow.updated_at == dt
 
