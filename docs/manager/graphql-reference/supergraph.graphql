@@ -8832,12 +8832,12 @@ type ImageV2IdentityInfo
   namespace: String!
 
   """
-  Full image tag as written in the image reference (e.g. '3.11-ubuntu20.04-cuda12.1').
+  Added in 26.9.0. Full image tag as written in the image reference (e.g. '3.11-ubuntu20.04-cuda12.1').
   """
   tag: String
 
   """
-  Base version parsed from the tag, i.e. the segment before the first platform tag (e.g. '3.11' for '3.11-ubuntu20.04').
+  Added in 26.9.0. Base version parsed from the tag, i.e. the segment before the first platform tag (e.g. '3.11' for '3.11-ubuntu20.04').
   """
   version: String!
 
