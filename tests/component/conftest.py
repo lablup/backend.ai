@@ -1455,6 +1455,7 @@ def auth_processors(
         auth_repository=repo,
         config_provider=config_provider,
         valkey_session_client=valkey_clients.session,
+        valkey_rate_limit_client=valkey_clients.rate_limit,
         user_resource_policy_repository=user_resource_policy_repository,
         user_repository=user_repository,
         group_repository=group_repository,

@@ -10,6 +10,7 @@ from typing import Any, cast
 from aiohttp import web
 from sqlalchemy import RowMapping
 
+from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.clients.valkey_client.valkey_session.types import (
     LoginSessionData,
@@ -18,6 +19,7 @@ from ai.backend.common.clients.valkey_client.valkey_session.types import (
 )
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import InvalidAPIParameters, UserResourcePolicyNotFound
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.types import AccessKey, SSHPrivateKey, SSHPublicKey
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -125,6 +127,8 @@ from ai.backend.manager.utils import check_if_requester_is_eligible_to_act_as_ta
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
+_DEFAULT_USER_RATE_LIMIT = 10000
+
 _FAILURE_MAP: dict[type[Exception], LoginAttemptResult] = {
     AuthorizationFailed: LoginAttemptResult.FAILED_INVALID_CREDENTIALS,
     PasswordExpired: LoginAttemptResult.FAILED_PASSWORD_EXPIRED,
@@ -142,6 +146,7 @@ class AuthService:
     _auth_repository: AuthRepository
     _config_provider: ManagerConfigProvider
     _valkey_session_client: ValkeySessionClient
+    _valkey_rate_limit_client: ValkeyRateLimitClient
     _user_resource_policy_repository: UserResourcePolicyRepository
     _user_repository: UserRepository
     _group_repository: GroupRepository
@@ -153,6 +158,7 @@ class AuthService:
         auth_repository: AuthRepository,
         config_provider: ManagerConfigProvider,
         valkey_session_client: ValkeySessionClient,
+        valkey_rate_limit_client: ValkeyRateLimitClient,
         user_resource_policy_repository: UserResourcePolicyRepository,
         user_repository: UserRepository,
         group_repository: GroupRepository,
@@ -162,6 +168,7 @@ class AuthService:
         self._auth_repository = auth_repository
         self._config_provider = config_provider
         self._valkey_session_client = valkey_session_client
+        self._valkey_rate_limit_client = valkey_rate_limit_client
         self._user_resource_policy_repository = user_resource_policy_repository
         self._user_repository = user_repository
         self._group_repository = group_repository
@@ -405,6 +412,17 @@ class AuthService:
             session_data.model_dump_json(),
             auth_config.login_session_max_age,
         )
+
+        # The published limit is advisory (readers fall back to their own default),
+        # so a failure here must not fail the login itself.
+        try:
+            await self._valkey_rate_limit_client.set_user_rate_limit(
+                UserID(user.uuid),
+                _DEFAULT_USER_RATE_LIMIT,
+                auth_config.login_session_max_age,
+            )
+        except Exception:
+            log.warning("Failed to publish the rate limit for user {}", user.uuid)
 
         return AuthorizeActionResult(
             stream_response=None,

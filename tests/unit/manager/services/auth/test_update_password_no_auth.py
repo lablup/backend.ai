@@ -54,6 +54,7 @@ def auth_service(
         auth_repository=mock_auth_repository,
         config_provider=mock_config_provider,
         valkey_session_client=AsyncMock(),
+        valkey_rate_limit_client=AsyncMock(),
         user_resource_policy_repository=AsyncMock(spec=UserResourcePolicyRepository),
         user_repository=mock_user_repository,
         group_repository=mock_group_repository,

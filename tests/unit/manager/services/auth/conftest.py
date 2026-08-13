@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
@@ -31,6 +32,11 @@ def mock_config_provider() -> MagicMock:
         login_session_max_age=604800,
     )
     return mock_provider
+
+
+@pytest.fixture
+def mock_valkey_rate_limit_client() -> AsyncMock:
+    return AsyncMock(spec=ValkeyRateLimitClient)
 
 
 @pytest.fixture

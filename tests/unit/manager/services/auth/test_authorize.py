@@ -28,7 +28,7 @@ from ai.backend.manager.repositories.user_resource_policy.repository import (
 from ai.backend.manager.services.auth.actions.authorize import (
     AuthorizeAction,
 )
-from ai.backend.manager.services.auth.service import AuthService
+from ai.backend.manager.services.auth.service import _DEFAULT_USER_RATE_LIMIT, AuthService
 
 _DEFAULT_USER_UUID = UUID("12345678-1234-5678-1234-567812345678")
 
@@ -83,6 +83,7 @@ def auth_service(
     mock_auth_repository: AsyncMock,
     mock_config_provider: MagicMock,
     mock_valkey_session_client: AsyncMock,
+    mock_valkey_rate_limit_client: AsyncMock,
     mock_user_resource_policy_repository: AsyncMock,
     mock_user_repository: AsyncMock,
     mock_group_repository: AsyncMock,
@@ -92,6 +93,7 @@ def auth_service(
         auth_repository=mock_auth_repository,
         config_provider=mock_config_provider,
         valkey_session_client=mock_valkey_session_client,
+        valkey_rate_limit_client=mock_valkey_rate_limit_client,
         user_resource_policy_repository=mock_user_resource_policy_repository,
         user_repository=mock_user_repository,
         group_repository=mock_group_repository,
@@ -195,6 +197,55 @@ async def test_authorize_success(
     assert result.authorization_result is not None
     assert result.authorization_result.access_key == "test_access_key"
     assert result.authorization_result.secret_key == "test_secret_key"
+    assert result.authorization_result.session_token == "test_session_token"
+
+
+async def test_authorize_publishes_user_rate_limit(
+    auth_service: AuthService,
+    setup_successful_auth: None,
+    mock_valkey_rate_limit_client: AsyncMock,
+) -> None:
+    action = AuthorizeAction(
+        type=AuthTokenType.KEYPAIR,
+        domain_name="default",
+        email="test@example.com",
+        password="correct_password",
+        request=MagicMock(),
+        stoken=None,
+        client_type_id=uuid4(),
+        otp=None,
+    )
+
+    await auth_service.authorize(action)
+
+    mock_valkey_rate_limit_client.set_user_rate_limit.assert_awaited_once_with(
+        _DEFAULT_USER_UUID,
+        _DEFAULT_USER_RATE_LIMIT,
+        604800,
+    )
+
+
+async def test_authorize_succeeds_when_rate_limit_publish_fails(
+    auth_service: AuthService,
+    setup_successful_auth: None,
+    mock_valkey_rate_limit_client: AsyncMock,
+) -> None:
+    mock_valkey_rate_limit_client.set_user_rate_limit.side_effect = RuntimeError("valkey down")
+
+    action = AuthorizeAction(
+        type=AuthTokenType.KEYPAIR,
+        domain_name="default",
+        email="test@example.com",
+        password="correct_password",
+        request=MagicMock(),
+        stoken=None,
+        client_type_id=uuid4(),
+        otp=None,
+    )
+
+    result = await auth_service.authorize(action)
+
+    assert result.authorization_result is not None
     assert result.authorization_result.session_token == "test_session_token"
 
 

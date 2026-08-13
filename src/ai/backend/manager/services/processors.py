@@ -15,6 +15,9 @@ if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_live.client import (
         ValkeyLiveClient,
     )
+    from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import (
+        ValkeyRateLimitClient,
+    )
     from ai.backend.common.clients.valkey_client.valkey_session.client import (
         ValkeySessionClient,
     )
@@ -376,6 +379,7 @@ class ServiceArgs:
     valkey_live: ValkeyLiveClient
     valkey_artifact_client: ValkeyArtifactDownloadTrackingClient
     valkey_session_client: ValkeySessionClient
+    valkey_rate_limit_client: ValkeyRateLimitClient
     event_fetcher: EventFetcher
     background_task_manager: BackgroundTaskManager
     event_hub: EventHub

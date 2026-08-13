@@ -372,6 +372,7 @@ def create_services(args: ServiceArgs) -> Services:
             auth_repository=repositories.auth.repository,
             config_provider=args.config_provider,
             valkey_session_client=args.valkey_session_client,
+            valkey_rate_limit_client=args.valkey_rate_limit_client,
             user_resource_policy_repository=repositories.user_resource_policy.repository,
             user_repository=repositories.user.repository,
             group_repository=repositories.group.repository,

@@ -10,6 +10,7 @@ from ai.backend.common.clients.valkey_client.client import (
     create_valkey_client,
 )
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
     BackoffStrategy,
@@ -41,6 +42,8 @@ valkey_rate_limit_resilience = Resilience(
 
 _DEFAULT_RATE_LIMIT_EXPIRATION = 60 * 15  # 15 minutes
 _TIME_PRECISION = Decimal("1e-3")  # milliseconds
+
+_USER_RATE_LIMIT_KEY_PREFIX: Final = "user-rate-limit."
 
 
 _RATE_LIMIT_SCRIPT: Final[str] = """
@@ -144,6 +147,39 @@ class ValkeyRateLimitClient:
         """
         async with self._client.client() as conn:
             return await conn.zcard(access_key)
+
+    @valkey_rate_limit_resilience.apply()
+    async def set_user_rate_limit(
+        self,
+        user_id: UserID,
+        rate_limit: int,
+        expiration: int,
+    ) -> None:
+        """
+        Publish the per-user rate limit so that other components can read it.
+
+        :param user_id: The user to publish the limit for.
+        :param rate_limit: The allowed number of requests per rate-limit window.
+        :param expiration: The expiration time in seconds.
+        """
+        async with self._client.client() as conn:
+            await conn.set(
+                key=f"{_USER_RATE_LIMIT_KEY_PREFIX}{user_id}",
+                value=str(rate_limit),
+                expiry=ExpirySet(ExpiryType.SEC, expiration),
+            )
+
+    @valkey_rate_limit_resilience.apply()
+    async def get_user_rate_limit(self, user_id: UserID) -> int | None:
+        """
+        Get the published per-user rate limit.
+
+        :param user_id: The user to look up.
+        :return: The rate limit, or None if no limit is published for the user.
+        """
+        async with self._client.client() as conn:
+            result = await conn.get(f"{_USER_RATE_LIMIT_KEY_PREFIX}{user_id}")
+        return int(result.decode("utf-8")) if result is not None else None
 
     @valkey_rate_limit_resilience.apply()
     async def set_rate_limit_config(

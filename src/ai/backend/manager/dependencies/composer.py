@@ -330,6 +330,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 valkey_live=infrastructure.valkey.live,
                 valkey_artifact_client=infrastructure.valkey.artifact,
                 valkey_session_client=infrastructure.valkey.session,
+                valkey_rate_limit=infrastructure.valkey.rate_limit,
                 event_fetcher=messaging.event_fetcher,
                 background_task_manager=system.background_task_manager,
                 error_monitor=monitoring.error_monitor,
