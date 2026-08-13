@@ -21,22 +21,26 @@ down_revision = "b9e3a7c14f28"
 branch_labels = None
 depends_on = None
 
-# (column, backfill expression) — created_at is backfilled from the sibling
-# timestamp first, so the sibling's own backfill sees a non-NULL value.
-_TARGETS = (
-    ("created_at", "COALESCE(updated_at, now())"),
-    ("updated_at", "COALESCE(created_at, now())"),
-)
-
 
 def upgrade() -> None:
     op.alter_column("domains", "modified_at", new_column_name="updated_at")
-    for column, backfill in _TARGETS:
-        op.execute(sa.text(f"UPDATE domains SET {column} = {backfill} WHERE {column} IS NULL"))
-        op.alter_column("domains", column, nullable=False)
+    # created_at is backfilled first, so a row with both timestamps NULL leaves
+    # this statement with now() for the updated_at backfill to read.
+    op.execute(
+        sa.text(
+            "UPDATE domains SET created_at = COALESCE(updated_at, now()) WHERE created_at IS NULL"
+        )
+    )
+    op.execute(
+        sa.text(
+            "UPDATE domains SET updated_at = COALESCE(created_at, now()) WHERE updated_at IS NULL"
+        )
+    )
+    op.alter_column("domains", "created_at", nullable=False)
+    op.alter_column("domains", "updated_at", nullable=False)
 
 
 def downgrade() -> None:
-    for column, _ in reversed(_TARGETS):
-        op.alter_column("domains", column, nullable=True)
+    op.alter_column("domains", "updated_at", nullable=True)
+    op.alter_column("domains", "created_at", nullable=True)
     op.alter_column("domains", "updated_at", new_column_name="modified_at")
