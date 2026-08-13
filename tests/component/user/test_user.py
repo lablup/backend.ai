@@ -46,6 +46,7 @@ from ai.backend.manager.data.permission.types import (
     Permission,
     ScopeType,
 )
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -411,6 +412,9 @@ async def user_with_rbac_rows(
                 domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.USER,
+                domain_id=sa.select(DomainRow.id)
+                .where(DomainRow.name == domain_fixture.domain_name)
+                .scalar_subquery(),
             )
         )
         await conn.execute(

@@ -274,6 +274,9 @@ async def admin_user_fixture(
                 domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.SUPERADMIN,
+                domain_id=sa.select(DomainRow.id)
+                .where(DomainRow.name == domain_fixture.domain_name)
+                .scalar_subquery(),
             )
         )
         await conn.execute(
@@ -321,6 +324,9 @@ async def regular_user_fixture(
                 domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.USER,
+                domain_id=sa.select(DomainRow.id)
+                .where(DomainRow.name == domain_fixture.domain_name)
+                .scalar_subquery(),
             )
         )
         await conn.execute(

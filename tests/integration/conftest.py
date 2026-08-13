@@ -52,7 +52,7 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.composer import DependencyInput, ManagerDependencyComposer
 from ai.backend.manager.models.base import pgsql_connect_opts
-from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.domain import DomainRow, domains
 from ai.backend.manager.models.group import GroupRow, association_groups_users
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
@@ -641,6 +641,9 @@ async def admin_user_fixture(
                 domain_name=domain_fixture,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.SUPERADMIN,
+                domain_id=sa.select(DomainRow.id)
+                .where(DomainRow.name == domain_fixture)
+                .scalar_subquery(),
             )
         )
         await conn.execute(
@@ -720,6 +723,9 @@ async def regular_user_fixture(
                 domain_name=domain_fixture,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.USER,
+                domain_id=sa.select(DomainRow.id)
+                .where(DomainRow.name == domain_fixture)
+                .scalar_subquery(),
             )
         )
         await conn.execute(

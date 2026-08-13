@@ -608,7 +608,6 @@ class TestAuthRepository:
         default_domain: DomainTestData,
         keypair_resource_policy: ResourcePolicyTestData,
         signup_user_spec: UserCreatorSpec,
-        domain_id: DomainID,
     ) -> None:
         result = await auth_repository.create_user_with_keypair(
             signup_user_spec,

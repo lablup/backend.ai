@@ -46,7 +46,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.user.types import UserStatus
-from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.domain import DomainRow, domains
 from ai.backend.manager.models.group import GroupRow, association_groups_users
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
@@ -230,6 +230,9 @@ async def expired_password_user(
                 resource_policy=resource_policy_fixture,
                 role=UserRole.USER,
                 password_changed_at=expired_at,
+                domain_id=sa.select(DomainRow.id)
+                .where(DomainRow.name == domain_fixture.domain_name)
+                .scalar_subquery(),
             )
         )
         await conn.execute(
@@ -357,6 +360,9 @@ async def cross_domain_fixture(
                 domain_name=domain_name,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.ADMIN,
+                domain_id=sa.select(DomainRow.id)
+                .where(DomainRow.name == domain_name)
+                .scalar_subquery(),
             )
         )
         await conn.execute(
@@ -397,6 +403,9 @@ async def cross_domain_fixture(
                 domain_name=domain_name,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.USER,
+                domain_id=sa.select(DomainRow.id)
+                .where(DomainRow.name == domain_name)
+                .scalar_subquery(),
             )
         )
         await conn.execute(

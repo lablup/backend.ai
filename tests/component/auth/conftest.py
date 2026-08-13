@@ -28,6 +28,7 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import association_groups_users
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
@@ -148,6 +149,9 @@ async def auth_user_fixture(
                 domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.USER,
+                domain_id=sa.select(DomainRow.id)
+                .where(DomainRow.name == domain_fixture.domain_name)
+                .scalar_subquery(),
             )
         )
         await conn.execute(

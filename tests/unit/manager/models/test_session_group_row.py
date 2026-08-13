@@ -176,7 +176,7 @@ class TestSessionGroupRow:
         )
 
     async def test_placement_policy_round_trips(
-        self, db: ExtendedAsyncSAEngine, scope: _OwnershipScope, domain_id: DomainID
+        self, db: ExtendedAsyncSAEngine, scope: _OwnershipScope
     ) -> None:
         group_id = SessionGroupID(uuid.uuid4())
         async with db.begin_session() as sess:
