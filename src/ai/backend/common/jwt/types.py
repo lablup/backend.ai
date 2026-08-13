@@ -5,9 +5,10 @@ from __future__ import annotations
 import enum
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, override
+from typing import Any, Final, Self, override
 
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey
@@ -24,6 +25,18 @@ class JWTPrincipalType(enum.StrEnum):
 class JWTPrincipal(ABC):
     """Who a JWT authenticates and by which identifier."""
 
+    @classmethod
+    @abstractmethod
+    def principal_type(cls) -> JWTPrincipalType:
+        """The discriminant this principal serializes under."""
+        raise NotImplementedError
+
+    @classmethod
+    @abstractmethod
+    def from_claims(cls, payload: Mapping[str, Any]) -> Self:
+        """Build the principal from its claims in a JWT payload."""
+        raise NotImplementedError
+
     @abstractmethod
     def to_claims(self) -> dict[str, Any]:
         """The principal's claims to embed in the JWT payload."""
@@ -37,9 +50,19 @@ class UserPrincipal(JWTPrincipal):
     user_id: UserID
 
     @override
+    @classmethod
+    def principal_type(cls) -> JWTPrincipalType:
+        return JWTPrincipalType.USER
+
+    @override
+    @classmethod
+    def from_claims(cls, payload: Mapping[str, Any]) -> Self:
+        return cls(user_id=UserID(uuid.UUID(payload["user_id"])))
+
+    @override
     def to_claims(self) -> dict[str, Any]:
         return {
-            "principal_type": JWTPrincipalType.USER.value,
+            "principal_type": self.principal_type().value,
             "user_id": str(self.user_id),
         }
 
@@ -51,14 +74,29 @@ class AccessKeyPrincipal(JWTPrincipal):
     access_key: AccessKey
 
     @override
+    @classmethod
+    def principal_type(cls) -> JWTPrincipalType:
+        return JWTPrincipalType.ACCESS_KEY
+
+    @override
+    @classmethod
+    def from_claims(cls, payload: Mapping[str, Any]) -> Self:
+        return cls(access_key=AccessKey(payload["access_key"]))
+
+    @override
     def to_claims(self) -> dict[str, Any]:
         return {
-            "principal_type": JWTPrincipalType.ACCESS_KEY.value,
+            "principal_type": self.principal_type().value,
             "access_key": str(self.access_key),
         }
 
 
-def parse_jwt_principal(payload: dict[str, Any]) -> JWTPrincipal:
+_PRINCIPAL_CLASSES: Final[Mapping[JWTPrincipalType, type[JWTPrincipal]]] = {
+    cls.principal_type(): cls for cls in (UserPrincipal, AccessKeyPrincipal)
+}
+
+
+def parse_jwt_principal(payload: Mapping[str, Any]) -> JWTPrincipal:
     """Read the principal claims out of a JWT payload.
 
     Tokens issued before the ``principal_type`` claim existed carry only an
@@ -71,11 +109,7 @@ def parse_jwt_principal(payload: dict[str, Any]) -> JWTPrincipal:
         principal_type = JWTPrincipalType.ACCESS_KEY
     else:
         principal_type = JWTPrincipalType(raw_type)
-    match principal_type:
-        case JWTPrincipalType.USER:
-            return UserPrincipal(user_id=UserID(uuid.UUID(payload["user_id"])))
-        case JWTPrincipalType.ACCESS_KEY:
-            return AccessKeyPrincipal(access_key=AccessKey(payload["access_key"]))
+    return _PRINCIPAL_CLASSES[principal_type].from_claims(payload)
 
 
 @dataclass(frozen=True)
