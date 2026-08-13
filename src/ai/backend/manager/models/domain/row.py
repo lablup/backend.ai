@@ -35,7 +35,7 @@ from ai.backend.manager.models.base import (
     SlugType,
     VFolderHostPermissionColumn,
 )
-from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -75,7 +75,7 @@ def row_to_data(row: DomainRow | Row[Any]) -> DomainData:
         is_active=row.is_active,
         is_default=row.is_default,
         created_at=row.created_at,
-        modified_at=row.modified_at,
+        modified_at=row.updated_at,
         total_resource_slots=row.total_resource_slots,
         allowed_vfolder_hosts=row.allowed_vfolder_hosts,
         allowed_docker_registries=row.allowed_docker_registries,
@@ -84,7 +84,7 @@ def row_to_data(row: DomainRow | Row[Any]) -> DomainData:
     )
 
 
-class DomainRow(CreatedAtMixin, Base):
+class DomainRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "domains"
     __table_args__ = (
         # Partial unique index: at most one domain may have is_default = true.
@@ -110,13 +110,6 @@ class DomainRow(CreatedAtMixin, Base):
     is_active: Mapped[bool] = mapped_column("is_active", sa.Boolean, default=True, nullable=False)
     is_default: Mapped[bool] = mapped_column(
         "is_default", sa.Boolean, nullable=False, default=False, server_default=sa.false()
-    )
-    modified_at: Mapped[datetime] = mapped_column(
-        "modified_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        onupdate=sa.func.current_timestamp(),
-        nullable=False,
     )
     # TODO: separate resource-related fields with new domain resource policy table when needed.
     total_resource_slots: Mapped[ResourceSlot] = mapped_column(
@@ -215,7 +208,7 @@ class DomainModel(RBACModel[DomainPermission]):
             description=row.description,
             is_active=row.is_active,
             created_at=row.created_at,
-            modified_at=row.modified_at,
+            modified_at=row.updated_at,
             _total_resource_slots=row.total_resource_slots,
             _allowed_vfolder_hosts=row.allowed_vfolder_hosts,
             _allowed_docker_registries=row.allowed_docker_registries,

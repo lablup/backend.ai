@@ -131,7 +131,7 @@ _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
     "name": ("name", None),
     "is_active": ("is_active", None),
     "created_at": ("created_at", dtparse),
-    "modified_at": ("modified_at", dtparse),
+    "modified_at": ("updated_at", dtparse),
 }
 
 _queryorder_colmap: Mapping[str, OrderSpecItem] = {
@@ -140,7 +140,7 @@ _queryorder_colmap: Mapping[str, OrderSpecItem] = {
     "name": ("name", None),
     "is_active": ("is_active", None),
     "created_at": ("created_at", None),
-    "modified_at": ("modified_at", None),
+    "modified_at": ("updated_at", None),
 }
 
 
@@ -198,7 +198,7 @@ class DomainNode(graphene.ObjectType):  # type: ignore[misc]
             description=obj.description,
             is_active=obj.is_active,
             created_at=obj.created_at,
-            modified_at=obj.modified_at,
+            modified_at=obj.updated_at,
             total_resource_slots=obj.total_resource_slots,
             allowed_vfolder_hosts=(
                 obj.allowed_vfolder_hosts.to_json() if obj.allowed_vfolder_hosts else None
@@ -612,7 +612,7 @@ class Domain(graphene.ObjectType):  # type: ignore[misc]
             description=row.description,
             is_active=row.is_active,
             created_at=row.created_at,
-            modified_at=row.modified_at,
+            modified_at=row.updated_at,
             total_resource_slots=(
                 row.total_resource_slots.to_json() if row.total_resource_slots is not None else {}
             ),

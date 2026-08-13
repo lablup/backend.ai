@@ -240,7 +240,7 @@ class DomainConditions:
         """Filter by modified_at < datetime."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DomainRow.modified_at < dt
+            return DomainRow.updated_at < dt
 
         return inner
 
@@ -249,7 +249,7 @@ class DomainConditions:
         """Filter by modified_at > datetime."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DomainRow.modified_at > dt
+            return DomainRow.updated_at > dt
 
         return inner
 
@@ -258,7 +258,7 @@ class DomainConditions:
         """Filter by modified_at == datetime."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DomainRow.modified_at == dt
+            return DomainRow.updated_at == dt
 
         return inner
 
