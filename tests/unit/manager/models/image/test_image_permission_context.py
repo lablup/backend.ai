@@ -49,6 +49,8 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -143,6 +145,8 @@ class TestImagePermissionContextNonGlobalRegistry:
                 UserRow,
                 GroupRow,
                 AssocGroupUserRow,
+                VirtualScopeRow,
+                EntityMembershipRow,
                 ContainerRegistryRow,
                 AssociationContainerRegistriesGroupsRow,
                 ImageRow,
