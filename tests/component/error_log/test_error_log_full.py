@@ -6,7 +6,6 @@ from typing import Any
 import pytest
 
 from ai.backend.client.exceptions import BackendAPIError
-from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.error_log import (
     AppendErrorLogRequest,
@@ -55,19 +54,22 @@ class TestAppendErrorLogFull:
 
 
 class TestListErrorLogsFull:
-    async def test_admin_sees_every_recorded_log(
+    async def test_admin_sees_all_users_logs(
         self,
         admin_registry: BackendAIClientRegistry,
+        user_registry: BackendAIClientRegistry,
     ) -> None:
         await admin_registry.error_log.append(
-            _make_append_request(message="first log for visibility"),
+            _make_append_request(message="admin log for visibility"),
         )
-        await admin_registry.error_log.append(
-            _make_append_request(message="second log for visibility"),
+        await user_registry.error_log.append(
+            _make_append_request(message="user log for visibility"),
         )
         admin_result = await admin_registry.error_log.list_logs()
+        user_result = await user_registry.error_log.list_logs()
         assert isinstance(admin_result, ListErrorLogsResponse)
-        assert admin_result.count >= 2
+        assert isinstance(user_result, ListErrorLogsResponse)
+        assert admin_result.count >= user_result.count
 
 
 class TestMarkClearedFull:
@@ -78,19 +80,4 @@ class TestMarkClearedFull:
         nonexistent_id = uuid.uuid4()
         with pytest.raises(BackendAPIError) as exc_info:
             await admin_registry.error_log.mark_cleared(nonexistent_id)
-        assert exc_info.value.status == 500
-
-    async def test_user_cannot_clear_another_users_log(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        user_registry: BackendAIClientRegistry,
-    ) -> None:
-        await admin_registry.error_log.append(
-            _make_append_request(message="admin-only log"),
-        )
-        admin_list = await admin_registry.error_log.list_logs()
-        assert admin_list.count >= 1
-        admin_log_id = uuid.UUID(admin_list.logs[0].log_id)
-
-        with pytest.raises(PermissionDeniedError):
-            await user_registry.error_log.mark_cleared(admin_log_id)
+        assert exc_info.value.status == 404

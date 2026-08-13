@@ -2,31 +2,36 @@ from __future__ import annotations
 
 from ai.backend.manager.actions.registry import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
-from ai.backend.manager.actions.v2.ops.result import BatchOpsResult, CreatedEntityOpsResult
+from ai.backend.manager.actions.v2.ops.result import (
+    BatchOpsResult,
+    CreatedEntityOpsResult,
+    EntityOpsResult,
+    ScopedBatchOpsResult,
+)
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
+from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.error_log.types import ErrorLogData
 from ai.backend.manager.services.error_log.actions.admin_search import AdminSearchErrorLogsAction
 from ai.backend.manager.services.error_log.actions.create import CreateErrorLogAction
-from ai.backend.manager.services.error_log.actions.mark_cleared import (
-    MarkClearedErrorLogAction,
-    MarkClearedErrorLogActionResult,
-)
-from ai.backend.manager.services.error_log.actions.search import (
-    SearchErrorLogsAction,
-    SearchErrorLogsActionResult,
-)
-from ai.backend.manager.services.error_log.service import ErrorLogService
+from ai.backend.manager.services.error_log.actions.delete import DeleteErrorLogAction
+from ai.backend.manager.services.error_log.actions.search import SearchErrorLogsAction
 
 
 class ErrorLogProcessors:
-    """Recording and the admin read run against ops; the role-scoped reads keep the service."""
+    """Every operation runs against ops; the domain keeps no service of its own.
 
-    create: GlobalActionProcessor[CreateErrorLogAction, CreatedEntityOpsResult[ErrorLogData]]
+    Recording and reading are scope-shaped -- the caller acts inside the owning
+    user's scope -- while clearing targets the log itself, since by then the row
+    exists to name. The super-admin read spans the table and is its own action.
+    """
+
+    create: ScopeActionProcessor[CreateErrorLogAction, CreatedEntityOpsResult[ErrorLogData]]
     search: GlobalActionProcessor[AdminSearchErrorLogsAction, BatchOpsResult[ErrorLogData]]
-    list_logs: GlobalActionProcessor[SearchErrorLogsAction, SearchErrorLogsActionResult]
-    mark_cleared: GlobalActionProcessor[MarkClearedErrorLogAction, MarkClearedErrorLogActionResult]
+    scoped_search: ScopeActionProcessor[SearchErrorLogsAction, ScopedBatchOpsResult[ErrorLogData]]
+    delete: SingleEntityActionProcessor[DeleteErrorLogAction, EntityOpsResult[ErrorLogData]]
 
-    def __init__(self, service: ErrorLogService, group: ProcessorGroup[ErrorLogData]) -> None:
-        self.create = group.global_create_ops(CreateErrorLogAction)
+    def __init__(self, group: ProcessorGroup[ErrorLogData]) -> None:
+        self.create = group.entity_create_ops(CreateErrorLogAction)
         self.search = group.global_search_ops(AdminSearchErrorLogsAction)
-        self.list_logs = group.global_scope(SearchErrorLogsAction, service.list_logs)
-        self.mark_cleared = group.global_scope(MarkClearedErrorLogAction, service.mark_cleared)
+        self.scoped_search = group.scope_search_ops(SearchErrorLogsAction)
+        self.delete = group.single_delete_ops(DeleteErrorLogAction)

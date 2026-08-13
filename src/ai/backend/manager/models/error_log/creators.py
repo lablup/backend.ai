@@ -7,20 +7,31 @@ holds only what the v2 lineage requires to sit under ``models/``.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Any, override
 
+from ai.backend.common.data.entity.error_log import ERROR_LOG_ENTITY_TYPE
+from ai.backend.common.data.entity.types import ScopeRef, ScopeType
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.manager.data.error_log.types import ErrorLogData, ErrorLogSeverity
 from ai.backend.manager.models.error_logs import ErrorLogRow
-from ai.backend.manager.models.specs.creator import GlobalEntityCreator
+from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+
+_ERROR_LOG_SCOPE = ScopeType(ERROR_LOG_ENTITY_TYPE)
 
 
 @dataclass
-class ErrorLogCreator(GlobalEntityCreator[ErrorLogRow, ErrorLogData]):
-    """Creator for one recorded error."""
+class ErrorLogCreator(EntityCreator[ErrorLogRow, ErrorLogData]):
+    """Creator for one recorded error.
+
+    An error belongs to whoever it happened to, so the row joins that user's scope
+    and is reachable through it. The column is nullable because the manager and the
+    agents record their own failures through the plugin, where there is no user to
+    own the row; those join nothing and stay visible only to the admin read.
+    """
 
     severity: ErrorLogSeverity
     source: str
@@ -33,7 +44,20 @@ class ErrorLogCreator(GlobalEntityCreator[ErrorLogRow, ErrorLogData]):
     request_url: str | None = None
     request_status: int | None = None
     traceback: str | None = None
-    created_at: datetime | None = None
+
+    @override
+    def scope_type(self) -> ScopeType:
+        return _ERROR_LOG_SCOPE
+
+    @override
+    def scope_id(self, row: ErrorLogRow) -> ScopeID:
+        return row.id
+
+    @override
+    def member_of(self, row: ErrorLogRow) -> Collection[ScopeRef]:
+        if row.user is None:
+            return ()
+        return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=row.user),)
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
@@ -42,7 +66,7 @@ class ErrorLogCreator(GlobalEntityCreator[ErrorLogRow, ErrorLogData]):
     @override
     def build_row(self) -> ErrorLogRow:
         return ErrorLogRow(
-            severity=self.severity,
+            severity=self.severity.value,
             source=self.source,
             message=self.message,
             context_lang=self.context_lang,
@@ -53,7 +77,6 @@ class ErrorLogCreator(GlobalEntityCreator[ErrorLogRow, ErrorLogData]):
             request_url=self.request_url,
             request_status=self.request_status,
             traceback=self.traceback,
-            created_at=self.created_at,
         )
 
     @override

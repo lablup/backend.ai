@@ -54,7 +54,6 @@ from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.dotfile.processors import DotfileProcessors
 from ai.backend.manager.services.dotfile.service import DotfileService
 from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
-from ai.backend.manager.services.error_log.service import ErrorLogService
 from ai.backend.manager.services.etcd_config.processors import EtcdConfigProcessors
 from ai.backend.manager.services.etcd_config.service import EtcdConfigService
 from ai.backend.manager.services.events.processors import EventsProcessors
@@ -197,9 +196,6 @@ def create_services(args: ServiceArgs) -> Services:
         domain=DomainService(repositories.domain.repository),
         dotfile=DotfileService(
             repository=repositories.dotfile.repository,
-        ),
-        error_log=ErrorLogService(
-            repository=repositories.error_log.repository,
         ),
         etcd_config=EtcdConfigService(
             repository=repositories.etcd_config.repository,
@@ -465,7 +461,7 @@ def create_processors(
         ),
         domain=DomainProcessors(services.domain, action_monitors, validators),
         dotfile=DotfileProcessors(services.dotfile, action_monitors, validators),
-        error_log=ErrorLogProcessors(services.error_log, registry.group()),
+        error_log=ErrorLogProcessors(registry.group()),
         etcd_config=EtcdConfigProcessors(services.etcd_config, action_monitors, validators),
         export=ExportProcessors(services.export, action_monitors, validators),
         fair_share=FairShareProcessors(services.fair_share, action_monitors, validators),

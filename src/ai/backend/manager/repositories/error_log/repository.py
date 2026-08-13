@@ -73,22 +73,3 @@ class ErrorLogRepository:
             page_size=page_size,
             mark_read=mark_read,
         )
-
-    @error_log_repository_resilience.apply()
-    async def mark_cleared(
-        self,
-        *,
-        log_id: uuid.UUID,
-        user_uuid: uuid.UUID,
-        user_domain: str,
-        is_superadmin: bool,
-        is_admin: bool,
-    ) -> int:
-        """Mark an error log as cleared. Returns number of rows updated."""
-        return await self._db_source.mark_cleared(
-            log_id=log_id,
-            user_uuid=user_uuid,
-            user_domain=user_domain,
-            is_superadmin=is_superadmin,
-            is_admin=is_admin,
-        )

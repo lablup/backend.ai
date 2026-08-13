@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 from typing import Any
 
 import sqlalchemy as sa
@@ -17,27 +16,24 @@ from ai.backend.manager.data.error_log.types import (
 )
 
 from .base import GUID, Base
+from .mixins.timestamp import CreatedAtMixin
 
 __all__ = [
     "ErrorLogRow",
 ]
 
 
-class ErrorLogRow(Base):
+class ErrorLogRow(CreatedAtMixin, Base):
     __tablename__ = "error_logs"
+    # The mixin does not index its column, but every read of this table orders by it
+    # and pages, so the index is declared here rather than lost to the move.
+    __table_args__ = (sa.Index("ix_error_logs_created_at", "created_at"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        index=True,
-        nullable=False,
-    )
     # Columns keep the historical nullable=True of the imperative table definition;
-    # the annotations stay non-Optional because __init__ always assigns them.
+    # the annotations stay non-Optional because every writer supplies them.
     severity: Mapped[str] = mapped_column(
         "severity",
         sa.Enum("critical", "error", "warning", name="errorlog_severity"),
@@ -62,35 +58,6 @@ class ErrorLogRow(Base):
     request_url: Mapped[str | None] = mapped_column("request_url", sa.String, nullable=True)
     request_status: Mapped[int | None] = mapped_column("request_status", sa.Integer, nullable=True)
     traceback: Mapped[str | None] = mapped_column("traceback", sa.Text, nullable=True)
-
-    def __init__(
-        self,
-        severity: ErrorLogSeverity,
-        source: str,
-        message: str,
-        context_lang: str,
-        context_env: dict[str, Any],
-        user: uuid.UUID | None = None,
-        is_read: bool = False,
-        is_cleared: bool = False,
-        request_url: str | None = None,
-        request_status: int | None = None,
-        traceback: str | None = None,
-        created_at: datetime | None = None,
-    ) -> None:
-        self.severity = severity.value
-        self.source = source
-        self.user = user
-        self.is_read = is_read
-        self.is_cleared = is_cleared
-        self.message = message
-        self.context_lang = context_lang
-        self.context_env = context_env
-        self.request_url = request_url
-        self.request_status = request_status
-        self.traceback = traceback
-        if created_at:
-            self.created_at = created_at
 
     def to_dataclass(self) -> ErrorLogData:
         return ErrorLogData(

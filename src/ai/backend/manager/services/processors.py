@@ -115,7 +115,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.error_log.processors import (
         ErrorLogProcessors,
     )
-    from ai.backend.manager.services.error_log.service import ErrorLogService
     from ai.backend.manager.services.etcd_config.processors import (
         EtcdConfigProcessors,
     )
@@ -376,7 +375,6 @@ class Services:
     app_config_fragment: AppConfigFragmentService
     domain: DomainService
     dotfile: DotfileService
-    error_log: ErrorLogService
     etcd_config: EtcdConfigService
     export: ExportService
     fair_share: FairShareService

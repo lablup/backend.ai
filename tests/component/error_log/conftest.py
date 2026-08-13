@@ -13,17 +13,13 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.models.error_logs import ErrorLogRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.error_log.repository import ErrorLogRepository
 from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
-from ai.backend.manager.services.error_log.service import ErrorLogService
 from ai.backend.testutils.processors import ops_processor_group
 
 
 @pytest.fixture()
 def error_log_processors(database_engine: ExtendedAsyncSAEngine) -> ErrorLogProcessors:
-    repo = ErrorLogRepository(database_engine)
-    service = ErrorLogService(repo)
-    return ErrorLogProcessors(service=service, group=ops_processor_group(database_engine))
+    return ErrorLogProcessors(group=ops_processor_group(database_engine))
 
 
 @pytest.fixture()

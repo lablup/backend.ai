@@ -25,10 +25,8 @@ from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.error_logs import ErrorLogRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.error_log.repository import ErrorLogRepository
 from ai.backend.manager.repositories.manager_admin.repository import ManagerAdminRepository
 from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
-from ai.backend.manager.services.error_log.service import ErrorLogService
 from ai.backend.manager.services.manager_admin.processors import ManagerAdminProcessors
 from ai.backend.manager.services.manager_admin.service import ManagerAdminService
 from ai.backend.testutils.processors import ops_processor_group
@@ -36,9 +34,7 @@ from ai.backend.testutils.processors import ops_processor_group
 
 @pytest.fixture()
 def error_log_processors(database_engine: ExtendedAsyncSAEngine) -> ErrorLogProcessors:
-    repo = ErrorLogRepository(database_engine)
-    service = ErrorLogService(repo)
-    return ErrorLogProcessors(service=service, group=ops_processor_group(database_engine))
+    return ErrorLogProcessors(group=ops_processor_group(database_engine))
 
 
 @pytest.fixture()

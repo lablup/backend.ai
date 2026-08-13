@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
-from sqlalchemy.engine import CursorResult
 
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -147,47 +146,3 @@ class ErrorLogDBSource:
                 await db_sess.execute(read_update_query)
 
             return items, total_count
-
-    @error_log_db_source_resilience.apply()
-    async def mark_cleared(
-        self,
-        *,
-        log_id: uuid.UUID,
-        user_uuid: uuid.UUID,
-        user_domain: str,
-        is_superadmin: bool,
-        is_admin: bool,
-    ) -> int:
-        """Mark an error log as cleared with role-based authorization.
-
-        Returns:
-            Number of rows updated (expected 1 on success).
-        """
-        async with self._db.begin_session() as db_sess:
-            update_query = sa.update(ErrorLogRow).values(is_cleared=True)
-
-            if is_superadmin:
-                update_query = update_query.where(ErrorLogRow.id == log_id)
-            elif is_admin:
-                j = sa.join(
-                    GroupRow.__table__,
-                    AssocGroupUserRow.__table__,
-                    GroupRow.id == AssocGroupUserRow.group_id,
-                )
-                usr_query = (
-                    sa.select(AssocGroupUserRow.user_id)
-                    .select_from(j)
-                    .where(GroupRow.domain_name == user_domain)
-                )
-                usr_result = await db_sess.execute(usr_query)
-                user_ids = [row.user_id for row in usr_result]
-                update_query = update_query.where(
-                    (ErrorLogRow.user.in_(user_ids)) & (ErrorLogRow.id == log_id),
-                )
-            else:
-                update_query = update_query.where(
-                    (ErrorLogRow.user == user_uuid) & (ErrorLogRow.id == log_id),
-                )
-
-            update_result = await db_sess.execute(update_query)
-            return cast(CursorResult[Any], update_result).rowcount

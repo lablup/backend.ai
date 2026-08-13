@@ -1,27 +1,45 @@
 from __future__ import annotations
 
-import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.error_log import ERROR_LOG_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType, ScopeRef
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.identifier.user import UserID
+from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.error_log.types import ErrorLogData
-
-from .base import ErrorLogGlobalAction
+from ai.backend.manager.models.error_logs import ErrorLogRow
+from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.repositories.error_log.searchers import ErrorLogSearcher
+from ai.backend.manager.repositories.error_log.types import UserErrorLogOperationScope
 
 
 @dataclass
-class SearchErrorLogsAction(ErrorLogGlobalAction):
-    """Action to list error logs with role-based visibility."""
+class SearchErrorLogsAction(OperationScopeOpsAction[ErrorLogRow, ErrorLogData]):
+    """Page through the errors recorded against one user.
 
-    user_uuid: uuid.UUID
-    user_domain: str
-    is_superadmin: bool
-    is_admin: bool
-    page_no: int
-    page_size: int
-    mark_read: bool
+    The super-admin read is a different action against the whole table; this one
+    never widens past the user it names, so a caller cannot reach another user's
+    errors by asking nicely.
+    """
+
+    user_id: UserID
+    searcher: ErrorLogSearcher
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return ERROR_LOG_ENTITY_TYPE
+
+    @override
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return (ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=self.user_id),)
+
+    @override
+    def operation_scopes(self) -> Sequence[OperationScope]:
+        return (UserErrorLogOperationScope(user_id=self.user_id),)
 
     @override
     @classmethod
@@ -29,18 +47,5 @@ class SearchErrorLogsAction(ErrorLogGlobalAction):
         return "search_error_logs"
 
     @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass
-class SearchErrorLogsActionResult(BaseActionResult):
-    """Result of listing error logs."""
-
-    logs: list[ErrorLogData]
-    total_count: int
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
+    def to_searcher(self) -> ErrorLogSearcher:
+        return self.searcher
