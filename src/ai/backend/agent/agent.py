@@ -2707,7 +2707,7 @@ class AbstractAgent[
                     "create_kernel(kernel:{}, session:{}) resource spec prepared: {}",
                     kernel_id,
                     session_id,
-                    resource_spec.to_json(),
+                    resource_spec.to_data().model_dump_json(),
                 )
 
                 # Mount backend-specific intrinsic mounts (e.g., scratch directories)
