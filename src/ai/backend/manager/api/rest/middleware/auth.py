@@ -36,7 +36,7 @@ from aiohttp import web
 from aiohttp.typedefs import Handler, Middleware
 from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
-from sqlalchemy.orm import joinedload, load_only
+from sqlalchemy.orm import load_only
 
 from ai.backend.common.contexts.client_ip import with_client_ip
 from ai.backend.common.contexts.user import with_triggered_user, with_user
@@ -60,6 +60,10 @@ from ai.backend.manager.errors.auth import (
 )
 from ai.backend.manager.errors.common import GenericForbidden, RejectedByHook
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.resource_policy.row import (
+    KeyPairResourcePolicyRow,
+    UserResourcePolicyRow,
+)
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import execute_with_retry
 
@@ -607,38 +611,43 @@ async def _query_auth_context_by_access_key(
     Only the columns that context carries are loaded, and the rows stay inside this session.
     """
     async with db.begin_readonly_session_read_committed() as sess:
-        keypair_row = await sess.scalar(
-            sa.select(KeyPairRow)
+        result = await sess.execute(
+            sa.select(KeyPairRow, UserRow, KeyPairResourcePolicyRow, UserResourcePolicyRow)
+            .join(UserRow, UserRow.uuid == KeyPairRow.user)
+            .join(
+                KeyPairResourcePolicyRow,
+                KeyPairResourcePolicyRow.name == KeyPairRow.resource_policy,
+            )
+            .join(
+                UserResourcePolicyRow,
+                UserResourcePolicyRow.name == UserRow.resource_policy,
+            )
             .options(
                 load_only(
                     KeyPairRow.access_key,
                     KeyPairRow.secret_key,
-                    KeyPairRow.user,
                     KeyPairRow.is_admin,
                     KeyPairRow.rate_limit,
                 ),
-                joinedload(KeyPairRow.resource_policy_row),
-                joinedload(KeyPairRow.user_row).options(
-                    load_only(
-                        UserRow.uuid,
-                        UserRow.email,
-                        UserRow.role,
-                        UserRow.domain_name,
-                        UserRow.domain_id,
-                        UserRow.sudo_session_enabled,
-                        UserRow.allowed_client_ip,
-                    ),
-                    joinedload(UserRow.resource_policy_row),
+                load_only(
+                    UserRow.uuid,
+                    UserRow.email,
+                    UserRow.role,
+                    UserRow.domain_name,
+                    UserRow.domain_id,
+                    UserRow.sudo_session_enabled,
+                    UserRow.allowed_client_ip,
                 ),
             )
             .where(
                 (KeyPairRow.access_key == access_key) & (KeyPairRow.is_active.is_(True)),
             )
         )
-        if keypair_row is None:
+        row = result.one_or_none()
+        if row is None:
             return None
 
-        user_row = keypair_row.user_row
+        keypair_row, user_row, keypair_policy_row, user_policy_row = row
         return _AuthContext(
             user=AuthenticatedUser(
                 uuid=UserID(user_row.uuid),
@@ -648,14 +657,14 @@ async def _query_auth_context_by_access_key(
                 domain_id=DomainID(user_row.domain_id),
                 sudo_session_enabled=user_row.sudo_session_enabled,
                 allowed_client_ip=user_row.allowed_client_ip,
-                resource_policy=user_row.resource_policy_row.to_dataclass(),
+                resource_policy=user_policy_row.to_dataclass(),
             ),
             keypair=AuthenticatedKeypair(
                 access_key=AccessKey(keypair_row.access_key),
                 secret_key=SecretKey(keypair_row.secret_key),
                 is_admin=bool(keypair_row.is_admin),
                 rate_limit=keypair_row.rate_limit,
-                resource_policy=keypair_row.resource_policy_row.to_dataclass(),
+                resource_policy=keypair_policy_row.to_dataclass(),
             ),
         )
 
