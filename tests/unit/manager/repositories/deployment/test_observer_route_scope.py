@@ -237,6 +237,7 @@ class TestObserverCycleRouteScope:
                     resource_policy=user_resource_policy,
                     role=UserRole.USER,
                     status=UserStatus.ACTIVE,
+                    domain_id=domain.domain_id,
                 )
             )
         return user_id

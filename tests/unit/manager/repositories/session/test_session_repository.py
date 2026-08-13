@@ -1033,6 +1033,7 @@ class TestGetTemplateInfoById:
                         rounds=100_000,
                         salt_size=32,
                     ),
+                    domain_id=domain_id,
                     need_password_change=False,
                     full_name="Test User",
                     description="",

@@ -373,6 +373,7 @@ async def scope_owners(database: ExtendedAsyncSAEngine) -> None:
                 ),
                 domain_name=_DOMAIN_NAME,
                 resource_policy=_RESOURCE_POLICY_NAME,
+                domain_id=_DOMAIN_ID,
             )
         )
 

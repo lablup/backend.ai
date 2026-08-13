@@ -174,6 +174,7 @@ class TestEndpointSearchInProject:
                         rounds=1,
                         salt_size=16,
                     ),
+                    domain_id=domain_id,
                     domain_name=domain_name,
                     resource_policy=user_policy_name,
                     role=UserRole.USER,

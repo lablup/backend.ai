@@ -178,6 +178,7 @@ class TestLegacyExtraMountsHydration:
                         rounds=1,
                         salt_size=16,
                     ),
+                    domain_id=domain_fixture.domain_id,
                     domain_name=domain_fixture.domain_name,
                     resource_policy=user_resource_policy_name,
                     role=UserRole.USER,

@@ -158,6 +158,7 @@ async def test_user(
                     rounds=1,
                     salt_size=16,
                 ),
+                domain_id=test_domain.domain_id,
                 domain_name=test_domain.domain_name,
                 resource_policy="default",
                 role=UserRole.SUPERADMIN,

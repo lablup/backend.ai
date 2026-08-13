@@ -217,6 +217,7 @@ class TestReplicaGroupHistoryRepository:
                         rounds=100_000,
                         salt_size=32,
                     ),
+                    domain_id=domain_id,
                     need_password_change=False,
                     status=UserStatus.ACTIVE,
                     status_info="active",

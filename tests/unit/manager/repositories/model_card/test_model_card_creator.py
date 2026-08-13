@@ -168,6 +168,7 @@ class TestModelCardCreatorResourceRequirements:
                     rounds=100_000,
                     salt_size=32,
                 ),
+                domain_id=DomainID(test_domain.id),
                 need_password_change=False,
                 full_name="Test User",
                 domain_name=test_domain.name,

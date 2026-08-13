@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 import pytest
+import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
 from ai.backend.common.identifier.domain import DomainID, DomainName
@@ -1180,6 +1181,9 @@ class TestSearchUserFairSharesEntityBased:
         """Helper to create a user associated with domain and project."""
         user_uuid = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
+            domain_id = (
+                await db_sess.execute(sa.select(DomainRow.id).where(DomainRow.name == domain_name))
+            ).scalar_one()
             user_policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
             db_sess.add(
                 UserResourcePolicyRow(
@@ -1222,6 +1226,7 @@ class TestSearchUserFairSharesEntityBased:
                     role=UserRole.USER,
                     status=UserStatus.ACTIVE,
                     resource_policy=user_policy_name,
+                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()
