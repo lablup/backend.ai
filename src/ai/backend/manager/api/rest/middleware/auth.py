@@ -602,71 +602,109 @@ class _AuthContext:
     keypair: AuthenticatedKeypair
 
 
+# Only the columns the auth context carries are loaded, and the rows stay
+# inside the resolving session.
+_AUTH_CONTEXT_SELECT: Final = (
+    sa.select(KeyPairRow, UserRow, KeyPairResourcePolicyRow, UserResourcePolicyRow)
+    .join(UserRow, UserRow.uuid == KeyPairRow.user)
+    .join(
+        KeyPairResourcePolicyRow,
+        KeyPairResourcePolicyRow.name == KeyPairRow.resource_policy,
+    )
+    .join(
+        UserResourcePolicyRow,
+        UserResourcePolicyRow.name == UserRow.resource_policy,
+    )
+    .options(
+        load_only(
+            KeyPairRow.access_key,
+            KeyPairRow.secret_key,
+            KeyPairRow.is_admin,
+            KeyPairRow.rate_limit,
+        ),
+        load_only(
+            UserRow.uuid,
+            UserRow.email,
+            UserRow.role,
+            UserRow.domain_name,
+            UserRow.domain_id,
+            UserRow.sudo_session_enabled,
+            UserRow.allowed_client_ip,
+        ),
+    )
+)
+
+# Deterministic keypair choice for a user: the default keypair first, then the
+# oldest one, with access_key breaking created_at ties so that every request
+# resolves the same keypair.
+_USER_KEYPAIR_PRECEDENCE: Final = (
+    KeyPairRow.is_default.desc(),
+    KeyPairRow.created_at.asc(),
+    KeyPairRow.access_key.asc(),
+)
+
+
+def _auth_context_from_row(row: sa.Row[Any]) -> _AuthContext:
+    keypair_row, user_row, keypair_policy_row, user_policy_row = row
+    return _AuthContext(
+        user=AuthenticatedUser(
+            uuid=UserID(user_row.uuid),
+            email=user_row.email,
+            role=user_row.role,
+            domain_name=user_row.domain_name,
+            domain_id=DomainID(user_row.domain_id),
+            sudo_session_enabled=user_row.sudo_session_enabled,
+            allowed_client_ip=user_row.allowed_client_ip,
+            resource_policy=user_policy_row.to_dataclass(),
+        ),
+        keypair=AuthenticatedKeypair(
+            access_key=AccessKey(keypair_row.access_key),
+            secret_key=SecretKey(keypair_row.secret_key),
+            is_admin=bool(keypair_row.is_admin),
+            rate_limit=keypair_row.rate_limit,
+            resource_policy=keypair_policy_row.to_dataclass(),
+        ),
+    )
+
+
 async def _query_auth_context_by_access_key(
     db: ExtendedAsyncSAEngine,
     access_key: str,
 ) -> _AuthContext | None:
-    """Resolve an access key into the context an authenticated request carries.
-
-    Only the columns that context carries are loaded, and the rows stay inside this session.
-    """
+    """Resolve an access key into the context an authenticated request carries."""
     async with db.begin_readonly_session_read_committed() as sess:
         result = await sess.execute(
-            sa.select(KeyPairRow, UserRow, KeyPairResourcePolicyRow, UserResourcePolicyRow)
-            .join(UserRow, UserRow.uuid == KeyPairRow.user)
-            .join(
-                KeyPairResourcePolicyRow,
-                KeyPairResourcePolicyRow.name == KeyPairRow.resource_policy,
-            )
-            .join(
-                UserResourcePolicyRow,
-                UserResourcePolicyRow.name == UserRow.resource_policy,
-            )
-            .options(
-                load_only(
-                    KeyPairRow.access_key,
-                    KeyPairRow.secret_key,
-                    KeyPairRow.is_admin,
-                    KeyPairRow.rate_limit,
-                ),
-                load_only(
-                    UserRow.uuid,
-                    UserRow.email,
-                    UserRow.role,
-                    UserRow.domain_name,
-                    UserRow.domain_id,
-                    UserRow.sudo_session_enabled,
-                    UserRow.allowed_client_ip,
-                ),
-            )
-            .where(
+            _AUTH_CONTEXT_SELECT.where(
                 (KeyPairRow.access_key == access_key) & (KeyPairRow.is_active.is_(True)),
             )
         )
         row = result.one_or_none()
         if row is None:
             return None
+        return _auth_context_from_row(row)
 
-        keypair_row, user_row, keypair_policy_row, user_policy_row = row
-        return _AuthContext(
-            user=AuthenticatedUser(
-                uuid=UserID(user_row.uuid),
-                email=user_row.email,
-                role=user_row.role,
-                domain_name=user_row.domain_name,
-                domain_id=DomainID(user_row.domain_id),
-                sudo_session_enabled=user_row.sudo_session_enabled,
-                allowed_client_ip=user_row.allowed_client_ip,
-                resource_policy=user_policy_row.to_dataclass(),
-            ),
-            keypair=AuthenticatedKeypair(
-                access_key=AccessKey(keypair_row.access_key),
-                secret_key=SecretKey(keypair_row.secret_key),
-                is_admin=bool(keypair_row.is_admin),
-                rate_limit=keypair_row.rate_limit,
-                resource_policy=keypair_policy_row.to_dataclass(),
-            ),
+
+async def _query_auth_context_by_user_id(
+    db: ExtendedAsyncSAEngine,
+    user_id: UserID,
+) -> _AuthContext | None:
+    """Resolve a user id into the context an authenticated request carries.
+
+    The keypair is derived from the user by ``_USER_KEYPAIR_PRECEDENCE`` among
+    the user's active keypairs, not taken from the request.
+    """
+    async with db.begin_readonly_session_read_committed() as sess:
+        result = await sess.execute(
+            _AUTH_CONTEXT_SELECT.where(
+                (UserRow.uuid == user_id) & (KeyPairRow.is_active.is_(True)),
+            )
+            .order_by(*_USER_KEYPAIR_PRECEDENCE)
+            .limit(1)
         )
+        row = result.first()
+        if row is None:
+            return None
+        return _auth_context_from_row(row)
 
 
 async def _authenticate_via_jwt(
@@ -680,23 +718,31 @@ async def _authenticate_via_jwt(
             jwt_token,
             options={"verify_signature": False},
         )
-        access_key = unverified_payload.get("access_key")
-        if not access_key:
-            raise AuthorizationFailed("Access key not found in JWT token")
+        raw_user_id = unverified_payload.get("user_id")
+        if raw_user_id is not None:
+            # The user_id claim names the caller; the access_key claim is not
+            # consulted, and the verification keypair is derived from the user.
+            try:
+                user_id = UserID(uuid.UUID(raw_user_id))
+            except (TypeError, ValueError) as e:
+                raise AuthorizationFailed("Malformed user_id in JWT token") from e
+            context = await _query_auth_context_by_user_id(db, user_id)
+            if context is None:
+                raise AuthorizationFailed("User not found in database")
+        else:
+            # Tokens issued before the user_id claim existed carry only an access key.
+            access_key = unverified_payload.get("access_key")
+            if not access_key:
+                raise AuthorizationFailed("Access key not found in JWT token")
+            context = await _query_auth_context_by_access_key(db, access_key)
+            if context is None:
+                raise AuthorizationFailed("Access key not found in database")
 
-        context = await _query_auth_context_by_access_key(db, access_key)
+        jwt_validator.validate_token(jwt_token, context.keypair.secret_key)
 
-        if context is None:
-            raise AuthorizationFailed("Access key not found in database")
-        claims = jwt_validator.validate_token(jwt_token, context.keypair.secret_key)
-        # Tokens issued before the claim existed carry no user_id; only a
-        # present-but-mismatched claim is rejected.
-        if claims.user_id is not None and claims.user_id != context.user.uuid:
-            raise AuthorizationFailed("JWT user does not match the access key owner")
+        log.trace("JWT authentication succeeded for access_key={}", context.keypair.access_key)
 
-        log.trace("JWT authentication succeeded for access_key={}", access_key)
-
-        await valkey_stat.increment_keypair_query_count(access_key)
+        await valkey_stat.increment_keypair_query_count(context.keypair.access_key)
         return context
 
     except JWTError as e:
