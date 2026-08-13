@@ -187,9 +187,11 @@ class TestUnassignUsersFromProject:
         policy_name: str,
         password_info: PasswordInfo,
     ) -> uuid.UUID:
-        domain_id = DomainID(uuid.uuid4())
         user_uuid = uuid.uuid4()
         async with db.begin_session() as session:
+            domain_id = (
+                await session.execute(sa.select(DomainRow.id).where(DomainRow.name == domain_name))
+            ).scalar_one()
             session.add(
                 UserRow(
                     uuid=user_uuid,

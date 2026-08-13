@@ -263,7 +263,6 @@ class TestVFolderOwnershipTransferRBACCleanup:
         kp_policy_name: str,
     ) -> UserWithKeypair:
         """Create a user with RBAC role and keypair. Returns (user_uuid, email)."""
-        domain_id = DomainID(uuid.uuid4())
         user_uuid = uuid.uuid4()
         email = f"test-{user_uuid.hex[:8]}@example.com"
         password_info = PasswordInfo(
@@ -274,6 +273,9 @@ class TestVFolderOwnershipTransferRBACCleanup:
         )
 
         async with db.begin_session() as db_sess:
+            domain_id = (
+                await db_sess.execute(sa.select(DomainRow.id).where(DomainRow.name == domain_name))
+            ).scalar_one()
             user = UserRow(
                 uuid=user_uuid,
                 username=f"testuser-{user_uuid.hex[:8]}",

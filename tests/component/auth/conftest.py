@@ -245,6 +245,7 @@ async def _create_auth_user(
         "status": status,
         "status_info": "admin-requested",
         "domain_name": domain_name,
+        "domain_id": sa.select(DomainRow.id).where(DomainRow.name == domain_name).scalar_subquery(),
         "resource_policy": resource_policy,
         "role": UserRole.USER,
     }

@@ -4,6 +4,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
+import sqlalchemy as sa
 
 from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.types import BinarySize, QuotaScopeID, ResourceSlot
@@ -251,7 +252,6 @@ class TestEnsureQuotaScopeAccessibleByUser:
         test_resource_policy_name: str,
     ) -> AsyncGenerator[UUID, None]:
         """Create user in other domain and return user UUID"""
-        domain_id = DomainID(uuid.uuid4())
         user_uuid = uuid4()
         password_info = PasswordInfo(
             password="dummy",
@@ -261,6 +261,11 @@ class TestEnsureQuotaScopeAccessibleByUser:
         )
 
         async with db_with_cleanup.begin_session() as db_sess:
+            domain_id = (
+                await db_sess.execute(
+                    sa.select(DomainRow.id).where(DomainRow.name == other_domain_name)
+                )
+            ).scalar_one()
             user = UserRow(
                 uuid=user_uuid,
                 username=f"test_other_{user_uuid.hex[:8]}",
