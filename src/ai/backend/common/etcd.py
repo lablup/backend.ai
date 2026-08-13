@@ -503,22 +503,10 @@ class AsyncEtcd(AbstractKVStore):
     ) -> None:
         """Replace each subtree under the given prefixes in a single etcd transaction.
 
-        For every ``(prefix, dict_obj)`` pair the subtree rooted at ``prefix`` is
-        replaced by the flattened ``dict_obj``: keys present under the prefix but
-        absent from the new contents are deleted, and keys whose value changes are
-        put. The current-value reads and the delete/put operations are committed as
-        one transaction so watchers (e.g. Traefik) never observe a partially-applied
-        state where a router's backing service has briefly vanished.
-
-        A key already holding the new value is left out of the transaction: etcd
-        bumps the revision on every put even when the value is identical, so
-        re-publishing an unchanged subtree on a periodic reconcile would grow the
-        mvcc history until the backend quota is exceeded. Replacing an unchanged
-        subtree therefore issues no transaction at all.
-
-        An empty ``dict_obj`` removes the whole subtree under its prefix. Prefixes
-        are expected to be disjoint subtrees (one per logical object); sibling
-        subtrees not listed in ``replacements`` are left untouched.
+        Keys absent from the new contents are deleted, changed keys are put, and an
+        empty ``dict_obj`` removes the subtree. Keys already holding the new value
+        are skipped because etcd bumps the revision even on an identical put, so an
+        unchanged subtree issues no transaction at all. Prefixes must be disjoint.
 
         :param replacements: Mapping of subtree prefix to its new nested contents.
             Both prefixes and dict keys must be quoted by the caller as needed.

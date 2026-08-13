@@ -261,10 +261,7 @@ async def test_atomic_replace_prefixes_skips_unchanged_keys(etcd: AsyncEtcd) -> 
 
     url_key = f"/sorna/{etcd.ns}/global/svc/bai_service_f/loadBalancer/servers/0/url".encode()
 
-    # etcd bumps a key's version on every put even when the value is identical, so
-    # re-publishing an unchanged subtree on a periodic reconcile would grow the mvcc
-    # history until the backend quota is exceeded. A version still at 1 proves the
-    # replace issued no put at all.
+    # etcd bumps the version on every put, so a version still at 1 proves no put ran.
     await etcd.atomic_replace_prefixes({
         "svc/bai_service_f": {"loadBalancer": {"servers": {"0": {"url": "u0"}}}},
     })
