@@ -23,25 +23,26 @@ branch_labels = None
 depends_on = None
 
 
+def _backfill_and_set_not_null(column: str, backfill: str) -> None:
+    """Tighten ``domains.{column}``, skipping a database that already has it NOT NULL."""
+    inspector = sa.inspect(op.get_bind())
+    reflected = {col["name"]: col for col in inspector.get_columns("domains")}
+    if not reflected[column]["nullable"]:
+        return
+    op.execute(sa.text(f"UPDATE domains SET {column} = {backfill} WHERE {column} IS NULL"))
+    op.alter_column("domains", column, nullable=False)
+
+
 def upgrade() -> None:
     op.alter_column("domains", "modified_at", new_column_name="updated_at")
-    # created_at is backfilled first, so a row with both timestamps NULL leaves
-    # this statement with now() for the updated_at backfill to read.
-    op.execute(
-        sa.text(
-            "UPDATE domains SET created_at = COALESCE(updated_at, now()) WHERE created_at IS NULL"
-        )
-    )
-    op.execute(
-        sa.text(
-            "UPDATE domains SET updated_at = COALESCE(created_at, now()) WHERE updated_at IS NULL"
-        )
-    )
-    op.alter_column("domains", "created_at", nullable=False)
-    op.alter_column("domains", "updated_at", nullable=False)
+    # created_at is tightened first, so a row with both timestamps NULL leaves
+    # this call with now() for the updated_at backfill to read.
+    _backfill_and_set_not_null("created_at", "COALESCE(updated_at, now())")
+    _backfill_and_set_not_null("updated_at", "COALESCE(created_at, now())")
 
 
 def downgrade() -> None:
-    op.alter_column("domains", "updated_at", nullable=True)
-    op.alter_column("domains", "created_at", nullable=True)
+    # The tightening is not reversed: upgrade only applies it to a database that
+    # was still nullable, and loosening one that never was would undo a state it
+    # arrived with.
     op.alter_column("domains", "updated_at", new_column_name="modified_at")
