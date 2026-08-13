@@ -7,7 +7,7 @@ left ``domains`` out, so a database that came up through ``bae1a7326e8a``
 rather than ``create_all`` still allows NULLs the ORM declares impossible.
 
 Revision ID: c4d1a7e58b32
-Revises: b9e3a7c14f28
+Revises: 99365294b8d9
 Create Date: 2026-08-13 10:00:00.000000
 
 """
@@ -17,7 +17,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "c4d1a7e58b32"
-down_revision = "b9e3a7c14f28"
+down_revision = "99365294b8d9"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
