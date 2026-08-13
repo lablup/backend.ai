@@ -6,7 +6,7 @@ the half it is missing from the other, and one missing both joins the domain
 ``b9e3a7c14f28`` marks as the default.
 
 Revision ID: e7b2c9f04d31
-Revises: b9e3a7c14f28
+Revises: c4d1a7e58b32
 Create Date: 2026-08-12 20:40:00.000000
 
 """
@@ -19,7 +19,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "e7b2c9f04d31"
-down_revision = "b9e3a7c14f28"
+down_revision = "c4d1a7e58b32"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
