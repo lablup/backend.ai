@@ -26,6 +26,8 @@
 | `common/events/` | Event type definitions and dispatcher — see existing `AbstractEvent` subclasses |
 | `common/bgtask/` | Background task framework — extend `BaseBackgroundTaskHandler` |
 | `common/dto/` | Inter-component DTOs — see `common/dto/AGENTS.md` |
+| `common/interchange/` | Payloads one component sends another (event/RPC bodies) — see `common/interchange/AGENTS.md` |
+| `common/schema/` | Pydantic types the manager persists as a JSON DB column — see `common/schema/AGENTS.md` |
 | `common/exception.py` | Root `BackendAIError` and `ErrorCode` — all component exceptions inherit from here |
 | `common/types.py` | Common base types used across layers |
 

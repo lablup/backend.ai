@@ -40,9 +40,7 @@ from ai.backend.agent.errors.resources import (
     InvalidResourceConfigError,
     ResourceOverAllocatedError,
 )
-from ai.backend.common.data.kernel.types import KernelResourceSpecData, MountData
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.types import (
@@ -57,7 +55,6 @@ from ai.backend.common.types import (
     MountPermission,
     MountTypes,
     ResourceSlot,
-    ResourceSlotEntry,
     SlotName,
     SlotTypes,
     aobject,
@@ -126,7 +123,7 @@ class KernelResourceSpec:
     slots: ResourceSlot
     """Stores the original user-requested resource slots."""
 
-    allocations: MutableMapping[DeviceName, Mapping[SlotName, Mapping[DeviceId, Decimal]]]
+    allocations: MutableMapping[DeviceName, DeviceAllocation]
     """
     Represents the resource allocations for each slot (device) type and devices.
     """
@@ -265,34 +262,35 @@ class KernelResourceSpec:
         text = "\n".join(await file.readlines())
         return cls.read_from_string(text)
 
-    def to_data(self) -> KernelResourceSpecData:
-        """
-        Render this spec as the value events and logs carry it as.
-        """
-        return KernelResourceSpecData(
-            slots=ResourceSlotEntry.from_resource_slot(self.slots),
-            allocations={
-                dev_name: {
-                    ResourceSlotName(str(slot_name)): dict(per_device_alloc)
-                    for slot_name, per_device_alloc in dev_alloc.items()
-                }
-                for dev_name, dev_alloc in self.allocations.items()
-            },
-            scratch_disk_size=self.scratch_disk_size,
-            mounts=[
-                MountData(
-                    type=mount.type,
-                    source=mount.source,
-                    target=mount.target,
-                    permission=mount.permission,
-                )
-                for mount in self.mounts
-            ],
-            unified_devices=[
-                (device_name, ResourceSlotName(str(slot_name)))
-                for device_name, slot_name in self.unified_devices
-            ],
-        )
+    def to_json_serializable_dict(self) -> Mapping[str, Any]:
+        o = attrs.asdict(self)
+        for slot_name, alloc in o["slots"].items():
+            if known_slot_types.get(slot_name, "count") == "bytes":
+                o["slots"] = f"{BinarySize(alloc):s}"
+            else:
+                o["slots"] = str(alloc)
+        serialized_allocations = {}
+        for dev_name, dev_alloc in o["allocations"].items():
+            serialized_dev_alloc = {}
+            for slot_name, per_device_alloc in dev_alloc.items():
+                serialized_per_device_alloc = {}
+                for dev_id, alloc in per_device_alloc.items():
+                    if known_slot_types.get(slot_name, "count") == "bytes":
+                        serialized_alloc = f"{BinarySize(alloc):s}"
+                    else:
+                        serialized_alloc = str(alloc)
+                    serialized_per_device_alloc[str(dev_id)] = serialized_alloc
+                serialized_dev_alloc[str(slot_name)] = serialized_per_device_alloc
+            serialized_allocations[str(dev_name)] = serialized_dev_alloc
+        o["allocations"] = serialized_allocations
+        o["mounts"] = list(map(str, self.mounts))
+        o["unified_devices"] = [
+            (str(device_name), str(slot_name)) for device_name, slot_name in self.unified_devices
+        ]
+        return o
+
+    def to_json(self) -> str:
+        return dump_json_str(self.to_json_serializable_dict())
 
     @classmethod
     def __get_pydantic_core_schema__(
