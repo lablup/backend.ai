@@ -57,70 +57,51 @@ class KernelLifecycleEventReason(enum.StrEnum):
         return None
 
 
-class SlotOccupancy(BackendAISchema):
-    """How much of one slot each individual device supplies."""
+class OccupiedDevice(BackendAISchema):
+    """
+    One device unit the kernel holds, and how much of it.
 
-    amounts: Mapping[DeviceId, Decimal]
-
-
-class DeviceOccupancy(BackendAISchema):
-    """The slots one device supplies.
-
-    A device supplies more than one slot when it is metered along more than one axis —
-    `cuda` supplies both `cuda.device` and `cuda.shares`.
+    `allocated` is in the scheduler's units — the slots it accounts by, of which a unit
+    supplies more than one when it is metered along more than one axis, as a `cuda`
+    device does with `cuda.device` and `cuda.shares`. `processing_units` and
+    `memory_size` are that same allocation in the device's own units, mirroring
+    `AbstractComputeDevice`; only an accelerator reports them.
     """
 
-    slots: Mapping[ResourceSlotName, SlotOccupancy]
+    model_name: str | None  # kept for the GPU usage stats, which aggregate device models
+    allocated: Mapping[ResourceSlotName, Decimal]
+    processing_units: int | None
+    memory_size: int | None
 
 
-class KernelOccupancy(BackendAISchema):
+class OccupiedDevices(BackendAISchema):
     """
-    The resources the kernel occupies, attributed to the devices supplying them.
+    The devices the kernel occupies.
 
-    `DeviceName` names a device (`cuda`) and `DeviceId` one of its units (`0`), so the
-    two levels keyed by a device are not the same thing.
+    Keyed by device name (`cuda`) and then by unit (`0`): `DeviceName` names a kind of
+    device, `DeviceId` one of its units.
     """
 
-    devices: Mapping[DeviceName, DeviceOccupancy]
+    units: Mapping[DeviceName, Mapping[DeviceId, OccupiedDevice]]
 
     @property
     def slot_totals(self) -> list[ResourceSlotEntry]:
         """
-        The per-device amounts summed per slot — what a caller records as occupancy.
+        The per-unit allocations summed per slot — what a caller records as occupancy.
 
-        A slot supplied by no device is left out rather than reported as zero, which is
-        the distinction a caller storing the result depends on.
-
-        Not a `computed_field`: it would be written into the payload beside the
-        occupancy it is derived from, and a receiver recomputes it anyway.
+        Not a `computed_field`: it would be written into the payload beside the allocations
+        it is derived from, where nothing reads it — a receiver recomputes it — and it
+        can disagree with the value next to it.
         """
-        totals: list[ResourceSlotEntry] = []
-        for device in self.devices.values():
-            for slot_name, slot in device.slots.items():
-                if not slot.amounts:
-                    continue
-                total = sum(slot.amounts.values(), Decimal(0))
-                totals.append(ResourceSlotEntry(resource_type=slot_name, quantity=str(total)))
-        return totals
-
-
-class DeviceCapacity(BackendAISchema):
-    """
-    What a device reports about itself.
-
-    Both are defaulted, unlike every other field here: the compute plugin's own
-    `ComputedDeviceCapacity` declares them `NotRequired`, so a device that measures
-    neither reports neither.
-    """
-
-    mem: int | None = None
-    proc: int | None = None
-
-
-class AttachedDevice(BackendAISchema):
-    device_id: DeviceId
-    model_name: str
-    data: DeviceCapacity
+        totals: dict[ResourceSlotName, Decimal] = {}
+        for units in self.units.values():
+            for device in units.values():
+                for slot_name, amount in device.allocated.items():
+                    totals[slot_name] = totals.get(slot_name, Decimal(0)) + amount
+        return [
+            ResourceSlotEntry(resource_type=slot_name, quantity=str(total))
+            for slot_name, total in totals.items()
+        ]
 
 
 class ServicePortInfo(BackendAISchema):
@@ -144,5 +125,4 @@ class KernelCreationInfo(BackendAISchema):
     repl_in_port: int
     repl_out_port: int
     service_ports: list[ServicePortInfo]
-    attached_devices: Mapping[DeviceName, list[AttachedDevice]]
-    occupancy: KernelOccupancy
+    occupied_devices: OccupiedDevices
