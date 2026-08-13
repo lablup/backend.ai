@@ -976,7 +976,7 @@ def build_auth_middleware(
                 "is_authorized": True,
                 "is_admin": context.keypair.is_admin,
                 "is_superadmin": is_superadmin,
-                # Handlers still read mappings; BA-7189 puts the dataclasses themselves here.
+                # Handlers still read these two as mappings.
                 "user": dataclasses.asdict(context.user),
                 "keypair": dataclasses.asdict(context.keypair),
             })
