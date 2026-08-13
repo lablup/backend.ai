@@ -684,9 +684,7 @@ async def _authenticate_via_jwt(
         if not access_key:
             raise AuthorizationFailed("Access key not found in JWT token")
 
-        context = await execute_with_retry(
-            functools.partial(_query_auth_context_by_access_key, db, access_key)
-        )
+        context = await _query_auth_context_by_access_key(db, access_key)
 
         if context is None:
             raise AuthorizationFailed("Access key not found in database")
@@ -716,9 +714,7 @@ async def _authenticate_via_hmac(
 
     sign_method, access_key, signature = params
 
-    context = await execute_with_retry(
-        functools.partial(_query_auth_context_by_access_key, db, access_key)
-    )
+    context = await _query_auth_context_by_access_key(db, access_key)
 
     if context is None:
         raise AuthorizationFailed("Access key not found in HMAC")
@@ -753,9 +749,7 @@ async def _authenticate_via_hook(
     if access_key is None:
         return None
 
-    context = await execute_with_retry(
-        functools.partial(_query_auth_context_by_access_key, db, access_key)
-    )
+    context = await _query_auth_context_by_access_key(db, access_key)
 
     if context is None:
         raise AuthorizationFailed("Access key not found in hook")
