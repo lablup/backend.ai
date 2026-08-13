@@ -70,11 +70,6 @@ class SessionTestData:
 
 
 @pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
-
-
-@pytest.fixture
 def test_domain_id() -> DomainID:
     return DomainID(uuid.uuid4())
 
@@ -963,18 +958,22 @@ class TestGetTemplateInfoById:
 
     @pytest.fixture
     async def active_template(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: DomainID
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> tuple[uuid.UUID, str]:
         """Insert an active session_template. Returns (template_id, name)."""
+        domain_id = DomainID(uuid.uuid4())
         return await self._create_template(
             db_with_cleanup, is_active=True, name="test-template", domain_id=domain_id
         )
 
     @pytest.fixture
     async def inactive_template(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: DomainID
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> tuple[uuid.UUID, str]:
         """Insert an inactive session_template. Returns (template_id, name)."""
+        domain_id = DomainID(uuid.uuid4())
         return await self._create_template(
             db_with_cleanup, is_active=False, name="inactive-template", domain_id=domain_id
         )
@@ -991,6 +990,7 @@ class TestGetTemplateInfoById:
 
         Returns (template_id, name).
         """
+        domain_id = DomainID(uuid.uuid4())
         template_id = uuid.uuid4()
         domain_name = f"test-domain-{template_id.hex[:8]}"
         user_uuid = uuid.uuid4()

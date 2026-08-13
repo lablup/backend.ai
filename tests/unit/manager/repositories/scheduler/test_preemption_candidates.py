@@ -46,11 +46,6 @@ from ai.backend.testutils.fixtures import DomainFixtureData
 from .conftest import create_pending_session_with_kernels
 
 
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
-
-
 def _user_key(user_uuid: uuid.UUID) -> PreemptionScopeKey:
     """Snapshot key of an owner under the default (user) victim scope."""
     return PreemptionScopeKey(user_uuid)
@@ -59,8 +54,8 @@ def _user_key(user_uuid: uuid.UUID) -> PreemptionScopeKey:
 async def _create_allocated_session(
     db: ExtendedAsyncSAEngine,
     *,
-    domain_id: DomainID,
     domain_name: str,
+    domain_id: DomainID,
     resource_group_id: ResourceGroupID,
     scaling_group_name: str,
     group_id: uuid.UUID,
@@ -74,6 +69,7 @@ async def _create_allocated_session(
     kernel_status: KernelStatus = KernelStatus.RUNNING,
 ) -> SessionId:
     """A resource-holding session: the shared factory with agents assigned."""
+    domain_id = DomainID(uuid.uuid4())
     session_id, _ = await create_pending_session_with_kernels(
         db,
         domain_id=domain_id,
@@ -98,6 +94,7 @@ async def _create_extra_user(
     db: ExtendedAsyncSAEngine,
     *,
     domain_name: str,
+    domain_id: DomainID,
     user_resource_policy: str,
     keypair_resource_policy: str,
 ) -> tuple[uuid.UUID, AccessKey]:
@@ -533,6 +530,7 @@ class TestFetchPreemptionCandidates:
         other_user, other_access_key = await _create_extra_user(
             db_with_cleanup,
             domain_name=test_domain.domain_name,
+            domain_id=test_domain_id,
             user_resource_policy=test_user_resource_policy_name,
             keypair_resource_policy=test_keypair_resource_policy_name,
         )
@@ -636,6 +634,7 @@ class TestFetchPreemptionCandidates:
         other_user, other_access_key = await _create_extra_user(
             db_with_cleanup,
             domain_name=test_domain.domain_name,
+            domain_id=test_domain_id,
             user_resource_policy=test_user_resource_policy_name,
             keypair_resource_policy=test_keypair_resource_policy_name,
         )
@@ -941,6 +940,7 @@ class TestPreemptionVictimScope:
         other_user, other_access_key = await _create_extra_user(
             db_with_cleanup,
             domain_name=test_domain.domain_name,
+            domain_id=test_domain_id,
             user_resource_policy=test_user_resource_policy_name,
             keypair_resource_policy=test_keypair_resource_policy_name,
         )
@@ -1039,6 +1039,7 @@ class TestPreemptionVictimScope:
         other_user, other_access_key = await _create_extra_user(
             db_with_cleanup,
             domain_name=test_domain.domain_name,
+            domain_id=test_domain_id,
             user_resource_policy=test_user_resource_policy_name,
             keypair_resource_policy=test_keypair_resource_policy_name,
         )
@@ -1069,6 +1070,7 @@ class TestPreemptionVictimScope:
         extra_domain_user, extra_domain_access_key = await _create_extra_user(
             db_with_cleanup,
             domain_name=extra_domain_name,
+            domain_id=test_domain_id,
             user_resource_policy=test_user_resource_policy_name,
             keypair_resource_policy=test_keypair_resource_policy_name,
         )
@@ -1141,6 +1143,7 @@ class TestPreemptionVictimScope:
         extra_domain_user, extra_domain_access_key = await _create_extra_user(
             db_with_cleanup,
             domain_name=extra_domain_name,
+            domain_id=test_domain_id,
             user_resource_policy=test_user_resource_policy_name,
             keypair_resource_policy=test_keypair_resource_policy_name,
         )

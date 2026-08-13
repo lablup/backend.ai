@@ -121,7 +121,6 @@ class TestKernelTermination:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
     ) -> AsyncGenerator[DomainFixtureData, None]:
-        domain_id = DomainID(uuid.uuid4())
         """Create test domain and return domain name"""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
@@ -137,7 +136,7 @@ class TestKernelTermination:
             db_sess.add(domain)
             await db_sess.flush()
 
-        yield DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
+        yield DomainFixtureData(domain_name=DomainName(domain_name), domain_id=test_domain_id)
 
     @pytest.fixture
     async def test_scaling_group_name(

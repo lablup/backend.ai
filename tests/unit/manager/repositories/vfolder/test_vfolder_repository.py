@@ -184,8 +184,8 @@ class TestVfolderRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[DomainFixtureData, None]:
-        domain_id = DomainID(uuid.uuid4())
         """Create test domain and return domain name"""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:

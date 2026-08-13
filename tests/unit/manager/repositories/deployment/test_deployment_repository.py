@@ -254,7 +254,6 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
     ) -> DomainFixtureData:
-        domain_id = DomainID(uuid.uuid4())
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
@@ -271,7 +270,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             db_sess.add(domain)
             await db_sess.commit()
 
-        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=test_domain_id)
 
     @pytest.fixture
     async def test_scaling_group_name(

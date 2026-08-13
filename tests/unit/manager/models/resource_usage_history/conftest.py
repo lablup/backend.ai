@@ -68,8 +68,8 @@ async def database_with_usage_tables(
 async def domain_fixture(
     database_with_usage_tables: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[DomainFixtureData, None]:
-    domain_id = DomainID(uuid.uuid4())
     """Create DomainRow and return its name."""
+    domain_id = DomainID(uuid.uuid4())
     name = "test-domain"
     async with database_with_usage_tables.begin_session() as db_sess:
         db_sess.add(DomainRow(id=domain_id, name=name))

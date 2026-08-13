@@ -180,7 +180,6 @@ class TestCheckPresetsOccupiedSlots:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
     ) -> AsyncGenerator[DomainFixtureData, None]:
-        domain_id = DomainID(uuid.uuid4())
         """Create test domain and return domain name"""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
@@ -197,7 +196,7 @@ class TestCheckPresetsOccupiedSlots:
             await db_sess.flush()
 
         try:
-            yield DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
+            yield DomainFixtureData(domain_name=DomainName(domain_name), domain_id=test_domain_id)
         finally:
             # Cleanup handled by db_with_cleanup
             pass

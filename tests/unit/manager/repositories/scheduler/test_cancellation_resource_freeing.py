@@ -110,7 +110,6 @@ class TestCancelFreesResourceAllocations:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
     ) -> AsyncGenerator[DomainFixtureData, None]:
-        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -124,7 +123,7 @@ class TestCancelFreesResourceAllocations:
                 )
             )
             await db_sess.flush()
-        yield DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
+        yield DomainFixtureData(domain_name=DomainName(domain_name), domain_id=test_domain_id)
 
     @pytest.fixture
     async def test_scaling_group_name(

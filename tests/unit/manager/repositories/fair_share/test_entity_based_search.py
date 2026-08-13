@@ -150,8 +150,8 @@ class TestSearchDomainFairSharesEntityBased:
         scaling_group: str,
         fair_share_repository: FairShareRepository,
     ) -> DomainFixtureData:
-        domain_id = DomainID(uuid.uuid4())
         """Create a domain with fair share record."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"domain-with-record-{uuid.uuid4().hex[:8]}"
         domain_id = DomainID(uuid.uuid4())
         async with db_with_cleanup.begin_session() as db_sess:

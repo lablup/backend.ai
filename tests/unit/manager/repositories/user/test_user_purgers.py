@@ -660,7 +660,7 @@ class TestUserSessionGroupPurger:
     ) -> _PlacementScope:
         domain_id = DomainID(uuid.uuid4())
         domain = DomainRow(
-            id=DomainID(uuid.uuid4()),
+            id=domain_id,
             name=f"test-domain-{uuid.uuid4().hex[:8]}",
             total_resource_slots=ResourceSlot(),
             allowed_vfolder_hosts={},
@@ -711,7 +711,7 @@ class TestUserSessionGroupPurger:
             await session.flush()
 
         return _PlacementScope(
-            domain_id=DomainID(domain.id),
+            domain_id=domain_id,
             domain_name=domain.name,
             project_id=ProjectID(project.id),
             owner_user_id=UserID(user.uuid),

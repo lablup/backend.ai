@@ -244,8 +244,8 @@ class TestDomainRepository:
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
     ) -> DomainFixtureData:
-        domain_id = DomainID(uuid.uuid4())
         """Create an inactive domain for purge testing."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"inactive-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_default_resource_policies.begin_session() as session:
             domain = DomainRow(

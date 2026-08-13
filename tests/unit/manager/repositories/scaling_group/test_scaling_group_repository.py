@@ -106,11 +106,6 @@ from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 
 
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
-
-
 class TestScalingGroupRepositoryDB:
     """Test cases for ScalingGroupRepository"""
 
@@ -345,13 +340,13 @@ class TestScalingGroupRepositoryDB:
     async def test_user_domain_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> AsyncGenerator[tuple[uuid.UUID, str, uuid.UUID], None]:
         """Create test user, domain, and group for cascade delete testing.
 
         Returns:
             Tuple of (user_uuid, domain_name, group_id)
         """
+        domain_id = DomainID(uuid.uuid4())
         test_user_uuid = uuid.uuid4()
         test_domain = f"test-domain-{uuid.uuid4().hex[:8]}"
         test_group_id = uuid.uuid4()
