@@ -7,6 +7,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any, Self
 
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import BackendAISchema
 
 __all__ = (
@@ -56,6 +57,7 @@ class AuthSuccessResponse(AuthResponse):
     status: str
     session_token: str
     type: AuthTokenType = AuthTokenType.KEYPAIR
+    user_id: UserID | None = None
 
     def to_dict(self) -> dict[str, str]:
         return self.model_dump(mode="json")

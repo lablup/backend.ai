@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 from typing import cast
 
 from aiohttp import web
@@ -9,6 +10,7 @@ from multidict import CIMultiDict
 from ai.backend.client.config import APIConfig
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common.clients.http_client.client_pool import ClientKey, ClientPool
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.jwt.signer import JWTSigner
 from ai.backend.common.jwt.types import JWTUserContext
 from ai.backend.common.types import AccessKey
@@ -186,12 +188,13 @@ async def generate_jwt_token_for_session(
     access_key = AccessKey(token["access_key"])
     secret_key = token["secret_key"]
     role = session.get("role", "user")
+    # Sessions created before user_id was stored in the login token lack it.
+    raw_user_id = token.get("user_id")
 
-    # Create JWT user context (minimal information)
-    # user_id, domain_name, is_admin, is_superadmin will be retrieved from user table during authentication
     user_context = JWTUserContext(
         access_key=access_key,
         role=role,
+        user_id=UserID(uuid.UUID(raw_user_id)) if raw_user_id else None,
     )
 
     # Generate JWT token using user's secret key

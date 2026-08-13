@@ -73,6 +73,7 @@ class JWTSigner:
             iat=now,
             access_key=user_context.access_key,
             role=user_context.role,
+            user_id=user_context.user_id,
         )
 
         try:

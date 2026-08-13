@@ -688,7 +688,11 @@ async def _authenticate_via_jwt(
 
         if context is None:
             raise AuthorizationFailed("Access key not found in database")
-        jwt_validator.validate_token(jwt_token, context.keypair.secret_key)
+        claims = jwt_validator.validate_token(jwt_token, context.keypair.secret_key)
+        # Tokens issued before the claim existed carry no user_id; only a
+        # present-but-mismatched claim is rejected.
+        if claims.user_id is not None and claims.user_id != context.user.uuid:
+            raise AuthorizationFailed("JWT user does not match the access key owner")
 
         log.trace("JWT authentication succeeded for access_key={}", access_key)
 
