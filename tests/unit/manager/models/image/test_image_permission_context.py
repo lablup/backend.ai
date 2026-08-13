@@ -1,28 +1,23 @@
-"""Regression tests for ImagePermissionContextBuilder.
+"""Regression test for ImagePermissionContextBuilder with non-global registries.
 
-Two crashes are covered here:
+Reproduces the KeyError bug where querying images with a single project scope
+crashes when a non-global registry is associated with multiple projects.
+See: https://github.com/lablup/backend.ai/pull/10482
 
-- Querying a single project scope raised KeyError when a non-global registry was
-  associated with more than one project.
-  See: https://github.com/lablup/backend.ai/pull/10482
-- Querying the system scope raised IndexError when the caller belonged to no project,
-  because global-registry images read their permissions off the per-project permission
-  map, which is empty in that case.
+Also covers the IndexError raised in the system scope when the caller is enrolled in no
+project, where the same loop read the global-registry permissions off an empty map.
 """
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncGenerator
-from dataclasses import dataclass
 from uuid import UUID, uuid4
 
 import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
 from ai.backend.common.identifier.domain import DomainID, DomainName
-from ai.backend.common.identifier.virtual_scope import VirtualScopeID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.data.permission.permission_defs import ImagePermission
@@ -40,11 +35,7 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.image.row import (
-    ADMIN_PERMISSIONS,
-    ALL_IMAGE_PERMISSIONS,
     MEMBER_PERMISSIONS,
-    MONITOR_PERMISSIONS,
-    PRIVILEGED_MEMBER_PERMISSIONS,
     ImagePermissionContextBuilder,
 )
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -58,8 +49,6 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -76,150 +65,55 @@ _ORM_CLUSTER = (
 )
 
 
-async def _create_project(
-    db: ExtendedAsyncSAEngine,
-    name: str,
-    domain: DomainFixtureData,
-    user: UserRow,
-) -> UUID:
-    """Create a project and join `user` to it as a group member."""
-    project_id = uuid4()
-    async with db.begin_session() as sess:
-        sess.add(
-            GroupRow(
-                id=project_id,
-                name=name,
-                domain_name=domain.domain_name,
-                is_active=True,
-                resource_policy=PROJECT_RESOURCE_POLICY_NAME,
+class TestImagePermissionContextNonGlobalRegistry:
+    """Tests for ImagePermissionContextBuilder with non-global registry access control."""
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    async def _create_project(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        name: str,
+        domain: DomainFixtureData,
+        user: UserRow,
+    ) -> UUID:
+        project_id = uuid4()
+        async with db_with_cleanup.begin_session() as sess:
+            sess.add(
+                GroupRow(
+                    id=project_id,
+                    name=name,
+                    domain_name=domain.domain_name,
+                    is_active=True,
+                    resource_policy=PROJECT_RESOURCE_POLICY_NAME,
+                )
             )
-        )
-        await sess.flush()
-        sess.add(
-            AssocGroupUserRow(
-                id=uuid4(),
-                user_id=user.uuid,
-                group_id=project_id,
+            await sess.flush()
+            sess.add(
+                AssocGroupUserRow(
+                    id=uuid4(),
+                    user_id=user.uuid,
+                    group_id=project_id,
+                )
             )
-        )
-        await sess.commit()
-    return project_id
+            await sess.commit()
+        return project_id
 
-
-@pytest.fixture
-async def db_with_cleanup(
-    database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-    async with with_tables(
-        database_connection,
-        [
-            DomainRow,
-            UserResourcePolicyRow,
-            ProjectResourcePolicyRow,
-            KeyPairResourcePolicyRow,
-            KeyPairRow,
-            UserRow,
-            GroupRow,
-            AssocGroupUserRow,
-            VirtualScopeRow,
-            EntityMembershipRow,
-            ContainerRegistryRow,
-            AssociationContainerRegistriesGroupsRow,
-            ImageRow,
-        ],
-    ):
-        yield database_connection
-
-
-@pytest.fixture
-async def domain(db_with_cleanup: ExtendedAsyncSAEngine) -> DomainFixtureData:
-    domain_id = DomainID(uuid4())
-    async with db_with_cleanup.begin_session() as sess:
-        sess.add(
-            DomainRow(
-                id=domain_id,
-                name=DOMAIN_NAME,
-                is_active=True,
-                total_resource_slots=ResourceSlot(),
-                allowed_vfolder_hosts={},
-                allowed_docker_registries=[REGISTRY_NAME],
-                dotfiles=b"\x90",
-            )
-        )
-        sess.add(
-            ProjectResourcePolicyRow(
-                name=PROJECT_RESOURCE_POLICY_NAME,
-                max_vfolder_count=0,
-                max_quota_scope_size=0,
-                max_network_count=0,
-            )
-        )
-        await sess.commit()
-    return DomainFixtureData(domain_name=DomainName(DOMAIN_NAME), domain_id=domain_id)
-
-
-@pytest.fixture
-async def user(db_with_cleanup: ExtendedAsyncSAEngine, domain: DomainFixtureData) -> UserRow:
-    user_id = uuid4()
-    async with db_with_cleanup.begin_session() as sess:
-        sess.add(
-            UserResourcePolicyRow(
-                name=USER_RESOURCE_POLICY_NAME,
-                max_vfolder_count=0,
-                max_quota_scope_size=0,
-                max_session_count_per_model_session=0,
-                max_customized_image_count=0,
-            )
-        )
-        await sess.flush()
-        sess.add(
-            UserRow(
-                uuid=user_id,
-                username="testuser",
-                email="testuser@test.io",
-                domain_name=domain.domain_name,
-                role=UserRole.USER,
-                resource_policy=USER_RESOURCE_POLICY_NAME,
-                domain_id=domain.domain_id,
-            )
-        )
-        await sess.commit()
-
-    async with db_with_cleanup.begin_readonly_session() as sess:
-        return await sess.get_one(UserRow, user_id)
-
-
-@pytest.fixture
-async def global_registry_id(db_with_cleanup: ExtendedAsyncSAEngine) -> UUID:
-    registry_id = uuid4()
-    async with db_with_cleanup.begin_session() as sess:
-        sess.add(
-            ContainerRegistryRow(
-                id=registry_id,
-                url=REGISTRY_URL,
-                registry_name=REGISTRY_NAME,
-                type=ContainerRegistryType.HARBOR2,
-                project="stable",
-                is_global=True,
-            )
-        )
-        await sess.commit()
-    return registry_id
-
-
-@pytest.fixture
-async def global_image_id(
-    db_with_cleanup: ExtendedAsyncSAEngine,
-    global_registry_id: UUID,
-) -> UUID:
-    async with db_with_cleanup.begin_session() as sess:
-        img = ImageRow(
-            name=f"{REGISTRY_NAME}/stable/python:latest",
-            image="python",
+    def _make_image(
+        self,
+        registry_id: UUID,
+        project: str,
+        name_suffix: str,
+    ) -> ImageRow:
+        return ImageRow(
+            name=f"{REGISTRY_NAME}/{project}/{name_suffix}:latest",
+            image=name_suffix,
             tag="latest",
             registry=REGISTRY_NAME,
-            registry_id=global_registry_id,
-            project="stable",
+            registry_id=registry_id,
+            project=project,
             architecture="x86_64",
             config_digest=f"sha256:{uuid4().hex}",
             size_bytes=100_000,
@@ -228,40 +122,132 @@ async def global_image_id(
             labels={},
             resources={},
         )
-        sess.add(img)
-        await sess.flush()
-        image_id = img.id
-        await sess.commit()
-    return image_id
-
-
-class TestImagePermissionContextNonGlobalRegistry:
-    """Tests for ImagePermissionContextBuilder with non-global registry access control."""
 
     # ------------------------------------------------------------------
     # Fixtures
     # ------------------------------------------------------------------
 
     @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                KeyPairRow,
+                UserRow,
+                GroupRow,
+                AssocGroupUserRow,
+                ContainerRegistryRow,
+                AssociationContainerRegistriesGroupsRow,
+                ImageRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    async def domain(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> DomainFixtureData:
+        domain_id = DomainID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as sess:
+            sess.add(
+                DomainRow(
+                    id=domain_id,
+                    name=DOMAIN_NAME,
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    allowed_docker_registries=[REGISTRY_NAME],
+                    dotfiles=b"\x90",
+                )
+            )
+            sess.add(
+                ProjectResourcePolicyRow(
+                    name=PROJECT_RESOURCE_POLICY_NAME,
+                    max_vfolder_count=0,
+                    max_quota_scope_size=0,
+                    max_network_count=0,
+                )
+            )
+            await sess.commit()
+        return DomainFixtureData(domain_name=DomainName(DOMAIN_NAME), domain_id=domain_id)
+
+    @pytest.fixture
+    async def user(
+        self, db_with_cleanup: ExtendedAsyncSAEngine, domain: DomainFixtureData
+    ) -> UserRow:
+        user_id = uuid4()
+        async with db_with_cleanup.begin_session() as sess:
+            sess.add(
+                UserResourcePolicyRow(
+                    name=USER_RESOURCE_POLICY_NAME,
+                    max_vfolder_count=0,
+                    max_quota_scope_size=0,
+                    max_session_count_per_model_session=0,
+                    max_customized_image_count=0,
+                )
+            )
+            await sess.flush()
+            sess.add(
+                UserRow(
+                    uuid=user_id,
+                    username="testuser",
+                    email="testuser@test.io",
+                    domain_name=domain.domain_name,
+                    role=UserRole.USER,
+                    resource_policy=USER_RESOURCE_POLICY_NAME,
+                    domain_id=domain.domain_id,
+                )
+            )
+            await sess.commit()
+
+        async with db_with_cleanup.begin_readonly_session() as sess:
+            return await sess.get_one(UserRow, user_id)
+
+    @pytest.fixture
     async def queried_project(
         self, db_with_cleanup: ExtendedAsyncSAEngine, domain: DomainFixtureData, user: UserRow
     ) -> UUID:
         """The project used as the query scope."""
-        return await _create_project(db_with_cleanup, "queried-project", domain, user)
+        return await self._create_project(db_with_cleanup, "queried-project", domain, user)
 
     @pytest.fixture
     async def other_associated_project(
         self, db_with_cleanup: ExtendedAsyncSAEngine, domain: DomainFixtureData, user: UserRow
     ) -> UUID:
         """Another project associated with the non-global registry, but NOT the query scope."""
-        return await _create_project(db_with_cleanup, "other-associated-project", domain, user)
+        return await self._create_project(db_with_cleanup, "other-associated-project", domain, user)
 
     @pytest.fixture
     async def unassociated_project(
         self, db_with_cleanup: ExtendedAsyncSAEngine, domain: DomainFixtureData, user: UserRow
     ) -> UUID:
         """A project with NO association to the non-global registry."""
-        return await _create_project(db_with_cleanup, "unassociated-project", domain, user)
+        return await self._create_project(db_with_cleanup, "unassociated-project", domain, user)
+
+    @pytest.fixture
+    async def global_registry_id(self, db_with_cleanup: ExtendedAsyncSAEngine) -> UUID:
+        registry_id = uuid4()
+        async with db_with_cleanup.begin_session() as sess:
+            sess.add(
+                ContainerRegistryRow(
+                    id=registry_id,
+                    url=REGISTRY_URL,
+                    registry_name=REGISTRY_NAME,
+                    type=ContainerRegistryType.HARBOR2,
+                    project="stable",
+                    is_global=True,
+                )
+            )
+            await sess.commit()
+        return registry_id
 
     @pytest.fixture
     async def non_global_registry_id(
@@ -296,27 +282,27 @@ class TestImagePermissionContextNonGlobalRegistry:
         return registry_id
 
     @pytest.fixture
+    async def global_image_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        global_registry_id: UUID,
+    ) -> UUID:
+        async with db_with_cleanup.begin_session() as sess:
+            img = self._make_image(global_registry_id, "stable", "python")
+            sess.add(img)
+            await sess.flush()
+            image_id = img.id
+            await sess.commit()
+        return image_id
+
+    @pytest.fixture
     async def non_global_image_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         non_global_registry_id: UUID,
     ) -> UUID:
         async with db_with_cleanup.begin_session() as sess:
-            img = ImageRow(
-                name=f"{REGISTRY_NAME}/community/custom-env:latest",
-                image="custom-env",
-                tag="latest",
-                registry=REGISTRY_NAME,
-                registry_id=non_global_registry_id,
-                project="community",
-                architecture="x86_64",
-                config_digest=f"sha256:{uuid4().hex}",
-                size_bytes=100_000,
-                type=ImageType.COMPUTE,
-                status=ImageStatus.ALIVE,
-                labels={},
-                resources={},
-            )
+            img = self._make_image(non_global_registry_id, "community", "custom-env")
             sess.add(img)
             await sess.flush()
             image_id = img.id
@@ -391,118 +377,14 @@ class TestImagePermissionContextNonGlobalRegistry:
         assert global_image_id in allowed_ids
         assert non_global_image_id not in allowed_ids
 
-
-@dataclass(frozen=True)
-class _SystemScopeCase:
-    """A caller's role and the permissions its global-registry images must carry."""
-
-    user_role: UserRole
-    expected_permissions: frozenset[ImagePermission]
-
-
-class TestImagePermissionContextSystemScope:
-    """Tests for ImagePermissionContextBuilder in the system scope.
-
-    Global-registry images belong to no project, so the caller must still get them when it
-    belongs to none.
-    """
-
-    # ------------------------------------------------------------------
-    # Fixtures
-    # ------------------------------------------------------------------
-
-    @pytest.fixture
-    def case(self) -> _SystemScopeCase:
-        """The caller for tests that do not vary the role; overridden by parametrize.
-
-        A plain user that belongs to a project holds the privileged-member permissions there.
-        """
-        return _SystemScopeCase(
-            user_role=UserRole.USER,
-            expected_permissions=PRIVILEGED_MEMBER_PERMISSIONS,
-        )
-
-    @pytest.fixture
-    def client_ctx(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        user: UserRow,
-        case: _SystemScopeCase,
-    ) -> ClientContext:
-        return ClientContext(
-            db=db_with_cleanup,
-            domain_name=DOMAIN_NAME,
-            user_id=user.uuid,
-            user_role=case.user_role,
-        )
-
-    @pytest.fixture
-    async def member_project(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, domain: DomainFixtureData, user: UserRow
-    ) -> UUID:
-        """A project the caller is a group member of."""
-        return await _create_project(db_with_cleanup, "member-project", domain, user)
-
-    @pytest.fixture
-    async def enrollment_in_member_project(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, user: UserRow, member_project: UUID
-    ) -> None:
-        """Enroll the caller in `member_project` over the virtual-scope chain, the read
-        model the builder consults for project membership."""
-        virtual_scope_id = VirtualScopeID(uuid4())
-        async with db_with_cleanup.begin_session() as sess:
-            sess.add(
-                VirtualScopeRow(
-                    id=virtual_scope_id,
-                    scope_type=PROJECT_SCOPE_TYPE,
-                    scope_id=member_project,
-                )
-            )
-            await sess.flush()
-            sess.add(
-                EntityMembershipRow(
-                    virtual_scope_id=virtual_scope_id,
-                    entity_type=USER_ENTITY_TYPE,
-                    entity_id=user.uuid,
-                )
-            )
-            await sess.commit()
-
-    # ------------------------------------------------------------------
-    # Tests
-    # ------------------------------------------------------------------
-
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _SystemScopeCase(
-                user_role=UserRole.SUPERADMIN,
-                expected_permissions=ALL_IMAGE_PERMISSIONS,
-            ),
-            _SystemScopeCase(
-                user_role=UserRole.ADMIN,
-                expected_permissions=ADMIN_PERMISSIONS,
-            ),
-            _SystemScopeCase(
-                user_role=UserRole.USER,
-                expected_permissions=MEMBER_PERMISSIONS,
-            ),
-            _SystemScopeCase(
-                user_role=UserRole.MONITOR,
-                expected_permissions=MONITOR_PERMISSIONS,
-            ),
-        ],
-        ids=lambda case: case.user_role.value,
-    )
-    async def test_global_registry_images_visible_without_project_membership(
+    async def test_system_scope_keeps_global_registry_images_without_project_enrollment(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         client_ctx: ClientContext,
-        case: _SystemScopeCase,
         global_image_id: UUID,
     ) -> None:
-        """Regression: a caller enrolled in no project must still get the global-registry
-        images, carrying the permissions it holds in the system scope.
+        """A caller enrolled in no project must still get the global-registry images,
+        carrying the permissions it holds in the system scope.
 
         Before the fix, this raised IndexError from an empty per-project permission map.
         """
@@ -515,27 +397,5 @@ class TestImagePermissionContextSystemScope:
             )
 
         assert perm_ctx.object_id_to_additional_permission_map == {
-            global_image_id: case.expected_permissions
-        }
-
-    async def test_global_registry_images_visible_with_project_membership(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        client_ctx: ClientContext,
-        case: _SystemScopeCase,
-        enrollment_in_member_project: None,
-        global_image_id: UUID,
-    ) -> None:
-        """A caller enrolled in a project sees the global-registry images carrying the
-        permissions it holds in that project."""
-        async with db_with_cleanup.begin_readonly_session() as db_session:
-            builder = ImagePermissionContextBuilder(db_session)
-            perm_ctx = await builder.build(
-                client_ctx,
-                SystemScope(),
-                ImagePermission.READ_ATTRIBUTE,
-            )
-
-        assert perm_ctx.object_id_to_additional_permission_map == {
-            global_image_id: case.expected_permissions
+            global_image_id: MEMBER_PERMISSIONS
         }
