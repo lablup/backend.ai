@@ -15,6 +15,7 @@ import pytest
 
 from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
 from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermission, VFolderHostPermissionMap
 from ai.backend.manager.data.domain.types import DomainData, UserInfo
 from ai.backend.manager.errors.resource import (
@@ -93,8 +94,9 @@ class TestCreateDomain:
             name="test-create-domain",
             description="Test domain",
             is_active=True,
+            is_default=False,
             created_at=datetime.now(tz=UTC),
-            modified_at=datetime.now(tz=UTC),
+            updated_at=datetime.now(tz=UTC),
             total_resource_slots=ResourceSlot.from_user_input({}, None),
             allowed_vfolder_hosts=VFolderHostPermissionMap({}),
             allowed_docker_registries=[],
@@ -109,8 +111,9 @@ class TestCreateDomain:
             name="test-complex-resources",
             description="Test domain with complex resource slots",
             is_active=True,
+            is_default=False,
             created_at=datetime.now(tz=UTC),
-            modified_at=datetime.now(tz=UTC),
+            updated_at=datetime.now(tz=UTC),
             total_resource_slots=ResourceSlot.from_user_input(
                 {"cpu": "10", "mem": "64G", "cuda.device": "2"}, None
             ),
@@ -277,8 +280,9 @@ class TestModifyDomain:
             name="test-modify-domain",
             description="Domain Description Modified",
             is_active=True,
+            is_default=False,
             created_at=datetime.now(tz=UTC),
-            modified_at=datetime.now(tz=UTC),
+            updated_at=datetime.now(tz=UTC),
             total_resource_slots=ResourceSlot.from_user_input({}, None),
             allowed_vfolder_hosts=VFolderHostPermissionMap({}),
             allowed_docker_registries=[],
@@ -293,8 +297,9 @@ class TestModifyDomain:
             name="test-domain",
             description="Test domain",
             is_active=False,
+            is_default=False,
             created_at=datetime.now(tz=UTC),
-            modified_at=datetime.now(tz=UTC),
+            updated_at=datetime.now(tz=UTC),
             total_resource_slots=ResourceSlot.from_user_input({}, None),
             allowed_vfolder_hosts=VFolderHostPermissionMap({}),
             allowed_docker_registries=[],
@@ -309,8 +314,9 @@ class TestModifyDomain:
             name="test-nullify-domain",
             description=None,
             is_active=True,
+            is_default=False,
             created_at=datetime.now(tz=UTC),
-            modified_at=datetime.now(tz=UTC),
+            updated_at=datetime.now(tz=UTC),
             total_resource_slots=ResourceSlot.from_user_input({}, None),
             allowed_vfolder_hosts=VFolderHostPermissionMap({}),
             allowed_docker_registries=[],
@@ -639,8 +645,9 @@ class TestCreateDomainNode:
             name="test-domain-node",
             description="Test domain node",
             is_active=True,
+            is_default=False,
             created_at=datetime.now(tz=UTC),
-            modified_at=datetime.now(tz=UTC),
+            updated_at=datetime.now(tz=UTC),
             total_resource_slots=ResourceSlot.from_user_input({}, None),
             allowed_vfolder_hosts=VFolderHostPermissionMap({}),
             allowed_docker_registries=[],
@@ -668,7 +675,7 @@ class TestCreateDomainNode:
                 )
             ),
             user_info=admin_user,
-            scaling_groups=None,
+            scaling_group_ids=None,
         )
 
         result = await service.create_domain_node(action)
@@ -696,7 +703,7 @@ class TestCreateDomainNode:
                 )
             ),
             user_info=superadmin_user,
-            scaling_groups=["sg1", "sg2"],
+            scaling_group_ids=[ResourceGroupID(uuid4()), ResourceGroupID(uuid4())],
         )
 
         result = await service.create_domain_node(action)
@@ -771,8 +778,9 @@ class TestModifyDomainNode:
             name="test-domain-node",
             description="Modified description",
             is_active=True,
+            is_default=False,
             created_at=datetime.now(tz=UTC),
-            modified_at=datetime.now(tz=UTC),
+            updated_at=datetime.now(tz=UTC),
             total_resource_slots=ResourceSlot.from_user_input({}, None),
             allowed_vfolder_hosts=VFolderHostPermissionMap({}),
             allowed_docker_registries=[],
@@ -787,8 +795,9 @@ class TestModifyDomainNode:
             name="test-domain",
             description="Test domain",
             is_active=True,
+            is_default=False,
             created_at=datetime.now(tz=UTC),
-            modified_at=datetime.now(tz=UTC),
+            updated_at=datetime.now(tz=UTC),
             total_resource_slots=ResourceSlot.from_user_input({}, None),
             allowed_vfolder_hosts=VFolderHostPermissionMap({}),
             allowed_docker_registries=[],
@@ -906,14 +915,17 @@ class TestModifyDomainNode:
         superadmin_user: UserInfo,
     ) -> None:
         """Modify domain node with overlapping add/remove scaling groups should raise error."""
+        sg1 = ResourceGroupID(uuid4())
+        sg2 = ResourceGroupID(uuid4())
+        sg3 = ResourceGroupID(uuid4())
         action = ModifyDomainNodeAction(
             user_info=superadmin_user,
             updater=Updater(
                 spec=DomainNodeUpdaterSpec(),
                 pk_value="test-domain",
             ),
-            sgroups_to_add={"sg1", "sg2"},
-            sgroups_to_remove={"sg1", "sg3"},  # sg1 overlaps
+            sgroup_ids_to_add={sg1, sg2},
+            sgroup_ids_to_remove={sg1, sg3},  # sg1 overlaps
         )
 
         with pytest.raises(InvalidAPIParameters):
@@ -937,8 +949,8 @@ class TestModifyDomainNode:
                 spec=DomainNodeUpdaterSpec(),
                 pk_value="test-domain",
             ),
-            sgroups_to_add={"sg1", "sg2"},
-            sgroups_to_remove=None,
+            sgroup_ids_to_add={ResourceGroupID(uuid4()), ResourceGroupID(uuid4())},
+            sgroup_ids_to_remove=None,
         )
 
         result = await service.modify_domain_node(action)
@@ -964,8 +976,8 @@ class TestModifyDomainNode:
                 spec=DomainNodeUpdaterSpec(),
                 pk_value="test-domain",
             ),
-            sgroups_to_add=None,
-            sgroups_to_remove={"sg3"},
+            sgroup_ids_to_add=None,
+            sgroup_ids_to_remove={ResourceGroupID(uuid4())},
         )
 
         result = await service.modify_domain_node(action)
@@ -991,8 +1003,8 @@ class TestModifyDomainNode:
                 spec=DomainNodeUpdaterSpec(),
                 pk_value="test-domain",
             ),
-            sgroups_to_add={"sg1", "sg2"},
-            sgroups_to_remove={"sg3", "sg4"},  # No overlap
+            sgroup_ids_to_add={ResourceGroupID(uuid4()), ResourceGroupID(uuid4())},
+            sgroup_ids_to_remove={ResourceGroupID(uuid4()), ResourceGroupID(uuid4())},  # No overlap
         )
 
         result = await service.modify_domain_node(action)
@@ -1018,8 +1030,8 @@ class TestModifyDomainNode:
                 spec=DomainNodeUpdaterSpec(),
                 pk_value="test-domain",
             ),
-            sgroups_to_add=set(),
-            sgroups_to_remove=set(),
+            sgroup_ids_to_add=set(),
+            sgroup_ids_to_remove=set(),
         )
 
         result = await service.modify_domain_node(action)

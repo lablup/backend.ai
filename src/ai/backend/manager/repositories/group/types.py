@@ -9,21 +9,20 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group.row import GroupRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
 
 __all__ = (
     "GroupSearchResult",
-    "DomainProjectSearchScope",
-    "UserProjectSearchScope",
+    "DomainProjectOperationScope",
+    "UserProjectOperationScope",
 )
 
 
@@ -38,45 +37,50 @@ class GroupSearchResult:
 
 
 @dataclass(frozen=True)
-class DomainProjectSearchScope(SearchScope):
+class DomainProjectOperationScope(OperationScope):
     """Required scope for searching projects within a domain.
 
     Used for domain-scoped project search (domain admin+).
     """
 
-    domain_name: str
+    domain_id: DomainID
     """Required. The domain to search within."""
 
     @override
     def to_condition(self) -> QueryCondition:
-        """Convert scope to a query condition for GroupRow."""
-        domain_name = self.domain_name
+        """Convert scope to a query condition for GroupRow.
+
+        Groups reference their domain by name, so the domain UUID is resolved
+        to the name via a scalar subquery.
+        """
+        domain_id = self.domain_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return GroupRow.domain_name == domain_name
+            return GroupRow.domain_name == (
+                sa.select(DomainRow.name).where(DomainRow.id == domain_id).scalar_subquery()
+            )
 
         return inner
 
     @property
     @override
-    def existence_checks(self) -> Sequence[ExistenceCheck[str]]:
+    def existence_checks(self) -> Sequence[ExistenceCheck[DomainID]]:
         """Return existence checks for scope validation."""
         return [
             ExistenceCheck(
-                column=DomainRow.name,
-                value=self.domain_name,
-                error=DomainNotFound(self.domain_name),
+                column=DomainRow.id,
+                value=self.domain_id,
+                error=DomainNotFound(str(self.domain_id)),
             ),
         ]
 
 
 @dataclass(frozen=True)
-class UserProjectSearchScope(SearchScope):
+class UserProjectOperationScope(OperationScope):
     """Required scope for searching projects a user is member of.
 
     Used for user-scoped project search (any authenticated user).
-    Filters via the association_scopes_entities table (PROJECT scope, USER
-    entity).
+    Membership is read from the projects' virtual scopes.
     """
 
     user_uuid: UUID
@@ -84,21 +88,12 @@ class UserProjectSearchScope(SearchScope):
 
     @override
     def to_condition(self) -> QueryCondition:
-        """Convert scope to a query condition on AssociationScopesEntitiesRow.
-
-        Used as a WHERE predicate in a JOIN query with GroupRow. Applies the
-        ``scope_type=PROJECT`` / ``entity_type=USER`` filters and narrows
-        ``entity_id`` to this user; the JOIN side may also re-state the
-        scope/entity-type filters for redundancy without affecting results.
-        """
-        user_uuid_str = str(self.user_uuid)
+        """Membership predicate: the user is enrolled in the project's virtual
+        scope."""
+        user_uuid = self.user_uuid
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.and_(
-                AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                AssociationScopesEntitiesRow.entity_id == user_uuid_str,
-            )
+            return user_scope_membership_exists(PROJECT_SCOPE_TYPE, GroupRow.id, user_uuid)
 
         return inner
 

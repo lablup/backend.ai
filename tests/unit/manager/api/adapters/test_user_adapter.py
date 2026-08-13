@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from ai.backend.common.data.user.types import UserRole as DataUserRole
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.data.user.types import UserData
 
@@ -30,13 +31,14 @@ def _create_user_data(
         created_at=now,
         modified_at=now,
         domain_name="default",
+        domain_id=DomainID(uuid4()),
         role=DataUserRole.USER,
         resource_policy="default",
         allowed_client_ip=None,
         totp_activated=False,
         totp_activated_at=None,
         sudo_session_enabled=False,
-        main_access_key=None,
+        default_access_key=None,
         container_uid=None,
         container_main_gid=None,
         container_gids=None,

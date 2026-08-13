@@ -9,7 +9,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.client.v2.exceptions import ConflictError, NotFoundError, ServerError
+from ai.backend.client.v2.exceptions import ConflictError, NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.domain import (
@@ -26,7 +26,7 @@ from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.user.types import UserStatus
-from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.domain import DomainRow, domains
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.kernel import kernels
@@ -112,6 +112,9 @@ class TestDomainPurgeValidation:
                     domain_name=domain_name,
                     resource_policy="default",
                     role=UserRole.USER,
+                    domain_id=sa.select(DomainRow.id)
+                    .where(DomainRow.name == domain_name)
+                    .scalar_subquery(),
                 )
             )
 
@@ -216,12 +219,12 @@ class TestDomainPurgeValidation:
                     scaling_groups.delete().where(scaling_groups.c.name == sgroup_name)
                 )
 
-    async def test_purge_nonexistent_domain_raises_server_error(
+    async def test_purge_nonexistent_domain_raises_not_found(
         self,
         admin_registry: BackendAIClientRegistry,
     ) -> None:
-        """F-PURGE-BIZ-4: Purging nonexistent domain → ServerError (HTTP 500)."""
-        with pytest.raises(ServerError):
+        """F-PURGE-BIZ-4: Purging nonexistent domain → NotFoundError (HTTP 404)."""
+        with pytest.raises(NotFoundError):
             await admin_registry.domain.purge(
                 PurgeDomainRequest(name="nonexistent-domain-xyz-99999")
             )
@@ -326,6 +329,9 @@ class TestDomainPurgeValidation:
                     domain_name=domain_name,
                     resource_policy="default",
                     role=UserRole.USER,
+                    domain_id=sa.select(DomainRow.id)
+                    .where(DomainRow.name == domain_name)
+                    .scalar_subquery(),
                 )
             )
 

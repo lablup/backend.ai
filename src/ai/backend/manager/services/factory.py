@@ -1,6 +1,10 @@
+from typing import Any
+
 from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.monitors import ActionMonitors
+from ai.backend.manager.actions.registry import ProcessorDependencies, ProcessorRegistry
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
 )
@@ -14,9 +18,6 @@ from ai.backend.manager.services.app_config.service import (
 )
 from ai.backend.manager.services.app_config_allow_list.processors import (
     AppConfigAllowListProcessors,
-)
-from ai.backend.manager.services.app_config_allow_list.service import (
-    AppConfigAllowListService,
 )
 from ai.backend.manager.services.app_config_definition.processors import (
     AppConfigDefinitionProcessors,
@@ -110,7 +111,13 @@ from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
 )
 from ai.backend.manager.services.permission_contoller.service import PermissionControllerService
-from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs, Services
+from ai.backend.manager.services.processors import (
+    ProcessorArgs,
+    Processors,
+    ProcessorsBundle,
+    ServiceArgs,
+    Services,
+)
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
@@ -198,9 +205,6 @@ def create_services(args: ServiceArgs) -> Services:
         app_config=AppConfigService(
             fragment_repository=repositories.app_config_fragment.repository,
         ),
-        app_config_allow_list=AppConfigAllowListService(
-            repository=repositories.app_config_allow_list.repository,
-        ),
         app_config_fragment=AppConfigFragmentService(
             repository=repositories.app_config_fragment.repository,
         ),
@@ -236,7 +240,10 @@ def create_services(args: ServiceArgs) -> Services:
             repositories.user.repository,
             args.scheduling_controller,
         ),
-        idle_checker=IdleCheckerService(repositories.idle_checker.repository),
+        idle_checker=IdleCheckerService(
+            repositories.idle_checker.repository,
+            repositories.prometheus_query_preset.repository,
+        ),
         image=ImageService(
             args.agent_registry, repositories.image.repository, args.config_provider
         ),
@@ -465,16 +472,28 @@ def create_services(args: ServiceArgs) -> Services:
 
 def create_processors(
     args: ProcessorArgs,
-    action_monitors: list[ActionMonitor],
+    monitors: ActionMonitors,
     validators: ActionValidators,
-) -> Processors:
+) -> ProcessorsBundle:
     services = create_services(args.service_args)
-    return Processors(
+    repositories = args.service_args.repositories
+    # Legacy BaseAction-era packages consume the flat monitor list; packages migrated
+    # to the pure-ABC frameworks pick the per-type monitors from `monitors` instead.
+    action_monitors = monitors.legacy
+    # One registry shared by every v2-wired package: each package wires through its
+    # own group, and the registry's wired_specs() is the catalog of every
+    # registered action.
+    registry: ProcessorRegistry[Any] = ProcessorRegistry(
+        ProcessorDependencies(
+            monitors=monitors,
+            validators=args.validators,
+            repository=OpsRepository(repositories.v2_ops_provider),
+        )
+    )
+    processors = Processors(
         agent=AgentProcessors(services.agent, action_monitors, validators),
         app_config=AppConfigProcessors(services.app_config, action_monitors),
-        app_config_allow_list=AppConfigAllowListProcessors(
-            services.app_config_allow_list, action_monitors
-        ),
+        app_config_allow_list=AppConfigAllowListProcessors(registry.group()),
         app_config_fragment=AppConfigFragmentProcessors(
             services.app_config_fragment, action_monitors, validators
         ),
@@ -486,7 +505,9 @@ def create_processors(
         fair_share=FairShareProcessors(services.fair_share, action_monitors, validators),
         group=GroupProcessors(services.group, action_monitors, validators),
         user=UserProcessors(services.user, action_monitors, validators),
-        idle_checker=IdleCheckerProcessors(services.idle_checker, action_monitors),
+        idle_checker=IdleCheckerProcessors(
+            services.idle_checker, action_monitors, registry.group()
+        ),
         image=ImageProcessors(services.image, action_monitors, validators),
         container_registry=ContainerRegistryProcessors(
             services.container_registry, action_monitors, validators
@@ -520,7 +541,12 @@ def create_processors(
         resource_preset=ResourcePresetProcessors(
             services.resource_preset, action_monitors, validators
         ),
-        resource_slot=ResourceSlotProcessors(services.resource_slot, action_monitors, validators),
+        resource_slot=ResourceSlotProcessors(
+            services.resource_slot,
+            action_monitors,
+            validators,
+            registry.group(),
+        ),
         retention_policy=RetentionPolicyProcessors(services.retention_policy, action_monitors),
         role_preset=RolePresetProcessors(services.role_preset, action_monitors, validators),
         runtime_variant=RuntimeVariantProcessors(
@@ -591,3 +617,4 @@ def create_processors(
             event_fetcher=args.event_fetcher,
         ),
     )
+    return ProcessorsBundle(processors=processors, registry=registry)

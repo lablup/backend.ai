@@ -6,7 +6,7 @@ from typing import Any, override
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 
 
 @dataclass
@@ -19,6 +19,7 @@ class RolePresetUpdaterSpec(UpdaterSpec[RolePresetRow]):
     """
 
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
+    role_name_template: TriState[str] = field(default_factory=TriState[str].nop)
     scope_type: OptionalState[ScopeType] = field(default_factory=OptionalState[ScopeType].nop)
     auto_assign: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
 
@@ -31,6 +32,7 @@ class RolePresetUpdaterSpec(UpdaterSpec[RolePresetRow]):
     def build_values(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
         self.name.update_dict(to_update, "name")
+        self.role_name_template.update_dict(to_update, "role_name_template")
         self.scope_type.update_dict(to_update, "scope_type")
         self.auto_assign.update_dict(to_update, "auto_assign")
         return to_update

@@ -1,0 +1,36 @@
+name: create-version-branch
+
+# Cutting a release line and releasing its first rc are one action: merging
+# `release: X.Y.0rc1` into `main` is what tags the release and creates `X.Y`.
+
+on:
+  push:
+    branches:
+      - 'main'
+
+permissions:
+  contents: read
+
+concurrency:
+  # One group per commit: a re-run of the same push must not race the first run
+  # into the push of the refs.
+  group: ${{ github.workflow }}-${{ github.sha }}
+
+jobs:
+  cut:
+    # A cheap filter on the event; which release cuts a line is the script's call.
+    if: "startsWith(github.event.head_commit.message, 'release: ')"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the release commit
+        uses: actions/checkout@v6
+        with:
+          lfs: false
+          # Refs pushed with the workflow's own token trigger no workflow, and
+          # `ci.yml`'s `make-final-release` -- wheels, GitHub Release, PyPI --
+          # runs on the tag push.
+          token: ${{ secrets.OCTODOG }}
+      - name: Tag the release and cut the version branch
+        env:
+          COMMIT: ${{ github.sha }}
+        run: .github/scripts/create-version-branch.sh "$COMMIT"

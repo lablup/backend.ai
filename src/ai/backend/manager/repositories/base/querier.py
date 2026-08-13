@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -12,9 +12,8 @@ import sqlalchemy as sa
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
-
-from .pagination import PageInfoResult, QueryPagination
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.specs.pagination import PageInfoResult, QueryPagination
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
@@ -96,6 +95,18 @@ async def execute_querier[TRow: Base](
 # =============================================================================
 
 
+class BatchQueryOptions(Protocol):
+    """The filtering, ordering, and pagination options a batch query reads.
+
+    Both :class:`BatchQuerier` and :class:`Searcher` satisfy this, so a batch query
+    runs against either while the two remain separate classes.
+    """
+
+    pagination: QueryPagination
+    conditions: list[QueryCondition]
+    orders: list[QueryOrder]
+
+
 @dataclass
 class BatchQuerier:
     """Bundles query conditions, orders, and pagination for batch repository queries."""
@@ -106,7 +117,7 @@ class BatchQuerier:
 
 
 @dataclass
-class BatchQuerierResult[TRow: Base]:
+class BatchQuerierResult[TRow]:
     """Result of executing a batch query with querier."""
 
     rows: list[TRow]
@@ -151,7 +162,7 @@ async def _validate_scope(
 
 def _apply_batch_querier(
     query: sa.sql.Select[Any],
-    querier: BatchQuerier,
+    querier: BatchQueryOptions,
     or_conditions: Sequence[QueryCondition],
 ) -> _QueryPair:
     """Apply query conditions, orders, and pagination to a SQLAlchemy select statement.
@@ -195,8 +206,8 @@ def _apply_batch_querier(
 async def execute_batch_querier(
     db_sess: SASession,
     query: sa.sql.Select[Any],
-    querier: BatchQuerier,
-    scopes: Sequence[SearchScope] = (),
+    querier: BatchQueryOptions,
+    scopes: Sequence[OperationScope] = (),
 ) -> BatchQuerierResult[Row[Any]]:
     """Execute query with batch querier and return rows with total_count and pagination info.
 
@@ -207,7 +218,7 @@ async def execute_batch_querier(
         db_sess: Database session
         query: Base SELECT query (without count window function)
         querier: BatchQuerier for filtering, ordering, and pagination
-        scopes: Optional sequence of SearchScope. Each scope contributes its own
+        scopes: Optional sequence of OperationScope. Each scope contributes its own
             existence checks (aggregated and validated in a single query) and its
             own to_condition() result. The to_condition() results form a single
             OR group that is AND-merged with querier.conditions.

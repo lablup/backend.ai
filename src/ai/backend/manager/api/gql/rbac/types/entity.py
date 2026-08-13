@@ -21,7 +21,8 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 from ai.backend.common.dto.manager.v2.rbac.response import (
     AssociationScopesEntitiesNode,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -67,7 +68,7 @@ async def _load_rbac_element(
         case RBACElementType.PROJECT:
             return await data_loaders.project_loader.load(uuid.UUID(element_id))
         case RBACElementType.DOMAIN:
-            return await data_loaders.domain_loader.load(element_id)
+            return await data_loaders.domain_by_id_loader.load(DomainID(uuid.UUID(element_id)))
         case RBACElementType.ROLE:
             return await data_loaders.role_loader.load(uuid.UUID(element_id))
         case RBACElementType.IMAGE:
@@ -75,7 +76,9 @@ async def _load_rbac_element(
         case RBACElementType.MODEL_DEPLOYMENT:
             return await data_loaders.deployment_loader.load(uuid.UUID(element_id))
         case RBACElementType.RESOURCE_GROUP:
-            return await data_loaders.resource_group_loader.load(element_id)
+            return await data_loaders.resource_group_by_id_loader.load(
+                ResourceGroupID(uuid.UUID(element_id))
+            )
         case RBACElementType.NOTIFICATION_CHANNEL:
             return await data_loaders.notification_channel_loader.load(uuid.UUID(element_id))
         case RBACElementType.NOTIFICATION_RULE:
@@ -156,14 +159,14 @@ class EntityFilter(PydanticInputMixin[EntityFilterDTO], GQLFilter):
     entity_id: StringFilter | None = None
     scope_type: RBACElementTypeFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description="Filter by the type of scope the entity is registered in.",
         ),
         default=None,
     )
     scope_id: StringFilter | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description="Filter by the id of scope the entity is registered in.",
         ),
         default=None,

@@ -334,6 +334,7 @@ class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):  # type: ignor
                 max_pending_session_resource_slots=value_or_none(
                     max_pending_session_resource_slots
                 ),
+                max_priority=None,
             )
         )
 
@@ -393,8 +394,10 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):  # type: ignor
                 max_pending_session_count=TriState[int].from_graphql(
                     self.max_pending_session_count
                 ),
-                max_pending_session_resource_slots=TriState[dict[str, Any]].from_graphql(
-                    self.max_pending_session_resource_slots
+                max_pending_session_resource_slots=TriState[ResourceSlot].from_graphql(
+                    ResourceSlot.from_user_input(self.max_pending_session_resource_slots, None)
+                    if isinstance(self.max_pending_session_resource_slots, dict)
+                    else self.max_pending_session_resource_slots
                 ),
             ),
             pk_value=name,

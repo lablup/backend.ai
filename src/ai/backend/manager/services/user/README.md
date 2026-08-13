@@ -136,15 +136,14 @@ result = await user_processor.delete_user.wait_for_complete(action)
 
 #### Complete User Removal
 ```python
+from ai.backend.manager.data.user.types import UserInfoContext
 from ai.backend.manager.services.user.actions.purge_user import PurgeUserAction
-from ai.backend.manager.services.user.type import UserInfoContext
 
 action = PurgeUserAction(
     email="user@example.com",
     user_info_ctx=UserInfoContext(
         uuid=user_uuid,
         email="user@example.com",
-        main_access_key=user_access_key,
     ),
 )
 ```

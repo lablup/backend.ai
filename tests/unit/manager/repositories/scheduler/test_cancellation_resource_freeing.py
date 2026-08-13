@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
@@ -58,9 +58,10 @@ from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
-from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.db import TableOrORM, with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
-_BASE_TABLES = [
+_BASE_TABLES: list[TableOrORM] = [
     DomainRow,
     ScalingGroupRow,
     UserResourcePolicyRow,
@@ -104,11 +105,11 @@ class TestCancelFreesResourceAllocations:
         return ResourceGroupID(uuid.uuid4())
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_id: DomainID,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[DomainFixtureData, None]:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -122,7 +123,7 @@ class TestCancelFreesResourceAllocations:
                 )
             )
             await db_sess.flush()
-        yield domain_name
+        yield DomainFixtureData(domain_name=DomainName(domain_name), domain_id=test_domain_id)
 
     @pytest.fixture
     async def test_scaling_group_name(
@@ -216,7 +217,7 @@ class TestCancelFreesResourceAllocations:
     async def test_user_uuid(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_user_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
         user_uuid = uuid.uuid4()
@@ -228,8 +229,9 @@ class TestCancelFreesResourceAllocations:
                     username=f"test-user-{uuid.uuid4().hex[:8]}",
                     role=UserRole.USER,
                     status=UserStatus.ACTIVE,
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     resource_policy=test_user_resource_policy_name,
+                    domain_id=test_domain.domain_id,
                 )
             )
             await db_sess.flush()
@@ -264,7 +266,7 @@ class TestCancelFreesResourceAllocations:
     async def test_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
         group_id = uuid.uuid4()
@@ -275,7 +277,7 @@ class TestCancelFreesResourceAllocations:
                     name=f"test-group-{uuid.uuid4().hex[:8]}",
                     description="Test group",
                     is_active=True,
-                    domain_name=test_domain_name,
+                    domain_name=test_domain.domain_name,
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts={},
                     resource_policy=test_resource_policy_name,
@@ -436,7 +438,7 @@ class TestCancelFreesResourceAllocations:
     async def pending_session(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_domain_id: DomainID,
         test_scaling_group_name: str,
         test_scaling_group_id: ResourceGroupID,
@@ -448,7 +450,7 @@ class TestCancelFreesResourceAllocations:
         return await self._insert_session(
             db_with_cleanup,
             kernel_status=KernelStatus.PENDING,
-            domain_name=test_domain_name,
+            domain_name=test_domain.domain_name,
             domain_id=test_domain_id,
             scaling_group_name=test_scaling_group_name,
             resource_group_id=test_scaling_group_id,
@@ -462,7 +464,7 @@ class TestCancelFreesResourceAllocations:
     async def pulling_session_on_agent(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_domain_id: DomainID,
         test_scaling_group_name: str,
         test_scaling_group_id: ResourceGroupID,
@@ -475,7 +477,7 @@ class TestCancelFreesResourceAllocations:
         session_id, kernel_id = await self._insert_session(
             db_with_cleanup,
             kernel_status=KernelStatus.PULLING,
-            domain_name=test_domain_name,
+            domain_name=test_domain.domain_name,
             domain_id=test_domain_id,
             scaling_group_name=test_scaling_group_name,
             resource_group_id=test_scaling_group_id,

@@ -7,7 +7,6 @@ from strawberry import Info
 from strawberry.scalars import JSON
 
 from ai.backend.common.dto.manager.v2.agent.request import AdminSearchAgentsInput
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.agent.types import (
     AgentFilterGQL,
     AgentOrderByGQL,
@@ -87,7 +86,7 @@ async def agents_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Change the resource group of an agent (superadmin only). Sessions still running"
             " on the agent under the old resource group are cleaned up per the given policy;"

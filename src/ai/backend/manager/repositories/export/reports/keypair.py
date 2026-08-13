@@ -65,7 +65,7 @@ SGROUP_FOR_KEYPAIR_JOIN = JoinDef(
 )
 RESOURCE_GROUP_JOIN = JoinDef(
     table=ScalingGroupRow.__table__,
-    condition=ScalingGroupForKeypairsRow.scaling_group == ScalingGroupRow.name,
+    condition=ScalingGroupForKeypairsRow.resource_group_id == ScalingGroupRow.id,
 )
 RESOURCE_GROUP_JOINS = (SGROUP_FOR_KEYPAIR_JOIN, RESOURCE_GROUP_JOIN)
 
@@ -99,6 +99,13 @@ KEYPAIR_FIELDS: list[ExportFieldDef] = [
         column=KeyPairRow.is_admin,
     ),
     ExportFieldDef(
+        key="is_default",
+        name="Default",
+        description="Whether this is the owner's default keypair",
+        field_type=ExportFieldType.BOOLEAN,
+        column=KeyPairRow.is_default,
+    ),
+    ExportFieldDef(
         key="created_at",
         name="Created At",
         description="Keypair creation time",
@@ -111,7 +118,7 @@ KEYPAIR_FIELDS: list[ExportFieldDef] = [
         name="Modified At",
         description="Last modification time",
         field_type=ExportFieldType.DATETIME,
-        column=KeyPairRow.modified_at,
+        column=KeyPairRow.updated_at,
         formatter=lambda v: v.isoformat() if v else "",
     ),
     ExportFieldDef(

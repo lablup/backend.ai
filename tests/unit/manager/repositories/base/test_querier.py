@@ -20,11 +20,11 @@ from ai.backend.common.exception import (
 )
 from ai.backend.manager.models.base import Base, IDColumn
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BatchQuerierResult,
-    OffsetPagination,
     Querier,
     QuerierResult,
     execute_batch_querier,
@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-class QuerierTestRowInt(Base):  # type: ignore[misc]
+class QuerierTestRowInt(Base):
     """ORM model for querier testing with integer PK."""
 
     __tablename__ = "test_querier_int_pk"
@@ -51,7 +51,7 @@ class QuerierTestRowInt(Base):  # type: ignore[misc]
     value = sa.Column(sa.String(100), nullable=True)
 
 
-class QuerierTestRowUUID(Base):  # type: ignore[misc]
+class QuerierTestRowUUID(Base):
     """ORM model for querier testing with UUID PK."""
 
     __tablename__ = "test_querier_uuid_pk"
@@ -226,7 +226,7 @@ class TestQuerierUUIDPK:
 # =============================================================================
 
 
-class BatchQuerierTestRow(Base):  # type: ignore[misc]
+class BatchQuerierTestRow(Base):
     """ORM model for batch querier testing."""
 
     __tablename__ = "test_batch_querier_orm"
@@ -376,7 +376,7 @@ class TestScopeValidationError2(BackendAIError):
         )
 
 
-class ScopeValidationTestRow(Base):  # type: ignore[misc]
+class ScopeValidationTestRow(Base):
     """ORM model for scope validation testing."""
 
     __tablename__ = "test_scope_validation"
@@ -388,8 +388,8 @@ class ScopeValidationTestRow(Base):  # type: ignore[misc]
 
 
 @dataclass(frozen=True)
-class MockSearchScope(SearchScope):
-    """Mock SearchScope for testing."""
+class MockOperationScope(OperationScope):
+    """Mock OperationScope for testing."""
 
     checks: Sequence[ExistenceCheck[Any]]
     filter_category: str | None = None
@@ -484,7 +484,7 @@ class TestBatchQuerierScopeValidation:
             querier = BatchQuerier(
                 pagination=OffsetPagination(offset=0, limit=10),
             )
-            scope = MockSearchScope(checks=[])
+            scope = MockOperationScope(checks=[])
 
             result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
@@ -504,7 +504,7 @@ class TestBatchQuerierScopeValidation:
             querier = BatchQuerier(
                 pagination=OffsetPagination(offset=0, limit=10),
             )
-            scope = MockSearchScope(
+            scope = MockOperationScope(
                 checks=[
                     ExistenceCheck(
                         column=ScopeValidationTestRow.name,
@@ -532,7 +532,7 @@ class TestBatchQuerierScopeValidation:
             querier = BatchQuerier(
                 pagination=OffsetPagination(offset=0, limit=10),
             )
-            scope = MockSearchScope(
+            scope = MockOperationScope(
                 checks=[
                     ExistenceCheck(
                         column=ScopeValidationTestRow.name,
@@ -558,7 +558,7 @@ class TestBatchQuerierScopeValidation:
             querier = BatchQuerier(
                 pagination=OffsetPagination(offset=0, limit=10),
             )
-            scope = MockSearchScope(
+            scope = MockOperationScope(
                 checks=[
                     ExistenceCheck(
                         column=ScopeValidationTestRow.name,
@@ -591,7 +591,7 @@ class TestBatchQuerierScopeValidation:
             querier = BatchQuerier(
                 pagination=OffsetPagination(offset=0, limit=10),
             )
-            scope = MockSearchScope(
+            scope = MockOperationScope(
                 checks=[
                     ExistenceCheck(
                         column=ScopeValidationTestRow.name,
@@ -624,7 +624,7 @@ class TestBatchQuerierScopeValidation:
             querier = BatchQuerier(
                 pagination=OffsetPagination(offset=0, limit=10),
             )
-            scope = MockSearchScope(
+            scope = MockOperationScope(
                 checks=[
                     ExistenceCheck(
                         column=ScopeValidationTestRow.name,
@@ -657,7 +657,7 @@ class TestBatchQuerierScopeValidation:
             querier = BatchQuerier(
                 pagination=OffsetPagination(offset=0, limit=10),
             )
-            scope = MockSearchScope(
+            scope = MockOperationScope(
                 checks=[
                     ExistenceCheck(
                         column=ScopeValidationTestRow.name,
@@ -690,7 +690,7 @@ class TestBatchQuerierScopeValidation:
             querier = BatchQuerier(
                 pagination=OffsetPagination(offset=0, limit=10),
             )
-            scope = MockSearchScope(
+            scope = MockOperationScope(
                 checks=[
                     ExistenceCheck(
                         column=ScopeValidationTestRow.name,
@@ -779,8 +779,8 @@ class TestBatchQuerierMultipleScopes:
             querier = BatchQuerier(
                 pagination=OffsetPagination(offset=0, limit=10),
             )
-            scope_cat1 = MockSearchScope(checks=[], filter_category="cat1")
-            scope_cat2 = MockSearchScope(checks=[], filter_category="cat2")
+            scope_cat1 = MockOperationScope(checks=[], filter_category="cat1")
+            scope_cat2 = MockOperationScope(checks=[], filter_category="cat2")
 
             result = await execute_batch_querier(
                 db_sess, query, querier, scopes=[scope_cat1, scope_cat2]
@@ -803,8 +803,8 @@ class TestBatchQuerierMultipleScopes:
                 pagination=OffsetPagination(offset=0, limit=10),
                 conditions=[lambda: ScopeValidationTestRow.name == "item-a"],
             )
-            scope_cat1 = MockSearchScope(checks=[], filter_category="cat1")
-            scope_cat2 = MockSearchScope(checks=[], filter_category="cat2")
+            scope_cat1 = MockOperationScope(checks=[], filter_category="cat1")
+            scope_cat2 = MockOperationScope(checks=[], filter_category="cat2")
 
             result = await execute_batch_querier(
                 db_sess, query, querier, scopes=[scope_cat1, scope_cat2]
@@ -830,8 +830,8 @@ class TestBatchQuerierMultipleScopes:
                     lambda: ScopeValidationTestRow.id <= 4,
                 ],
             )
-            scope_cat1 = MockSearchScope(checks=[], filter_category="cat1")
-            scope_cat2 = MockSearchScope(checks=[], filter_category="cat2")
+            scope_cat1 = MockOperationScope(checks=[], filter_category="cat1")
+            scope_cat2 = MockOperationScope(checks=[], filter_category="cat2")
 
             result = await execute_batch_querier(
                 db_sess, query, querier, scopes=[scope_cat1, scope_cat2]
@@ -854,7 +854,7 @@ class TestBatchQuerierMultipleScopes:
             querier = BatchQuerier(
                 pagination=OffsetPagination(offset=0, limit=10),
             )
-            scope_a = MockSearchScope(
+            scope_a = MockOperationScope(
                 checks=[
                     ExistenceCheck(
                         column=ScopeValidationTestRow.name,
@@ -864,7 +864,7 @@ class TestBatchQuerierMultipleScopes:
                 ],
                 filter_category="cat1",
             )
-            scope_b = MockSearchScope(
+            scope_b = MockOperationScope(
                 checks=[
                     ExistenceCheck(
                         column=ScopeValidationTestRow.name,
@@ -893,7 +893,7 @@ class TestBatchQuerierMultipleScopes:
             querier = BatchQuerier(
                 pagination=OffsetPagination(offset=0, limit=10),
             )
-            scope_a = MockSearchScope(
+            scope_a = MockOperationScope(
                 checks=[
                     ExistenceCheck(
                         column=ScopeValidationTestRow.name,
@@ -903,7 +903,7 @@ class TestBatchQuerierMultipleScopes:
                 ],
                 filter_category="cat1",
             )
-            scope_b = MockSearchScope(
+            scope_b = MockOperationScope(
                 checks=[
                     ExistenceCheck(
                         column=ScopeValidationTestRow.name,

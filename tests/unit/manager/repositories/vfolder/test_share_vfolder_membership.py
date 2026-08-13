@@ -1,12 +1,14 @@
 """Tests for `VfolderRepository.share_vfolder_with_users` project-membership lookup.
 
-Only the membership filter — powered by `association_scopes_entities` after BA-5819 —
-is verified. The host-permission gate is patched out so the test focuses purely on
-which users can or cannot be returned by the membership lookup.
+Only the membership filter — powered by the virtual-scope chain
+(`entity_memberships` joined to `virtual_scopes`) — is verified. The host-permission
+gate is patched out so the test focuses purely on which users can or cannot be
+returned by the membership lookup.
 """
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncGenerator
 from typing import Any
 from unittest.mock import AsyncMock
@@ -14,6 +16,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.types import (
     BinarySize,
     ResourceSlot,
@@ -54,9 +57,12 @@ from ai.backend.manager.models.vfolder import (
     VFolderPermissionRow,
     VFolderRow,
 )
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.vfolder import repository as vfolder_repo_module
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 REQUESTER_EMAIL = "requester@example.com"
 DOMAIN_NAME_FIXED = "test-domain-share"
@@ -107,17 +113,22 @@ class TestShareVfolderWithUsersMembership:
                 VFolderRow,
                 VFolderPermissionRow,
                 AssociationScopesEntitiesRow,
+                VirtualScopeRow,
+                EntityMembershipRow,
             ],
         ):
             yield database_connection
 
     @pytest.fixture
-    async def domain_name(
-        self, db_with_cleanup: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[str, None]:
+    async def domain_fixture(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[DomainFixtureData, None]:
+        domain_id = DomainID(uuid.uuid4())
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=DOMAIN_NAME_FIXED,
                     description="",
                     is_active=True,
@@ -127,7 +138,7 @@ class TestShareVfolderWithUsersMembership:
                 )
             )
             await sess.flush()
-        yield DOMAIN_NAME_FIXED
+        yield DomainFixtureData(domain_name=DomainName(DOMAIN_NAME_FIXED), domain_id=domain_id)
 
     @pytest.fixture
     async def project_resource_policy(
@@ -168,7 +179,7 @@ class TestShareVfolderWithUsersMembership:
     async def project(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         project_resource_policy: str,
     ) -> AsyncGenerator[UUID, None]:
         gid = uuid4()
@@ -177,7 +188,7 @@ class TestShareVfolderWithUsersMembership:
                 GroupRow(
                     id=gid,
                     name=f"proj-{gid.hex[:8]}",
-                    domain_name=domain_name,
+                    domain_name=domain_fixture.domain_name,
                     resource_policy=project_resource_policy,
                     description="",
                     is_active=True,
@@ -190,10 +201,29 @@ class TestShareVfolderWithUsersMembership:
         yield gid
 
     @pytest.fixture
+    async def project_scope_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        project: UUID,
+    ) -> AsyncGenerator[UUID, None]:
+        """Materialize `project`'s virtual scope and yield its id."""
+        vs_id = uuid4()
+        async with db_with_cleanup.begin_session() as sess:
+            sess.add(
+                VirtualScopeRow(
+                    id=vs_id,
+                    scope_type=PermissionScopeType.PROJECT.value,
+                    scope_id=project,
+                )
+            )
+            await sess.flush()
+        yield vs_id
+
+    @pytest.fixture
     async def requester(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         user_resource_policy: str,
     ) -> AsyncGenerator[UUID, None]:
         user_uuid = uuid4()
@@ -207,9 +237,10 @@ class TestShareVfolderWithUsersMembership:
                     need_password_change=False,
                     status=UserStatus.ACTIVE,
                     status_info="active",
-                    domain_name=domain_name,
+                    domain_name=domain_fixture.domain_name,
                     role=UserRole.USER,
                     resource_policy=user_resource_policy,
+                    domain_id=domain_fixture.domain_id,
                 )
             )
             await sess.flush()
@@ -219,7 +250,7 @@ class TestShareVfolderWithUsersMembership:
     async def vfolder(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         project: UUID,
         requester: UUID,
     ) -> AsyncGenerator[UUID, None]:
@@ -230,7 +261,7 @@ class TestShareVfolderWithUsersMembership:
                     id=vfolder_id,
                     name=f"vf-{vfolder_id.hex[:8]}",
                     host="local",
-                    domain_name=domain_name,
+                    domain_name=domain_fixture.domain_name,
                     quota_scope_id=f"project:{project}",
                     ownership_type=VFolderOwnershipType.GROUP,
                     user=None,
@@ -249,11 +280,12 @@ class TestShareVfolderWithUsersMembership:
     async def member_user_email(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         user_resource_policy: str,
         project: UUID,
+        project_scope_id: UUID,
     ) -> AsyncGenerator[str, None]:
-        """An ACTIVE user with an ASE membership row in `project`."""
+        """An ACTIVE user enrolled in `project`'s virtual scope."""
         user_uuid = uuid4()
         email = f"member-{user_uuid.hex[:8]}@example.com"
         async with db_with_cleanup.begin_session() as sess:
@@ -266,9 +298,17 @@ class TestShareVfolderWithUsersMembership:
                     need_password_change=False,
                     status=UserStatus.ACTIVE,
                     status_info="active",
-                    domain_name=domain_name,
+                    domain_name=domain_fixture.domain_name,
                     role=UserRole.USER,
                     resource_policy=user_resource_policy,
+                    domain_id=domain_fixture.domain_id,
+                )
+            )
+            sess.add(
+                EntityMembershipRow(
+                    virtual_scope_id=project_scope_id,
+                    entity_type=PermissionEntityType.USER.value,
+                    entity_id=user_uuid,
                 )
             )
             sess.add(
@@ -286,7 +326,7 @@ class TestShareVfolderWithUsersMembership:
     async def non_member_user_email(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         user_resource_policy: str,
     ) -> AsyncGenerator[str, None]:
         """An ACTIVE user with no project membership."""
@@ -302,9 +342,10 @@ class TestShareVfolderWithUsersMembership:
                     need_password_change=False,
                     status=UserStatus.ACTIVE,
                     status_info="active",
-                    domain_name=domain_name,
+                    domain_name=domain_fixture.domain_name,
                     role=UserRole.USER,
                     resource_policy=user_resource_policy,
+                    domain_id=domain_fixture.domain_id,
                 )
             )
             await sess.flush()
@@ -314,11 +355,12 @@ class TestShareVfolderWithUsersMembership:
     async def inactive_member_user_email(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         user_resource_policy: str,
         project: UUID,
+        project_scope_id: UUID,
     ) -> AsyncGenerator[str, None]:
-        """An INACTIVE user that nonetheless has an ASE membership row in `project`."""
+        """An INACTIVE user that is nonetheless enrolled in `project`'s virtual scope."""
         user_uuid = uuid4()
         email = f"inactive-{user_uuid.hex[:8]}@example.com"
         async with db_with_cleanup.begin_session() as sess:
@@ -331,9 +373,17 @@ class TestShareVfolderWithUsersMembership:
                     need_password_change=False,
                     status=UserStatus.INACTIVE,
                     status_info="inactive",
-                    domain_name=domain_name,
+                    domain_name=domain_fixture.domain_name,
                     role=UserRole.USER,
                     resource_policy=user_resource_policy,
+                    domain_id=domain_fixture.domain_id,
+                )
+            )
+            sess.add(
+                EntityMembershipRow(
+                    virtual_scope_id=project_scope_id,
+                    entity_type=PermissionEntityType.USER.value,
+                    entity_id=user_uuid,
                 )
             )
             sess.add(
@@ -351,7 +401,7 @@ class TestShareVfolderWithUsersMembership:
     async def other_project(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         project_resource_policy: str,
     ) -> AsyncGenerator[UUID, None]:
         """A separate project in the same domain (used to verify cross-project isolation)."""
@@ -361,7 +411,7 @@ class TestShareVfolderWithUsersMembership:
                 GroupRow(
                     id=gid,
                     name=f"other-{gid.hex[:8]}",
-                    domain_name=domain_name,
+                    domain_name=domain_fixture.domain_name,
                     resource_policy=project_resource_policy,
                     description="",
                     is_active=True,
@@ -374,14 +424,34 @@ class TestShareVfolderWithUsersMembership:
         yield gid
 
     @pytest.fixture
+    async def other_project_scope_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        other_project: UUID,
+    ) -> AsyncGenerator[UUID, None]:
+        """Materialize `other_project`'s virtual scope and yield its id."""
+        vs_id = uuid4()
+        async with db_with_cleanup.begin_session() as sess:
+            sess.add(
+                VirtualScopeRow(
+                    id=vs_id,
+                    scope_type=PermissionScopeType.PROJECT.value,
+                    scope_id=other_project,
+                )
+            )
+            await sess.flush()
+        yield vs_id
+
+    @pytest.fixture
     async def other_project_member_email(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         user_resource_policy: str,
         other_project: UUID,
+        other_project_scope_id: UUID,
     ) -> AsyncGenerator[str, None]:
-        """An ACTIVE user with an ASE membership row in `other_project` (not `project`)."""
+        """An ACTIVE user enrolled in `other_project`'s virtual scope (not `project`'s)."""
         user_uuid = uuid4()
         email = f"elsewhere-{user_uuid.hex[:8]}@example.com"
         async with db_with_cleanup.begin_session() as sess:
@@ -394,9 +464,17 @@ class TestShareVfolderWithUsersMembership:
                     need_password_change=False,
                     status=UserStatus.ACTIVE,
                     status_info="active",
-                    domain_name=domain_name,
+                    domain_name=domain_fixture.domain_name,
                     role=UserRole.USER,
                     resource_policy=user_resource_policy,
+                    domain_id=domain_fixture.domain_id,
+                )
+            )
+            sess.add(
+                EntityMembershipRow(
+                    virtual_scope_id=other_project_scope_id,
+                    entity_type=PermissionEntityType.USER.value,
+                    entity_id=user_uuid,
                 )
             )
             sess.add(
@@ -415,7 +493,7 @@ class TestShareVfolderWithUsersMembership:
         vfolder_id: UUID,
         project: UUID,
         requester: UUID,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         emails: list[str],
     ) -> dict[str, Any]:
         return {
@@ -424,7 +502,7 @@ class TestShareVfolderWithUsersMembership:
             "vfolder_group": project,
             "requester_uuid": requester,
             "requester_email": REQUESTER_EMAIL,
-            "domain_name": domain_name,
+            "domain_name": domain_fixture.domain_name,
             "resource_policy": {},
             "emails": emails,
             "permission": VFolderPermission.READ_ONLY,
@@ -434,7 +512,7 @@ class TestShareVfolderWithUsersMembership:
     async def test_member_is_returned(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         project: UUID,
         requester: UUID,
         vfolder: UUID,
@@ -443,7 +521,7 @@ class TestShareVfolderWithUsersMembership:
         """A user that is a project member is returned in the share result."""
         repo = VfolderRepository(db_with_cleanup)
         result = await repo.share_vfolder_with_users(
-            **self._share_kwargs(vfolder, project, requester, domain_name, [member_user_email])
+            **self._share_kwargs(vfolder, project, requester, domain_fixture, [member_user_email])
         )
 
         assert result == [member_user_email]
@@ -451,25 +529,25 @@ class TestShareVfolderWithUsersMembership:
     async def test_non_member_raises_object_not_found(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         project: UUID,
         requester: UUID,
         vfolder: UUID,
         non_member_user_email: str,
     ) -> None:
-        """A user without an ASE membership row triggers ObjectNotFound."""
+        """A user without a virtual-scope membership triggers ObjectNotFound."""
         repo = VfolderRepository(db_with_cleanup)
         with pytest.raises(ObjectNotFound):
             await repo.share_vfolder_with_users(
                 **self._share_kwargs(
-                    vfolder, project, requester, domain_name, [non_member_user_email]
+                    vfolder, project, requester, domain_fixture, [non_member_user_email]
                 )
             )
 
     async def test_partial_membership_raises_object_not_found(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         project: UUID,
         requester: UUID,
         vfolder: UUID,
@@ -484,7 +562,7 @@ class TestShareVfolderWithUsersMembership:
                     vfolder,
                     project,
                     requester,
-                    domain_name,
+                    domain_fixture,
                     [member_user_email, non_member_user_email],
                 )
             )
@@ -492,7 +570,7 @@ class TestShareVfolderWithUsersMembership:
     async def test_membership_in_other_project_does_not_grant_share(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         project: UUID,
         requester: UUID,
         vfolder: UUID,
@@ -503,14 +581,18 @@ class TestShareVfolderWithUsersMembership:
         with pytest.raises(ObjectNotFound):
             await repo.share_vfolder_with_users(
                 **self._share_kwargs(
-                    vfolder, project, requester, domain_name, [other_project_member_email]
+                    vfolder,
+                    project,
+                    requester,
+                    domain_fixture,
+                    [other_project_member_email],
                 )
             )
 
     async def test_inactive_member_is_filtered_out(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         project: UUID,
         requester: UUID,
         vfolder: UUID,
@@ -521,6 +603,10 @@ class TestShareVfolderWithUsersMembership:
         with pytest.raises(ObjectNotFound):
             await repo.share_vfolder_with_users(
                 **self._share_kwargs(
-                    vfolder, project, requester, domain_name, [inactive_member_user_email]
+                    vfolder,
+                    project,
+                    requester,
+                    domain_fixture,
+                    [inactive_member_user_email],
                 )
             )

@@ -36,7 +36,7 @@ __all__ = (
 )
 
 
-class SessionSchedulingHistoryRow(Base):  # type: ignore[misc]
+class SessionSchedulingHistoryRow(Base):
     __tablename__ = "session_scheduling_history"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -78,17 +78,28 @@ class SessionSchedulingHistoryRow(Base):  # type: ignore[misc]
         onupdate=sa.func.now(),
     )
 
+    def records_an_attempt(self) -> bool:
+        """Whether this record describes an attempt rather than a skip."""
+        return self.result != SchedulingResult.SKIPPED
+
     def should_merge_with(self, new_row: SessionSchedulingHistoryRow) -> bool:
         """Check if a new entry should be merged with this one.
 
         Merge conditions:
         - Same phase, error_code, and to_status -> merge (increment attempts)
-        - from_status and result (success/failure) do not affect merge decision
+        - Both must describe an attempt, or both a skip
+        - from_status and which attempt result (success/failure/give-up) do
+          not affect the merge decision
+
+        Skips are kept apart because ``attempts`` drives the give-up
+        (deprioritization) classification, which may only count attempts a
+        session really got.
         """
         return (
             self.phase == new_row.phase
             and self.error_code == new_row.error_code
             and self.to_status == new_row.to_status
+            and self.records_an_attempt() == new_row.records_an_attempt()
         )
 
     def to_data(self) -> SessionSchedulingHistoryData:
@@ -108,7 +119,7 @@ class SessionSchedulingHistoryRow(Base):  # type: ignore[misc]
         )
 
 
-class KernelSchedulingHistoryRow(Base):  # type: ignore[misc]
+class KernelSchedulingHistoryRow(Base):
     __tablename__ = "kernel_scheduling_history"
 
     id: Mapped[KernelSchedulingHistoryID] = mapped_column(
@@ -177,7 +188,7 @@ class KernelSchedulingHistoryRow(Base):  # type: ignore[misc]
         )
 
 
-class DeploymentHistoryRow(Base):  # type: ignore[misc]
+class DeploymentHistoryRow(Base):
     __tablename__ = "deployment_history"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -247,7 +258,7 @@ class DeploymentHistoryRow(Base):  # type: ignore[misc]
         )
 
 
-class RouteHistoryRow(Base):  # type: ignore[misc]
+class RouteHistoryRow(Base):
     __tablename__ = "route_history"
 
     id: Mapped[uuid.UUID] = mapped_column(

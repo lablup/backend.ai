@@ -163,6 +163,7 @@ async def session_info(
             password=create_test_password_info("test_password"),
             domain_name=domain_name,
             resource_policy=resource_policy_name,
+            domain_id=domain_id,
         )
         db_sess.add(user)
 
@@ -463,7 +464,7 @@ async def test_agg_to_str(session_info: tuple[str, Any]) -> None:
         sa.select(SessionRow, agg_to_str(KernelRow.tag).label("kernels_tag"))
         .select_from(sa.join(SessionRow, KernelRow))
         .where(SessionRow.id == session_id)
-        .group_by(SessionRow)
+        .group_by(*SessionRow.__table__.c)
     )
     result = await conn.execute(query)
     session = result.first()
@@ -527,7 +528,7 @@ async def test_agg_to_array(session_info: tuple[str, Any]) -> None:
         sa.select(SessionRow, agg_to_array(KernelRow.tag).label("kernels_tag"))
         .select_from(sa.join(SessionRow, KernelRow))
         .where(SessionRow.id == session_id)
-        .group_by(SessionRow)
+        .group_by(*SessionRow.__table__.c)
     )
     result = await conn.execute(query)
     session = result.first()

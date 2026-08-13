@@ -101,7 +101,6 @@ from ai.backend.common.dto.manager.v2.scheduling_history.request import (
 from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     ReplicaGroupHistoryScopeDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     NullableDateTimeFilter,
@@ -165,10 +164,10 @@ from ai.backend.manager.api.gql.project import Project
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.deployment.types import (
-    AccessTokenSearchScope,
-    AutoScalingRuleSearchScope,
-    ReplicaSearchScope,
-    RevisionSearchScope,
+    AccessTokenOperationScope,
+    AutoScalingRuleOperationScope,
+    ReplicaOperationScope,
+    RevisionOperationScope,
 )
 
 if TYPE_CHECKING:
@@ -443,7 +442,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_revisions(
-            scope=RevisionSearchScope(deployment_id=UUID(str(self.id))),
+            scope=RevisionOperationScope(deployment_id=UUID(str(self.id))),
             input=AdminSearchRevisionsInput(
                 filter=pydantic_filter,
                 order=pydantic_order,
@@ -484,7 +483,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_replicas(
-            scope=ReplicaSearchScope(deployment_id=UUID(str(self.id))),
+            scope=ReplicaOperationScope(deployment_id=UUID(str(self.id))),
             input=SearchReplicasInput(
                 filter=pydantic_filter,
                 order=pydantic_order,
@@ -511,7 +510,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description=(
                 "The scheduling history of this deployment's replica groups. This is the"
                 " per-replica-group scaling status that the deprecated ``scaling_state``"
@@ -604,7 +603,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_rules(
-            scope=AutoScalingRuleSearchScope(deployment_id=UUID(str(self.id))),
+            scope=AutoScalingRuleOperationScope(deployment_id=UUID(str(self.id))),
             input=SearchAutoScalingRulesInput(
                 filter=pydantic_filter,
                 order=pydantic_order,
@@ -647,7 +646,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_access_tokens(
-            scope=AccessTokenSearchScope(deployment_id=UUID(str(self.id))),
+            scope=AccessTokenOperationScope(deployment_id=UUID(str(self.id))),
             input=SearchAccessTokensInput(
                 filter=pydantic_filter,
                 order=pydantic_order,
@@ -718,7 +717,7 @@ class ProjectDeploymentScopeGQL(PydanticInputMixin[ProjectDeploymentScopeDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter deployments by conditions on their replicas.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
     ),
     name="ReplicaNestedFilter",
 )
@@ -785,7 +784,7 @@ class DeploymentFilter(PydanticInputMixin[DeploymentFilterDTO]):
     )
     replicas: ReplicaNestedFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description="Filter by conditions on deployment replicas.",
         ),
         default=None,

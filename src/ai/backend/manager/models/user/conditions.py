@@ -636,7 +636,7 @@ class UserConditions:
         """Filter by modified_at < datetime."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserRow.modified_at < dt
+            return UserRow.updated_at < dt
 
         return inner
 
@@ -645,7 +645,7 @@ class UserConditions:
         """Filter by modified_at > datetime."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserRow.modified_at > dt
+            return UserRow.updated_at > dt
 
         return inner
 

@@ -19,6 +19,7 @@ from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.hub import EventHub
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -66,6 +67,7 @@ class ModelServingCRUDBaseFixtures:
             is_superadmin=False,
             role=UserRole.USER,
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
         )
 
     @pytest.fixture(autouse=True)

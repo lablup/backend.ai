@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, override
@@ -13,15 +13,16 @@ import sqlalchemy as sa
 from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSpec, IdleCheckPhase
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
+from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
 
 @dataclass(frozen=True)
-class IdleCheckerAssignmentSearchScope(SearchScope):
+class IdleCheckerAssignmentOperationScope(OperationScope):
     """Idle checker bindings attached to one ``(scope_type, scope_id)`` pair.
 
     One scope = one item of a scoped binding query; the repository layer
@@ -77,6 +78,15 @@ class IdleCheckBatchData:
     """Handler-oriented idle-check input for one reconciler tick."""
 
     assignments: Sequence[IdleCheckAssignmentData]
+
+
+@dataclass(frozen=True)
+class SessionIdleCheckBatchResult:
+    """Per-session outcome of a batch exclusion/inclusion: the sessions the write
+    was applied to and, for each failed one, the exception saying why."""
+
+    success: Sequence[SessionID]
+    errors: Mapping[SessionID, Exception]
 
 
 @dataclass(frozen=True)

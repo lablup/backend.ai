@@ -11,6 +11,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import BinarySize, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
@@ -29,12 +30,13 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
-from ai.backend.manager.repositories.vfolder.types import UserVFolderSearchScope
+from ai.backend.manager.repositories.vfolder.types import UserVFolderOperationScope
 from ai.backend.testutils.db import with_tables
 
 
@@ -77,6 +79,7 @@ class TestVfolderSearchUserVfolders:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
         """Create two users with vfolders: user_a has 2 vfolders, user_b has 1 (all GROUP-owned)."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = "test-domain"
         user_a_id = uuid.uuid4()
         user_b_id = uuid.uuid4()
@@ -88,6 +91,7 @@ class TestVfolderSearchUserVfolders:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -139,6 +143,7 @@ class TestVfolderSearchUserVfolders:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy="default",
+                    domain_id=domain_id,
                 )
             )
             db_sess.add(
@@ -153,6 +158,7 @@ class TestVfolderSearchUserVfolders:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy="default",
+                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()
@@ -241,7 +247,7 @@ class TestVfolderSearchUserVfolders:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_user_vfolders returns only vfolders where VFolderRow.user matches the target user."""
-        scope = UserVFolderSearchScope(user_id=test_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=test_data["user_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -261,7 +267,7 @@ class TestVfolderSearchUserVfolders:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_user_vfolders for user_b returns only vfolders with user_b as VFolderRow.user."""
-        scope = UserVFolderSearchScope(user_id=test_data["user_b_id"])
+        scope = UserVFolderOperationScope(user_id=test_data["user_b_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -280,7 +286,7 @@ class TestVfolderSearchUserVfolders:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_user_vfolders returns correct pagination fields."""
-        scope = UserVFolderSearchScope(user_id=test_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=test_data["user_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -298,6 +304,7 @@ class TestVfolderSearchUserVfolders:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
         """Create a user with both USER-owned and GROUP-owned vfolders."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = "test-domain"
         user_id = uuid.uuid4()
         project_id = uuid.uuid4()
@@ -307,6 +314,7 @@ class TestVfolderSearchUserVfolders:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -357,6 +365,7 @@ class TestVfolderSearchUserVfolders:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy="default",
+                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()
@@ -451,7 +460,7 @@ class TestVfolderSearchUserVfolders:
     ) -> None:
         """search_user_vfolders returns both USER-owned and GROUP-owned vfolders
         as long as VFolderRow.user matches, regardless of ownership_type."""
-        scope = UserVFolderSearchScope(user_id=mixed_ownership_data["user_id"])
+        scope = UserVFolderOperationScope(user_id=mixed_ownership_data["user_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -473,7 +482,7 @@ class TestVfolderSearchUserVfolders:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_user_vfolders raises UserNotFound for a nonexistent user."""
-        scope = UserVFolderSearchScope(user_id=uuid.uuid4())
+        scope = UserVFolderOperationScope(user_id=uuid.uuid4())
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -494,6 +503,7 @@ class TestVfolderSearchUserVfolders:
         - vfolder_shared: owned by user_b, user_a has READ_ATTRIBUTE permission
         - vfolder_no_access: owned by user_b, user_a has no permission
         """
+        domain_id = DomainID(uuid.uuid4())
         domain_name = "test-domain"
         user_a_id = uuid.uuid4()
         user_b_id = uuid.uuid4()
@@ -505,6 +515,7 @@ class TestVfolderSearchUserVfolders:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -555,6 +566,7 @@ class TestVfolderSearchUserVfolders:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy="default",
+                    domain_id=domain_id,
                 )
             )
             db_sess.add(
@@ -569,6 +581,7 @@ class TestVfolderSearchUserVfolders:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy="default",
+                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()
@@ -709,7 +722,7 @@ class TestVfolderSearchUserVfolders:
         permission_data: dict[str, uuid.UUID],
     ) -> None:
         """search_user_vfolders returns vfolders the user owns AND vfolders shared via permission."""
-        scope = UserVFolderSearchScope(user_id=permission_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=permission_data["user_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -731,7 +744,7 @@ class TestVfolderSearchUserVfolders:
         permission_data: dict[str, uuid.UUID],
     ) -> None:
         """search_user_vfolders does not return vfolders the user neither owns nor has permission for."""
-        scope = UserVFolderSearchScope(user_id=permission_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=permission_data["user_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -761,7 +774,7 @@ class TestVfolderSearchUserVfolders:
             )
             await db_sess.flush()
 
-        scope = UserVFolderSearchScope(user_id=permission_data["user_a_id"])
+        scope = UserVFolderOperationScope(user_id=permission_data["user_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],

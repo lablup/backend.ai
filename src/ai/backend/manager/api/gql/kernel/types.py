@@ -26,7 +26,6 @@ from ai.backend.common.dto.manager.v2.kernel.response import (
 from ai.backend.common.dto.manager.v2.kernel.types import (
     KernelStatusFilter,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import AgentId, KernelId, SessionTypes
 from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
@@ -225,7 +224,7 @@ class ResourceAllocationGQL(PydanticOutputMixin[ResourceAllocationGQLDTO]):
     )
     allocated: ResourceSlotGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description=(
                 "The resource slots actually allocated, computed from the "
                 "resource_allocations table. Unlike `used`, this persists after the "
@@ -418,7 +417,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description=(
                 "Resource allocation (requested / used / allocated) computed on-demand "
                 "from the resource_allocations table. Unlike the deprecated eager "
@@ -565,7 +564,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.8.0",
             description="Scheduling history of this kernel with pagination support.",
         )
     )  # type: ignore[misc]

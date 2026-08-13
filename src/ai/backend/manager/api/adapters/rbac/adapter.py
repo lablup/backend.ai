@@ -218,11 +218,10 @@ from ai.backend.manager.models.role_invitation.conditions import (
     RoleInvitationOrders,
 )
 from ai.backend.manager.models.role_invitation.row import RoleInvitationRow
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkCreator,
-    NoPagination,
-    OffsetPagination,
     Purger,
     combine_conditions_or,
     negate_conditions,
@@ -238,15 +237,15 @@ from ai.backend.manager.repositories.permission_controller.purgers import (
     PermissionPurgerSpec,
     RolePurgerSpec,
 )
-from ai.backend.manager.repositories.permission_controller.types import ScopedRoleSearchScope
+from ai.backend.manager.repositories.permission_controller.types import ScopedRoleOperationScope
 from ai.backend.manager.repositories.permission_controller.updaters import (
     PermissionUpdaterSpec,
     RoleUpdaterSpec,
 )
 from ai.backend.manager.repositories.role_invitation.types import (
-    InviteeSearchScope,
-    InviterSearchScope,
-    RoleInvitationSearchScope,
+    InviteeOperationScope,
+    InviterOperationScope,
+    RoleInvitationOperationScope,
 )
 from ai.backend.manager.services.permission_contoller.actions.assign_role import AssignRoleAction
 from ai.backend.manager.services.permission_contoller.actions.bulk_add_role_permissions import (
@@ -395,7 +394,7 @@ class RBACAdapter(BaseAdapter):
     def _validate_scope_id(self, scope_type: RBACElementType, scope_id: str) -> None:
         """Raise InvalidScope if scope_id is not a valid UUID for scope types that require one."""
         match scope_type:
-            case RBACElementType.USER | RBACElementType.PROJECT:
+            case RBACElementType.USER | RBACElementType.PROJECT | RBACElementType.DOMAIN:
                 try:
                     uuid.UUID(scope_id)
                 except ValueError:
@@ -757,7 +756,7 @@ class RBACAdapter(BaseAdapter):
 
     async def search_roles_in_scope(
         self,
-        scope: ScopedRoleSearchScope,
+        scope: ScopedRoleOperationScope,
         input: SearchRolesInput,
     ) -> SearchResult[RoleNode]:
         """Search roles registered in a given scope."""
@@ -2118,7 +2117,7 @@ class RBACAdapter(BaseAdapter):
             SearchMyRoleInvitationsAction(
                 user_id=me.user_id,
                 querier=querier,
-                scope=InviteeSearchScope(invitee_user_id=me.user_id),
+                scope=InviteeOperationScope(invitee_user_id=me.user_id),
             )
         )
         raw = action_result.result
@@ -2155,7 +2154,7 @@ class RBACAdapter(BaseAdapter):
             SearchMySentRoleInvitationsAction(
                 user_id=me.user_id,
                 querier=querier,
-                scope=InviterSearchScope(inviter_user_id=me.user_id),
+                scope=InviterOperationScope(inviter_user_id=me.user_id),
             )
         )
         raw = action_result.result
@@ -2190,7 +2189,7 @@ class RBACAdapter(BaseAdapter):
             SearchRoleInvitationsByRoleAction(
                 role_id=role_id,
                 querier=querier,
-                scope=RoleInvitationSearchScope(role_id=role_id),
+                scope=RoleInvitationOperationScope(role_id=role_id),
             )
         )
         raw = action_result.result

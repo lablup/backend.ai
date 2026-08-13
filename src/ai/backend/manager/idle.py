@@ -260,7 +260,10 @@ class IdleCheckerHost:
         policy_cache: dict[AccessKey | None, Row[Any] | None] = {}
         errors: list[BaseException] = []
         async with self._db.begin_readonly() as conn:
-            j = sa.join(kernels, users, kernels.c.user_uuid == users.c.uuid)
+            j = sa.join(kernels, users, kernels.c.user_uuid == users.c.uuid).outerjoin(
+                keypairs,
+                (keypairs.c.user == users.c.uuid) & keypairs.c.is_default,
+            )
             query = (
                 sa.select(
                     kernels.c.id,
@@ -273,7 +276,7 @@ class IdleCheckerHost:
                     kernels.c.requested_slots,
                     kernels.c.cluster_size,
                     users.c.created_at.label("user_created_at"),
-                    users.c.main_access_key,
+                    keypairs.c.access_key.label("default_access_key"),
                 )
                 .select_from(j)
                 .where(
@@ -286,24 +289,24 @@ class IdleCheckerHost:
             rows = result.fetchall()
             for kernel in rows:
                 grace_period_end = await self._grace_period_checker.get_grace_period_end(kernel)
-                # The idle policy is resolved through the user's main access key,
-                # which is a real foreign key, instead of the kernel's own access
-                # key, which may be left orphaned by a keypair deletion.
-                main_access_key = cast(AccessKey | None, kernel.main_access_key)
-                if main_access_key not in policy_cache:
+                # The idle policy is resolved through the user's default keypair
+                # instead of the kernel's own access key, which may be left
+                # orphaned by a keypair deletion.
+                default_access_key = cast(AccessKey | None, kernel.default_access_key)
+                if default_access_key not in policy_cache:
                     policy = (
-                        await self._fetch_idle_policy(conn, main_access_key)
-                        if main_access_key is not None
+                        await self._fetch_idle_policy(conn, default_access_key)
+                        if default_access_key is not None
                         else None
                     )
                     if policy is None:
                         log.warning(
-                            "idle policy not found for main_access_key={}; "
+                            "idle policy not found for default_access_key={}; "
                             "skipping its kernels in this cycle",
-                            main_access_key,
+                            default_access_key,
                         )
-                    policy_cache[main_access_key] = policy
-                policy = policy_cache[main_access_key]
+                    policy_cache[default_access_key] = policy
+                policy = policy_cache[default_access_key]
                 if policy is None:
                     continue
 
@@ -552,7 +555,7 @@ class BaseIdleChecker(AbstractIdleChecker, AbstractIdleCheckReporter):
     @override
     async def callback_idle_session(self, session_id: SessionId) -> None:
         await self._event_producer.anycast_event(
-            DoTerminateSessionEvent(session_id, self.terminate_reason())
+            DoTerminateSessionEvent(session_id=session_id, reason=self.terminate_reason())
         )
 
 

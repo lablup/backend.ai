@@ -51,7 +51,7 @@ from pydantic import (
     ValidationError,
     field_validator,
 )
-from pydantic_core import ErrorDetails
+from pydantic_core import ErrorDetails, core_schema
 from redis.asyncio import Redis
 
 from .defs import UNKNOWN_CONTAINER_ID, RedisRole
@@ -131,6 +131,7 @@ __all__ = (
     "MovingStatValue",
     "PreemptionMode",
     "PreemptionOrder",
+    "PreemptionVictimScope",
     "PromMetric",
     "PromMetricGroup",
     "PromMetricPrimitive",
@@ -1498,7 +1499,6 @@ class QuotaScopeID:
         handler: Any,
     ) -> Any:
         """Provide Pydantic core schema for QuotaScopeID serialization/deserialization."""
-        from pydantic_core import core_schema
 
         def validate_quota_scope_id(v: Any) -> QuotaScopeID:
             if isinstance(v, QuotaScopeID):
@@ -1563,7 +1563,6 @@ class VFolderID:
         handler: Any,
     ) -> Any:
         """Provide Pydantic core schema for VFolderID serialization/deserialization."""
-        from pydantic_core import core_schema
 
         def validate_vfolder_id(v: Any) -> VFolderID:
             if isinstance(v, VFolderID):
@@ -2272,6 +2271,20 @@ class PreemptionOrder(enum.StrEnum):
     NEWEST = "newest"
     FEWEST_SESSIONS = "fewest-sessions"
     SMALLEST_RESOURCES = "smallest-resources"
+
+
+class PreemptionVictimScope(enum.StrEnum):
+    """Which sessions may become preemption victims for a pending session.
+
+    USER limits victims to the pending session's own sessions;
+    PROJECT/DOMAIN widen to sessions of the same project/domain;
+    RESOURCE_GROUP allows any session in the resource group.
+    """
+
+    USER = "user"
+    PROJECT = "project"
+    DOMAIN = "domain"
+    RESOURCE_GROUP = "resource-group"
 
 
 class SchedulerStatus(TypedDict):

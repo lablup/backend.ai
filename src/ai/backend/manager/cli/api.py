@@ -47,9 +47,8 @@ async def generate_strawberry_gql_schema(output_path: Path | None) -> None:
 async def generate_public_strawberry_gql_schema(output_path: Path | None) -> None:
     """Dump the unauthenticated public schema (``PublicQueries``).
 
-    This is a separate schema from the main one (a different Query root), served directly at
-    ``POST /admin/gql/strawberry/public`` and not part of the federated supergraph, so it is
-    dumped to its own file.
+    This is the `public` subgraph: a schema of its own, composed into the same supergraph as the
+    main one, so it is dumped to its own file for `rover supergraph compose`.
     """
     if output_path is None:
         log.info("======== Public Strawberry GraphQL API Schema ========")

@@ -15,7 +15,7 @@ from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import association_groups_users as agus
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.session_template import TemplateType, session_templates
+from ai.backend.manager.models.session_template import SessionTemplateRow, TemplateType
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.utils import check_if_requester_is_eligible_to_act_as_target_user
 
@@ -115,7 +115,7 @@ class TemplateDBSource:
         results: list[dict[str, str]] = []
         async with self._db.begin() as conn:
             for item in items:
-                query = session_templates.insert().values({
+                query = sa.insert(SessionTemplateRow).values({
                     "id": item["id"],
                     "created_at": datetime.now(UTC),
                     "domain_name": domain_name,
@@ -134,16 +134,18 @@ class TemplateDBSource:
     async def list_task_templates(self, user_uuid: uuid.UUID) -> list[dict[str, Any]]:
         """List all active task templates with user/group info."""
         async with self._db.begin_readonly() as conn:
-            j = session_templates.join(
-                users, session_templates.c.user_uuid == users.c.uuid, isouter=True
-            ).join(groups, session_templates.c.group_id == groups.c.id, isouter=True)
+            j = sa.join(
+                SessionTemplateRow,
+                users,
+                SessionTemplateRow.user_uuid == users.c.uuid,
+                isouter=True,
+            ).join(groups, SessionTemplateRow.group_id == groups.c.id, isouter=True)
             q = (
-                sa.select(session_templates, users.c.email, groups.c.name)
+                sa.select(SessionTemplateRow.__table__, users.c.email, groups.c.name)
                 .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
                 .select_from(j)
                 .where(
-                    (session_templates.c.is_active)
-                    & (session_templates.c.type == TemplateType.TASK),
+                    (SessionTemplateRow.is_active) & (SessionTemplateRow.type == TemplateType.TASK),
                 )
             )
             result = await conn.execute(q)
@@ -178,16 +180,16 @@ class TemplateDBSource:
         async with self._db.begin_readonly() as conn:
             q = (
                 sa.select(
-                    session_templates.c.template,
-                    session_templates.c.name,
-                    session_templates.c.user_uuid,
-                    session_templates.c.group_id,
+                    SessionTemplateRow.template,
+                    SessionTemplateRow.name,
+                    SessionTemplateRow.user_uuid,
+                    SessionTemplateRow.group_id,
                 )
-                .select_from(session_templates)
+                .select_from(SessionTemplateRow)
                 .where(
-                    (session_templates.c.id == template_id)
-                    & (session_templates.c.is_active)
-                    & (session_templates.c.type == TemplateType.TASK),
+                    (SessionTemplateRow.id == template_id)
+                    & (SessionTemplateRow.is_active)
+                    & (SessionTemplateRow.type == TemplateType.TASK),
                 )
             )
             result = await conn.execute(q)
@@ -205,12 +207,12 @@ class TemplateDBSource:
         """Check if an active task template exists."""
         async with self._db.begin_readonly() as conn:
             q = (
-                sa.select(session_templates.c.id)
-                .select_from(session_templates)
+                sa.select(SessionTemplateRow.id)
+                .select_from(SessionTemplateRow)
                 .where(
-                    (session_templates.c.id == template_id)
-                    & (session_templates.c.is_active)
-                    & (session_templates.c.type == TemplateType.TASK),
+                    (SessionTemplateRow.id == template_id)
+                    & (SessionTemplateRow.is_active)
+                    & (SessionTemplateRow.type == TemplateType.TASK),
                 )
             )
             result = await conn.scalar(q)
@@ -227,14 +229,14 @@ class TemplateDBSource:
         """Update a task template. Returns rowcount."""
         async with self._db.begin() as conn:
             q = (
-                sa.update(session_templates)
+                sa.update(SessionTemplateRow)
                 .values({
                     "group_id": group_id,
                     "user_uuid": user_uuid,
                     "name": name,
                     "template": template_data,
                 })
-                .where(session_templates.c.id == template_id)
+                .where(SessionTemplateRow.id == template_id)
             )
             result = await conn.execute(q)
             return result.rowcount
@@ -252,7 +254,7 @@ class TemplateDBSource:
         """Insert a cluster template. Returns template ID."""
         template_id = uuid.uuid4().hex
         async with self._db.begin() as conn:
-            q = session_templates.insert().values({
+            q = sa.insert(SessionTemplateRow).values({
                 "id": template_id,
                 "domain_name": domain_name,
                 "group_id": group_id,
@@ -269,16 +271,19 @@ class TemplateDBSource:
     async def list_cluster_templates_all(self, user_uuid: uuid.UUID) -> list[dict[str, Any]]:
         """List all active cluster templates (superadmin + all mode)."""
         async with self._db.begin_readonly() as conn:
-            j = session_templates.join(
-                users, session_templates.c.user_uuid == users.c.uuid, isouter=True
-            ).join(groups, session_templates.c.group_id == groups.c.id, isouter=True)
+            j = sa.join(
+                SessionTemplateRow,
+                users,
+                SessionTemplateRow.user_uuid == users.c.uuid,
+                isouter=True,
+            ).join(groups, SessionTemplateRow.group_id == groups.c.id, isouter=True)
             q = (
-                sa.select(session_templates, users.c.email, groups.c.name)
+                sa.select(SessionTemplateRow.__table__, users.c.email, groups.c.name)
                 .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
                 .select_from(j)
                 .where(
-                    (session_templates.c.is_active)
-                    & (session_templates.c.type == TemplateType.CLUSTER),
+                    (SessionTemplateRow.is_active)
+                    & (SessionTemplateRow.type == TemplateType.CLUSTER),
                 )
             )
             result = await conn.execute(q)
@@ -319,26 +324,26 @@ class TemplateDBSource:
         """
         extra_conds = None
         if group_id_filter is not None:
-            extra_conds = session_templates.c.group_id == group_id_filter
+            extra_conds = SessionTemplateRow.group_id == group_id_filter
 
         entries: list[dict[str, Any]] = []
         async with self._db.begin_readonly() as conn:
             if "user" in allowed_types:
-                j = session_templates.join(users, session_templates.c.user_uuid == users.c.uuid)
+                j = sa.join(SessionTemplateRow, users, SessionTemplateRow.user_uuid == users.c.uuid)
                 query = (
                     sa.select(
-                        session_templates.c.name,
-                        session_templates.c.id,
-                        session_templates.c.created_at,
-                        session_templates.c.user_uuid,
-                        session_templates.c.group_id,
+                        SessionTemplateRow.name,
+                        SessionTemplateRow.id,
+                        SessionTemplateRow.created_at,
+                        SessionTemplateRow.user_uuid,
+                        SessionTemplateRow.group_id,
                         users.c.email,
                     )
                     .select_from(j)
                     .where(
-                        (session_templates.c.user_uuid == user_uuid)
-                        & session_templates.c.is_active
-                        & (session_templates.c.type == TemplateType.CLUSTER),
+                        (SessionTemplateRow.user_uuid == user_uuid)
+                        & SessionTemplateRow.is_active
+                        & (SessionTemplateRow.type == TemplateType.CLUSTER),
                     )
                 )
                 if extra_conds is not None:
@@ -375,30 +380,28 @@ class TemplateDBSource:
                     result = await conn.execute(grp_query)
                     group_ids = [g.group_id for g in result.fetchall()]
 
-                j3 = session_templates.join(groups, session_templates.c.group_id == groups.c.id)
+                j3 = sa.join(SessionTemplateRow, groups, SessionTemplateRow.group_id == groups.c.id)
                 grp_tmpl_query = (
                     sa.select(
-                        session_templates.c.name,
-                        session_templates.c.id,
-                        session_templates.c.created_at,
-                        session_templates.c.user_uuid,
-                        session_templates.c.group_id,
+                        SessionTemplateRow.name,
+                        SessionTemplateRow.id,
+                        SessionTemplateRow.created_at,
+                        SessionTemplateRow.user_uuid,
+                        SessionTemplateRow.group_id,
                         groups.c.name,
                     )
                     .set_label_style(sa.LABEL_STYLE_TABLENAME_PLUS_COL)
                     .select_from(j3)
                     .where(
-                        session_templates.c.group_id.in_(group_ids)
-                        & session_templates.c.is_active
-                        & (session_templates.c.type == TemplateType.CLUSTER),
+                        SessionTemplateRow.group_id.in_(group_ids)
+                        & SessionTemplateRow.is_active
+                        & (SessionTemplateRow.type == TemplateType.CLUSTER),
                     )
                 )
                 if extra_conds is not None:
                     grp_tmpl_query = grp_tmpl_query.where(extra_conds)
                 if "user" in allowed_types:
-                    grp_tmpl_query = grp_tmpl_query.where(
-                        session_templates.c.user_uuid != user_uuid
-                    )
+                    grp_tmpl_query = grp_tmpl_query.where(SessionTemplateRow.user_uuid != user_uuid)
                 result = await conn.execute(grp_tmpl_query)
                 is_owner = user_role == UserRole.ADMIN
                 for row in result:
@@ -426,12 +429,12 @@ class TemplateDBSource:
         """Get a single active cluster template by ID. Returns template dict or None."""
         async with self._db.begin_readonly() as conn:
             q = (
-                sa.select(session_templates.c.template)
-                .select_from(session_templates)
+                sa.select(SessionTemplateRow.template)
+                .select_from(SessionTemplateRow)
                 .where(
-                    (session_templates.c.id == template_id)
-                    & (session_templates.c.is_active)
-                    & (session_templates.c.type == TemplateType.CLUSTER),
+                    (SessionTemplateRow.id == template_id)
+                    & (SessionTemplateRow.is_active)
+                    & (SessionTemplateRow.type == TemplateType.CLUSTER),
                 )
             )
             template = await conn.scalar(q)
@@ -445,12 +448,12 @@ class TemplateDBSource:
         """Check if an active cluster template exists."""
         async with self._db.begin_readonly() as conn:
             q = (
-                sa.select(session_templates.c.id)
-                .select_from(session_templates)
+                sa.select(SessionTemplateRow.id)
+                .select_from(SessionTemplateRow)
                 .where(
-                    (session_templates.c.id == template_id)
-                    & (session_templates.c.is_active)
-                    & (session_templates.c.type == TemplateType.CLUSTER),
+                    (SessionTemplateRow.id == template_id)
+                    & (SessionTemplateRow.is_active)
+                    & (SessionTemplateRow.type == TemplateType.CLUSTER),
                 )
             )
             result = await conn.scalar(q)
@@ -465,9 +468,9 @@ class TemplateDBSource:
         """Update a cluster template. Returns rowcount."""
         async with self._db.begin() as conn:
             q = (
-                sa.update(session_templates)
+                sa.update(SessionTemplateRow)
                 .values(template=template_data, name=name)
-                .where(session_templates.c.id == template_id)
+                .where(SessionTemplateRow.id == template_id)
             )
             result = await conn.execute(q)
             return result.rowcount
@@ -478,11 +481,11 @@ class TemplateDBSource:
         """Soft-delete a template by setting is_active=False. Returns rowcount."""
         async with self._db.begin() as conn:
             q = (
-                sa.update(session_templates)
+                sa.update(SessionTemplateRow)
                 .values(is_active=False)
                 .where(
-                    (session_templates.c.id == template_id)
-                    & (session_templates.c.type == template_type),
+                    (SessionTemplateRow.id == template_id)
+                    & (SessionTemplateRow.type == template_type),
                 )
             )
             result = await conn.execute(q)

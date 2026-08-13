@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.client.v2.exceptions import ConflictError, InvalidRequestError, NotFoundError
+from ai.backend.client.v2.exceptions import ConflictError, NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.data.permission.types import RelationType
 from ai.backend.common.dto.manager.user import (
@@ -23,7 +23,7 @@ from ai.backend.common.dto.manager.user import (
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.models.group import GroupRow, ProjectType
-from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -63,6 +63,29 @@ class TestUserCreateCrud:
             kp = row.fetchone()
         assert kp is not None, "Keypair should be auto-created for new user"
         assert kp.is_active is True
+
+    async def test_s6_create_marks_the_default_keypair_as_main(
+        self,
+        user_factory: UserFactory,
+        db_engine: SAEngine,
+    ) -> None:
+        """S-6: Exactly the auto-created keypair is marked as the user's main one."""
+        result = await user_factory()
+
+        async with db_engine.begin() as conn:
+            marked = (
+                await conn.execute(
+                    sa.select(KeyPairRow.access_key).where(
+                        (KeyPairRow.user == str(result.user.id)) & KeyPairRow.is_default
+                    )
+                )
+            ).scalars()
+            owned = (
+                await conn.execute(
+                    sa.select(KeyPairRow.access_key).where(KeyPairRow.user == str(result.user.id))
+                )
+            ).scalars()
+        assert marked.all() == owned.all()
 
     async def test_s3_create_with_group_ids(
         self,
@@ -149,8 +172,8 @@ class TestUserCreateCrud:
         resource_policy_fixture: str,
         admin_registry: BackendAIClientRegistry,
     ) -> None:
-        """F-BIZ-2: Non-existent domain → InvalidRequestError (400)."""
-        with pytest.raises(InvalidRequestError):
+        """F-BIZ-2: Non-existent domain → NotFoundError (404)."""
+        with pytest.raises(NotFoundError):
             await admin_registry.user.create(
                 CreateUserRequest(
                     email="no-domain@test.local",

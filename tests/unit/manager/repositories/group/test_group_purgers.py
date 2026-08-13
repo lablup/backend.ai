@@ -164,6 +164,7 @@ class TestGroupPurgersIntegration:
                 domain_name=sample_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy,
+                domain_id=sample_domain.domain_id,
             )
             session.add(user)
             await session.flush()
@@ -486,8 +487,8 @@ class TestGroupPurgersIntegration:
 
         # Purge endpoint sessions using collected session IDs
         async with db_with_cleanup.begin_session() as session:
-            purger = BatchPurger(spec=SessionByIdsBatchPurgerSpec(session_ids=session_ids))
-            result = await execute_batch_purger(session, purger)
+            session_purger = BatchPurger(spec=SessionByIdsBatchPurgerSpec(session_ids=session_ids))
+            result = await execute_batch_purger(session, session_purger)
             assert result.deleted_count == len(endpoint_sessions)
 
         # Verify endpoint sessions are deleted

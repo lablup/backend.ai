@@ -69,7 +69,7 @@ def _create_scaling_group(
     return ScalingGroupData(
         id=ResourceGroupID(uuid.uuid4()),
         name="default",
-        status=ScalingGroupStatus(is_active=True, is_public=True),
+        status=ScalingGroupStatus(is_active=True, is_public=True, is_default=False),
         metadata=ScalingGroupMetadata(description="Test", created_at=datetime.now(tz=UTC)),
         network=ScalingGroupNetworkConfig(
             wsproxy_addr="", wsproxy_api_token="", use_host_network=False

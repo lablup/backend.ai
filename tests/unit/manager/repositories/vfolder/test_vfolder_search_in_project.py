@@ -10,6 +10,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import BinarySize, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.vfolder.types import (
@@ -27,12 +28,13 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
-from ai.backend.manager.repositories.vfolder.types import ProjectVFolderSearchScope
+from ai.backend.manager.repositories.vfolder.types import ProjectVFolderOperationScope
 from ai.backend.testutils.db import with_tables
 
 
@@ -74,6 +76,7 @@ class TestVfolderSearchInProject:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[dict[str, uuid.UUID], None]:
         """Create two projects with vfolders: project_a has 2 vfolders, project_b has 1."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = "test-domain"
         user_id = uuid.uuid4()
         project_a_id = uuid.uuid4()
@@ -85,6 +88,7 @@ class TestVfolderSearchInProject:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -136,6 +140,7 @@ class TestVfolderSearchInProject:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy="default",
+                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()
@@ -216,7 +221,7 @@ class TestVfolderSearchInProject:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_in_project returns only vfolders belonging to the specified project."""
-        scope = ProjectVFolderSearchScope(project_id=test_data["project_a_id"])
+        scope = ProjectVFolderOperationScope(project_id=test_data["project_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -236,7 +241,7 @@ class TestVfolderSearchInProject:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_in_project for project_b returns only its vfolder, not project_a's."""
-        scope = ProjectVFolderSearchScope(project_id=test_data["project_b_id"])
+        scope = ProjectVFolderOperationScope(project_id=test_data["project_b_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
@@ -255,7 +260,7 @@ class TestVfolderSearchInProject:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """search_in_project returns correct pagination fields."""
-        scope = ProjectVFolderSearchScope(project_id=test_data["project_a_id"])
+        scope = ProjectVFolderOperationScope(project_id=test_data["project_a_id"])
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],

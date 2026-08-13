@@ -7,7 +7,7 @@ from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.repositories.base.querier import BatchQuerier
-from ai.backend.manager.repositories.user.types import DomainUserSearchScope
+from ai.backend.manager.repositories.user.types import DomainUserOperationScope
 from ai.backend.manager.services.user.actions.base import UserAction
 
 
@@ -15,7 +15,7 @@ from ai.backend.manager.services.user.actions.base import UserAction
 class SearchUsersByDomainAction(UserAction):
     """Action for searching users within a domain."""
 
-    scope: DomainUserSearchScope
+    scope: DomainUserOperationScope
     querier: BatchQuerier
 
     @override

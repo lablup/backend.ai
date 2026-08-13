@@ -116,6 +116,10 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
         - successes: Sessions that were scheduled
         - failures: Sessions whose scheduling attempt failed in the Provisioner
         - skipped: Sessions that were not attempted (priority-based, resource constraints)
+
+        A session left unattempted must stay out of `failures`: the retry
+        pressure that eventually deprioritizes a session may only be charged
+        to attempts that actually happened.
         """
         result = SessionExecutionResult()
 
@@ -141,6 +145,7 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
         failure_map = {
             failure.session_id: failure for failure in schedule_result.scheduling_failures
         }
+        skip_map = {skip.session_id: skip for skip in schedule_result.scheduling_skips}
 
         # Reservation-backed placements: the sessions hold their resources
         # (kernels already RESERVED) and wait for their victims; the victims
@@ -180,6 +185,9 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
             elif session_id in failure_map:
                 reason = failure_map[session_id].msg or "scheduling-failed"
                 result.failures.append(self._to_transition_info(session, reason))
+            elif session_id in skip_map:
+                reason = skip_map[session_id].msg or "not-attempted-this-cycle"
+                result.skipped.append(self._to_transition_info(session, reason))
             else:
                 result.skipped.append(self._to_transition_info(session, "not-scheduled-this-cycle"))
 

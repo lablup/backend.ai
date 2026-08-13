@@ -7,11 +7,13 @@ focus of this test module.
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncGenerator
 from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.types import (
     BinarySize,
     ResourceSlot,
@@ -47,7 +49,12 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import get_allowed_vfolder_hosts_by_user
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
+from ai.backend.testutils.virtual_scope import VirtualScopeSeeder
 
 HOST_A = "host-a"
 HOST_B = "host-b"
@@ -99,18 +106,24 @@ class TestGetAllowedVFolderHostsByUserMembership:
                 GroupRow,
                 AgentRow,
                 AssociationScopesEntitiesRow,
+                VirtualScopeRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
             ],
         ):
             yield database_connection
 
     @pytest.fixture
-    async def domain_name(
-        self, db_with_cleanup: ExtendedAsyncSAEngine
-    ) -> AsyncGenerator[str, None]:
+    async def domain_fixture(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[DomainFixtureData, None]:
+        domain_id = DomainID(uuid.uuid4())
         name = f"test-domain-{uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=name,
                     description="",
                     is_active=True,
@@ -120,7 +133,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
                 )
             )
             await sess.flush()
-        yield name
+        yield DomainFixtureData(domain_name=DomainName(name), domain_id=domain_id)
 
     @pytest.fixture
     async def project_resource_policy(
@@ -161,7 +174,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
     async def regular_user(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         user_resource_policy: str,
     ) -> AsyncGenerator[UUID, None]:
         user_uuid = uuid4()
@@ -175,9 +188,10 @@ class TestGetAllowedVFolderHostsByUserMembership:
                     need_password_change=False,
                     status=UserStatus.ACTIVE,
                     status_info="active",
-                    domain_name=domain_name,
+                    domain_name=domain_fixture.domain_name,
                     role=UserRole.USER,
                     resource_policy=user_resource_policy,
+                    domain_id=domain_fixture.domain_id,
                 )
             )
             await sess.flush()
@@ -187,7 +201,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
     async def group_a(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         project_resource_policy: str,
     ) -> AsyncGenerator[UUID, None]:
         gid = uuid4()
@@ -196,7 +210,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
                 GroupRow(
                     id=gid,
                     name=f"group-a-{gid.hex[:8]}",
-                    domain_name=domain_name,
+                    domain_name=domain_fixture.domain_name,
                     resource_policy=project_resource_policy,
                     description="",
                     is_active=True,
@@ -212,7 +226,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
     async def group_b(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         project_resource_policy: str,
     ) -> AsyncGenerator[UUID, None]:
         gid = uuid4()
@@ -221,7 +235,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
                 GroupRow(
                     id=gid,
                     name=f"group-b-{gid.hex[:8]}",
-                    domain_name=domain_name,
+                    domain_name=domain_fixture.domain_name,
                     resource_policy=project_resource_policy,
                     description="",
                     is_active=True,
@@ -250,6 +264,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
                     entity_id=str(regular_user),
                 )
             )
+            await VirtualScopeSeeder().enroll_user_in_project(sess, group_a, regular_user)
             await sess.flush()
         yield
 
@@ -270,13 +285,14 @@ class TestGetAllowedVFolderHostsByUserMembership:
                     entity_id=str(regular_user),
                 )
             )
+            await VirtualScopeSeeder().enroll_user_in_project(sess, group_b, regular_user)
             await sess.flush()
         yield
 
     async def test_member_groups_contribute_their_hosts(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         regular_user: UUID,
         group_a: UUID,
         group_b: UUID,
@@ -288,7 +304,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
             result = await get_allowed_vfolder_hosts_by_user(
                 conn,
                 resource_policy={},
-                domain_name=domain_name,
+                domain_name=domain_fixture.domain_name,
                 user_uuid=regular_user,
             )
 
@@ -298,7 +314,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
     async def test_non_member_groups_do_not_contribute(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         regular_user: UUID,
         group_a: UUID,
         group_b: UUID,
@@ -309,7 +325,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
             result = await get_allowed_vfolder_hosts_by_user(
                 conn,
                 resource_policy={},
-                domain_name=domain_name,
+                domain_name=domain_fixture.domain_name,
                 user_uuid=regular_user,
             )
 
@@ -319,7 +335,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
     async def test_group_id_filter_with_membership(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         regular_user: UUID,
         group_a: UUID,
         group_b: UUID,
@@ -331,7 +347,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
             result = await get_allowed_vfolder_hosts_by_user(
                 conn,
                 resource_policy={},
-                domain_name=domain_name,
+                domain_name=domain_fixture.domain_name,
                 user_uuid=regular_user,
                 group_id=group_a,
             )
@@ -342,7 +358,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
     async def test_group_id_filter_without_membership(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         regular_user: UUID,
         group_a: UUID,
     ) -> None:
@@ -351,7 +367,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
             result = await get_allowed_vfolder_hosts_by_user(
                 conn,
                 resource_policy={},
-                domain_name=domain_name,
+                domain_name=domain_fixture.domain_name,
                 user_uuid=regular_user,
                 group_id=group_a,
             )
@@ -361,7 +377,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
     async def test_resource_policy_hosts_merge_independent_of_membership(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         regular_user: UUID,
     ) -> None:
         """Hosts from `resource_policy` are merged regardless of project membership.
@@ -372,7 +388,7 @@ class TestGetAllowedVFolderHostsByUserMembership:
             result = await get_allowed_vfolder_hosts_by_user(
                 conn,
                 resource_policy={"allowed_vfolder_hosts": HOSTS_C},
-                domain_name=domain_name,
+                domain_name=domain_fixture.domain_name,
                 user_uuid=regular_user,
             )
 

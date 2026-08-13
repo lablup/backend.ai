@@ -8,8 +8,8 @@ from ai.backend.common.exception import ResourcePresetConflict
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.base.creator import CreatorSpec
-from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 
 @dataclass

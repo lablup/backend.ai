@@ -60,15 +60,15 @@ class VFolderDeleteTaskHandler(BaseBackgroundTaskHandler[VFolderDeleteManifest, 
             )
             await self._event_producer.anycast_event(
                 VFolderDeletionFailureEvent(
-                    manifest.vfolder_id,
-                    str(e),
+                    vfid=manifest.vfolder_id,
+                    message=str(e),
                 )
             )
             raise e
         else:
             await self._event_producer.anycast_event(
                 VFolderDeletionSuccessEvent(
-                    manifest.vfolder_id,
+                    vfid=manifest.vfolder_id,
                 )
             )
 

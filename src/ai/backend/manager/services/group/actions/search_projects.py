@@ -13,8 +13,8 @@ from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.group.types import (
-    DomainProjectSearchScope,
-    UserProjectSearchScope,
+    DomainProjectOperationScope,
+    UserProjectOperationScope,
 )
 from ai.backend.manager.services.group.actions.base import (
     GroupAction,
@@ -45,7 +45,7 @@ class SearchProjectsAction(GroupAction):
 class SearchProjectsByDomainAction(ProjectScopeAction):
     """Search projects within a domain."""
 
-    scope: DomainProjectSearchScope
+    scope: DomainProjectOperationScope
     querier: BatchQuerier
 
     @override
@@ -59,18 +59,18 @@ class SearchProjectsByDomainAction(ProjectScopeAction):
 
     @override
     def scope_id(self) -> str:
-        return self.scope.domain_name
+        return str(self.scope.domain_id)
 
     @override
     def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.DOMAIN, self.scope.domain_name)
+        return RBACElementRef(RBACElementType.DOMAIN, str(self.scope.domain_id))
 
 
 @dataclass
 class SearchProjectsByUserAction(ProjectScopeAction):
     """Search projects a user is member of."""
 
-    scope: UserProjectSearchScope
+    scope: UserProjectOperationScope
     querier: BatchQuerier
 
     @override

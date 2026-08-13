@@ -4,6 +4,8 @@ from collections.abc import Sequence
 
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -12,16 +14,14 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentBulkResult,
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
+    AppConfigFragmentUpsertBulkResult,
 )
-from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.repositories.app_config_fragment.db_source import (
     AppConfigFragmentDBSource,
 )
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
     AppConfigFragmentPurgerSpec,
-)
-from ai.backend.manager.repositories.app_config_fragment.types import (
-    ResolvedAppConfigScope,
 )
 from ai.backend.manager.repositories.app_config_fragment.upserters import (
     AppConfigFragmentUpserterSpec,
@@ -64,7 +64,7 @@ class AppConfigFragmentRepository:
     @app_config_fragment_repository_resilience.apply()
     async def bulk_upsert(
         self, specs: Sequence[AppConfigFragmentUpserterSpec]
-    ) -> list[AppConfigFragmentData]:
+    ) -> AppConfigFragmentUpsertBulkResult:
         return await self._db_source.bulk_upsert(specs)
 
     @app_config_fragment_repository_resilience.apply()
@@ -81,7 +81,7 @@ class AppConfigFragmentRepository:
 
     @app_config_fragment_repository_resilience.apply()
     async def scoped_search(
-        self, querier: BatchQuerier, scopes: Sequence[SearchScope]
+        self, querier: BatchQuerier, scopes: Sequence[OperationScope]
     ) -> AppConfigFragmentSearchResult:
         return await self._db_source.scoped_search(querier, scopes)
 
@@ -94,6 +94,6 @@ class AppConfigFragmentRepository:
 
     @app_config_fragment_repository_resilience.apply()
     async def list_visible_fragments_bulk(
-        self, config_names: list[str], scope: ResolvedAppConfigScope | None = None
+        self, config_names: list[str], user_id: UserID | None, domain_id: DomainID | None
     ) -> list[AppConfigFragmentData]:
-        return await self._db_source.list_visible_fragments_bulk(config_names, scope)
+        return await self._db_source.list_visible_fragments_bulk(config_names, user_id, domain_id)

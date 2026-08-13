@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.errors.resource import ProjectNotFound
@@ -103,6 +104,7 @@ class TestCreateGroup:
                 )
             ),
             _domain_name=sample_group_data.domain_name,
+            _domain_id=DomainID(uuid.uuid4()),
         )
 
         result = await service.create_group(action)
@@ -134,6 +136,7 @@ class TestCreateGroup:
                 )
             ),
             _domain_name="default",
+            _domain_id=DomainID(uuid.uuid4()),
         )
 
         with pytest.raises(InvalidAPIParameters):
@@ -161,6 +164,7 @@ class TestCreateGroup:
                 )
             ),
             _domain_name="default",
+            _domain_id=DomainID(uuid.uuid4()),
         )
 
         with pytest.raises(InvalidAPIParameters):

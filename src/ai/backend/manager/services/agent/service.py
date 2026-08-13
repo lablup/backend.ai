@@ -326,7 +326,7 @@ class AgentService:
         )
         if result.was_revived:
             await self._event_producer.anycast_event(
-                AgentStartedEvent("revived"), source_override=action.agent_id
+                AgentStartedEvent(reason="revived"), source_override=action.agent_id
             )
         await self._agent_repository.sync_installed_images(agent_id=action.agent_id)
 

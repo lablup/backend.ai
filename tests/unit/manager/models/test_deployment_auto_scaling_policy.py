@@ -12,6 +12,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -116,9 +117,11 @@ class TestDeploymentAutoScalingPolicyRow:
     ) -> AsyncGenerator[DomainRow, None]:
         """Create test domain."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = DomainID(uuid.uuid4())
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -173,6 +176,7 @@ class TestDeploymentAutoScalingPolicyRow:
                 status=UserStatus.ACTIVE,
                 status_info="active",
                 resource_policy=test_user_resource_policy.name,
+                domain_id=test_domain.id,
             )
             db_sess.add(user)
             await db_sess.flush()

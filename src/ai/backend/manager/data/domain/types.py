@@ -32,8 +32,9 @@ class DomainData:
     name: str
     description: str | None
     is_active: bool
+    is_default: bool
     created_at: datetime = field(compare=False)
-    modified_at: datetime = field(compare=False)
+    updated_at: datetime = field(compare=False)
     total_resource_slots: ResourceSlot
     allowed_vfolder_hosts: VFolderHostPermissionMap
     allowed_docker_registries: list[str]
@@ -43,7 +44,7 @@ class DomainData:
     def scope_id(self) -> ScopeId:
         return ScopeId(
             scope_type=ScopeType.DOMAIN,
-            scope_id=self.name,
+            scope_id=str(self.id),
         )
 
     def role_name(self) -> str:

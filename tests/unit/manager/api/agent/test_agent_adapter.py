@@ -26,7 +26,7 @@ from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.types import AgentId, ResourceSlot
 from ai.backend.manager.api.rest.agent.adapter import AgentAdapter
 from ai.backend.manager.data.agent.types import AgentData, AgentDetailData, AgentStatus
-from ai.backend.manager.repositories.base import OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 
 
 class TestAgentAdapterBuildQuerier:

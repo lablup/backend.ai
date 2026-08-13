@@ -13,6 +13,7 @@ import pytest
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.actions.action.base import BaseActionTriggerMeta
@@ -70,6 +71,7 @@ def enqueue_on_behalf() -> _EnqueueOnBehalf:
             is_superadmin=False,
             role=UserRole.USER,
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
         ),
     )
 

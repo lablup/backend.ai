@@ -43,6 +43,7 @@ class KeyPairResourcePolicyData:
     max_concurrent_sessions: int
     max_pending_session_count: int | None
     max_pending_session_resource_slots: Any | None  # TODO: Use ResourceSlot.
+    max_priority: int | None
     max_concurrent_sftp_sessions: int
     max_containers_per_session: int
     idle_timeout: int
@@ -76,7 +77,7 @@ class SlotTypeInfo:
 class UserEnqueuePolicy:
     """Per-user gates applied at session enqueue.
 
-    Sourced from the user's main-keypair resource policy row until
+    Sourced from the user's default-keypair resource policy row until
     user-level policy columns exist; carries only the fields the
     enqueue path actually consumes.
     """

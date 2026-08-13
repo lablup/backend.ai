@@ -29,15 +29,14 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkCreator,
-    NoPagination,
-    OffsetPagination,
 )
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 from ai.backend.manager.repositories.role_preset.creators import (
     RolePermissionPresetCreatorSpec,
     RolePermissionPresetDependentCreatorSpec,
@@ -63,7 +62,7 @@ async def repository(
             RolePermissionPresetRow,  # child (FK -> role_presets.id, CASCADE)
         ],
     ):
-        yield RolePresetRepository(DBOpsProvider(database_connection))
+        yield RolePresetRepository(RBACOpsProvider(database_connection))
 
 
 async def _count_permissions(

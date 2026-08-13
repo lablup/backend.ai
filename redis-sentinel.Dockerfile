@@ -1,4 +1,4 @@
-FROM valkey/valkey:9.1.0-alpine
+FROM valkey/valkey:9.1.1-alpine
 
 COPY configs/redis/sentinel.conf /etc/redis-sentinel.conf
 

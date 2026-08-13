@@ -1,8 +1,5 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.clients.storage_proxy.manager_facing_client import (
     StorageProxyManagerFacingClient,
@@ -50,7 +47,7 @@ from ai.backend.manager.services.vfs_storage.actions.update import (
 from ai.backend.manager.services.vfs_storage.service import VFSStorageService
 
 
-class VFSStorageProcessors(AbstractProcessorPackage):
+class VFSStorageProcessors:
     create: ActionProcessor[CreateVFSStorageAction, CreateVFSStorageActionResult]
     update: ActionProcessor[UpdateVFSStorageAction, UpdateVFSStorageActionResult]
     delete: ActionProcessor[DeleteVFSStorageAction, DeleteVFSStorageActionResult]
@@ -87,18 +84,3 @@ class VFSStorageProcessors(AbstractProcessorPackage):
         """
         storage_manager = self._service._ensure_storage_manager()
         return storage_manager.get_manager_facing_client(proxy_name)
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateVFSStorageAction.spec(),
-            UpdateVFSStorageAction.spec(),
-            DeleteVFSStorageAction.spec(),
-            GetVFSStorageAction.spec(),
-            ListVFSStorageAction.spec(),
-            SearchVFSStoragesAction.spec(),
-            GetQuotaScopeAction.spec(),
-            SearchQuotaScopesAction.spec(),
-            SetQuotaScopeAction.spec(),
-            UnsetQuotaScopeAction.spec(),
-        ]

@@ -122,14 +122,14 @@ from ai.backend.manager.models.session.orders import (
     resolve_order as resolve_session_order,
 )
 from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    NoPagination,
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
+from ai.backend.manager.repositories.session.types import ProjectSessionOperationScope
 from ai.backend.manager.services.session.actions.batch_get_kernel_resource_allocation import (
     BatchGetKernelResourceAllocationAction,
 )
@@ -240,7 +240,7 @@ class SessionAdapter(BaseAdapter):
         """Enqueue a new session for scheduling.
 
         When ``input.owner_id`` is set, the session is created on behalf of the
-        target user: their main access key, role, and domain are used in place
+        target user: their default access key, role, and domain are used in place
         of the caller's. Resolution and authorization of the delegated user
         are handled by the downstream session service, not by this adapter.
         """
@@ -347,7 +347,7 @@ class SessionAdapter(BaseAdapter):
 
         A self-service query: the requesting user is resolved from the request
         context and passed as ``user_uuid``. The service resolves that user's
-        main access key from it, so the adapter supplies no access key.
+        default access key from it, so the adapter supplies no access key.
         """
         cluster_mode = (
             ClusterMode.MULTI_NODE
@@ -639,7 +639,7 @@ class SessionAdapter(BaseAdapter):
 
     async def gql_search_by_project(
         self,
-        scope: ProjectSessionSearchScope,
+        scope: ProjectSessionOperationScope,
         input: AdminSearchSessionsInput,
     ) -> AdminSearchSessionsPayload:
         """Search sessions within a project, cursor-based pagination."""

@@ -7,14 +7,14 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.config import DEFAULT_SHELL, ModelConfig, ModelDefinition, ModelServiceConfig
+from ai.backend.common.config import (
+    DEFAULT_SHELL,
+    PresetModelConfig,
+    PresetModelDefinition,
+    PresetModelServiceConfig,
+)
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
-from ai.backend.common.dto.manager.v2.deployment.types import (
-    ModelConfigInfoDTO,
-    ModelDefinitionInfoDTO,
-    ModelServiceConfigInfoDTO,
-)
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     CreateDeploymentRevisionPresetInput,
     PresetModelConfigInput,
@@ -28,6 +28,11 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
     PresetDeploymentDefaults,
     PresetExecutionSpec,
     PresetResourceAllocation,
+)
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
+    PresetModelConfigInfoDTO,
+    PresetModelDefinitionInfoDTO,
+    PresetModelServiceConfigInfoDTO,
 )
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
@@ -46,7 +51,7 @@ from ai.backend.manager.api.gql.deployment.types.revision_preset import (
 def _make_preset_node(
     *,
     image_id: ImageID | None = None,
-    model_definition: ModelDefinitionInfoDTO | None = None,
+    model_definition: PresetModelDefinitionInfoDTO | None = None,
 ) -> DeploymentRevisionPresetNode:
     now = datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
     return DeploymentRevisionPresetNode(
@@ -76,12 +81,12 @@ class TestDeploymentRevisionPresetGQL:
 
     def test_from_pydantic_populates_execution_and_model_definition(self) -> None:
         image_id = ImageID(uuid.uuid4())
-        model_def = ModelDefinitionInfoDTO(
+        model_def = PresetModelDefinitionInfoDTO(
             models=[
-                ModelConfigInfoDTO(
+                PresetModelConfigInfoDTO(
                     name="llama",
                     model_path="/models/llama",
-                    service=ModelServiceConfigInfoDTO(port=8080),
+                    service=PresetModelServiceConfigInfoDTO(port=8080),
                     metadata=None,
                 ),
             ],
@@ -110,12 +115,12 @@ class TestModelDefinitionToDTO:
     """Tests for the adapter helper ``_model_definition_to_dto``."""
 
     def test_converts_config_to_info_dto(self) -> None:
-        config_model_def = ModelDefinition(
+        config_model_def = PresetModelDefinition(
             models=[
-                ModelConfig(
+                PresetModelConfig(
                     name="llama",
                     model_path="/models/llama",
-                    service=ModelServiceConfig(start_command="python serve.py", port=8080),
+                    service=PresetModelServiceConfig(start_command="python serve.py", port=8080),
                 )
             ],
         )

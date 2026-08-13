@@ -11,6 +11,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.types import (
     AccessKey,
@@ -23,7 +24,6 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.resource_preset.types import (
     ResourcePresetData,
     ResourcePresetSearchResult,
@@ -39,9 +39,6 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.resource_slot import (
     AgentResourceRow,
@@ -51,6 +48,7 @@ from ai.backend.manager.models.resource_slot import (
 from ai.backend.manager.models.scaling_group import query_allowed_sgroups
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_scope.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
@@ -253,23 +251,10 @@ class ResourcePresetDBSource:
         :return: Tuple of (group_id, total_resource_slots)
         :raises ProjectNotFound: If the group does not exist or the user is not a member
         """
-        j = sa.join(
-            groups,
-            AssociationScopesEntitiesRow,
-            sa.and_(
-                AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                AssociationScopesEntitiesRow.entity_type == EntityType.USER,
-                AssociationScopesEntitiesRow.scope_id == sa.cast(groups.c.id, sa.String),
-            ),
-        )
-        query = (
-            sa.select(groups.c.id, groups.c.total_resource_slots)
-            .select_from(j)
-            .where(
-                (AssociationScopesEntitiesRow.entity_id == str(user_id))
-                & (groups.c.name == group_name)
-                & (groups.c.domain_name == domain_name),
-            )
+        query = sa.select(groups.c.id, groups.c.total_resource_slots).where(
+            user_scope_membership_exists(PROJECT_SCOPE_TYPE, groups.c.id, user_id)
+            & (groups.c.name == group_name)
+            & (groups.c.domain_name == domain_name),
         )
         result = await db_sess.execute(query)
         row = result.first()

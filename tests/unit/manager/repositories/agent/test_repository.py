@@ -26,11 +26,13 @@ from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.exception import AgentNotFound
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.types import (
     AgentId,
     ClusterMode,
     DeviceName,
     ResourceSlot,
+    ResourceSlotEntry,
     SessionId,
     SessionResult,
     SessionTypes,
@@ -69,12 +71,12 @@ from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.agent.db_source.db_source import AgentDBSource
 from ai.backend.manager.repositories.agent.repository import AgentRepository
-from ai.backend.manager.repositories.base.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.testutils.db import with_tables
 
@@ -157,13 +159,13 @@ class TestAgentRepositoryDB:
             ip="192.168.1.100",
             version="24.12.0",
             scaling_group=scaling_group.name,
-            available_resource_slots=ResourceSlot({
-                SlotName("cpu"): "8",
-                SlotName("mem"): "32768",
-            }),
+            available_resource_slots=[
+                ResourceSlotEntry(resource_type=ResourceSlotName("cpu"), quantity="8"),
+                ResourceSlotEntry(resource_type=ResourceSlotName("mem"), quantity="32768"),
+            ],
             slot_key_and_units={
-                SlotName("cpu"): SlotTypes.COUNT,
-                SlotName("mem"): SlotTypes.BYTES,
+                ResourceSlotName("cpu"): SlotTypes.COUNT,
+                ResourceSlotName("mem"): SlotTypes.BYTES,
             },
             compute_plugins={
                 DeviceName("cpu"): {"brand": "Intel", "model": "Core i7"},
@@ -171,7 +173,6 @@ class TestAgentRepositoryDB:
             addr="tcp://192.168.1.100:6001",
             public_key=PublicKey(b"test-public-key"),
             public_host="192.168.1.100",
-            images=b"\x82\xc4\x00\x00",
             region="us-west-1",
             architecture="x86_64",
             auto_terminate_abusing_kernel=False,
@@ -184,23 +185,22 @@ class TestAgentRepositoryDB:
             ip="192.168.1.101",
             version="24.12.0",
             scaling_group=scaling_group.name,
-            available_resource_slots=ResourceSlot({
-                SlotName("cpu"): "8",
-                SlotName("mem"): "32768",
-                SlotName("cuda.shares"): "4",
-                SlotName("rocm.device"): "2",
-            }),
+            available_resource_slots=[
+                ResourceSlotEntry(resource_type=ResourceSlotName("cpu"), quantity="8"),
+                ResourceSlotEntry(resource_type=ResourceSlotName("mem"), quantity="32768"),
+                ResourceSlotEntry(resource_type=ResourceSlotName("cuda.shares"), quantity="4"),
+                ResourceSlotEntry(resource_type=ResourceSlotName("rocm.device"), quantity="2"),
+            ],
             slot_key_and_units={
-                SlotName("cpu"): SlotTypes.COUNT,
-                SlotName("mem"): SlotTypes.BYTES,
-                SlotName("cuda.shares"): SlotTypes.COUNT,
-                SlotName("rocm.device"): SlotTypes.COUNT,
+                ResourceSlotName("cpu"): SlotTypes.COUNT,
+                ResourceSlotName("mem"): SlotTypes.BYTES,
+                ResourceSlotName("cuda.shares"): SlotTypes.COUNT,
+                ResourceSlotName("rocm.device"): SlotTypes.COUNT,
             },
             compute_plugins={DeviceName("cpu"): {}},
             addr="tcp://192.168.1.101:6001",
             public_key=PublicKey(b"test-public-key-2"),
             public_host="192.168.1.101",
-            images=b"\x82\xc4\x00\x00",
             region="us-east-1",
             architecture="x86_64",
             auto_terminate_abusing_kernel=False,
@@ -483,19 +483,18 @@ class TestAgentRepositoryDB:
             ip="192.168.1.100",
             version="24.12.0",
             scaling_group="nonexistent-scaling-group",
-            available_resource_slots=ResourceSlot({
-                SlotName("cpu"): "8",
-                SlotName("mem"): "32768",
-            }),
+            available_resource_slots=[
+                ResourceSlotEntry(resource_type=ResourceSlotName("cpu"), quantity="8"),
+                ResourceSlotEntry(resource_type=ResourceSlotName("mem"), quantity="32768"),
+            ],
             slot_key_and_units={
-                SlotName("cpu"): SlotTypes.COUNT,
-                SlotName("mem"): SlotTypes.BYTES,
+                ResourceSlotName("cpu"): SlotTypes.COUNT,
+                ResourceSlotName("mem"): SlotTypes.BYTES,
             },
             compute_plugins={DeviceName("cpu"): {}},
             addr="tcp://192.168.1.100:6001",
             public_key=PublicKey(b"test-public-key"),
             public_host="192.168.1.100",
-            images=b"\x82\xc4\x00\x00",
             region="us-west-1",
             architecture="x86_64",
             auto_terminate_abusing_kernel=False,

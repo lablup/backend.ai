@@ -590,6 +590,44 @@
         "title": "UpdateAgentResourceGroupBody",
         "type": "object"
       },
+      "MyGetAppConfigsInput": {
+        "description": "Input for the acting user's merged AppConfigs; the scope comes from the session.",
+        "properties": {
+          "config_names": {
+            "description": "Config names to get the merged view for.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Config Names",
+            "type": "array"
+          }
+        },
+        "required": [
+          "config_names"
+        ],
+        "title": "MyGetAppConfigsInput",
+        "type": "object"
+      },
+      "PublicGetAppConfigsInput": {
+        "description": "Input for the anonymous, pre-login read, where only public fragments contribute.",
+        "properties": {
+          "config_names": {
+            "description": "Config names to get the merged public view for.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Config Names",
+            "type": "array"
+          }
+        },
+        "required": [
+          "config_names"
+        ],
+        "title": "PublicGetAppConfigsInput",
+        "type": "object"
+      },
       "BulkPurgeAppConfigFragmentInput": {
         "description": "Input for purging many fragments (per-item partial success).",
         "properties": {
@@ -2289,7 +2327,8 @@
           "success",
           "error",
           "unknown",
-          "running"
+          "running",
+          "denied"
         ],
         "title": "AuditLogStatus",
         "type": "string"
@@ -7410,16 +7449,32 @@
       "PresetModelConfigInput": {
         "properties": {
           "name": {
-            "description": "Name of the model.",
-            "minLength": 1,
-            "title": "Name",
-            "type": "string"
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Name of the model. Optional; defaults to the runtime variant baseline's model name at revision resolution.",
+            "title": "Name"
           },
           "model_path": {
-            "description": "Path to the model file.",
-            "minLength": 1,
-            "title": "Model Path",
-            "type": "string"
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Path to the model file. Optional; defaults to the model mount destination at revision resolution.",
+            "title": "Model Path"
           },
           "service": {
             "$ref": "#/components/schemas/PresetModelServiceConfigInput",
@@ -7439,8 +7494,6 @@
           }
         },
         "required": [
-          "name",
-          "model_path",
           "service"
         ],
         "title": "PresetModelConfigInput",
@@ -7750,10 +7803,18 @@
             "title": "Shell"
           },
           "port": {
-            "description": "Port number for the model service. Must be greater than 1.",
-            "exclusiveMinimum": 1,
-            "title": "Port",
-            "type": "integer"
+            "anyOf": [
+              {
+                "exclusiveMinimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Port number for the model service. Must be greater than 1. Optional; defaults to the runtime variant baseline's port at revision resolution.",
+            "title": "Port"
           },
           "health_check": {
             "anyOf": [
@@ -7768,9 +7829,6 @@
             "description": "Health check configuration for the model service."
           }
         },
-        "required": [
-          "port"
-        ],
         "title": "PresetModelServiceConfigInput",
         "type": "object"
       },
@@ -7818,7 +7876,7 @@
               }
             ],
             "default": null,
-            "description": "Model definition configuration. Optional, but when provided it must be fully populated (non-empty models, each with name/model_path/service)."
+            "description": "Model definition configuration. Optional; each model requires a service block, while name/model_path may be omitted to inherit merge-chain defaults."
           },
           "resource_slots": {
             "anyOf": [
@@ -7972,393 +8030,6 @@
         "title": "CreateDeploymentRevisionPresetInput",
         "type": "object"
       },
-      "ModelConfig": {
-        "additionalProperties": true,
-        "properties": {
-          "name": {
-            "description": "Name of the model.",
-            "examples": [
-              "my_model"
-            ],
-            "title": "Name",
-            "type": "string"
-          },
-          "model-path": {
-            "description": "Path to the model file.",
-            "examples": [
-              "/models/my_model"
-            ],
-            "title": "Model-Path",
-            "type": "string"
-          },
-          "service": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ModelServiceConfig"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Configuration for the model service."
-          },
-          "metadata": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ModelMetadata"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Metadata about the model."
-          }
-        },
-        "required": [
-          "name",
-          "model-path"
-        ],
-        "title": "ModelConfig",
-        "type": "object"
-      },
-      "ModelDefinition": {
-        "additionalProperties": true,
-        "properties": {
-          "models": {
-            "description": "List of models in the model definition.",
-            "items": {
-              "$ref": "#/components/schemas/ModelConfig"
-            },
-            "title": "Models",
-            "type": "array"
-          }
-        },
-        "title": "ModelDefinition",
-        "type": "object"
-      },
-      "ModelHealthCheck": {
-        "additionalProperties": true,
-        "properties": {
-          "enable": {
-            "default": false,
-            "description": "Whether the route should be health-checked. When false the route becomes active immediately and the remaining fields are ignored.",
-            "examples": [
-              false
-            ],
-            "title": "Enable",
-            "type": "boolean"
-          },
-          "interval": {
-            "default": 10.0,
-            "description": "Interval in seconds between health checks.",
-            "examples": [
-              10.0
-            ],
-            "title": "Interval",
-            "type": "number"
-          },
-          "path": {
-            "default": "/health",
-            "description": "Path to check for health status.",
-            "examples": [
-              "/health"
-            ],
-            "title": "Path",
-            "type": "string"
-          },
-          "max-retries": {
-            "default": 10,
-            "description": "Maximum number of retries for health check.",
-            "examples": [
-              10
-            ],
-            "title": "Max-Retries",
-            "type": "integer"
-          },
-          "max-wait-time": {
-            "default": 15.0,
-            "description": "Maximum time in seconds to wait for a health check response.",
-            "examples": [
-              15.0
-            ],
-            "title": "Max-Wait-Time",
-            "type": "number"
-          },
-          "expected-status-code": {
-            "default": 200,
-            "description": "Expected HTTP status code for a healthy response.",
-            "examples": [
-              200
-            ],
-            "exclusiveMinimum": 100,
-            "title": "Expected-Status-Code",
-            "type": "integer"
-          },
-          "initial-delay": {
-            "default": 60.0,
-            "description": "Grace period in seconds for a warming-up route to pass its first health check. Probing starts immediately; the route stays WARMING_UP until a probe passes (then it activates) or this period elapses without a passing probe (then it is terminated). This does not delay the first probe.",
-            "examples": [
-              60.0
-            ],
-            "minimum": 0,
-            "title": "Initial-Delay",
-            "type": "number"
-          }
-        },
-        "title": "ModelHealthCheck",
-        "type": "object"
-      },
-      "ModelMetadata": {
-        "additionalProperties": true,
-        "properties": {
-          "author": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "examples": [
-              "John Doe"
-            ],
-            "title": "Author"
-          },
-          "title": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Title"
-          },
-          "version": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Version"
-          },
-          "created": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Created"
-          },
-          "last_modified": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Last Modified"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Description"
-          },
-          "task": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Task"
-          },
-          "category": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Category"
-          },
-          "architecture": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Architecture"
-          },
-          "framework": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Framework"
-          },
-          "label": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Label"
-          },
-          "license": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "License"
-          },
-          "min-resource": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Minimum resource requirements for the model.",
-            "title": "Min-Resource"
-          }
-        },
-        "title": "ModelMetadata",
-        "type": "object"
-      },
-      "ModelServiceConfig": {
-        "additionalProperties": true,
-        "properties": {
-          "pre-start-actions": {
-            "description": "List of pre-start actions to execute before starting the model service.",
-            "items": {
-              "$ref": "#/components/schemas/PreStartAction"
-            },
-            "title": "Pre-Start-Actions",
-            "type": "array"
-          },
-          "start-command": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Command string to start the model service. ``{model_path}`` is replaced with the resolved ``model_path`` before launch. ``None`` falls back to the image's default CMD.",
-            "examples": [
-              "python service.py",
-              "vllm serve {model_path}"
-            ],
-            "title": "Start-Command"
-          },
-          "shell": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": "/bin/bash",
-            "description": "Shell used to run the command. If set, the kernel runs `[shell, '-c', command]`; null or empty disables shell wrapping.",
-            "examples": [
-              "/bin/bash"
-            ],
-            "title": "Shell"
-          },
-          "port": {
-            "description": "Port number for the model service. Must be greater than 1.",
-            "examples": [
-              8080
-            ],
-            "exclusiveMinimum": 1,
-            "title": "Port",
-            "type": "integer"
-          },
-          "health-check": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ModelHealthCheck"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Health check configuration for the model service."
-          }
-        },
-        "required": [
-          "port"
-        ],
-        "title": "ModelServiceConfig",
-        "type": "object"
-      },
       "UpdateDeploymentRevisionPresetInput": {
         "properties": {
           "id": {
@@ -8441,7 +8112,7 @@
           "model_definition": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/ModelDefinition"
+                "$ref": "#/components/schemas/PresetModelDefinitionInput"
               },
               {
                 "$ref": "#/components/schemas/Sentinel"
@@ -10328,6 +9999,27 @@
         "title": "IdleCheckerSpecInputDTO",
         "type": "object"
       },
+      "MetricLabelEntry": {
+        "description": "A key-value label entry for executing a query definition.",
+        "properties": {
+          "key": {
+            "description": "Label key",
+            "title": "Key",
+            "type": "string"
+          },
+          "value": {
+            "description": "Label value",
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "value"
+        ],
+        "title": "MetricLabelEntry",
+        "type": "object"
+      },
       "NetworkTimeoutSpecInputDTO": {
         "properties": {
           "max_network_inactivity_seconds": {
@@ -10401,6 +10093,20 @@
               }
             ],
             "title": "Threshold"
+          },
+          "filter_labels": {
+            "items": {
+              "$ref": "#/components/schemas/MetricLabelEntry"
+            },
+            "title": "Filter Labels",
+            "type": "array"
+          },
+          "group_labels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Group Labels",
+            "type": "array"
           }
         },
         "required": [
@@ -12173,6 +11879,19 @@
             "default": null,
             "title": "Is Admin"
           },
+          "is_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by whether the keypair is its owner's default one.",
+            "title": "Is Default"
+          },
           "access_key": {
             "anyOf": [
               {
@@ -12302,6 +12021,7 @@
           "last_used",
           "access_key",
           "is_active",
+          "is_default",
           "resource_policy"
         ],
         "title": "KeypairOrderField",
@@ -17819,27 +17539,6 @@
         "title": "ExecuteQueryDefinitionOptionsInput",
         "type": "object"
       },
-      "MetricLabelEntry": {
-        "description": "A key-value label entry for executing a query definition.",
-        "properties": {
-          "key": {
-            "description": "Label key",
-            "title": "Key",
-            "type": "string"
-          },
-          "value": {
-            "description": "Label value",
-            "title": "Value",
-            "type": "string"
-          }
-        },
-        "required": [
-          "key",
-          "value"
-        ],
-        "title": "MetricLabelEntry",
-        "type": "object"
-      },
       "QueryTimeRangeInputDTO": {
         "description": "Input for a Prometheus query time range.",
         "properties": {
@@ -20173,6 +19872,19 @@
             "description": "Filter by public status.",
             "title": "Is Public"
           },
+          "is_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by whether the resource group is the default one.",
+            "title": "Is Default"
+          },
           "AND": {
             "anyOf": [
               {
@@ -20457,6 +20169,12 @@
             "default": null,
             "description": "Resource policy name to apply to this resource group.",
             "title": "Resource Policy"
+          },
+          "is_default": {
+            "default": false,
+            "description": "Make this the default resource group. At most one resource group may hold the flag, so this is rejected while another one holds it; clear that one first.",
+            "title": "Is Default",
+            "type": "boolean"
           }
         },
         "required": [
@@ -20510,6 +20228,19 @@
             "default": null,
             "description": "Whether the resource group is active. Leave null to keep existing value.",
             "title": "Is Active"
+          },
+          "is_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whether this is the default resource group. At most one resource group may hold the flag, so setting it to true is rejected while another one holds it; clear that one first. Leave null to keep existing value.",
+            "title": "Is Default"
           },
           "total_resource_slots": {
             "anyOf": [
@@ -20731,10 +20462,26 @@
             "minimum": 0.0,
             "title": "Preemption Min Runtime",
             "type": "number"
+          },
+          "victim_scope": {
+            "$ref": "#/components/schemas/PreemptionVictimScope",
+            "default": "user",
+            "description": "Scope preemption victims are drawn from (user/project/domain/resource-group). Default is user."
           }
         },
         "title": "PreemptionConfigInputDTO",
         "type": "object"
+      },
+      "PreemptionVictimScope": {
+        "description": "Which sessions may become preemption victims for a pending session.\n\nUSER limits victims to the pending session's own sessions;\nPROJECT/DOMAIN widen to sessions of the same project/domain;\nRESOURCE_GROUP allows any session in the resource group.",
+        "enum": [
+          "user",
+          "project",
+          "domain",
+          "resource-group"
+        ],
+        "title": "PreemptionVictimScope",
+        "type": "string"
       },
       "UpdateResourceGroupConfigInput": {
         "description": "Input for updating resource group configuration via GQL (all fields optional).",
@@ -20769,6 +20516,19 @@
             "default": null,
             "description": "Whether the resource group is public. Leave null to keep existing value.",
             "title": "Is Public"
+          },
+          "is_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whether this is the default resource group. At most one resource group may hold the flag, so setting it to true is rejected while another one holds it; clear that one first. Leave null to keep existing value.",
+            "title": "Is Default"
           },
           "description": {
             "anyOf": [
@@ -21551,6 +21311,18 @@
             "default": null,
             "description": "Filter by max pending session count."
           },
+          "max_priority": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IntFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by max scheduling priority."
+          },
           "AND": {
             "anyOf": [
               {
@@ -21651,7 +21423,8 @@
           "max_containers_per_session",
           "idle_timeout",
           "max_concurrent_sftp_sessions",
-          "max_pending_session_count"
+          "max_pending_session_count",
+          "max_priority"
         ],
         "title": "KeypairResourcePolicyOrderField",
         "type": "string"
@@ -21846,6 +21619,19 @@
             "description": "Maximum number of sessions in pending state. Null means unlimited.",
             "title": "Max Pending Session Count"
           },
+          "max_priority": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Highest scheduling priority a session may declare. Null means uncapped.",
+            "title": "Max Priority"
+          },
           "max_pending_session_resource_slots": {
             "anyOf": [
               {
@@ -21975,6 +21761,22 @@
             "default": 1,
             "description": "Updated max pending sessions. Set to null to clear.",
             "title": "Max Pending Session Count"
+          },
+          "max_priority": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "$ref": "#/components/schemas/Sentinel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 1,
+            "description": "Updated max priority. Set to null to clear.",
+            "title": "Max Priority"
           },
           "max_pending_session_resource_slots": {
             "anyOf": [
@@ -23370,6 +23172,237 @@
           }
         },
         "title": "AdminSearchResourceSlotTypesInput",
+        "type": "object"
+      },
+      "NumberFormatInput": {
+        "description": "Number format configuration supplied when writing a resource slot type.",
+        "properties": {
+          "binary": {
+            "default": false,
+            "description": "Whether to use binary (1024-based) or decimal (1000-based) prefixes.",
+            "title": "Binary",
+            "type": "boolean"
+          },
+          "round_length": {
+            "default": 0,
+            "description": "Number of decimal places to round to when displaying values.",
+            "title": "Round Length",
+            "type": "integer"
+          }
+        },
+        "title": "NumberFormatInput",
+        "type": "object"
+      },
+      "SlotTypes": {
+        "enum": [
+          "count",
+          "bytes",
+          "unique",
+          "unified"
+        ],
+        "title": "SlotTypes",
+        "type": "string"
+      },
+      "CreateResourceSlotTypeInput": {
+        "description": "Input for registering a new resource slot type.",
+        "properties": {
+          "slot_name": {
+            "description": "Unique slot name to register (e.g., 'cpu', 'mem', 'cuda.device').",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Slot Name",
+            "type": "string"
+          },
+          "slot_type": {
+            "$ref": "#/components/schemas/SlotTypes",
+            "description": "Category of the slot type. The scheduler reads this back as a `SlotTypes` member for every enabled slot, so a value outside the enum is rejected here rather than breaking the catalog."
+          },
+          "required": {
+            "default": false,
+            "description": "Whether a session request must name this slot.",
+            "title": "Required",
+            "type": "boolean"
+          },
+          "enabled": {
+            "default": true,
+            "description": "Whether the scheduler considers this slot when placing sessions.",
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "display_name": {
+            "default": "",
+            "description": "Human-readable name.",
+            "maxLength": 128,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "description": "Longer description.",
+            "maxLength": 256,
+            "title": "Description",
+            "type": "string"
+          },
+          "display_unit": {
+            "default": "",
+            "description": "Unit label (e.g., 'GiB').",
+            "maxLength": 32,
+            "title": "Display Unit",
+            "type": "string"
+          },
+          "display_icon": {
+            "default": "",
+            "description": "Icon identifier for UIs.",
+            "maxLength": 64,
+            "title": "Display Icon",
+            "type": "string"
+          },
+          "number_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NumberFormatInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Number formatting rules. Defaults to decimal, no rounding."
+          },
+          "rank": {
+            "default": 0,
+            "description": "Display ordering rank. Lower values appear first.",
+            "title": "Rank",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "slot_name",
+          "slot_type"
+        ],
+        "title": "CreateResourceSlotTypeInput",
+        "type": "object"
+      },
+      "UpdateResourceSlotTypeInput": {
+        "description": "Input for updating a resource slot type.\n\n``slot_name`` names the target and is not itself updatable; neither is\n``slot_type``. Every other field left unset stays unchanged.",
+        "properties": {
+          "slot_name": {
+            "description": "Slot name identifying the slot type to update.",
+            "title": "Slot Name",
+            "type": "string"
+          },
+          "required": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whether a session request must name this slot.",
+            "title": "Required"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whether the scheduler considers this slot when placing sessions.",
+            "title": "Enabled"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Human-readable name.",
+            "title": "Display Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Longer description.",
+            "title": "Description"
+          },
+          "display_unit": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Unit label (e.g., 'GiB').",
+            "title": "Display Unit"
+          },
+          "display_icon": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Icon identifier for UIs.",
+            "title": "Display Icon"
+          },
+          "number_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NumberFormatInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Number formatting rules."
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Display ordering rank.",
+            "title": "Rank"
+          }
+        },
+        "required": [
+          "slot_name"
+        ],
+        "title": "UpdateResourceSlotTypeInput",
         "type": "object"
       },
       "AgentResourceFilter": {
@@ -24817,7 +24850,7 @@
           },
           "value_type": {
             "$ref": "#/components/schemas/PresetValueType",
-            "description": "Value type: str, int, float, bool, flag."
+            "description": "Value type: str, int, float, bool, flag. 'flag' is only valid with preset_target 'args'."
           },
           "default_value": {
             "anyOf": [
@@ -24967,7 +25000,8 @@
                 "type": "null"
               }
             ],
-            "default": null
+            "default": null,
+            "description": "New value type. 'flag' is only valid when the effective preset_target is 'args' (the stored target applies when preset_target is omitted)."
           },
           "default_value": {
             "anyOf": [
@@ -30335,7 +30369,7 @@
               }
             ],
             "default": 1,
-            "description": "Set the primary API access key. Set to null to clear.",
+            "description": "Set the primary API access key. It cannot be cleared; null is ignored.",
             "title": "Main Access Key"
           },
           "container_uid": {
@@ -39574,6 +39608,183 @@
         "title": "ModelHealthCheckDraft",
         "type": "object"
       },
+      "ModelMetadata": {
+        "additionalProperties": true,
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "examples": [
+              "John Doe"
+            ],
+            "title": "Author"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Title"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Version"
+          },
+          "created": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Created"
+          },
+          "last_modified": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last Modified"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "task": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Task"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Category"
+          },
+          "architecture": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Architecture"
+          },
+          "framework": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Framework"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Label"
+          },
+          "license": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "License"
+          },
+          "min-resource": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Minimum resource requirements for the model.",
+            "title": "Min-Resource"
+          }
+        },
+        "title": "ModelMetadata",
+        "type": "object"
+      },
       "ModelServiceConfigDraft": {
         "additionalProperties": true,
         "properties": {
@@ -39619,6 +39830,7 @@
           "port": {
             "anyOf": [
               {
+                "exclusiveMinimum": 1,
                 "type": "integer"
               },
               {
@@ -41731,6 +41943,59 @@
         "description": "Retrieve aggregate resource capacity/usage across all agents (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/app-config/my/get": {
+      "post": {
+        "operationId": "v2/app-config.my_get_app_configs",
+        "tags": [
+          "v2/app-config"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MyGetAppConfigsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Get the acting user's merged AppConfigs (auth required).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config/public/get": {
+      "post": {
+        "operationId": "v2/app-config.public_get_app_configs",
+        "tags": [
+          "v2/app-config"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicGetAppConfigsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Get merged AppConfigs from public fragments only (anonymous)."
+      }
+    },
     "/v2/app-config-fragments/bulk-delete": {
       "post": {
         "operationId": "v2/app-config-fragments.bulk_purge",
@@ -41844,7 +42109,7 @@
           }
         },
         "parameters": [],
-        "description": "Upsert many fragments at one scope, all-or-nothing (auth, RBAC-authorized).\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Upsert many fragments at one scope, with per-item partial success (auth, RBAC).\n\nNot in effect yet: still all-or-nothing.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/app-config-fragments/my/by-names": {
@@ -41902,7 +42167,7 @@
           }
         },
         "parameters": [],
-        "description": "Upsert many fragments at the caller's own user scope, all-or-nothing (auth).\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Upsert many fragments at the caller's own user scope, with per-item partial\nsuccess (auth).\n\nNot in effect yet: still all-or-nothing.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/app-config-fragments/{fragment_id}": {
@@ -49821,7 +50086,101 @@
           }
         },
         "parameters": [],
-        "description": "Search resource slot types with filters, orders, and pagination.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Search resource slot types with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/resource-slots/slot-types": {
+      "post": {
+        "operationId": "v2/resource-slots.admin_create_slot_type",
+        "tags": [
+          "v2/resource-slots"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateResourceSlotTypeInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Register a new resource slot type (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/resource-slots/slot-types/{slot_name}": {
+      "patch": {
+        "operationId": "v2/resource-slots.admin_update_slot_type",
+        "tags": [
+          "v2/resource-slots"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateResourceSlotTypeInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "slot_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update a resource slot type by slot name (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/resource-slots.admin_purge_slot_type",
+        "tags": [
+          "v2/resource-slots"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slot_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Remove a resource slot type by slot name (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/resource-slots/agent-resources/search": {
@@ -53764,6 +54123,30 @@
         ],
         "parameters": [],
         "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/admin/gql/strawberry/public": {
+      "post": {
+        "operationId": "admin.handle_gql_strawberry_public",
+        "tags": [
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GraphQLRequest"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Execute a GraphQL query without credentials.\n\nServes the public schema, which holds only the fields that are safe to read anonymously;\nevery other field is absent from it and cannot be queried here. The full schema is at\n``POST /admin/gql/strawberry`` and requires authentication.\n"
       }
     },
     "/admin/domains": {
@@ -64231,7 +64614,7 @@
           }
         },
         "parameters": [],
-        "description": "Search resource slot types with filters, orders, and pagination.\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
+        "description": "Search resource slot types with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/resource-slot-types/{slot_name}": {
@@ -64260,7 +64643,7 @@
             }
           }
         ],
-        "description": "Get a single resource slot type by slot_name.\n\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: RUNNING\n"
+        "description": "Get a single resource slot type by slot_name.\n\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
     "/resource/prometheus-query-definitions": {

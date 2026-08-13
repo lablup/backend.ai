@@ -53,18 +53,18 @@ from ai.backend.manager.models.session import (
     SessionRow,
     batch_populate_session_occupied_slots,
 )
-from ai.backend.manager.models.session_template import session_templates
+from ai.backend.manager.models.session_template import SessionTemplateRow
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    NoPagination,
     execute_batch_querier,
 )
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.session.dependency_graph import find_dependency_sessions
-from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
+from ai.backend.manager.repositories.session.types import ProjectSessionOperationScope
 from ai.backend.manager.utils import query_userinfo
 
 
@@ -141,11 +141,12 @@ class SessionDBSource:
                 sa.select(UserRow)
                 .join(SessionRow, SessionRow.user_uuid == UserRow.uuid)
                 .where(SessionRow.id == session_id)
+                .options(joinedload(UserRow.default_keypair))
             )
             user = await db_sess.scalar(query)
             if user is None:
                 raise SessionNotFound(f"Session with id {session_id} not found")
-            return UserData.from_row(user)
+            return user.to_data()
 
     async def get_session_validated(
         self,
@@ -184,10 +185,10 @@ class SessionDBSource:
     ) -> dict[str, Any] | None:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select(session_templates.c.template)
-                .select_from(session_templates)
+                sa.select(SessionTemplateRow.template)
+                .select_from(SessionTemplateRow)
                 .where(
-                    (session_templates.c.id == template_id) & session_templates.c.is_active,
+                    (SessionTemplateRow.id == template_id) & SessionTemplateRow.is_active,
                 )
             )
             return await conn.scalar(query)
@@ -198,10 +199,10 @@ class SessionDBSource:
     ) -> dict[str, Any] | None:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select(session_templates)
-                .select_from(session_templates)
+                sa.select(SessionTemplateRow.__table__)
+                .select_from(SessionTemplateRow)
                 .where(
-                    (session_templates.c.id == template_id) & session_templates.c.is_active,
+                    (SessionTemplateRow.id == template_id) & SessionTemplateRow.is_active,
                 )
             )
             result = await conn.execute(query)
@@ -636,13 +637,13 @@ class SessionDBSource:
     async def search_in_project(
         self,
         querier: BatchQuerier,
-        scope: ProjectSessionSearchScope,
+        scope: ProjectSessionOperationScope,
     ) -> SessionListResult:
         """Search sessions scoped to a project.
 
         Args:
             querier: BatchQuerier for filtering, ordering, and pagination
-            scope: ProjectSessionSearchScope that filters by project and validates existence
+            scope: ProjectSessionOperationScope that filters by project and validates existence
 
         Returns:
             SessionListResult with items, total count, and pagination info

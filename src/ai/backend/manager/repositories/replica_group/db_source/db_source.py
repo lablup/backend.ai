@@ -38,11 +38,11 @@ from ai.backend.manager.models.replica_group_history.conditions import (
 )
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
-    NoPagination,
     execute_batch_querier,
 )
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator

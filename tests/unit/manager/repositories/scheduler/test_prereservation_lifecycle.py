@@ -25,6 +25,7 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import (
     create_pending_session_with_kernels,
@@ -100,7 +101,7 @@ class TestPrereservationLifecycle:
     async def pending_session(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_domain_id: DomainID,
         test_scaling_group_name: str,
         test_scaling_group_id: ResourceGroupID,
@@ -112,7 +113,7 @@ class TestPrereservationLifecycle:
     ) -> tuple[SessionId, list[KernelId], str]:
         session_id, kernel_ids = await create_pending_session_with_kernels(
             db_with_cleanup,
-            domain_name=test_domain_name,
+            domain_name=test_domain.domain_name,
             domain_id=test_domain_id,
             scaling_group_name=test_scaling_group_name,
             resource_group_id=test_scaling_group_id,

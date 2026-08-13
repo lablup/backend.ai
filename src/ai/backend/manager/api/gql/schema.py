@@ -7,6 +7,8 @@ from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 
 from ai.backend.common.api_handlers import Sentinel as BackendSentinel
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_root_field
 from ai.backend.manager.api.gql.extensions import (
     GQLExceptionHandlerExtension,
     GQLLoggingExtension,
@@ -18,6 +20,10 @@ from .agent import (
     admin_update_agent_resource_group,
     agent_stats,
     agents_v2,
+)
+from .app_config import (
+    my_app_configs,
+    public_app_configs,
 )
 from .app_config_allow_list import (
     admin_app_config_allow_list,
@@ -397,7 +403,13 @@ from .resource_preset import (
     admin_resource_presets_v2,
     admin_update_resource_preset_v2,
 )
-from .resource_slot.resolver import resource_slot_type, resource_slot_types
+from .resource_slot.resolver import (
+    admin_create_resource_slot_type,
+    admin_purge_resource_slot_type,
+    admin_update_resource_slot_type,
+    resource_slot_type,
+    resource_slot_types,
+)
 from .resource_usage import (
     admin_domain_usage_buckets,
     admin_project_usage_buckets,
@@ -542,6 +554,7 @@ class Query:
     scoped_idle_checker_assignments = scoped_idle_checker_assignments
     scoped_app_config_fragments_by_names = scoped_app_config_fragments_by_names
     my_app_config_fragments_by_names = my_app_config_fragments_by_names
+    my_app_configs = my_app_configs
     artifact = artifact
     artifacts = artifacts
     artifact_revision = artifact_revision
@@ -764,6 +777,9 @@ class Mutation:
     admin_create_idle_checker_assignment = admin_create_idle_checker_assignment
     update_idle_checker_assignment = update_idle_checker_assignment
     purge_idle_checker_assignment = purge_idle_checker_assignment
+    admin_create_resource_slot_type = admin_create_resource_slot_type
+    admin_update_resource_slot_type = admin_update_resource_slot_type
+    admin_purge_resource_slot_type = admin_purge_resource_slot_type
     admin_create_app_config_allow_list = admin_create_app_config_allow_list
     admin_purge_app_config_allow_list = admin_purge_app_config_allow_list
     admin_update_app_config_allow_list = admin_update_app_config_allow_list
@@ -1080,35 +1096,32 @@ schema = CustomizedSchema(
 )
 
 
-async def _public_ping() -> str:
+@gql_root_field(BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Returns 'pong'"))  # type: ignore[misc]
+async def ping() -> str:
     return "pong"
 
 
-@strawberry.type
+@strawberry.type(name="Query")
 class PublicQueries:
-    """Query root served at the unauthenticated public endpoint (POST /admin/gql/strawberry/public).
+    """Query root of the ``public`` subgraph, served without authentication at
+    ``POST /admin/gql/strawberry/public``.
 
     Contains ONLY fields that are safe to expose without authentication; private fields are
-    physically absent, so they cannot be queried (no runtime gate needed). Real public fields
-    should be registered both here and on ``Query`` so authenticated clients can reach them via the
-    main endpoint too.
-
-    ``public_ping`` is a temporary placeholder so this type is non-empty (GraphQL requires >=1
-    field). It is intentionally registered only here (not on ``Query``) and will be replaced by
-    real public fields (e.g. ``publicAppConfigs``).
+    physically absent, so they cannot be queried (no runtime gate needed). A public field belongs
+    here and nowhere else: declaring it on ``Query`` as well would let the router resolve it
+    against the authenticated subgraph, which answers 401 to an anonymous caller.
     """
 
-    public_ping: str = strawberry.field(
-        resolver=_public_ping,
-        description="Placeholder public field; returns 'pong'.",
-    )
+    ping = ping
+    public_app_configs = public_app_configs
 
 
-# Plain (non-federation) schema: the public endpoint is hit directly, not through the Apollo
-# Router supergraph, so it needs no federation machinery.
-public_schema = strawberry.Schema(
+# A subgraph of the same supergraph as `schema`, kept separate only so that its routing URL
+# carries no auth middleware: anonymous queries compose against this subgraph alone.
+public_schema = Schema(
     query=PublicQueries,
     config=StrawberryConfig(auto_camel_case=True),
+    federation_version="2.7",
     extensions=[
         GQLLoggingExtension,
         GQLMetricExtension,

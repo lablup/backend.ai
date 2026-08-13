@@ -61,6 +61,15 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
     max_pending_session_count: int | None = gql_field(
         description="Maximum pending sessions. Null means unlimited."
     )
+    max_priority: int | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.0",
+            description=(
+                "Highest scheduling priority a session created with this policy may declare."
+                " Null means uncapped."
+            ),
+        ),
+    )
     max_pending_session_resource_slots: list[ResourceLimitEntryGQL] | None = gql_field(
         description="Maximum resource slots for pending sessions. Null means unlimited."
     )
@@ -119,11 +128,11 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
             KeyPairGQL,
         )
         from ai.backend.manager.repositories.keypair.types import (
-            KeypairResourcePolicyKeypairSearchScope,
+            KeypairResourcePolicyKeypairOperationScope,
         )
 
         result = await info.context.adapters.user.gql_search_keypairs_by_resource_policy(
-            scope=KeypairResourcePolicyKeypairSearchScope(resource_policy_name=self.name),
+            scope=KeypairResourcePolicyKeypairOperationScope(resource_policy_name=self.name),
             input=SearchKeypairsRequest(
                 filter=filter.to_pydantic() if filter is not None else None,
                 order=[o.to_pydantic() for o in order_by] if order_by is not None else None,

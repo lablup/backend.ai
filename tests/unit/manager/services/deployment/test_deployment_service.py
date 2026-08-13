@@ -9,7 +9,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
-from typing import cast, override
+from typing import Any, cast, override
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -24,6 +24,7 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
 )
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
@@ -65,7 +66,8 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import EndpointTokenCreatorSpec
@@ -495,6 +497,7 @@ class TestAddModelRevision(ModelRevisionFixtures):
             is_superadmin=False,
             role=UserRole.USER,
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
         )
 
     @pytest.fixture(autouse=True)
@@ -681,7 +684,7 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
 
         repo_call = configure_repository.create_access_token.await_args
         assert repo_call is not None
-        creator = cast(RBACEntityCreator[object], repo_call.args[0])
+        creator = cast(RBACEntityCreator[Any], repo_call.args[0])
         spec = cast(EndpointTokenCreatorSpec, creator.spec)
         assert spec.token == sample_coordinator_jwt
 

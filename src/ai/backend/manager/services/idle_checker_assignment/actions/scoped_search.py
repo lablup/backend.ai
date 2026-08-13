@@ -13,9 +13,9 @@ from ai.backend.manager.actions.action.types import SearchableActionTarget
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.idle_checker.types import IdleCheckerAssignmentSearchScope
+from ai.backend.manager.repositories.idle_checker.types import IdleCheckerAssignmentOperationScope
 
 
 @dataclass(frozen=True)
@@ -33,8 +33,8 @@ class IdleCheckerAssignmentScopeTarget(SearchableActionTarget):
         )
 
     @override
-    def to_search_scope(self) -> SearchScope:
-        return IdleCheckerAssignmentSearchScope(
+    def to_search_scope(self) -> OperationScope:
+        return IdleCheckerAssignmentOperationScope(
             scope_type=self.scope_type,
             scope_id=self.scope_id,
         )

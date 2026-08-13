@@ -1216,8 +1216,7 @@ class SessionService:
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
 
-        created_at = sess.created_at or datetime.now(tzutc())
-        age = datetime.now(tzutc()) - created_at
+        age = datetime.now(tzutc()) - sess.created_at
         session_info = LegacySessionInfo(
             domain_name=sess.domain_name,
             group_id=sess.group_id,
@@ -1240,7 +1239,7 @@ class SessionService:
             status_info=str(sess.status_info) if sess.status_info else None,
             status_data=sess.status_data,
             age_ms=int(age.total_seconds() * 1000),
-            creation_time=created_at,
+            creation_time=sess.created_at,
             termination_time=sess.terminated_at,
             num_queries_executed=sess.num_queries or 0,
             last_stat=sess.last_stat,
@@ -1595,9 +1594,9 @@ class SessionService:
         domain_name = action.domain_name
         if action.owner_id is not None:
             owner = await self._user_repository.get_user_by_uuid(action.owner_id)
-            if owner.main_access_key is None:
+            if owner.default_access_key is None:
                 raise InternalServerError(
-                    f"Delegated owner {action.owner_id} has no main access key configured"
+                    f"Delegated owner {action.owner_id} has no default access key configured"
                 )
             if owner.role is None:
                 raise InternalServerError(
@@ -1608,7 +1607,7 @@ class SessionService:
                     f"Delegated owner {action.owner_id} has no domain configured"
                 )
             user_id = owner.id
-            access_key = AccessKey(owner.main_access_key)
+            access_key = AccessKey(owner.default_access_key)
             domain_name = owner.domain_name
 
         # Keep the image resolve so callers passing a stale UUID get a

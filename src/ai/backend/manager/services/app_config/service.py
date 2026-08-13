@@ -5,14 +5,12 @@ from typing import Any
 
 from ai.backend.manager.data.app_config.types import AppConfigData
 from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
-from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
-from ai.backend.manager.repositories.app_config_fragment.types import ResolvedAppConfigScope
-from ai.backend.manager.services.app_config.actions.resolve import (
-    ResolveAppConfigsAction,
-    ResolveAppConfigsActionResult,
+from ai.backend.manager.services.app_config.actions.get import (
+    GetAppConfigsAction,
+    GetAppConfigsActionResult,
 )
 
 __all__ = ("AppConfigService",)
@@ -50,40 +48,23 @@ class AppConfigService:
     def __init__(self, fragment_repository: AppConfigFragmentRepository) -> None:
         self._fragment_repository = fragment_repository
 
-    async def resolve_app_configs(
-        self, action: ResolveAppConfigsAction
-    ) -> ResolveAppConfigsActionResult:
-        """Resolve the merged ``AppConfig`` for each of ``config_names`` in a single query.
+    async def get_app_configs(self, action: GetAppConfigsAction) -> GetAppConfigsActionResult:
+        """Get the merged ``AppConfig`` for each of ``config_names``.
 
         One entry per requested name, in request order; a repeated name is repeated in the
-        output. Without both ``scope_arguments`` and ``user_id`` this is the anonymous,
-        pre-login read — only ``public`` fragments contribute. A name nothing contributes to
-        fails the whole call with ``AppConfigFragmentNotFound``.
+        output. Without a principal only ``public`` fragments contribute. A name nothing
+        contributes to yields an empty merge rather than failing the whole call.
         """
-        if action.scope_arguments is None or action.user_id is None:
-            # Either half missing is the anonymous, pre-login read.
-            scope = None
-        else:
-            scope = ResolvedAppConfigScope(
-                domain_id=action.scope_arguments.domain_id, user_id=action.user_id
-            )
         fragments = await self._fragment_repository.list_visible_fragments_bulk(
-            action.config_names, scope
+            action.config_names, action.user_id, action.domain_id
         )
         app_configs: list[AppConfigData] = []
         for config_name in action.config_names:
             visible = [fragment for fragment in fragments if fragment.config_name == config_name]
-            if not visible:
-                raise AppConfigFragmentNotFound(
-                    "No visible fragment contributes to this app config."
-                )
             app_configs.append(
                 AppConfigData(
                     config_name=config_name,
-                    fragments=visible,
-                    merged_config=_merge_configs(visible),
+                    config=_merge_configs(visible),
                 )
             )
-        return ResolveAppConfigsActionResult(
-            app_configs=app_configs, _user_id=scope.user_id if scope is not None else None
-        )
+        return GetAppConfigsActionResult(app_configs=app_configs, _user_id=action.user_id)

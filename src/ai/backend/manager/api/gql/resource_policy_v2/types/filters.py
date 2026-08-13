@@ -77,6 +77,13 @@ class KeypairResourcePolicyV2Filter(PydanticInputMixin[KeypairResourcePolicyFilt
     idle_timeout: IntFilter | None = None
     max_concurrent_sftp_sessions: IntFilter | None = None
     max_pending_session_count: IntFilter | None = None
+    max_priority: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.0",
+            description="Filter by the max scheduling priority ceiling.",
+        ),
+        default=None,
+    )
     keypair: KeypairResourcePolicyKeypairNestedFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
@@ -117,6 +124,7 @@ class KeypairResourcePolicyV2OrderField(StrEnum):
     IDLE_TIMEOUT = "idle_timeout"
     MAX_CONCURRENT_SFTP_SESSIONS = "max_concurrent_sftp_sessions"
     MAX_PENDING_SESSION_COUNT = "max_pending_session_count"
+    MAX_PRIORITY = "max_priority"
 
 
 @gql_pydantic_input(

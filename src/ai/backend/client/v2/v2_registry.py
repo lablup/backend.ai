@@ -11,13 +11,15 @@ from functools import cached_property
 from typing import TYPE_CHECKING
 
 from .auth import AuthStrategy
-from .base_client import BackendAIAuthClient
+from .base_client import BackendAIAnonymousClient, BackendAIAuthClient
 from .config import ClientConfig
 
 if TYPE_CHECKING:
     from .domains_v2.agent import V2AgentClient
+    from .domains_v2.app_config import V2AppConfigClient
     from .domains_v2.app_config_allow_list import V2AppConfigAllowListClient
     from .domains_v2.app_config_definition import V2AppConfigDefinitionClient
+    from .domains_v2.app_config_fragment import V2AppConfigFragmentClient
     from .domains_v2.artifact import V2ArtifactClient
     from .domains_v2.artifact_registry import V2ArtifactRegistryClient
     from .domains_v2.audit_log import V2AuditLogClient
@@ -70,9 +72,11 @@ class V2ClientRegistry:
     """Registry of domain clients targeting ``/v2/`` REST endpoints."""
 
     _client: BackendAIAuthClient
+    _anon_client: BackendAIAnonymousClient
 
-    def __init__(self, client: BackendAIAuthClient) -> None:
+    def __init__(self, client: BackendAIAuthClient, anon_client: BackendAIAnonymousClient) -> None:
         self._client = client
+        self._anon_client = anon_client
 
     @classmethod
     async def create(
@@ -81,10 +85,12 @@ class V2ClientRegistry:
         auth: AuthStrategy,
     ) -> V2ClientRegistry:
         client = await BackendAIAuthClient.create(config, auth)
-        return cls(client)
+        anon_client = await BackendAIAnonymousClient.create(config)
+        return cls(client, anon_client)
 
     async def close(self) -> None:
         await self._client.close()
+        await self._anon_client.close()
 
     # ------------------------------------------------------------------ domains
 
@@ -93,6 +99,12 @@ class V2ClientRegistry:
         from .domains_v2.agent import V2AgentClient
 
         return V2AgentClient(self._client)
+
+    @cached_property
+    def app_config(self) -> V2AppConfigClient:
+        from .domains_v2.app_config import V2AppConfigClient
+
+        return V2AppConfigClient(self._client, self._anon_client)
 
     @cached_property
     def app_config_allow_list(self) -> V2AppConfigAllowListClient:
@@ -105,6 +117,12 @@ class V2ClientRegistry:
         from .domains_v2.app_config_definition import V2AppConfigDefinitionClient
 
         return V2AppConfigDefinitionClient(self._client)
+
+    @cached_property
+    def app_config_fragment(self) -> V2AppConfigFragmentClient:
+        from .domains_v2.app_config_fragment import V2AppConfigFragmentClient
+
+        return V2AppConfigFragmentClient(self._client)
 
     @cached_property
     def artifact(self) -> V2ArtifactClient:

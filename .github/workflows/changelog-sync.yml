@@ -1,0 +1,38 @@
+name: changelog-sync
+
+# A release branch keeps its own `CHANGELOG/<series>.md`, so a release cut there
+# never reaches `main`. This brings that one file back.
+
+on:
+  push:
+    tags:
+      - '[0-9][0-9].[0-9].*'
+      - '[0-9][0-9].[0-9][0-9].*'
+
+permissions:
+  contents: read
+
+concurrency:
+  # One group per tag: a re-run of the same tag must not race the first run into
+  # two pull requests.
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the tag
+        uses: actions/checkout@v6
+        with:
+          lfs: false
+          # The pull request's checks only run when its branch is pushed by
+          # something other than the workflow's own token.
+          token: ${{ secrets.OCTODOG }}
+      - name: Sync the changelog to main
+        # The tag names the release; a tag name is never interpolated into the
+        # shell, only handed over as an argument.
+        env:
+          GH_TOKEN: ${{ secrets.OCTODOG }}
+          TAG: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
+        run: .github/scripts/sync-changelog-to-main.sh "$TAG" "$COMMIT"

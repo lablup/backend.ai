@@ -2,24 +2,21 @@
 
 from __future__ import annotations
 
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions import (
+    OperationScopedDomainUsageBucketsAction,
+    OperationScopedDomainUsageBucketsActionResult,
+    OperationScopedProjectUsageBucketsAction,
+    OperationScopedProjectUsageBucketsActionResult,
+    OperationScopedUserUsageBucketsAction,
+    OperationScopedUserUsageBucketsActionResult,
     SearchDomainUsageBucketsAction,
     SearchDomainUsageBucketsActionResult,
     SearchProjectUsageBucketsAction,
     SearchProjectUsageBucketsActionResult,
-    SearchScopedDomainUsageBucketsAction,
-    SearchScopedDomainUsageBucketsActionResult,
-    SearchScopedProjectUsageBucketsAction,
-    SearchScopedProjectUsageBucketsActionResult,
-    SearchScopedUserUsageBucketsAction,
-    SearchScopedUserUsageBucketsActionResult,
     SearchUserUsageBucketsAction,
     SearchUserUsageBucketsActionResult,
 )
@@ -28,7 +25,7 @@ from .service import ResourceUsageService
 __all__ = ("ResourceUsageProcessors",)
 
 
-class ResourceUsageProcessors(AbstractProcessorPackage):
+class ResourceUsageProcessors:
     """Processor package for resource usage operations."""
 
     # Domain Usage Buckets
@@ -36,7 +33,7 @@ class ResourceUsageProcessors(AbstractProcessorPackage):
         SearchDomainUsageBucketsAction, SearchDomainUsageBucketsActionResult
     ]
     search_scoped_domain_usage_buckets: ActionProcessor[
-        SearchScopedDomainUsageBucketsAction, SearchScopedDomainUsageBucketsActionResult
+        OperationScopedDomainUsageBucketsAction, OperationScopedDomainUsageBucketsActionResult
     ]
 
     # Project Usage Buckets
@@ -44,7 +41,7 @@ class ResourceUsageProcessors(AbstractProcessorPackage):
         SearchProjectUsageBucketsAction, SearchProjectUsageBucketsActionResult
     ]
     search_scoped_project_usage_buckets: ActionProcessor[
-        SearchScopedProjectUsageBucketsAction, SearchScopedProjectUsageBucketsActionResult
+        OperationScopedProjectUsageBucketsAction, OperationScopedProjectUsageBucketsActionResult
     ]
 
     # User Usage Buckets
@@ -52,7 +49,7 @@ class ResourceUsageProcessors(AbstractProcessorPackage):
         SearchUserUsageBucketsAction, SearchUserUsageBucketsActionResult
     ]
     search_scoped_user_usage_buckets: ActionProcessor[
-        SearchScopedUserUsageBucketsAction, SearchScopedUserUsageBucketsActionResult
+        OperationScopedUserUsageBucketsAction, OperationScopedUserUsageBucketsActionResult
     ]
 
     def __init__(
@@ -84,17 +81,3 @@ class ResourceUsageProcessors(AbstractProcessorPackage):
         self.search_scoped_user_usage_buckets = ActionProcessor(
             service.search_scoped_user_usage_buckets, action_monitors
         )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            # Domain
-            SearchDomainUsageBucketsAction.spec(),
-            SearchScopedDomainUsageBucketsAction.spec(),
-            # Project
-            SearchProjectUsageBucketsAction.spec(),
-            SearchScopedProjectUsageBucketsAction.spec(),
-            # User
-            SearchUserUsageBucketsAction.spec(),
-            SearchScopedUserUsageBucketsAction.spec(),
-        ]

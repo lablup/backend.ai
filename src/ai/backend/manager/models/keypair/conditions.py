@@ -39,6 +39,13 @@ class KeypairConditions:
         return inner
 
     @staticmethod
+    def by_is_default(is_default: bool) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KeyPairRow.is_default == is_default
+
+        return inner
+
+    @staticmethod
     def by_access_key_equals(spec: StringMatchSpec) -> QueryCondition:
         value = spec.value
         negated = spec.negated
@@ -314,6 +321,12 @@ class KeypairOrders:
         if ascending:
             return KeyPairRow.is_active.asc()
         return KeyPairRow.is_active.desc()
+
+    @staticmethod
+    def is_default(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return KeyPairRow.is_default.asc()
+        return KeyPairRow.is_default.desc()
 
     @staticmethod
     def resource_policy(ascending: bool = True) -> QueryOrder:

@@ -12,16 +12,16 @@ from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, ScalingGroupRow
-from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 
 __all__ = (
-    "DomainSearchScope",
+    "DomainOperationScope",
     "DomainSearchResult",
 )
 
 
 @dataclass(frozen=True)
-class DomainSearchScope(SearchScope):
+class DomainOperationScope(OperationScope):
     """Required scope for domain search within a resource group.
 
     Used for resource group-scoped queries where domains are filtered
@@ -37,7 +37,12 @@ class DomainSearchScope(SearchScope):
         resource_group = self.resource_group
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ScalingGroupForDomainRow.scaling_group == resource_group
+            return (
+                ScalingGroupForDomainRow.resource_group_id
+                == sa.select(ScalingGroupRow.id)
+                .where(ScalingGroupRow.name == resource_group)
+                .scalar_subquery()
+            )
 
         return inner
 

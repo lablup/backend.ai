@@ -77,7 +77,7 @@ async def degraded_session_seed(
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
     scaling_group_name: ResourceGroupName,
-    scaling_group_id: ResourceGroupID,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING_DEGRADED session with two kernels (one RUNNING, one ERROR)."""
     unique = secrets.token_hex(4)
@@ -101,7 +101,7 @@ async def degraded_session_seed(
         user_uuid=admin_user_fixture.user_uuid,
         access_key=admin_user_fixture.keypair.access_key,
         scaling_group=scaling_group_name,
-        resource_group_id=scaling_group_id,
+        resource_group_id=resource_group_id,
         now=now,
     )
 
@@ -120,7 +120,7 @@ async def degraded_session_seed(
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
                 scaling_group_name=scaling_group_name,
-                resource_group_id=scaling_group_id,
+                resource_group_id=resource_group_id,
                 status=SessionStatus.RUNNING_DEGRADED,
                 status_info="",
                 status_history=status_history,
@@ -173,7 +173,7 @@ async def full_lifecycle_session_seed(
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
     scaling_group_name: ResourceGroupName,
-    scaling_group_id: ResourceGroupID,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING session with a full lifecycle status_history
     (PENDING → SCHEDULED → PREPARING → PULLING → CREATING → RUNNING).
@@ -203,7 +203,7 @@ async def full_lifecycle_session_seed(
         user_uuid=admin_user_fixture.user_uuid,
         access_key=admin_user_fixture.keypair.access_key,
         scaling_group=scaling_group_name,
-        resource_group_id=scaling_group_id,
+        resource_group_id=resource_group_id,
         now=now,
     )
 
@@ -222,7 +222,7 @@ async def full_lifecycle_session_seed(
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
                 scaling_group_name=scaling_group_name,
-                resource_group_id=scaling_group_id,
+                resource_group_id=resource_group_id,
                 status=SessionStatus.RUNNING,
                 status_info="",
                 status_history=status_history,

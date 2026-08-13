@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+from ai.backend.common.message_queue.payload import AnycastMessagePayload
+
 
 class AbstractAnycaster(ABC):
     """
@@ -10,12 +12,12 @@ class AbstractAnycaster(ABC):
     """
 
     @abstractmethod
-    async def anycast(self, payload: dict[bytes, bytes]) -> None:
+    async def anycast(self, payload: AnycastMessagePayload) -> None:
         """
         Send a message to the anycast queue.
 
         Args:
-            payload: Message payload as a dict of bytes
+            payload: Message payload as an anycast envelope
 
         Raises:
             RuntimeError: If the component is closed

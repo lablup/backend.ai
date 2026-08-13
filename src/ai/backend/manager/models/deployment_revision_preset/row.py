@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime
-from typing import TYPE_CHECKING
-
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.config import ModelDefinition
+from ai.backend.common.config import PresetModelDefinition
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.image import ImageID
@@ -26,17 +23,15 @@ from ai.backend.manager.models.base import (
     ResourceOptsEntry,
     StrEnumType,
 )
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 from ai.backend.manager.models.runtime_variant_preset.types import (
     RuntimeVariantPresetValueEntry,
 )
 
-if TYPE_CHECKING:
-    from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
-
 __all__ = ("DeploymentRevisionPresetRow",)
 
 
-class DeploymentRevisionPresetRow(Base):  # type: ignore[misc]
+class DeploymentRevisionPresetRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "deployment_revision_presets"
 
     __table_args__ = (
@@ -60,8 +55,8 @@ class DeploymentRevisionPresetRow(Base):  # type: ignore[misc]
     rank: Mapped[int] = mapped_column("rank", sa.Integer, nullable=False)
 
     image_id: Mapped[ImageID] = mapped_column("image_id", GUID(ImageID), nullable=False)
-    model_definition: Mapped[ModelDefinition | None] = mapped_column(
-        "model_definition", PydanticColumn(ModelDefinition), nullable=True
+    model_definition: Mapped[PresetModelDefinition | None] = mapped_column(
+        "model_definition", PydanticColumn(PresetModelDefinition, exclude_unset=True), nullable=True
     )
     resource_opts: Mapped[list[ResourceOptsEntry]] = mapped_column(
         "resource_opts", PydanticListColumn(ResourceOptsEntry), nullable=False, server_default="[]"
@@ -110,25 +105,6 @@ class DeploymentRevisionPresetRow(Base):  # type: ignore[misc]
         pgsql.JSONB(),
         nullable=False,
         server_default=sa.text("'{}'::jsonb"),
-    )
-
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        nullable=False,
-    )
-    updated_at: Mapped[datetime | None] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        nullable=True,
-        onupdate=sa.func.now(),
-    )
-
-    resource_slot_rows: Mapped[list[PresetResourceSlotRow]] = relationship(
-        "PresetResourceSlotRow",
-        cascade="all, delete-orphan",
-        lazy="selectin",
     )
 
     def to_data(self) -> DeploymentRevisionPresetData:

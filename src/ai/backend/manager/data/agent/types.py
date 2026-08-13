@@ -8,7 +8,14 @@ from typing import TYPE_CHECKING, Any, Self, override
 
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.data.agent.types import AgentInfo
-from ai.backend.common.types import AgentId, DeviceName, ResourceSlot, SlotName, SlotTypes
+from ai.backend.common.types import (
+    AgentId,
+    DeviceName,
+    ResourceSlot,
+    ResourceSlotEntry,
+    SlotName,
+    SlotTypes,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.permission.permission_defs import AgentPermission
@@ -172,9 +179,17 @@ class AgentHeartbeatUpsert:
                 public_host=agent_info.public_host,
                 public_key=agent_info.public_key,
             ),
+            # The heartbeat carries the list-friendly `ResourceSlotEntry` form, while the
+            # agents table still stores a `ResourceSlot`, so the wire form is collapsed
+            # back here at the boundary rather than downstream.
             resource_info=AgentResourceInfo(
-                slot_key_and_units=agent_info.slot_key_and_units,
-                available_slots=agent_info.available_resource_slots,
+                slot_key_and_units={
+                    SlotName(slot_name): slot_type
+                    for slot_name, slot_type in agent_info.slot_key_and_units.items()
+                },
+                available_slots=ResourceSlotEntry.inputs_to_resource_slot(
+                    agent_info.available_resource_slots
+                ),
                 compute_plugins=agent_info.compute_plugins,
             ),
             lost_at=None,

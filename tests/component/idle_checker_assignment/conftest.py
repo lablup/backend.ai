@@ -26,6 +26,7 @@ from ai.backend.common.data.permission.types import (
     RelationType,
     ScopeType,
 )
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, SessionTypes
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
@@ -73,7 +74,7 @@ if TYPE_CHECKING:
 
 @dataclass
 class AssignmentSeedData:
-    domain_id: uuid.UUID
+    domain_id: DomainID
     project_id: uuid.UUID
     other_project_id: uuid.UUID
     domain_assignment_id: uuid.UUID
@@ -165,7 +166,7 @@ async def assignment_seed(
     association row so that single-entity scope-chain checks can resolve the
     assignment back to its scope.
     """
-    domain_id = uuid.uuid4()
+    domain_id = DomainID(uuid.uuid4())
     project_id = uuid.uuid4()
     other_project_id = uuid.uuid4()
     domain_name = f"icb-domain-{domain_id.hex[:8]}"

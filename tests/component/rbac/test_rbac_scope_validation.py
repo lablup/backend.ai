@@ -24,9 +24,12 @@ def adapter() -> RBACAdapter:
 
 
 class TestValidateScopeId:
-    """Adapter rejects non-UUID scope_id for USER / PROJECT scopes."""
+    """Adapter rejects non-UUID scope_id for USER / PROJECT / DOMAIN scopes."""
 
-    @pytest.mark.parametrize("scope_type", [RBACElementType.USER, RBACElementType.PROJECT])
+    @pytest.mark.parametrize(
+        "scope_type",
+        [RBACElementType.USER, RBACElementType.PROJECT, RBACElementType.DOMAIN],
+    )
     def test_rejects_email_as_scope_id(
         self,
         adapter: RBACAdapter,
@@ -35,7 +38,10 @@ class TestValidateScopeId:
         with pytest.raises(InvalidScope):
             adapter._validate_scope_id(scope_type, "alice@example.com")
 
-    @pytest.mark.parametrize("scope_type", [RBACElementType.USER, RBACElementType.PROJECT])
+    @pytest.mark.parametrize(
+        "scope_type",
+        [RBACElementType.USER, RBACElementType.PROJECT, RBACElementType.DOMAIN],
+    )
     def test_accepts_valid_uuid_scope_id(
         self,
         adapter: RBACAdapter,
@@ -43,11 +49,12 @@ class TestValidateScopeId:
     ) -> None:
         adapter._validate_scope_id(scope_type, str(uuid.uuid4()))
 
-    def test_accepts_string_scope_id_for_domain(
+    def test_rejects_domain_name_as_scope_id(
         self,
         adapter: RBACAdapter,
     ) -> None:
-        adapter._validate_scope_id(RBACElementType.DOMAIN, "default")
+        with pytest.raises(InvalidScope):
+            adapter._validate_scope_id(RBACElementType.DOMAIN, "default")
 
 
 class TestCreateRoleScopeValidation:

@@ -29,9 +29,9 @@ from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.login_client_type.conditions import LoginClientTypeConditions
 from ai.backend.manager.models.login_client_type.orders import LoginClientTypeOrders
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    OffsetPagination,
     combine_conditions_or,
     negate_conditions,
 )
@@ -75,7 +75,7 @@ class LoginClientTypeAdapter(BaseAdapter):
             name=data.name,
             description=data.description,
             created_at=data.created_at,
-            modified_at=data.modified_at,
+            modified_at=data.updated_at,
         )
 
     @staticmethod
@@ -89,7 +89,7 @@ class LoginClientTypeAdapter(BaseAdapter):
                 case LoginClientTypeOrderField.CREATED_AT:
                     result.append(LoginClientTypeOrders.created_at(ascending))
                 case LoginClientTypeOrderField.MODIFIED_AT:
-                    result.append(LoginClientTypeOrders.modified_at(ascending))
+                    result.append(LoginClientTypeOrders.updated_at(ascending))
         return result
 
     # --- Non-admin methods ---
@@ -213,9 +213,9 @@ class LoginClientTypeAdapter(BaseAdapter):
 
         if filter.modified_at is not None:
             condition = filter.modified_at.build_query_condition(
-                before_factory=LoginClientTypeConditions.by_modified_at_before,
-                after_factory=LoginClientTypeConditions.by_modified_at_after,
-                equals_factory=LoginClientTypeConditions.by_modified_at_equals,
+                before_factory=LoginClientTypeConditions.by_updated_at_before,
+                after_factory=LoginClientTypeConditions.by_updated_at_after,
+                equals_factory=LoginClientTypeConditions.by_updated_at_equals,
             )
             if condition is not None:
                 conditions.append(condition)

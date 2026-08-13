@@ -123,17 +123,17 @@ from ai.backend.manager.repositories.permission_controller.purgers import (
     PermissionPurgerSpec,
 )
 from ai.backend.manager.repositories.permission_controller.types import (
-    PermissionSearchScope,
-    ScopedRoleSearchScope,
+    PermissionOperationScope,
+    ScopedRoleOperationScope,
 )
 from ai.backend.manager.repositories.role_invitation.creators import (
     RoleInvitationCreatorSpec,
 )
 from ai.backend.manager.repositories.role_invitation.types import (
-    InviteeSearchScope,
-    InviterSearchScope,
+    InviteeOperationScope,
+    InviterOperationScope,
+    RoleInvitationOperationScope,
     RoleInvitationSearchResult,
-    RoleInvitationSearchScope,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -678,7 +678,7 @@ class PermissionDBSource:
     async def search_roles_in_scope(
         self,
         querier: BatchQuerier,
-        scope: ScopedRoleSearchScope,
+        scope: ScopedRoleOperationScope,
     ) -> RoleListResult:
         """Search roles registered in a given scope via association_scopes_entities."""
         async with self._db.begin_readonly_session() as db_sess:
@@ -703,7 +703,7 @@ class PermissionDBSource:
     async def search_permissions(
         self,
         querier: BatchQuerier,
-        scope: PermissionSearchScope | None = None,
+        scope: PermissionOperationScope | None = None,
     ) -> PermissionListResult:
         """Searches permissions with pagination and filtering."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
@@ -784,7 +784,7 @@ class PermissionDBSource:
     ) -> ScopeListResult:
         """Search all domains using BatchQuerier."""
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(DomainRow.name)
+            query = sa.select(DomainRow.id, DomainRow.name)
 
             result = await execute_batch_querier(
                 db_sess,
@@ -794,7 +794,7 @@ class PermissionDBSource:
 
             items = [
                 ScopeData(
-                    id=ScopeId(scope_type=LegacyScopeType.DOMAIN, scope_id=row.name),
+                    id=ScopeId(scope_type=LegacyScopeType.DOMAIN, scope_id=str(row.id)),
                     name=row.name,
                 )
                 for row in result.rows
@@ -1203,10 +1203,11 @@ class PermissionDBSource:
         """Return whether the user holds *permission* on the key's entity via a virtual scope.
 
         Resolves the effective permission through the virtual-scope chain and tests
-        it bitwise (``effective & permission != NONE``).
+        that it covers *every* bit of ``permission``, which may be a mask
+        (``UPSERT`` requires ``CREATE | UPDATE``) rather than a single bit.
         """
         resolved = await self.resolve_effective_permissions_via_virtual_scope([key])
-        return bool(resolved.get(key, Permission.NONE) & permission)
+        return resolved.get(key, Permission.NONE).covers(permission)
 
     async def check_bulk_permission_via_virtual_scope(
         self,
@@ -1215,12 +1216,13 @@ class PermissionDBSource:
     ) -> Mapping[EntityPermissionCheckKey, bool]:
         """Check *permission* on each target entity through the virtual-scope chain in one go.
 
-        Returns a mapping from each input key to whether the permission is granted.
+        Returns a mapping from each input key to whether every bit of ``permission``
+        is granted.
         """
         if not keys:
             return {}
         resolved = await self.resolve_effective_permissions_via_virtual_scope(keys)
-        return {key: bool(resolved.get(key, Permission.NONE) & permission) for key in keys}
+        return {key: resolved.get(key, Permission.NONE).covers(permission) for key in keys}
 
     async def check_scope_permission_via_virtual_scope(
         self,
@@ -1229,12 +1231,13 @@ class PermissionDBSource:
     ) -> Mapping[ScopePermissionCheckKey, bool]:
         """Check *permission* on each target scope through the virtual-scope chain in one go.
 
-        Returns a mapping from each input key to whether the permission is granted.
+        Returns a mapping from each input key to whether every bit of ``permission``
+        is granted.
         """
         if not keys:
             return {}
         resolved = await self._resolve_effective_scope_permissions_via_virtual_scope(keys)
-        return {key: bool(resolved.get(key, Permission.NONE) & permission) for key in keys}
+        return {key: resolved.get(key, Permission.NONE).covers(permission) for key in keys}
 
     async def resolve_effective_permissions_via_virtual_scope(
         self,
@@ -1474,7 +1477,7 @@ class PermissionDBSource:
     async def search_invitations_by_invitee(
         self,
         querier: BatchQuerier,
-        scope: InviteeSearchScope,
+        scope: InviteeOperationScope,
     ) -> RoleInvitationSearchResult:
         async with self._db.begin_readonly_session_read_committed() as session:
             query = sa.select(RoleInvitationRow)
@@ -1490,7 +1493,7 @@ class PermissionDBSource:
     async def search_invitations_by_inviter(
         self,
         querier: BatchQuerier,
-        scope: InviterSearchScope,
+        scope: InviterOperationScope,
     ) -> RoleInvitationSearchResult:
         async with self._db.begin_readonly_session_read_committed() as session:
             query = sa.select(RoleInvitationRow)
@@ -1506,7 +1509,7 @@ class PermissionDBSource:
     async def search_invitations_by_role(
         self,
         querier: BatchQuerier,
-        scope: RoleInvitationSearchScope,
+        scope: RoleInvitationOperationScope,
     ) -> RoleInvitationSearchResult:
         async with self._db.begin_readonly_session_read_committed() as session:
             query = sa.select(RoleInvitationRow)

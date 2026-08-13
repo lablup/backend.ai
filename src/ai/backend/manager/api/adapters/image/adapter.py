@@ -55,10 +55,9 @@ from ai.backend.manager.models.image.conditions import (
 )
 from ai.backend.manager.models.image.orders import ImageAliasOrders, ImageOrders
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    NoPagination,
-    OffsetPagination,
     combine_conditions_or,
     negate_conditions,
 )
@@ -539,7 +538,7 @@ class ImageAdapter(BaseAdapter):
         ]
         accelerators = data.accelerators
         accelerator_list = (
-            [a.strip() for a in accelerators.split(",") if a.strip()] if accelerators else []
+            [a.strip() for a in accelerators.split(",") if a.strip()] if accelerators else ["*"]
         )
         resource_limits_gql = [
             ImageResourceLimitGQLInfo(

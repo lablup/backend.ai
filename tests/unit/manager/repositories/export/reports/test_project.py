@@ -13,6 +13,8 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.api.rest.export.adapter import ExportAdapter
 from ai.backend.manager.models.agent import AgentRow
@@ -624,7 +626,7 @@ class TestProjectQuerySQLGenerationForBugReproduction:
         """sgroups_for_groups must appear before scaling_groups in the JOIN chain.
 
         SCALING_GROUP_JOIN depends on sgroups_for_groups already being joined,
-        because its condition references ScalingGroupForProjectRow.scaling_group.
+        because its condition references ScalingGroupForProjectRow.resource_group_id.
         """
         query = adapter.build_project_query(
             report=PROJECT_REPORT,
@@ -768,11 +770,14 @@ class TestProjectExportExecuteStreamingDB:
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
         project_id = uuid.uuid4()
         rg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
+        rg_id = ResourceGroupID(uuid.uuid4())
         registry_id = uuid.uuid4()
 
         async with db_engine.begin_session() as db_sess:
+            domain_id = DomainID(uuid.uuid4())
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="",
                     is_active=True,
@@ -805,6 +810,7 @@ class TestProjectExportExecuteStreamingDB:
 
             db_sess.add(
                 ScalingGroupRow(
+                    id=rg_id,
                     name=rg_name,
                     description="",
                     is_active=True,
@@ -817,7 +823,7 @@ class TestProjectExportExecuteStreamingDB:
             )
             await db_sess.flush()
 
-            db_sess.add(ScalingGroupForProjectRow(scaling_group=rg_name, group=project_id))
+            db_sess.add(ScalingGroupForProjectRow(resource_group_id=rg_id, group=project_id))
             await db_sess.flush()
 
             db_sess.add(
@@ -1044,8 +1050,10 @@ class TestGlobalContainerRegistryExport:
         scoped_registry_id = uuid.uuid4()
 
         async with db_engine.begin_session() as db_sess:
+            domain_id = DomainID(uuid.uuid4())
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="",
                     is_active=True,

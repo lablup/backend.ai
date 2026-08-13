@@ -10,6 +10,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.error_log.types import (
     ErrorLogData,
@@ -23,7 +24,7 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.error_logs import ErrorLogRow, error_logs
+from ai.backend.manager.models.error_logs import ErrorLogRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -36,6 +37,7 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import (
     PasswordHashAlgorithm,
     PasswordInfo,
@@ -49,11 +51,11 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkCreator,
     Creator,
-    OffsetPagination,
     execute_bulk_creator,
 )
 from ai.backend.manager.repositories.error_log import ErrorLogCreatorSpec, ErrorLogRepository
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 class TestErrorLogRepository:
@@ -96,15 +98,17 @@ class TestErrorLogRepository:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+    ) -> DomainFixtureData:
         """Create test domain and return domain name"""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain for error log",
                 is_active=True,
@@ -115,7 +119,7 @@ class TestErrorLogRepository:
             db_sess.add(domain)
             await db_sess.commit()
 
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def test_resource_policy_name(
@@ -142,7 +146,7 @@ class TestErrorLogRepository:
     async def test_user_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test user and return user UUID"""
@@ -164,9 +168,10 @@ class TestErrorLogRepository:
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
+                domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
             await db_sess.commit()
@@ -364,7 +369,7 @@ class TestErrorLogRepository:
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 # TODO: Refactor after adding Condition type
-                lambda: error_logs.c.source == target_source,
+                lambda: ErrorLogRow.source == target_source,
             ],
             orders=[],
         )
@@ -385,7 +390,7 @@ class TestErrorLogRepository:
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[
                 # TODO: Refactor after adding Condition type
-                lambda: error_logs.c.severity == ErrorLogSeverity.CRITICAL.value,
+                lambda: ErrorLogRow.severity == ErrorLogSeverity.CRITICAL.value,
             ],
             orders=[],
         )
@@ -408,7 +413,7 @@ class TestErrorLogRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
-            orders=[error_logs.c.source.asc()],
+            orders=[ErrorLogRow.source.asc()],
         )
 
         result = await error_log_repository.search(querier=querier)
@@ -427,7 +432,7 @@ class TestErrorLogRepository:
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
             conditions=[],
-            orders=[error_logs.c.source.desc()],
+            orders=[ErrorLogRow.source.desc()],
         )
 
         result = await error_log_repository.search(querier=querier)
@@ -506,9 +511,9 @@ class TestErrorLogRepository:
             pagination=OffsetPagination(limit=5, offset=2),
             conditions=[
                 # TODO: Refactor after adding Condition type
-                lambda: error_logs.c.severity == ErrorLogSeverity.ERROR.value,
+                lambda: ErrorLogRow.severity == ErrorLogSeverity.ERROR.value,
             ],
-            orders=[error_logs.c.source.asc()],
+            orders=[ErrorLogRow.source.asc()],
         )
 
         result = await error_log_repository.search(querier=querier)

@@ -11,7 +11,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
 
 
-class TestSampleRow(Base):  # type: ignore[misc]
+class TestSampleRow(Base):
     __tablename__ = "test_sample"
     name = sa.Column(sa.String(64), primary_key=True)
 
@@ -40,6 +40,5 @@ async def test_with_tables_creates_and_truncates(
 
     # After exiting context, table should be truncated
     async with database_connection.begin_readonly_session() as db_sess:
-        result = await db_sess.execute(sa.select(sa.func.count()).select_from(TestSampleRow))
-        count = result.scalar()
+        count = await db_sess.scalar(sa.select(sa.func.count()).select_from(TestSampleRow))
         assert count == 0

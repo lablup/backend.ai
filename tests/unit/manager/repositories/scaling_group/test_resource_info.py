@@ -462,6 +462,7 @@ class TestResourceInfo:
                 created_at=datetime.now(tz=UTC),
                 domain_name=test_domain,
                 resource_policy=test_resource_policy,
+                domain_id=test_domain_id,
             )
             db_sess.add(user)
 

@@ -4,7 +4,6 @@ from strawberry import Info
 from strawberry.relay import PageInfo
 
 from ai.backend.common.dto.manager.v2.idle_checker.request import SearchIdleCheckersInput
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -30,7 +29,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 
 @gql_root_field(  # type: ignore[misc]
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description=(
             "Searches global idle checker definitions with filtering, ordering, and "
             "pagination (super admin only)."
@@ -77,7 +76,7 @@ async def admin_idle_checkers(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Creates a global idle checker definition (super admin only).",
     )
 )
@@ -92,7 +91,7 @@ async def admin_create_idle_checker(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Updates a global idle checker definition (super admin only).",
     )
 )
@@ -107,7 +106,7 @@ async def admin_update_idle_checker(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Permanently removes a global idle checker (super admin only).",
     )
 )

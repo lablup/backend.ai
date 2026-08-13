@@ -22,6 +22,7 @@ class KeyPairResourcePolicyCreatorSpec(CreatorSpec["KeyPairResourcePolicyRow"]):
     max_containers_per_session: int | None
     max_pending_session_count: int | None
     max_pending_session_resource_slots: ResourceSlot | None
+    max_priority: int | None
     max_quota_scope_size: int | None
     max_vfolder_count: int | None
     max_vfolder_size: int | None
@@ -39,6 +40,7 @@ class KeyPairResourcePolicyCreatorSpec(CreatorSpec["KeyPairResourcePolicyRow"]):
             max_concurrent_sessions=self.max_concurrent_sessions,
             max_pending_session_count=self.max_pending_session_count,
             max_pending_session_resource_slots=self.max_pending_session_resource_slots,
+            max_priority=self.max_priority,
             max_concurrent_sftp_sessions=self.max_concurrent_sftp_sessions,
             max_containers_per_session=self.max_containers_per_session,
             idle_timeout=self.idle_timeout,

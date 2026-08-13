@@ -73,6 +73,7 @@ def _make_metric_repository(
     return MetricRepository(
         db=MagicMock(),
         prometheus_client=mock_prometheus_client,
+        default_timewindow=timewindow,
     )
 
 

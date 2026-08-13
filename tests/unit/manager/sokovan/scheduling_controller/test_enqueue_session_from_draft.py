@@ -209,6 +209,7 @@ def _make_user() -> UserData:
         is_superadmin=False,
         role=UserRole.USER,
         domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
     )
 
 

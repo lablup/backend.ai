@@ -11,6 +11,7 @@ import sqlalchemy as sa
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.session_group import SessionGroupID
@@ -47,9 +48,10 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.db import TableOrORM, with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
-_REQUIRED_TABLES = [
+_REQUIRED_TABLES: list[TableOrORM] = [
     DomainRow,
     ScalingGroupRow,
     UserResourcePolicyRow,
@@ -91,11 +93,22 @@ class TestLegacyExtraMountsHydration:
         return uuid.uuid4().hex[:8]
 
     @pytest.fixture
-    async def domain_name(self, db_with_cleanup: ExtendedAsyncSAEngine, suffix: str) -> str:
+    async def domain_fixture(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        suffix: str,
+    ) -> DomainFixtureData:
+        domain_id = DomainID(uuid.uuid4())
         name = f"d-{suffix}"
         async with db_with_cleanup.begin_session() as db_sess:
-            db_sess.add(DomainRow(name=name, total_resource_slots=ResourceSlot()))
-        return name
+            db_sess.add(
+                DomainRow(
+                    id=domain_id,
+                    name=name,
+                    total_resource_slots=ResourceSlot(),
+                )
+            )
+        return DomainFixtureData(domain_name=DomainName(name), domain_id=domain_id)
 
     @pytest.fixture
     async def scaling_group_name(self, db_with_cleanup: ExtendedAsyncSAEngine, suffix: str) -> str:
@@ -149,7 +162,7 @@ class TestLegacyExtraMountsHydration:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         suffix: str,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         user_resource_policy_name: str,
     ) -> uuid.UUID:
         user_uuid = uuid.uuid4()
@@ -165,7 +178,8 @@ class TestLegacyExtraMountsHydration:
                         rounds=1,
                         salt_size=16,
                     ),
-                    domain_name=domain_name,
+                    domain_id=domain_fixture.domain_id,
+                    domain_name=domain_fixture.domain_name,
                     resource_policy=user_resource_policy_name,
                     role=UserRole.USER,
                     status=UserStatus.ACTIVE,
@@ -178,7 +192,7 @@ class TestLegacyExtraMountsHydration:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         suffix: str,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         project_resource_policy_name: str,
     ) -> uuid.UUID:
         project_uuid = uuid.uuid4()
@@ -187,7 +201,7 @@ class TestLegacyExtraMountsHydration:
                 GroupRow(
                     id=project_uuid,
                     name=f"g-{suffix}",
-                    domain_name=domain_name,
+                    domain_name=domain_fixture.domain_name,
                     total_resource_slots=ResourceSlot(),
                     resource_policy=project_resource_policy_name,
                 )
@@ -250,7 +264,7 @@ class TestLegacyExtraMountsHydration:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         suffix: str,
-        domain_name: str,
+        domain_fixture: DomainFixtureData,
         scaling_group_name: str,
         user_id: uuid.UUID,
         project_id: uuid.UUID,
@@ -266,7 +280,7 @@ class TestLegacyExtraMountsHydration:
                 name=f"ep-{suffix}",
                 created_user=user_id,
                 session_owner=user_id,
-                domain=domain_name,
+                domain=domain_fixture.domain_name,
                 project=project_id,
                 resource_group=scaling_group_name,
                 url="http://test.example.com",

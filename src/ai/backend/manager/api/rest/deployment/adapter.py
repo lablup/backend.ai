@@ -83,7 +83,8 @@ from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
 from ai.backend.manager.models.endpoint.orders import DeploymentOrders
 from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.models.routing.orders import RouteOrders
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 __all__ = (

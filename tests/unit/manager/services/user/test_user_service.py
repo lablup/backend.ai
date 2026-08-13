@@ -16,6 +16,7 @@ import pytest
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -32,15 +33,15 @@ from ai.backend.manager.data.user.types import (
 )
 from ai.backend.manager.errors.user import UserConflict, UserNotFound, UserPurgeFailure
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user.types import (
-    DomainUserSearchScope,
-    ProjectUserSearchScope,
+    DomainUserOperationScope,
+    ProjectUserOperationScope,
 )
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.services.user.actions.admin_month_stats import AdminMonthStatsAction
@@ -96,13 +97,14 @@ def _make_user_data(
         created_at=datetime.now(tz=UTC),
         modified_at=datetime.now(tz=UTC),
         domain_name=domain_name,
+        domain_id=DomainID(uuid.uuid4()),
         role=role,
         resource_policy="default",
         allowed_client_ip=None,
         totp_activated=False,
         totp_activated_at=None,
         sudo_session_enabled=False,
-        main_access_key="TESTKEY1234567890",
+        default_access_key="TESTKEY1234567890",
         container_uid=None,
         container_main_gid=None,
         container_gids=None,
@@ -135,6 +137,7 @@ def _make_keypair_data(user_uuid: uuid.UUID | None = None) -> KeyPairData:
         secret_key=SecretKey("TESTSECRETKEY1234567890"),
         is_active=True,
         is_admin=False,
+        is_default=True,
         created_at=datetime.now(tz=UTC),
         modified_at=datetime.now(tz=UTC),
         resource_policy_name="default",
@@ -179,7 +182,7 @@ class TestCreateUser:
                 domain_name="default",
             )
         )
-        action = CreateUserAction(creator=creator)
+        action = CreateUserAction(creator=creator, _domain_id=DomainID(uuid.uuid4()))
 
         result = await service.create_user(action)
 
@@ -209,7 +212,9 @@ class TestCreateUser:
                 domain_name="default",
             )
         )
-        action = CreateUserAction(creator=creator, group_ids=group_ids)
+        action = CreateUserAction(
+            creator=creator, _domain_id=DomainID(uuid.uuid4()), group_ids=group_ids
+        )
 
         result = await service.create_user(action)
 
@@ -235,7 +240,7 @@ class TestCreateUser:
                 domain_name="default",
             )
         )
-        action = CreateUserAction(creator=creator)
+        action = CreateUserAction(creator=creator, _domain_id=DomainID(uuid.uuid4()))
 
         with pytest.raises(UserConflict):
             await service.create_user(action)
@@ -568,7 +573,7 @@ class TestSearchUsersByDomain:
             )
         )
 
-        scope = DomainUserSearchScope(domain_name="corp")
+        scope = DomainUserOperationScope(domain_name="corp")
         querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
         action = SearchUsersByDomainAction(scope=scope, querier=querier)
 
@@ -597,7 +602,7 @@ class TestSearchUsersByDomain:
             )
         )
 
-        scope = DomainUserSearchScope(domain_name="corp")
+        scope = DomainUserOperationScope(domain_name="corp")
         querier = BatchQuerier(pagination=OffsetPagination(limit=5, offset=0))
         action = SearchUsersByDomainAction(scope=scope, querier=querier)
 
@@ -636,7 +641,7 @@ class TestSearchUsersByProject:
             )
         )
 
-        scope = ProjectUserSearchScope(project_id=project_id)
+        scope = ProjectUserOperationScope(project_id=project_id)
         querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
         action = SearchUsersByProjectAction(scope=scope, querier=querier)
 
@@ -664,7 +669,7 @@ class TestSearchUsersByProject:
             )
         )
 
-        scope = ProjectUserSearchScope(project_id=project_id)
+        scope = ProjectUserOperationScope(project_id=project_id)
         querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
         action = SearchUsersByProjectAction(scope=scope, querier=querier)
 
@@ -786,7 +791,6 @@ class TestPurgeUser:
             user_info_ctx=UserInfoContext(
                 uuid=uuid.uuid4(),
                 email="admin@example.com",
-                main_access_key=AccessKey("ADMINKEY"),
             ),
             email=email,
             **kwargs,

@@ -13,6 +13,7 @@ from sqlalchemy.engine import CursorResult
 
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.specs import purger as specs_purger
 from ai.backend.manager.repositories.base.types import ConflictCheck
 
 from .integrity import parse_integrity_error
@@ -69,6 +70,37 @@ class PurgerSpec[TRow: Base](ABC):
     @abstractmethod
     def conflict_checks(self) -> Sequence[ConflictCheck]:
         """Return rows that must not exist before deletion (empty if none)."""
+        raise NotImplementedError
+
+
+class DataPurger[TRow: Base, TData](PurgerSpec[TRow], ABC):
+    """A purger spec that also says how the deleted row becomes data.
+
+    ``PurgerSpec`` is already self-contained about what to delete; this adds the
+    conversion so the ops layer returns the ``data/`` type of the row it removed
+    instead of the row itself.
+
+    Example:
+        class UserPurger(DataPurger[UserRow, UserData]):
+            def row_class(self) -> type[UserRow]:
+                return UserRow
+
+            def pk_value(self) -> UUID:
+                return self._user_id
+
+            def conflict_checks(self) -> Sequence[ConflictCheck]:
+                return ()
+
+            def to_data(self, row: UserRow) -> UserData:
+                return row.to_data()
+
+        async with ops.write_ops() as w:
+            removed = await w.purge_data(UserPurger(user_id))
+    """
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        """Convert the deleted row into its ``data/`` type."""
         raise NotImplementedError
 
 
@@ -208,6 +240,17 @@ class BatchPurgerSpec[TRow: Base](ABC):
     def conflict_checks(self) -> Sequence[ConflictCheck]:
         """Return rows that must not exist before deletion (empty if none)."""
         raise NotImplementedError
+
+
+class DataBatchPurger[TRow: Base, TData](
+    BatchPurgerSpec[TRow], specs_purger.DataBatchPurger[TRow, TData], ABC
+):
+    """Legacy-compatible view of the v2 batch purge spec.
+
+    The declaration lives in ``models/specs/purger.py``; this adds the legacy
+    ``BatchPurgerSpec`` contract on top, so existing executors and domain specs
+    keep working during the transition.
+    """
 
 
 @dataclass

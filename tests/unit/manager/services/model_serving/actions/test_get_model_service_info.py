@@ -14,6 +14,7 @@ from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.hub import EventHub
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
@@ -47,6 +48,7 @@ class TestGetModelServiceInfo:
             is_superadmin=False,
             role=UserRole.USER,
             domain_name="default",
+            domain_id=DomainID(uuid.uuid4()),
         )
 
     @pytest.fixture(autouse=True)

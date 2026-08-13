@@ -16,11 +16,12 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.agent.anycast import AgentStartedEvent
 from ai.backend.common.exception import AgentWatcherResponseError
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
     AgentId,
     DeviceName,
-    ResourceSlot,
+    ResourceSlotEntry,
     SessionId,
     SlotName,
     SlotTypes,
@@ -140,18 +141,17 @@ def sample_agent_info() -> AgentInfo:
         ip="192.168.1.100",
         version="24.12.0",
         scaling_group="default",
-        available_resource_slots=ResourceSlot({
-            SlotName("cpu"): "8",
-            SlotName("mem"): "32768",
-        }),
+        available_resource_slots=[
+            ResourceSlotEntry(resource_type=ResourceSlotName("cpu"), quantity="8"),
+            ResourceSlotEntry(resource_type=ResourceSlotName("mem"), quantity="32768"),
+        ],
         slot_key_and_units={
-            SlotName("cpu"): SlotTypes.COUNT,
-            SlotName("mem"): SlotTypes.BYTES,
+            ResourceSlotName("cpu"): SlotTypes.COUNT,
+            ResourceSlotName("mem"): SlotTypes.BYTES,
         },
         addr="tcp://192.168.1.100:6001",
         public_key=PublicKey(b"test-public-key"),
         public_host="192.168.1.100",
-        images=b"\x82\xc4\x00\x00",  # msgpack compressed data
         region="us-west-1",
         architecture="x86_64",
         compute_plugins={DeviceName("cpu"): {}},
@@ -327,20 +327,20 @@ class TestAgentService:
             ip="192.168.1.100",
             version="24.12.0",
             scaling_group="gpu-cluster",
-            available_resource_slots=ResourceSlot({
-                SlotName("cpu"): "16",
-                SlotName("mem"): "65536",
-                SlotName("cuda.shares"): "8",  # New GPU resources
-            }),
+            available_resource_slots=[
+                ResourceSlotEntry(resource_type=ResourceSlotName("cpu"), quantity="16"),
+                ResourceSlotEntry(resource_type=ResourceSlotName("mem"), quantity="65536"),
+                # New GPU resources
+                ResourceSlotEntry(resource_type=ResourceSlotName("cuda.shares"), quantity="8"),
+            ],
             slot_key_and_units={
-                SlotName("cpu"): SlotTypes.COUNT,
-                SlotName("mem"): SlotTypes.BYTES,
-                SlotName("cuda.shares"): SlotTypes.COUNT,
+                ResourceSlotName("cpu"): SlotTypes.COUNT,
+                ResourceSlotName("mem"): SlotTypes.BYTES,
+                ResourceSlotName("cuda.shares"): SlotTypes.COUNT,
             },
             addr="tcp://192.168.1.200:6001",
             public_key=PublicKey(b"gpu-node-key"),
             public_host="192.168.1.200",
-            images=b"\x82\xc4\x00\x00",
             region="us-west-2",
             architecture="x86_64",
             compute_plugins={DeviceName("cpu"): {}},

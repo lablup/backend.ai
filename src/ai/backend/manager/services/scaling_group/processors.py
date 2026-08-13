@@ -1,8 +1,5 @@
-from typing import override
-
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.scaling_group.actions.associate_with_domain import (
     AssociateScalingGroupWithDomainsAction,
@@ -84,6 +81,10 @@ from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_id
     ResolveResourceGroupIDByNameAction,
     ResolveResourceGroupIDByNameActionResult,
 )
+from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_ids_by_names import (
+    ResolveResourceGroupIDsByNamesAction,
+    ResolveResourceGroupIDsByNamesActionResult,
+)
 from ai.backend.manager.services.scaling_group.actions.update_allowed_domains_for_rg import (
     UpdateAllowedDomainsForResourceGroupAction,
     UpdateAllowedDomainsForResourceGroupActionResult,
@@ -107,7 +108,7 @@ from ai.backend.manager.services.scaling_group.actions.update_fair_share_spec im
 from ai.backend.manager.services.scaling_group.service import ScalingGroupService
 
 
-class ScalingGroupProcessors(AbstractProcessorPackage):
+class ScalingGroupProcessors:
     create_scaling_group: ActionProcessor[CreateScalingGroupAction, CreateScalingGroupActionResult]
     purge_scaling_group: ActionProcessor[PurgeScalingGroupAction, PurgeScalingGroupActionResult]
     modify_scaling_group: ActionProcessor[ModifyScalingGroupAction, ModifyScalingGroupActionResult]
@@ -185,6 +186,10 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
         ResolveResourceGroupIDByNameAction,
         ResolveResourceGroupIDByNameActionResult,
     ]
+    resolve_resource_group_ids_by_names: ActionProcessor[
+        ResolveResourceGroupIDsByNamesAction,
+        ResolveResourceGroupIDsByNamesActionResult,
+    ]
 
     def __init__(
         self,
@@ -253,33 +258,6 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
         self.resolve_resource_group_id_by_name = ActionProcessor(
             service.resolve_resource_group_id_by_name, action_monitors
         )
-
-    @override
-    def supported_actions(self) -> list[ActionSpec]:
-        return [
-            CreateScalingGroupAction.spec(),
-            PurgeScalingGroupAction.spec(),
-            ModifyScalingGroupAction.spec(),
-            SearchScalingGroupsAction.spec(),
-            ListAllowedScalingGroupsAction.spec(),
-            GetWsproxyVersionAction.spec(),
-            GetResourceInfoAction.spec(),
-            UpdateFairShareSpecAction.spec(),
-            ReplaceDefaultDeploymentOptionsAction.spec(),
-            ReplaceDefaultSessionOptionsAction.spec(),
-            AssociateScalingGroupWithDomainsAction.spec(),
-            DisassociateScalingGroupWithDomainsAction.spec(),
-            AssociateScalingGroupWithKeypairsAction.spec(),
-            DisassociateScalingGroupWithKeypairsAction.spec(),
-            AssociateScalingGroupWithUserGroupsAction.spec(),
-            DisassociateScalingGroupWithUserGroupsAction.spec(),
-            UpdateAllowedResourceGroupsForDomainAction.spec(),
-            UpdateAllowedResourceGroupsForProjectAction.spec(),
-            UpdateAllowedDomainsForResourceGroupAction.spec(),
-            UpdateAllowedProjectsForResourceGroupAction.spec(),
-            GetAllowedResourceGroupsForDomainAction.spec(),
-            GetAllowedResourceGroupsForProjectAction.spec(),
-            GetAllowedDomainsForResourceGroupAction.spec(),
-            GetAllowedProjectsForResourceGroupAction.spec(),
-            ResolveResourceGroupIDByNameAction.spec(),
-        ]
+        self.resolve_resource_group_ids_by_names = ActionProcessor(
+            service.resolve_resource_group_ids_by_names, action_monitors
+        )

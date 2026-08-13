@@ -94,7 +94,6 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleStatusFilter as RoleStatusFilterDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -538,7 +537,7 @@ class RoleUserNestedFilterGQL(PydanticInputMixin[UserNestedFilterDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter roles by the scope they are mapped (registered) to.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
     ),
     name="RoleMappedScopeNestedFilter",
 )

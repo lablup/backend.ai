@@ -48,10 +48,11 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow, ResourceSlotTypeRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow, batch_populate_session_occupied_slots
-from ai.backend.manager.models.session_template import TemplateType, session_templates
+from ai.backend.manager.models.session_template import SessionTemplateRow, TemplateType
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.testutils.db import with_tables
 
@@ -202,7 +203,7 @@ class TestSessionRepository:
                 resource_policy=user_resource_policy.name,
                 allowed_client_ip=None,
                 totp_key=None,
-                main_access_key=None,
+                domain_id=test_domain_id,
             )
             db_sess.add(user)
 
@@ -702,7 +703,7 @@ class TestBatchPopulateSessionOccupiedSlots:
                 resource_policy=user_resource_policy.name,
                 allowed_client_ip=None,
                 totp_key=None,
-                main_access_key=None,
+                domain_id=test_domain_id,
             )
             db_sess.add(user)
 
@@ -939,7 +940,7 @@ class TestGetTemplateInfoById:
                 KeyPairResourcePolicyRow,
                 UserRow,
                 GroupRow,
-                session_templates,
+                SessionTemplateRow,
                 KeyPairRow,
                 ContainerRegistryRow,
                 ImageRow,
@@ -957,14 +958,16 @@ class TestGetTemplateInfoById:
 
     @pytest.fixture
     async def active_template(
-        self, db_with_cleanup: ExtendedAsyncSAEngine
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> tuple[uuid.UUID, str]:
         """Insert an active session_template. Returns (template_id, name)."""
         return await self._create_template(db_with_cleanup, is_active=True, name="test-template")
 
     @pytest.fixture
     async def inactive_template(
-        self, db_with_cleanup: ExtendedAsyncSAEngine
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> tuple[uuid.UUID, str]:
         """Insert an inactive session_template. Returns (template_id, name)."""
         return await self._create_template(
@@ -982,6 +985,7 @@ class TestGetTemplateInfoById:
 
         Returns (template_id, name).
         """
+        domain_id = DomainID(uuid.uuid4())
         template_id = uuid.uuid4()
         domain_name = f"test-domain-{template_id.hex[:8]}"
         user_uuid = uuid.uuid4()
@@ -990,6 +994,7 @@ class TestGetTemplateInfoById:
         async with db.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -1023,6 +1028,7 @@ class TestGetTemplateInfoById:
                         rounds=100_000,
                         salt_size=32,
                     ),
+                    domain_id=domain_id,
                     need_password_change=False,
                     full_name="Test User",
                     description="",
@@ -1036,7 +1042,7 @@ class TestGetTemplateInfoById:
             await db_sess.flush()
 
             await db_sess.execute(
-                sa.insert(session_templates).values(
+                sa.insert(SessionTemplateRow).values(
                     id=template_id,
                     is_active=is_active,
                     domain_name=domain_name,

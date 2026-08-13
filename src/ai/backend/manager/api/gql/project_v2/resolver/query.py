@@ -8,6 +8,7 @@ from strawberry import Info
 from strawberry.relay import PageInfo
 
 from ai.backend.common.dto.manager.v2.group.request import AdminSearchProjectsInput
+from ai.backend.common.identifier.domain import DomainName
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -105,11 +106,8 @@ async def domain_projects_v2(
     offset: int | None = None,
 ) -> ProjectV2Connection | None:
     """List projects within a specific domain."""
-    from ai.backend.manager.repositories.group.types import DomainProjectSearchScope
-
-    repo_scope = DomainProjectSearchScope(domain_name=scope.domain_name)
-    payload = await info.context.adapters.project.search_by_domain(
-        scope=repo_scope,
+    payload = await info.context.adapters.project.search_by_domain_name(
+        domain_name=DomainName(scope.domain_name),
         input=AdminSearchProjectsInput(
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,

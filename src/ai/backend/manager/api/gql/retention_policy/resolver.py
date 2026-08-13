@@ -13,7 +13,6 @@ from ai.backend.common.dto.manager.v2.retention_policy.request import (
 )
 from ai.backend.common.dto.manager.v2.retention_policy.types import RetentionPolicyOrderField
 from ai.backend.common.identifier.retention_policy import RetentionPolicyID
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.retention_policy.types import (
     CreateRetentionPolicyInputGQL,
@@ -34,7 +33,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Search retention policies (superadmin only).",
     )
 )  # type: ignore[misc]
@@ -94,7 +93,7 @@ async def admin_retention_policies(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Get a single retention policy by ID (superadmin only).",
     )
 )  # type: ignore[misc]
@@ -109,7 +108,7 @@ async def admin_retention_policy(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Create a retention policy (superadmin only).",
     )
 )
@@ -125,7 +124,7 @@ async def admin_create_retention_policy(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Update a retention policy (superadmin only).",
     )
 )
@@ -141,7 +140,7 @@ async def admin_update_retention_policy(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Delete a retention policy (superadmin only).",
     )
 )
@@ -156,7 +155,7 @@ async def admin_delete_retention_policy(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Purge (permanently remove) a retention policy (superadmin only).",
     )
 )

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -60,6 +60,47 @@ class UpserterSpec[TRow: Base](ABC):
             Dict with column values to update on conflict
             (may be subset of insert values)
         """
+        raise NotImplementedError
+
+
+class DataUpserter[TRow: Base, TData](UpserterSpec[TRow], ABC):
+    """An upserter spec that names its conflict target and how the row becomes data.
+
+    ``UpserterSpec`` says only what to insert and what to set on conflict, leaving
+    ``index_elements`` as a separate argument and the conversion to the caller. Carrying
+    both here makes it self-contained, so the ops layer returns the ``data/`` type and
+    the ORM row never leaves it.
+
+    Example:
+        class ConfigUpserter(DataUpserter[ConfigRow, ConfigData]):
+            @property
+            def row_class(self) -> type[ConfigRow]:
+                return ConfigRow
+
+            def index_elements(self) -> list[str]:
+                return ["key"]
+
+            def build_insert_values(self) -> dict[str, Any]:
+                return {"key": self._key, "value": self._value}
+
+            def build_update_values(self) -> dict[str, Any]:
+                return {"value": self._value}
+
+            def to_data(self, row: ConfigRow) -> ConfigData:
+                return row.to_data()
+
+        async with ops.write_ops() as w:
+            config = await w.upsert_data(ConfigUpserter("setting", "enabled"))
+    """
+
+    @abstractmethod
+    def index_elements(self) -> list[str]:
+        """Return the column names conflict detection keys on."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        """Convert the inserted-or-updated row into its ``data/`` type."""
         raise NotImplementedError
 
 
@@ -201,3 +242,31 @@ async def execute_bulk_upserter[TRow: Base](
 
     result = await db_sess.execute(stmt)
     return BulkUpserterResult(upserted_count=cast(CursorResult[Any], result).rowcount)
+
+
+@dataclass
+class BulkUpserterError[TRow: Base]:
+    """Error information for one failed row of a partial bulk upsert.
+
+    Follows the same pattern as BulkUpdaterError.
+
+    Attributes:
+        spec: The UpserterSpec that failed
+        exception: The exception that occurred
+        index: Original position in the specs list for traceability
+    """
+
+    spec: UpserterSpec[TRow]
+    exception: Exception
+    index: int
+
+
+@dataclass
+class BulkUpserterResultWithFailures[TRow: Base]:
+    """Result of a partial bulk upsert: some rows may fail while the rest go through.
+
+    Names its fields as the other partial bulk results do (successes/errors).
+    """
+
+    successes: list[TRow] = field(default_factory=list)
+    errors: list[BulkUpserterError[TRow]] = field(default_factory=list)

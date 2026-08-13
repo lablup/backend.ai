@@ -5,6 +5,10 @@ dynamic = ["version"]
 
 [tool.towncrier]
 package = "ai.backend.manager"  # reference point for getting __version__
+# Releases go to the per-version-branch file instead: scripts/run-towncrier.py
+# overrides this with CHANGELOG/<version>.md on every run. The value is kept
+# because towncrier picks the markdown template from this suffix, and because
+# dropping it would fall back to NEWS.rst.
 filename = "CHANGELOG.md"
 directory = "changes/"
 title_format = ""  # embedded inside the template

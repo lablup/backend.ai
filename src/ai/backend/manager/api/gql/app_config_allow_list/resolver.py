@@ -11,7 +11,6 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     SearchAppConfigAllowListInput,
 )
 from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -122,7 +121,7 @@ async def admin_create_app_config_allow_list(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.8.0",
         description="Update an app config allow-list entry's rank by id (super admin only).",
     )
 )

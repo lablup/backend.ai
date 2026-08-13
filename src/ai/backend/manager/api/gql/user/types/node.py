@@ -156,12 +156,12 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
             UserUsageBucketGQL,
         )
         from ai.backend.manager.repositories.resource_usage_history.types import (
-            UserUsageBucketSearchScope,
+            UserUsageBucketOperationScope,
         )
 
         if self.organization.domain_name is None:
             raise InvalidAPIParameters("User must belong to a domain to query usage buckets")
-        repository_scope = UserUsageBucketSearchScope(
+        repository_scope = UserUsageBucketOperationScope(
             resource_group=scope.resource_group_name,
             domain_name=self.organization.domain_name,
             project_id=scope.project_id,
@@ -249,9 +249,9 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
             ProjectV2Edge,
             ProjectV2GQL,
         )
-        from ai.backend.manager.repositories.group.types import UserProjectSearchScope
+        from ai.backend.manager.repositories.group.types import UserProjectOperationScope
 
-        scope = UserProjectSearchScope(user_uuid=UUID(str(self.id)))
+        scope = UserProjectOperationScope(user_uuid=UUID(str(self.id)))
         payload = await info.context.adapters.project.search_by_user(
             scope=scope,
             input=AdminSearchProjectsInput(

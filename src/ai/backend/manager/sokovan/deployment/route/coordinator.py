@@ -29,9 +29,9 @@ from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    NoPagination,
     combine_conditions_and,
     combine_conditions_or,
 )
@@ -85,11 +85,11 @@ class RouteTaskSpec:
 
     def create_if_needed_event(self) -> DoRouteLifecycleIfNeededEvent:
         """Create event for checking if processing is needed."""
-        return DoRouteLifecycleIfNeededEvent(self.lifecycle_type.value)
+        return DoRouteLifecycleIfNeededEvent(lifecycle_type=self.lifecycle_type.value)
 
     def create_process_event(self) -> DoRouteLifecycleEvent:
         """Create event for forced processing."""
-        return DoRouteLifecycleEvent(self.lifecycle_type.value)
+        return DoRouteLifecycleEvent(lifecycle_type=self.lifecycle_type.value)
 
     @property
     def short_task_name(self) -> str:

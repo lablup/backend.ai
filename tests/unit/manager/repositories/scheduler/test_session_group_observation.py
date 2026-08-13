@@ -32,6 +32,7 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import create_pending_session_with_kernels
 
@@ -104,7 +105,7 @@ async def _create_extra_agent(
 @pytest.fixture
 def session_scope(
     test_domain_id: DomainID,
-    test_domain_name: str,
+    test_domain: DomainFixtureData,
     test_scaling_group_id: ResourceGroupID,
     test_scaling_group_name: str,
     test_group_id: uuid.UUID,
@@ -113,7 +114,7 @@ def session_scope(
 ) -> SessionScope:
     return {
         "domain_id": test_domain_id,
-        "domain_name": test_domain_name,
+        "domain_name": test_domain.domain_name,
         "resource_group_id": test_scaling_group_id,
         "scaling_group_name": test_scaling_group_name,
         "group_id": test_group_id,

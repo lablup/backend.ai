@@ -319,6 +319,7 @@ class TestUserPurgersIntegration:
                 domain_name=sample_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy,
+                domain_id=sample_domain.domain_id,
             )
             session.add(user)
             await session.flush()
@@ -363,6 +364,7 @@ class TestUserPurgersIntegration:
             for i in range(2):
                 keypair = KeyPairRow(
                     user=sample_user.uuid,
+                    user_id=sample_user.email,
                     access_key=f"AKTEST{uuid.uuid4().hex[:12].upper()}",
                     secret_key=f"SK{uuid.uuid4().hex}",
                     is_active=True,
@@ -651,8 +653,9 @@ class TestUserSessionGroupPurger:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_password_info: PasswordInfo,
     ) -> _PlacementScope:
+        domain_id = DomainID(uuid.uuid4())
         domain = DomainRow(
-            id=DomainID(uuid.uuid4()),
+            id=domain_id,
             name=f"test-domain-{uuid.uuid4().hex[:8]}",
             total_resource_slots=ResourceSlot(),
             allowed_vfolder_hosts={},
@@ -687,6 +690,7 @@ class TestUserSessionGroupPurger:
             domain_name=domain.name,
             role=UserRole.USER,
             resource_policy=user_policy.name,
+            domain_id=domain_id,
         )
         project = GroupRow(
             id=uuid.uuid4(),
@@ -702,7 +706,7 @@ class TestUserSessionGroupPurger:
             await session.flush()
 
         return _PlacementScope(
-            domain_id=DomainID(domain.id),
+            domain_id=domain_id,
             domain_name=domain.name,
             project_id=ProjectID(project.id),
             owner_user_id=UserID(user.uuid),

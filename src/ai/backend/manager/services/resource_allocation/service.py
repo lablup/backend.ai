@@ -63,7 +63,7 @@ class ResourceAllocationService:
     async def resolve_keypair_context(
         self, action: ResolveKeypairContextAction
     ) -> ResolveKeypairContextActionResult:
-        """Resolve a user's main keypair context (access_key + resource_policy)."""
+        """Resolve a user's default keypair context (access_key + resource_policy)."""
         ctx = await self._resource_allocation_repository.get_keypair_context(
             user_id=action.user_id,
         )

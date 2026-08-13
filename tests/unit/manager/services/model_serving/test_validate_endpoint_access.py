@@ -13,6 +13,7 @@ import pytest
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.data.model_serving.types import (
     EndpointAccessValidationData,
 )
@@ -159,6 +160,7 @@ def test_validate_endpoint_access(case: EndpointAccessCase) -> None:
         is_superadmin=case.requester_role == UserRole.SUPERADMIN,
         role=case.requester_role,
         domain_name=case.requester_domain,
+        domain_id=DomainID(uuid.uuid4()),
     )
 
     with with_user(user_data):

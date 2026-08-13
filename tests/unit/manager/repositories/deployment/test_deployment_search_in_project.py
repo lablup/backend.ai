@@ -12,6 +12,7 @@ import pytest
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -44,12 +45,13 @@ from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.types import ProjectDeploymentSearchScope
+from ai.backend.manager.repositories.deployment.types import ProjectDeploymentOperationScope
 from ai.backend.testutils.db import with_tables
 
 
@@ -108,6 +110,7 @@ class TestEndpointSearchInProject:
     ) -> AsyncGenerator[TestData, None]:
         """Create two projects with endpoints: 2 in project A, 1 in project B."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        domain_id = DomainID(uuid.uuid4())
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         user_policy_name = f"test-upolicy-{uuid.uuid4().hex[:8]}"
         project_policy_name = f"test-ppolicy-{uuid.uuid4().hex[:8]}"
@@ -119,7 +122,13 @@ class TestEndpointSearchInProject:
 
         async with db_with_cleanup.begin_session() as db_sess:
             # Domain
-            db_sess.add(DomainRow(name=domain_name, total_resource_slots=ResourceSlot()))
+            db_sess.add(
+                DomainRow(
+                    id=domain_id,
+                    name=domain_name,
+                    total_resource_slots=ResourceSlot(),
+                )
+            )
             await db_sess.flush()
 
             # Scaling group
@@ -165,6 +174,7 @@ class TestEndpointSearchInProject:
                         rounds=1,
                         salt_size=16,
                     ),
+                    domain_id=domain_id,
                     domain_name=domain_name,
                     resource_policy=user_policy_name,
                     role=UserRole.USER,
@@ -294,7 +304,7 @@ class TestEndpointSearchInProject:
             conditions=[],
             orders=[],
         )
-        scope = ProjectDeploymentSearchScope(project_id=test_data.project_a_id)
+        scope = ProjectDeploymentOperationScope(project_id=test_data.project_a_id)
 
         result = await deployment_repository.search_deployments_in_project(querier, scope)
 
@@ -314,7 +324,7 @@ class TestEndpointSearchInProject:
             conditions=[],
             orders=[],
         )
-        scope = ProjectDeploymentSearchScope(project_id=test_data.project_b_id)
+        scope = ProjectDeploymentOperationScope(project_id=test_data.project_b_id)
 
         result = await deployment_repository.search_deployments_in_project(querier, scope)
 
@@ -333,7 +343,7 @@ class TestEndpointSearchInProject:
             conditions=[],
             orders=[],
         )
-        scope = ProjectDeploymentSearchScope(project_id=test_data.project_a_id)
+        scope = ProjectDeploymentOperationScope(project_id=test_data.project_a_id)
 
         result = await deployment_repository.search_deployments_in_project(querier, scope)
 

@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
-from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
@@ -22,20 +20,12 @@ from ai.backend.manager.data.runtime_variant_preset.types import (
     UIOptionData,
 )
 from ai.backend.manager.models.base import GUID, Base, PydanticColumn
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 __all__ = ("RuntimeVariantPresetRow",)
 
 
-def _get_runtime_variant_join_condition() -> sa.sql.elements.ColumnElement[Any]:
-    from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-
-    return foreign(RuntimeVariantPresetRow.runtime_variant) == RuntimeVariantRow.id
-
-
-class RuntimeVariantPresetRow(Base):  # type: ignore[misc]
+class RuntimeVariantPresetRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "runtime_variant_presets"
 
     __table_args__ = (
@@ -74,24 +64,6 @@ class RuntimeVariantPresetRow(Base):  # type: ignore[misc]
     # separate ``ui_type`` column has been folded into this JSONB.
     ui_option: Mapped[UIOption | None] = mapped_column(
         "ui_option", PydanticColumn(UIOption), nullable=True
-    )
-
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        nullable=False,
-    )
-    updated_at: Mapped[datetime | None] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        nullable=True,
-        onupdate=sa.func.now(),
-    )
-
-    runtime_variant_row: Mapped[RuntimeVariantRow] = relationship(
-        "RuntimeVariantRow",
-        primaryjoin=_get_runtime_variant_join_condition,
     )
 
     @staticmethod

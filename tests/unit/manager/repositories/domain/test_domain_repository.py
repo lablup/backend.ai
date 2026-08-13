@@ -6,7 +6,6 @@ Tests the repository layer with real database operations.
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -23,7 +22,6 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.domain.types import DomainData, UserInfo
 from ai.backend.manager.errors.resource import (
-    DomainDeletionFailed,
     DomainHasActiveKernels,
     DomainHasGroups,
     DomainHasUsers,
@@ -43,6 +41,14 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
+    RolePermissionPresetRow,
+)
+from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -57,6 +63,9 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
@@ -64,6 +73,7 @@ from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.domain.updaters import DomainUpdaterSpec
 from ai.backend.manager.types import TriState
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 class TestDomainRepository:
@@ -84,6 +94,13 @@ class TestDomainRepository:
                 KeyPairResourcePolicyRow,
                 RoleRow,
                 UserRoleRow,
+                AssociationScopesEntitiesRow,
+                PermissionRow,
+                RolePresetRow,
+                RolePermissionPresetRow,
+                VirtualScopeRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
                 UserRow,
                 KeyPairRow,
                 GroupRow,
@@ -152,14 +169,7 @@ class TestDomainRepository:
         self, db_with_default_resource_policies: ExtendedAsyncSAEngine
     ) -> DomainRepository:
         """Create DomainRepository instance with real database"""
-        repo = DomainRepository(db=db_with_default_resource_policies)
-
-        # Create mock for _role_manager
-        mock_role_manager = MagicMock()
-        mock_role_manager.create_system_role = AsyncMock(return_value=None)
-        repo._role_manager = mock_role_manager
-
-        return repo
+        return DomainRepository(db=db_with_default_resource_policies)
 
     @pytest.fixture
     def sample_domain_creator(self) -> DomainCreatorSpec:
@@ -210,7 +220,7 @@ class TestDomainRepository:
                 "domain_name": "sample-domain",
                 "is_active": True,
                 "created_at": datetime.now(tz=UTC),
-                "modified_at": datetime.now(tz=UTC),
+                "updated_at": datetime.now(tz=UTC),
                 "type": ProjectType.GENERAL,
                 "total_resource_slots": ResourceSlot(),
                 "allowed_vfolder_hosts": VFolderHostPermissionMap(),
@@ -231,12 +241,15 @@ class TestDomainRepository:
 
     @pytest.fixture
     async def inactive_domain(
-        self, db_with_default_resource_policies: ExtendedAsyncSAEngine
-    ) -> str:
+        self,
+        db_with_default_resource_policies: ExtendedAsyncSAEngine,
+    ) -> DomainFixtureData:
         """Create an inactive domain for purge testing."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"inactive-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_default_resource_policies.begin_session() as session:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain for purging",
                 is_active=False,
@@ -248,16 +261,18 @@ class TestDomainRepository:
             )
             session.add(domain)
             await session.commit()
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def domain_with_user(
         self, db_with_default_resource_policies: ExtendedAsyncSAEngine
     ) -> str:
         """Create an inactive domain with a user for purge testing."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"domain-with-user-{uuid.uuid4().hex[:8]}"
         async with db_with_default_resource_policies.begin_session() as session:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain with users",
                 is_active=False,
@@ -288,6 +303,7 @@ class TestDomainRepository:
                 domain_name=domain_name,
                 role=UserRole.USER,
                 resource_policy="default",
+                domain_id=domain_id,
             )
             session.add(user)
             await session.commit()
@@ -295,12 +311,15 @@ class TestDomainRepository:
 
     @pytest.fixture
     async def domain_with_group(
-        self, db_with_default_resource_policies: ExtendedAsyncSAEngine
+        self,
+        db_with_default_resource_policies: ExtendedAsyncSAEngine,
     ) -> str:
         """Create an inactive domain with a group for purge testing."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"domain-with-group-{uuid.uuid4().hex[:8]}"
         async with db_with_default_resource_policies.begin_session() as session:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain with groups",
                 is_active=False,
@@ -400,6 +419,7 @@ class TestDomainRepository:
                 domain_name=domain_name,
                 role=UserRole.USER,
                 resource_policy="default",
+                domain_id=domain_id,
             )
             session.add(user)
 
@@ -609,15 +629,17 @@ class TestDomainRepository:
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
-        inactive_domain: str,
+        inactive_domain: DomainFixtureData,
     ) -> None:
         """Test successful domain purging"""
         # Purge domain (should succeed since no users/groups/kernels)
-        await domain_repository.purge_domain(inactive_domain)
+        await domain_repository.purge_domain(inactive_domain.domain_name)
 
         # Verify domain is completely removed
         async with db_with_default_resource_policies.begin() as conn:
-            result = await conn.execute(sa.select(domains).where(domains.c.name == inactive_domain))
+            result = await conn.execute(
+                sa.select(domains).where(domains.c.name == inactive_domain.domain_name)
+            )
             domain_row = result.first()
             assert domain_row is None
 
@@ -636,7 +658,7 @@ class TestDomainRepository:
         domain_repository: DomainRepository,
     ) -> None:
         """Test domain purging when domain not found"""
-        with pytest.raises(DomainDeletionFailed):
+        with pytest.raises(DomainNotFound):
             await domain_repository.purge_domain("nonexistent-domain")
 
     async def test_create_domain_with_all_fields(

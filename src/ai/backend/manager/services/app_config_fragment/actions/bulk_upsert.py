@@ -5,10 +5,13 @@ from typing import override
 
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
+from ai.backend.manager.data.app_config_fragment.types import (
+    AppConfigFragmentData,
+    AppConfigFragmentUpsertItemError,
+)
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.app_config_fragment.types import (
-    AppConfigFragmentSearchScope,
+    AppConfigFragmentOperationScope,
 )
 from ai.backend.manager.repositories.app_config_fragment.upserters import (
     AppConfigFragmentUpserterSpec,
@@ -21,13 +24,13 @@ from ai.backend.manager.services.app_config_fragment.actions.base import (
 
 @dataclass
 class BulkUpsertAppConfigFragmentsAction(AppConfigFragmentScopeAction):
-    """Upsert many fragments at one scope (RBAC-authorized at that scope).
+    """Upsert many fragments at one scope.
 
     Every item shares ``scope``, so the RBAC gate is the write permission at that single
     scope — the same gate a create at that scope crosses.
     """
 
-    scope: AppConfigFragmentSearchScope
+    scope: AppConfigFragmentOperationScope
     upserter_specs: list[AppConfigFragmentUpserterSpec]
 
     @override
@@ -55,9 +58,10 @@ class BulkUpsertAppConfigFragmentsAction(AppConfigFragmentScopeAction):
 
 @dataclass
 class BulkUpsertAppConfigFragmentsActionResult(AppConfigFragmentScopeActionResult):
-    fragments: list[AppConfigFragmentData]
+    items: list[AppConfigFragmentData]
+    failed: list[AppConfigFragmentUpsertItemError]
     #: The scope the upsert ran at, carried only to report the RBAC scope.
-    _scope: AppConfigFragmentSearchScope
+    _scope: AppConfigFragmentOperationScope
 
     @override
     def scope_type(self) -> ScopeType:

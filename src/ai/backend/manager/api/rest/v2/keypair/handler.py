@@ -19,6 +19,8 @@ from ai.backend.common.dto.manager.v2.keypair.request import (
     UpdateMyKeypairInput,
 )
 from ai.backend.common.dto.manager.v2.keypair.response import SearchMyKeypairsPayload
+from ai.backend.common.identifier.user import UserID
+from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import AccessKeyPathParam
 from ai.backend.manager.dto.context import UserContext
@@ -87,8 +89,8 @@ class V2KeypairHandler:
         ctx: UserContext,
     ) -> APIResponse:
         """Switch the main access key for the current user."""
-        result = await self._adapter.switch_my_main_access_key(
-            ctx.user_uuid, body.parsed.access_key
+        result = await self._adapter.switch_default_access_key(
+            UserID(ctx.user_uuid), AccessKey(body.parsed.access_key)
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
