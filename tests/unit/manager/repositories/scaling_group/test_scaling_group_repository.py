@@ -9,6 +9,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import ScalingGroupConflict
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import (
     AccessKey,
@@ -345,6 +346,7 @@ class TestScalingGroupRepositoryDB:
         Returns:
             Tuple of (user_uuid, domain_name, group_id)
         """
+        domain_id = DomainID(uuid.uuid4())
         test_user_uuid = uuid.uuid4()
         test_domain = f"test-domain-{uuid.uuid4().hex[:8]}"
         test_group_id = uuid.uuid4()
@@ -353,6 +355,7 @@ class TestScalingGroupRepositoryDB:
         async with db_with_cleanup.begin_session() as db_sess:
             # Create domain
             domain = DomainRow(
+                id=domain_id,
                 name=test_domain,
                 description="Test domain for cascade delete",
                 is_active=True,
@@ -391,6 +394,7 @@ class TestScalingGroupRepositoryDB:
                     rounds=100_000,
                     salt_size=32,
                 ),
+                domain_id=domain_id,
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
                 status_info="active",

@@ -299,6 +299,7 @@ class TestDoIdleCheck:
         db: ExtendedAsyncSAEngine,
         *,
         domain_name: str,
+        domain_id: DomainID,
         user_resource_policy_name: str,
         default_keypair_idle_timeout: int | None,
     ) -> tuple[uuid.UUID, AccessKey | None]:
@@ -314,6 +315,7 @@ class TestDoIdleCheck:
                     status=UserStatus.ACTIVE,
                     domain_name=domain_name,
                     resource_policy=user_resource_policy_name,
+                    domain_id=domain_id,
                 )
             )
             await db_sess.flush()
@@ -452,6 +454,7 @@ class TestDoIdleCheck:
         user_uuid, default_access_key = await self._create_user(
             db,
             domain_name=domain[1],
+            domain_id=domain[0],
             user_resource_policy_name=user_resource_policy_name,
             default_keypair_idle_timeout=600,
         )
@@ -484,6 +487,7 @@ class TestDoIdleCheck:
         user_uuid, _ = await self._create_user(
             db,
             domain_name=domain[1],
+            domain_id=domain[0],
             user_resource_policy_name=user_resource_policy_name,
             default_keypair_idle_timeout=600,
         )
@@ -516,12 +520,14 @@ class TestDoIdleCheck:
         policyless_uuid, _ = await self._create_user(
             db,
             domain_name=domain[1],
+            domain_id=domain[0],
             user_resource_policy_name=user_resource_policy_name,
             default_keypair_idle_timeout=None,
         )
         normal_uuid, normal_access_key = await self._create_user(
             db,
             domain_name=domain[1],
+            domain_id=domain[0],
             user_resource_policy_name=user_resource_policy_name,
             default_keypair_idle_timeout=600,
         )
@@ -572,6 +578,7 @@ class TestDoIdleCheck:
         user_uuid, access_key = await self._create_user(
             db,
             domain_name=domain[1],
+            domain_id=domain[0],
             user_resource_policy_name=user_resource_policy_name,
             default_keypair_idle_timeout=600,
         )

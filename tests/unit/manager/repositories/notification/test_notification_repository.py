@@ -17,6 +17,7 @@ from ai.backend.common.data.notification import (
     WebhookSpec,
 )
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.notification import (
@@ -83,6 +84,7 @@ from ai.backend.manager.repositories.notification.updaters import (
 )
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 class TestNotificationRepository:
@@ -133,15 +135,17 @@ class TestNotificationRepository:
             yield database_connection
 
     @pytest.fixture
-    async def test_domain_name(
+    async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
+    ) -> DomainFixtureData:
         """Create test domain and return domain name"""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain for notification",
                 is_active=True,
@@ -152,7 +156,7 @@ class TestNotificationRepository:
             db_sess.add(domain)
             await db_sess.commit()
 
-        return domain_name
+        return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
     @pytest.fixture
     async def test_resource_policy_name(
@@ -179,7 +183,7 @@ class TestNotificationRepository:
     async def test_user(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
+        test_domain: DomainFixtureData,
         test_resource_policy_name: str,
     ) -> uuid.UUID:
         """Create test user and return user UUID"""
@@ -201,9 +205,10 @@ class TestNotificationRepository:
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
                 status_info="active",
-                domain_name=test_domain_name,
+                domain_name=test_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=test_resource_policy_name,
+                domain_id=test_domain.domain_id,
             )
             db_sess.add(user)
             await db_sess.commit()

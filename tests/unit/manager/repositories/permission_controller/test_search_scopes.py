@@ -12,6 +12,7 @@ import pytest
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -125,10 +126,13 @@ class TestSearchDomainScopes:
     ) -> list[str]:
         """Create sample domains for testing."""
         domain_names = ["test-domain-alpha", "test-domain-beta", "prod-domain"]
+        domain_id = DomainID(uuid.uuid4())
 
         async with db_with_scope_tables.begin_session() as db_sess:
             for name in domain_names:
+                domain_id = DomainID(uuid.uuid4())
                 domain = DomainRow(
+                    id=domain_id,
                     name=name,
                     description=f"Test domain: {name}",
                     is_active=True,
@@ -145,10 +149,13 @@ class TestSearchDomainScopes:
     ) -> list[str]:
         """Create 15 sample domains for pagination testing."""
         domain_names = [f"domain-{i:02d}" for i in range(15)]
+        domain_id = DomainID(uuid.uuid4())
 
         async with db_with_scope_tables.begin_session() as db_sess:
             for name in domain_names:
+                domain_id = DomainID(uuid.uuid4())
                 domain = DomainRow(
+                    id=domain_id,
                     name=name,
                     description=f"Test domain: {name}",
                     is_active=True,
@@ -378,13 +385,15 @@ class TestSearchProjectScopes:
     async def sample_domain_with_policy(
         self,
         db_with_scope_tables: ExtendedAsyncSAEngine,
-    ) -> tuple[str, str]:
+    ) -> tuple[str, str, DomainID]:
         """Create a sample domain and project resource policy for projects."""
         domain_name = "test-domain-for-projects"
+        domain_id = DomainID(uuid.uuid4())
         policy_name = "test-project-policy"
 
         async with db_with_scope_tables.begin_session() as db_sess:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain for projects",
                 is_active=True,
@@ -400,16 +409,16 @@ class TestSearchProjectScopes:
             db_sess.add(policy)
             await db_sess.flush()
 
-        return domain_name, policy_name
+        return domain_name, policy_name, domain_id
 
     @pytest.fixture
     async def sample_projects(
         self,
         db_with_scope_tables: ExtendedAsyncSAEngine,
-        sample_domain_with_policy: tuple[str, str],
+        sample_domain_with_policy: tuple[str, str, DomainID],
     ) -> list[uuid.UUID]:
         """Create sample projects (groups) for testing."""
-        domain_name, policy_name = sample_domain_with_policy
+        domain_name, policy_name, domain_id = sample_domain_with_policy
         project_ids: list[uuid.UUID] = []
 
         async with db_with_scope_tables.begin_session() as db_sess:
@@ -436,10 +445,10 @@ class TestSearchProjectScopes:
     async def sample_projects_for_pagination(
         self,
         db_with_scope_tables: ExtendedAsyncSAEngine,
-        sample_domain_with_policy: tuple[str, str],
+        sample_domain_with_policy: tuple[str, str, DomainID],
     ) -> list[uuid.UUID]:
         """Create 15 sample projects for pagination testing."""
-        domain_name, policy_name = sample_domain_with_policy
+        domain_name, policy_name, domain_id = sample_domain_with_policy
         project_ids: list[uuid.UUID] = []
 
         async with db_with_scope_tables.begin_session() as db_sess:
@@ -594,13 +603,15 @@ class TestSearchUserScopes:
     async def sample_domain_with_user_policy(
         self,
         db_with_scope_tables: ExtendedAsyncSAEngine,
-    ) -> tuple[str, str]:
+    ) -> tuple[str, str, DomainID]:
         """Create a sample domain and user resource policy for users."""
         domain_name = "test-domain-for-users"
+        domain_id = DomainID(uuid.uuid4())
         policy_name = "test-user-policy"
 
         async with db_with_scope_tables.begin_session() as db_sess:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain for users",
                 is_active=True,
@@ -617,16 +628,16 @@ class TestSearchUserScopes:
             db_sess.add(policy)
             await db_sess.flush()
 
-        return domain_name, policy_name
+        return domain_name, policy_name, domain_id
 
     @pytest.fixture
     async def sample_users(
         self,
         db_with_scope_tables: ExtendedAsyncSAEngine,
-        sample_domain_with_user_policy: tuple[str, str],
+        sample_domain_with_user_policy: tuple[str, str, DomainID],
     ) -> list[uuid.UUID]:
         """Create sample users for testing."""
-        domain_name, policy_name = sample_domain_with_user_policy
+        domain_name, policy_name, domain_id = sample_domain_with_user_policy
         user_ids: list[uuid.UUID] = []
 
         async with db_with_scope_tables.begin_session() as db_sess:
@@ -647,6 +658,7 @@ class TestSearchUserScopes:
                     resource_policy=policy_name,
                     status=UserStatus.ACTIVE,
                     need_password_change=False,
+                    domain_id=domain_id,
                 )
                 db_sess.add(user)
                 user_ids.append(user_id)
@@ -658,10 +670,10 @@ class TestSearchUserScopes:
     async def sample_users_for_pagination(
         self,
         db_with_scope_tables: ExtendedAsyncSAEngine,
-        sample_domain_with_user_policy: tuple[str, str],
+        sample_domain_with_user_policy: tuple[str, str, DomainID],
     ) -> list[uuid.UUID]:
         """Create 15 sample users for pagination testing."""
-        domain_name, policy_name = sample_domain_with_user_policy
+        domain_name, policy_name, domain_id = sample_domain_with_user_policy
         user_ids: list[uuid.UUID] = []
 
         async with db_with_scope_tables.begin_session() as db_sess:
@@ -676,6 +688,7 @@ class TestSearchUserScopes:
                     resource_policy=policy_name,
                     status=UserStatus.ACTIVE,
                     need_password_change=False,
+                    domain_id=domain_id,
                 )
                 db_sess.add(user)
                 user_ids.append(user_id)
@@ -864,10 +877,13 @@ class TestSearchScopesEmptyResult:
     ) -> list[str]:
         """Create sample domains for testing."""
         domain_names = ["test-domain-alpha", "test-domain-beta", "prod-domain"]
+        domain_id = DomainID(uuid.uuid4())
 
         async with db_with_scope_tables.begin_session() as db_sess:
             for name in domain_names:
+                domain_id = DomainID(uuid.uuid4())
                 domain = DomainRow(
+                    id=domain_id,
                     name=name,
                     description=f"Test domain: {name}",
                     is_active=True,

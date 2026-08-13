@@ -22,6 +22,7 @@ from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiv
 from ai.backend.common.config import DefaultModelDefinition, ModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.session_group import SessionGroupID
@@ -57,6 +58,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 @pytest.fixture
@@ -93,12 +95,21 @@ async def db_with_cleanup(
 
 
 @pytest.fixture
-async def test_domain(db_with_cleanup: ExtendedAsyncSAEngine) -> str:
+async def test_domain(
+    db_with_cleanup: ExtendedAsyncSAEngine,
+) -> DomainFixtureData:
+    domain_id = DomainID(uuid.uuid4())
     name = f"test-domain-{uuid.uuid4().hex[:8]}"
     async with db_with_cleanup.begin_session() as sess:
-        sess.add(DomainRow(name=name, total_resource_slots=ResourceSlot()))
+        sess.add(
+            DomainRow(
+                id=domain_id,
+                name=name,
+                total_resource_slots=ResourceSlot(),
+            )
+        )
         await sess.flush()
-    return name
+    return DomainFixtureData(domain_name=DomainName(name), domain_id=domain_id)
 
 
 @pytest.fixture
@@ -118,7 +129,9 @@ async def test_scaling_group(db_with_cleanup: ExtendedAsyncSAEngine) -> str:
 
 
 @pytest.fixture
-async def test_user_id(db_with_cleanup: ExtendedAsyncSAEngine, test_domain: str) -> uuid.UUID:
+async def test_user_id(
+    db_with_cleanup: ExtendedAsyncSAEngine, test_domain: DomainFixtureData
+) -> uuid.UUID:
     user_id = uuid.uuid4()
     email = f"test-{uuid.uuid4().hex[:8]}@test.com"
     async with db_with_cleanup.begin_session() as sess:
@@ -143,7 +156,8 @@ async def test_user_id(db_with_cleanup: ExtendedAsyncSAEngine, test_domain: str)
                     rounds=1,
                     salt_size=16,
                 ),
-                domain_name=test_domain,
+                domain_id=test_domain.domain_id,
+                domain_name=test_domain.domain_name,
                 resource_policy="default",
                 role=UserRole.SUPERADMIN,
                 status=UserStatus.ACTIVE,
@@ -180,7 +194,9 @@ async def test_user_id(db_with_cleanup: ExtendedAsyncSAEngine, test_domain: str)
 
 
 @pytest.fixture
-async def test_group_id(db_with_cleanup: ExtendedAsyncSAEngine, test_domain: str) -> uuid.UUID:
+async def test_group_id(
+    db_with_cleanup: ExtendedAsyncSAEngine, test_domain: DomainFixtureData
+) -> uuid.UUID:
     group_id = uuid.uuid4()
     async with db_with_cleanup.begin_session() as sess:
         sess.add(
@@ -196,7 +212,7 @@ async def test_group_id(db_with_cleanup: ExtendedAsyncSAEngine, test_domain: str
             GroupRow(
                 id=group_id,
                 name=f"test-grp-{uuid.uuid4().hex[:8]}",
-                domain_name=test_domain,
+                domain_name=test_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
                 resource_policy="default",
             )
@@ -243,7 +259,7 @@ async def test_image_id(db_with_cleanup: ExtendedAsyncSAEngine) -> uuid.UUID:
 async def endpoint_with_revision_and_route(
     db_with_cleanup: ExtendedAsyncSAEngine,
     test_user_id: uuid.UUID,
-    test_domain: str,
+    test_domain: DomainFixtureData,
     test_group_id: uuid.UUID,
     test_scaling_group: str,
     test_image_id: uuid.UUID,
@@ -262,7 +278,7 @@ async def endpoint_with_revision_and_route(
                 name=f"test-ep-{uuid.uuid4().hex[:8]}",
                 created_user=test_user_id,
                 session_owner=test_user_id,
-                domain=test_domain,
+                domain=test_domain.domain_name,
                 project=test_group_id,
                 resource_group=test_scaling_group,
                 lifecycle_stage=EndpointLifecycle.READY,
@@ -345,7 +361,7 @@ async def endpoint_with_revision_and_route(
                 status=RouteStatus.RUNNING,
                 traffic_ratio=1.0,
                 session_owner=test_user_id,
-                domain=test_domain,
+                domain=test_domain.domain_name,
                 project=test_group_id,
                 revision=revision_id,
             )

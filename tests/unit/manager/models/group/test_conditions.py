@@ -11,6 +11,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
@@ -258,7 +259,9 @@ class TestGroupNestedSearchIntegration:
                 (active_domain, True, "Research lab"),
                 (inactive_domain, False, "Archived department"),
             ]:
+                domain_id = DomainID(uuid.uuid4())
                 domain = DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description=desc,
                     is_active=is_active,
@@ -590,7 +593,9 @@ class TestGroupUserNestedSearchIntegration:
         result: dict[str, dict[str, Any]] = {}
 
         async with db_with_cleanup.begin_session() as session:
+            domain_id = DomainID(uuid.uuid4())
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -632,6 +637,7 @@ class TestGroupUserNestedSearchIntegration:
                     rounds=100_000,
                     salt_size=32,
                 ),
+                domain_id=domain_id,
                 need_password_change=False,
                 full_name="Alice Active",
                 description="Active user",
@@ -654,6 +660,7 @@ class TestGroupUserNestedSearchIntegration:
                     rounds=100_000,
                     salt_size=32,
                 ),
+                domain_id=domain_id,
                 need_password_change=False,
                 full_name="Bob Inactive",
                 description="Inactive user",

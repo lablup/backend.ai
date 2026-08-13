@@ -53,7 +53,7 @@ from ai.backend.manager.errors.auth import (
     InvalidClientIPConfig,
     UserNotFound,
 )
-from ai.backend.manager.errors.common import GenericForbidden, InternalServerError, RejectedByHook
+from ai.backend.manager.errors.common import GenericForbidden, RejectedByHook
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.resource_policy import (
     keypair_resource_policies,
@@ -782,8 +782,6 @@ async def _load_user_data(db: ExtendedAsyncSAEngine, user_id: UserID) -> UserDat
     row = await execute_with_retry(_query)
     if row is None:
         raise UserNotFound("Impersonation target user not found")
-    if row.role is None or row.domain_name is None or row.domain_id is None:
-        raise InternalServerError(f"Impersonation target user is misconfigured (user_id={user_id})")
     return UserData(
         user_id=row.uuid,
         is_authorized=True,

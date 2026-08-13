@@ -12,6 +12,7 @@ import sqlalchemy as sa
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.common.exception import ContainerRegistryGroupsAlreadyAssociated
 from ai.backend.common.identifier.container_registry import ContainerRegistryID
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
@@ -432,7 +433,8 @@ class TestContainerRegistryRepository:
 
     @pytest.fixture
     async def creator_spec_with_allowed_groups(
-        self, db_with_cleanup: ExtendedAsyncSAEngine
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> tuple[ContainerRegistryCreatorSpec, list[str]]:
         """Fixture that provides a creator spec with allowed_groups for creating registries."""
         registry_name = "registry-with-groups-" + str(uuid.uuid4())[:8]
@@ -444,7 +446,12 @@ class TestContainerRegistryRepository:
         group_ids: list[str] = []
         async with db_with_cleanup.begin_session() as session:
             # Create domain
-            domain = DomainRow(name=domain_name, total_resource_slots=ResourceSlot())
+            domain_id = DomainID(uuid.uuid4())
+            domain = DomainRow(
+                id=domain_id,
+                name=domain_name,
+                total_resource_slots=ResourceSlot(),
+            )
             session.add(domain)
 
             # Create project resource policy

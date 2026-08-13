@@ -5,6 +5,7 @@ Tests the repository layer with real database operations.
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncGenerator, Callable, Coroutine
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -15,6 +16,7 @@ import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.types import BinarySize, KernelId, ResourceSlot, SessionId
 from ai.backend.manager.models.agent import AgentRow
@@ -488,7 +490,9 @@ class TestImageRepositoryLastUsedAt:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> DomainRow:
-        domain = DomainRow(name=f"test-{uuid4()}")
+        name = f"test-{uuid4()}"
+        domain_id = DomainID(uuid.uuid4())
+        domain = DomainRow(id=domain_id, name=name)
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(domain)
             await db_sess.flush()
@@ -557,6 +561,7 @@ class TestImageRepositoryLastUsedAt:
             email=f"test-{uuid4().hex[:8]}@example.com",
             domain_name=domain.name,
             resource_policy=user_policy.name,
+            domain_id=DomainID(domain.id),
         )
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(user)

@@ -13,6 +13,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.api.rest.export.adapter import ExportAdapter
@@ -773,8 +774,10 @@ class TestProjectExportExecuteStreamingDB:
         registry_id = uuid.uuid4()
 
         async with db_engine.begin_session() as db_sess:
+            domain_id = DomainID(uuid.uuid4())
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="",
                     is_active=True,
@@ -1047,8 +1050,10 @@ class TestGlobalContainerRegistryExport:
         scoped_registry_id = uuid.uuid4()
 
         async with db_engine.begin_session() as db_sess:
+            domain_id = DomainID(uuid.uuid4())
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description="",
                     is_active=True,

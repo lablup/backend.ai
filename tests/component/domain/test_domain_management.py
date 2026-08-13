@@ -26,7 +26,7 @@ from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.user.types import UserStatus
-from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.domain import DomainRow, domains
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.kernel import kernels
@@ -112,6 +112,9 @@ class TestDomainPurgeValidation:
                     domain_name=domain_name,
                     resource_policy="default",
                     role=UserRole.USER,
+                    domain_id=sa.select(DomainRow.id)
+                    .where(DomainRow.name == domain_name)
+                    .scalar_subquery(),
                 )
             )
 
@@ -326,6 +329,9 @@ class TestDomainPurgeValidation:
                     domain_name=domain_name,
                     resource_policy="default",
                     role=UserRole.USER,
+                    domain_id=sa.select(DomainRow.id)
+                    .where(DomainRow.name == domain_name)
+                    .scalar_subquery(),
                 )
             )
 

@@ -124,7 +124,8 @@ class TestSessionGroupRow:
 
     @pytest.fixture
     async def scope(self, db: ExtendedAsyncSAEngine) -> AsyncIterator[_OwnershipScope]:
-        domain = DomainRow(id=DomainID(uuid.uuid4()), name=f"test-{uuid.uuid4().hex[:8]}")
+        domain_id = DomainID(uuid.uuid4())
+        domain = DomainRow(id=domain_id, name=f"test-{uuid.uuid4().hex[:8]}")
         scaling_group = ScalingGroupRow(
             id=ResourceGroupID(uuid.uuid4()),
             name=f"test-sg-{uuid.uuid4().hex[:8]}",
@@ -150,6 +151,7 @@ class TestSessionGroupRow:
             email=f"user-{uuid.uuid4().hex[:8]}@example.com",
             domain_name=domain.name,
             resource_policy=user_policy.name,
+            domain_id=domain_id,
         )
         project = GroupRow(
             id=uuid.uuid4(),
@@ -165,7 +167,7 @@ class TestSessionGroupRow:
             await sess.flush()
 
         yield _OwnershipScope(
-            domain_id=DomainID(domain.id),
+            domain_id=domain_id,
             domain_name=domain.name,
             project_id=ProjectID(project.id),
             owner_user_id=UserID(user.uuid),

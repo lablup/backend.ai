@@ -217,6 +217,7 @@ async def _seed_scope(engine: ExtendedAsyncSAEngine) -> _Scope:
                 domain_name=scope.domain_name,
                 role=UserRole.USER,
                 resource_policy=scope.user_policy_name,
+                domain_id=scope.domain_id,
             )
         )
         sess.add(
@@ -611,6 +612,7 @@ class TestSessionsRetention:
                     domain_name=scope.domain_name,
                     role=UserRole.USER,
                     resource_policy=scope.user_policy_name,
+                    domain_id=scope.domain_id,
                 )
             )
             sess.add(
@@ -1188,6 +1190,7 @@ class TestDeploymentsTerminalChildCleanup:
                     domain_name=scope.domain_name,
                     role=UserRole.USER,
                     resource_policy=scope.user_policy_name,
+                    domain_id=scope.domain_id,
                 )
             )
             sess.add(

@@ -148,19 +148,19 @@ class UserRow(LifecycleTimestampsMixin, Base):
         "integration_id", sa.String(length=512), nullable=True
     )
     #: Deprecated: use ``domain_id``.
-    domain_name: Mapped[str | None] = mapped_column(
+    domain_name: Mapped[str] = mapped_column(
         "domain_name",
         sa.String(length=64),
         sa.ForeignKey("domains.name"),
         index=True,
-        nullable=True,
+        nullable=False,
     )
-    domain_id: Mapped[DomainID | None] = mapped_column(
+    domain_id: Mapped[DomainID] = mapped_column(
         "domain_id",
         GUID,
         sa.ForeignKey("domains.id"),
         index=True,
-        nullable=True,
+        nullable=False,
     )
     role: Mapped[UserRole] = mapped_column(
         "role", EnumValueType(UserRole), default=UserRole.USER, nullable=False

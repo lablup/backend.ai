@@ -10,6 +10,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
@@ -429,6 +430,7 @@ class TestUserNestedSearchIntegration:
           - user_in_inactive_domain
           - project_beta (user is member)
         """
+        domain_id = DomainID(uuid.uuid4())
         active_domain = f"active-dom-{uuid.uuid4().hex[:8]}"
         inactive_domain = f"inactive-dom-{uuid.uuid4().hex[:8]}"
         user_active_uuid = uuid.uuid4()
@@ -442,8 +444,10 @@ class TestUserNestedSearchIntegration:
                 (active_domain, True, "Research lab"),
                 (inactive_domain, False, "Archived department"),
             ]:
+                domain_id = DomainID(uuid.uuid4())
                 session.add(
                     DomainRow(
+                        id=domain_id,
                         name=dn,
                         description=desc,
                         is_active=active,
@@ -494,6 +498,7 @@ class TestUserNestedSearchIntegration:
                         domain_name=dom,
                         role=UserRole.USER,
                         resource_policy=urp.name,
+                        domain_id=domain_id,
                     )
                 )
             await session.flush()

@@ -53,6 +53,7 @@ from ai.backend.manager.data.permission.types import (
 )
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
@@ -575,6 +576,9 @@ async def assigned_users(
                     domain_name=domain_fixture.domain_name,
                     resource_policy=resource_policy_fixture,
                     role=UserRole.USER,
+                    domain_id=sa.select(DomainRow.id)
+                    .where(DomainRow.name == domain_fixture.domain_name)
+                    .scalar_subquery(),
                 )
             )
             await conn.execute(

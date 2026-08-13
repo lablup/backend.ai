@@ -10,6 +10,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
@@ -409,6 +410,7 @@ class TestDomainNestedSearchIntegration:
 
         Returns mapping of domain_name -> {project_name, username, email}.
         """
+        domain_id = DomainID(uuid.uuid4())
         domain_alpha = f"domain-alpha-{uuid.uuid4().hex[:8]}"
         domain_beta = f"domain-beta-{uuid.uuid4().hex[:8]}"
         result: dict[str, dict[str, str]] = {}
@@ -418,7 +420,9 @@ class TestDomainNestedSearchIntegration:
                 (domain_alpha, True, "Research lab"),
                 (domain_beta, False, "Archived department"),
             ]:
+                domain_id = DomainID(uuid.uuid4())
                 domain = DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     description=desc,
                     is_active=is_active,
@@ -506,6 +510,7 @@ class TestDomainNestedSearchIntegration:
                     domain_name=domain_name,
                     role=UserRole.USER,
                     resource_policy=user_policy.name,
+                    domain_id=domain_id,
                 )
                 session.add(user)
                 keypair_data.append((email, user_uuid))

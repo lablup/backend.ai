@@ -80,8 +80,8 @@ class UserData:
     status_info: str | None
     created_at: datetime | None = field(compare=False)
     modified_at: datetime | None = field(compare=False)
-    domain_name: str | None
-    domain_id: DomainID | None
+    domain_name: str
+    domain_id: DomainID
     role: UserRole
     resource_policy: str
     allowed_client_ip: list[str] | None
