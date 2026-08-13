@@ -21,5 +21,5 @@ class LoginClientTypeOrders:
 
     @staticmethod
     def modified_at(ascending: bool = True) -> QueryOrder:
-        col = LoginClientTypeRow.modified_at
+        col = LoginClientTypeRow.updated_at
         return col.asc() if ascending else col.desc()
