@@ -4690,6 +4690,9 @@ type DomainLifecycleInfo {
   """Timestamp when the domain was created."""
   createdAt: DateTime!
 
+  """Timestamp when the domain was last modified."""
+  modifiedAt: DateTime! @deprecated(reason: "Deprecated since 26.9.0. Use updated_at.")
+
   """
   Added in 26.9.0. Timestamp when the domain was last updated. Replaces modified_at.
   """
@@ -4959,6 +4962,7 @@ input DomainV2Filter {
   description: StringFilter = null
   isActive: Boolean = null
   createdAt: DateTimeFilter = null
+  modifiedAt: DateTimeFilter = null
 
   """Added in 26.9.0. Filter by last update time. Replaces modified_at."""
   updatedAt: DateTimeFilter = null
@@ -4978,10 +4982,11 @@ input DomainV2OrderBy {
 }
 
 """
-Added in 26.2.0. Fields available for ordering domain query results. CREATED_AT: Order by creation timestamp. UPDATED_AT: Order by last update timestamp. NAME: Order by domain name alphabetically. IS_ACTIVE: Order by active status. PROJECT_NAME: Order by project name (MIN aggregation). USER_USERNAME: Order by username (MIN aggregation). USER_EMAIL: Order by user email (MIN aggregation).
+Added in 26.2.0. Fields available for ordering domain query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp, deprecated in favor of UPDATED_AT. UPDATED_AT: Order by last update timestamp. NAME: Order by domain name alphabetically. IS_ACTIVE: Order by active status. PROJECT_NAME: Order by project name (MIN aggregation). USER_USERNAME: Order by username (MIN aggregation). USER_EMAIL: Order by user email (MIN aggregation).
 """
 enum DomainV2OrderField {
   CREATED_AT
+  MODIFIED_AT
   UPDATED_AT
   NAME
   IS_ACTIVE
