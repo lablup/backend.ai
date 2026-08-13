@@ -7,7 +7,7 @@ import sys
 import textwrap
 from pathlib import Path
 from pprint import pformat
-from typing import Annotated, Self
+from typing import Annotated, Any, Self
 
 import click
 from pydantic import AnyUrl, Field, FilePath, IPvAnyNetwork, ValidationError, model_validator
@@ -521,20 +521,6 @@ class ProxyWorkerConfig(BaseSchema):
         ),
     ]
 
-    use_experimental_redis_event_dispatcher: Annotated[
-        bool,
-        Field(default=False),
-        BackendAIConfigMeta(
-            description=(
-                "Enable the experimental Redis-based event dispatcher for real-time event "
-                "propagation from the coordinator. This feature is under development "
-                "and may have stability issues. Use with caution in production."
-            ),
-            added_version="25.9.0",
-            example=ConfigExample(local="false", prod="false"),
-        ),
-    ]
-
     tls_listen: Annotated[
         bool,
         Field(default=False),
@@ -844,6 +830,12 @@ class ProxyWorkerConfig(BaseSchema):
                 if not self.http2:
                     raise ValueError("http2 config must be set when protocol = 'h2'")
         return self
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_experimental_redis_event_dispatcher(cls, values: Any) -> Any:
+        config.reject_experimental_redis_event_dispatcher(values)
+        return values
 
 
 class ServerConfig(BaseSchema):

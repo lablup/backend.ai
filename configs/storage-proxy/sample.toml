@@ -93,11 +93,6 @@
   # an external watcher process for health monitoring and management.
   # Added in 23.09.0
   use-watcher = true
-  # Enable the experimental Redis-based event dispatcher for inter-process event
-  # communication. May provide better scalability and performance for event
-  # handling in multi-node deployments. Requires Redis configuration.
-  # Added in 24.09.0
-  use-experimental-redis-event-dispatcher = true
   # Allow automatic creation of quota scopes when creating virtual folders in
   # non-existent quota scopes. If true, quota scopes are created on demand. If
   # false, VFolder creation fails when the quota scope doesn't exist.

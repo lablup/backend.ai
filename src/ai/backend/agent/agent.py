@@ -184,7 +184,6 @@ from ai.backend.common.log.types import (
     ContainerLogData,
     ContainerLogType,
 )
-from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
@@ -1107,11 +1106,6 @@ class AbstractAgent[
             node_id=node_id,
             db=REDIS_STREAM_DB,
         )
-        if self.local_config.agent.use_experimental_redis_event_dispatcher:
-            return HiRedisQueue(
-                stream_redis_target,
-                args,
-            )
         return await RedisQueue.create(
             stream_redis_target,
             args,

@@ -201,11 +201,6 @@
   # here for review by administrators.
   # Added in 25.12.0
   ## abuse-report-path = "/var/log/backend.ai/abuse"
-  # Enables the experimental Redis-based event dispatcher for agent-manager
-  # communication. Provides improved event delivery reliability and scalability.
-  # Requires Redis to be configured. Still in experimental phase.
-  # Added in 25.12.0
-  use-experimental-redis-event-dispatcher = false
   # Docker runtime mode, auto-detected based on the kernel version. 'linuxkit'
   # indicates Docker Desktop with LinuxKit VM (macOS/Windows). 'native'
   # indicates native Docker on Linux. Affects filesystem and networking

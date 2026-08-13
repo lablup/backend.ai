@@ -1,6 +1,6 @@
 # Message Queue
 
-Abstraction over Redis streams (anycast) and pub/sub (broadcast). Prefer `RedisQueue` (`redis_queue/queue.py`); `hiredis_queue.py` is legacy.
+Abstraction over Redis streams (anycast) and pub/sub (broadcast). `RedisQueue` (`redis_queue/queue.py`) is the only implementation.
 
 ## Interfaces (`abc/`)
 

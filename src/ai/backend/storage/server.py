@@ -54,7 +54,6 @@ from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
 from ai.backend.common.health_checker.types import ComponentId
-from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
@@ -261,13 +260,8 @@ async def _make_message_queue(
         node_id=node_id,
         db=REDIS_STREAM_DB,
     )
-    if local_config.storage_proxy.use_experimental_redis_event_dispatcher:
-        return HiRedisQueue(
-            stream_redis_target,
-            args,
-        )
     return await RedisQueue.create(
-        redis_profile_target.profile_target(RedisRole.STREAM),
+        stream_redis_target,
         args,
     )
 
