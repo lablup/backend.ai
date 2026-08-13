@@ -26,6 +26,7 @@ def _make_domain_node(
     is_active: bool = True,
     is_default: bool = False,
     created_at: datetime | None = None,
+    modified_at: datetime | None = None,
     updated_at: datetime | None = None,
 ) -> DomainNode:
     now = datetime.now(tz=UTC)
@@ -43,6 +44,7 @@ def _make_domain_node(
             is_active=is_active,
             is_default=is_default,
             created_at=created_at or now,
+            modified_at=modified_at or now,
             updated_at=updated_at or now,
         ),
     )
@@ -63,6 +65,7 @@ class TestDomainV2GQL:
             is_active=True,
             is_default=False,
             created_at=created,
+            modified_at=updated,
             updated_at=updated,
         )
 
@@ -79,6 +82,7 @@ class TestDomainV2GQL:
         # Verify lifecycle
         assert domain_gql.lifecycle.is_active is True
         assert domain_gql.lifecycle.created_at == created
+        assert domain_gql.lifecycle.modified_at == updated
         assert domain_gql.lifecycle.updated_at == updated
 
     def test_from_pydantic_id_is_the_domain_uuid(self) -> None:

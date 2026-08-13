@@ -73,6 +73,10 @@ class DomainLifecycleInfo(BackendAISchema):
     created_at: datetime = Field(
         description="Timestamp when the domain was created.",
     )
+    modified_at: datetime = Field(
+        description=f"Timestamp when the domain was last modified. Deprecated since {NEXT_RELEASE_VERSION}. Use updated_at.",
+        deprecated=True,
+    )
     updated_at: datetime = Field(
         description="Timestamp when the domain was last updated.",
     )

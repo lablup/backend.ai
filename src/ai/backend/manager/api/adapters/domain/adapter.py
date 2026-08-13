@@ -290,6 +290,15 @@ class DomainAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
 
+        if filter.modified_at is not None:
+            condition = filter.modified_at.build_query_condition(
+                before_factory=DomainConditions.by_updated_at_before,
+                after_factory=DomainConditions.by_updated_at_after,
+                equals_factory=DomainConditions.by_updated_at_equals,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
         if filter.updated_at is not None:
             condition = filter.updated_at.build_query_condition(
                 before_factory=DomainConditions.by_updated_at_before,
@@ -398,6 +407,7 @@ class DomainAdapter(BaseAdapter):
                 is_active=data.is_active,
                 is_default=data.is_default,
                 created_at=data.created_at,
+                modified_at=data.updated_at,
                 updated_at=data.updated_at,
             ),
         )
@@ -411,7 +421,7 @@ def _resolve_order(field: DomainOrderField, direction: OrderDirection) -> QueryO
             return DomainOrders.name(ascending)
         case DomainOrderField.CREATED_AT:
             return DomainOrders.created_at(ascending)
-        case DomainOrderField.UPDATED_AT:
+        case DomainOrderField.MODIFIED_AT | DomainOrderField.UPDATED_AT:
             return DomainOrders.updated_at(ascending)
         case DomainOrderField.IS_ACTIVE:
             return DomainOrders.is_active(ascending)

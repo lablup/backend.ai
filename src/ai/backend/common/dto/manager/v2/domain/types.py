@@ -27,6 +27,7 @@ class DomainOrderField(StrEnum):
 
     NAME = "name"
     CREATED_AT = "created_at"
+    MODIFIED_AT = "modified_at"
     UPDATED_AT = "updated_at"
     IS_ACTIVE = "is_active"
     PROJECT_NAME = "project_name"

@@ -93,6 +93,10 @@ class DomainLifecycleInfoGQL:
         description=f"Added in {NEXT_RELEASE_VERSION}. Whether this is the default domain. At most one domain carries the marker."
     )
     created_at: datetime = gql_field(description="Timestamp when the domain was created.")
+    modified_at: datetime = gql_field(
+        description="Timestamp when the domain was last modified.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use updated_at.",
+    )
     updated_at: datetime = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
