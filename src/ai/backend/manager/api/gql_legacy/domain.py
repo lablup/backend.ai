@@ -176,7 +176,7 @@ class DomainNode(graphene.ObjectType):  # type: ignore[misc]
             description=obj.description,
             is_active=obj.is_active,
             created_at=obj.created_at,
-            modified_at=obj.modified_at,
+            modified_at=obj.updated_at,
             total_resource_slots=obj.total_resource_slots,
             allowed_vfolder_hosts=(
                 obj.allowed_vfolder_hosts.to_json() if obj.allowed_vfolder_hosts else None
@@ -216,7 +216,7 @@ class DomainNode(graphene.ObjectType):  # type: ignore[misc]
             description=dto.description,
             is_active=dto.is_active,
             created_at=dto.created_at,
-            modified_at=dto.modified_at,
+            modified_at=dto.updated_at,
             total_resource_slots=dto.total_resource_slots,
             allowed_vfolder_hosts=dto.allowed_vfolder_hosts.to_json(),
             allowed_docker_registries=dto.allowed_docker_registries,
@@ -628,7 +628,7 @@ class Domain(graphene.ObjectType):  # type: ignore[misc]
             description=dto.description,
             is_active=dto.is_active,
             created_at=dto.created_at,
-            modified_at=dto.modified_at,
+            modified_at=dto.updated_at,
             total_resource_slots=dto.total_resource_slots.to_json()
             if dto.total_resource_slots
             else {},

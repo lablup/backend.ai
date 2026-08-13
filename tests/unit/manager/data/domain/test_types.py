@@ -19,7 +19,7 @@ def _make_domain_data() -> DomainData:
         is_active=True,
         is_default=False,
         created_at=now,
-        modified_at=now,
+        updated_at=now,
         total_resource_slots=ResourceSlot(),
         allowed_vfolder_hosts=VFolderHostPermissionMap(),
         allowed_docker_registries=[],

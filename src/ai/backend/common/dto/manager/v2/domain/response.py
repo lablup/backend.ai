@@ -73,8 +73,8 @@ class DomainLifecycleInfo(BackendAISchema):
     created_at: datetime = Field(
         description="Timestamp when the domain was created.",
     )
-    modified_at: datetime = Field(
-        description="Timestamp when the domain was last modified.",
+    updated_at: datetime = Field(
+        description="Timestamp when the domain was last updated.",
     )
 
 

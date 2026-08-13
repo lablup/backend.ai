@@ -100,8 +100,8 @@ class DomainFilter(BaseRequestModel):
     description: StringFilter | None = Field(default=None, description="Filter by description.")
     is_active: bool | None = Field(default=None, description="Filter by active status.")
     created_at: DateTimeFilter | None = Field(default=None, description="Filter by creation time.")
-    modified_at: DateTimeFilter | None = Field(
-        default=None, description="Filter by last modification time."
+    updated_at: DateTimeFilter | None = Field(
+        default=None, description="Filter by last update time."
     )
     project: DomainProjectFilter | None = Field(
         default=None, description="Filter by nested project conditions."

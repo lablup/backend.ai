@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.domain.response import (
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_field,
     gql_pydantic_type,
 )
@@ -92,4 +93,9 @@ class DomainLifecycleInfoGQL:
         description=f"Added in {NEXT_RELEASE_VERSION}. Whether this is the default domain. At most one domain carries the marker."
     )
     created_at: datetime = gql_field(description="Timestamp when the domain was created.")
-    modified_at: datetime = gql_field(description="Timestamp when the domain was last modified.")
+    updated_at: datetime = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Timestamp when the domain was last updated. Replaces modified_at.",
+        )
+    )

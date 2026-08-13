@@ -40,8 +40,8 @@ class TestDomainOrderField:
     def test_created_at_value(self) -> None:
         assert DomainOrderField.CREATED_AT.value == "created_at"
 
-    def test_modified_at_value(self) -> None:
-        assert DomainOrderField.MODIFIED_AT.value == "modified_at"
+    def test_updated_at_value(self) -> None:
+        assert DomainOrderField.UPDATED_AT.value == "updated_at"
 
     def test_enum_members_count(self) -> None:
         assert len(list(DomainOrderField)) == 7
@@ -56,5 +56,5 @@ class TestDomainOrderField:
     def test_from_string_created_at(self) -> None:
         assert DomainOrderField("created_at") is DomainOrderField.CREATED_AT
 
-    def test_from_string_modified_at(self) -> None:
-        assert DomainOrderField("modified_at") is DomainOrderField.MODIFIED_AT
+    def test_from_string_updated_at(self) -> None:
+        assert DomainOrderField("updated_at") is DomainOrderField.UPDATED_AT

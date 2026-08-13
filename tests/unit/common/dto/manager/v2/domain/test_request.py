@@ -229,10 +229,10 @@ class TestDomainOrder:
         assert order.direction == OrderDirection.DESC
 
     def test_round_trip(self) -> None:
-        order = DomainOrder(field=DomainOrderField.MODIFIED_AT, direction=OrderDirection.DESC)
+        order = DomainOrder(field=DomainOrderField.UPDATED_AT, direction=OrderDirection.DESC)
         json_data = order.model_dump_json()
         restored = DomainOrder.model_validate_json(json_data)
-        assert restored.field == DomainOrderField.MODIFIED_AT
+        assert restored.field == DomainOrderField.UPDATED_AT
         assert restored.direction == OrderDirection.DESC
 
 
