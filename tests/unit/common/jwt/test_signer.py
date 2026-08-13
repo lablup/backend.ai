@@ -10,7 +10,7 @@ import pytest
 
 from ai.backend.common.jwt.config import JWTConfig
 from ai.backend.common.jwt.signer import JWTSigner
-from ai.backend.common.jwt.types import JWTUserContext
+from ai.backend.common.jwt.types import AccessKeyPrincipal, JWTUserContext
 from ai.backend.common.types import AccessKey
 
 
@@ -39,7 +39,7 @@ def jwt_signer(jwt_config: JWTConfig) -> JWTSigner:
 def user_context() -> JWTUserContext:
     """Create test user context."""
     return JWTUserContext(
-        access_key=AccessKey("AKIAIOSFODNN7EXAMPLE"),
+        principal=AccessKeyPrincipal(access_key=AccessKey("AKIAIOSFODNN7EXAMPLE")),
         role="user",
     )
 
@@ -85,7 +85,8 @@ def test_generate_token_includes_user_data(
         algorithms=[jwt_config.algorithm],
     )
 
-    assert decoded["access_key"] == str(user_context.access_key)
+    assert decoded["principal_type"] == "access_key"
+    assert decoded["access_key"] == "AKIAIOSFODNN7EXAMPLE"
     assert decoded["role"] == user_context.role
 
 
@@ -148,7 +149,7 @@ def test_generate_token_with_admin_user(
 ) -> None:
     """Test token generation for admin user."""
     admin_context = JWTUserContext(
-        access_key=AccessKey("AKIAADMIN123456789"),
+        principal=AccessKeyPrincipal(access_key=AccessKey("AKIAADMIN123456789")),
         role="admin",
     )
 
@@ -170,7 +171,7 @@ def test_generate_token_with_superadmin_user(
 ) -> None:
     """Test token generation for superadmin user."""
     superadmin_context = JWTUserContext(
-        access_key=AccessKey("AKIASUPERADMIN123456"),
+        principal=AccessKeyPrincipal(access_key=AccessKey("AKIASUPERADMIN123456")),
         role="superadmin",
     )
 

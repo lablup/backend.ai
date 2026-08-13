@@ -29,8 +29,7 @@ class JWTSigner:
         signer = JWTSigner(config)
 
         user_context = JWTUserContext(
-            user_id=user_uuid,
-            access_key=access_key,
+            principal=UserPrincipal(user_id=user_uuid),
             role="user",
         )
         # Get user's secret key from keypair table
@@ -71,9 +70,8 @@ class JWTSigner:
         claims = JWTClaims(
             exp=now + self._config.token_expiration,
             iat=now,
-            access_key=user_context.access_key,
             role=user_context.role,
-            user_id=user_context.user_id,
+            principal=user_context.principal,
         )
 
         try:

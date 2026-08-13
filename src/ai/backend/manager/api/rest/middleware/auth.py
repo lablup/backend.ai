@@ -45,6 +45,11 @@ from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.jwt.exceptions import JWTError
+from ai.backend.common.jwt.types import (
+    AccessKeyPrincipal,
+    UserPrincipal,
+    parse_jwt_principal,
+)
 from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED
 from ai.backend.common.types import AccessKey, ReadableCIDR, SecretKey
 from ai.backend.logging import BraceStyleAdapter
@@ -718,25 +723,24 @@ async def _authenticate_via_jwt(
             jwt_token,
             options={"verify_signature": False},
         )
-        raw_user_id = unverified_payload.get("user_id")
-        if raw_user_id is not None:
-            # The user_id claim names the caller; the access_key claim is not
-            # consulted, and the verification keypair is derived from the user.
-            try:
-                user_id = UserID(uuid.UUID(raw_user_id))
-            except (TypeError, ValueError) as e:
-                raise AuthorizationFailed("Malformed user_id in JWT token") from e
-            context = await _query_auth_context_by_user_id(db, user_id)
-            if context is None:
-                raise AuthorizationFailed("User not found in database")
-        else:
-            # Tokens issued before the user_id claim existed carry only an access key.
-            access_key = unverified_payload.get("access_key")
-            if not access_key:
-                raise AuthorizationFailed("Access key not found in JWT token")
-            context = await _query_auth_context_by_access_key(db, access_key)
-            if context is None:
-                raise AuthorizationFailed("Access key not found in database")
+        try:
+            principal = parse_jwt_principal(unverified_payload)
+        except (KeyError, TypeError, ValueError) as e:
+            raise AuthorizationFailed(f"Malformed JWT principal claims: {e}") from e
+
+        context: _AuthContext | None
+        match principal:
+            case UserPrincipal(user_id=user_id):
+                # The verification keypair is derived from the user.
+                context = await _query_auth_context_by_user_id(db, user_id)
+                if context is None:
+                    raise AuthorizationFailed("User not found in database")
+            case AccessKeyPrincipal(access_key=access_key):
+                context = await _query_auth_context_by_access_key(db, access_key)
+                if context is None:
+                    raise AuthorizationFailed("Access key not found in database")
+            case _:
+                raise AuthorizationFailed("Unsupported JWT principal type")
 
         jwt_validator.validate_token(jwt_token, context.keypair.secret_key)
 

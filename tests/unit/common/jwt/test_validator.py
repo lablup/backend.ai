@@ -15,7 +15,7 @@ from ai.backend.common.jwt.exceptions import (
     JWTInvalidSignatureError,
 )
 from ai.backend.common.jwt.signer import JWTSigner
-from ai.backend.common.jwt.types import JWTUserContext
+from ai.backend.common.jwt.types import AccessKeyPrincipal, JWTUserContext
 from ai.backend.common.jwt.validator import JWTValidator
 from ai.backend.common.types import AccessKey
 
@@ -51,7 +51,7 @@ def jwt_validator(jwt_config: JWTConfig) -> JWTValidator:
 def user_context() -> JWTUserContext:
     """Create test user context."""
     return JWTUserContext(
-        access_key=AccessKey("AKIAIOSFODNN7EXAMPLE"),
+        principal=AccessKeyPrincipal(access_key=AccessKey("AKIAIOSFODNN7EXAMPLE")),
         role="user",
     )
 
@@ -66,7 +66,7 @@ def test_validate_token_with_valid_token(
     token = jwt_signer.generate_token(user_context, test_secret_key)
     claims = jwt_validator.validate_token(token, test_secret_key)
 
-    assert claims.access_key == user_context.access_key
+    assert claims.principal == user_context.principal
     assert claims.role == user_context.role
 
 
@@ -83,7 +83,7 @@ def test_validate_token_with_expired_token(
     payload = {
         "exp": int((past_time + timedelta(seconds=900)).timestamp()),
         "iat": int(past_time.timestamp()),
-        "access_key": str(user_context.access_key),
+        "access_key": "AKIAIOSFODNN7EXAMPLE",
         "role": user_context.role,
     }
 
@@ -159,7 +159,7 @@ def test_validate_token_with_invalid_role(
     payload = {
         "exp": int((datetime.now(UTC) + timedelta(seconds=900)).timestamp()),
         "iat": int(datetime.now(UTC).timestamp()),
-        "access_key": str(user_context.access_key),
+        "access_key": "AKIAIOSFODNN7EXAMPLE",
         "role": "invalid_role",  # Not in valid_roles
     }
 
@@ -182,7 +182,7 @@ def test_validate_token_with_admin_role(
 ) -> None:
     """Test validation of token with admin role."""
     admin_context = JWTUserContext(
-        access_key=AccessKey("AKIAADMIN123456789"),
+        principal=AccessKeyPrincipal(access_key=AccessKey("AKIAADMIN123456789")),
         role="admin",
     )
 
@@ -199,7 +199,7 @@ def test_validate_token_with_superadmin_role(
 ) -> None:
     """Test validation of token with superadmin role."""
     superadmin_context = JWTUserContext(
-        access_key=AccessKey("AKIASUPERADMIN123456"),
+        principal=AccessKeyPrincipal(access_key=AccessKey("AKIASUPERADMIN123456")),
         role="superadmin",
     )
 
@@ -223,5 +223,5 @@ def test_validate_token_roundtrip(
     claims = jwt_validator.validate_token(token, test_secret_key)
 
     # Verify all data matches
-    assert claims.access_key == user_context.access_key
+    assert claims.principal == user_context.principal
     assert claims.role == user_context.role

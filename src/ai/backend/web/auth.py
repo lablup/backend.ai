@@ -12,7 +12,12 @@ from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common.clients.http_client.client_pool import ClientKey, ClientPool
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.jwt.signer import JWTSigner
-from ai.backend.common.jwt.types import JWTUserContext
+from ai.backend.common.jwt.types import (
+    AccessKeyPrincipal,
+    JWTPrincipal,
+    JWTUserContext,
+    UserPrincipal,
+)
 from ai.backend.common.types import AccessKey
 from ai.backend.common.web.session import get_session
 from ai.backend.web.clients.endpoint_pool import AcquiredEndpoint
@@ -188,13 +193,19 @@ async def generate_jwt_token_for_session(
     access_key = AccessKey(token["access_key"])
     secret_key = token["secret_key"]
     role = session.get("role", "user")
-    # Sessions created before user_id was stored in the login token lack it.
+
+    # Sessions created before user_id was stored in the login token lack it
+    # and fall back to naming the caller by access key.
     raw_user_id = token.get("user_id")
+    principal: JWTPrincipal
+    if raw_user_id is not None:
+        principal = UserPrincipal(user_id=UserID(uuid.UUID(raw_user_id)))
+    else:
+        principal = AccessKeyPrincipal(access_key=access_key)
 
     user_context = JWTUserContext(
-        access_key=access_key,
+        principal=principal,
         role=role,
-        user_id=UserID(uuid.UUID(raw_user_id)) if raw_user_id else None,
     )
 
     # Generate JWT token using user's secret key
