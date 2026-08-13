@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import logging
 import os
 import shlex
 import sys
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
-from typing import Any, override
+from typing import Any, Self, override
 
 import humps
 import tomli
@@ -17,17 +18,20 @@ from pydantic import (
     model_validator,
 )
 
+from ai.backend.logging.utils import BraceStyleAdapter
+
 from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes
 from .exception import BackendAIError, ConfigurationError, ModelDefinitionValidationError
 from .model_service_start_command_compat import resolve_model_service_start_command
 from .types import BackendAISchema, RedisHelperConfig, SchemaValidationFailureInfo
 
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
 __all__ = (
     "ConfigurationError",
     "check",
     "etcd_config_iv",
-    "reject_experimental_redis_event_dispatcher",
     "merge",
     "override_key",
     "override_with_env",
@@ -40,28 +44,13 @@ __all__ = (
 )
 
 
-def reject_experimental_redis_event_dispatcher(values: Any) -> None:
-    """
-    Raise ``ValueError`` when the removed ``use-experimental-redis-event-dispatcher``
-    option is still enabled in a raw configuration mapping, so that a configuration
-    whose transport silently changed fails to load.
-    A falsy or absent value is accepted and ignored.
-    """
-    if not isinstance(values, Mapping):
-        return
-    for alias in (
-        "use-experimental-redis-event-dispatcher",
-        "use_experimental_redis_event_dispatcher",
-    ):
-        if values.get(alias):
-            raise ValueError(
-                f"The '{alias}' option has been removed. "
-                "RedisQueue is now the only message queue implementation. "
-                "Delete the option from the configuration to keep using RedisQueue."
-            )
-
-
 class BaseConfigSchema(BackendAISchema):
+    """
+    Use for a component's config file schema (``configs/``). Unknown fields are
+    warned about and dropped; a schema that takes a wider mapping on purpose opts
+    out with ``ConfigDict(extra="ignore")``.
+    """
+
     @staticmethod
     def snake_to_kebab_case(string: str) -> str:
         return string.replace("_", "-")
@@ -71,10 +60,30 @@ class BaseConfigSchema(BackendAISchema):
         from_attributes=True,
         alias_generator=snake_to_kebab_case,
         validate_default=True,
+        extra="allow",
     )
+
+    @model_validator(mode="after")
+    def _warn_unknown_fields(self) -> Self:
+        extra = self.__pydantic_extra__
+        if extra:
+            keys = sorted(extra)
+            log.warning(
+                "Ignoring unknown config field(s) in {}: {}",
+                type(self).__name__,
+                ", ".join(keys),
+            )
+            extra.clear()
+            self.__pydantic_fields_set__.difference_update(keys)
+        return self
 
 
 class BaseConfigModel(BackendAISchema):
+    """
+    Use for config-shaped payloads authored outside this repository - model service
+    definitions, logging and tester config. Unknown fields are kept, not reported.
+    """
+
     @staticmethod
     def snake_to_kebab_case(string: str) -> str:
         return string.replace("_", "-")

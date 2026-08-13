@@ -192,13 +192,9 @@ from pydantic import (
     IPvAnyNetwork,
     field_serializer,
     field_validator,
-    model_validator,
 )
 
-from ai.backend.common.config import (
-    BaseConfigSchema,
-    reject_experimental_redis_event_dispatcher,
-)
+from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.configs.client import HttpTimeoutConfig
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.jwt import SharedJWTConfig
@@ -1278,12 +1274,6 @@ class ManagerConfig(BaseConfigSchema):
                 f'RPC authentication keypair file does not exist: "{v}".',
             )
         return v
-
-    @model_validator(mode="before")
-    @classmethod
-    def _reject_experimental_redis_event_dispatcher(cls, values: Any) -> Any:
-        reject_experimental_redis_event_dispatcher(values)
-        return values
 
 
 # Deprecated: v20.09

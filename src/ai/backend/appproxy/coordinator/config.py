@@ -4,7 +4,7 @@ import socket
 import sys
 from pathlib import Path
 from pprint import pformat
-from typing import Annotated, Any, Self
+from typing import Annotated, Self
 
 import click
 from pydantic import Field, FilePath, IPvAnyNetwork, ValidationError, model_validator
@@ -618,12 +618,6 @@ class ProxyCoordinatorConfig(BaseSchema):
             return f"{connection_info.host}:{connection_info.port}"
         protocol = "https" if (self.tls_advertised or self.tls_listen) else "http"
         return f"{protocol}://{connection_info.host}:{connection_info.port}"
-
-    @model_validator(mode="before")
-    @classmethod
-    def _reject_experimental_redis_event_dispatcher(cls, values: Any) -> Any:
-        config.reject_experimental_redis_event_dispatcher(values)
-        return values
 
 
 class ServerConfig(BaseSchema):

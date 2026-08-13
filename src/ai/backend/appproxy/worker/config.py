@@ -7,7 +7,7 @@ import sys
 import textwrap
 from pathlib import Path
 from pprint import pformat
-from typing import Annotated, Any, Self
+from typing import Annotated, Self
 
 import click
 from pydantic import AnyUrl, Field, FilePath, IPvAnyNetwork, ValidationError, model_validator
@@ -830,12 +830,6 @@ class ProxyWorkerConfig(BaseSchema):
                 if not self.http2:
                     raise ValueError("http2 config must be set when protocol = 'h2'")
         return self
-
-    @model_validator(mode="before")
-    @classmethod
-    def _reject_experimental_redis_event_dispatcher(cls, values: Any) -> Any:
-        config.reject_experimental_redis_event_dispatcher(values)
-        return values
 
 
 class ServerConfig(BaseSchema):
