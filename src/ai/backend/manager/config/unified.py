@@ -192,9 +192,13 @@ from pydantic import (
     IPvAnyNetwork,
     field_serializer,
     field_validator,
+    model_validator,
 )
 
-from ai.backend.common.config import BaseConfigSchema
+from ai.backend.common.config import (
+    BaseConfigSchema,
+    reject_experimental_redis_event_dispatcher,
+)
 from ai.backend.common.configs.client import HttpTimeoutConfig
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.jwt import SharedJWTConfig
@@ -1186,25 +1190,6 @@ class ManagerConfig(BaseConfigSchema):
             example=ConfigExample(local="39100", prod="39100"),
         ),
     ]
-    use_experimental_redis_event_dispatcher: Annotated[
-        bool,
-        Field(
-            default=False,
-            validation_alias=AliasChoices(
-                "use-experimental-redis-event-dispatcher", "use_experimental_redis_event_dispatcher"
-            ),
-            serialization_alias="use-experimental-redis-event-dispatcher",
-        ),
-        BackendAIConfigMeta(
-            description=(
-                "Whether to use the experimental Redis-based event dispatcher. "
-                "May provide better performance for event handling in large clusters. "
-                "Not recommended for production use unless specifically tested and needed."
-            ),
-            added_version="25.8.0",
-            example=ConfigExample(local="false", prod="false"),
-        ),
-    ]
     status_update_interval: Annotated[
         float | None,
         Field(
@@ -1293,6 +1278,12 @@ class ManagerConfig(BaseConfigSchema):
                 f'RPC authentication keypair file does not exist: "{v}".',
             )
         return v
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_experimental_redis_event_dispatcher(cls, values: Any) -> Any:
+        reject_experimental_redis_event_dispatcher(values)
+        return values
 
 
 # Deprecated: v20.09

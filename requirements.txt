@@ -75,7 +75,6 @@ PyJWT~=2.10.1
 PyYAML~=6.0
 pydantic[email]~=2.11.3
 packaging>=24.1
-hiredis>=3.0.0
 huggingface-hub~=0.34.3
 redis[hiredis]~=7.1.0
 rich~=13.6

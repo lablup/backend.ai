@@ -579,6 +579,39 @@ class TestAgentUnifiedConfigValidation:
         assert config.agent.backend == AgentBackend.KUBERNETES
         assert config.container.scratch_type == ScratchType.K8S_NFS
 
+    def test_removed_experimental_dispatcher_key_is_rejected_when_enabled(
+        self,
+        default_raw_config: RawConfigT,
+    ) -> None:
+        raw_config = {
+            **default_raw_config,
+            "agent": {
+                **default_raw_config["agent"],
+                "use-experimental-redis-event-dispatcher": True,
+            },
+        }
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)) as exc_info:
+            AgentUnifiedConfig.model_validate(raw_config)
+
+        assert "The 'use-experimental-redis-event-dispatcher' option has been removed." in str(
+            exc_info.value
+        )
+
+    def test_removed_experimental_dispatcher_key_is_ignored_when_disabled(
+        self,
+        default_raw_config: RawConfigT,
+    ) -> None:
+        raw_config = {
+            **default_raw_config,
+            "agent": {
+                **default_raw_config["agent"],
+                "use-experimental-redis-event-dispatcher": False,
+            },
+        }
+        config = AgentUnifiedConfig.model_validate(raw_config)
+
+        assert not hasattr(config.agent, "use_experimental_redis_event_dispatcher")
+
     def test_kubernetes_backend_with_other_scratch_types(
         self,
         default_raw_config: RawConfigT,
@@ -1079,7 +1112,6 @@ class TestMultipleAgentsConfigValidation:
         agent_configs = config.get_agent_configs()
         assert agent_configs[0].agent.agent_sock_port == 6007
         assert agent_configs[0].agent.force_terminate_abusing_containers is False
-        assert agent_configs[0].agent.use_experimental_redis_event_dispatcher is False
 
         assert agent_configs[1].agent.force_terminate_abusing_containers is True
         assert agent_configs[1].agent.agent_sock_port == 6007

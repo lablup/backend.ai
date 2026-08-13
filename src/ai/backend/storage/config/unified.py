@@ -13,7 +13,10 @@ from pydantic import (
     model_validator,
 )
 
-from ai.backend.common.config import BaseConfigSchema
+from ai.backend.common.config import (
+    BaseConfigSchema,
+    reject_experimental_redis_event_dispatcher,
+)
 from ai.backend.common.configs import (
     EtcdConfig,
     OTELConfig,
@@ -746,25 +749,6 @@ class StorageProxyConfig(BaseConfigSchema):
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
-    use_experimental_redis_event_dispatcher: Annotated[
-        bool,
-        Field(
-            default=False,
-            validation_alias=AliasChoices(
-                "use-experimental-redis-event-dispatcher", "use_experimental_redis_event_dispatcher"
-            ),
-            serialization_alias="use-experimental-redis-event-dispatcher",
-        ),
-        BackendAIConfigMeta(
-            description=(
-                "Enable the experimental Redis-based event dispatcher for inter-process "
-                "event communication. May provide better scalability and performance for "
-                "event handling in multi-node deployments. Requires Redis configuration."
-            ),
-            added_version="24.09.0",
-            example=ConfigExample(local="false", prod="true"),
-        ),
-    ]
     auto_quota_scope_creation: Annotated[
         bool,
         Field(
@@ -800,6 +784,12 @@ class StorageProxyConfig(BaseConfigSchema):
             added_version="25.12.0",
         ),
     ]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_experimental_redis_event_dispatcher(cls, values: Any) -> Any:
+        reject_experimental_redis_event_dispatcher(values)
+        return values
 
 
 class PresignedUploadConfig(BaseConfigSchema):

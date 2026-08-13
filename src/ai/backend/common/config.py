@@ -27,6 +27,7 @@ __all__ = (
     "ConfigurationError",
     "check",
     "etcd_config_iv",
+    "reject_experimental_redis_event_dispatcher",
     "merge",
     "override_key",
     "override_with_env",
@@ -37,6 +38,27 @@ __all__ = (
     "redis_helper_default_config",
     "vfolder_config_iv",
 )
+
+
+def reject_experimental_redis_event_dispatcher(values: Any) -> None:
+    """
+    Raise ``ValueError`` when the removed ``use-experimental-redis-event-dispatcher``
+    option is still enabled in a raw configuration mapping, so that a configuration
+    whose transport silently changed fails to load.
+    A falsy or absent value is accepted and ignored.
+    """
+    if not isinstance(values, Mapping):
+        return
+    for alias in (
+        "use-experimental-redis-event-dispatcher",
+        "use_experimental_redis_event_dispatcher",
+    ):
+        if values.get(alias):
+            raise ValueError(
+                f"The '{alias}' option has been removed. "
+                "RedisQueue is now the only message queue implementation. "
+                "Delete the option from the configuration to keep using RedisQueue."
+            )
 
 
 class BaseConfigSchema(BackendAISchema):

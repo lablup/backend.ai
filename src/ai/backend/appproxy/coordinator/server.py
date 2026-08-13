@@ -103,7 +103,6 @@ from ai.backend.common.leader.tasks import (
     PeriodicTask,
 )
 from ai.backend.common.lock import FileLock, RedisLock
-from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.http import build_api_metric_middleware
@@ -317,7 +316,6 @@ async def _make_message_queue(
     *,
     anycast_stream_key: str = APPPROXY_ANYCAST_STREAM_KEY,
     broadcast_channel: str = APPPROXY_BROADCAST_CHANNEL,
-    use_experimental_redis_event_dispatcher: bool = False,
 ) -> AbstractMessageQueue:
     redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(redis_config.to_dict())
     stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
@@ -336,11 +334,6 @@ async def _make_message_queue(
         db=REDIS_STREAM_DB,
     )
 
-    if use_experimental_redis_event_dispatcher:
-        return HiRedisQueue(
-            stream_redis_target,
-            args,
-        )
     return await RedisQueue.create(
         stream_redis_target,
         args,
@@ -352,7 +345,6 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     mq = await _make_message_queue(
         root_ctx.local_config.proxy_coordinator.id,
         root_ctx.local_config.redis,
-        use_experimental_redis_event_dispatcher=root_ctx.local_config.proxy_coordinator.use_experimental_redis_event_dispatcher,
     )
     root_ctx.event_producer = EventProducer(
         mq,
@@ -369,7 +361,6 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.local_config.core_redis or root_ctx.local_config.redis,
         anycast_stream_key="events",
         broadcast_channel="events_all",
-        use_experimental_redis_event_dispatcher=root_ctx.local_config.proxy_coordinator.use_experimental_redis_event_dispatcher,
     )
     root_ctx.core_event_producer = EventProducer(
         core_mq,

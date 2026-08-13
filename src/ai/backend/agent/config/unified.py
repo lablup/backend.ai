@@ -36,7 +36,10 @@ from ai.backend.agent.affinity_map import AffinityPolicy
 from ai.backend.agent.stats import StatModes
 from ai.backend.agent.types import AgentBackend
 from ai.backend.agent.utils import get_arch_name
-from ai.backend.common.config import BaseConfigSchema
+from ai.backend.common.config import (
+    BaseConfigSchema,
+    reject_experimental_redis_event_dispatcher,
+)
 from ai.backend.common.configs import (
     EtcdConfig,
     OTELConfig,
@@ -1094,25 +1097,6 @@ class CommonAgentConfig(BaseConfigSchema):
             example=ConfigExample(local="", prod="/var/log/backend.ai/abuse"),
         ),
     ]
-    use_experimental_redis_event_dispatcher: Annotated[
-        bool,
-        Field(
-            default=False,
-            validation_alias=AliasChoices(
-                "use-experimental-redis-event-dispatcher", "use_experimental_redis_event_dispatcher"
-            ),
-            serialization_alias="use-experimental-redis-event-dispatcher",
-        ),
-        BackendAIConfigMeta(
-            description=(
-                "Enables the experimental Redis-based event dispatcher for agent-manager communication. "
-                "Provides improved event delivery reliability and scalability. "
-                "Requires Redis to be configured. Still in experimental phase."
-            ),
-            added_version="25.12.0",
-            example=ConfigExample(local="false", prod="false"),
-        ),
-    ]
     docker_mode: Annotated[
         str | None,
         Field(
@@ -1167,6 +1151,12 @@ class CommonAgentConfig(BaseConfigSchema):
         if rpc_host.is_link_local:
             raise ValueError("Cannot use link-local IP address as the RPC listening host.")
         return rpc_listen_addr
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_experimental_redis_event_dispatcher(cls, values: Any) -> Any:
+        reject_experimental_redis_event_dispatcher(values)
+        return values
 
 
 class OverridableAgentConfig(BaseConfigSchema):

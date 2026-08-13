@@ -4,7 +4,7 @@ import socket
 import sys
 from pathlib import Path
 from pprint import pformat
-from typing import Annotated, Self
+from typing import Annotated, Any, Self
 
 import click
 from pydantic import Field, FilePath, IPvAnyNetwork, ValidationError, model_validator
@@ -480,20 +480,6 @@ class ProxyCoordinatorConfig(BaseSchema):
         ),
     ]
 
-    use_experimental_redis_event_dispatcher: Annotated[
-        bool,
-        Field(default=False),
-        BackendAIConfigMeta(
-            description=(
-                "Enable the experimental Redis-based event dispatcher for real-time event "
-                "propagation between coordinator and workers. This feature is under development "
-                "and may have stability issues. Use with caution in production."
-            ),
-            added_version="25.9.0",
-            example=ConfigExample(local="false", prod="false"),
-        ),
-    ]
-
     enable_traefik: Annotated[
         bool,
         Field(default=False),
@@ -632,6 +618,12 @@ class ProxyCoordinatorConfig(BaseSchema):
             return f"{connection_info.host}:{connection_info.port}"
         protocol = "https" if (self.tls_advertised or self.tls_listen) else "http"
         return f"{protocol}://{connection_info.host}:{connection_info.port}"
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_experimental_redis_event_dispatcher(cls, values: Any) -> Any:
+        config.reject_experimental_redis_event_dispatcher(values)
+        return values
 
 
 class ServerConfig(BaseSchema):

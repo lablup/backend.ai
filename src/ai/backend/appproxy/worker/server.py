@@ -97,7 +97,6 @@ from ai.backend.common.exception import BackendAIError
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
 from ai.backend.common.health_checker.types import ComponentId
-from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.http import build_api_metric_middleware
@@ -342,11 +341,6 @@ async def _make_message_queue(
         db=REDIS_STREAM_DB,
     )
 
-    if root_ctx.local_config.proxy_worker.use_experimental_redis_event_dispatcher:
-        return HiRedisQueue(
-            stream_redis_target,
-            args,
-        )
     return await RedisQueue.create(
         stream_redis_target,
         args,

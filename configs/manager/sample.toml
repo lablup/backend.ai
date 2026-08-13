@@ -289,11 +289,6 @@
   # only from trusted networks for security.
   # Added in 25.8.0
   aiomonitor-webui-port = 39100
-  # Whether to use the experimental Redis-based event dispatcher. May provide
-  # better performance for event handling in large clusters. Not recommended for
-  # production use unless specifically tested and needed.
-  # Added in 25.8.0
-  use-experimental-redis-event-dispatcher = false
   # Interval in seconds between manager status updates to the cluster. Controls
   # how frequently the manager broadcasts its health status. Smaller values
   # provide more real-time information but increase network overhead.
