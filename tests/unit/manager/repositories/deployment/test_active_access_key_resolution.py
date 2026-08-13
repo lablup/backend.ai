@@ -146,15 +146,15 @@ class TestResolveUserAndActiveAccessKey:
             result = await db_source._resolve_user_and_active_access_key(sess, user_uuid)
         return result.access_key
 
-    async def test_picks_the_main_keypair_when_active(
+    async def test_picks_the_default_keypair_when_active(
         self,
         db: ExtendedAsyncSAEngine,
         db_source: DeploymentDBSource,
     ) -> None:
-        # The main keypair wins over a newer active key.
+        # The default keypair wins over a newer active key.
         user_uuid = uuid.uuid4()
         now = datetime.now(tz=UTC)
-        main_key = "AK" + "M" * 18
+        default_key = "AK" + "M" * 18
         other_active = "AK" + "O" * 18
         await self._seed(
             db,
@@ -163,7 +163,7 @@ class TestResolveUserAndActiveAccessKey:
                 domain_name=f"d-{uuid.uuid4().hex[:8]}",
                 keypairs=[
                     KeypairSpec(
-                        main_key,
+                        default_key,
                         is_active=True,
                         created_at=now - timedelta(days=10),
                         is_default=True,
@@ -175,7 +175,7 @@ class TestResolveUserAndActiveAccessKey:
 
         chosen = await self._resolve(db_source, user_uuid)
 
-        assert chosen == AccessKey(main_key)
+        assert chosen == AccessKey(default_key)
 
     async def test_raises_no_active_keypair_when_all_inactive(
         self,

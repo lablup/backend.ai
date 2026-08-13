@@ -202,7 +202,7 @@ Uses `DomainRow` from the models layer with the following key fields:
 - **name**: Unique domain identifier (primary key)
 - **description**: Optional domain description
 - **is_active**: Domain activation status
-- **created_at/modified_at**: Timestamp tracking
+- **created_at/updated_at**: Timestamp tracking
 - **total_resource_slots**: Available compute resources
 - **allowed_vfolder_hosts**: Virtual folder host permissions
 - **allowed_docker_registries**: Permitted Docker registries

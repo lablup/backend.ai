@@ -12,7 +12,6 @@ import sys
 import time
 import traceback
 import weakref
-import zlib
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from collections.abc import (
@@ -86,7 +85,6 @@ from ai.backend.agent.tasks import (
     ScanImagesTask,
     SyncContainerLifecyclesTask,
 )
-from ai.backend.common import msgpack
 from ai.backend.common.asyncio import cancel_tasks, current_loop
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
@@ -99,7 +97,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import ModelConfig, ModelDefinition
 from ai.backend.common.cron import LocalCron, PeriodicTask
-from ai.backend.common.data.agent.types import AgentInfo, ImageOpts
+from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.data.image.types import InstalledImageInfo, ScannedImage
 from ai.backend.common.defs import (
     REDIS_BGTASK_DB,
@@ -175,6 +173,7 @@ from ai.backend.common.exception import (
     ConfigurationError,
     VolumeMountFailed,
 )
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.json import (
     dump_json,
     dump_json_str,
@@ -216,6 +215,7 @@ from ai.backend.common.types import (
     MountTypes,
     RedisTarget,
     ResourceSlot,
+    ResourceSlotEntry,
     Sentinel,
     ServicePort,
     ServicePortProtocols,
@@ -1267,13 +1267,13 @@ class AbstractAgent[
         """
         Send my status information and available kernel images to the manager(s).
         """
-        slot_key_and_units: dict[SlotName, SlotTypes] = {}
+        slot_key_and_units: dict[ResourceSlotName, SlotTypes] = {}
         res_slots: dict[SlotName, Decimal] = {}
         try:
             for cctx in self.computers.values():
                 for slot_key, slot_type in cctx.instance.slot_types:
                     # TODO: Need to fix when cctx.instance.slot_types receives str instead of SlotName
-                    slot_key_and_units[SlotName(slot_key)] = slot_type
+                    slot_key_and_units[ResourceSlotName(str(slot_key))] = slot_type
                     res_slots[SlotName(slot_key)] = Decimal(str(self.slots.get(slot_key, 0)))
             agent_info = AgentInfo(
                 ip=str(self.rpc_addr.host),
@@ -1282,7 +1282,9 @@ class AbstractAgent[
                 addr=f"tcp://{self.rpc_addr}",
                 public_key=self.agent_public_key,
                 public_host=str(self._get_public_host()),
-                available_resource_slots=ResourceSlot(res_slots),
+                available_resource_slots=ResourceSlotEntry.from_resource_slot(
+                    ResourceSlot(res_slots)
+                ),
                 slot_key_and_units=slot_key_and_units,
                 version=VERSION,
                 compute_plugins={
@@ -1292,13 +1294,6 @@ class AbstractAgent[
                     }
                     for key, computer in self.computers.items()
                 },
-                images=zlib.compress(
-                    msgpack.packb([
-                        (str(canonical), image_info.digest)
-                        for canonical, image_info in self.images.items()
-                    ])
-                ),
-                images_opts=ImageOpts(compression="zlib"),  # compression: zlib or None
                 architecture=get_arch_name(),
                 auto_terminate_abusing_kernel=self.local_config.agent.force_terminate_abusing_containers,
             )

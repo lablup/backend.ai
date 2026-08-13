@@ -57,7 +57,7 @@ def _make_domain_data(
         is_active=is_active,
         is_default=is_default,
         created_at=now,
-        modified_at=now,
+        updated_at=now,
         total_resource_slots=ResourceSlot(),
         allowed_vfolder_hosts=VFolderHostPermissionMap(),
         allowed_docker_registries=[],
@@ -191,7 +191,7 @@ class TestCreateDomain:
         result = await service.create_domain(action)
 
         assert result.domain_data.created_at is not None
-        assert result.domain_data.modified_at is not None
+        assert result.domain_data.updated_at is not None
 
 
 class TestGetDomain:

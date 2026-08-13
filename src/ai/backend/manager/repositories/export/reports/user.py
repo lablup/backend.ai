@@ -63,8 +63,8 @@ PROJECT_JOIN = JoinDef(
 )
 PROJECT_JOINS = (ASSOC_GROUP_USER_JOIN, PROJECT_JOIN)
 
-# Main Keypair JOIN (N:1, no duplication)
-MAIN_KEYPAIR_JOIN = JoinDef(
+# Default Keypair JOIN (N:1, no duplication)
+DEFAULT_KEYPAIR_JOIN = JoinDef(
     table=KeyPairRow.__table__,
     condition=(KeyPairRow.user == UserRow.uuid) & KeyPairRow.is_default,
 )
@@ -243,7 +243,7 @@ USER_FIELDS: list[ExportFieldDef] = [
         joins=PROJECT_JOINS,
     ),
     # =========================================================================
-    # Main Keypair Fields (N:1, no duplication)
+    # Default Keypair Fields (N:1, no duplication)
     # =========================================================================
     ExportFieldDef(
         key="main_access_key",
@@ -254,7 +254,7 @@ USER_FIELDS: list[ExportFieldDef] = [
         ),
         field_type=ExportFieldType.STRING,
         column=KeyPairRow.access_key,
-        joins=frozenset({MAIN_KEYPAIR_JOIN}),
+        joins=frozenset({DEFAULT_KEYPAIR_JOIN}),
     ),
     ExportFieldDef(
         key="main_keypair_is_active",
@@ -262,7 +262,7 @@ USER_FIELDS: list[ExportFieldDef] = [
         description="Main keypair active status",
         field_type=ExportFieldType.BOOLEAN,
         column=KeyPairRow.is_active,
-        joins=frozenset({MAIN_KEYPAIR_JOIN}),
+        joins=frozenset({DEFAULT_KEYPAIR_JOIN}),
     ),
     ExportFieldDef(
         key="main_keypair_created_at",
@@ -271,7 +271,7 @@ USER_FIELDS: list[ExportFieldDef] = [
         field_type=ExportFieldType.DATETIME,
         column=KeyPairRow.created_at,
         formatter=lambda v: v.isoformat() if v else "",
-        joins=frozenset({MAIN_KEYPAIR_JOIN}),
+        joins=frozenset({DEFAULT_KEYPAIR_JOIN}),
     ),
     ExportFieldDef(
         key="main_keypair_last_used",
@@ -280,7 +280,7 @@ USER_FIELDS: list[ExportFieldDef] = [
         field_type=ExportFieldType.DATETIME,
         column=KeyPairRow.last_used,
         formatter=lambda v: v.isoformat() if v else "",
-        joins=frozenset({MAIN_KEYPAIR_JOIN}),
+        joins=frozenset({DEFAULT_KEYPAIR_JOIN}),
     ),
 ]
 
