@@ -6797,8 +6797,10 @@ type DomainLifecycleInfo
   """Timestamp when the domain was created."""
   createdAt: DateTime!
 
-  """Timestamp when the domain was last modified."""
-  modifiedAt: DateTime!
+  """
+  Added in 26.9.0. Timestamp when the domain was last updated. Replaces modified_at.
+  """
+  updatedAt: DateTime!
 }
 
 """Added in 24.12.0."""
@@ -7123,7 +7125,9 @@ input DomainV2Filter
   description: StringFilter = null
   isActive: Boolean = null
   createdAt: DateTimeFilter = null
-  modifiedAt: DateTimeFilter = null
+
+  """Added in 26.9.0. Filter by last update time. Replaces modified_at."""
+  updatedAt: DateTimeFilter = null
   project: DomainProjectNestedFilter = null
   user: DomainUserNestedFilter = null
   AND: [DomainV2Filter!] = null
@@ -7142,13 +7146,13 @@ input DomainV2OrderBy
 }
 
 """
-Added in 26.2.0. Fields available for ordering domain query results. CREATED_AT: Order by creation timestamp. MODIFIED_AT: Order by last modification timestamp. NAME: Order by domain name alphabetically. IS_ACTIVE: Order by active status. PROJECT_NAME: Order by project name (MIN aggregation). USER_USERNAME: Order by username (MIN aggregation). USER_EMAIL: Order by user email (MIN aggregation).
+Added in 26.2.0. Fields available for ordering domain query results. CREATED_AT: Order by creation timestamp. UPDATED_AT: Order by last update timestamp. NAME: Order by domain name alphabetically. IS_ACTIVE: Order by active status. PROJECT_NAME: Order by project name (MIN aggregation). USER_USERNAME: Order by username (MIN aggregation). USER_EMAIL: Order by user email (MIN aggregation).
 """
 enum DomainV2OrderField
   @join__type(graph: STRAWBERRY)
 {
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
-  MODIFIED_AT @join__enumValue(graph: STRAWBERRY)
+  UPDATED_AT @join__enumValue(graph: STRAWBERRY)
   NAME @join__enumValue(graph: STRAWBERRY)
   IS_ACTIVE @join__enumValue(graph: STRAWBERRY)
   PROJECT_NAME @join__enumValue(graph: STRAWBERRY)
