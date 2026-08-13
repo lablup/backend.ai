@@ -31,7 +31,7 @@ class DomainOrders:
         return DomainRow.created_at.desc()
 
     @staticmethod
-    def updated_at(ascending: bool = True) -> QueryOrder:
+    def modified_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return DomainRow.updated_at.asc()
         return DomainRow.updated_at.desc()

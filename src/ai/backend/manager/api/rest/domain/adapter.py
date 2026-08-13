@@ -41,7 +41,7 @@ class DomainAdapter(BaseFilterAdapter):
             description=data.description,
             is_active=data.is_active,
             created_at=data.created_at,
-            modified_at=data.updated_at,
+            modified_at=data.modified_at,
             total_resource_slots=dict(data.total_resource_slots),
             allowed_vfolder_hosts=dict(data.allowed_vfolder_hosts),
             allowed_docker_registries=data.allowed_docker_registries,
@@ -122,7 +122,7 @@ class DomainAdapter(BaseFilterAdapter):
         if order.field == DomainOrderField.CREATED_AT:
             return DomainOrders.created_at(ascending=ascending)
         if order.field == DomainOrderField.MODIFIED_AT:
-            return DomainOrders.updated_at(ascending=ascending)
+            return DomainOrders.modified_at(ascending=ascending)
         raise ValueError(f"Unknown order field: {order.field}")
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:

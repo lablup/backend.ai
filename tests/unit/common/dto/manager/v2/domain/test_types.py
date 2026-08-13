@@ -43,11 +43,8 @@ class TestDomainOrderField:
     def test_modified_at_value(self) -> None:
         assert DomainOrderField.MODIFIED_AT.value == "modified_at"
 
-    def test_updated_at_value(self) -> None:
-        assert DomainOrderField.UPDATED_AT.value == "updated_at"
-
     def test_enum_members_count(self) -> None:
-        assert len(list(DomainOrderField)) == 8
+        assert len(list(DomainOrderField)) == 7
 
     def test_all_values_are_strings(self) -> None:
         for member in DomainOrderField:
@@ -61,6 +58,3 @@ class TestDomainOrderField:
 
     def test_from_string_modified_at(self) -> None:
         assert DomainOrderField("modified_at") is DomainOrderField.MODIFIED_AT
-
-    def test_from_string_updated_at(self) -> None:
-        assert DomainOrderField("updated_at") is DomainOrderField.UPDATED_AT

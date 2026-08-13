@@ -236,8 +236,8 @@ class DomainConditions:
         return inner
 
     @staticmethod
-    def by_updated_at_before(dt: datetime) -> QueryCondition:
-        """Filter by updated_at < datetime."""
+    def by_modified_at_before(dt: datetime) -> QueryCondition:
+        """Filter by modified_at < datetime."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return DomainRow.updated_at < dt
@@ -245,8 +245,8 @@ class DomainConditions:
         return inner
 
     @staticmethod
-    def by_updated_at_after(dt: datetime) -> QueryCondition:
-        """Filter by updated_at > datetime."""
+    def by_modified_at_after(dt: datetime) -> QueryCondition:
+        """Filter by modified_at > datetime."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return DomainRow.updated_at > dt
@@ -254,8 +254,8 @@ class DomainConditions:
         return inner
 
     @staticmethod
-    def by_updated_at_equals(dt: datetime) -> QueryCondition:
-        """Filter by updated_at == datetime."""
+    def by_modified_at_equals(dt: datetime) -> QueryCondition:
+        """Filter by modified_at == datetime."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return DomainRow.updated_at == dt

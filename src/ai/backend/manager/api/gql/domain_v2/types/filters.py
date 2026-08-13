@@ -77,13 +77,6 @@ class DomainV2Filter(PydanticInputMixin[DomainFilter]):
     is_active: bool | None = None
     created_at: DateTimeFilter | None = None
     modified_at: DateTimeFilter | None = None
-    updated_at: DateTimeFilter | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
-            description="Filter by last update time. Replaces modified_at.",
-        ),
-        default=None,
-    )
     project: DomainProjectNestedFilter | None = None
     user: DomainUserNestedFilter | None = None
     AND: list[Self] | None = None
@@ -97,8 +90,7 @@ class DomainV2Filter(PydanticInputMixin[DomainFilter]):
         description=(
             "Fields available for ordering domain query results. "
             "CREATED_AT: Order by creation timestamp. "
-            "MODIFIED_AT: Order by last modification timestamp, deprecated in favor of UPDATED_AT. "
-            "UPDATED_AT: Order by last update timestamp. "
+            "MODIFIED_AT: Order by last modification timestamp. "
             "NAME: Order by domain name alphabetically. "
             "IS_ACTIVE: Order by active status. "
             "PROJECT_NAME: Order by project name (MIN aggregation). "
@@ -111,7 +103,6 @@ class DomainV2Filter(PydanticInputMixin[DomainFilter]):
 class DomainV2OrderField(StrEnum):
     CREATED_AT = "created_at"
     MODIFIED_AT = "modified_at"
-    UPDATED_AT = "updated_at"
     NAME = "name"
     IS_ACTIVE = "is_active"
     PROJECT_NAME = "project_name"

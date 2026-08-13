@@ -16,7 +16,6 @@ from ai.backend.common.dto.manager.v2.domain.types import (
     DomainUserFilter,
     OrderDirection,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AdminSearchDomainsInput",
@@ -102,15 +101,7 @@ class DomainFilter(BaseRequestModel):
     is_active: bool | None = Field(default=None, description="Filter by active status.")
     created_at: DateTimeFilter | None = Field(default=None, description="Filter by creation time.")
     modified_at: DateTimeFilter | None = Field(
-        default=None,
-        description=(
-            "Filter by last modification time. "
-            f"Deprecated since {NEXT_RELEASE_VERSION}. Use updated_at."
-        ),
-        deprecated=True,
-    )
-    updated_at: DateTimeFilter | None = Field(
-        default=None, description="Filter by last update time."
+        default=None, description="Filter by last modification time."
     )
     project: DomainProjectFilter | None = Field(
         default=None, description="Filter by nested project conditions."
