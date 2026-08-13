@@ -8,11 +8,12 @@ from ai.backend.account_manager.types import UserRole, UserStatus
 from ai.backend.account_manager.utils import verify_password
 
 from .base import GUID, Base, PasswordColumn, StrEnumType
+from .mixins.timestamp import LifecycleTimestampsMixin
 
 __all__: tuple[str, ...] = ("UserProfileRow",)
 
 
-class UserProfileRow(Base):
+class UserProfileRow(LifecycleTimestampsMixin, Base):
     __tablename__ = "user_profiles"
     id: Mapped[UUID] = mapped_column(
         GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
@@ -45,14 +46,6 @@ class UserProfileRow(Base):
         "status", StrEnumType(UserStatus), server_default=UserStatus.ACTIVE.value, nullable=False
     )
     status_info: Mapped[str | None] = mapped_column("status_info", sa.Unicode(), nullable=True)
-
-    created_at = sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now())
-    modified_at = sa.Column(
-        "modified_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        onupdate=sa.func.current_timestamp(),
-    )
 
     user_row = relationship(
         "UserRow",
