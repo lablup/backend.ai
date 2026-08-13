@@ -75,7 +75,7 @@ class LoginClientTypeAdapter(BaseAdapter):
             name=data.name,
             description=data.description,
             created_at=data.created_at,
-            modified_at=data.modified_at,
+            modified_at=data.updated_at,
         )
 
     @staticmethod

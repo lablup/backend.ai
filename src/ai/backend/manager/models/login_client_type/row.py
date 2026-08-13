@@ -32,5 +32,5 @@ class LoginClientTypeRow(LifecycleTimestampsMixin, Base):
             name=self.name,
             description=self.description,
             created_at=self.created_at,
-            modified_at=self.updated_at,
+            updated_at=self.updated_at,
         )
