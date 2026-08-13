@@ -34,7 +34,7 @@ class DomainData:
     is_active: bool
     is_default: bool
     created_at: datetime = field(compare=False)
-    modified_at: datetime = field(compare=False)
+    updated_at: datetime = field(compare=False)
     total_resource_slots: ResourceSlot
     allowed_vfolder_hosts: VFolderHostPermissionMap
     allowed_docker_registries: list[str]

@@ -75,7 +75,7 @@ def row_to_data(row: DomainRow | Row[Any]) -> DomainData:
         is_active=row.is_active,
         is_default=row.is_default,
         created_at=row.created_at,
-        modified_at=row.updated_at,
+        updated_at=row.updated_at,
         total_resource_slots=row.total_resource_slots,
         allowed_vfolder_hosts=row.allowed_vfolder_hosts,
         allowed_docker_registries=row.allowed_docker_registries,
@@ -159,7 +159,7 @@ class DomainModel(RBACModel[DomainPermission]):
     description: str | None
     is_active: bool
     created_at: datetime
-    modified_at: datetime
+    updated_at: datetime
 
     _total_resource_slots: ResourceSlot
     _allowed_vfolder_hosts: VFolderHostPermissionMap
@@ -208,7 +208,7 @@ class DomainModel(RBACModel[DomainPermission]):
             description=row.description,
             is_active=row.is_active,
             created_at=row.created_at,
-            modified_at=row.updated_at,
+            updated_at=row.updated_at,
             _total_resource_slots=row.total_resource_slots,
             _allowed_vfolder_hosts=row.allowed_vfolder_hosts,
             _allowed_docker_registries=row.allowed_docker_registries,
