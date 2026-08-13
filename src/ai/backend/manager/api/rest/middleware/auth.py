@@ -618,6 +618,18 @@ async def _query_auth_context_by_access_key(
                     KeyPairRow.rate_limit,
                 ),
                 joinedload(KeyPairRow.resource_policy_row),
+                joinedload(KeyPairRow.user_row).options(
+                    load_only(
+                        UserRow.uuid,
+                        UserRow.email,
+                        UserRow.role,
+                        UserRow.domain_name,
+                        UserRow.domain_id,
+                        UserRow.sudo_session_enabled,
+                        UserRow.allowed_client_ip,
+                    ),
+                    joinedload(UserRow.resource_policy_row),
+                ),
             )
             .where(
                 (KeyPairRow.access_key == access_key) & (KeyPairRow.is_active.is_(True)),
@@ -626,25 +638,7 @@ async def _query_auth_context_by_access_key(
         if keypair_row is None:
             return None
 
-        user_row = await sess.scalar(
-            sa.select(UserRow)
-            .options(
-                load_only(
-                    UserRow.uuid,
-                    UserRow.email,
-                    UserRow.role,
-                    UserRow.domain_name,
-                    UserRow.domain_id,
-                    UserRow.sudo_session_enabled,
-                    UserRow.allowed_client_ip,
-                ),
-                joinedload(UserRow.resource_policy_row),
-            )
-            .where(UserRow.uuid == keypair_row.user)
-        )
-        if user_row is None:
-            return None
-
+        user_row = keypair_row.user_row
         return _AuthContext(
             user=AuthenticatedUser(
                 uuid=UserID(user_row.uuid),
