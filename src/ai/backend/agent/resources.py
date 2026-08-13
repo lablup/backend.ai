@@ -123,7 +123,7 @@ class KernelResourceSpec:
     slots: ResourceSlot
     """Stores the original user-requested resource slots."""
 
-    allocations: MutableMapping[DeviceName, DeviceAllocation]
+    allocations: MutableMapping[DeviceName, Mapping[SlotName, Mapping[DeviceId, Decimal]]]
     """
     Represents the resource allocations for each slot (device) type and devices.
     """
