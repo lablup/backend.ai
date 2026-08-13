@@ -606,7 +606,7 @@ async def _query_auth_context_by_access_key(
 
     Only the columns that context carries are loaded, and the rows stay inside this session.
     """
-    async with db.begin_readonly_session() as sess:
+    async with db.begin_readonly_session_read_committed() as sess:
         keypair_row = await sess.scalar(
             sa.select(KeyPairRow)
             .options(
