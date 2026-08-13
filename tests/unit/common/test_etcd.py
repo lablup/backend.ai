@@ -7,7 +7,15 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from etcd_client import CondVar, GRPCStatusCode, GRPCStatusError, WatchEventType
+from etcd_client import (
+    Compare,
+    CompareOp,
+    CondVar,
+    GRPCStatusCode,
+    GRPCStatusError,
+    Txn,
+    WatchEventType,
+)
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes, Event
 from ai.backend.common.types import HostPortPair, QueueSentinel
@@ -245,6 +253,37 @@ async def test_atomic_replace_prefixes_multiple_subtrees(etcd: AsyncEtcd) -> Non
     }
     assert await etcd.get_prefix("cfg/services/bai_service_e") == {
         "loadBalancer": {"servers": {"0": "new"}}
+    }
+
+
+async def test_atomic_replace_prefixes_skips_unchanged_keys(etcd: AsyncEtcd) -> None:
+    await etcd.put_prefix("svc/bai_service_f", {"loadBalancer": {"servers": {"0": {"url": "u0"}}}})
+
+    url_key = f"/sorna/{etcd.ns}/global/svc/bai_service_f/loadBalancer/servers/0/url".encode()
+
+    # etcd bumps a key's version on every put even when the value is identical, so
+    # re-publishing an unchanged subtree on a periodic reconcile would grow the mvcc
+    # history until the backend quota is exceeded. A version still at 1 proves the
+    # replace issued no put at all.
+    await etcd.atomic_replace_prefixes({
+        "svc/bai_service_f": {"loadBalancer": {"servers": {"0": {"url": "u0"}}}},
+    })
+    async with etcd.etcd.connect() as communicator:
+        unchanged = await communicator.txn(
+            Txn().when([Compare.version(url_key, CompareOp.EQUAL, 1)]).and_then([]).or_else([])
+        )
+    assert unchanged.succeeded()
+
+    await etcd.atomic_replace_prefixes({
+        "svc/bai_service_f": {"loadBalancer": {"servers": {"0": {"url": "u1"}}}},
+    })
+    async with etcd.etcd.connect() as communicator:
+        changed = await communicator.txn(
+            Txn().when([Compare.version(url_key, CompareOp.EQUAL, 2)]).and_then([]).or_else([])
+        )
+    assert changed.succeeded()
+    assert await etcd.get_prefix("svc/bai_service_f") == {
+        "loadBalancer": {"servers": {"0": {"url": "u1"}}}
     }
 
 

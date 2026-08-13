@@ -252,7 +252,9 @@ services:
       --initial-advertise-peer-urls http://$${MYSELF}:2380
       --initial-cluster $${CLUSTER}
       --initial-cluster-token $${TOKEN}
-      --initial-cluster-state $${STATE}"
+      --initial-cluster-state $${STATE}
+      --auto-compaction-mode periodic
+      --auto-compaction-retention 1"
 
   backendai-half-etcd-node02:
     image: quay.io/coreos/etcd:v3.5.4
@@ -276,7 +278,9 @@ services:
       --initial-advertise-peer-urls http://$${MYSELF}:2380
       --initial-cluster $${CLUSTER}
       --initial-cluster-token $${TOKEN}
-      --initial-cluster-state $${STATE}"
+      --initial-cluster-state $${STATE}
+      --auto-compaction-mode periodic
+      --auto-compaction-retention 1"
 
   backendai-half-etcd-node03:
     image: quay.io/coreos/etcd:v3.5.4
@@ -300,7 +304,9 @@ services:
       --initial-advertise-peer-urls http://$${MYSELF}:2380
       --initial-cluster $${CLUSTER}
       --initial-cluster-token $${TOKEN}
-      --initial-cluster-state $${STATE}"
+      --initial-cluster-state $${STATE}
+      --auto-compaction-mode periodic
+      --auto-compaction-retention 1"
 
   backendai-half-grafana:
     image: grafana/grafana-enterprise:11.4.0

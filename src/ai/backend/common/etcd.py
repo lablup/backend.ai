@@ -505,10 +505,16 @@ class AsyncEtcd(AbstractKVStore):
 
         For every ``(prefix, dict_obj)`` pair the subtree rooted at ``prefix`` is
         replaced by the flattened ``dict_obj``: keys present under the prefix but
-        absent from the new contents are deleted, and every new key is put. The
-        current-key reads and the delete/put operations are committed as one
-        transaction so watchers (e.g. Traefik) never observe a partially-applied
+        absent from the new contents are deleted, and keys whose value changes are
+        put. The current-value reads and the delete/put operations are committed as
+        one transaction so watchers (e.g. Traefik) never observe a partially-applied
         state where a router's backing service has briefly vanished.
+
+        A key already holding the new value is left out of the transaction: etcd
+        bumps the revision on every put even when the value is identical, so
+        re-publishing an unchanged subtree on a periodic reconcile would grow the
+        mvcc history until the backend quota is exceeded. Replacing an unchanged
+        subtree therefore issues no transaction at all.
 
         An empty ``dict_obj`` removes the whole subtree under its prefix. Prefixes
         are expected to be disjoint subtrees (one per logical object); sibling
@@ -522,21 +528,24 @@ class AsyncEtcd(AbstractKVStore):
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
 
         new_pairs: dict[str, str] = {}
-        existing_keys: set[str] = set()
+        existing_pairs: dict[str, str] = {}
         async with self.etcd.connect() as communicator:
             for prefix, dict_obj in replacements.items():
                 mangled_prefix = self._mangle_key(f"{_slash(scope_prefix)}{prefix}")
                 pairs = await communicator.get_prefix(mangled_prefix.encode(self.encoding))
-                for raw_key, _ in pairs:
-                    existing_keys.add(bytes(raw_key).decode(self.encoding))
+                for raw_key, raw_value in pairs:
+                    existing_pairs[bytes(raw_key).decode(self.encoding)] = bytes(raw_value).decode(
+                        self.encoding
+                    )
                 for k, v in _flatten_nested_dict(prefix, dict_obj).items():
                     new_pairs[self._mangle_key(f"{_slash(scope_prefix)}{k}")] = str(v)
 
-            stale_keys = existing_keys - new_pairs.keys()
+            stale_keys = existing_pairs.keys() - new_pairs.keys()
             actions = [TxnOp.delete(k.encode(self.encoding)) for k in stale_keys]
             actions.extend(
                 TxnOp.put(k.encode(self.encoding), v.encode(self.encoding))
                 for k, v in new_pairs.items()
+                if existing_pairs.get(k) != v
             )
             if not actions:
                 return
