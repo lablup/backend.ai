@@ -83,11 +83,6 @@ class _PlacementScope:
     resource_group_name: str
 
 
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
-
-
 class TestUserPurgerSpecs:
     """Tests for PurgerSpec classes - verifying build_subquery() generates correct conditions."""
 
@@ -324,7 +319,7 @@ class TestUserPurgersIntegration:
                 domain_name=sample_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy,
-                domain_id=domain_id,
+                domain_id=sample_domain.domain_id,
             )
             session.add(user)
             await session.flush()

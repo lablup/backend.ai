@@ -74,11 +74,6 @@ from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 
 
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
-
-
 def _running_route(
     endpoint_row: EndpointRow,
     group_id: ReplicaGroupID,

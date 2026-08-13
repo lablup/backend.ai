@@ -59,11 +59,6 @@ from ai.backend.manager.repositories.permission_controller.repository import (
 from ai.backend.testutils.db import with_tables
 
 
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
-
-
 def create_test_password_info(password: str = "test_password") -> PasswordInfo:
     """Create a PasswordInfo object for testing with default PBKDF2 algorithm."""
     return PasswordInfo(
@@ -128,10 +123,10 @@ class TestSearchDomainScopes:
     async def sample_domains(
         self,
         db_with_scope_tables: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> list[str]:
         """Create sample domains for testing."""
         domain_names = ["test-domain-alpha", "test-domain-beta", "prod-domain"]
+        domain_id = DomainID(uuid.uuid4())
 
         async with db_with_scope_tables.begin_session() as db_sess:
             for name in domain_names:
@@ -150,10 +145,10 @@ class TestSearchDomainScopes:
     async def sample_domains_for_pagination(
         self,
         db_with_scope_tables: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> list[str]:
         """Create 15 sample domains for pagination testing."""
         domain_names = [f"domain-{i:02d}" for i in range(15)]
+        domain_id = DomainID(uuid.uuid4())
 
         async with db_with_scope_tables.begin_session() as db_sess:
             for name in domain_names:
@@ -388,10 +383,10 @@ class TestSearchProjectScopes:
     async def sample_domain_with_policy(
         self,
         db_with_scope_tables: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
-    ) -> tuple[str, str]:
+    ) -> tuple[str, str, DomainID]:
         """Create a sample domain and project resource policy for projects."""
         domain_name = "test-domain-for-projects"
+        domain_id = DomainID(uuid.uuid4())
         policy_name = "test-project-policy"
 
         async with db_with_scope_tables.begin_session() as db_sess:
@@ -412,7 +407,7 @@ class TestSearchProjectScopes:
             db_sess.add(policy)
             await db_sess.flush()
 
-        return domain_name, policy_name
+        return domain_name, policy_name, domain_id
 
     @pytest.fixture
     async def sample_projects(
@@ -606,10 +601,10 @@ class TestSearchUserScopes:
     async def sample_domain_with_user_policy(
         self,
         db_with_scope_tables: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> tuple[str, str]:
         """Create a sample domain and user resource policy for users."""
         domain_name = "test-domain-for-users"
+        domain_id = DomainID(uuid.uuid4())
         policy_name = "test-user-policy"
 
         async with db_with_scope_tables.begin_session() as db_sess:
@@ -637,10 +632,10 @@ class TestSearchUserScopes:
     async def sample_users(
         self,
         db_with_scope_tables: ExtendedAsyncSAEngine,
-        sample_domain_with_user_policy: tuple[str, str],
+        sample_domain_with_user_policy: tuple[str, str, DomainID],
     ) -> list[uuid.UUID]:
         """Create sample users for testing."""
-        domain_name, policy_name = sample_domain_with_user_policy
+        domain_name, policy_name, domain_id = sample_domain_with_user_policy
         user_ids: list[uuid.UUID] = []
 
         async with db_with_scope_tables.begin_session() as db_sess:
@@ -673,10 +668,10 @@ class TestSearchUserScopes:
     async def sample_users_for_pagination(
         self,
         db_with_scope_tables: ExtendedAsyncSAEngine,
-        sample_domain_with_user_policy: tuple[str, str],
+        sample_domain_with_user_policy: tuple[str, str, DomainID],
     ) -> list[uuid.UUID]:
         """Create 15 sample users for pagination testing."""
-        domain_name, policy_name = sample_domain_with_user_policy
+        domain_name, policy_name, domain_id = sample_domain_with_user_policy
         user_ids: list[uuid.UUID] = []
 
         async with db_with_scope_tables.begin_session() as db_sess:
@@ -877,10 +872,10 @@ class TestSearchScopesEmptyResult:
     async def sample_domains(
         self,
         db_with_scope_tables: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> list[str]:
         """Create sample domains for testing."""
         domain_names = ["test-domain-alpha", "test-domain-beta", "prod-domain"]
+        domain_id = DomainID(uuid.uuid4())
 
         async with db_with_scope_tables.begin_session() as db_sess:
             for name in domain_names:

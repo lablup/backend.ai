@@ -45,11 +45,6 @@ from ai.backend.testutils.db import with_tables
 CreateKernelForImageFunc = Callable[[ImageRow, datetime], Coroutine[Any, Any, None]]
 
 
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
-
-
 class TestImageRepositorySearch:
     """Test cases for ImageRepository search functionality"""
 
@@ -494,9 +489,9 @@ class TestImageRepositoryLastUsedAt:
     async def domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        domain_id: DomainID,
     ) -> DomainRow:
         name = f"test-{uuid4()}"
+        domain_id = DomainID(uuid.uuid4())
         domain = DomainRow(id=domain_id, name=name)
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(domain)
@@ -566,7 +561,7 @@ class TestImageRepositoryLastUsedAt:
             email=f"test-{uuid4().hex[:8]}@example.com",
             domain_name=domain.name,
             resource_policy=user_policy.name,
-            domain_id=domain_id,
+            domain_id=DomainID(domain.id),
         )
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(user)

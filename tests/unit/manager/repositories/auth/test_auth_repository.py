@@ -90,11 +90,6 @@ class ResourcePolicyTestData:
     name: str
 
 
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
-
-
 class TestAuthRepository:
     """Test cases for AuthRepository with real database"""
 
@@ -259,7 +254,7 @@ class TestAuthRepository:
                 role=UserRole.USER,
                 resource_policy=user_resource_policy.name,
                 need_password_change=False,
-                domain_id=domain_id,
+                domain_id=default_domain.id,
             )
             db_sess.add(user)
             await db_sess.flush()

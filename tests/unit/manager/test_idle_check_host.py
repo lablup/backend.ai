@@ -112,11 +112,6 @@ _IDLE_ROWS: list[TableOrORM] = [
 ]
 
 
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
-
-
 class _RecordingChecker(BaseIdleChecker):
     """Records which kernels were checked and with which policy."""
 
@@ -304,6 +299,7 @@ class TestDoIdleCheck:
         db: ExtendedAsyncSAEngine,
         *,
         domain_name: str,
+        domain_id: DomainID,
         user_resource_policy_name: str,
         main_keypair_idle_timeout: int | None,
     ) -> tuple[uuid.UUID, AccessKey | None]:
@@ -458,6 +454,7 @@ class TestDoIdleCheck:
         user_uuid, main_access_key = await self._create_user(
             db,
             domain_name=domain[1],
+            domain_id=domain[0],
             user_resource_policy_name=user_resource_policy_name,
             main_keypair_idle_timeout=600,
         )
@@ -490,6 +487,7 @@ class TestDoIdleCheck:
         user_uuid, _ = await self._create_user(
             db,
             domain_name=domain[1],
+            domain_id=domain[0],
             user_resource_policy_name=user_resource_policy_name,
             main_keypair_idle_timeout=600,
         )
@@ -522,12 +520,14 @@ class TestDoIdleCheck:
         policyless_uuid, _ = await self._create_user(
             db,
             domain_name=domain[1],
+            domain_id=domain[0],
             user_resource_policy_name=user_resource_policy_name,
             main_keypair_idle_timeout=None,
         )
         normal_uuid, normal_access_key = await self._create_user(
             db,
             domain_name=domain[1],
+            domain_id=domain[0],
             user_resource_policy_name=user_resource_policy_name,
             main_keypair_idle_timeout=600,
         )
@@ -578,6 +578,7 @@ class TestDoIdleCheck:
         user_uuid, access_key = await self._create_user(
             db,
             domain_name=domain[1],
+            domain_id=domain[0],
             user_resource_policy_name=user_resource_policy_name,
             main_keypair_idle_timeout=600,
         )

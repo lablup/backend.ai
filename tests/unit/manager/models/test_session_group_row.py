@@ -45,11 +45,6 @@ class _OwnershipScope:
     resource_group_name: str
 
 
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
-
-
 class TestSessionGroupSchema:
     """Column contracts the scheduler and the retention sweep rely on."""
 
@@ -59,7 +54,7 @@ class TestSessionGroupSchema:
         assert columns["placement_direction"].nullable is False
         assert columns["placement_enforcement"].nullable is False
 
-    def test_ownership_axes_match_sessions_and_endpoints(self, domain_id: DomainID) -> None:
+    def test_ownership_axes_match_sessions_and_endpoints(self) -> None:
         columns = SessionGroupRow.__table__.columns
 
         targets = {

@@ -65,11 +65,6 @@ class TestConfig:
     second_session_status: SessionStatus
 
 
-@pytest.fixture
-def domain_id() -> DomainID:
-    return DomainID(uuid.uuid4())
-
-
 class TestSessionUniqueNamePerUser:
     @pytest.fixture
     async def database_with_tables(
@@ -191,7 +186,7 @@ class TestSessionUniqueNamePerUser:
             email=f"user-a-{uuid.uuid4().hex[:8]}@example.com",
             domain_name=domain.name,
             resource_policy=user_policy.name,
-            domain_id=domain_id,
+            domain_id=DomainID(domain.id),
         )
 
         async with database_with_tables.begin_session() as db_sess:
@@ -213,7 +208,7 @@ class TestSessionUniqueNamePerUser:
             email=f"user-b-{uuid.uuid4().hex[:8]}@example.com",
             domain_name=domain.name,
             resource_policy=user_policy.name,
-            domain_id=domain_id,
+            domain_id=DomainID(domain.id),
         )
 
         async with database_with_tables.begin_session() as db_sess:
