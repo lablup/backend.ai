@@ -410,7 +410,6 @@ async def user_with_rbac_rows(
                 status=UserStatus.ACTIVE,
                 status_info="admin-requested",
                 domain_name=domain_fixture.domain_name,
-                domain_id=domain_fixture.domain_id,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.USER,
                 domain_id=sa.select(DomainRow.id)

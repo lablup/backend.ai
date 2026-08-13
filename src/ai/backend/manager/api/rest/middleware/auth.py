@@ -58,7 +58,7 @@ from ai.backend.manager.errors.auth import (
     InvalidClientIPConfig,
     UserNotFound,
 )
-from ai.backend.manager.errors.common import GenericForbidden, InternalServerError, RejectedByHook
+from ai.backend.manager.errors.common import GenericForbidden, RejectedByHook
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import execute_with_retry
@@ -644,19 +644,6 @@ async def _query_auth_context_by_access_key(
         )
         if user_row is None:
             return None
-        if user_row.domain_name is None or user_row.domain_id is None:
-            missing_fields = [
-                name
-                for name, value in (
-                    ("domain_name", user_row.domain_name),
-                    ("domain_id", user_row.domain_id),
-                )
-                if value is None
-            ]
-            raise InternalServerError(
-                f"The authenticated user has no {', '.join(missing_fields)} "
-                f"(user_id={user_row.uuid})"
-            )
 
         return _AuthContext(
             user=AuthenticatedUser(

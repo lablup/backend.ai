@@ -24,12 +24,7 @@ from ai.backend.manager.errors.auth import (
 ACT_AS_HEADER = "X-BackendAI-Act-As"
 
 
-def _make_request(*, headers: dict[str, str] | None = None) -> Any:
-    return make_mocked_request("GET", "/v2/foo", headers=headers or {})
-
-
 def _make_caller(role: UserRole) -> UserData:
-    """The caller's ``UserData`` as the auth middleware builds it."""
     return UserData(
         user_id=uuid.uuid4(),
         is_authorized=True,
@@ -68,7 +63,7 @@ class RejectCase:
 
 class TestResolveEffectiveUser:
     async def test_no_header_returns_authenticated_user(self) -> None:
-        request = _make_request()
+        request = make_mocked_request("GET", "/v2/foo")
         caller = _make_caller(UserRole.USER)
         effective = await _resolve_effective_user(request, None, caller)  # type: ignore[arg-type]
         assert effective is caller
@@ -77,7 +72,7 @@ class TestResolveEffectiveUser:
         target_id = uuid.uuid4()
         _install_target_loader(monkeypatch, target_id)
 
-        request = _make_request(headers={ACT_AS_HEADER: str(target_id)})
+        request = make_mocked_request("GET", "/v2/foo", headers={ACT_AS_HEADER: str(target_id)})
         caller = _make_caller(UserRole.SUPERADMIN)
         effective = await _resolve_effective_user(request, None, caller)  # type: ignore[arg-type]
 
@@ -113,7 +108,7 @@ class TestResolveEffectiveUser:
 
             monkeypatch.setattr(auth_mw, "_load_user_data", _fake_load)
 
-        request = _make_request(headers={ACT_AS_HEADER: case.raw_target})
+        request = make_mocked_request("GET", "/v2/foo", headers={ACT_AS_HEADER: case.raw_target})
         caller = _make_caller(case.role)
         with pytest.raises(case.expected):
             await _resolve_effective_user(request, None, caller)  # type: ignore[arg-type]
@@ -121,7 +116,7 @@ class TestResolveEffectiveUser:
 
 class TestSetupUserContext:
     def test_pushes_effective_as_current_and_trigger_as_triggered(self) -> None:
-        request = _make_request()
+        request = make_mocked_request("GET", "/v2/foo")
         effective = UserData(
             user_id=uuid.uuid4(),
             is_authorized=True,
@@ -147,7 +142,7 @@ class TestSetupUserContext:
         assert triggered_user() is None
 
     def test_none_identities_push_nothing(self) -> None:
-        request = _make_request()
+        request = make_mocked_request("GET", "/v2/foo")
         with _setup_user_context(request, None, None):
             assert current_user() is None
             assert triggered_user() is None
