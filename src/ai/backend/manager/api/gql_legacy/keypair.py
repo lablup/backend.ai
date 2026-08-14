@@ -113,7 +113,6 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
     resource_policy = graphene.String()
     created_at = GQLDateTime()
     last_used = GQLDateTime()
-    rate_limit = graphene.Int()
     num_queries = graphene.Int()
     rolling_count = graphene.Int(description="Added in 24.09.0.")
     user = graphene.UUID()
@@ -134,6 +133,12 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
     concurrency_limit = graphene.Int(
         deprecation_reason=(
             "Moved to KeyPairResourcePolicy object as the max_concurrent_sessions field."
+        )
+    )
+    rate_limit = graphene.Int(
+        deprecation_reason=(
+            "Moved to UserResourcePolicy object as the max_api_requests_per_window field."
+            " The value is still stored but no longer enforced."
         )
     )
 

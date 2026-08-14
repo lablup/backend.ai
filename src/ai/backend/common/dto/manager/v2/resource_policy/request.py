@@ -181,6 +181,14 @@ class CreateUserResourcePolicyInput(BaseRequestModel):
             " Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions."
         ),
     )
+    max_api_requests_per_window: int | None = Field(
+        default=None,
+        ge=0,
+        description=(
+            "Maximum number of API requests allowed per user within the rate limit window."
+            " Null means unlimited."
+        ),
+    )
     max_quota_scope_size: BinarySizeInput = Field(
         description="Maximum quota scope size (e.g., '1g', '536870912').",
     )
@@ -215,6 +223,14 @@ class UpdateUserResourcePolicyInput(BaseRequestModel):
             "Updated maximum number of concurrent authenticated login sessions per user."
             " Set to null to clear (unlimited). Must be >= 1 when set."
             " Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions."
+        ),
+    )
+    max_api_requests_per_window: int | Sentinel | None = Field(
+        default=SENTINEL,
+        ge=0,
+        description=(
+            "Updated maximum number of API requests allowed per user within the rate limit"
+            " window. Set to null to clear (unlimited)."
         ),
     )
     max_quota_scope_size: BinarySizeInput | Sentinel | None = Field(
@@ -349,6 +365,9 @@ class UserResourcePolicyFilter(BaseRequestModel):
     )
     max_concurrent_logins: IntFilter | None = Field(
         default=None, description="Filter by max concurrent logins."
+    )
+    max_api_requests_per_window: IntFilter | None = Field(
+        default=None, description="Filter by max API requests per rate limit window."
     )
     max_quota_scope_size: IntFilter | None = Field(
         default=None, description="Filter by max quota scope size."

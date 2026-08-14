@@ -247,6 +247,9 @@ class UserResourcePolicyConditions:
 
     by_max_vfolder_count = make_int_conditions(UserResourcePolicyRow.max_vfolder_count)
     by_max_concurrent_logins = make_int_conditions(UserResourcePolicyRow.max_concurrent_logins)
+    by_max_api_requests_per_window = make_int_conditions(
+        UserResourcePolicyRow.max_api_requests_per_window
+    )
     by_max_quota_scope_size = make_int_conditions(UserResourcePolicyRow.max_quota_scope_size)
     by_max_session_count_per_model_session = make_int_conditions(
         UserResourcePolicyRow.max_session_count_per_model_session
