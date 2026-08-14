@@ -25,7 +25,6 @@ from ai.backend.manager.repositories.storage_namespace.repository import Storage
 from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
 from ai.backend.manager.services.object_storage.service import ObjectStorageService
 from ai.backend.manager.services.storage_namespace.processors import StorageNamespaceProcessors
-from ai.backend.manager.services.storage_namespace.service import StorageNamespaceService
 from ai.backend.testutils.processors import ops_processor_group
 
 _STORAGE_NAMESPACE_SERVER_SUBAPP_MODULES = (_auth_api,)
@@ -59,11 +58,7 @@ def object_storage_processors(
 def storage_namespace_processors(
     database_engine: ExtendedAsyncSAEngine,
 ) -> StorageNamespaceProcessors:
-    storage_namespace_repository = StorageNamespaceRepository(database_engine)
-    service = StorageNamespaceService(
-        storage_namespace_repository=storage_namespace_repository,
-    )
-    return StorageNamespaceProcessors(service=service, group=ops_processor_group(database_engine))
+    return StorageNamespaceProcessors(group=ops_processor_group(database_engine))
 
 
 @pytest.fixture()

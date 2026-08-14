@@ -1,25 +1,33 @@
-import uuid
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.storage_namespace.actions.base import (
-    StorageNamespaceGlobalAction,
-)
+from ai.backend.common.data.entity.storage_namespace import STORAGE_NAMESPACE_ENTITY_TYPE
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.identifier.storage_namespace import StorageNamespaceID
+from ai.backend.manager.actions.v2.ops.base import PurgeGlobalOpsAction
+from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
+from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
+from ai.backend.manager.models.storage_namespace.purgers import StorageNamespacePurger
 
 
 @dataclass
-class UnregisterNamespaceAction(StorageNamespaceGlobalAction):
+class UnregisterNamespaceAction(PurgeGlobalOpsAction[StorageNamespaceRow, StorageNamespaceData]):
     """Remove one namespace from a storage.
 
-    Service-kept: the row is addressed by ``(storage_id, namespace)``, and the purge
-    specs key on a single primary value. ``PURGE`` because the row leaves the table —
-    the storage namespace carries no lifecycle column.
+    Addressed by id: callers who hold only the (storage, namespace) pair resolve it
+    through the lookup first, which keeps this keyed on the primary value like every
+    other purge. PURGE because the row leaves the table -- a storage namespace
+    carries no lifecycle column.
     """
 
-    storage_id: uuid.UUID
-    namespace: str
+    id: StorageNamespaceID
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return STORAGE_NAMESPACE_ENTITY_TYPE
 
     @override
     @classmethod
@@ -27,15 +35,5 @@ class UnregisterNamespaceAction(StorageNamespaceGlobalAction):
         return "unregister_storage_namespace"
 
     @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.PURGE
-
-
-@dataclass
-class UnregisterNamespaceActionResult(BaseActionResult):
-    storage_id: uuid.UUID
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.storage_id)
+    def to_purger(self) -> StorageNamespacePurger:
+        return StorageNamespacePurger(storage_namespace_id=self.id)

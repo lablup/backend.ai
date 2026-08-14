@@ -8,6 +8,7 @@ layer with a real database.
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Callable, Coroutine
 from typing import Any
 
@@ -19,12 +20,14 @@ from ai.backend.common.dto.manager.object_storage.response import (
     ObjectStorageBucketsResponse,
 )
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
-from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.storage_namespace.creators import StorageNamespaceCreator
 from ai.backend.manager.repositories.storage_namespace.searchers import StorageNamespaceSearcher
-from ai.backend.manager.services.storage_namespace.actions.get_all import GetAllNamespacesAction
 from ai.backend.manager.services.storage_namespace.actions.get_multi import GetNamespacesAction
 from ai.backend.manager.services.storage_namespace.actions.register import RegisterNamespaceAction
+from ai.backend.manager.services.storage_namespace.actions.resolve_by_namespace import (
+    ResolveStorageNamespaceAction,
+)
 from ai.backend.manager.services.storage_namespace.actions.search import (
     SearchStorageNamespacesAction,
 )
@@ -142,13 +145,15 @@ class TestStorageNamespace:
         ns_names = [n.namespace for n in before.items]
         assert "to-unregister" in ns_names
 
-        # Unregister
-        unregister_action = UnregisterNamespaceAction(
-            storage_id=storage["id"],
-            namespace="to-unregister",
+        # Unregister: the pair resolves to an id, and the purge takes the id
+        resolved = await storage_namespace_processors.lookup.run(
+            ResolveStorageNamespaceAction(storage_id=storage["id"], namespace="to-unregister")
         )
-        unregister_result = await storage_namespace_processors.unregister.run(unregister_action)
-        assert unregister_result.storage_id == ns["storage_id"]
+        assert resolved.data.id == ns["id"]
+        unregister_result = await storage_namespace_processors.unregister.run(
+            UnregisterNamespaceAction(id=resolved.data.id)
+        )
+        assert unregister_result.data.storage_id == ns["storage_id"]
 
         # Verify removed
         after = await storage_namespace_processors.get_namespaces.run(get_action)
@@ -197,15 +202,17 @@ class TestStorageNamespace:
         await storage_namespace_factory(storage_id=storage_x["id"], namespace="grouped-x2")
         await storage_namespace_factory(storage_id=storage_y["id"], namespace="grouped-y1")
 
-        action = GetAllNamespacesAction()
-        result = await storage_namespace_processors.get_all_namespaces.run(action)
+        result = await storage_namespace_processors.search.run(
+            SearchStorageNamespacesAction(
+                searcher=StorageNamespaceSearcher(pagination=NoPagination()),
+            )
+        )
+        by_storage: dict[uuid.UUID, set[str]] = {}
+        for item in result.items:
+            by_storage.setdefault(item.storage_id, set()).add(item.namespace)
 
-        assert storage_x["id"] in result.result
-        assert "grouped-x1" in result.result[storage_x["id"]]
-        assert "grouped-x2" in result.result[storage_x["id"]]
-
-        assert storage_y["id"] in result.result
-        assert "grouped-y1" in result.result[storage_y["id"]]
+        assert by_storage[storage_x["id"]] >= {"grouped-x1", "grouped-x2"}
+        assert by_storage[storage_y["id"]] >= {"grouped-y1"}
 
     async def test_register_and_unregister_lifecycle(
         self,
@@ -232,15 +239,12 @@ class TestStorageNamespace:
         )
         assert "lifecycle-ns" in [n.namespace for n in list_result.items]
 
-        # Verify in grouped query
-        all_result = await storage_namespace_processors.get_all_namespaces.run(
-            GetAllNamespacesAction()
+        # Unregister: the pair resolves to an id, and the purge takes the id
+        resolved = await storage_namespace_processors.lookup.run(
+            ResolveStorageNamespaceAction(storage_id=storage["id"], namespace="lifecycle-ns")
         )
-        assert "lifecycle-ns" in all_result.result[storage["id"]]
-
-        # Unregister
         await storage_namespace_processors.unregister.run(
-            UnregisterNamespaceAction(storage_id=storage["id"], namespace="lifecycle-ns")
+            UnregisterNamespaceAction(id=resolved.data.id)
         )
 
         # Verify gone from per-storage listing

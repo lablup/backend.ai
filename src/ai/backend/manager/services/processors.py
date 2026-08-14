@@ -278,9 +278,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.storage_namespace.processors import (
         StorageNamespaceProcessors,
     )
-    from ai.backend.manager.services.storage_namespace.service import (
-        StorageNamespaceService,
-    )
     from ai.backend.manager.services.stream.processors import (
         StreamProcessors,
     )
@@ -412,7 +409,6 @@ class Services:
     artifact_revision: ArtifactRevisionService
     artifact_registry: ArtifactRegistryService
     deployment: DeploymentService
-    storage_namespace: StorageNamespaceService
     audit_log: AuditLogService
     idle_checker_assignment: IdleCheckerAssignmentService
     scheduling_history: SchedulingHistoryService

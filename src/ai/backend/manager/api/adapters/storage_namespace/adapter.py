@@ -25,6 +25,9 @@ from ai.backend.manager.models.storage_namespace.creators import StorageNamespac
 from ai.backend.manager.repositories.storage_namespace.searchers import StorageNamespaceSearcher
 from ai.backend.manager.services.storage_namespace.actions.get_multi import GetNamespacesAction
 from ai.backend.manager.services.storage_namespace.actions.register import RegisterNamespaceAction
+from ai.backend.manager.services.storage_namespace.actions.resolve_by_namespace import (
+    ResolveStorageNamespaceAction,
+)
 from ai.backend.manager.services.storage_namespace.actions.search import (
     SearchStorageNamespacesAction,
 )
@@ -58,13 +61,18 @@ class StorageNamespaceAdapter(BaseAdapter):
         self, input: UnregisterStorageNamespaceInput
     ) -> UnregisterStorageNamespacePayload:
         """Unregister a namespace from a storage."""
-        action_result = await self._processors.storage_namespace.unregister.run(
-            UnregisterNamespaceAction(
+        # The API names a namespace by the pair it was registered under, so the id the
+        # purge needs is resolved first rather than taught to the purge itself.
+        resolved = await self._processors.storage_namespace.lookup.run(
+            ResolveStorageNamespaceAction(
                 storage_id=input.storage_id,
                 namespace=input.namespace,
             )
         )
-        return UnregisterStorageNamespacePayload(id=action_result.storage_id)
+        action_result = await self._processors.storage_namespace.unregister.run(
+            UnregisterNamespaceAction(id=resolved.data.id)
+        )
+        return UnregisterStorageNamespacePayload(id=action_result.data.storage_id)
 
     async def get_namespaces(self, storage_id: uuid.UUID) -> list[StorageNamespaceNode]:
         """Retrieve all namespaces for a given storage."""

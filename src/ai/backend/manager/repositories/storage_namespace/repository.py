@@ -49,11 +49,3 @@ class StorageNamespaceRepository:
     @storage_namespace_repository_resilience.apply()
     async def get_by_id(self, storage_namespace_id: uuid.UUID) -> StorageNamespaceData:
         return await self._db_source.get_by_id(storage_namespace_id)
-
-    @storage_namespace_repository_resilience.apply()
-    async def unregister(self, storage_id: uuid.UUID, namespace: str) -> uuid.UUID:
-        return await self._db_source.unregister(storage_id, namespace)
-
-    @storage_namespace_repository_resilience.apply()
-    async def get_all_namespaces_by_storage(self) -> dict[uuid.UUID, list[str]]:
-        return await self._db_source.get_all_namespaces_by_storage()

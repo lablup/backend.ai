@@ -148,7 +148,6 @@ from ai.backend.manager.services.service_catalog.processors import ServiceCatalo
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 from ai.backend.manager.services.storage_namespace.processors import StorageNamespaceProcessors
-from ai.backend.manager.services.storage_namespace.service import StorageNamespaceService
 from ai.backend.manager.services.stream.processors import StreamProcessors
 from ai.backend.manager.services.stream.service import StreamService
 from ai.backend.manager.services.template.processors import TemplateProcessors
@@ -405,7 +404,6 @@ def create_services(args: ServiceArgs) -> Services:
             runtime_variant_preset_repository=repositories.runtime_variant_preset.repository,
             appproxy_client_pool=args.appproxy_client_pool,
         ),
-        storage_namespace=StorageNamespaceService(repositories.storage_namespace.repository),
         audit_log=AuditLogService(repositories.audit_log.repository),
         idle_checker_assignment=IdleCheckerAssignmentService(repositories.idle_checker.repository),
         scheduling_history=SchedulingHistoryService(repositories.scheduling_history.repository),
@@ -544,7 +542,7 @@ def create_processors(
             services.artifact_revision, action_monitors, validators
         ),
         deployment=DeploymentProcessors(services.deployment, action_monitors, validators),
-        storage_namespace=StorageNamespaceProcessors(services.storage_namespace, registry.group()),
+        storage_namespace=StorageNamespaceProcessors(registry.group()),
         audit_log=AuditLogProcessors(services.audit_log, validators, registry.group()),
         idle_checker_assignment=IdleCheckerAssignmentProcessors(
             services.idle_checker_assignment, action_monitors, validators

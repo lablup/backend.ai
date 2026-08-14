@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from collections import defaultdict
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
@@ -24,6 +25,7 @@ from ai.backend.common.dto.manager.response import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.object_storage.searchers import ObjectStorageSearcher
+from ai.backend.manager.repositories.storage_namespace.searchers import StorageNamespaceSearcher
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
 )
@@ -33,8 +35,10 @@ from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url
 from ai.backend.manager.services.object_storage.actions.list import (
     ListObjectStorageAction,
 )
-from ai.backend.manager.services.storage_namespace.actions.get_all import GetAllNamespacesAction
 from ai.backend.manager.services.storage_namespace.actions.get_multi import GetNamespacesAction
+from ai.backend.manager.services.storage_namespace.actions.search import (
+    SearchStorageNamespacesAction,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
@@ -96,11 +100,18 @@ class ObjectStorageHandler:
 
         Note: This API is deprecated. Use /storage-namespaces instead.
         """
-        action_result = await self._storage_namespace.get_all_namespaces.run(
-            GetAllNamespacesAction()
+        # Grouping is the caller's job: the search reads the table, and this
+        # deprecated shape is the only one that wants it keyed by storage.
+        action_result = await self._storage_namespace.search.run(
+            SearchStorageNamespacesAction(
+                searcher=StorageNamespaceSearcher(pagination=NoPagination()),
+            )
         )
+        buckets_by_storage: dict[uuid.UUID, list[str]] = defaultdict(list)
+        for item in action_result.items:
+            buckets_by_storage[item.storage_id].append(item.namespace)
 
-        resp = ObjectStorageAllBucketsResponse(buckets_by_storage=action_result.result)
+        resp = ObjectStorageAllBucketsResponse(buckets_by_storage=dict(buckets_by_storage))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def get_buckets(
