@@ -1217,6 +1217,9 @@ class TestSessionIdleCheckExclusion:
             )
         assert active_row is not None
         assert active_row.last_status is IdleCheckPhase.EXCLUDED
+        # The overwrite restamps the managing writer on a checker-managed row.
+        assert active_row.is_manual is True
+        assert active_row.manually_triggered_by == exclusion_rows.user_id
         assert idle_expired_row is not None
         assert idle_expired_row.last_status is IdleCheckPhase.EXCLUDED
         assert untouched_row is not None
@@ -1367,6 +1370,9 @@ class TestSessionIdleCheckExclusion:
         assert excluded_row.last_status is IdleCheckPhase.NOT_CHECKED
         # The grace period restarts from this write, not from the seeded row's age.
         assert excluded_row.updated_at > datetime(2026, 1, 1, tzinfo=UTC)
+        # The overwrite restamps the managing writer on a checker-managed row.
+        assert excluded_row.is_manual is True
+        assert excluded_row.manually_triggered_by == exclusion_rows.user_id
         assert active_row is not None
         assert active_row.last_status is IdleCheckPhase.NOT_CHECKED
         assert untouched_row is not None
@@ -1408,6 +1414,73 @@ class TestSessionIdleCheckExclusion:
         )
         assert set(result.errors) == {unknown_pair}
         assert isinstance(result.errors[unknown_pair], SessionNotFound)
+
+    async def test_include_unknown_checker_reported_per_pair(
+        self,
+        repository: IdleCheckerRepository,
+        exclusion_rows: ExclusionRows,
+    ) -> None:
+        """The FK violation fails only the pair naming the unknown checker."""
+        unknown_checker_id = IdleCheckerID(uuid.uuid4())
+
+        result = await repository.batch_include_session_idle_checks(
+            BulkUpserter(
+                specs=[
+                    SessionIdleCheckIncludeUpserterSpec(
+                        session_id=SessionID(exclusion_rows.excluded_session_id),
+                        checker_id=exclusion_rows.checker_id,
+                        user_id=exclusion_rows.user_id,
+                    ),
+                    SessionIdleCheckIncludeUpserterSpec(
+                        session_id=SessionID(exclusion_rows.active_session_id),
+                        checker_id=unknown_checker_id,
+                        user_id=exclusion_rows.user_id,
+                    ),
+                ]
+            )
+        )
+
+        assert result.success == [
+            SessionIdleCheckPair(
+                session_id=exclusion_rows.excluded_session_id,
+                checker_id=exclusion_rows.checker_id,
+            )
+        ]
+        unknown_pair = SessionIdleCheckPair(
+            session_id=exclusion_rows.active_session_id,
+            checker_id=unknown_checker_id,
+        )
+        assert set(result.errors) == {unknown_pair}
+        assert isinstance(result.errors[unknown_pair], IdleCheckerNotFound)
+
+    async def test_include_restarts_grace_period_from_new_write(
+        self,
+        repository: IdleCheckerRepository,
+        exclusion_rows: ExclusionRows,
+    ) -> None:
+        """The included pair reenters the grace fetch with this write as its start."""
+        await repository.batch_include_session_idle_checks(
+            BulkUpserter(
+                specs=[
+                    SessionIdleCheckIncludeUpserterSpec(
+                        session_id=SessionID(exclusion_rows.excluded_session_id),
+                        checker_id=exclusion_rows.checker_id,
+                        user_id=exclusion_rows.user_id,
+                    ),
+                ]
+            )
+        )
+
+        batch = await repository.fetch_initial_grace_period_checks([SessionStatus.RUNNING])
+
+        assert [check.pair for check in batch.checks] == [
+            SessionIdleCheckPair(
+                session_id=exclusion_rows.excluded_session_id,
+                checker_id=exclusion_rows.checker_id,
+            )
+        ]
+        # The grace start is this write's timestamp, not the seeded row's age.
+        assert batch.checks[0].grace_started_at > datetime(2026, 1, 1, tzinfo=UTC)
 
     async def test_sync_delete_spares_user_managed_rows(
         self,
