@@ -3377,6 +3377,11 @@ input CreateUserResourcePolicyInputV2 {
   """
   maxConcurrentLogins: Int = null
 
+  """
+  Added in 26.9.0. Maximum number of API requests allowed per user within the rate limit window. Null means unlimited.
+  """
+  maxApiRequestsPerWindow: Int = null
+
   """Maximum quota scope size (e.g., '1g', '536870912')."""
   maxQuotaScopeSize: BinarySizeInput!
 
@@ -16030,6 +16035,11 @@ input UpdateUserResourcePolicyInput {
   """
   maxConcurrentLogins: Int
 
+  """
+  Added in 26.9.0. Updated maximum number of API requests allowed per user within the rate limit window. Set to null to clear (unlimited).
+  """
+  maxApiRequestsPerWindow: Int
+
   """Updated max quota scope size."""
   maxQuotaScopeSize: BinarySizeInput = null
 
@@ -16446,6 +16456,11 @@ type UserResourcePolicyV2 implements Node {
   """
   maxConcurrentLogins: Int
 
+  """
+  Added in 26.9.0. Maximum number of API requests allowed per user within the rate limit window. Null means unlimited.
+  """
+  maxApiRequestsPerWindow: Int
+
   """Maximum quota scope size."""
   maxQuotaScopeSize: BinarySizeInfo!
 
@@ -16483,6 +16498,9 @@ input UserResourcePolicyV2Filter {
   createdAt: DateTimeFilter = null
   maxVfolderCount: IntFilter = null
   maxConcurrentLogins: IntFilter = null
+
+  """Added in 26.9.0. Filter by max API requests per rate limit window."""
+  maxApiRequestsPerWindow: IntFilter = null
   maxQuotaScopeSize: IntFilter = null
   maxSessionCountPerModelSession: IntFilter = null
   maxCustomizedImageCount: IntFilter = null
@@ -16512,6 +16530,7 @@ enum UserResourcePolicyV2OrderField {
   CREATED_AT
   MAX_VFOLDER_COUNT
   MAX_CONCURRENT_LOGINS
+  MAX_API_REQUESTS_PER_WINDOW
   MAX_QUOTA_SCOPE_SIZE
   MAX_SESSION_COUNT_PER_MODEL_SESSION
   MAX_CUSTOMIZED_IMAGE_COUNT
