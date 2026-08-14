@@ -3,6 +3,11 @@
 This module provides the ``rlim_middleware`` function which is installed
 as a global aiohttp middleware.  There are no route handlers — rate
 limiting is applied transparently to all authorized requests.
+
+The middleware is also what keeps the published limit fresh for the web
+server: it resolves the policy value per request anyway, so it republishes it
+on every authorized request. A limit that stops being republished expires
+within the window, which is also when its counter would expire.
 """
 
 from __future__ import annotations
@@ -38,8 +43,13 @@ def make_rlim_middleware(
         """Global middleware implementing a rolling-counter rate limiter."""
         if request["is_authorized"]:
             rate_limit = request["user"]["resource_policy"]["max_api_requests_per_window"]
+            user_id = request["user"]["uuid"]
+            if rate_limit is not None:
+                await valkey_client.set_user_rate_limit(
+                    user_id, rate_limit, expiration=_rlim_window
+                )
             rolling_count = await valkey_client.execute_rate_limit_logic(
-                user_id=request["user"]["uuid"],
+                user_id=user_id,
                 window=_rlim_window,
             )
             if rate_limit is not None and rolling_count > rate_limit:
