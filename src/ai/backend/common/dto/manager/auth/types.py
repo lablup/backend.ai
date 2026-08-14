@@ -7,6 +7,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any, Self
 
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import BackendAISchema
 
 __all__ = (
@@ -55,9 +56,13 @@ class AuthSuccessResponse(AuthResponse):
     role: str
     status: str
     session_token: str
+    # Optional for wire compatibility with managers that do not send them yet.
+    user_id: UserID | None = None
+    # The keypair rate limit (requests per window); None means unlimited.
+    rate_limit: int | None = None
     type: AuthTokenType = AuthTokenType.KEYPAIR
 
-    def to_dict(self) -> dict[str, str]:
+    def to_dict(self) -> dict[str, Any]:
         return self.model_dump(mode="json")
 
 

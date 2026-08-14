@@ -415,6 +415,7 @@ class AuthService:
                 role=user.role,
                 status=user.status,
                 session_token=session_result.session_token,
+                rate_limit=keypair_row.rate_limit,
             ),
         )
 

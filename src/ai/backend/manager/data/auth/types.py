@@ -29,6 +29,7 @@ class AuthorizationResult:
     role: str
     status: str
     session_token: str
+    rate_limit: int | None
 
 
 @dataclass
