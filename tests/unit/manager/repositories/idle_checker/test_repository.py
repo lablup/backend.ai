@@ -1107,6 +1107,7 @@ class TestSessionIdleCheckExclusion:
                     status=UserStatus.ACTIVE,
                     status_info="active",
                     domain_name=scope.domain_name,
+                    domain_id=scope.domain_id,
                     role=UserRole.USER,
                     resource_policy=f"{scope.domain_name}-user-policy",
                 )
