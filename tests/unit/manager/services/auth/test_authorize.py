@@ -73,7 +73,6 @@ def mock_user_resource_policy_repository() -> AsyncMock:
         max_session_count_per_model_session=5,
         max_customized_image_count=3,
         max_concurrent_logins=None,
-        max_api_requests_per_window=30000,
     )
     return mock_repo
 
