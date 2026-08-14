@@ -2,14 +2,17 @@ from dataclasses import dataclass
 
 import pytest
 
-from ai.backend.common.dto.manager.v2.prometheus_query_preset.validators import (
-    validate_query_template,
-)
 from ai.backend.common.exception import InvalidMetricPresetTemplate
-from ai.backend.manager.clients.prometheus import (
+from ai.backend.manager.clients.prometheus.preset import (
     LabelMatcher,
     MetricPreset,
+    PromQLTemplateRenderer,
 )
+
+
+@pytest.fixture
+def renderer() -> PromQLTemplateRenderer:
+    return PromQLTemplateRenderer()
 
 
 @dataclass
@@ -22,8 +25,8 @@ class RenderTestCase:
     expected: str
 
 
-class TestMetricPresetRender:
-    """Tests for MetricPreset.render() method."""
+class TestPromQLTemplateRendererRender:
+    """Tests for PromQLTemplateRenderer.render()."""
 
     @pytest.mark.parametrize(
         "case",
@@ -114,7 +117,7 @@ class TestMetricPresetRender:
         ],
         ids=lambda c: c.id,
     )
-    async def test_render(self, case: RenderTestCase) -> None:
+    async def test_render(self, renderer: PromQLTemplateRenderer, case: RenderTestCase) -> None:
         preset = MetricPreset(
             template=case.template,
             labels=case.labels,
@@ -122,7 +125,7 @@ class TestMetricPresetRender:
             window=case.window,
         )
 
-        result = preset.render()
+        result = renderer.render(preset)
 
         assert result == case.expected
 
@@ -133,15 +136,15 @@ class TestMetricPresetRender:
             pytest.param("metric{ {{ unknown_var }} }", id="unknown_variable"),
         ],
     )
-    async def test_render_raises(self, template: str) -> None:
+    async def test_render_raises(self, renderer: PromQLTemplateRenderer, template: str) -> None:
         preset = MetricPreset(template=template)
 
         with pytest.raises(InvalidMetricPresetTemplate):
-            preset.render()
+            renderer.render(preset)
 
 
-class TestValidateQueryTemplate:
-    """Tests for validate_query_template() called from Pydantic field validators."""
+class TestPromQLTemplateRendererValidate:
+    """Tests for PromQLTemplateRenderer.validate() called from the service layer."""
 
     @pytest.mark.parametrize(
         "template",
@@ -164,8 +167,8 @@ class TestValidateQueryTemplate:
             ),
         ],
     )
-    def test_accepts_valid_template(self, template: str) -> None:
-        validate_query_template(template)  # does not raise
+    def test_accepts_valid_template(self, renderer: PromQLTemplateRenderer, template: str) -> None:
+        renderer.validate(template)  # does not raise
 
     @pytest.mark.parametrize(
         "template",
@@ -175,9 +178,9 @@ class TestValidateQueryTemplate:
             pytest.param("sum(metric{{{labels}}})", id="triple_brace"),
         ],
     )
-    def test_rejects_legacy_syntax(self, template: str) -> None:
+    def test_rejects_legacy_syntax(self, renderer: PromQLTemplateRenderer, template: str) -> None:
         with pytest.raises(InvalidMetricPresetTemplate, match="Legacy"):
-            validate_query_template(template)
+            renderer.validate(template)
 
     @pytest.mark.parametrize(
         "template",
@@ -187,9 +190,11 @@ class TestValidateQueryTemplate:
             pytest.param('metric{region="${region}"}', id="braced_dollar_var"),
         ],
     )
-    def test_rejects_unsupported_template_variables(self, template: str) -> None:
+    def test_rejects_unsupported_template_variables(
+        self, renderer: PromQLTemplateRenderer, template: str
+    ) -> None:
         with pytest.raises(InvalidMetricPresetTemplate, match="Unsupported"):
-            validate_query_template(template)
+            renderer.validate(template)
 
     @pytest.mark.parametrize(
         "template",
@@ -201,6 +206,8 @@ class TestValidateQueryTemplate:
             pytest.param("   ", id="blank"),
         ],
     )
-    def test_rejects_disallowed_constructs(self, template: str) -> None:
+    def test_rejects_disallowed_constructs(
+        self, renderer: PromQLTemplateRenderer, template: str
+    ) -> None:
         with pytest.raises(InvalidMetricPresetTemplate):
-            validate_query_template(template)
+            renderer.validate(template)

@@ -15,7 +15,6 @@ from ai.backend.common.dto.clients.prometheus.defs import PROMETHEUS_DURATION_PA
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 
 from .types import OrderDirection, QueryDefinitionOrderField
-from .validators import validate_query_template
 
 __all__ = (
     # Options inputs
@@ -85,12 +84,6 @@ class CreateQueryDefinitionInput(BaseRequestModel):
             raise ValueError("name must not be blank or whitespace-only")
         return stripped
 
-    @field_validator("query_template")
-    @classmethod
-    def _validate_query_template(cls, v: str) -> str:
-        validate_query_template(v)
-        return v
-
 
 class ModifyQueryDefinitionOptionsInput(BaseRequestModel):
     """Options for modifying a prometheus query definition.
@@ -158,13 +151,6 @@ class ModifyQueryDefinitionInput(BaseRequestModel):
     def _validate_time_window(cls, v: str | Sentinel | None) -> str | Sentinel | None:
         if isinstance(v, str) and not re.match(PROMETHEUS_DURATION_PATTERN, v):
             raise ValueError(f"Invalid Prometheus duration format: {v!r}")
-        return v
-
-    @field_validator("query_template")
-    @classmethod
-    def _validate_query_template(cls, v: str | None) -> str | None:
-        if v is not None:
-            validate_query_template(v)
         return v
 
 
@@ -246,12 +232,6 @@ class PreviewQueryDefinitionInput(BaseRequestModel):
     """Input for previewing a prometheus query template before saving (admin only)."""
 
     query_template: str = Field(description="PromQL template to validate")
-
-    @field_validator("query_template")
-    @classmethod
-    def _validate_query_template(cls, v: str) -> str:
-        validate_query_template(v)
-        return v
 
 
 class ExecuteQueryDefinitionInput(BaseRequestModel):
