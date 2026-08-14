@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -8,8 +9,11 @@ import pytest
 from aiohttp import web
 
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.api.rest.ratelimit.handler import _rlim_window, make_rlim_middleware
 from ai.backend.manager.errors.api import RateLimitExceeded
+
+_USER_ID = UserID(uuid.UUID("12345678-1234-5678-1234-567812345678"))
 
 
 @dataclass
@@ -65,16 +69,16 @@ class TestRlimMiddleware:
     def mock_request_authorized(self) -> web.Request:
         """Mock request for authorized user."""
         request = MagicMock(spec=web.Request)
-        keypair_data = {
-            "rate_limit": 30000,
-            "access_key": "AKIAIOSFODNN7EXAMPLE",
-        }
+        keypair_data = {"rate_limit": 30000}
+        user_data = {"uuid": _USER_ID}
 
         def getitem(key: Any) -> Any:
             if key == "is_authorized":
                 return True
             if key == "keypair":
                 return keypair_data
+            if key == "user":
+                return user_data
             return None
 
         request.__getitem__ = MagicMock(side_effect=getitem)
@@ -162,7 +166,7 @@ class TestRlimMiddleware:
 
         # Valkey should be called for authorized requests
         mock_valkey_client.execute_rate_limit_logic.assert_called_once_with(
-            access_key="AKIAIOSFODNN7EXAMPLE",
+            user_id=_USER_ID,
             window=_rlim_window,
         )
 
@@ -211,6 +215,6 @@ class TestRlimMiddleware:
 
         # Valkey should still be called
         mock_valkey_client.execute_rate_limit_logic.assert_called_once_with(
-            access_key="AKIAIOSFODNN7EXAMPLE",
+            user_id=_USER_ID,
             window=_rlim_window,
         )
