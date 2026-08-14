@@ -206,7 +206,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
             human_readable_name="ratelimit",
         )
         try:
-            return await valkey_client.get_rolling_count(self.access_key)
+            return await valkey_client.get_rolling_count(UserID(self.user))
         finally:
             await valkey_client.close()
 
