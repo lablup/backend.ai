@@ -303,7 +303,7 @@ class ExcludeSessionIdleChecksFailureInfo(BaseResponseModel):
 class ExcludeSessionIdleChecksPayload(BaseResponseModel):
     """Payload for idle-check exclusion with per-pair partial success."""
 
-    success: list[SessionIdleCheckTargetInfo] = Field(
+    items: list[SessionIdleCheckTargetInfo] = Field(
         description=f"Added in {NEXT_RELEASE_VERSION}. Pairs successfully excluded."
     )
     failed: list[ExcludeSessionIdleChecksFailureInfo] = Field(
@@ -328,7 +328,7 @@ class IncludeSessionIdleChecksFailureInfo(BaseResponseModel):
 class IncludeSessionIdleChecksPayload(BaseResponseModel):
     """Payload for idle-check inclusion with per-pair partial success."""
 
-    success: list[SessionIdleCheckTargetInfo] = Field(
+    items: list[SessionIdleCheckTargetInfo] = Field(
         description=f"Added in {NEXT_RELEASE_VERSION}. Pairs successfully included."
     )
     failed: list[IncludeSessionIdleChecksFailureInfo] = Field(

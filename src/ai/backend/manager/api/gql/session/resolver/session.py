@@ -219,12 +219,12 @@ async def exclude_session_idle_checks(
     """Exclude one or more checker-session pairs from idle checks."""
     payload = await info.context.adapters.session.exclude_idle_checks(input.to_pydantic())
     return ExcludeSessionIdleChecksPayloadGQL(
-        success=[
+        items=[
             SessionIdleCheckTargetInfoGQL(
                 checker_id=ID(str(target.checker_id)),
                 session_id=ID(str(target.session_id)),
             )
-            for target in payload.success
+            for target in payload.items
         ],
         failed=[
             ExcludeSessionIdleChecksFailureInfoGQL(
@@ -254,12 +254,12 @@ async def include_session_idle_checks(
     """Include one or more checker-session pairs into idle checks."""
     payload = await info.context.adapters.session.include_idle_checks(input.to_pydantic())
     return IncludeSessionIdleChecksPayloadGQL(
-        success=[
+        items=[
             SessionIdleCheckTargetInfoGQL(
                 checker_id=ID(str(target.checker_id)),
                 session_id=ID(str(target.session_id)),
             )
-            for target in payload.success
+            for target in payload.items
         ],
         failed=[
             IncludeSessionIdleChecksFailureInfoGQL(

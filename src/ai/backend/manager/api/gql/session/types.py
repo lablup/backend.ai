@@ -836,7 +836,7 @@ class IncludeSessionIdleChecksFailureInfoGQL:
     name="ExcludeSessionIdleChecksPayload",
 )
 class ExcludeSessionIdleChecksPayloadGQL:
-    success: list[SessionIdleCheckTargetInfoGQL] = gql_field(
+    items: list[SessionIdleCheckTargetInfoGQL] = gql_field(
         description="Pairs successfully excluded."
     )
     failed: list[ExcludeSessionIdleChecksFailureInfoGQL] = gql_field(
@@ -853,7 +853,7 @@ class ExcludeSessionIdleChecksPayloadGQL:
     name="IncludeSessionIdleChecksPayload",
 )
 class IncludeSessionIdleChecksPayloadGQL:
-    success: list[SessionIdleCheckTargetInfoGQL] = gql_field(
+    items: list[SessionIdleCheckTargetInfoGQL] = gql_field(
         description="Pairs successfully included."
     )
     failed: list[IncludeSessionIdleChecksFailureInfoGQL] = gql_field(

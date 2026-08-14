@@ -7711,7 +7711,7 @@ type ExcludeSessionIdleChecksPayload
   @join__type(graph: STRAWBERRY)
 {
   """Pairs successfully excluded."""
-  success: [SessionIdleCheckTargetInfo!]!
+  items: [SessionIdleCheckTargetInfo!]!
 
   """Pairs that could not be excluded."""
   failed: [ExcludeSessionIdleChecksFailureInfo!]!
@@ -9086,7 +9086,7 @@ type IncludeSessionIdleChecksPayload
   @join__type(graph: STRAWBERRY)
 {
   """Pairs successfully included."""
-  success: [SessionIdleCheckTargetInfo!]!
+  items: [SessionIdleCheckTargetInfo!]!
 
   """Pairs that could not be included."""
   failed: [IncludeSessionIdleChecksFailureInfo!]!

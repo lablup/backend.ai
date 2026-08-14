@@ -5309,7 +5309,7 @@ Added in 26.9.0. Payload returned after excluding session pairs from idle checks
 """
 type ExcludeSessionIdleChecksPayload {
   """Pairs successfully excluded."""
-  success: [SessionIdleCheckTargetInfo!]!
+  items: [SessionIdleCheckTargetInfo!]!
 
   """Pairs that could not be excluded."""
   failed: [ExcludeSessionIdleChecksFailureInfo!]!
@@ -6243,7 +6243,7 @@ Added in 26.9.0. Payload returned after including session pairs into idle checks
 """
 type IncludeSessionIdleChecksPayload {
   """Pairs successfully included."""
-  success: [SessionIdleCheckTargetInfo!]!
+  items: [SessionIdleCheckTargetInfo!]!
 
   """Pairs that could not be included."""
   failed: [IncludeSessionIdleChecksFailureInfo!]!
