@@ -4,6 +4,11 @@ This module provides the ``rlim_middleware`` function which is installed
 as a global aiohttp middleware.  There are no route handlers — rate
 limiting is applied transparently to all authorized requests.
 
+The rolling counter is keyed by the authenticated user, the same counter the
+web server's limiter uses. This is the fallback guard for clients that reach
+the manager directly; requests proxied by the web server are already limited
+there.
+
 The middleware is also what keeps the published limit fresh for the web
 server: it resolves the policy value per request anyway, so it republishes it
 on every authorized request. A limit that stops being republished expires

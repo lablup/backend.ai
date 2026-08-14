@@ -47,8 +47,9 @@ from ai.backend.client.v2.config import ClientConfig as V2ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common import config
 from ai.backend.common.clients.http_client.client_pool import ClientPool
+from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
-from ai.backend.common.defs import REDIS_STATISTICS_DB, RedisRole
+from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.dto.internal.health import (
     ConnectivityCheckResponse,
     HealthResponse,
@@ -92,6 +93,7 @@ from ai.backend.web.clients.manager_pool import (
     ManagerPoolGateHealthChecker,
 )
 from ai.backend.web.config.unified import EventLoopType, ServiceMode, WebServerUnifiedConfig
+from ai.backend.web.ratelimit import rate_limit_middleware
 from ai.backend.web.security import SecurityPolicy, csp_nonce_var, security_policy_middleware
 
 from . import __version__, user_agent
@@ -855,6 +857,13 @@ async def redis_ctx(
     # Keep app["redis"] key for compatibility
     app["redis"] = valkey_session_client
 
+    valkey_rate_limit_client = await ValkeyRateLimitClient.create(
+        valkey_target=valkey_profile_target.profile_target(RedisRole.RATE_LIMIT),
+        db_id=REDIS_RATE_LIMIT_DB,
+        human_readable_name="web.ratelimit",
+    )
+    app["valkey_rate_limit"] = valkey_rate_limit_client
+
     if pidx == 0 and config.session.flush_on_startup:
         await valkey_session_client.flush_all_sessions()
         log.info("flushed session storage.")
@@ -867,9 +876,13 @@ async def redis_ctx(
         secure=config.security.cookie_secure,
     )
     setup_session(app, redis_storage)
+    # Must come after ``setup_session()``: the session middleware it appends is what
+    # populates the request with the session storage the rate limiter reads.
+    app.middlewares.append(rate_limit_middleware)
     try:
         yield
     finally:
+        await valkey_rate_limit_client.close()
         await valkey_session_client.close()
 
 
