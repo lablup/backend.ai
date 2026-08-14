@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -24,6 +24,7 @@ class RateLimitSuccessCase:
     rolling_count: int
     expected_limit: str
     expected_remaining: str
+    expected_published: list[int] = field(default_factory=list)
     description: str = ""
 
 
@@ -42,6 +43,7 @@ class TestRlimMiddleware:
         """Mock ValkeyRateLimitClient."""
         client = MagicMock(spec=ValkeyRateLimitClient)
         client.execute_rate_limit_logic = AsyncMock()
+        client.set_user_rate_limit = AsyncMock()
         return client
 
     @pytest.fixture
@@ -112,6 +114,7 @@ class TestRlimMiddleware:
                 rolling_count=10,
                 expected_limit="30000",
                 expected_remaining="29990",
+                expected_published=[30000],
                 description="within limit",
             ),
             RateLimitSuccessCase(
@@ -119,6 +122,7 @@ class TestRlimMiddleware:
                 rolling_count=30000,
                 expected_limit="30000",
                 expected_remaining="0",
+                expected_published=[30000],
                 description="exactly at limit",
             ),
             RateLimitSuccessCase(
@@ -171,6 +175,10 @@ class TestRlimMiddleware:
             user_id=_USER_ID,
             window=_rlim_window,
         )
+        published = [
+            call.args[1] for call in mock_valkey_client.set_user_rate_limit.await_args_list
+        ]
+        assert published == test_case.expected_published
 
     @pytest.mark.parametrize(
         "test_case",
