@@ -17,6 +17,7 @@ class UserResourcePolicyCreatorSpec(CreatorSpec["UserResourcePolicyRow"]):
     max_session_count_per_model_session: int
     max_customized_image_count: int
     max_concurrent_logins: int | None = None
+    max_api_requests_per_window: int | None = None
 
     @override
     def build_row(self) -> UserResourcePolicyRow:
@@ -27,4 +28,5 @@ class UserResourcePolicyCreatorSpec(CreatorSpec["UserResourcePolicyRow"]):
             max_session_count_per_model_session=self.max_session_count_per_model_session,
             max_customized_image_count=self.max_customized_image_count,
             max_concurrent_logins=self.max_concurrent_logins,
+            max_api_requests_per_window=self.max_api_requests_per_window,
         )

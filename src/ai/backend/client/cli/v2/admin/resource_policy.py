@@ -464,6 +464,12 @@ def user_get(name: str) -> None:
         " Distinct from --max-concurrent-sessions which limits compute sessions."
     ),
 )
+@click.option(
+    "--max-api-requests-per-window",
+    type=int,
+    default=None,
+    help="Maximum API requests per user within the rate limit window (NULL = unlimited).",
+)
 @click.option("--json", "json_str", default=None, help="Full input as JSON string.")
 @click.option(
     "--file",
@@ -479,6 +485,7 @@ def user_create(
     max_session_count_per_model_session: int | None,
     max_customized_image_count: int | None,
     max_concurrent_logins: int | None,
+    max_api_requests_per_window: int | None,
     json_str: str | None,
     file_path: str | None,
 ) -> None:
@@ -504,6 +511,7 @@ def user_create(
         max_session_count_per_model_session=max_session_count_per_model_session,
         max_customized_image_count=max_customized_image_count,
         max_concurrent_logins=max_concurrent_logins,
+        max_api_requests_per_window=max_api_requests_per_window,
     )
     dto = _build_dto(CreateUserResourcePolicyInput, data)
 
@@ -542,6 +550,12 @@ def user_create(
         " Distinct from --max-concurrent-sessions which limits compute sessions."
     ),
 )
+@click.option(
+    "--max-api-requests-per-window",
+    type=int,
+    default=None,
+    help="Maximum API requests per user within the rate limit window (NULL = unlimited).",
+)
 @click.option("--json", "json_str", default=None, help="Full update input as JSON string.")
 @click.option(
     "--file",
@@ -557,6 +571,7 @@ def user_update(
     max_session_count_per_model_session: int | None,
     max_customized_image_count: int | None,
     max_concurrent_logins: int | None,
+    max_api_requests_per_window: int | None,
     json_str: str | None,
     file_path: str | None,
 ) -> None:
@@ -573,6 +588,7 @@ def user_update(
         max_session_count_per_model_session=max_session_count_per_model_session,
         max_customized_image_count=max_customized_image_count,
         max_concurrent_logins=max_concurrent_logins,
+        max_api_requests_per_window=max_api_requests_per_window,
     )
 
     dto = _build_dto(UpdateUserResourcePolicyInput, data)

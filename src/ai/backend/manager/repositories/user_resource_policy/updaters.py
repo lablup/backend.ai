@@ -19,6 +19,7 @@ class UserResourcePolicyUpdaterSpec(UpdaterSpec[UserResourcePolicyRow]):
     )
     max_customized_image_count: OptionalState[int] = field(default_factory=OptionalState.nop)
     max_concurrent_logins: TriState[int] = field(default_factory=TriState.nop)
+    max_api_requests_per_window: TriState[int] = field(default_factory=TriState.nop)
 
     @property
     @override
@@ -35,4 +36,5 @@ class UserResourcePolicyUpdaterSpec(UpdaterSpec[UserResourcePolicyRow]):
         )
         self.max_customized_image_count.update_dict(to_update, "max_customized_image_count")
         self.max_concurrent_logins.update_dict(to_update, "max_concurrent_logins")
+        self.max_api_requests_per_window.update_dict(to_update, "max_api_requests_per_window")
         return to_update

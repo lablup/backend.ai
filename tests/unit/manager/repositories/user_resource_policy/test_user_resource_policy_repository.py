@@ -352,3 +352,55 @@ class TestUserResourcePolicyRepository:
         )
         result_cleared = await repository.update(updater_clear)
         assert result_cleared.max_concurrent_logins is None
+
+    @pytest.mark.parametrize(
+        "max_api_requests_per_window",
+        [None, 0, 30000],
+        ids=["none-unlimited", "zero", "thirty-thousand"],
+    )
+    async def test_create_and_get_roundtrip_max_api_requests_per_window(
+        self,
+        repository: UserResourcePolicyRepository,
+        max_api_requests_per_window: int | None,
+    ) -> None:
+        """Test that max_api_requests_per_window round-trips for None, 0, and positive values."""
+        policy_name = f"test-policy-marpw-{max_api_requests_per_window}"
+        created = await repository.create(
+            Creator(
+                spec=UserResourcePolicyCreatorSpec(
+                    name=policy_name,
+                    max_vfolder_count=5,
+                    max_quota_scope_size=0,
+                    max_session_count_per_model_session=3,
+                    max_customized_image_count=2,
+                    max_api_requests_per_window=max_api_requests_per_window,
+                )
+            )
+        )
+        retrieved = await repository.get_by_name(created.name)
+
+        assert retrieved.max_api_requests_per_window == max_api_requests_per_window
+
+    async def test_update_max_api_requests_per_window_nullify_clears_to_none(
+        self,
+        repository: UserResourcePolicyRepository,
+        sample_policy: UserResourcePolicyData,
+    ) -> None:
+        """Test that TriState.nullify() clears max_api_requests_per_window back to None."""
+        updater_set = Updater(
+            spec=UserResourcePolicyUpdaterSpec(
+                max_api_requests_per_window=TriState.update(1000),
+            ),
+            pk_value=sample_policy.name,
+        )
+        result_set = await repository.update(updater_set)
+        assert result_set.max_api_requests_per_window == 1000
+
+        updater_clear = Updater(
+            spec=UserResourcePolicyUpdaterSpec(
+                max_api_requests_per_window=TriState.nullify(),
+            ),
+            pk_value=sample_policy.name,
+        )
+        result_cleared = await repository.update(updater_clear)
+        assert result_cleared.max_api_requests_per_window is None
