@@ -240,6 +240,34 @@ without modification in your codes).
 Please contact us (contact-at-lablup-com) for commercial consulting and more
 licensing details/options about individual use-cases.
 
+### Confidential Computing
+
+Confidential computing is a feature that spans the existing components rather than a
+component of its own. Its implementation lives beside the code it extends under
+`src/ai/backend/`, while the auxiliary build, provisioning, and deployment material is
+gathered into a `cc/` subdirectory of the matching top-level directory.
+
+| Location | Contents |
+| -------- | -------- |
+| `src/ai/backend/agent/coco/` | Agent's confidential-container backend |
+| `src/ai/backend/manager/confidential/` | Manager's attestation, admission, and key-release logic |
+| `src/ai/backend/manager/api/rest/confidential/` | Manager's confidential REST endpoints |
+| `src/ai/backend/common/pki/`, `common/kernel_runner/`, `common/cc_storage.py` | Shared PKI, guest kernel-runner protocol, and encrypted storage bindings |
+| `src/ai/backend/cc_broker/` | Attestation-gated credential broker running inside the measured control plane |
+| `rust/` | `bai-storage-format` crates implementing the confidential storage format (see `rust/bai-storage-format/FORMAT.md`) |
+| `scripts/cc/guest-image/` | Guest image build scripts and the `overlay/` tree copied verbatim into the guest filesystem |
+| `scripts/cc/control-plane/` | State-bundle build scripts, in-image helpers (`bin/`, `bench/`), and the dracut `initramfs/` module |
+| `scripts/cc/host-setup/` | Bare-metal host provisioning and verification |
+| `scripts/cc/trustee/` | Trustee/KBS operator CLI and PKI bootstrap |
+| `configs/cc/guest-image/` | Guest image pins, agent/CDH/AA configs, and attestation policies |
+| `configs/cc/control-plane/` | Control-plane pins and the systemd units baked into the image |
+| `configs/cc/credential-broker/` | Credential release policy and rendered configuration templates |
+| `configs/cc/trustee/` | KBS configuration and environment examples |
+| `docker/cc/` | Builder/PKIX Dockerfiles and the Trustee compose stack |
+
+Scripts under `scripts/cc/` resolve their configuration through the matching
+`configs/cc/` directory, so the two move together.
+
 
 Major Components
 ----------------

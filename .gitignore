@@ -167,8 +167,9 @@ backup.*.json
 
 /rust/target/
 /rust/*/pkg/
-/guest-image/out/
-/guest-image/.cache/
-/control-plane/build/out/
-/trustee/.local/
-/host-setup/.state/
+/scripts/cc/guest-image/out/
+/scripts/cc/guest-image/.cache/
+/scripts/cc/control-plane/build/out/
+/scripts/cc/trustee/.local/
+/scripts/cc/trustee/.env
+/scripts/cc/host-setup/.state/

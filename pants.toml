@@ -24,16 +24,11 @@ pants_ignore = [
     "/plugins/",
     "/docs/",  # TODO: docs build config
     "/proposals/",
-    "/guest-image/",
     "*.log",
     "/tools/pants-plugins",
     "/rust/",
     "/wheelhouse/*/",
-    "/wheelhouse/*.whl",
-    "/control-plane/",
-    "/credential-broker/",
-    "/host-setup/",
-    "/trustee/"
+    "/wheelhouse/*.whl"
 ]
 build_file_prelude_globs = ["tools/build-macros.py"]
 unmatched_build_file_globs = "error"
