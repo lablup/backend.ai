@@ -1034,7 +1034,7 @@ class RBACWriteOps(WriteOps):
         member = ScopeUserMember(user_id=user_id)
         domain_scope = ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=full_creation.domain_id)
         await self.ensure_scope(domain_scope)
-        await self.add_bulk_members(EntityMembersAddition(scope=domain_scope, members=[member]))
+        await self.add_bulk_subscopes(EntityMembersAddition(scope=domain_scope, members=[member]))
         for project_id in await self._domain_member_project_ids(
             full_creation.domain_id, full_creation.project_ids
         ):
@@ -1074,14 +1074,14 @@ class RBACWriteOps(WriteOps):
         addition: EntityMembersAddition,
         permission_cap: Permission | None = None,
     ) -> None:
-        """Attach each member under the scope: membership in the scope's virtual scope,
-        the legacy scope association, and the scope's binding into the member's own
-        virtual scope — never the reverse binding, which would widen every
-        member-scoped role at once. Grants the scope's auto_assign roles to members
-        whose ``assign_role_on`` returns a user id.
+        """Attach each member under the scope: membership in the scope's virtual scope
+        and the legacy scope association. The scope reaches the member entities
+        themselves, not the entities they own — use :meth:`add_bulk_subscopes` when the
+        member's own virtual scope must inherit the scope's permissions. Grants the
+        scope's auto_assign roles to members whose ``assign_role_on`` returns a user id.
 
-        Raises :class:`VirtualScopeNotFound` for any missing virtual scope. Idempotent:
-        existing rows keep their ``permission_cap``.
+        Raises :class:`VirtualScopeNotFound` if the scope has no virtual scope.
+        Idempotent: existing rows keep their ``permission_cap``.
         """
         members = list(addition.members)
         if not members:
@@ -1089,11 +1089,35 @@ class RBACWriteOps(WriteOps):
         scope = addition.scope
         virtual_scope_id = await self._resolve_virtual_scope_id(scope)
         entity_refs = [member.entity_ref() for member in members]
-        member_scopes = [self._member_scope_ref(ref) for ref in entity_refs]
         await self._enroll_members_in_scope_vs(virtual_scope_id, entity_refs, permission_cap)
         await self._associate_entities_with_scope(scope, entity_refs)
-        await self._bind_scope_to_member_vs(scope, member_scopes, permission_cap)
         await self._grant_member_auto_assign_roles(scope, members)
+
+    async def add_bulk_subscopes(
+        self,
+        addition: EntityMembersAddition,
+        permission_cap: Permission | None = None,
+    ) -> None:
+        """Nest each member's own scope under the scope: everything
+        :meth:`add_bulk_members` writes, plus the binding that lets the scope's
+        permissions reach every entity the member owns.
+
+        Only for relations where that cascade is intended — a domain over its projects
+        and users, a project over the container registries it contains. A member that
+        merely participates in the scope, such as a user in a project, is an ordinary
+        member: binding its virtual scope would expose everything it owns elsewhere.
+        The binding stays unidirectional; the reverse would widen every member-scoped
+        role at once.
+
+        Raises :class:`VirtualScopeNotFound` for any missing virtual scope. Idempotent:
+        existing rows keep their ``permission_cap``.
+        """
+        members = list(addition.members)
+        if not members:
+            return
+        await self.add_bulk_members(addition, permission_cap)
+        member_scopes = [self._member_scope_ref(member.entity_ref()) for member in members]
+        await self._bind_scope_to_member_vs(addition.scope, member_scopes, permission_cap)
 
     async def add_bulk_members_partial(
         self,
@@ -1119,9 +1143,6 @@ class RBACWriteOps(WriteOps):
                     ref = member.entity_ref()
                     await self._enroll_members_in_scope_vs(virtual_scope_id, [ref], permission_cap)
                     await self._associate_entities_with_scope(scope, [ref])
-                    await self._bind_scope_to_member_vs(
-                        scope, [self._member_scope_ref(ref)], permission_cap
-                    )
                 successes.append(member)
             except Exception as e:
                 errors.append(EntityMemberCreationError(member=member, exception=e, index=index))
@@ -1212,9 +1233,12 @@ class RBACWriteOps(WriteOps):
         scope: ScopeRef,
         entities: Collection[EntityRef],
     ) -> None:
-        """Delete each member's membership, association, and the scope's binding in the
-        member's own virtual scope; role mappings are left untouched. Missing virtual
-        scopes (legacy data) never raise — whatever exists is deleted.
+        """Detach each member from the scope, undoing both :meth:`add_bulk_members` and
+        :meth:`add_bulk_subscopes`: the membership, the association, and the scope's
+        binding in the member's own virtual scope — a no-op for members added without
+        that binding, since the delete matches the scope exactly. Role mappings are left
+        untouched. Missing virtual scopes (legacy data) never raise — whatever exists is
+        deleted.
         """
         entity_refs = list(entities)
         if not entity_refs:

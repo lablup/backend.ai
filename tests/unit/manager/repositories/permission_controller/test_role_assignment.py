@@ -369,6 +369,51 @@ class TestRoleAssignment:
             )
             assert len(assoc.fetchall()) == 1
 
+    async def test_bind_user_to_project_does_not_bind_project_into_user_scope(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        group_db_source: GroupDBSource,
+        user_1: uuid.UUID,
+        test_project: uuid.UUID,
+    ) -> None:
+        """Joining a project leaves the user's own virtual scope unbound: the user is a
+        member of the project, not a subscope of it, so project-scoped permissions never
+        reach the entities the user owns."""
+        await group_db_source.bind_user_to_project(UserID(user_1), ProjectID(test_project))
+
+        async with db_with_cleanup.begin_readonly_session() as session:
+            user_vs_id = await session.scalar(
+                sa.select(VirtualScopeRow.id).where(
+                    VirtualScopeRow.scope_type == ScopeType.USER.value,
+                    VirtualScopeRow.scope_id == user_1,
+                )
+            )
+            project_vs_id = await session.scalar(
+                sa.select(VirtualScopeRow.id).where(
+                    VirtualScopeRow.scope_type == ScopeType.PROJECT.value,
+                    VirtualScopeRow.scope_id == test_project,
+                )
+            )
+            bindings_into_user_scope = (
+                await session.scalars(
+                    sa.select(ScopeBindingRow.scope_id).where(
+                        ScopeBindingRow.virtual_scope_id == user_vs_id,
+                        ScopeBindingRow.scope_id == test_project,
+                    )
+                )
+            ).all()
+            memberships_in_project_scope = (
+                await session.scalars(
+                    sa.select(EntityMembershipRow.entity_id).where(
+                        EntityMembershipRow.virtual_scope_id == project_vs_id,
+                        EntityMembershipRow.entity_id == user_1,
+                    )
+                )
+            ).all()
+
+        assert list(bindings_into_user_scope) == []
+        assert list(memberships_in_project_scope) == [user_1]
+
     async def test_bind_user_to_project_skips_if_already_bound(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,

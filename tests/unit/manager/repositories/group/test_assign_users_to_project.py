@@ -460,6 +460,52 @@ class TestAssignUsersToProject:
             ).all()
             assert len(rows) == 1
 
+    async def test_assign_does_not_bind_project_into_user_scope(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        group_db_source: GroupDBSource,
+        test_project: ProjectID,
+        test_role: uuid.UUID,
+        same_domain_user_1: UserID,
+    ) -> None:
+        """Assigned users become members of the project's virtual scope, and the project
+        is not bound into theirs — project-scoped permissions must not reach the entities
+        a member owns."""
+        await group_db_source.assign_users_to_project(test_project, [same_domain_user_1], test_role)
+
+        async with db_with_cleanup.begin_readonly_session() as session:
+            user_vs_id = await session.scalar(
+                sa.select(VirtualScopeRow.id).where(
+                    VirtualScopeRow.scope_type == ScopeType.USER.value,
+                    VirtualScopeRow.scope_id == same_domain_user_1,
+                )
+            )
+            project_vs_id = await session.scalar(
+                sa.select(VirtualScopeRow.id).where(
+                    VirtualScopeRow.scope_type == ScopeType.PROJECT.value,
+                    VirtualScopeRow.scope_id == test_project,
+                )
+            )
+            bindings_into_user_scope = (
+                await session.scalars(
+                    sa.select(ScopeBindingRow.scope_id).where(
+                        ScopeBindingRow.virtual_scope_id == user_vs_id,
+                        ScopeBindingRow.scope_id == test_project,
+                    )
+                )
+            ).all()
+            memberships_in_project_scope = (
+                await session.scalars(
+                    sa.select(EntityMembershipRow.entity_id).where(
+                        EntityMembershipRow.virtual_scope_id == project_vs_id,
+                        EntityMembershipRow.entity_id == same_domain_user_1,
+                    )
+                )
+            ).all()
+
+        assert list(bindings_into_user_scope) == []
+        assert list(memberships_in_project_scope) == [same_domain_user_1]
+
 
 class TestUnassignUsersFromProject:
     """Tests for GroupDBSource.unassign_users_from_project"""
