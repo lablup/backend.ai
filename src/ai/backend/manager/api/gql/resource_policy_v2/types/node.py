@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.resource_policy.response import (
     ProjectResourcePolicyNode,
     UserResourcePolicyNode,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.common_types import (
     BinarySizeInfoGQL,
     ResourceLimitEntryGQL,
@@ -202,6 +203,15 @@ class UserResourcePolicyV2GQL(PydanticNodeMixin[UserResourcePolicyNode]):
                 " Null means unlimited."
                 " Distinct from keypair_resource_policies.max_concurrent_sessions"
                 " which caps compute sessions."
+            ),
+        ),
+    )
+    max_api_requests_per_window: int | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Maximum number of API requests allowed per user within the rate limit"
+                " window. Null means unlimited."
             ),
         ),
     )

@@ -138,7 +138,13 @@ class AdminCreateKeypairInput(BaseRequestModel):
     resource_policy: str = Field(description="Name of the resource policy to assign.")
     is_active: bool = Field(default=True, description="Whether the keypair should be active.")
     is_admin: bool = Field(default=False, description="Whether the keypair has admin privileges.")
-    rate_limit: int = Field(default=30000, description="API rate limit (requests per minute).")
+    rate_limit: int = Field(
+        default=30000,
+        deprecated=True,
+        description=(
+            "Deprecated: superseded by the user resource policy field max_api_requests_per_window, which is what the rate limiter reads. This value is stored but no longer enforced."
+        ),
+    )
 
 
 class AdminUpdateKeypairInput(BaseRequestModel):
@@ -148,7 +154,13 @@ class AdminUpdateKeypairInput(BaseRequestModel):
     is_active: bool | None = Field(default=None, description="New active state.")
     is_admin: bool | None = Field(default=None, description="New admin privilege state.")
     resource_policy: str | None = Field(default=None, description="New resource policy name.")
-    rate_limit: int | None = Field(default=None, description="New API rate limit.")
+    rate_limit: int | None = Field(
+        default=None,
+        deprecated=True,
+        description=(
+            "Deprecated: superseded by the user resource policy field max_api_requests_per_window, which is what the rate limiter reads. This value is stored but no longer enforced."
+        ),
+    )
 
 
 class AdminDeleteKeypairInput(BaseRequestModel):

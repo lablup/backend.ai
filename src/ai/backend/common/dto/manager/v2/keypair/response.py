@@ -53,7 +53,12 @@ class KeypairNode(BaseResponseModel):
     last_used: datetime | None = Field(
         default=None, description="When the keypair was last used for an API call."
     )
-    rate_limit: int = Field(description="API rate limit (requests per minute).")
+    rate_limit: int = Field(
+        deprecated=True,
+        description=(
+            "Deprecated: superseded by the user resource policy field max_api_requests_per_window, which is what the rate limiter reads. This value is stored but no longer enforced."
+        ),
+    )
     num_queries: int = Field(description="Total number of API queries made with this keypair.")
     resource_policy: str = Field(
         description="Name of the resource policy assigned to this keypair."

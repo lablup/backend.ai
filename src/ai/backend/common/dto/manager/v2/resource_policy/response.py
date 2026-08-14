@@ -122,6 +122,13 @@ class UserResourcePolicyNode(BaseResponseModel):
             " Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions."
         ),
     )
+    max_api_requests_per_window: int | None = Field(
+        default=None,
+        description=(
+            "Maximum number of API requests allowed per user within the rate limit window."
+            " Null means unlimited."
+        ),
+    )
     max_quota_scope_size: BinarySizeInfo = Field(
         description="Maximum quota scope size.",
     )

@@ -115,5 +115,4 @@ class AuthenticatedKeypair:
     access_key: AccessKey
     secret_key: SecretKey
     is_admin: bool
-    rate_limit: int | None
     resource_policy: KeyPairResourcePolicyData
