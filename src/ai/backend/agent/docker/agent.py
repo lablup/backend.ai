@@ -180,8 +180,8 @@ known_glibc_distros: Final[dict[float, str]] = {
 }
 
 
-def _parse_distro_from_ldd_output(output: str) -> str | None:
-    for line in output.splitlines():
+def _parse_distro_from_ldd_output(log_chunks: Sequence[str]) -> str | None:
+    for line in "".join(log_chunks).splitlines():
         stripped_line = line.strip()
         if m := LDD_GLIBC_REGEX.search(stripped_line):
             version = float(m.group(1))
@@ -1770,7 +1770,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             await container.stop()
             await container.delete()
             log.debug("response: {}", container_log)
-            distro = _parse_distro_from_ldd_output("\n".join(container_log))
+            distro = _parse_distro_from_ldd_output(container_log)
             if distro is None:
                 raise RuntimeError("Could not determine the C library variant.")
             await self.valkey_stat_client.set_image_distro(image_id, distro)

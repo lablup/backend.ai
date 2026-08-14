@@ -111,7 +111,20 @@ class TestParseDistroFromLddOutput:
         ],
     )
     def test_detects_distro_from_libc_banner(self, output: str, expected: str) -> None:
-        assert _parse_distro_from_ldd_output(output) == expected
+        assert _parse_distro_from_ldd_output([output]) == expected
+
+    @pytest.mark.parametrize(
+        "chunk_size",
+        [pytest.param(1, id="one-byte-chunks"), pytest.param(16, id="sixteen-byte-chunks")],
+    )
+    def test_detects_distro_from_chunked_log(self, chunk_size: int) -> None:
+        output = "\r\n".join([
+            LDD_PRELOAD_ERROR_LINES,
+            "ldd (Ubuntu GLIBC 2.39-0ubuntu8.7) 2.39",
+            LDD_GLIBC_TRAILER,
+        ])
+        chunks = [output[i : i + chunk_size] for i in range(0, len(output), chunk_size)]
+        assert _parse_distro_from_ldd_output(chunks) == "ubuntu24.04"
 
     @pytest.mark.parametrize(
         "output",
@@ -125,7 +138,7 @@ class TestParseDistroFromLddOutput:
         ],
     )
     def test_returns_none_without_libc_banner(self, output: str) -> None:
-        assert _parse_distro_from_ldd_output(output) is None
+        assert _parse_distro_from_ldd_output([output]) is None
 
 
 @pytest.fixture
