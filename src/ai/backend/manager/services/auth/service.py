@@ -395,7 +395,7 @@ class AuthService:
                 token=LoginSessionTokenData(
                     type="keypair",
                     access_key=keypair_row.access_key,
-                    secret_key=keypair_row.secret_key or "",
+                    secret_key=keypair_row.secret_key,
                     role=user.role,
                     status=user.status,
                 ),
