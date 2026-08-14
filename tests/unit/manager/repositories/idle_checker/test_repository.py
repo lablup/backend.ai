@@ -19,6 +19,7 @@ from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.session import SessionID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import (
     ClusterMode,
     ResourceSlot,
@@ -42,12 +43,17 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import BulkUpserter
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.repositories.idle_checker.types import (
     IdleJudgmentData,
     SessionIdleCheckPair,
+)
+from ai.backend.manager.repositories.idle_checker.upserters import (
+    SessionIdleCheckExcludeUpserterSpec,
+    SessionIdleCheckIncludeUpserterSpec,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.testutils.db import with_tables
@@ -1009,6 +1015,13 @@ class TestFetchExpiredIdleChecks:
 
 @dataclass(frozen=True)
 class ExclusionRows:
+    """Rows seeded for one checker; each session field names its pair's starting state.
+
+    ``unassigned_session_id`` has no idle-check row yet, ``user_excluded_session_id``'s
+    row is already manual, and the rest start with a system-written row in the phase
+    their name says.
+    """
+
     active_session_id: SessionId
     idle_expired_session_id: SessionId
     excluded_session_id: SessionId
@@ -1016,6 +1029,7 @@ class ExclusionRows:
     unassigned_session_id: SessionId
     user_excluded_session_id: SessionId
     checker_id: IdleCheckerID
+    user_id: UserID
 
 
 class TestSessionIdleCheckExclusion:
@@ -1058,6 +1072,7 @@ class TestSessionIdleCheckExclusion:
             unassigned_session_id=SessionId(uuid.uuid4()),
             user_excluded_session_id=SessionId(uuid.uuid4()),
             checker_id=IdleCheckerID(uuid.uuid4()),
+            user_id=UserID(uuid.uuid4()),
         )
         check_specs = (
             (rows.active_session_id, IdleCheckPhase.ACTIVE, datetime(2026, 2, 1, tzinfo=UTC)),
@@ -1072,6 +1087,31 @@ class TestSessionIdleCheckExclusion:
         async with database.begin_session() as db_sess:
             for scope_row in _expired_check_scope_rows(scope):
                 db_sess.add(scope_row)
+            # The requesting user recorded as the managing writer.
+            db_sess.add(
+                UserResourcePolicyRow(
+                    name=f"{scope.domain_name}-user-policy",
+                    max_vfolder_count=10,
+                    max_quota_scope_size=1024,
+                    max_session_count_per_model_session=5,
+                    max_customized_image_count=3,
+                )
+            )
+            db_sess.add(
+                UserRow(
+                    uuid=rows.user_id,
+                    username="exclusion-requester",
+                    email="exclusion-requester@example.com",
+                    password=None,
+                    need_password_change=False,
+                    status=UserStatus.ACTIVE,
+                    status_info="active",
+                    domain_name=scope.domain_name,
+                    domain_id=scope.domain_id,
+                    role=UserRole.USER,
+                    resource_policy=f"{scope.domain_name}-user-policy",
+                )
+            )
             for session_id, _phase, _expire_at in check_specs:
                 db_sess.add(_expired_check_session_row(scope, session_id, SessionStatus.RUNNING))
             # The unassigned session exists but has no idle-check row yet.
@@ -1093,6 +1133,7 @@ class TestSessionIdleCheckExclusion:
                         expire_at=expire_at,
                         last_status=phase,
                         last_message=f"{phase.value} judgment",
+                        updated_at=datetime(2026, 1, 1, tzinfo=UTC),
                     )
                 )
             # A pair the user excluded by hand.
@@ -1108,41 +1149,6 @@ class TestSessionIdleCheckExclusion:
             )
         return rows
 
-    async def test_exclude_overwrites_any_phase(
-        self,
-        database: ExtendedAsyncSAEngine,
-        repository: IdleCheckerRepository,
-        exclusion_rows: ExclusionRows,
-    ) -> None:
-        await repository.batch_exclude_session_idle_checks(
-            exclusion_rows.checker_id,
-            [
-                SessionID(exclusion_rows.active_session_id),
-                SessionID(exclusion_rows.idle_expired_session_id),
-            ],
-        )
-
-        async with database.begin_readonly_session() as db_sess:
-            for session_id in (
-                exclusion_rows.active_session_id,
-                exclusion_rows.idle_expired_session_id,
-            ):
-                row = await db_sess.get(
-                    SessionIdleCheckRow,
-                    (session_id, exclusion_rows.checker_id),
-                )
-                assert row is not None
-                assert row.last_status is IdleCheckPhase.EXCLUDED
-                assert row.expire_at is None
-                assert row.last_message == "Excluded from idle checks."
-            untouched_row = await db_sess.get(
-                SessionIdleCheckRow,
-                (exclusion_rows.untouched_session_id, exclusion_rows.checker_id),
-            )
-        assert untouched_row is not None
-        assert untouched_row.last_status is IdleCheckPhase.ACTIVE
-        assert untouched_row.expire_at == datetime(2026, 2, 1, tzinfo=UTC)
-
     async def test_exclude_upserts_missing_pair_row(
         self,
         database: ExtendedAsyncSAEngine,
@@ -1150,8 +1156,15 @@ class TestSessionIdleCheckExclusion:
         exclusion_rows: ExclusionRows,
     ) -> None:
         await repository.batch_exclude_session_idle_checks(
-            exclusion_rows.checker_id,
-            [SessionID(exclusion_rows.unassigned_session_id)],
+            BulkUpserter(
+                specs=[
+                    SessionIdleCheckExcludeUpserterSpec(
+                        session_id=SessionID(exclusion_rows.unassigned_session_id),
+                        checker_id=exclusion_rows.checker_id,
+                        user_id=exclusion_rows.user_id,
+                    ),
+                ]
+            )
         )
 
         async with database.begin_readonly_session() as db_sess:
@@ -1163,98 +1176,55 @@ class TestSessionIdleCheckExclusion:
         assert row.last_status is IdleCheckPhase.EXCLUDED
         assert row.expire_at is None
         assert row.last_message == "Excluded from idle checks."
+        assert row.is_manual is True
+        assert row.manually_triggered_by == exclusion_rows.user_id
 
-    async def test_exclude_deduplicates_repeated_session_ids(
+    async def test_exclude_overwrites_any_phase(
         self,
         database: ExtendedAsyncSAEngine,
         repository: IdleCheckerRepository,
         exclusion_rows: ExclusionRows,
     ) -> None:
-        """A repeated session id must not break the single INSERT..ON CONFLICT statement."""
         await repository.batch_exclude_session_idle_checks(
-            exclusion_rows.checker_id,
-            [
-                SessionID(exclusion_rows.unassigned_session_id),
-                SessionID(exclusion_rows.unassigned_session_id),
-            ],
+            BulkUpserter(
+                specs=[
+                    SessionIdleCheckExcludeUpserterSpec(
+                        session_id=SessionID(exclusion_rows.active_session_id),
+                        checker_id=exclusion_rows.checker_id,
+                        user_id=exclusion_rows.user_id,
+                    ),
+                    SessionIdleCheckExcludeUpserterSpec(
+                        session_id=SessionID(exclusion_rows.idle_expired_session_id),
+                        checker_id=exclusion_rows.checker_id,
+                        user_id=exclusion_rows.user_id,
+                    ),
+                ]
+            )
         )
 
         async with database.begin_readonly_session() as db_sess:
-            row = await db_sess.get(
-                SessionIdleCheckRow,
-                (exclusion_rows.unassigned_session_id, exclusion_rows.checker_id),
-            )
-        assert row is not None
-        assert row.last_status is IdleCheckPhase.EXCLUDED
-
-    async def test_include_resets_only_excluded_rows(
-        self,
-        database: ExtendedAsyncSAEngine,
-        repository: IdleCheckerRepository,
-        exclusion_rows: ExclusionRows,
-    ) -> None:
-        await repository.batch_include_session_idle_checks(
-            exclusion_rows.checker_id,
-            [
-                SessionID(exclusion_rows.excluded_session_id),
-                SessionID(exclusion_rows.active_session_id),
-            ],
-        )
-
-        async with database.begin_readonly_session() as db_sess:
-            reset_row = await db_sess.get(
-                SessionIdleCheckRow,
-                (exclusion_rows.excluded_session_id, exclusion_rows.checker_id),
-            )
             active_row = await db_sess.get(
                 SessionIdleCheckRow,
                 (exclusion_rows.active_session_id, exclusion_rows.checker_id),
             )
-        assert reset_row is not None
-        assert reset_row.last_status is IdleCheckPhase.NOT_CHECKED
-        assert reset_row.expire_at is None
-        assert reset_row.last_message == "Not checked yet."
+            idle_expired_row = await db_sess.get(
+                SessionIdleCheckRow,
+                (exclusion_rows.idle_expired_session_id, exclusion_rows.checker_id),
+            )
+            untouched_row = await db_sess.get(
+                SessionIdleCheckRow,
+                (exclusion_rows.untouched_session_id, exclusion_rows.checker_id),
+            )
         assert active_row is not None
-        assert active_row.last_status is IdleCheckPhase.ACTIVE
-        assert active_row.last_message == f"{IdleCheckPhase.ACTIVE.value} judgment"
-
-    async def test_include_is_idempotent(
-        self,
-        database: ExtendedAsyncSAEngine,
-        repository: IdleCheckerRepository,
-        exclusion_rows: ExclusionRows,
-    ) -> None:
-        target = [SessionID(exclusion_rows.excluded_session_id)]
-
-        await repository.batch_include_session_idle_checks(exclusion_rows.checker_id, target)
-        await repository.batch_include_session_idle_checks(exclusion_rows.checker_id, target)
-
-        async with database.begin_readonly_session() as db_sess:
-            row = await db_sess.get(
-                SessionIdleCheckRow,
-                (exclusion_rows.excluded_session_id, exclusion_rows.checker_id),
-            )
-        assert row is not None
-        assert row.last_status is IdleCheckPhase.NOT_CHECKED
-        assert row.last_message == "Not checked yet."
-
-    async def test_include_ignores_pair_without_row(
-        self,
-        database: ExtendedAsyncSAEngine,
-        repository: IdleCheckerRepository,
-        exclusion_rows: ExclusionRows,
-    ) -> None:
-        await repository.batch_include_session_idle_checks(
-            exclusion_rows.checker_id,
-            [SessionID(exclusion_rows.unassigned_session_id)],
-        )
-
-        async with database.begin_readonly_session() as db_sess:
-            row = await db_sess.get(
-                SessionIdleCheckRow,
-                (exclusion_rows.unassigned_session_id, exclusion_rows.checker_id),
-            )
-        assert row is None
+        assert active_row.last_status is IdleCheckPhase.EXCLUDED
+        # The overwrite restamps the managing writer on a checker-managed row.
+        assert active_row.is_manual is True
+        assert active_row.manually_triggered_by == exclusion_rows.user_id
+        assert idle_expired_row is not None
+        assert idle_expired_row.last_status is IdleCheckPhase.EXCLUDED
+        assert untouched_row is not None
+        assert untouched_row.last_status is IdleCheckPhase.ACTIVE
+        assert untouched_row.expire_at == datetime(2026, 2, 1, tzinfo=UTC)
 
     async def test_exclude_skips_unknown_sessions(
         self,
@@ -1262,72 +1232,255 @@ class TestSessionIdleCheckExclusion:
         repository: IdleCheckerRepository,
         exclusion_rows: ExclusionRows,
     ) -> None:
-        unknown_session_id = SessionID(uuid.uuid4())
+        unknown_session_id = SessionId(uuid.uuid4())
 
         result = await repository.batch_exclude_session_idle_checks(
-            exclusion_rows.checker_id,
-            [
-                SessionID(exclusion_rows.active_session_id),
-                unknown_session_id,
-            ],
+            BulkUpserter(
+                specs=[
+                    SessionIdleCheckExcludeUpserterSpec(
+                        session_id=SessionID(exclusion_rows.active_session_id),
+                        checker_id=exclusion_rows.checker_id,
+                        user_id=exclusion_rows.user_id,
+                    ),
+                    SessionIdleCheckExcludeUpserterSpec(
+                        session_id=SessionID(unknown_session_id),
+                        checker_id=exclusion_rows.checker_id,
+                        user_id=exclusion_rows.user_id,
+                    ),
+                ]
+            )
         )
 
-        assert result.success == [SessionID(exclusion_rows.active_session_id)]
+        assert result.success == [
+            SessionIdleCheckPair(
+                session_id=exclusion_rows.active_session_id,
+                checker_id=exclusion_rows.checker_id,
+            )
+        ]
         # The FK violation is mapped to SessionNotFound naming the session.
-        assert set(result.errors) == {unknown_session_id}
-        assert isinstance(result.errors[unknown_session_id], SessionNotFound)
+        unknown_pair = SessionIdleCheckPair(
+            session_id=unknown_session_id,
+            checker_id=exclusion_rows.checker_id,
+        )
+        assert set(result.errors) == {unknown_pair}
+        assert isinstance(result.errors[unknown_pair], SessionNotFound)
 
         async with database.begin_readonly_session() as db_sess:
-            valid_row = await db_sess.get(
-                SessionIdleCheckRow,
-                (exclusion_rows.active_session_id, exclusion_rows.checker_id),
-            )
             unknown_row = await db_sess.get(
                 SessionIdleCheckRow,
                 (unknown_session_id, exclusion_rows.checker_id),
             )
-        assert valid_row is not None
-        assert valid_row.last_status is IdleCheckPhase.EXCLUDED
         assert unknown_row is None
 
-    async def test_include_skips_unknown_sessions(
+    async def test_unknown_checker_reported_per_pair(
+        self,
+        repository: IdleCheckerRepository,
+        exclusion_rows: ExclusionRows,
+    ) -> None:
+        """The FK violation is mapped to IdleCheckerNotFound for the failing pair only."""
+        unknown_checker_id = IdleCheckerID(uuid.uuid4())
+
+        result = await repository.batch_exclude_session_idle_checks(
+            BulkUpserter(
+                specs=[
+                    SessionIdleCheckExcludeUpserterSpec(
+                        session_id=SessionID(exclusion_rows.active_session_id),
+                        checker_id=unknown_checker_id,
+                        user_id=exclusion_rows.user_id,
+                    ),
+                ]
+            )
+        )
+
+        assert result.success == []
+        unknown_pair = SessionIdleCheckPair(
+            session_id=exclusion_rows.active_session_id,
+            checker_id=unknown_checker_id,
+        )
+        assert set(result.errors) == {unknown_pair}
+        assert isinstance(result.errors[unknown_pair], IdleCheckerNotFound)
+
+    async def test_include_upserts_missing_pair_row(
         self,
         database: ExtendedAsyncSAEngine,
         repository: IdleCheckerRepository,
         exclusion_rows: ExclusionRows,
     ) -> None:
-        unknown_session_id = SessionID(uuid.uuid4())
-
-        result = await repository.batch_include_session_idle_checks(
-            exclusion_rows.checker_id,
-            [
-                SessionID(exclusion_rows.excluded_session_id),
-                unknown_session_id,
-            ],
+        await repository.batch_include_session_idle_checks(
+            BulkUpserter(
+                specs=[
+                    SessionIdleCheckIncludeUpserterSpec(
+                        session_id=SessionID(exclusion_rows.unassigned_session_id),
+                        checker_id=exclusion_rows.checker_id,
+                        user_id=exclusion_rows.user_id,
+                    ),
+                ]
+            )
         )
 
-        assert result.success == [SessionID(exclusion_rows.excluded_session_id)]
-        assert set(result.errors) == {unknown_session_id}
-        assert isinstance(result.errors[unknown_session_id], SessionNotFound)
+        async with database.begin_readonly_session() as db_sess:
+            row = await db_sess.get(
+                SessionIdleCheckRow,
+                (exclusion_rows.unassigned_session_id, exclusion_rows.checker_id),
+            )
+        assert row is not None
+        assert row.last_status is IdleCheckPhase.NOT_CHECKED
+        assert row.expire_at is None
+        assert row.last_message == "Not checked yet."
+        assert row.is_manual is True
+        assert row.manually_triggered_by == exclusion_rows.user_id
+
+    async def test_include_overwrites_any_phase(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        exclusion_rows: ExclusionRows,
+    ) -> None:
+        await repository.batch_include_session_idle_checks(
+            BulkUpserter(
+                specs=[
+                    SessionIdleCheckIncludeUpserterSpec(
+                        session_id=SessionID(exclusion_rows.excluded_session_id),
+                        checker_id=exclusion_rows.checker_id,
+                        user_id=exclusion_rows.user_id,
+                    ),
+                    SessionIdleCheckIncludeUpserterSpec(
+                        session_id=SessionID(exclusion_rows.active_session_id),
+                        checker_id=exclusion_rows.checker_id,
+                        user_id=exclusion_rows.user_id,
+                    ),
+                ]
+            )
+        )
 
         async with database.begin_readonly_session() as db_sess:
-            reset_row = await db_sess.get(
+            excluded_row = await db_sess.get(
                 SessionIdleCheckRow,
                 (exclusion_rows.excluded_session_id, exclusion_rows.checker_id),
             )
-        assert reset_row is not None
-        assert reset_row.last_status is IdleCheckPhase.NOT_CHECKED
+            active_row = await db_sess.get(
+                SessionIdleCheckRow,
+                (exclusion_rows.active_session_id, exclusion_rows.checker_id),
+            )
+            untouched_row = await db_sess.get(
+                SessionIdleCheckRow,
+                (exclusion_rows.untouched_session_id, exclusion_rows.checker_id),
+            )
+        assert excluded_row is not None
+        assert excluded_row.last_status is IdleCheckPhase.NOT_CHECKED
+        # The grace period restarts from this write, not from the seeded row's age.
+        assert excluded_row.updated_at > datetime(2026, 1, 1, tzinfo=UTC)
+        # The overwrite restamps the managing writer on a checker-managed row.
+        assert excluded_row.is_manual is True
+        assert excluded_row.manually_triggered_by == exclusion_rows.user_id
+        assert active_row is not None
+        assert active_row.last_status is IdleCheckPhase.NOT_CHECKED
+        assert untouched_row is not None
+        assert untouched_row.last_status is IdleCheckPhase.ACTIVE
 
-    async def test_unknown_checker_rejects_whole_batch(
+    async def test_include_skips_unknown_sessions(
         self,
         repository: IdleCheckerRepository,
         exclusion_rows: ExclusionRows,
     ) -> None:
-        with pytest.raises(IdleCheckerNotFound):
-            await repository.batch_exclude_session_idle_checks(
-                IdleCheckerID(uuid.uuid4()),
-                [SessionID(exclusion_rows.active_session_id)],
+        unknown_session_id = SessionId(uuid.uuid4())
+
+        result = await repository.batch_include_session_idle_checks(
+            BulkUpserter(
+                specs=[
+                    SessionIdleCheckIncludeUpserterSpec(
+                        session_id=SessionID(exclusion_rows.excluded_session_id),
+                        checker_id=exclusion_rows.checker_id,
+                        user_id=exclusion_rows.user_id,
+                    ),
+                    SessionIdleCheckIncludeUpserterSpec(
+                        session_id=SessionID(unknown_session_id),
+                        checker_id=exclusion_rows.checker_id,
+                        user_id=exclusion_rows.user_id,
+                    ),
+                ]
             )
+        )
+
+        assert result.success == [
+            SessionIdleCheckPair(
+                session_id=exclusion_rows.excluded_session_id,
+                checker_id=exclusion_rows.checker_id,
+            )
+        ]
+        unknown_pair = SessionIdleCheckPair(
+            session_id=unknown_session_id,
+            checker_id=exclusion_rows.checker_id,
+        )
+        assert set(result.errors) == {unknown_pair}
+        assert isinstance(result.errors[unknown_pair], SessionNotFound)
+
+    async def test_include_unknown_checker_reported_per_pair(
+        self,
+        repository: IdleCheckerRepository,
+        exclusion_rows: ExclusionRows,
+    ) -> None:
+        """The FK violation fails only the pair naming the unknown checker."""
+        unknown_checker_id = IdleCheckerID(uuid.uuid4())
+
+        result = await repository.batch_include_session_idle_checks(
+            BulkUpserter(
+                specs=[
+                    SessionIdleCheckIncludeUpserterSpec(
+                        session_id=SessionID(exclusion_rows.excluded_session_id),
+                        checker_id=exclusion_rows.checker_id,
+                        user_id=exclusion_rows.user_id,
+                    ),
+                    SessionIdleCheckIncludeUpserterSpec(
+                        session_id=SessionID(exclusion_rows.active_session_id),
+                        checker_id=unknown_checker_id,
+                        user_id=exclusion_rows.user_id,
+                    ),
+                ]
+            )
+        )
+
+        assert result.success == [
+            SessionIdleCheckPair(
+                session_id=exclusion_rows.excluded_session_id,
+                checker_id=exclusion_rows.checker_id,
+            )
+        ]
+        unknown_pair = SessionIdleCheckPair(
+            session_id=exclusion_rows.active_session_id,
+            checker_id=unknown_checker_id,
+        )
+        assert set(result.errors) == {unknown_pair}
+        assert isinstance(result.errors[unknown_pair], IdleCheckerNotFound)
+
+    async def test_include_restarts_grace_period_from_new_write(
+        self,
+        repository: IdleCheckerRepository,
+        exclusion_rows: ExclusionRows,
+    ) -> None:
+        """The included pair reenters the grace fetch with this write as its start."""
+        await repository.batch_include_session_idle_checks(
+            BulkUpserter(
+                specs=[
+                    SessionIdleCheckIncludeUpserterSpec(
+                        session_id=SessionID(exclusion_rows.excluded_session_id),
+                        checker_id=exclusion_rows.checker_id,
+                        user_id=exclusion_rows.user_id,
+                    ),
+                ]
+            )
+        )
+
+        batch = await repository.fetch_initial_grace_period_checks([SessionStatus.RUNNING])
+
+        assert [check.pair for check in batch.checks] == [
+            SessionIdleCheckPair(
+                session_id=exclusion_rows.excluded_session_id,
+                checker_id=exclusion_rows.checker_id,
+            )
+        ]
+        # The grace start is this write's timestamp, not the seeded row's age.
+        assert batch.checks[0].grace_started_at > datetime(2026, 1, 1, tzinfo=UTC)
 
     async def test_sync_delete_spares_user_managed_rows(
         self,

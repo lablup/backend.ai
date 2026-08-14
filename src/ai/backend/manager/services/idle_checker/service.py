@@ -2,9 +2,15 @@ from typing import cast
 
 from ai.backend.common.data.idle_checker.types import IdleCheckerSpec
 from ai.backend.common.exception import PrometheusQueryPresetInvalidLabel
+from ai.backend.common.identifier.session import SessionID
+from ai.backend.manager.repositories.base import BulkUpserter
 from ai.backend.manager.repositories.idle_checker.creators import IdleCheckerCreatorSpec
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.repositories.idle_checker.updaters import IdleCheckerUpdaterSpec
+from ai.backend.manager.repositories.idle_checker.upserters import (
+    SessionIdleCheckExcludeUpserterSpec,
+    SessionIdleCheckIncludeUpserterSpec,
+)
 from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
@@ -100,11 +106,19 @@ class IdleCheckerService:
     async def exclude_sessions(
         self, action: ExcludeSessionIdleChecksAction
     ) -> ExcludeSessionIdleChecksActionResult:
+        specs: list[SessionIdleCheckExcludeUpserterSpec] = []
+        for target in dict.fromkeys(action.targets):
+            specs.append(
+                SessionIdleCheckExcludeUpserterSpec(
+                    session_id=SessionID(target.session_id),
+                    checker_id=target.checker_id,
+                    user_id=action.user_id,
+                )
+            )
         batch_result = await self._repository.batch_exclude_session_idle_checks(
-            action.checker_id, action.session_ids
+            BulkUpserter(specs=specs)
         )
         return ExcludeSessionIdleChecksActionResult(
-            checker_id=action.checker_id,
             success=batch_result.success,
             errors=batch_result.errors,
         )
@@ -112,11 +126,19 @@ class IdleCheckerService:
     async def include_sessions(
         self, action: IncludeSessionIdleChecksAction
     ) -> IncludeSessionIdleChecksActionResult:
+        specs: list[SessionIdleCheckIncludeUpserterSpec] = []
+        for target in dict.fromkeys(action.targets):
+            specs.append(
+                SessionIdleCheckIncludeUpserterSpec(
+                    session_id=SessionID(target.session_id),
+                    checker_id=target.checker_id,
+                    user_id=action.user_id,
+                )
+            )
         batch_result = await self._repository.batch_include_session_idle_checks(
-            action.checker_id, action.session_ids
+            BulkUpserter(specs=specs)
         )
         return IncludeSessionIdleChecksActionResult(
-            checker_id=action.checker_id,
             success=batch_result.success,
             errors=batch_result.errors,
         )
