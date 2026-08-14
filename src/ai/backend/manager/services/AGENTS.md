@@ -49,6 +49,13 @@ grows a branch; the generic services take no hook or callback to hide one in.
 - Wrap every service method in an `ActionProcessor`. Do NOT expose raw service methods to handlers.
 - Framework-level rules — v2 bases, `ProcessorGroup` wiring, gates, registry test —
   live in `actions/AGENTS.md`.
+- A change to a domain's processor composition — a field added or removed, a different
+  factory, a different action base — updates that domain's `KNOWLEDGE.md` in the same
+  change. Its field table states the entity type, shape and operation each field runs
+  as, which the wiring silently contradicts once it moves.
+- A domain whose composition changes and has no `KNOWLEDGE.md` yet gets one, following
+  the `/knowledge` skill's schema. Record what the shapes are and why the surprising
+  ones were chosen — not the wiring, which the code already shows.
 
 ## What belongs here
 
