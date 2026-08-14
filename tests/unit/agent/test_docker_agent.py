@@ -1,5 +1,5 @@
 """
-Unit tests for `DockerKernelCreationContext` helpers.
+Unit tests for `ai.backend.agent.docker.agent` helpers.
 """
 
 from __future__ import annotations
@@ -11,7 +11,25 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from aiodocker.exceptions import DockerError
 
-from ai.backend.agent.docker.agent import DockerKernelCreationContext
+from ai.backend.agent.docker.agent import (
+    DockerKernelCreationContext,
+    _parse_distro_from_ldd_output,
+)
+
+LDD_PRELOAD_ERROR_LINES = "\n".join([
+    "ERROR: ld.so: object '/opt/kernel/libbaihook.so' from LD_PRELOAD cannot be preloaded"
+    " (file too short): ignored.",
+    "ERROR: ld.so: object '/opt/kernel/libnvmlhook.ubuntu18.04.x86_64.so' from LD_PRELOAD cannot"
+    " be preloaded (file too short): ignored.",
+    "ERROR: ld.so: object '/opt/kernel/libcudahook.ubuntu18.04.x86_64.so' from /etc/ld.so.preload"
+    " cannot be preloaded (file too short): ignored.",
+])
+LDD_GLIBC_TRAILER = "\n".join([
+    "Copyright (C) 2024 Free Software Foundation, Inc.",
+    "This is free software; see the source for copying conditions.  There is NO",
+    "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+    "Written by Roland McGrath and Ulrich Drepper.",
+])
 
 
 def _make_container_show_response(networks: dict[str, dict[str, Any] | None]) -> dict[str, Any]:
@@ -30,6 +48,97 @@ def _make_docker_mock(network_get: AsyncMock | None = None) -> MagicMock:
     docker.networks = MagicMock()
     docker.networks.get = network_get if network_get is not None else AsyncMock()
     return docker
+
+
+class TestParseDistroFromLddOutput:
+    @pytest.mark.parametrize(
+        ("output", "expected"),
+        [
+            pytest.param(
+                f"ldd (GNU libc) 2.35\n{LDD_GLIBC_TRAILER}",
+                "ubuntu22.04",
+                id="glibc-banner-on-first-line",
+            ),
+            pytest.param(
+                "\n".join([
+                    LDD_PRELOAD_ERROR_LINES,
+                    "ldd (Ubuntu GLIBC 2.39-0ubuntu8.7) 2.39",
+                    LDD_GLIBC_TRAILER,
+                ]),
+                "ubuntu24.04",
+                id="glibc-banner-after-ld-preload-errors",
+            ),
+            pytest.param(
+                "ERROR: ld.so: ignored.\r\nldd (Ubuntu GLIBC 2.31-0ubuntu9) 2.31\r\n",
+                "ubuntu20.04",
+                id="glibc-banner-with-carriage-returns",
+            ),
+            pytest.param(
+                "ldd (GNU libc) 2.39.1",
+                "ubuntu24.04",
+                id="glibc-version-with-patch-component",
+            ),
+            pytest.param(
+                "ldd (GNU libc) 2",
+                "centos7.6",
+                id="glibc-version-without-minor-component",
+            ),
+            pytest.param(
+                "ldd (GNU libc) 2.33",
+                "ubuntu20.04",
+                id="glibc-version-between-known-versions",
+            ),
+            pytest.param(
+                "ldd (GNU libc) 2.12",
+                "centos7.6",
+                id="glibc-version-older-than-known-versions",
+            ),
+            pytest.param(
+                "ldd (GNU libc) 2.41",
+                "ubuntu24.04",
+                id="glibc-version-newer-than-known-versions",
+            ),
+            pytest.param(
+                "musl libc (x86_64)\nVersion 1.2.4\nDynamic Program Loader",
+                "alpine3.8",
+                id="musl-banner-on-first-line",
+            ),
+            pytest.param(
+                f"{LDD_PRELOAD_ERROR_LINES}\nmusl libc (x86_64)\nVersion 1.2.4",
+                "alpine3.8",
+                id="musl-banner-after-ld-preload-errors",
+            ),
+        ],
+    )
+    def test_detects_distro_from_libc_banner(self, output: str, expected: str) -> None:
+        assert _parse_distro_from_ldd_output([output]) == expected
+
+    @pytest.mark.parametrize(
+        "chunk_size",
+        [pytest.param(1, id="one-byte-chunks"), pytest.param(16, id="sixteen-byte-chunks")],
+    )
+    def test_detects_distro_from_chunked_log(self, chunk_size: int) -> None:
+        output = "\r\n".join([
+            LDD_PRELOAD_ERROR_LINES,
+            "ldd (Ubuntu GLIBC 2.39-0ubuntu8.7) 2.39",
+            LDD_GLIBC_TRAILER,
+        ])
+        chunks = [output[i : i + chunk_size] for i in range(0, len(output), chunk_size)]
+        assert _parse_distro_from_ldd_output(chunks) == "ubuntu24.04"
+
+    @pytest.mark.parametrize(
+        "output",
+        [
+            pytest.param("", id="empty-output"),
+            pytest.param(
+                f"{LDD_PRELOAD_ERROR_LINES}\nldd: command not found",
+                id="no-libc-banner",
+            ),
+            pytest.param("ldd (GNU libc)", id="banner-without-version"),
+        ],
+    )
+    def test_returns_none_without_libc_banner(self, output: str) -> None:
+        assert _parse_distro_from_ldd_output([output]) is None
 
 
 @pytest.fixture
