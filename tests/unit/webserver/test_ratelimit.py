@@ -17,11 +17,13 @@ from ai.backend.web.ratelimit import rate_limit_middleware
 
 _USER_ID = UserID(uuid.UUID("12345678-1234-5678-1234-567812345678"))
 _RATE_LIMIT = 1000
+_AUTHENTICATED_SESSION = {"authenticated": True, "token": {"user_id": str(_USER_ID)}}
 
 
 @pytest.fixture
 def mock_valkey_rate_limit_client() -> AsyncMock:
     client = AsyncMock(spec=ValkeyRateLimitClient)
+    client.get_user_rate_limit.return_value = _RATE_LIMIT
     client.execute_rate_limit_logic.return_value = 1
     return client
 
@@ -41,6 +43,7 @@ class _PassThroughCase:
     id: str
     path: str
     session: dict[str, Any]
+    published_rate_limit: int | None = _RATE_LIMIT
 
 
 @pytest.mark.parametrize(
@@ -49,10 +52,7 @@ class _PassThroughCase:
         _PassThroughCase(
             id="non-proxied-path",
             path="/server/login",
-            session={
-                "authenticated": True,
-                "token": {"user_id": str(_USER_ID), "rate_limit": _RATE_LIMIT},
-            },
+            session=_AUTHENTICATED_SESSION,
         ),
         _PassThroughCase(
             id="unauthenticated",
@@ -60,9 +60,15 @@ class _PassThroughCase:
             session={},
         ),
         _PassThroughCase(
-            id="no-user-id-in-token",
+            id="session-stored-before-user-id",
             path="/func/session",
             session={"authenticated": True, "token": {"access_key": "AKTEST"}},
+        ),
+        _PassThroughCase(
+            id="no-published-rate-limit",
+            path="/func/session",
+            session=_AUTHENTICATED_SESSION,
+            published_rate_limit=None,
         ),
     ],
     ids=lambda case: case.id,
@@ -75,6 +81,7 @@ async def test_pass_through_without_rate_limiting(
     handler_response: web.Response,
 ) -> None:
     mocker.patch.object(ratelimit, "get_session", AsyncMock(return_value=case.session))
+    mock_valkey_rate_limit_client.get_user_rate_limit.return_value = case.published_rate_limit
     request = make_mocked_request(
         "GET", case.path, app={"valkey_rate_limit": mock_valkey_rate_limit_client}
     )
@@ -93,11 +100,7 @@ async def test_counts_request_per_user_and_sets_headers(
     handler: AsyncMock,
     handler_response: web.Response,
 ) -> None:
-    session = {
-        "authenticated": True,
-        "token": {"user_id": str(_USER_ID), "rate_limit": _RATE_LIMIT},
-    }
-    mocker.patch.object(ratelimit, "get_session", AsyncMock(return_value=session))
+    mocker.patch.object(ratelimit, "get_session", AsyncMock(return_value=_AUTHENTICATED_SESSION))
     request = make_mocked_request(
         "GET", "/func/session", app={"valkey_rate_limit": mock_valkey_rate_limit_client}
     )
@@ -105,6 +108,7 @@ async def test_counts_request_per_user_and_sets_headers(
     response = await rate_limit_middleware(request, handler)
 
     assert response is handler_response
+    mock_valkey_rate_limit_client.get_user_rate_limit.assert_awaited_once_with(_USER_ID)
     mock_valkey_rate_limit_client.execute_rate_limit_logic.assert_awaited_once_with(
         user_id=_USER_ID,
         window=ratelimit._rlim_window,
@@ -119,11 +123,7 @@ async def test_rejects_over_limit_request_with_429(
     mock_valkey_rate_limit_client: AsyncMock,
     handler: AsyncMock,
 ) -> None:
-    session = {
-        "authenticated": True,
-        "token": {"user_id": str(_USER_ID), "rate_limit": _RATE_LIMIT},
-    }
-    mocker.patch.object(ratelimit, "get_session", AsyncMock(return_value=session))
+    mocker.patch.object(ratelimit, "get_session", AsyncMock(return_value=_AUTHENTICATED_SESSION))
     mock_valkey_rate_limit_client.execute_rate_limit_logic.return_value = _RATE_LIMIT + 1
     request = make_mocked_request(
         "GET", "/func/session", app={"valkey_rate_limit": mock_valkey_rate_limit_client}
@@ -136,27 +136,3 @@ async def test_rejects_over_limit_request_with_429(
     assert response.content_type == "application/problem+json"
     assert response.headers["X-RateLimit-Limit"] == str(_RATE_LIMIT)
     assert response.headers["X-RateLimit-Remaining"] == "0"
-
-
-async def test_null_rate_limit_counts_but_never_rejects(
-    mocker: MockerFixture,
-    mock_valkey_rate_limit_client: AsyncMock,
-    handler: AsyncMock,
-    handler_response: web.Response,
-) -> None:
-    session = {
-        "authenticated": True,
-        "token": {"user_id": str(_USER_ID), "rate_limit": None},
-    }
-    mocker.patch.object(ratelimit, "get_session", AsyncMock(return_value=session))
-    mock_valkey_rate_limit_client.execute_rate_limit_logic.return_value = 10_000_000
-    request = make_mocked_request(
-        "GET", "/func/session", app={"valkey_rate_limit": mock_valkey_rate_limit_client}
-    )
-
-    response = await rate_limit_middleware(request, handler)
-
-    assert response is handler_response
-    handler.assert_awaited_once_with(request)
-    mock_valkey_rate_limit_client.execute_rate_limit_logic.assert_awaited_once()
-    assert response.headers["X-RateLimit-Remaining"] == "10000000"

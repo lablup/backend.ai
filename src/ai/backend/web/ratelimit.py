@@ -1,11 +1,15 @@
 """Per-user rate limiting for requests proxied to the manager.
 
 The same rolling counter and limit value as the manager-side rate limiter
-(``manager/api/rest/ratelimit``): the limit is the keypair ``rate_limit``
-delivered at login (``None`` means unlimited), and the counter is keyed by the
-login user, so holding multiple keypairs does not multiply the allowance.
-Over-limit requests are rejected with HTTP 429 at the web server, before they
-reach the manager.
+(``manager/api/rest/ratelimit``): the counter is keyed by the login user, so
+holding multiple keypairs does not multiply the allowance, and the limit is
+the value the manager publishes for that user. Over-limit requests are
+rejected with HTTP 429 at the web server, before they reach the manager.
+
+A user with no published limit is not limited here. The manager republishes
+on every authorized request, so the value is missing only before a user's
+first proxied request or after a window of inactivity, and the manager-side
+limiter covers both.
 """
 
 from __future__ import annotations
@@ -42,22 +46,25 @@ async def rate_limit_middleware(
     token = session.get("token") or {}
     raw_user_id = token.get("user_id")
     if raw_user_id is None:
-        # Session created against a manager that does not send the user ID yet.
+        # A session stored before the login handler started keeping the user id.
         return await handler(request)
-    rate_limit = token.get("rate_limit")
+    user_id = UserID(uuid.UUID(raw_user_id))
 
     valkey_client: ValkeyRateLimitClient = request.app["valkey_rate_limit"]
+    rate_limit = await valkey_client.get_user_rate_limit(user_id)
+    if rate_limit is None:
+        return await handler(request)
+
     rolling_count = await valkey_client.execute_rate_limit_logic(
-        user_id=UserID(uuid.UUID(raw_user_id)),
+        user_id=user_id,
         window=_rlim_window,
     )
-    remaining = max(rate_limit - rolling_count, 0) if rate_limit is not None else rolling_count
     rlim_headers = {
         "X-RateLimit-Limit": str(rate_limit),
-        "X-RateLimit-Remaining": str(remaining),
+        "X-RateLimit-Remaining": str(max(rate_limit - rolling_count, 0)),
         "X-RateLimit-Window": str(_rlim_window),
     }
-    if rate_limit is not None and rolling_count > rate_limit:
+    if rolling_count > rate_limit:
         return web.HTTPTooManyRequests(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/rate-limit-exceeded",
