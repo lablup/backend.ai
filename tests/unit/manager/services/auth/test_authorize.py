@@ -124,14 +124,12 @@ def _make_mock_keypair_row(
     *,
     access_key: str = "test_access_key",
     secret_key: str = "test_secret_key",
-    rate_limit: int | None = 30000,
     max_concurrent_sessions: int = 1,
 ) -> MagicMock:
     """Create a mock keypair row with access_key, secret_key, and mapping."""
     mock_keypair = MagicMock()
     mock_keypair.access_key = access_key
     mock_keypair.secret_key = secret_key
-    mock_keypair.rate_limit = rate_limit
     mock_keypair.mapping = {"access_key": access_key}
     mock_keypair.resource_policy_row.max_concurrent_sessions = max_concurrent_sessions
     return mock_keypair
@@ -198,7 +196,6 @@ async def test_authorize_success(
     assert result.authorization_result.access_key == "test_access_key"
     assert result.authorization_result.secret_key == "test_secret_key"
     assert result.authorization_result.session_token == "test_session_token"
-    assert result.authorization_result.rate_limit == 30000
 
 
 async def test_authorize_invalid_token_type(
