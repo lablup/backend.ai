@@ -45,7 +45,6 @@ def test_auth_success_response_creation() -> None:
         status="active",
         session_token="test_session_token",
         user_id=UserID(uuid4()),
-        rate_limit=None,
     )
     assert resp.access_key == "AKTEST"
     assert resp.secret_key == "SKTEST"
@@ -63,7 +62,6 @@ def test_auth_success_response_to_dict() -> None:
         status="active",
         session_token="test_session_token",
         user_id=UserID(uuid4()),
-        rate_limit=None,
         type=AuthTokenType.JWT,
     )
     d = resp.to_dict()
@@ -125,7 +123,6 @@ def test_parse_auth_response_success() -> None:
         "status": "active",
         "session_token": "test_token",
         "user_id": "12345678-1234-5678-1234-567812345678",
-        "rate_limit": None,
     }
     result = parse_auth_response(data)
     assert isinstance(result, AuthSuccessResponse)
@@ -162,7 +159,6 @@ def test_parse_auth_response_explicit_success() -> None:
         "status": "active",
         "session_token": "test_token",
         "user_id": "12345678-1234-5678-1234-567812345678",
-        "rate_limit": None,
     }
     result = parse_auth_response(data)
     assert isinstance(result, AuthSuccessResponse)

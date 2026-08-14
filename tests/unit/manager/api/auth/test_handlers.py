@@ -248,7 +248,6 @@ class TestAuthorize:
                 role=UserRole.USER,
                 status=UserStatus.ACTIVE,
                 session_token="test_session_token",
-                rate_limit=30000,
             ),
         )
 

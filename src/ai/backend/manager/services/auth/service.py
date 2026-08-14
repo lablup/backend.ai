@@ -416,8 +416,6 @@ class AuthService:
                 role=UserRole(user.role),
                 status=user.status,
                 session_token=session_result.session_token,
-                # TODO: take this from the user resource policy instead of the keypair.
-                rate_limit=keypair_row.rate_limit,
             ),
         )
 
