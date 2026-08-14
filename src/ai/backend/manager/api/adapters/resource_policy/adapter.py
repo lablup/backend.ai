@@ -93,6 +93,11 @@ from ai.backend.manager.models.resource_policy.orders import (
     ProjectResourcePolicyOrders,
     UserResourcePolicyOrders,
 )
+from ai.backend.manager.models.resource_policy.updaters import (
+    KeyPairResourcePolicyUpdater,
+    ProjectResourcePolicyUpdater,
+    UserResourcePolicyUpdater,
+)
 from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
@@ -100,20 +105,11 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.repositories.keypair_resource_policy.searchers import (
     KeyPairResourcePolicySearcher,
 )
-from ai.backend.manager.repositories.keypair_resource_policy.updaters import (
-    KeyPairResourcePolicyUpdater,
-)
 from ai.backend.manager.repositories.project_resource_policy.searchers import (
     ProjectResourcePolicySearcher,
 )
-from ai.backend.manager.repositories.project_resource_policy.updaters import (
-    ProjectResourcePolicyUpdater,
-)
 from ai.backend.manager.repositories.user_resource_policy.searchers import (
     UserResourcePolicySearcher,
-)
-from ai.backend.manager.repositories.user_resource_policy.updaters import (
-    UserResourcePolicyUpdater,
 )
 from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
     CreateKeyPairResourcePolicyAction,

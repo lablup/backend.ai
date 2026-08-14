@@ -10,7 +10,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import UpdateGlobalOpsAction
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
-from ai.backend.manager.repositories.keypair_resource_policy.updaters import (
+from ai.backend.manager.models.resource_policy.updaters import (
     KeyPairResourcePolicyUpdater,
 )
 

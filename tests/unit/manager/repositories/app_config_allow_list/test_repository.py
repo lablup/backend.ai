@@ -31,6 +31,9 @@ from ai.backend.manager.models.app_config_allow_list.purgers import (
     AppConfigAllowListPurger,
 )
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
+from ai.backend.manager.models.app_config_allow_list.updaters import (
+    AppConfigAllowListUpdater,
+)
 from ai.backend.manager.models.app_config_definition.creators import (
     AppConfigDefinitionCreator,
 )
@@ -50,9 +53,6 @@ from ai.backend.manager.repositories.app_config_allow_list.queriers import (
 )
 from ai.backend.manager.repositories.app_config_allow_list.searchers import (
     AppConfigAllowListSearcher,
-)
-from ai.backend.manager.repositories.app_config_allow_list.updaters import (
-    AppConfigAllowListUpdater,
 )
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider

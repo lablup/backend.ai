@@ -29,13 +29,13 @@ from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.login_client_type.conditions import LoginClientTypeConditions
 from ai.backend.manager.models.login_client_type.creators import LoginClientTypeCreator
 from ai.backend.manager.models.login_client_type.orders import LoginClientTypeOrders
+from ai.backend.manager.models.login_client_type.updaters import LoginClientTypeUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
 from ai.backend.manager.repositories.login_client_type.searchers import LoginClientTypeSearcher
-from ai.backend.manager.repositories.login_client_type.updaters import LoginClientTypeUpdater
 from ai.backend.manager.services.login_client_type.actions.create import (
     CreateLoginClientTypeAction,
 )

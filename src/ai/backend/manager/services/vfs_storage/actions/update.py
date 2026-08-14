@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.vfs_storage import VFS_STORAGE_ENTITY_TYPE
 from ai.backend.manager.actions.v2.ops.base import UpdateGlobalOpsAction
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
-from ai.backend.manager.repositories.vfs_storage.updaters import VFSStorageUpdater
+from ai.backend.manager.models.vfs_storage.updaters import VFSStorageUpdater
 
 
 @dataclass

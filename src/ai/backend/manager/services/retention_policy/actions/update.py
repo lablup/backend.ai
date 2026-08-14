@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import UpdateGlobalOpsAction
 from ai.backend.manager.data.retention.types import RetentionPolicyData
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
-from ai.backend.manager.repositories.retention_policy.updaters import RetentionPolicyUpdater
+from ai.backend.manager.models.retention.updaters import RetentionPolicyUpdater
 
 
 @dataclass

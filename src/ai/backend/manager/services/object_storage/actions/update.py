@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import UpdateGlobalOpsAction
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.object_storage.row import ObjectStorageRow
-from ai.backend.manager.repositories.object_storage.updaters import ObjectStorageUpdater
+from ai.backend.manager.models.object_storage.updaters import ObjectStorageUpdater
 
 
 @dataclass

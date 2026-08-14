@@ -37,6 +37,10 @@ from ai.backend.manager.errors.repository import (
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.rbac_models.role_preset.purgers import RolePresetPurger
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.rbac_models.role_preset.updaters import (
+    RolePresetSoftDeleteUpdater,
+    RolePresetUpdater,
+)
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.specs.creator import GlobalEntityCreator
 from ai.backend.manager.models.specs.lookup import DataLookup
@@ -50,10 +54,6 @@ from ai.backend.manager.models.specs.upserter import GlobalEntityUpserter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.role_preset.updaters import (
-    RolePresetSoftDeleteUpdater,
-    RolePresetUpdater,
-)
 from ai.backend.manager.services.ops.service import SearchService
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables

@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import UpdateGlobalOpsAction
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
-from ai.backend.manager.repositories.login_client_type.updaters import LoginClientTypeUpdater
+from ai.backend.manager.models.login_client_type.updaters import LoginClientTypeUpdater
 
 
 @dataclass

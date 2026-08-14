@@ -6,7 +6,9 @@
 
 - `repository.py` (single-entity CRUD), `repositories.py` (multi-entity container / `RepositoryArgs`),
   `types.py` (OperationScope + SearchResult), `options.py` (QueryCondition/QueryOrder),
-  `db_source/db_source.py` (queries). Optional: `creators.py` / `updaters.py` / `purgers.py` / `upserters.py`.
+  `db_source/db_source.py` (queries). Optional: `updaters.py`, for the legacy
+  `UpdaterSpec` family only -- a v2 `DataUpdater` is declared next to its row under
+  `models/`, like every other v2 spec.
 - Separate out db_source so it is clear which source a Repository uses.
 - Do NOT write a `repository.py` / `db_source.py` for an operation that only hands a spec to
   ops and converts the row: `repositories/ops/repository.py` already does that for

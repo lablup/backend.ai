@@ -13,7 +13,7 @@ from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.models.rbac_models.role_preset.row import (
     RolePresetRow,
 )
-from ai.backend.manager.repositories.role_preset.updaters import (
+from ai.backend.manager.models.rbac_models.role_preset.updaters import (
     RolePresetRestoreUpdater,
 )
 

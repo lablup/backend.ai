@@ -84,6 +84,10 @@ from ai.backend.manager.models.notification.orders import (
     NotificationChannelOrders,
     NotificationRuleOrders,
 )
+from ai.backend.manager.models.notification.updaters import (
+    NotificationChannelUpdater,
+    NotificationRuleUpdater,
+)
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base import (
     combine_conditions_or,
@@ -92,10 +96,6 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.repositories.notification.searchers import (
     NotificationChannelSearcher,
     NotificationRuleSearcher,
-)
-from ai.backend.manager.repositories.notification.updaters import (
-    NotificationChannelUpdater,
-    NotificationRuleUpdater,
 )
 from ai.backend.manager.services.notification.actions import (
     CreateChannelAction,

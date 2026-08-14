@@ -9,7 +9,7 @@
 Every domain follows `models/{domain}/__init__.py` + `row.py` (ORM classes).
 The single-file shorthand (`models/{domain}.py`) is legacy — do not add new ones.
 
-Domains migrated to the v2 write specs add `creators.py` / `purgers.py` / `upserters.py`
+Domains migrated to the v2 write specs add `creators.py` / `purgers.py` / `upserters.py` / `updaters.py`
 next to `row.py`. The spec bases live in `models/specs/` — read `models/specs/AGENTS.md` before touching them.
 
 ## Row class rules

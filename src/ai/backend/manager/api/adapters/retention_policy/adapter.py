@@ -29,8 +29,8 @@ from ai.backend.manager.models.retention.creators import RetentionPolicyCreator
 from ai.backend.manager.models.retention.orders import RetentionPolicyOrders
 from ai.backend.manager.models.retention.purgers import RetentionPolicyPurger
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
+from ai.backend.manager.models.retention.updaters import RetentionPolicyUpdater
 from ai.backend.manager.repositories.retention_policy.searchers import RetentionPolicySearcher
-from ai.backend.manager.repositories.retention_policy.updaters import RetentionPolicyUpdater
 from ai.backend.manager.services.retention_policy.actions.create import (
     CreateRetentionPolicyAction,
 )

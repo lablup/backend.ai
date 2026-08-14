@@ -46,15 +46,15 @@ from ai.backend.manager.models.notification.orders import (
     NotificationChannelOrders,
     NotificationRuleOrders,
 )
+from ai.backend.manager.models.notification.updaters import (
+    NotificationChannelUpdater,
+    NotificationRuleUpdater,
+)
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 from ai.backend.manager.repositories.notification.searchers import (
     NotificationChannelSearcher,
     NotificationRuleSearcher,
-)
-from ai.backend.manager.repositories.notification.updaters import (
-    NotificationChannelUpdater,
-    NotificationRuleUpdater,
 )
 from ai.backend.manager.types import OptionalState, TriState
 

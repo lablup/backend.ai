@@ -41,6 +41,9 @@ from ai.backend.manager.models.resource_policy.creators import (
 from ai.backend.manager.models.resource_policy.purgers import (
     KeyPairResourcePolicyPurger,
 )
+from ai.backend.manager.models.resource_policy.updaters import (
+    KeyPairResourcePolicyUpdater,
+)
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
@@ -51,9 +54,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.keypair_resource_policy.repository import (
     KeypairResourcePolicyRepository,
-)
-from ai.backend.manager.repositories.keypair_resource_policy.updaters import (
-    KeyPairResourcePolicyUpdater,
 )
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider

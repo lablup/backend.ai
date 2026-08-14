@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import UpdateGlobalOpsAction
 from ai.backend.manager.data.notification.types import NotificationRuleData
 from ai.backend.manager.models.notification.row import NotificationRuleRow
-from ai.backend.manager.repositories.notification.updaters import NotificationRuleUpdater
+from ai.backend.manager.models.notification.updaters import NotificationRuleUpdater
 
 
 @dataclass

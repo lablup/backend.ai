@@ -43,15 +43,15 @@ from ai.backend.manager.models.app_config_allow_list.orders import AppConfigAllo
 from ai.backend.manager.models.app_config_allow_list.purgers import (
     AppConfigAllowListPurger,
 )
+from ai.backend.manager.models.app_config_allow_list.updaters import (
+    AppConfigAllowListUpdater,
+)
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.app_config_allow_list.queriers import (
     AppConfigAllowListQuerier,
 )
 from ai.backend.manager.repositories.app_config_allow_list.searchers import (
     AppConfigAllowListSearcher,
-)
-from ai.backend.manager.repositories.app_config_allow_list.updaters import (
-    AppConfigAllowListUpdater,
 )
 from ai.backend.manager.repositories.base import (
     combine_conditions_or,

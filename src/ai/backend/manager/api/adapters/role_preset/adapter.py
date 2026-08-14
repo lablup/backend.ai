@@ -76,6 +76,7 @@ from ai.backend.manager.models.rbac_models.role_preset.conditions import RolePre
 from ai.backend.manager.models.rbac_models.role_preset.creators import RolePresetCreator
 from ai.backend.manager.models.rbac_models.role_preset.orders import RolePresetOrders
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.rbac_models.role_preset.updaters import RolePresetUpdater
 from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
@@ -84,7 +85,6 @@ from ai.backend.manager.repositories.role_preset.searchers import (
     RolePermissionPresetSearcher,
     RolePresetSearcher,
 )
-from ai.backend.manager.repositories.role_preset.updaters import RolePresetUpdater
 from ai.backend.manager.services.role_preset.actions.bulk_add_permissions import (
     BulkAddRolePermissionPresetsAction,
 )

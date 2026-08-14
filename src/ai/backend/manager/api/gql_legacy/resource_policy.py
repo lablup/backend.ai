@@ -36,13 +36,9 @@ if TYPE_CHECKING:
         ProjectResourcePolicyCreator,
         UserResourcePolicyCreator,
     )
-    from ai.backend.manager.repositories.keypair_resource_policy.updaters import (
+    from ai.backend.manager.models.resource_policy.updaters import (
         KeyPairResourcePolicyUpdater,
-    )
-    from ai.backend.manager.repositories.project_resource_policy.updaters import (
         ProjectResourcePolicyUpdater,
-    )
-    from ai.backend.manager.repositories.user_resource_policy.updaters import (
         UserResourcePolicyUpdater,
     )
 
@@ -308,7 +304,7 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):  # type: ignor
             else Undefined
         )
 
-        from ai.backend.manager.repositories.keypair_resource_policy.updaters import (
+        from ai.backend.manager.models.resource_policy.updaters import (
             KeyPairResourcePolicyUpdater,
         )
 
@@ -575,7 +571,7 @@ class ModifyUserResourcePolicyInput(graphene.InputObjectType):  # type: ignore[m
     )
 
     def to_updater(self, name: str) -> UserResourcePolicyUpdater:
-        from ai.backend.manager.repositories.user_resource_policy.updaters import (
+        from ai.backend.manager.models.resource_policy.updaters import (
             UserResourcePolicyUpdater,
         )
 
@@ -822,7 +818,7 @@ class ModifyProjectResourcePolicyInput(graphene.InputObjectType):  # type: ignor
     )
 
     def to_updater(self, name: str) -> ProjectResourcePolicyUpdater:
-        from ai.backend.manager.repositories.project_resource_policy.updaters import (
+        from ai.backend.manager.models.resource_policy.updaters import (
             ProjectResourcePolicyUpdater,
         )
 

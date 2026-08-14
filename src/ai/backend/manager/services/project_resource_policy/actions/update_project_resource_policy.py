@@ -10,7 +10,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import UpdateGlobalOpsAction
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
-from ai.backend.manager.repositories.project_resource_policy.updaters import (
+from ai.backend.manager.models.resource_policy.updaters import (
     ProjectResourcePolicyUpdater,
 )
 

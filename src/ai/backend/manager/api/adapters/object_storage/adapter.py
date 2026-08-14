@@ -31,9 +31,9 @@ from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.object_storage.conditions import ObjectStorageConditions
 from ai.backend.manager.models.object_storage.creators import ObjectStorageCreator
 from ai.backend.manager.models.object_storage.orders import ObjectStorageOrders
+from ai.backend.manager.models.object_storage.updaters import ObjectStorageUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.object_storage.searchers import ObjectStorageSearcher
-from ai.backend.manager.repositories.object_storage.updaters import ObjectStorageUpdater
 from ai.backend.manager.services.object_storage.actions.create import CreateObjectStorageAction
 from ai.backend.manager.services.object_storage.actions.get import GetObjectStorageAction
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (

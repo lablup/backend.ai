@@ -9,7 +9,7 @@ from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.actions.v2.ops.base import UpdateSingleEntityOpsAction
 from ai.backend.manager.data.app_config_allow_list.types import AppConfigAllowListData
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
-from ai.backend.manager.repositories.app_config_allow_list.updaters import (
+from ai.backend.manager.models.app_config_allow_list.updaters import (
     AppConfigAllowListUpdater,
 )
 
