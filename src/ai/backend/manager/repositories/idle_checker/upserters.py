@@ -70,7 +70,6 @@ class SessionIdleCheckExcludeUpserterSpec(UpserterSpec[SessionIdleCheckRow]):
             "last_message": "Excluded from idle checks.",
             "is_manual": True,
             "manually_triggered_by": self.user_id,
-            "updated_at": datetime.now(UTC),
         }
 
 
