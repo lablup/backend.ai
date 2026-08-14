@@ -233,6 +233,84 @@ def terminate(session_ids: tuple[str, ...], forced: bool) -> None:
     asyncio.run(_run())
 
 
+@session.command(name="exclude-idle-checks")
+@click.argument("targets", nargs=-1, required=True)
+def exclude_idle_checks(targets: tuple[str, ...]) -> None:
+    """Exclude checker-session pairs from idle checks.
+
+    Each TARGET is a CHECKER_ID:SESSION_ID pair.
+    """
+
+    from ai.backend.common.dto.manager.v2.session.request import (
+        ExcludeSessionIdleChecksInput,
+        SessionIdleCheckTargetInput,
+    )
+    from ai.backend.common.identifier.idle_checker import IdleCheckerID
+    from ai.backend.common.identifier.session import SessionID
+
+    parsed_targets: list[SessionIdleCheckTargetInput] = []
+    for target in targets:
+        checker_part, sep, session_part = target.partition(":")
+        if not sep:
+            raise click.BadParameter(f"Expected CHECKER_ID:SESSION_ID, got {target!r}")
+        parsed_targets.append(
+            SessionIdleCheckTargetInput(
+                checker_id=IdleCheckerID(UUID(checker_part)),
+                session_id=SessionID(UUID(session_part)),
+            )
+        )
+    body = ExcludeSessionIdleChecksInput(targets=parsed_targets)
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.session.exclude_idle_checks(body)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@session.command(name="include-idle-checks")
+@click.argument("targets", nargs=-1, required=True)
+def include_idle_checks(targets: tuple[str, ...]) -> None:
+    """Include checker-session pairs into idle checks.
+
+    Each TARGET is a CHECKER_ID:SESSION_ID pair.
+    """
+
+    from ai.backend.common.dto.manager.v2.session.request import (
+        IncludeSessionIdleChecksInput,
+        SessionIdleCheckTargetInput,
+    )
+    from ai.backend.common.identifier.idle_checker import IdleCheckerID
+    from ai.backend.common.identifier.session import SessionID
+
+    parsed_targets: list[SessionIdleCheckTargetInput] = []
+    for target in targets:
+        checker_part, sep, session_part = target.partition(":")
+        if not sep:
+            raise click.BadParameter(f"Expected CHECKER_ID:SESSION_ID, got {target!r}")
+        parsed_targets.append(
+            SessionIdleCheckTargetInput(
+                checker_id=IdleCheckerID(UUID(checker_part)),
+                session_id=SessionID(UUID(session_part)),
+            )
+        )
+    body = IncludeSessionIdleChecksInput(targets=parsed_targets)
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.session.include_idle_checks(body)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
 @session.command(name="start-service")
 @click.argument("session_id", type=str)
 @click.argument("service", type=str)

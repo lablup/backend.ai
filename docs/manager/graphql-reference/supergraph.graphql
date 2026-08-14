@@ -7687,6 +7687,41 @@ input EnvironmentVariablesInput
   entries: [EnvironmentVariableEntryInput!]!
 }
 
+"""Added in 26.9.0. Why one pair could not be excluded from idle checks."""
+type ExcludeSessionIdleChecksFailureInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Idle checker of the pair the failure applies to."""
+  checkerId: ID!
+
+  """Session of the pair the failure applies to."""
+  sessionId: ID!
+
+  """Why the pair was not excluded."""
+  message: String!
+}
+
+"""Added in 26.9.0. Input for excluding session pairs from idle checks."""
+input ExcludeSessionIdleChecksInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Checker-session pairs to exclude."""
+  targets: [SessionIdleCheckTargetInput!]!
+}
+
+"""
+Added in 26.9.0. Payload returned after excluding session pairs from idle checks.
+"""
+type ExcludeSessionIdleChecksPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Pairs successfully excluded."""
+  items: [SessionIdleCheckTargetInfo!]!
+
+  """Pairs that could not be excluded."""
+  failed: [ExcludeSessionIdleChecksFailureInfo!]!
+}
+
 """Added in 26.3.0. Options for executing a query definition."""
 input ExecuteQueryDefinitionOptionsInput
   @join__type(graph: STRAWBERRY)
@@ -9023,6 +9058,43 @@ type ImportArtifactsPayload
 
   """List of import tasks created."""
   tasks: [ArtifactRevisionImportTask!]!
+}
+
+"""Added in 26.9.0. Why one pair could not be included into idle checks."""
+type IncludeSessionIdleChecksFailureInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Idle checker of the pair the failure applies to."""
+  checkerId: ID!
+
+  """Session of the pair the failure applies to."""
+  sessionId: ID!
+
+  """Why the pair was not included."""
+  message: String!
+}
+
+"""Added in 26.9.0. Input for including session pairs into idle checks."""
+input IncludeSessionIdleChecksInput
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Checker-session pairs to include; checks start from the initial grace period.
+  """
+  targets: [SessionIdleCheckTargetInput!]!
+}
+
+"""
+Added in 26.9.0. Payload returned after including session pairs into idle checks.
+"""
+type IncludeSessionIdleChecksPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Pairs successfully included."""
+  items: [SessionIdleCheckTargetInfo!]!
+
+  """Pairs that could not be included."""
+  failed: [IncludeSessionIdleChecksFailureInfo!]!
 }
 
 type InferenceSessionError
@@ -13226,6 +13298,16 @@ type Mutation
   Added in 26.4.4. Terminate one or more sessions by ID. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
   """
   terminateSessionsV2(sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.9.0. Exclude checker-session pairs from idle checks. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
+  """
+  excludeSessionIdleChecks(input: ExcludeSessionIdleChecksInput!): ExcludeSessionIdleChecksPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.9.0. Include checker-session pairs into idle checks, resetting them so checks start from the initial grace period. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
+  """
+  includeSessionIdleChecks(input: IncludeSessionIdleChecksInput!): IncludeSessionIdleChecksPayload @join__field(graph: STRAWBERRY)
 }
 
 """
@@ -20143,6 +20225,32 @@ enum SessionFailurePolicy
   STRICT @join__enumValue(graph: STRAWBERRY)
   BOOT_ALL @join__enumValue(graph: STRAWBERRY)
   TOLERANT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.9.0. One (checker, session) pair an idle-check exclusion or inclusion applied to.
+"""
+type SessionIdleCheckTargetInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Idle checker UUID of the pair."""
+  checkerId: ID!
+
+  """Session UUID of the pair."""
+  sessionId: ID!
+}
+
+"""
+Added in 26.9.0. One (checker, session) pair targeted by an idle-check exclusion or inclusion.
+"""
+input SessionIdleCheckTargetInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Idle checker UUID of the pair."""
+  checkerId: ID!
+
+  """Session UUID of the pair."""
+  sessionId: ID!
 }
 
 """

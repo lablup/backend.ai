@@ -12,6 +12,8 @@ from ai.backend.common.dto.manager.v2.scheduler.response import ComputeScheduleP
 from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
     EnqueueSessionInput,
+    ExcludeSessionIdleChecksInput,
+    IncludeSessionIdleChecksInput,
     ShutdownSessionServiceInput,
     StartSessionServiceInput,
     TerminateSessionsInput,
@@ -20,6 +22,8 @@ from ai.backend.common.dto.manager.v2.session.request import (
 from ai.backend.common.dto.manager.v2.session.response import (
     AdminSearchSessionsPayload,
     EnqueueSessionPayload,
+    ExcludeSessionIdleChecksPayload,
+    IncludeSessionIdleChecksPayload,
     SessionLogsPayload,
     SessionNode,
     StartSessionServicePayload,
@@ -158,6 +162,30 @@ class V2SessionClient(BaseDomainClient):
             f"{_PATH}/terminate",
             request=request,
             response_model=TerminateSessionsPayload,
+        )
+
+    async def exclude_idle_checks(
+        self,
+        request: ExcludeSessionIdleChecksInput,
+    ) -> ExcludeSessionIdleChecksPayload:
+        """Exclude checker-session pairs from idle checks."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/exclude-idle-checks",
+            request=request,
+            response_model=ExcludeSessionIdleChecksPayload,
+        )
+
+    async def include_idle_checks(
+        self,
+        request: IncludeSessionIdleChecksInput,
+    ) -> IncludeSessionIdleChecksPayload:
+        """Include checker-session pairs into idle checks."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/include-idle-checks",
+            request=request,
+            response_model=IncludeSessionIdleChecksPayload,
         )
 
     async def start_service(

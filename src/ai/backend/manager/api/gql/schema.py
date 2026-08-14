@@ -476,6 +476,8 @@ from .service_catalog import admin_service_catalogs
 from .session.resolver import (
     admin_sessions_v2,
     enqueue_session,
+    exclude_session_idle_checks,
+    include_session_idle_checks,
     project_sessions_v2,
     session_v2,
     terminate_sessions_v2,
@@ -1025,6 +1027,8 @@ class Mutation:
     # Session V2 mutations
     enqueue_session = enqueue_session
     terminate_sessions_v2 = terminate_sessions_v2
+    exclude_session_idle_checks = exclude_session_idle_checks
+    include_session_idle_checks = include_session_idle_checks
 
 
 @strawberry.type

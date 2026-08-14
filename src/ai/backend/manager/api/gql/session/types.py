@@ -24,6 +24,12 @@ from ai.backend.common.dto.manager.v2.session.request import (
     EnqueueSessionInput as EnqueueSessionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.session.request import (
+    ExcludeSessionIdleChecksInput as ExcludeSessionIdleChecksInputDTO,
+)
+from ai.backend.common.dto.manager.v2.session.request import (
+    IncludeSessionIdleChecksInput as IncludeSessionIdleChecksInputDTO,
+)
+from ai.backend.common.dto.manager.v2.session.request import (
     MountItemInput as MountItemInputDTO,
 )
 from ai.backend.common.dto.manager.v2.session.request import (
@@ -33,8 +39,26 @@ from ai.backend.common.dto.manager.v2.session.request import (
     SessionFilter,
     SessionOrder,
 )
+from ai.backend.common.dto.manager.v2.session.request import (
+    SessionIdleCheckTargetInput as SessionIdleCheckTargetInputDTO,
+)
 from ai.backend.common.dto.manager.v2.session.response import (
     EnqueueSessionPayload as EnqueueSessionPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.session.response import (
+    ExcludeSessionIdleChecksFailureInfo as ExcludeSessionIdleChecksFailureInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.session.response import (
+    ExcludeSessionIdleChecksPayload as ExcludeSessionIdleChecksPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.session.response import (
+    IncludeSessionIdleChecksFailureInfo as IncludeSessionIdleChecksFailureInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.session.response import (
+    IncludeSessionIdleChecksPayload as IncludeSessionIdleChecksPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.session.response import (
+    SessionIdleCheckTargetInfo as SessionIdleCheckTargetInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.session.response import (
     SessionLifecycleInfoGQLDTO,
@@ -51,6 +75,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
     ProjectSessionScope,
     SessionStatusFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID, SessionId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
 from ai.backend.manager.api.gql.common.types import (
@@ -721,3 +746,116 @@ class TerminateSessionsPayloadGQL:
     terminating: list[ID] = gql_field(description="Sessions marked TERMINATING.")
     force_terminated: list[ID] = gql_field(description="Sessions force-terminated.")
     skipped: list[ID] = gql_field(description="Sessions already terminated or not found.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="One (checker, session) pair targeted by an idle-check exclusion or inclusion.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="SessionIdleCheckTargetInput",
+)
+class SessionIdleCheckTargetInputGQL(PydanticInputMixin[SessionIdleCheckTargetInputDTO]):
+    checker_id: ID = gql_field(description="Idle checker UUID of the pair.")
+    session_id: ID = gql_field(description="Session UUID of the pair.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for excluding session pairs from idle checks.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="ExcludeSessionIdleChecksInput",
+)
+class ExcludeSessionIdleChecksInputGQL(PydanticInputMixin[ExcludeSessionIdleChecksInputDTO]):
+    targets: list[SessionIdleCheckTargetInputGQL] = gql_field(
+        description="Checker-session pairs to exclude."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for including session pairs into idle checks.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="IncludeSessionIdleChecksInput",
+)
+class IncludeSessionIdleChecksInputGQL(PydanticInputMixin[IncludeSessionIdleChecksInputDTO]):
+    targets: list[SessionIdleCheckTargetInputGQL] = gql_field(
+        description="Checker-session pairs to include; checks start from the initial grace period."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="One (checker, session) pair an idle-check exclusion or inclusion applied to.",
+    ),
+    model=SessionIdleCheckTargetInfoDTO,
+    name="SessionIdleCheckTargetInfo",
+)
+class SessionIdleCheckTargetInfoGQL:
+    checker_id: ID = gql_field(description="Idle checker UUID of the pair.")
+    session_id: ID = gql_field(description="Session UUID of the pair.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Why one pair could not be excluded from idle checks.",
+    ),
+    model=ExcludeSessionIdleChecksFailureInfoDTO,
+    name="ExcludeSessionIdleChecksFailureInfo",
+)
+class ExcludeSessionIdleChecksFailureInfoGQL:
+    checker_id: ID = gql_field(description="Idle checker of the pair the failure applies to.")
+    session_id: ID = gql_field(description="Session of the pair the failure applies to.")
+    message: str = gql_field(description="Why the pair was not excluded.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Why one pair could not be included into idle checks.",
+    ),
+    model=IncludeSessionIdleChecksFailureInfoDTO,
+    name="IncludeSessionIdleChecksFailureInfo",
+)
+class IncludeSessionIdleChecksFailureInfoGQL:
+    checker_id: ID = gql_field(description="Idle checker of the pair the failure applies to.")
+    session_id: ID = gql_field(description="Session of the pair the failure applies to.")
+    message: str = gql_field(description="Why the pair was not included.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload returned after excluding session pairs from idle checks.",
+    ),
+    model=ExcludeSessionIdleChecksPayloadDTO,
+    name="ExcludeSessionIdleChecksPayload",
+)
+class ExcludeSessionIdleChecksPayloadGQL:
+    items: list[SessionIdleCheckTargetInfoGQL] = gql_field(
+        description="Pairs successfully excluded."
+    )
+    failed: list[ExcludeSessionIdleChecksFailureInfoGQL] = gql_field(
+        description="Pairs that could not be excluded."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload returned after including session pairs into idle checks.",
+    ),
+    model=IncludeSessionIdleChecksPayloadDTO,
+    name="IncludeSessionIdleChecksPayload",
+)
+class IncludeSessionIdleChecksPayloadGQL:
+    items: list[SessionIdleCheckTargetInfoGQL] = gql_field(
+        description="Pairs successfully included."
+    )
+    failed: list[IncludeSessionIdleChecksFailureInfoGQL] = gql_field(
+        description="Pairs that could not be included."
+    )
