@@ -627,7 +627,6 @@ async def _query_auth_context_by_access_key(
                     KeyPairRow.access_key,
                     KeyPairRow.secret_key,
                     KeyPairRow.is_admin,
-                    KeyPairRow.rate_limit,
                 ),
                 load_only(
                     UserRow.uuid,
@@ -663,7 +662,6 @@ async def _query_auth_context_by_access_key(
                 access_key=AccessKey(keypair_row.access_key),
                 secret_key=SecretKey(keypair_row.secret_key),
                 is_admin=bool(keypair_row.is_admin),
-                rate_limit=keypair_row.rate_limit,
                 resource_policy=keypair_policy_row.to_dataclass(),
             ),
         )

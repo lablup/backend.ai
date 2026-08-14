@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.v2.resource_policy.request import (
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
     UserResourcePolicyOrder as UserResourcePolicyOrderDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     IntFilter,
@@ -158,6 +159,13 @@ class UserResourcePolicyV2Filter(PydanticInputMixin[UserResourcePolicyFilterDTO]
     created_at: DateTimeFilter | None = None
     max_vfolder_count: IntFilter | None = None
     max_concurrent_logins: IntFilter | None = None
+    max_api_requests_per_window: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by max API requests per rate limit window.",
+        ),
+        default=None,
+    )
     max_quota_scope_size: IntFilter | None = None
     max_session_count_per_model_session: IntFilter | None = None
     max_customized_image_count: IntFilter | None = None
@@ -187,6 +195,7 @@ class UserResourcePolicyV2OrderField(StrEnum):
     CREATED_AT = "created_at"
     MAX_VFOLDER_COUNT = "max_vfolder_count"
     MAX_CONCURRENT_LOGINS = "max_concurrent_logins"
+    MAX_API_REQUESTS_PER_WINDOW = "max_api_requests_per_window"
     MAX_QUOTA_SCOPE_SIZE = "max_quota_scope_size"
     MAX_SESSION_COUNT_PER_MODEL_SESSION = "max_session_count_per_model_session"
     MAX_CUSTOMIZED_IMAGE_COUNT = "max_customized_image_count"

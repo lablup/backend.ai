@@ -49,6 +49,7 @@ from ai.backend.common.dto.manager.v2.resource_policy.response import (
 from ai.backend.common.dto.manager.v2.resource_policy.response import (
     UpdateUserResourcePolicyPayload as UpdateUserResourcePolicyPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.common_types import (
     BinarySizeInputGQL,
     ResourceSlotEntryInputGQL,
@@ -185,6 +186,16 @@ class CreateUserResourcePolicyInputGQL(PydanticInputMixin[CreateUserResourcePoli
         ),
         default=None,
     )
+    max_api_requests_per_window: int | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Maximum number of API requests allowed per user within the rate limit"
+                " window. Null means unlimited."
+            ),
+        ),
+        default=None,
+    )
     max_quota_scope_size: BinarySizeInputGQL = gql_field(
         description="Maximum quota scope size (e.g., '1g', '536870912').",
     )
@@ -215,6 +226,16 @@ class UpdateUserResourcePolicyInputGQL(PydanticInputMixin[UpdateUserResourcePoli
                 " Set to null to clear (unlimited)."
                 " Distinct from keypair_resource_policies.max_concurrent_sessions"
                 " which caps compute sessions."
+            ),
+        ),
+        default=UNSET,
+    )
+    max_api_requests_per_window: int | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Updated maximum number of API requests allowed per user within the rate"
+                " limit window. Set to null to clear (unlimited)."
             ),
         ),
         default=UNSET,

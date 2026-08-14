@@ -93,6 +93,12 @@ class UserResourcePolicyOrders:
         return UserResourcePolicyRow.max_concurrent_logins.desc()
 
     @staticmethod
+    def max_api_requests_per_window(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return UserResourcePolicyRow.max_api_requests_per_window.asc()
+        return UserResourcePolicyRow.max_api_requests_per_window.desc()
+
+    @staticmethod
     def max_quota_scope_size(ascending: bool = True) -> QueryOrder:
         if ascending:
             return UserResourcePolicyRow.max_quota_scope_size.asc()

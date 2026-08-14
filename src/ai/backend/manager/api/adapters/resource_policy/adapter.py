@@ -400,6 +400,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             name=input.name,
             max_vfolder_count=input.max_vfolder_count,
             max_concurrent_logins=input.max_concurrent_logins,
+            max_api_requests_per_window=input.max_api_requests_per_window,
             max_quota_scope_size=input.max_quota_scope_size.bytes,
             max_session_count_per_model_session=input.max_session_count_per_model_session,
             max_customized_image_count=input.max_customized_image_count,
@@ -428,6 +429,13 @@ class ResourcePolicyAdapter(BaseAdapter):
                 else TriState.nullify()
                 if input.max_concurrent_logins is None
                 else TriState.update(input.max_concurrent_logins)
+            ),
+            max_api_requests_per_window=(
+                TriState.nop()
+                if isinstance(input.max_api_requests_per_window, Sentinel)
+                else TriState.nullify()
+                if input.max_api_requests_per_window is None
+                else TriState.update(input.max_api_requests_per_window)
             ),
             max_quota_scope_size=(
                 OptionalState.nop()
@@ -649,6 +657,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             created_at=data.created_at,
             max_vfolder_count=data.max_vfolder_count,
             max_concurrent_logins=data.max_concurrent_logins,
+            max_api_requests_per_window=data.max_api_requests_per_window,
             max_quota_scope_size=BinarySize.to_size_info(data.max_quota_scope_size),
             max_session_count_per_model_session=data.max_session_count_per_model_session,
             max_customized_image_count=data.max_customized_image_count,
@@ -814,6 +823,13 @@ class ResourcePolicyAdapter(BaseAdapter):
             )
             if cond is not None:
                 conditions.append(cond)
+        if filter.max_api_requests_per_window is not None:
+            cond = self.convert_int_filter(
+                filter.max_api_requests_per_window,
+                UserResourcePolicyConditions.by_max_api_requests_per_window,
+            )
+            if cond is not None:
+                conditions.append(cond)
         if filter.max_quota_scope_size is not None:
             cond = self.convert_int_filter(
                 filter.max_quota_scope_size,
@@ -970,6 +986,8 @@ def _resolve_user_order(
             return UserResourcePolicyOrders.max_vfolder_count(ascending)
         case UserResourcePolicyOrderField.MAX_CONCURRENT_LOGINS:
             return UserResourcePolicyOrders.max_concurrent_logins(ascending)
+        case UserResourcePolicyOrderField.MAX_API_REQUESTS_PER_WINDOW:
+            return UserResourcePolicyOrders.max_api_requests_per_window(ascending)
         case UserResourcePolicyOrderField.MAX_QUOTA_SCOPE_SIZE:
             return UserResourcePolicyOrders.max_quota_scope_size(ascending)
         case UserResourcePolicyOrderField.MAX_SESSION_COUNT_PER_MODEL_SESSION:

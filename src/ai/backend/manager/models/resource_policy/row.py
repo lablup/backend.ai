@@ -131,6 +131,9 @@ class UserResourcePolicyRow(CreatedAtMixin, Base):
     max_concurrent_logins: Mapped[int | None] = mapped_column(
         "max_concurrent_logins", sa.Integer(), nullable=True, default=None
     )
+    max_api_requests_per_window: Mapped[int | None] = mapped_column(
+        "max_api_requests_per_window", sa.Integer(), nullable=True, default=None
+    )
 
     def __init__(
         self,
@@ -140,6 +143,7 @@ class UserResourcePolicyRow(CreatedAtMixin, Base):
         max_session_count_per_model_session: int,
         max_customized_image_count: int,
         max_concurrent_logins: int | None = None,
+        max_api_requests_per_window: int | None = None,
     ) -> None:
         self.name = name
         self.max_vfolder_count = max_vfolder_count
@@ -147,6 +151,7 @@ class UserResourcePolicyRow(CreatedAtMixin, Base):
         self.max_session_count_per_model_session = max_session_count_per_model_session
         self.max_customized_image_count = max_customized_image_count
         self.max_concurrent_logins = max_concurrent_logins
+        self.max_api_requests_per_window = max_api_requests_per_window
 
     @classmethod
     def from_dataclass(cls, data: UserResourcePolicyData) -> Self:
@@ -168,6 +173,7 @@ class UserResourcePolicyRow(CreatedAtMixin, Base):
             max_session_count_per_model_session=self.max_session_count_per_model_session,
             max_customized_image_count=self.max_customized_image_count,
             max_concurrent_logins=self.max_concurrent_logins,
+            max_api_requests_per_window=self.max_api_requests_per_window,
         )
 
 

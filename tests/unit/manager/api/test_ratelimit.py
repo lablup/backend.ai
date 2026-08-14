@@ -69,14 +69,14 @@ class TestRlimMiddleware:
     def mock_request_authorized(self) -> web.Request:
         """Mock request for authorized user."""
         request = MagicMock(spec=web.Request)
-        keypair_data = {"rate_limit": 30000}
-        user_data = {"uuid": _USER_ID}
+        user_data = {
+            "uuid": _USER_ID,
+            "resource_policy": {"max_api_requests_per_window": 30000},
+        }
 
         def getitem(key: Any) -> Any:
             if key == "is_authorized":
                 return True
-            if key == "keypair":
-                return keypair_data
             if key == "user":
                 return user_data
             return None
@@ -148,7 +148,9 @@ class TestRlimMiddleware:
     ) -> None:
         """Authorized requests within rate limit succeed and return correct headers."""
         # Arrange
-        mock_request_authorized["keypair"]["rate_limit"] = test_case.rate_limit
+        mock_request_authorized["user"]["resource_policy"]["max_api_requests_per_window"] = (
+            test_case.rate_limit
+        )
         mock_valkey_client.execute_rate_limit_logic = AsyncMock(
             return_value=test_case.rolling_count
         )
@@ -201,7 +203,9 @@ class TestRlimMiddleware:
     ) -> None:
         """Authorized requests exceeding rate limit raise RateLimitExceeded."""
         # Arrange
-        mock_request_authorized["keypair"]["rate_limit"] = test_case.rate_limit
+        mock_request_authorized["user"]["resource_policy"]["max_api_requests_per_window"] = (
+            test_case.rate_limit
+        )
         mock_valkey_client.execute_rate_limit_logic = AsyncMock(
             return_value=test_case.rolling_count
         )
