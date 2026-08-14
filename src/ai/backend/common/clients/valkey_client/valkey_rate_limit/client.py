@@ -43,6 +43,8 @@ valkey_rate_limit_resilience = Resilience(
 _DEFAULT_RATE_LIMIT_EXPIRATION = 60 * 15  # 15 minutes
 _TIME_PRECISION = Decimal("1e-3")  # milliseconds
 
+_USER_RATE_LIMIT_KEY_PREFIX: Final = "user-rate-limit."
+
 
 _RATE_LIMIT_SCRIPT: Final[str] = """
 local key = KEYS[1]
@@ -145,6 +147,39 @@ class ValkeyRateLimitClient:
         """
         async with self._client.client() as conn:
             return await conn.zcard(f"user.{user_id}")
+
+    @valkey_rate_limit_resilience.apply()
+    async def set_user_rate_limit(
+        self,
+        user_id: UserID,
+        rate_limit: int,
+        expiration: int = _DEFAULT_RATE_LIMIT_EXPIRATION,
+    ) -> None:
+        """
+        Publish the rate limit of a user so that other components can read it.
+
+        :param user_id: The user to publish the limit for.
+        :param rate_limit: The allowed number of requests per rate limit window.
+        :param expiration: The expiration time in seconds.
+        """
+        async with self._client.client() as conn:
+            await conn.set(
+                key=f"{_USER_RATE_LIMIT_KEY_PREFIX}{user_id}",
+                value=str(rate_limit),
+                expiry=ExpirySet(ExpiryType.SEC, expiration),
+            )
+
+    @valkey_rate_limit_resilience.apply()
+    async def get_user_rate_limit(self, user_id: UserID) -> int | None:
+        """
+        Get the published rate limit of a user.
+
+        :param user_id: The user to look up.
+        :return: The rate limit, or None if nothing is published for the user.
+        """
+        async with self._client.client() as conn:
+            result = await conn.get(f"{_USER_RATE_LIMIT_KEY_PREFIX}{user_id}")
+        return int(result.decode("utf-8")) if result is not None else None
 
     @valkey_rate_limit_resilience.apply()
     async def set_rate_limit_config(
