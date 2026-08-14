@@ -82,6 +82,7 @@ class TestAuthClient:
                     "status": "active",
                     "session_token": "test_session_token",
                     "user_id": "12345678-1234-5678-1234-567812345678",
+                    "rate_limit": None,
                     "type": AuthTokenType.KEYPAIR,
                 },
             }

@@ -58,7 +58,7 @@ class AuthSuccessResponse(AuthResponse):
     status: str
     session_token: str
     user_id: UserID
-    rate_limit: int | None = None
+    rate_limit: int | None
     type: AuthTokenType = AuthTokenType.KEYPAIR
 
     def to_dict(self) -> dict[str, Any]:

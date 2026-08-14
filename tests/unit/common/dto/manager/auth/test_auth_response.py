@@ -34,6 +34,7 @@ def test_authorize_response() -> None:
         status="active",
         session_token="test_session_token",
         user_id=UserID(uuid4()),
+        rate_limit=None,
         type=AuthTokenType.KEYPAIR,
     )
     resp = AuthorizeResponse(data=data)
