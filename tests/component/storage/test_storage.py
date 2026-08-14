@@ -4,6 +4,7 @@ import uuid
 
 import pytest
 
+from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.storage.request import (
     GetPresignedDownloadURLReq,
@@ -29,13 +30,12 @@ class TestListObjectStorages:
         assert isinstance(result, ObjectStorageListResponse)
         assert isinstance(result.storages, list)
 
-    async def test_user_lists_object_storages(
+    async def test_user_cannot_list_object_storages(
         self,
         user_registry: BackendAIClientRegistry,
     ) -> None:
-        result = await user_registry.storage.list_object_storages()
-        assert isinstance(result, ObjectStorageListResponse)
-        assert isinstance(result.storages, list)
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.storage.list_object_storages()
 
 
 class TestGetPresignedUploadURL:
@@ -98,13 +98,12 @@ class TestListVFSStorages:
         assert isinstance(result, ListVFSStorageResponse)
         assert isinstance(result.storages, list)
 
-    async def test_user_lists_vfs_storages(
+    async def test_user_cannot_list_vfs_storages(
         self,
         user_registry: BackendAIClientRegistry,
     ) -> None:
-        result = await user_registry.storage.list_vfs_storages()
-        assert isinstance(result, ListVFSStorageResponse)
-        assert isinstance(result.storages, list)
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.storage.list_vfs_storages()
 
 
 class TestGetVFSStorage:

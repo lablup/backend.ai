@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 from ai.backend.manager.actions.registry import ProcessorGroup
-from ai.backend.manager.actions.v2.global_scope.processor import (
-    GlobalActionProcessor,
-    PublicActionProcessor,
-)
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     CreatedEntityOpsResult,
@@ -42,9 +39,9 @@ class ObjectStorageProcessors:
     ]
     update: GlobalActionProcessor[UpdateObjectStorageAction, EntityOpsResult[ObjectStorageData]]
     purge: GlobalActionProcessor[PurgeObjectStorageAction, EntityOpsResult[ObjectStorageData]]
-    get: PublicActionProcessor[GetObjectStorageAction, EntityOpsResult[ObjectStorageData]]
-    list_storages: PublicActionProcessor[ListObjectStorageAction, BatchOpsResult[ObjectStorageData]]
-    search_object_storages: PublicActionProcessor[
+    get: GlobalActionProcessor[GetObjectStorageAction, EntityOpsResult[ObjectStorageData]]
+    list_storages: GlobalActionProcessor[ListObjectStorageAction, BatchOpsResult[ObjectStorageData]]
+    search_object_storages: GlobalActionProcessor[
         SearchObjectStoragesAction, BatchOpsResult[ObjectStorageData]
     ]
     get_presigned_download_url: GlobalActionProcessor[
@@ -62,9 +59,9 @@ class ObjectStorageProcessors:
         self.create = group.global_create_ops(CreateObjectStorageAction)
         self.update = group.global_update_ops(UpdateObjectStorageAction)
         self.purge = group.global_purge_ops(PurgeObjectStorageAction)
-        self.get = group.public_get_ops(GetObjectStorageAction)
-        self.list_storages = group.public_search_ops(ListObjectStorageAction)
-        self.search_object_storages = group.public_search_ops(SearchObjectStoragesAction)
+        self.get = group.global_get_ops(GetObjectStorageAction)
+        self.list_storages = group.global_search_ops(ListObjectStorageAction)
+        self.search_object_storages = group.global_search_ops(SearchObjectStoragesAction)
         self.get_presigned_download_url = group.global_scope(
             GetDownloadPresignedURLAction, service.get_presigned_download_url
         )

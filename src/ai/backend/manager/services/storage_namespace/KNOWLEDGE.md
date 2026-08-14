@@ -35,7 +35,9 @@ own rather than living as a column on the storage.
 | `unregister` | `UnregisterNamespaceAction` | global | PURGE | SUPERADMIN gate |
 
 Every REST route in this domain declares `superadmin_required`, so the global
-gate matches what the surface promises.
+gate matches what the surface promises. The same holds for the object and VFS
+storage packages this one hangs off: both of their surfaces, v1 included, are
+super-admin operations, so no read in this family is open to a regular user.
 
 ## Removal takes an id, and the pair reaches it through the lookup
 

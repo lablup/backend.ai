@@ -17,6 +17,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.storage.request import VFSListFilesReq
 from ai.backend.common.dto.manager.storage.response import (
@@ -93,16 +94,14 @@ class TestVFSStorageList:
         assert storage_a["name"] in storage_names
         assert storage_b["name"] in storage_names
 
-    async def test_user_lists_vfs_storages(
+    async def test_user_cannot_list_vfs_storages(
         self,
         user_registry: BackendAIClientRegistry,
         target_vfs_storage: VFSStorageFixtureData,
     ) -> None:
-        """Regular user can also list VFS storages (auth_required)."""
-        result = await user_registry.storage.list_vfs_storages()
-        assert isinstance(result, ListVFSStorageResponse)
-        storage_names = [s.name for s in result.storages]
-        assert target_vfs_storage["name"] in storage_names
+        """The storage registry is a super-admin surface."""
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.storage.list_vfs_storages()
 
 
 class TestVFSStorageGet:
@@ -128,15 +127,14 @@ class TestVFSStorageGet:
         with pytest.raises(Exception):
             await admin_registry.storage.get_vfs_storage("nonexistent-storage-xyz-99999")
 
-    async def test_user_gets_storage_by_name(
+    async def test_user_cannot_get_storage_by_name(
         self,
         user_registry: BackendAIClientRegistry,
         target_vfs_storage: VFSStorageFixtureData,
     ) -> None:
-        """Regular user can also get VFS storage by name (auth_required)."""
-        result = await user_registry.storage.get_vfs_storage(target_vfs_storage["name"])
-        assert isinstance(result, GetVFSStorageResponse)
-        assert result.storage.name == target_vfs_storage["name"]
+        """The storage registry is a super-admin surface."""
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.storage.get_vfs_storage(target_vfs_storage["name"])
 
 
 class TestVFSStorageCRUDIntegration:

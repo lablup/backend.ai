@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 
 from ai.backend.client.exceptions import BackendAPIError
+from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.object_storage.request import (
     GetPresignedDownloadURLReq,
@@ -43,16 +44,14 @@ class TestListObjectStorages:
         names = [s.name for s in result.storages]
         assert created["name"] in names
 
-    async def test_user_lists_storages(
+    async def test_user_cannot_list_storages(
         self,
         user_registry: BackendAIClientRegistry,
         object_storage_factory: ObjectStorageFactory,
     ) -> None:
-        created = await object_storage_factory()
-        result = await user_registry.object_storage.list()
-        assert isinstance(result, ObjectStorageListResponse)
-        names = [s.name for s in result.storages]
-        assert created["name"] in names
+        await object_storage_factory()
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.object_storage.list()
 
 
 class TestGetAllBuckets:

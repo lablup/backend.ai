@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 from ai.backend.manager.actions.registry import ProcessorGroup
-from ai.backend.manager.actions.v2.global_scope.processor import (
-    GlobalActionProcessor,
-    PublicActionProcessor,
-)
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
@@ -50,12 +47,12 @@ class VFSStorageProcessors:
     create: GlobalActionProcessor[CreateVFSStorageAction, CreatedEntityOpsResult[VFSStorageData]]
     update: GlobalActionProcessor[UpdateVFSStorageAction, EntityOpsResult[VFSStorageData]]
     purge: GlobalActionProcessor[PurgeVFSStorageAction, EntityOpsResult[VFSStorageData]]
-    get: PublicActionProcessor[GetVFSStorageAction, EntityOpsResult[VFSStorageData]]
+    get: GlobalActionProcessor[GetVFSStorageAction, EntityOpsResult[VFSStorageData]]
     resolve_by_name: LookupActionProcessor[
         ResolveVFSStorageByNameAction, LookupOpsResult[VFSStorageData]
     ]
-    list_storages: PublicActionProcessor[ListVFSStorageAction, BatchOpsResult[VFSStorageData]]
-    search_vfs_storages: PublicActionProcessor[
+    list_storages: GlobalActionProcessor[ListVFSStorageAction, BatchOpsResult[VFSStorageData]]
+    search_vfs_storages: GlobalActionProcessor[
         SearchVFSStoragesAction, BatchOpsResult[VFSStorageData]
     ]
     get_quota_scope: GlobalActionProcessor[GetQuotaScopeAction, GetQuotaScopeActionResult]
@@ -76,10 +73,10 @@ class VFSStorageProcessors:
         self.create = group.global_create_ops(CreateVFSStorageAction)
         self.update = group.global_update_ops(UpdateVFSStorageAction)
         self.purge = group.global_purge_ops(PurgeVFSStorageAction)
-        self.get = group.public_get_ops(GetVFSStorageAction)
+        self.get = group.global_get_ops(GetVFSStorageAction)
         self.resolve_by_name = group.lookup_ops(ResolveVFSStorageByNameAction)
-        self.list_storages = group.public_search_ops(ListVFSStorageAction)
-        self.search_vfs_storages = group.public_search_ops(SearchVFSStoragesAction)
+        self.list_storages = group.global_search_ops(ListVFSStorageAction)
+        self.search_vfs_storages = group.global_search_ops(SearchVFSStoragesAction)
         self.get_quota_scope = group.global_scope(GetQuotaScopeAction, service.get_quota_scope)
         self.search_quota_scopes = group.global_scope(
             SearchQuotaScopesAction, service.search_quota_scopes
