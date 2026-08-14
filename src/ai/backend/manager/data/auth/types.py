@@ -23,10 +23,10 @@ class SSHKeypair:
 
 @dataclass
 class AuthorizationResult:
-    user_id: uuid.UUID
-    access_key: str
-    secret_key: str
-    role: str
+    user_id: UserID
+    access_key: AccessKey
+    secret_key: SecretKey
+    role: UserRole
     status: str
     session_token: str
     rate_limit: int | None

@@ -506,7 +506,7 @@ async def login_handler(request: web.Request) -> web.Response:
                     "secret_key": token.secret_key,
                     "role": token.role,
                     "status": token.status,
-                    "user_id": str(token.user_id) if token.user_id is not None else None,
+                    "user_id": str(token.user_id),
                     "rate_limit": token.rate_limit,
                 }
                 public_return = {
@@ -769,7 +769,7 @@ async def token_login_handler(request: web.Request) -> web.Response:
             "secret_key": token.secret_key,
             "role": token.role,
             "status": token.status,
-            "user_id": str(token.user_id) if token.user_id is not None else None,
+            "user_id": str(token.user_id),
             "rate_limit": token.rate_limit,
         }
         public_return = {

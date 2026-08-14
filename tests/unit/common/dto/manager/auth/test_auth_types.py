@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID, uuid4
 
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.auth.types import (
     AuthResponseType,
     AuthSuccessResponse,
@@ -12,6 +13,7 @@ from ai.backend.common.dto.manager.auth.types import (
     parse_auth_response,
 )
 from ai.backend.common.identifier.user import UserID
+from ai.backend.common.types import AccessKey, SecretKey
 
 
 def test_auth_token_type_values() -> None:
@@ -37,11 +39,12 @@ def test_two_factor_type_values() -> None:
 def test_auth_success_response_creation() -> None:
     resp = AuthSuccessResponse(
         response_type=AuthResponseType.SUCCESS,
-        access_key="AKTEST",
-        secret_key="SKTEST",
-        role="user",
+        access_key=AccessKey("AKTEST"),
+        secret_key=SecretKey("SKTEST"),
+        role=UserRole.USER,
         status="active",
         session_token="test_session_token",
+        user_id=UserID(uuid4()),
     )
     assert resp.access_key == "AKTEST"
     assert resp.secret_key == "SKTEST"
@@ -53,11 +56,12 @@ def test_auth_success_response_creation() -> None:
 def test_auth_success_response_to_dict() -> None:
     resp = AuthSuccessResponse(
         response_type=AuthResponseType.SUCCESS,
-        access_key="AK",
-        secret_key="SK",
-        role="admin",
+        access_key=AccessKey("AK"),
+        secret_key=SecretKey("SK"),
+        role=UserRole.ADMIN,
         status="active",
         session_token="test_session_token",
+        user_id=UserID(uuid4()),
         type=AuthTokenType.JWT,
     )
     d = resp.to_dict()
@@ -118,11 +122,11 @@ def test_parse_auth_response_success() -> None:
         "role": "user",
         "status": "active",
         "session_token": "test_token",
+        "user_id": "12345678-1234-5678-1234-567812345678",
     }
     result = parse_auth_response(data)
     assert isinstance(result, AuthSuccessResponse)
     assert result.access_key == "AK"
-    assert result.user_id is None
     assert result.rate_limit is None
 
 
@@ -147,9 +151,9 @@ def test_auth_success_response_to_dict_serializes_user_id_and_rate_limit() -> No
     user_id = UserID(uuid4())
     resp = AuthSuccessResponse(
         response_type=AuthResponseType.SUCCESS,
-        access_key="AK",
-        secret_key="SK",
-        role="user",
+        access_key=AccessKey("AK"),
+        secret_key=SecretKey("SK"),
+        role=UserRole.USER,
         status="active",
         session_token="test_token",
         user_id=user_id,

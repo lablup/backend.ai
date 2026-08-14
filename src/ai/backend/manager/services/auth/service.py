@@ -18,8 +18,9 @@ from ai.backend.common.clients.valkey_client.valkey_session.types import (
 )
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import InvalidAPIParameters, UserResourcePolicyNotFound
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
-from ai.backend.common.types import AccessKey, SSHPrivateKey, SSHPublicKey
+from ai.backend.common.types import AccessKey, SecretKey, SSHPrivateKey, SSHPublicKey
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig
@@ -409,10 +410,10 @@ class AuthService:
         return AuthorizeActionResult(
             stream_response=None,
             authorization_result=AuthorizationResult(
-                access_key=keypair_row.access_key,
-                secret_key=keypair_row.secret_key or "",
-                user_id=user.uuid,
-                role=user.role,
+                access_key=AccessKey(keypair_row.access_key),
+                secret_key=SecretKey(keypair_row.secret_key),
+                user_id=UserID(user.uuid),
+                role=UserRole(user.role),
                 status=user.status,
                 session_token=session_result.session_token,
                 rate_limit=keypair_row.rate_limit,
