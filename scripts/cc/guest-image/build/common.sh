@@ -1,12 +1,13 @@
 set -euo pipefail
 
 BAI_CC_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BAI_CC_CONFIG="${BAI_CC_CONFIG:-$(cd "${BAI_CC_ROOT}/../../../configs/cc/guest-image" && pwd)}"
 BAI_CC_OUT="${BAI_CC_OUT:-${BAI_CC_ROOT}/out}"
 BAI_CC_CACHE="${BAI_CC_CACHE:-${BAI_CC_ROOT}/.cache}"
 BAI_CC_KATA_SRC="${BAI_CC_KATA_SRC:-${BAI_CC_CACHE}/kata-src}"
 
 set -a
-. "${BAI_CC_ROOT}/pins.env"
+. "${BAI_CC_CONFIG}/pins.env"
 set +a
 
 log() { printf '[guest-image] %s\n' "$*" >&2; }

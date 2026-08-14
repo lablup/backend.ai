@@ -18,7 +18,7 @@ checkout_kata() {
 	fetch "${BAI_CC_KATA_VERSIONS_URL}" "${BAI_CC_CACHE}/versions.yaml" "${BAI_CC_KATA_VERSIONS_SHA256}"
 	cmp -s "${BAI_CC_CACHE}/versions.yaml" "${BAI_CC_KATA_SRC}/versions.yaml" \
 		|| die "kata checkout does not match the pinned release versions.yaml"
-	install -D -m 0644 "${BAI_CC_ROOT}/kernel/fragments/backendai.conf" \
+	install -D -m 0644 "${BAI_CC_CONFIG}/kernel/fragments/backendai.conf" \
 		"${BAI_CC_KATA_SRC}/tools/packaging/kernel/configs/fragments/common/backendai.conf"
 }
 
@@ -31,7 +31,7 @@ upstream_stamp() {
 	printf '%s\0' "${BAI_CC_KATA_COMMIT}" "$variant" "${BAI_CC_ROOTFS_DISTRO}" \
 		"${BAI_CC_EXTRA_PKGS}" "${BAI_CC_REPO_COMPONENTS}" \
 		"${BAI_CC_API_SERVER_REST_FEATURES}" "${SOURCE_DATE_EPOCH}" \
-		| cat - "${BAI_CC_ROOT}/kernel/fragments/backendai.conf" | sha256sum | cut -d' ' -f1
+		| cat - "${BAI_CC_CONFIG}/kernel/fragments/backendai.conf" | sha256sum | cut -d' ' -f1
 }
 
 build_upstream() {
@@ -205,7 +205,7 @@ stage_overlay() {
 	rm -rf "${stage}/usr/lib/systemd" "${stage}/etc/dcgm-exporter"
 	rm -f "${stage}/usr/sbin/ntpd"
 	rm -f "${stage}/etc/kata-opa/allow-all.rego" "${stage}/etc/kata-opa/default-policy.rego"
-	install -D -m 0644 "${BAI_CC_ROOT}/policy/deny-all.rego" \
+	install -D -m 0644 "${BAI_CC_CONFIG}/policy/deny-all.rego" \
 		"${stage}/etc/kata-opa/default-policy.rego"
 	rm -f "${stage}"/opt/kernel/libbaihook.*.so "${stage}"/opt/kernel/jail.*.bin
 }

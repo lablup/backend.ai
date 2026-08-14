@@ -1,22 +1,37 @@
 import argparse
 import json
+import logging
 import os
 import random
 import socket
 import sys
 import threading
 import time
+from collections.abc import Sequence
+from pathlib import Path
+from typing import Any
 
-from .clock import TrustedClock, claims, measurements, platform_status
-from .errors import BrokerUnreachable, ClockUntrusted, EmptySecret, PolicyError, ReleaseDenied
-from .identity import material
-from .kbs import Kbs
-from .policy import load
-from .render import render
-from .serve import CredentialServer, DecisionLog
+from ai.backend.cc_broker.clock import TrustedClock, claims, measurements, platform_status
+from ai.backend.cc_broker.errors import (
+    BrokerUnreachable,
+    ClockUntrusted,
+    EmptySecret,
+    PolicyError,
+    ReleaseDenied,
+)
+from ai.backend.cc_broker.identity import material
+from ai.backend.cc_broker.kbs import Kbs
+from ai.backend.cc_broker.policy import Entry, load
+from ai.backend.cc_broker.render import render
+from ai.backend.cc_broker.serve import CredentialServer, DecisionLog
+
+logger = logging.getLogger(__name__)
+
+CredentialStore = dict[tuple[str, str], bytes]
+CredentialTable = dict[tuple[str, str], Entry]
 
 
-def notify(state):
+def notify(state: str) -> None:
     address = os.environ.get("NOTIFY_SOCKET")
     if not address:
         return
@@ -27,16 +42,16 @@ def notify(state):
         sock.sendall(state.encode("ascii"))
 
 
-def collect(kbs, broker, table):
-    fetched = {}
-    issued = {}
+def collect(kbs: Kbs, broker: dict[str, Any], table: CredentialTable) -> CredentialStore:
+    fetched: dict[str, bytes] = {}
+    issued: dict[str, bytes] = {}
 
-    def fetch(path):
+    def fetch(path: str) -> bytes:
         if path not in fetched:
             fetched[path] = kbs.resource(path)
         return fetched[path]
 
-    store = {}
+    store: CredentialStore = {}
     for key, entry in table.items():
         if entry.kind == "resource":
             value = fetch(entry.value)
@@ -50,45 +65,56 @@ def collect(kbs, broker, table):
     return store
 
 
-def episode(kbs, broker, table, clock, log):
+def episode(
+    kbs: Kbs,
+    broker: dict[str, Any],
+    table: CredentialTable,
+    clock: TrustedClock,
+    log: DecisionLog,
+) -> CredentialStore:
     token = kbs.attest()
     body = claims(token)
     observed = time.time()
     attested = clock.take(body)
-    print(
-        f"credential-broker: wall clock read {observed:.0f}, attestation says "
-        f"{attested:.0f}, clock now {time.time():.0f}",
-        file=sys.stderr,
-        flush=True,
+    logger.info(
+        "wall clock read %.0f, attestation says %.0f, clock now %.0f",
+        observed,
+        attested,
+        time.time(),
     )
     status = platform_status(body)
     quoted = measurements(body)
     log.record("platform", json.dumps(status, sort_keys=True), "credential-broker", "")
-    with open(os.path.join(broker["identity_dir"], "platform-status.json"), "w") as f:
+    with (Path(broker["identity_dir"]) / "platform-status.json").open("w") as f:
         json.dump({"appraisal": status, "measurements": quoted}, f, sort_keys=True)
-    print(
-        "credential-broker: appraisal " + json.dumps(status, sort_keys=True),
-        file=sys.stderr,
-        flush=True,
-    )
+    logger.info("appraisal %s", json.dumps(status, sort_keys=True))
     for field, value in sorted(quoted.items()):
-        print(f"credential-broker: {field}={value}", file=sys.stderr, flush=True)
+        logger.info("%s=%s", field, value)
     return collect(kbs, broker, table)
 
 
-def carry(path, log):
+def carry(path: str, log: DecisionLog) -> None:
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with Path(path).open(encoding="utf-8") as f:
             entries = [json.loads(line) for line in f if line.strip()]
     except (OSError, ValueError) as exc:
-        print(f"credential-broker: no unlock verdicts to carry forward ({exc})", file=sys.stderr, flush=True)
+        logger.info("no unlock verdicts to carry forward (%s)", exc)
         return
     for entry in entries:
         log.record(entry["verdict"], entry["clause"], entry["unit"], entry["credential"])
-    print(f"credential-broker: carried {len(entries)} unlock verdicts into the decision log", file=sys.stderr, flush=True)
+    logger.info("carried %d unlock verdicts into the decision log", len(entries))
 
 
-def renew(kbs, broker, table, clock, log, server, period, jitter):
+def renew(
+    kbs: Kbs,
+    broker: dict[str, Any],
+    table: CredentialTable,
+    clock: TrustedClock,
+    log: DecisionLog,
+    server: CredentialServer,
+    period: float,
+    jitter: float,
+) -> None:
     while True:
         time.sleep(period + random.uniform(0, jitter))
         try:
@@ -99,13 +125,19 @@ def renew(kbs, broker, table, clock, log, server, period, jitter):
             log.record("renewal-failed", type(exc).__name__ + ": " + str(exc), "", "")
 
 
-def main(argv=None):
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="backendai-credential-broker")
     parser.add_argument("--policy", default="/etc/backendai/credential-policy.toml")
     args = parser.parse_args(argv)
 
+    logging.basicConfig(
+        stream=sys.stderr,
+        format="credential-broker: %(message)s",
+        level=logging.INFO,
+    )
+
     broker, table = load(args.policy)
-    os.makedirs(broker["identity_dir"], mode=0o700, exist_ok=True)
+    Path(broker["identity_dir"]).mkdir(mode=0o700, parents=True, exist_ok=True)
     log = DecisionLog(
         broker.get("decision_log", "/var/lib/backendai/log/backendai-credentials.jsonl"),
         broker.get("durable_root", "/var/lib/backendai"),
@@ -121,6 +153,7 @@ def main(argv=None):
     clock = TrustedClock(broker.get("clock_skew_bound_seconds", 60))
 
     attempts = broker.get("boot_attempts", 5)
+    store: CredentialStore | None = None
     for attempt in range(attempts):
         try:
             store = episode(kbs, broker, table, clock, log)
@@ -128,13 +161,17 @@ def main(argv=None):
         except BrokerUnreachable as exc:
             log.record("unreachable", str(exc), "", "")
             if attempt == attempts - 1:
-                print(f"key broker unreachable: {exc}", file=sys.stderr)
+                logger.error("key broker unreachable: %s", exc)
                 return 1
             time.sleep(broker.get("boot_backoff_seconds", 5) * (attempt + 1))
         except (ReleaseDenied, EmptySecret, PolicyError) as exc:
             log.record("fatal", type(exc).__name__ + ": " + str(exc), "", "")
-            print(f"{type(exc).__name__}: {exc}", file=sys.stderr)
+            logger.error("%s: %s", type(exc).__name__, exc)
             return 1
+
+    if store is None:
+        logger.error("broker.boot_attempts must be at least 1")
+        return 1
 
     server = CredentialServer(broker["socket"], table, store, log)
     server.bind()

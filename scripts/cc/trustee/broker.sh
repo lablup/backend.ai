@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "${HERE}/../../.." && pwd)"
+COMPOSE_DIR="${REPO}/docker/cc"
+CONFIG_DIR="${REPO}/configs/cc/trustee"
 if [[ -f $HERE/.env ]]; then set -a; . "$HERE/.env"; set +a; fi
 OVERLAY="${OVERLAY:-dev}"
 INCUMBENT="${INCUMBENT:-trustee-kbs-1}"
@@ -10,7 +13,7 @@ RESERVED_PORTS="8080 8081 5000 18080 50000"
 die() { printf 'broker: %s\n' "$*" >&2; exit 1; }
 note() { printf 'broker: %s\n' "$*" >&2; }
 
-compose() { docker compose -f "$HERE/compose.yaml" -f "$HERE/compose.$OVERLAY.yaml" "$@"; }
+compose() { docker compose -f "$COMPOSE_DIR/trustee-compose.yaml" -f "$COMPOSE_DIR/trustee-compose.$OVERLAY.yaml" "$@"; }
 
 scheme() { [[ $OVERLAY == prod ]] && printf https || printf http; }
 url() { printf '%s://127.0.0.1:%s' "$(scheme)" "${KBS_PORT:?set KBS_PORT}"; }
@@ -23,7 +26,7 @@ admin_curl() {
 }
 
 render_config() {
-    local template="$HERE/config/kbs-config.$OVERLAY.toml" out="${BROKER_STATE:?}/kbs-config.toml"
+    local template="$CONFIG_DIR/config/kbs-config.$OVERLAY.toml" out="${BROKER_STATE:?}/kbs-config.toml"
     sed "s|KBS_LISTEN_PORT|${KBS_PORT:?}|" "$template" >"$out.new"
     grep -qF "0.0.0.0:${KBS_PORT}" "$out.new" || die "port substitution produced no listener line; refusing"
     if [[ $OVERLAY == prod ]] && grep -q InsecureAllowAll "$out.new"; then

@@ -59,7 +59,7 @@ if [ -n "$config" ]; then
 			*=n) ! grep -qE "^${want%%=*}=" "$config" ;;
 			*) grep -qx "$want" "$config" ;;
 		esac && report ok "kernel ${want%%=*}" || report MISS "kernel $want"
-	done < "${BAI_CC_ROOT}/kernel/fragments/backendai.conf"
+	done < "${BAI_CC_CONFIG}/kernel/fragments/backendai.conf"
 else
 	report MISS "guest kernel .config not found for inspection"
 fi

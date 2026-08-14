@@ -20,3 +20,7 @@ class ClockUntrusted(Exception):
 
 class DecisionLogNotDurable(Exception):
     pass
+
+
+class SocketNotBound(Exception):
+    pass

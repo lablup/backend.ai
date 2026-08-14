@@ -1,15 +1,34 @@
 import tomllib
+from pathlib import Path
+from typing import Any
 
-from .errors import PolicyError
+from ai.backend.cc_broker.errors import PolicyError
 
 CLASSES = ("resource", "render", "identity")
 UNIT_MARKER = "/unit/"
 
 
 class Entry:
-    __slots__ = ("unit", "name", "kind", "value", "part", "subject", "sans")
+    unit: str
+    name: str
+    kind: str
+    value: str
+    part: str
+    subject: str
+    sans: tuple[str, ...]
 
-    def __init__(self, unit, name, kind, value, part, subject, sans):
+    __slots__ = ("kind", "name", "part", "sans", "subject", "unit", "value")
+
+    def __init__(
+        self,
+        unit: str,
+        name: str,
+        kind: str,
+        value: str,
+        part: str,
+        subject: str,
+        sans: tuple[str, ...],
+    ) -> None:
         self.unit = unit
         self.name = name
         self.kind = kind
@@ -19,14 +38,14 @@ class Entry:
         self.sans = sans
 
 
-def load(path):
-    with open(path, "rb") as f:
+def load(path: str) -> tuple[dict[str, Any], dict[tuple[str, str], Entry]]:
+    with Path(path).open("rb") as f:
         doc = tomllib.load(f)
     broker = doc["broker"]
     for required in ("url", "client", "socket", "template_dir", "identity_dir"):
         if not broker.get(required):
             raise PolicyError(f"broker.{required} is empty")
-    table = {}
+    table: dict[tuple[str, str], Entry] = {}
     for raw in doc.get("credential", ()):
         unit = raw.get("unit")
         name = raw.get("name")
@@ -56,14 +75,13 @@ def load(path):
     return broker, table
 
 
-def peer_credential(peer):
-    if isinstance(peer, bytes):
-        peer = peer.decode("utf-8", "replace")
-    peer = peer.lstrip("\x00")
-    marker = peer.find(UNIT_MARKER)
+def peer_credential(peer: bytes | str) -> tuple[str, str] | None:
+    text = peer.decode("utf-8", "replace") if isinstance(peer, bytes) else peer
+    text = text.lstrip("\x00")
+    marker = text.find(UNIT_MARKER)
     if marker < 0:
         return None
-    parts = peer[marker + len(UNIT_MARKER) :].split("/")
+    parts = text[marker + len(UNIT_MARKER) :].split("/")
     if len(parts) != 2 or not parts[0] or not parts[1]:
         return None
     return (parts[0], parts[1])

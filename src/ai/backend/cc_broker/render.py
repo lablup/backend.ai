@@ -1,23 +1,24 @@
 import json
-import os
 import re
 import urllib.parse
+from collections.abc import Callable
+from pathlib import Path
 
-from .errors import EmptySecret, PolicyError
+from ai.backend.cc_broker.errors import EmptySecret, PolicyError
 
 PLACEHOLDER = re.compile(rb"@@(?:(url):)?([A-Za-z0-9_./-]+)@@")
 
 
-def render(template_dir, template, fetch):
-    path = os.path.join(template_dir, template)
-    if os.path.relpath(path, template_dir).startswith(".."):
+def render(template_dir: str, template: str, fetch: Callable[[str], bytes]) -> bytes:
+    root = Path(template_dir).resolve()
+    path = (root / template).resolve()
+    if not path.is_relative_to(root):
         raise PolicyError(f"template {template!r} escapes {template_dir}")
-    with open(path, "rb") as f:
-        body = f.read()
+    body = path.read_bytes()
     if not body.strip():
         raise EmptySecret(f"template {template} is empty")
 
-    def substitute(match):
+    def substitute(match: re.Match[bytes]) -> bytes:
         mode, resource = match.group(1), match.group(2).decode("ascii")
         value = fetch(resource)
         if not value:

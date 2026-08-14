@@ -2,21 +2,24 @@ import json
 import os
 import socket
 import time
+from pathlib import Path
 
-from .errors import DecisionLogNotDurable
-from .policy import peer_credential
+from ai.backend.cc_broker.errors import DecisionLogNotDurable, SocketNotBound
+from ai.backend.cc_broker.policy import Entry, peer_credential
 
 
 class DecisionLog:
-    def __init__(self, path, durable_root):
+    path: Path
+
+    def __init__(self, path: str, durable_root: str) -> None:
         if not path.startswith(durable_root):
             raise DecisionLogNotDurable(f"{path} is not under {durable_root}")
-        if not os.path.ismount(durable_root):
+        if not Path(durable_root).is_mount():
             raise DecisionLogNotDurable(f"{durable_root} is not a mount point")
-        os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
-        self.path = path
+        self.path = Path(path)
+        self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
 
-    def record(self, verdict, clause, unit, name):
+    def record(self, verdict: str, clause: str, unit: str, name: str) -> None:
         line = json.dumps(
             {
                 "at": time.time(),
@@ -27,41 +30,52 @@ class DecisionLog:
             },
             sort_keys=True,
         )
-        with open(self.path, "a", encoding="utf-8") as f:
+        with self.path.open("a", encoding="utf-8") as f:
             f.write(line + "\n")
             f.flush()
             os.fsync(f.fileno())
 
 
 class CredentialServer:
-    def __init__(self, path, table, store, log):
-        self.path = path
+    path: Path
+    table: dict[tuple[str, str], Entry]
+    store: dict[tuple[str, str], bytes]
+    log: DecisionLog
+    sock: socket.socket | None
+
+    def __init__(
+        self,
+        path: str,
+        table: dict[tuple[str, str], Entry],
+        store: dict[tuple[str, str], bytes],
+        log: DecisionLog,
+    ) -> None:
+        self.path = Path(path)
         self.table = table
         self.store = store
         self.log = log
         self.sock = None
 
-    def bind(self):
-        staging = self.path + ".staged"
+    def bind(self) -> None:
+        staging = self.path.with_name(self.path.name + ".staged")
         for stale in (staging, self.path):
-            try:
-                os.unlink(stale)
-            except FileNotFoundError:
-                pass
+            stale.unlink(missing_ok=True)
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.bind(staging)
-        os.chmod(staging, 0o600)
+        sock.bind(str(staging))
+        staging.chmod(0o600)
         sock.listen(64)
-        os.rename(staging, self.path)
+        staging.rename(self.path)
         self.sock = sock
 
-    def serve_forever(self):
+    def serve_forever(self) -> None:
+        if self.sock is None:
+            raise SocketNotBound(f"{self.path} has not been bound")
         while True:
             conn, _ = self.sock.accept()
             with conn:
                 self.handle(conn)
 
-    def handle(self, conn):
+    def handle(self, conn: socket.socket) -> None:
         try:
             peer = conn.getpeername()
         except OSError:

@@ -3,10 +3,12 @@ set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 TREE=$(cd "${HERE}/.." && pwd)
-REPO=$(cd "${TREE}/.." && pwd)
+REPO=$(cd "${TREE}/../../.." && pwd)
+CONFIG=$(cd "${REPO}/configs/cc/control-plane" && pwd)
+BROKER_CONFIG=$(cd "${REPO}/configs/cc/credential-broker" && pwd)
 
 set -a
-. "${HERE}/pins.env"
+. "${CONFIG}/pins.env"
 set +a
 MIRROR="${MIRROR_BASE}/${SNAPSHOT}"
 ETCD_URL="https://github.com/etcd-io/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-amd64.tar.gz"
@@ -83,19 +85,19 @@ install -d -m 0755 "$ROOT/usr/lib/backendai" "$ROOT/etc/backendai" \
 install -m 0755 "$MANAGER_PEX" "$ROOT/usr/lib/backendai/backendai-manager"
 install -m 0755 "$COORDINATOR_PEX" "$ROOT/usr/lib/backendai/backendai-appproxy-coordinator"
 install -m 0755 "$KBS_CLIENT" "$ROOT/usr/bin/kbs-client"
-cp -a "${REPO}/credential-broker/broker" "$ROOT/usr/lib/backendai/credential-broker/"
-find "$ROOT/usr/lib/backendai/credential-broker" -name __pycache__ -type d -prune -exec rm -rf {} +
-install -m 0644 "${REPO}"/credential-broker/templates/* "$ROOT/usr/share/backendai/credential-templates/"
+install -D -m 0644 -t "$ROOT/usr/lib/backendai/credential-broker/ai/backend/cc_broker" \
+    "${REPO}"/src/ai/backend/cc_broker/*.py
+install -m 0644 "${BROKER_CONFIG}"/templates/* "$ROOT/usr/share/backendai/credential-templates/"
 sed "s|^url = .*|url = \"${BACKENDAI_KBS_URL}\"|" \
-    "${REPO}/credential-broker/policy/state-bundle.toml" > "$ROOT/etc/backendai/credential-policy.toml"
+    "${BROKER_CONFIG}/policy/state-bundle.toml" > "$ROOT/etc/backendai/credential-policy.toml"
 chmod 0644 "$ROOT/etc/backendai/credential-policy.toml"
 install -m 0755 "${TREE}"/bin/* "${TREE}/bench/run-benchmarks" "$ROOT/usr/lib/backendai/"
 rm -f "$ROOT"/usr/lib/systemd/system/backendai-*.service \
       "$ROOT"/usr/lib/systemd/system/backendai-*.timer \
       "$ROOT"/etc/systemd/system/*.wants/backendai-*
-install -m 0644 "${TREE}"/units/*.service "${TREE}"/units/*.timer "${TREE}"/units/*.mount \
+install -m 0644 "${CONFIG}"/units/*.service "${CONFIG}"/units/*.timer "${CONFIG}"/units/*.mount \
     "$ROOT/usr/lib/systemd/system/"
-install -m 0644 "${TREE}/units/backendai-state.conf" "$ROOT/usr/lib/tmpfiles.d/"
+install -m 0644 "${CONFIG}/units/backendai-state.conf" "$ROOT/usr/lib/tmpfiles.d/"
 install -m 0755 "${TREE}/initramfs/module-setup.sh" "$ROOT/usr/lib/dracut/modules.d/91backendai-unlock/"
 install -m 0755 "${TREE}/initramfs/unlock-state-volume" "$ROOT/usr/lib/dracut/modules.d/91backendai-unlock/"
 install -m 0644 "${TREE}/initramfs/backendai-unlock-state.service" "$ROOT/usr/lib/dracut/modules.d/91backendai-unlock/"

@@ -50,12 +50,12 @@ emit_key() {
 	printf '\n[data]\n'
 } > "${tmp}/initdata.toml"
 
-emit_key "cdh.toml" "${BAI_CC_ROOT}/config/cdh.toml"
-emit_key "aa.toml" "${BAI_CC_ROOT}/config/aa.toml"
-emit_key "policy.rego" "${BAI_CC_ROOT}/policy/agent-policy.rego"
-emit_key "backendai.toml" "${BAI_CC_ROOT}/config/backendai.toml"
+emit_key "cdh.toml" "${BAI_CC_CONFIG}/config/cdh.toml"
+emit_key "aa.toml" "${BAI_CC_CONFIG}/config/aa.toml"
+emit_key "policy.rego" "${BAI_CC_CONFIG}/policy/agent-policy.rego"
+emit_key "backendai.toml" "${BAI_CC_CONFIG}/config/backendai.toml"
 case "${BAI_CC_BUILD_VARIANT}" in
-	*nvidia-gpu*) emit_key "gpu-policy.json" "${BAI_CC_ROOT}/config/gpu-policy.json" ;;
+	*nvidia-gpu*) emit_key "gpu-policy.json" "${BAI_CC_CONFIG}/config/gpu-policy.json" ;;
 esac
 for extra in "$@"; do
 	emit_key "$(basename "$extra")" "$extra"

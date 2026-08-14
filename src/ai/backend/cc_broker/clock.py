@@ -2,14 +2,15 @@ import base64
 import json
 import subprocess
 import time
+from collections.abc import Mapping
+from typing import Any
 
-from .errors import ClockUntrusted
+from ai.backend.cc_broker.errors import ClockUntrusted
 
 
-def claims(token):
-    if isinstance(token, bytes):
-        token = token.decode("ascii", "replace")
-    parts = token.strip().split(".")
+def claims(token: bytes | str) -> dict[str, Any]:
+    text = token.decode("ascii", "replace") if isinstance(token, bytes) else token
+    parts = text.strip().split(".")
     if len(parts) != 3:
         raise ClockUntrusted("attestation token is not a three-part JWT")
     payload = parts[1].encode("ascii")
@@ -17,7 +18,7 @@ def claims(token):
     return json.loads(body)
 
 
-def issued_at(token_claims):
+def issued_at(token_claims: Mapping[str, Any]) -> float:
     for field in ("iat", "nbf"):
         value = token_claims.get(field)
         if isinstance(value, (int, float)):
@@ -37,8 +38,8 @@ MEASUREMENTS = (
 )
 
 
-def measurements(token_claims):
-    reported = {}
+def measurements(token_claims: Mapping[str, Any]) -> dict[str, Any]:
+    reported: dict[str, Any] = {}
     for submod in (token_claims.get("submods") or {}).values():
         if not isinstance(submod, dict):
             continue
@@ -50,8 +51,8 @@ def measurements(token_claims):
     return reported
 
 
-def platform_status(token_claims):
-    reported = {}
+def platform_status(token_claims: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    reported: dict[str, dict[str, Any]] = {}
     for name, submod in (token_claims.get("submods") or {}).items():
         if not isinstance(submod, dict):
             continue
@@ -68,17 +69,20 @@ def platform_status(token_claims):
 
 
 class TrustedClock:
-    def __init__(self, bound_seconds):
+    bound: float
+    offset: float | None
+
+    def __init__(self, bound_seconds: float) -> None:
         self.bound = bound_seconds
         self.offset = None
 
-    def take(self, token_claims):
+    def take(self, token_claims: Mapping[str, Any]) -> float:
         attested = issued_at(token_claims)
         counter = time.monotonic()
         if self.offset is None:
             if abs(time.time() - attested) > self.bound:
                 subprocess.run(
-                    ["date", "-u", "-s", "@%d" % int(attested)],
+                    ["date", "-u", "-s", f"@{int(attested)}"],
                     check=True,
                     timeout=10,
                 )
@@ -86,8 +90,6 @@ class TrustedClock:
             return attested
         drift = attested - (counter + self.offset)
         if abs(drift) > self.bound:
-            raise ClockUntrusted(
-                f"attested time drifted {drift:.1f}s from the hardware counter"
-            )
+            raise ClockUntrusted(f"attested time drifted {drift:.1f}s from the hardware counter")
         self.offset = attested - counter
         return attested
