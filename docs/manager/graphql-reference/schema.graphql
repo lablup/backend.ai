@@ -1216,7 +1216,6 @@ type KeyPair implements Item {
   resource_policy: String
   created_at: DateTime
   last_used: DateTime
-  rate_limit: Int
   num_queries: Int
 
   """Added in 24.09.0."""
@@ -1229,6 +1228,7 @@ type KeyPair implements Item {
   concurrency_used: Int
   user_info: UserInfo
   concurrency_limit: Int @deprecated(reason: "Moved to KeyPairResourcePolicy object as the max_concurrent_sessions field.")
+  rate_limit: Int @deprecated(reason: "Moved to UserResourcePolicy object as the max_api_requests_per_window field. The value is still stored but no longer enforced.")
 }
 
 type VirtualFolder implements Item {

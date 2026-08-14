@@ -12752,7 +12752,8 @@
           },
           "rate_limit": {
             "default": 30000,
-            "description": "API rate limit (requests per minute).",
+            "deprecated": true,
+            "description": "Deprecated: superseded by the user resource policy field max_api_requests_per_window, which is what the rate limiter reads. This value is stored but no longer enforced.",
             "title": "Rate Limit",
             "type": "integer"
           }
@@ -12821,7 +12822,8 @@
               }
             ],
             "default": null,
-            "description": "New API rate limit.",
+            "deprecated": true,
+            "description": "Deprecated: superseded by the user resource policy field max_api_requests_per_window, which is what the rate limiter reads. This value is stored but no longer enforced.",
             "title": "Rate Limit"
           }
         },
@@ -22582,6 +22584,18 @@
             "default": null,
             "description": "Filter by max concurrent logins."
           },
+          "max_api_requests_per_window": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IntFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by max API requests per rate limit window."
+          },
           "max_quota_scope_size": {
             "anyOf": [
               {
@@ -22696,6 +22710,7 @@
           "created_at",
           "max_vfolder_count",
           "max_concurrent_logins",
+          "max_api_requests_per_window",
           "max_quota_scope_size",
           "max_session_count_per_model_session",
           "max_customized_image_count"
@@ -22845,6 +22860,20 @@
             "description": "Maximum number of concurrent authenticated login sessions per user. Null means unlimited. Must be >= 1 when set. Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.",
             "title": "Max Concurrent Logins"
           },
+          "max_api_requests_per_window": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Maximum number of API requests allowed per user within the rate limit window. Null means unlimited.",
+            "title": "Max Api Requests Per Window"
+          },
           "max_quota_scope_size": {
             "$ref": "#/components/schemas/BinarySizeInput",
             "description": "Maximum quota scope size (e.g., '1g', '536870912')."
@@ -22909,6 +22938,27 @@
             "default": 1,
             "description": "Updated maximum number of concurrent authenticated login sessions per user. Set to null to clear (unlimited). Must be >= 1 when set. Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions.",
             "title": "Max Concurrent Logins"
+          },
+          "max_api_requests_per_window": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Sentinel"
+                  }
+                ],
+                "ge": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 1,
+            "description": "Updated maximum number of API requests allowed per user within the rate limit window. Set to null to clear (unlimited).",
+            "title": "Max Api Requests Per Window"
           },
           "max_quota_scope_size": {
             "anyOf": [
