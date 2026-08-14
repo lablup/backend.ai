@@ -466,7 +466,7 @@ class TestCheckPermissionViaVirtualScope:
 
 class TestScopeMemberEnrollmentCascade:
     """Enrolling a member under a scope only cascades the scope's permissions onto the
-    member's own entities when the member is attached as a subscope."""
+    member's own entities when the member is attached as an inheriting member."""
 
     @pytest.fixture
     async def db_with_rbac_tables(
@@ -595,7 +595,7 @@ class TestScopeMemberEnrollmentCascade:
         ids: VSChainFixture,
     ) -> None:
         """A project-scope grant must not resolve onto a vfolder the member user owns:
-        joining a project makes the user a member of the project, not a subscope of it."""
+        joining a project makes the user an ordinary member, not an inheriting one."""
         project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ids.owner_scope_id)
         user_scope = ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=ids.user_id)
         await self._grant_vfolder_read_on_project(db_with_rbac_tables, ids, ids.owner_scope_id)
@@ -619,14 +619,14 @@ class TestScopeMemberEnrollmentCascade:
         )
         assert result is False
 
-    async def test_subscope_enrollment_does_cascade(
+    async def test_inheriting_enrollment_does_cascade(
         self,
         db_with_rbac_tables: ExtendedAsyncSAEngine,
         db_source: PermissionDBSource,
         ops_provider: RBACOpsProvider,
         ids: VSChainFixture,
     ) -> None:
-        """The same topology attached as a subscope does reach the user's vfolder, so
+        """The same topology attached as an inheriting member does reach the vfolder, so
         the check above fails for the intended reason and not by accident."""
         project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ids.owner_scope_id)
         user_scope = ScopeRef(scope_type=USER_SCOPE_TYPE, scope_id=ids.user_id)
@@ -635,7 +635,7 @@ class TestScopeMemberEnrollmentCascade:
         async with ops_provider.write_ops() as w:
             await w.ensure_scope(project_scope)
             await w.ensure_scope(user_scope)
-            await w.add_bulk_subscopes(
+            await w.add_bulk_inheriting_members(
                 EntityMembersAddition(
                     scope=project_scope, members=[ScopeUserMember(user_id=ids.user_id)]
                 )

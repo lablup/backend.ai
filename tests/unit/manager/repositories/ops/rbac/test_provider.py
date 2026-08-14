@@ -916,8 +916,8 @@ class TestAddBulkMembers:
         assert binding_count == 1  # the self binding from ensure_scope
 
 
-class TestAddBulkSubscopes:
-    """add_bulk_subscopes writes everything add_bulk_members does and additionally binds
+class TestAddBulkInheritingMembers:
+    """add_bulk_inheriting_members writes everything add_bulk_members does and additionally binds
     the scope into the member's own VS — never the reverse binding."""
 
     async def test_writes_membership_association_and_binding(
@@ -936,7 +936,7 @@ class TestAddBulkSubscopes:
             await w.ensure_scope(scope)
             for mid in member_ids:
                 await w.ensure_scope(ScopeRef(scope_type=_TEST_MEMBER_SCOPE_TYPE, scope_id=mid))
-            await w.add_bulk_subscopes(
+            await w.add_bulk_inheriting_members(
                 EntityMembersAddition(
                     scope=scope,
                     members=[StubMember(member_id=mid) for mid in member_ids],
@@ -1006,8 +1006,8 @@ class TestAddBulkSubscopes:
         async with provider.write_ops() as w:
             await w.ensure_scope(scope)
             await w.ensure_scope(member_scope)
-            await w.add_bulk_subscopes(addition, permission_cap=Permission.READ)
-            await w.add_bulk_subscopes(addition, permission_cap=Permission.full())
+            await w.add_bulk_inheriting_members(addition, permission_cap=Permission.READ)
+            await w.add_bulk_inheriting_members(addition, permission_cap=Permission.full())
 
         async with database_connection.begin_session_read_committed() as sess:
             scope_vs = (
@@ -1068,7 +1068,7 @@ class TestAddBulkSubscopes:
 
         with pytest.raises(VirtualScopeNotFound):
             async with provider.write_ops() as w:
-                await w.add_bulk_subscopes(
+                await w.add_bulk_inheriting_members(
                     EntityMembersAddition(
                         scope=scope,
                         members=[
@@ -1102,7 +1102,7 @@ class TestAddBulkSubscopes:
 
         async with provider.write_ops() as w:
             await w.ensure_scope(scope)
-            await w.add_bulk_subscopes(EntityMembersAddition(scope=scope, members=[]))
+            await w.add_bulk_inheriting_members(EntityMembersAddition(scope=scope, members=[]))
 
         async with database_connection.begin_session_read_committed() as sess:
             binding_count = await sess.scalar(
@@ -1123,7 +1123,7 @@ class TestRemoveBulkMembers:
         provider: RBACOpsProvider,
         entity_member_tables: None,
     ) -> None:
-        """The removed subscope loses all three rows — its own VS keeps only the self
+        """The removed member loses all three rows — its own VS keeps only the self
         binding — while the other one keeps all of them."""
         scope_id = uuid.uuid4()
         scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=scope_id)
@@ -1133,7 +1133,7 @@ class TestRemoveBulkMembers:
             await w.ensure_scope(scope)
             for mid in (removed_id, kept_id):
                 await w.ensure_scope(ScopeRef(scope_type=_TEST_MEMBER_SCOPE_TYPE, scope_id=mid))
-            await w.add_bulk_subscopes(
+            await w.add_bulk_inheriting_members(
                 EntityMembersAddition(
                     scope=scope,
                     members=[StubMember(member_id=removed_id), StubMember(member_id=kept_id)],
@@ -1462,7 +1462,7 @@ class TestScopeDeletionVirtualScopeCleanup:
             await w.create_scope(single_scope.creation)
             await w.ensure_scope(other)
             # Two-way membership leaves scope's binding and membership in other's VS.
-            await w.add_bulk_subscopes(
+            await w.add_bulk_inheriting_members(
                 EntityMembersAddition(
                     scope=scope,
                     members=[
@@ -1472,7 +1472,7 @@ class TestScopeDeletionVirtualScopeCleanup:
                     ],
                 )
             )
-            await w.add_bulk_subscopes(
+            await w.add_bulk_inheriting_members(
                 EntityMembersAddition(
                     scope=other,
                     members=[
@@ -1524,7 +1524,7 @@ class TestScopeDeletionVirtualScopeCleanup:
             await w.ensure_scope(other)
             # Two-way membership leaves each scope's binding and membership in other's VS.
             for scope in scopes:
-                await w.add_bulk_subscopes(
+                await w.add_bulk_inheriting_members(
                     EntityMembersAddition(
                         scope=scope,
                         members=[
@@ -1536,7 +1536,7 @@ class TestScopeDeletionVirtualScopeCleanup:
                         ],
                     )
                 )
-            await w.add_bulk_subscopes(
+            await w.add_bulk_inheriting_members(
                 EntityMembersAddition(
                     scope=other,
                     members=[

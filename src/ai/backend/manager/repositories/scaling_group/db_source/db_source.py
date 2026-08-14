@@ -425,7 +425,7 @@ class ScalingGroupDBSource:
         accessor_scope: ScopeRef,
         resource_group_ids: list[ResourceGroupID],
     ) -> None:
-        """Nest resource groups under ``accessor_scope`` via ``add_bulk_subscopes``:
+        """Enroll resource groups under ``accessor_scope`` as inheriting members:
         membership, the legacy scope association, and the scope's binding into each
         resource group's virtual scope. The virtual scopes are ensured first, since
         rows created before the virtual-scope rollout may not have one."""
@@ -434,7 +434,7 @@ class ScalingGroupDBSource:
         await w.ensure_scope(accessor_scope)
         for resource_group_id in resource_group_ids:
             await w.ensure_scope(self._resource_group_scope(resource_group_id))
-        await w.add_bulk_subscopes(
+        await w.add_bulk_inheriting_members(
             EntityMembersAddition(
                 scope=accessor_scope,
                 members=[

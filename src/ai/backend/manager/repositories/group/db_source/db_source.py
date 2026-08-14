@@ -162,8 +162,8 @@ class GroupDBSource:
 
         Domain/resource-policy existence and name-uniqueness are enforced by the group
         row's DB constraints, mapped to domain errors via the spec's
-        integrity_error_checks. The new project is nested under its domain scope, so
-        domain-scoped permissions reach the project's entities.
+        integrity_error_checks. The new project joins its domain scope as an inheriting
+        member, so domain-scoped permissions reach the project's entities.
         """
         spec = cast(GroupCreatorSpec, creator.spec)
         async with self._rbac_ops_provider.write_ops() as w:
@@ -172,7 +172,7 @@ class GroupDBSource:
             domain_scope = ScopeRef(scope_type=DOMAIN_SCOPE_TYPE, scope_id=domain_id)
             data = (await w.create_scope(creation)).row.to_data()
             await w.ensure_scope(domain_scope)
-            await w.add_bulk_subscopes(
+            await w.add_bulk_inheriting_members(
                 EntityMembersAddition(
                     scope=domain_scope,
                     members=[

@@ -395,7 +395,7 @@ class ContainerRegistryRepository:
         scope reach the registry's own entities."""
         project_scope = ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id)
         await ops.ensure_scope(project_scope)
-        await ops.add_bulk_subscopes(
+        await ops.add_bulk_inheriting_members(
             EntityMembersAddition(
                 scope=project_scope,
                 members=[

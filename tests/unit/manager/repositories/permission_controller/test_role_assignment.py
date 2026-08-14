@@ -377,7 +377,7 @@ class TestRoleAssignment:
         test_project: uuid.UUID,
     ) -> None:
         """Joining a project leaves the user's own virtual scope unbound: the user is a
-        member of the project, not a subscope of it, so project-scoped permissions never
+        ordinary member of the project, not an inheriting one, so project permissions never
         reach the entities the user owns."""
         await group_db_source.bind_user_to_project(UserID(user_1), ProjectID(test_project))
 
