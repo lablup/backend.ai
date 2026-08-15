@@ -23,8 +23,6 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import (
     Mapped,
     contains_eager,
-    foreign,
-    joinedload,
     load_only,
     mapped_column,
     noload,
@@ -115,7 +113,7 @@ from ai.backend.manager.models.utils import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.user import UserRow
+    pass
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -348,13 +346,6 @@ ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE: Mapping[SessionTypes, tuple[str, ...]] = {
 }
 
 
-# Defined for avoiding circular import
-def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
-    from ai.backend.manager.models.user import UserRow
-
-    return UserRow.uuid == foreign(SessionRow.user_uuid)
-
-
 class SessionRow(CreatedAtMixin, Base):
     __tablename__ = "sessions"
     id: Mapped[SessionId] = mapped_column(
@@ -474,16 +465,9 @@ class SessionRow(CreatedAtMixin, Base):
     group_id: Mapped[UUID] = mapped_column(
         "group_id", GUID, sa.ForeignKey("groups.id"), nullable=False
     )
-    group: Mapped[GroupRow] = relationship("GroupRow")
     user_uuid: Mapped[UUID] = mapped_column(
         "user_uuid", GUID, server_default=sa.text("uuid_generate_v4()"), nullable=False
     )
-    user: Mapped[UserRow] = relationship(
-        "UserRow",
-        primaryjoin=_get_user_row_join_condition,
-        foreign_keys=[user_uuid],
-    )
-
     access_key: Mapped[str | None] = mapped_column("access_key", sa.String(length=20))
 
     # `images` stores canonical image name strings for historical audit.
@@ -663,14 +647,6 @@ class SessionRow(CreatedAtMixin, Base):
     @classmethod
     def kernel_load_option(cls, already_joined: bool = False) -> _AbstractLoad:
         return selectinload(cls.kernels) if not already_joined else contains_eager(cls.kernels)
-
-    @classmethod
-    def user_load_option(cls, already_joined: bool = False) -> _AbstractLoad:
-        return joinedload(cls.user) if not already_joined else contains_eager(cls.user)
-
-    @classmethod
-    def project_load_option(cls, already_joined: bool = False) -> _AbstractLoad:
-        return joinedload(cls.group) if not already_joined else contains_eager(cls.group)
 
     @classmethod
     def from_dataclass(cls, session_data: SessionData) -> SessionRow:
@@ -1048,7 +1024,6 @@ class SessionRow(CreatedAtMixin, Base):
                     noload("*"),
                     selectinload(kernel_rel).options(noload("*")),
                 ])
-        _eager_loading_op.append(joinedload(SessionRow.user))
 
         session_list = await cls.match_sessions(
             db_session,

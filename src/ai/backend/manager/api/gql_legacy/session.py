@@ -20,7 +20,7 @@ import trafaret as t
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import selectinload
 
 from ai.backend.common import validators as tx
 from ai.backend.common.defs.session import SESSION_PRIORITY_MAX, SESSION_PRIORITY_MIN
@@ -67,7 +67,6 @@ from ai.backend.manager.models.session import (
 from ai.backend.manager.models.types import (
     QueryCondition,
     QueryOption,
-    join_by_related_field,
     load_related_field,
 )
 from ai.backend.manager.models.user import UserRole, UserRow
@@ -194,6 +193,13 @@ class SessionPermissionValueField(graphene.Scalar):  # type: ignore[misc]
         return ComputeSessionPermission(value)
 
 
+def _join_owner_rows(stmt: sa.sql.Select[Any]) -> sa.sql.Select[Any]:
+    """Join the owning user and project so their columns are filterable/orderable."""
+    return stmt.join(UserRow, SessionRow.user_uuid == UserRow.uuid).join(
+        GroupRow, SessionRow.group_id == GroupRow.id
+    )
+
+
 class _HasVFID(Protocol):
     vfid: VFolderID
 
@@ -310,7 +316,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             stmt = (
                 sa.select(SessionRow)
                 .where(SessionRow.id == uuid.UUID(raw_session_id))
-                .options(selectinload(SessionRow.kernels), joinedload(SessionRow.user))
+                .options(selectinload(SessionRow.kernels))
             )
             query_result = await db_session.scalar(stmt)
             if query_result is None:
@@ -322,20 +328,20 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
     def _add_basic_options_to_query(
         cls, stmt: sa.sql.Select[Any], is_count: bool = False
     ) -> sa.sql.Select[Any]:
-        options = [
-            join_by_related_field(SessionRow.user),
-            join_by_related_field(SessionRow.group),
-        ]
+        # The user and project joins back the `full_name`/`user_email`/`group_name` filters.
+        stmt = _join_owner_rows(stmt)
         if not is_count:
-            options = [
-                *options,
-                load_related_field(SessionRow.kernel_load_option()),
-                load_related_field(SessionRow.user_load_option(already_joined=True)),
-                load_related_field(SessionRow.project_load_option(already_joined=True)),
-            ]
-        for option in options:
-            stmt = option(stmt)
+            stmt = stmt.options(SessionRow.kernel_load_option())
         return stmt
+
+    async def resolve_owner(self, info: graphene.ResolveInfo) -> UserNode | None:
+        if self.user_id is None:
+            return None
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader_by_func(
+            graph_ctx, UserNode.batch_load_by_uuids
+        )
+        return cast(UserNode | None, await loader.load(self.user_id))
 
     async def resolve_queue_position(self, info: graphene.ResolveInfo) -> int | None:
         if self.status != SessionStatus.PENDING:
@@ -377,7 +383,6 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             project_id=row.group_id,
             user_id=row.user_uuid,
             access_key=row.access_key,
-            owner=UserNode.from_row(ctx, row.user),
             # status
             status=row.status.name,
             # status_changed=row.status_changed,  # FIXME: generated attribute
@@ -592,13 +597,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             query = sa.select(dependency_cte.c.id)
             session_ids = (await db_sess.execute(query)).scalars().all()
             # Get the session rows in the graph
-            query = (
-                sa.select(SessionRow)
-                .where(SessionRow.id.in_(session_ids))
-                .options(
-                    selectinload(SessionRow.user),
-                )
-            )
+            query = sa.select(SessionRow).where(SessionRow.id.in_(session_ids))
             session_rows = list((await db_sess.execute(query)).scalars().all())
             await batch_populate_session_occupied_slots(db_sess, session_rows)
 
@@ -653,7 +652,6 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
                 .where(SessionRow.id.in_(dependent_ids))
                 .options(
                     selectinload(SessionRow.kernels.and_(KernelRow.cluster_role == DEFAULT_ROLE)),
-                    joinedload(SessionRow.user),
                 )
             )
             rows = list((await db_sess.execute(sess_query)).unique().scalars().all())
@@ -698,7 +696,6 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
                 .where(SessionRow.id.in_(dependee_ids))
                 .options(
                     selectinload(SessionRow.kernels.and_(KernelRow.cluster_role == DEFAULT_ROLE)),
-                    joinedload(SessionRow.user),
                 )
             )
             rows = list((await db_sess.execute(sess_query)).unique().scalars().all())
@@ -848,8 +845,7 @@ class TotalResourceSlot(graphene.ObjectType):  # type: ignore[misc]
             query_conditions.append(by_resource_group_name(resource_group_name))
         query_options: list[QueryOption] = [
             load_related_field(SessionRow.kernel_load_option()),
-            join_by_related_field(SessionRow.user),
-            join_by_related_field(SessionRow.group),
+            _join_owner_rows,
         ]
         session_rows = await SessionRow.list_session_by_condition(
             query_conditions, query_options, db=ctx.db

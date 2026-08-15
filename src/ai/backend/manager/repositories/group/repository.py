@@ -22,7 +22,7 @@ from ai.backend.manager.data.group.types import GroupData, UnassignUsersResult
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import InvalidUserUpdateMode
 from ai.backend.manager.models.group.row import GroupRow
-from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.resource_usage import ResourceUsageRecord
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.querier import BatchQuerier
@@ -116,7 +116,7 @@ class GroupRepository:
         start_date: datetime,
         end_date: datetime,
         project_ids: Sequence[UUID] | None = None,
-    ) -> list[KernelRow]:
+    ) -> list[ResourceUsageRecord]:
         """Fetch resource usage data for projects."""
         return await self._db_source.fetch_project_resource_usage(start_date, end_date, project_ids)
 

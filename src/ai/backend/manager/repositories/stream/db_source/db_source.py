@@ -1,7 +1,7 @@
 import uuid
 
 import sqlalchemy as sa
-from sqlalchemy.orm import joinedload, noload, selectinload
+from sqlalchemy.orm import noload, selectinload
 
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.kernel import SessionNotFound, TooManySessionsMatched
@@ -31,7 +31,6 @@ class StreamDBSource:
                 .options(
                     noload("*"),
                     selectinload(SessionRow.kernels).options(noload("*")),
-                    joinedload(SessionRow.user),
                 )
                 .execution_options(populate_existing=True)
             )

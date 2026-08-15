@@ -17,7 +17,7 @@ from graphql import GraphQLError, OperationType, Undefined
 from graphql.type import GraphQLField, get_named_type, is_leaf_type
 from opentelemetry import trace
 from opentelemetry.trace import StatusCode
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import selectinload
 
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
@@ -2615,7 +2615,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             stmt = (
                 sa.select(SessionRow)
                 .where(SessionRow.id.in_(pending_sessions))
-                .options(selectinload(SessionRow.kernels), joinedload(SessionRow.user))
+                .options(selectinload(SessionRow.kernels))
             )
             query_result = await db_session.scalars(stmt)
             for row in query_result:

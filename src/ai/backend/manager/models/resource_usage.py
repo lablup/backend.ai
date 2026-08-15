@@ -10,7 +10,7 @@ from uuid import UUID
 import attrs
 import msgpack
 import sqlalchemy as sa
-from sqlalchemy.orm import joinedload, load_only
+from sqlalchemy.orm import Load
 from sqlalchemy.sql.elements import ColumnElement
 
 from ai.backend.common.types import SlotName
@@ -30,6 +30,7 @@ __all__: Sequence[str] = (
     "BaseResourceUsageGroup",
     "ResourceGroupUnit",
     "ResourceUsage",
+    "ResourceUsageRecord",
     "fetch_resource_usage",
     "parse_resource_usage",
     "parse_resource_usage_groups",
@@ -42,6 +43,17 @@ class ResourceGroupUnit(StrEnum):
     PROJECT = "project"
     DOMAIN = "domain"
     TOTAL = "total"
+
+
+@attrs.define(slots=True, kw_only=True)
+class ResourceUsageRecord:
+    """A kernel joined with the session, project and user attributes its usage report needs."""
+
+    kernel: KernelRow
+    session: SessionRow
+    project: GroupRow
+    user_email: str | None
+    user_full_name: str | None
 
 
 @attrs.define(slots=True)
@@ -493,12 +505,12 @@ def parse_resource_usage(
 
 
 async def parse_resource_usage_groups(
-    kernels: list[KernelRow],
+    records: list[ResourceUsageRecord],
     valkey_stat_client: ValkeyStatClient,
     local_tz: tzinfo,
 ) -> list[BaseResourceUsageGroup]:
-    stat_map = {k.id: k.last_stat for k in kernels}
-    stat_empty_kerns = [k.id for k in kernels if not k.last_stat]
+    stat_map = {r.kernel.id: r.kernel.last_stat for r in records}
+    stat_empty_kerns = [r.kernel.id for r in records if not r.kernel.last_stat]
 
     kernel_ids_str = [str(kern_id) for kern_id in stat_empty_kerns]
     raw_stats = await valkey_stat_client.get_user_kernel_statistics_batch(kernel_ids_str)
@@ -509,40 +521,40 @@ async def parse_resource_usage_groups(
 
     return [
         BaseResourceUsageGroup(
-            kernel_row=kern,
-            project_row=kern.session.group,
-            session_row=kern.session,
-            created_at=kern.created_at,
-            terminated_at=kern.terminated_at,
+            kernel_row=record.kernel,
+            project_row=record.project,
+            session_row=record.session,
+            created_at=record.kernel.created_at,
+            terminated_at=record.kernel.terminated_at,
             scheduled_at=(
-                kern.status_history.get(KernelStatus.SCHEDULED.name)
-                if kern.status_history
+                record.kernel.status_history.get(KernelStatus.SCHEDULED.name)
+                if record.kernel.status_history
                 else None
             ),
-            used_time=kern.used_time,
-            used_days=kern.get_used_days(local_tz),
-            last_stat=stat_map.get(kern.id),
-            user_id=kern.session.user_uuid,
-            user_email=kern.session.user.email if kern.session.user is not None else None,
-            access_key=kern.session.access_key,
-            project_id=kern.session.group.id if kern.session.group is not None else None,
-            project_name=kern.session.group.name if kern.session.group is not None else None,
-            kernel_id=kern.id,
-            container_ids={kern.container_id} if kern.container_id else set(),
-            session_id=kern.session_id,
-            session_name=kern.session.name,
-            domain_name=kern.session.domain_name,
-            full_name=kern.session.user.full_name if kern.session.user is not None else None,
-            images={kern.image} if kern.image else set(),
-            agents={kern.agent} if kern.agent else set(),
-            status=kern.status.name,
-            status_history=kern.status_history,
-            cluster_mode=kern.cluster_mode,
-            status_info=kern.status_info,
+            used_time=record.kernel.used_time,
+            used_days=record.kernel.get_used_days(local_tz),
+            last_stat=stat_map.get(record.kernel.id),
+            user_id=record.session.user_uuid,
+            user_email=record.user_email,
+            access_key=record.session.access_key,
+            project_id=record.project.id,
+            project_name=record.project.name,
+            kernel_id=record.kernel.id,
+            container_ids={record.kernel.container_id} if record.kernel.container_id else set(),
+            session_id=record.kernel.session_id,
+            session_name=record.session.name,
+            domain_name=record.session.domain_name,
+            full_name=record.user_full_name,
+            images={record.kernel.image} if record.kernel.image else set(),
+            agents={record.kernel.agent} if record.kernel.agent else set(),
+            status=record.kernel.status.name,
+            status_history=record.kernel.status_history,
+            cluster_mode=record.kernel.cluster_mode,
+            status_info=record.kernel.status_info,
             group_unit=ResourceGroupUnit.KERNEL,
-            total_usage=parse_resource_usage(kern, stat_map.get(kern.id)),
+            total_usage=parse_resource_usage(record.kernel, stat_map.get(record.kernel.id)),
         )
-        for kern in kernels
+        for record in records
     ]
 
 
@@ -594,25 +606,25 @@ def _parse_query(
     session_cond: ColumnElement[bool] | None = None,
     project_cond: ColumnElement[bool] | None = None,
 ) -> sa.sql.Select[Any]:
-    session_load = joinedload(KernelRow.session)
-    if session_cond is not None:
-        session_load = joinedload(KernelRow.session.and_(session_cond))
-
-    project_load = joinedload(SessionRow.group)
-    if project_cond is not None:
-        project_load = joinedload(SessionRow.group.and_(project_cond))
-    query = sa.select(KernelRow).options(
-        load_only(*KERNEL_RESOURCE_SELECT_COLS),
-        session_load.options(
-            load_only(*SESSION_RESOURCE_SELECT_COLS),
-            joinedload(SessionRow.user).options(
-                load_only(UserRow.email, UserRow.username, UserRow.full_name)
-            ),
-            project_load.options(load_only(*PROJECT_RESOURCE_SELECT_COLS)),
-        ),
+    query = (
+        sa.select(KernelRow, SessionRow, GroupRow, UserRow.email, UserRow.full_name)
+        .select_from(KernelRow)
+        .join(SessionRow, KernelRow.session_id == SessionRow.id)
+        .join(GroupRow, SessionRow.group_id == GroupRow.id)
+        # Sessions of a purged user keep their user_uuid, so the user side may be missing.
+        .outerjoin(UserRow, SessionRow.user_uuid == UserRow.uuid)
+        .options(
+            Load(KernelRow).load_only(*KERNEL_RESOURCE_SELECT_COLS),
+            Load(SessionRow).load_only(*SESSION_RESOURCE_SELECT_COLS),
+            Load(GroupRow).load_only(*PROJECT_RESOURCE_SELECT_COLS),
+        )
     )
     if kernel_cond is not None:
         query = query.where(kernel_cond)
+    if session_cond is not None:
+        query = query.where(session_cond)
+    if project_cond is not None:
+        query = query.where(project_cond)
     return query
 
 
@@ -622,7 +634,7 @@ async def fetch_resource_usage(
     end_date: datetime,
     session_ids: Sequence[UUID] | None = None,
     project_ids: Sequence[UUID] | None = None,
-) -> list[KernelRow]:
+) -> list[ResourceUsageRecord]:
     project_cond = None
     if project_ids:
         project_cond = GroupRow.id.in_(project_ids)
@@ -646,4 +658,13 @@ async def fetch_resource_usage(
     )
     async with db_engine.begin_readonly_session() as db_sess:
         result = await db_sess.execute(query)
-        return list(result.scalars().all())
+        return [
+            ResourceUsageRecord(
+                kernel=row.KernelRow,
+                session=row.SessionRow,
+                project=row.GroupRow,
+                user_email=row.email,
+                user_full_name=row.full_name,
+            )
+            for row in result.all()
+        ]
