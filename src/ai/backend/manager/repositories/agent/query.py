@@ -1,13 +1,39 @@
 from collections.abc import Collection
 
 import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.common.types import AgentId
+from ai.backend.common.types import AgentId, ResourceSlot
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import make_string_in_factory
+from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
+
+
+async def fetch_actual_occupied_slots(
+    db_session: SASession,
+    agent_ids: Collection[AgentId],
+) -> dict[AgentId, ResourceSlot]:
+    """Load per-agent occupied slots from ``agent_resources``, keyed in slot type rank order."""
+    occupied: dict[AgentId, ResourceSlot] = {
+        AgentId(agent_id): ResourceSlot() for agent_id in agent_ids
+    }
+    if not occupied:
+        return occupied
+    stmt = (
+        sa.select(AgentResourceRow.agent_id, AgentResourceRow.slot_name, AgentResourceRow.used)
+        .join(
+            ResourceSlotTypeRow,
+            AgentResourceRow.slot_name == ResourceSlotTypeRow.slot_name,
+        )
+        .where(AgentResourceRow.agent_id.in_(occupied.keys()))
+        .order_by(ResourceSlotTypeRow.rank)
+    )
+    for row in await db_session.execute(stmt):
+        occupied[AgentId(row.agent_id)][row.slot_name] = row.used
+    return occupied
 
 
 class QueryConditions:

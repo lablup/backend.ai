@@ -46,10 +46,13 @@ from ai.backend.manager.models.rbac import (
     ScopeType,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.user import UserRole, users
-from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
+from ai.backend.manager.repositories.agent.query import (
+    QueryConditions,
+    QueryOrders,
+    fetch_actual_occupied_slots,
+)
 from ai.backend.manager.services.agent.actions.update_resource_group import (
     UpdateAgentResourceGroupAction,
 )
@@ -783,11 +786,6 @@ class AgentSummary(graphene.ObjectType):  # type: ignore[misc]
         query = (
             sa.select(AgentRow)
             .where(AgentRow.id.in_(agent_ids))
-            .options(
-                sa.orm.selectinload(AgentRow.agent_resource_rows).joinedload(
-                    AgentResourceRow.slot_type_row
-                )
-            )
             .order_by(
                 AgentRow.id,
             )
@@ -800,7 +798,13 @@ class AgentSummary(graphene.ObjectType):  # type: ignore[misc]
         async with graph_ctx.db.begin_readonly_session() as session:
             result = await session.scalars(query)
             agent_list = result.unique().all()
-            return [cls.from_data(agent.to_data()) for agent in agent_list]
+            occupied_slots = await fetch_actual_occupied_slots(
+                session, [AgentId(agent.id) for agent in agent_list]
+            )
+            return [
+                cls.from_data(agent.to_data(occupied_slots[AgentId(agent.id)]))
+                for agent in agent_list
+            ]
 
     @classmethod
     async def load_count(

@@ -31,6 +31,7 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.agent.query import fetch_actual_occupied_slots
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
 from ai.backend.manager.repositories.base import BulkUpserter, execute_bulk_upserter
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
@@ -85,18 +86,13 @@ class AgentDBSource:
     async def get_by_id(self, agent_id: AgentId) -> AgentData:
         async with self._db.begin_readonly_session_read_committed() as db_session:
             agent_row: AgentRow | None = await db_session.scalar(
-                sa.select(AgentRow)
-                .where(AgentRow.id == agent_id)
-                .options(
-                    selectinload(AgentRow.agent_resource_rows).joinedload(
-                        AgentResourceRow.slot_type_row
-                    )
-                )
+                sa.select(AgentRow).where(AgentRow.id == agent_id)
             )
             if agent_row is None:
                 log.error("Agent with id {} not found", agent_id)
                 raise AgentNotFound(f"Agent with id {agent_id} not found")
-            return agent_row.to_data()
+            occupied_slots = await fetch_actual_occupied_slots(db_session, [agent_id])
+            return agent_row.to_data(occupied_slots[agent_id])
 
     async def upsert_agent_with_state(self, upsert_data: AgentHeartbeatUpsert) -> UpsertResult:
         async with self._db.begin_session_read_committed() as session:
@@ -260,11 +256,7 @@ class AgentDBSource:
         """Searches agents with total count."""
 
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(AgentRow).options(
-                selectinload(AgentRow.agent_resource_rows).joinedload(
-                    AgentResourceRow.slot_type_row
-                ),
-            )
+            query = sa.select(AgentRow)
 
             result = await execute_batch_querier(
                 db_sess,
@@ -272,7 +264,12 @@ class AgentDBSource:
                 querier,
             )
             agent_rows: list[AgentRow] = [row.AgentRow for row in result.rows]
-            items = [agent_row.to_data() for agent_row in agent_rows]
+            occupied_slots = await fetch_actual_occupied_slots(
+                db_sess, [AgentId(row.id) for row in agent_rows]
+            )
+            items = [
+                agent_row.to_data(occupied_slots[AgentId(agent_row.id)]) for agent_row in agent_rows
+            ]
             admin_permissions = list(ADMIN_AGENT_PERMISSIONS)
             agents_with_permissions = [
                 AgentDetailData(agent=agent_data, permissions=admin_permissions)

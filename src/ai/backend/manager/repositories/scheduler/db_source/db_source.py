@@ -626,9 +626,7 @@ class ScheduleDBSource:
         from the normalized ``agent_resources`` table."""
         agent_rows = (
             await db_sess.scalars(
-                sa.select(AgentRow)
-                .options(selectinload(AgentRow.agent_resource_rows))
-                .where(
+                sa.select(AgentRow).where(
                     sa.and_(
                         AgentRow.status == AgentStatus.ALIVE,
                         AgentRow.resource_group_id == resource_group_id,
@@ -638,19 +636,14 @@ class ScheduleDBSource:
             )
         ).all()
         container_counts = await self._fetch_agent_container_counts(db_sess, resource_group_id)
+        slots_by_agent = await self._fetch_agent_slot_resources(
+            db_sess, [AgentId(agent_row.id) for agent_row in agent_rows]
+        )
 
         agents = []
         for agent_row in agent_rows:
-            slots = {
-                ResourceSlotName(ar.slot_name): SlotResource(
-                    capacity=ar.capacity,
-                    # Advance reservations occupy capacity for scheduling
-                    reserved=ar.reserved + ar.prereserved,
-                    used=ar.used,
-                )
-                for ar in agent_row.agent_resource_rows
-            }
             agent_id = AgentId(agent_row.id)
+            slots = slots_by_agent.get(agent_id, {})
             agents.append(
                 AgentMeta(
                     id=agent_id,
@@ -661,6 +654,27 @@ class ScheduleDBSource:
                 )
             )
         return agents
+
+    async def _fetch_agent_slot_resources(
+        self, db_sess: SASession, agent_ids: Sequence[AgentId]
+    ) -> dict[AgentId, dict[ResourceSlotName, SlotResource]]:
+        """Load per-agent, per-slot capacity/reserved/used from ``agent_resources``."""
+        if not agent_ids:
+            return {}
+        rows = (
+            await db_sess.scalars(
+                sa.select(AgentResourceRow).where(AgentResourceRow.agent_id.in_(agent_ids))
+            )
+        ).all()
+        slots_by_agent: dict[AgentId, dict[ResourceSlotName, SlotResource]] = defaultdict(dict)
+        for ar in rows:
+            slots_by_agent[AgentId(ar.agent_id)][ResourceSlotName(ar.slot_name)] = SlotResource(
+                capacity=ar.capacity,
+                # Advance reservations occupy capacity for scheduling
+                reserved=ar.reserved + ar.prereserved,
+                used=ar.used,
+            )
+        return dict(slots_by_agent)
 
     async def _fetch_agent_container_counts(
         self, db_sess: SASession, resource_group_id: ResourceGroupID
