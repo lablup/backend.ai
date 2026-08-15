@@ -37,6 +37,7 @@ from ai.backend.manager.errors.kernel import (
     SessionNotFound,
     TooManySessionsMatched,
 )
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.image import ImageRow
@@ -165,6 +166,13 @@ class SessionDBSource:
                 kernel_loading_strategy=kernel_loading_strategy,
                 allow_stale=allow_stale,
                 eager_loading_op=list(eager_loading_op) if eager_loading_op else None,
+            )
+
+    async def get_agent_public_host(self, agent_id: AgentId) -> str | None:
+        """Look up the public host of an agent, or None when the agent is unknown."""
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            return await db_sess.scalar(
+                sa.select(AgentRow.public_host).where(AgentRow.id == agent_id)
             )
 
     async def match_sessions(
@@ -579,10 +587,7 @@ class SessionDBSource:
                 noload("*"),
                 selectinload(
                     SessionRow.kernels.and_(KernelRow.cluster_role == DEFAULT_ROLE)
-                ).options(
-                    noload("*"),
-                    selectinload(KernelRow.agent_row).noload("*"),
-                ),
+                ).options(noload("*")),
                 joinedload(SessionRow.user),
             )
         )

@@ -286,8 +286,7 @@ def _make_mock_session(
     session.main_kernel.id = kernel_id
     session.main_kernel.status = MagicMock()
     session.main_kernel.status.name = "RUNNING"
-    session.main_kernel.agent_row = MagicMock()
-    session.main_kernel.agent_row.public_host = "10.0.0.1"
+    session.main_kernel.agent = "i-agent01"
     session.main_kernel.agent_addr = "tcp://10.0.0.1:6001"
     session.main_kernel.kernel_host = "10.0.0.1"
     session.main_kernel.service_ports = [
@@ -1784,6 +1783,7 @@ class TestGetDirectAccessInfo:
             session_type=SessionTypes.SYSTEM,
         )
         mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
+        mock_session_repository.get_agent_public_host = AsyncMock(return_value="10.0.0.1")
 
         action = GetDirectAccessInfoAction(
             session_name="system-session",
@@ -1823,7 +1823,7 @@ class TestGetDirectAccessInfo:
 
         assert result.result == {}
 
-    async def test_agent_row_none_raises_kernel_not_ready(
+    async def test_unassigned_agent_raises_kernel_not_ready(
         self,
         session_service: SessionService,
         mock_session_repository: MagicMock,
@@ -1841,7 +1841,7 @@ class TestGetDirectAccessInfo:
             sample_kernel_id,
             session_type=SessionTypes.SYSTEM,
         )
-        mock_session.main_kernel.agent_row = None
+        mock_session.main_kernel.agent = None
         mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
 
         action = GetDirectAccessInfoAction(

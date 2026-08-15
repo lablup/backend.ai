@@ -15,11 +15,9 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import (
     Mapped,
-    foreign,
     mapped_column,
     noload,
     relationship,
-    selectinload,
 )
 
 from ai.backend.common.identifier.image import ImageID
@@ -52,11 +50,7 @@ from ai.backend.manager.data.kernel.types import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.agent import AgentRow
-    from ai.backend.manager.models.group import GroupRow
-    from ai.backend.manager.models.image import ImageRow
     from ai.backend.manager.models.session import SessionRow
-    from ai.backend.manager.models.user import UserRow
 
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.kernel import SessionNotFound
@@ -129,13 +123,6 @@ LIVE_STATUS = (KernelStatus.RUNNING,)
 def default_hostname(context: Any) -> str:
     params = context.get_current_parameters()
     return f"{params['cluster_role']}{params['cluster_idx']}"
-
-
-# Defined for avoiding circular import
-def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
-    from ai.backend.manager.models.user import UserRow
-
-    return UserRow.uuid == foreign(KernelRow.user_uuid)
 
 
 class KernelRow(CreatedAtMixin, Base):
@@ -431,17 +418,6 @@ class KernelRow(CreatedAtMixin, Base):
     )
 
     session: Mapped[SessionRow] = relationship("SessionRow", back_populates="kernels")
-    image_row: Mapped[ImageRow | None] = relationship(
-        "ImageRow",
-        foreign_keys="KernelRow.image_id",
-    )
-    agent_row: Mapped[AgentRow | None] = relationship("AgentRow")
-    group_row: Mapped[GroupRow] = relationship("GroupRow")
-    user_row: Mapped[UserRow] = relationship(
-        "UserRow",
-        primaryjoin=_get_user_row_join_condition,
-        foreign_keys="KernelRow.user_uuid",
-    )
 
     @property
     def used_time(self) -> str | None:
@@ -473,28 +449,18 @@ class KernelRow(CreatedAtMixin, Base):
     async def get_kernel(
         db: ExtendedAsyncSAEngine, kern_id: uuid.UUID, allow_stale: bool = False
     ) -> KernelRow:
-        from ai.backend.manager.models.agent import AgentStatus
+        from ai.backend.manager.models.agent import AgentRow, AgentStatus
 
         async def _query() -> KernelRow:
             async with db.begin_readonly_session() as db_sess:
-                query = (
-                    sa.select(KernelRow)
-                    .where(KernelRow.id == kern_id)
-                    .options(
-                        noload("*"),
-                        selectinload(KernelRow.agent_row).options(noload("*")),
-                    )
-                )
-                result = (await db_sess.execute(query)).scalars().all()
-
-                cand = result
+                query = sa.select(KernelRow).where(KernelRow.id == kern_id).options(noload("*"))
                 if not allow_stale:
-                    cand = [
-                        k
-                        for k in result
-                        if (k.status not in DEAD_KERNEL_STATUSES)
-                        and (k.agent_row is not None and k.agent_row.status == AgentStatus.ALIVE)
-                    ]
+                    # An inner join drops kernels with no agent assigned yet.
+                    query = query.join(AgentRow, KernelRow.agent == AgentRow.id).where(
+                        KernelRow.status.not_in(DEAD_KERNEL_STATUSES),
+                        AgentRow.status == AgentStatus.ALIVE,
+                    )
+                cand = (await db_sess.execute(query)).scalars().all()
                 if not cand:
                     raise SessionNotFound
                 return cand[0]

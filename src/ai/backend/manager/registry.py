@@ -1456,10 +1456,7 @@ class AgentRegistry:
                     session_id,
                     eager_loading_op=(
                         noload("*"),
-                        selectinload(SessionRow.kernels).options(
-                            noload("*"),
-                            selectinload(KernelRow.agent_row).noload("*"),
-                        ),
+                        selectinload(SessionRow.kernels).options(noload("*")),
                     ),
                 )
                 network_ref_name = await sess.get_network_ref(db_sess)

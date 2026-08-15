@@ -5,7 +5,6 @@ from sqlalchemy.orm import joinedload, noload, selectinload
 
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.kernel import SessionNotFound, TooManySessionsMatched
-from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -31,10 +30,7 @@ class StreamDBSource:
                 )
                 .options(
                     noload("*"),
-                    selectinload(SessionRow.kernels).options(
-                        noload("*"),
-                        selectinload(KernelRow.agent_row).noload("*"),
-                    ),
+                    selectinload(SessionRow.kernels).options(noload("*")),
                     joinedload(SessionRow.user),
                 )
                 .execution_options(populate_existing=True)

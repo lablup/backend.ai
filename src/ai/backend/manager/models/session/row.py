@@ -1039,20 +1039,14 @@ class SessionRow(CreatedAtMixin, Base):
             case KernelLoadingStrategy.ALL_KERNELS:
                 _eager_loading_op.extend([
                     noload("*"),
-                    selectinload(SessionRow.kernels).options(
-                        noload("*"),
-                        selectinload(KernelRow.agent_row).noload("*"),
-                    ),
+                    selectinload(SessionRow.kernels).options(noload("*")),
                 ])
             case KernelLoadingStrategy.MAIN_KERNEL_ONLY:
                 kernel_rel = SessionRow.kernels
                 kernel_rel.and_(KernelRow.cluster_role == DEFAULT_ROLE)
                 _eager_loading_op.extend([
                     noload("*"),
-                    selectinload(kernel_rel).options(
-                        noload("*"),
-                        selectinload(KernelRow.agent_row).noload("*"),
-                    ),
+                    selectinload(kernel_rel).options(noload("*")),
                 ])
         _eager_loading_op.append(joinedload(SessionRow.user))
 
@@ -1097,20 +1091,14 @@ class SessionRow(CreatedAtMixin, Base):
             case KernelLoadingStrategy.ALL_KERNELS:
                 _eager_loading_op.extend([
                     noload("*"),
-                    selectinload(SessionRow.kernels).options(
-                        noload("*"),
-                        selectinload(KernelRow.agent_row).noload("*"),
-                    ),
+                    selectinload(SessionRow.kernels).options(noload("*")),
                 ])
             case KernelLoadingStrategy.MAIN_KERNEL_ONLY:
                 kernel_rel = SessionRow.kernels
                 kernel_rel.and_(KernelRow.cluster_role == DEFAULT_ROLE)
                 _eager_loading_op.extend([
                     noload("*"),
-                    selectinload(kernel_rel).options(
-                        noload("*"),
-                        selectinload(KernelRow.agent_row).noload("*"),
-                    ),
+                    selectinload(kernel_rel).options(noload("*")),
                 ])
 
         session_list = await cls.match_sessions(

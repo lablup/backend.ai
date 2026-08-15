@@ -1181,11 +1181,12 @@ class SessionService:
         resp = {}
         sess_type = sess.session_type
         if sess_type in PRIVATE_SESSION_TYPES:
-            if sess.main_kernel.agent_row is None:
+            agent_id = sess.main_kernel.agent
+            if agent_id is None:
                 raise KernelNotReady(
                     f"Kernel of the session has no agent info yet (kernel: {sess.main_kernel.id}, kernel status: {sess.main_kernel.status.name})"
                 )
-            public_host = sess.main_kernel.agent_row.public_host
+            public_host = await self._session_repository.get_agent_public_host(AgentId(agent_id))
             found_ports: dict[str, list[str]] = {}
             service_ports = sess.main_kernel.service_ports
             if service_ports is None:
