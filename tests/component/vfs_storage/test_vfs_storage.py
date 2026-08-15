@@ -262,7 +262,7 @@ class TestVFSStorageCRUD:
     ) -> None:
         """Resolve a VFS storage name into the storage it names."""
         action = ResolveVFSStorageByNameAction(name=target_vfs_storage["name"])
-        result = await vfs_storage_processors.resolve_by_name.run(action)
+        result = await vfs_storage_processors.lookup.run(action)
         assert result.data.id == target_vfs_storage["id"]
         assert result.data.name == target_vfs_storage["name"]
 

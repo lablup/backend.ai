@@ -743,7 +743,7 @@ class ServiceHandler:
         Uses the dedicated ``resolve_by_name`` processor added for the
         legacy → id migration; v2 surface callers skip this step.
         """
-        result = await self._runtime_variant.resolve_by_name.run(
+        result = await self._runtime_variant.lookup.run(
             ResolveRuntimeVariantByNameAction(name=str(name))
         )
         return result.data.id

@@ -98,7 +98,7 @@ class VFSStorageHandler:
 
         log.info("Download request for file: {} from storage: {}", filepath, storage_name)
 
-        action_result = await self._vfs_storage.resolve_by_name.run(
+        action_result = await self._vfs_storage.lookup.run(
             ResolveVFSStorageByNameAction(name=storage_name)
         )
 
@@ -134,7 +134,7 @@ class VFSStorageHandler:
 
         log.info("Get storage request for storage: {}", storage_name)
 
-        action_result = await self._vfs_storage.resolve_by_name.run(
+        action_result = await self._vfs_storage.lookup.run(
             ResolveVFSStorageByNameAction(name=storage_name)
         )
 
@@ -185,7 +185,7 @@ class VFSStorageHandler:
 
         log.info("List files request for directory: {} from storage: {}", directory, storage_name)
 
-        action_result = await self._vfs_storage.resolve_by_name.run(
+        action_result = await self._vfs_storage.lookup.run(
             ResolveVFSStorageByNameAction(name=storage_name)
         )
 

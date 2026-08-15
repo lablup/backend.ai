@@ -77,7 +77,6 @@ from ai.backend.manager.services.keypair_resource_policy.processors import (
 )
 from ai.backend.manager.services.keypair_resource_policy.service import KeypairResourcePolicyService
 from ai.backend.manager.services.login_client_type.processors import (
-    LoginClientTypeAdminProcessors,
     LoginClientTypeProcessors,
 )
 from ai.backend.manager.services.manager_admin.processors import ManagerAdminProcessors
@@ -525,7 +524,6 @@ def create_processors(
         auth=AuthProcessors(services.auth, action_monitors, validators),
         app_config_definition=AppConfigDefinitionProcessors(registry.group()),
         login_client_type=LoginClientTypeProcessors(registry.group()),
-        login_client_type_admin=LoginClientTypeAdminProcessors(registry.group()),
         notification=NotificationProcessors(
             services.notification, registry.group(), registry.group()
         ),

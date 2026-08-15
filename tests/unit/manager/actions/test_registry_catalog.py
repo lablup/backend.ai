@@ -41,7 +41,6 @@ from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
 )
 from ai.backend.manager.services.login_client_type.processors import (
-    LoginClientTypeAdminProcessors,
     LoginClientTypeProcessors,
 )
 from ai.backend.manager.services.notification.processors import NotificationProcessors
@@ -120,7 +119,6 @@ def test_every_defined_v2_action_is_wired() -> None:
     IdleCheckerProcessors(MagicMock(), [], registry.group())
     RetentionPolicyProcessors(registry.group())
     LoginClientTypeProcessors(registry.group())
-    LoginClientTypeAdminProcessors(registry.group())
     ServiceCatalogProcessors(registry.group())
     ProjectResourcePolicyProcessors(registry.group())
     UserResourcePolicyProcessors(MagicMock(), [], registry.group())

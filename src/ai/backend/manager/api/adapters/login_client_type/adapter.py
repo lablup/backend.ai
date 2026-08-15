@@ -115,7 +115,7 @@ class LoginClientTypeAdapter(BaseAdapter):
             name=input.name,
             description=input.description,
         )
-        action_result = await self._processors.login_client_type_admin.create.run(
+        action_result = await self._processors.login_client_type.create.run(
             CreateLoginClientTypeAction(creator=creator)
         )
         return CreateLoginClientTypePayload(
@@ -138,7 +138,7 @@ class LoginClientTypeAdapter(BaseAdapter):
                 else TriState.update(input.description)
             ),
         )
-        action_result = await self._processors.login_client_type_admin.update.run(
+        action_result = await self._processors.login_client_type.update.run(
             UpdateLoginClientTypeAction(updater=updater)
         )
         return UpdateLoginClientTypePayload(
@@ -146,7 +146,7 @@ class LoginClientTypeAdapter(BaseAdapter):
         )
 
     async def admin_delete(self, type_id: UUID) -> DeleteLoginClientTypePayload:
-        action_result = await self._processors.login_client_type_admin.purge.run(
+        action_result = await self._processors.login_client_type.purge.run(
             PurgeLoginClientTypeAction(id=type_id)
         )
         return DeleteLoginClientTypePayload(id=action_result.data.id)

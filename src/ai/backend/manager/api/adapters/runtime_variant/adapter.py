@@ -178,7 +178,7 @@ class RuntimeVariantAdapter(BaseAdapter):
         not form part of the v2 surface — v2 clients pass the id
         directly.
         """
-        result = await self._processors.runtime_variant.resolve_by_name.run(
+        result = await self._processors.runtime_variant.lookup.run(
             ResolveRuntimeVariantByNameAction(name=name)
         )
         return result.data.id

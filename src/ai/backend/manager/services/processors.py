@@ -154,8 +154,7 @@ if TYPE_CHECKING:
         KeypairResourcePolicyService,
     )
     from ai.backend.manager.services.login_client_type.processors import (
-        LoginClientTypeAdminProcessors,
-        LoginClientTypeProcessors,
+            LoginClientTypeProcessors,
     )
     from ai.backend.manager.services.manager_admin.processors import (
         ManagerAdminProcessors,
@@ -488,7 +487,6 @@ class Processors:
     stream: StreamProcessors
     events: EventsProcessors
     login_client_type: LoginClientTypeProcessors
-    login_client_type_admin: LoginClientTypeAdminProcessors
 
 
 @dataclass

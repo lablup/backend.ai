@@ -29,19 +29,15 @@ from ai.backend.manager.services.login_client_type.actions.update import (
 
 
 class LoginClientTypeProcessors:
-    """The catalog's reads, open to every authenticated user."""
+    """The catalog's reads are open to every authenticated user; its writes are not.
+
+    One class per domain: which gate an operation carries is a property of that
+    operation, and splitting the admin half into its own class states it twice --
+    once in the class name and once in the factory that wires it.
+    """
 
     get: PublicActionProcessor[GetLoginClientTypeAction, EntityOpsResult[LoginClientTypeData]]
     search: PublicActionProcessor[SearchLoginClientTypesAction, BatchOpsResult[LoginClientTypeData]]
-
-    def __init__(self, group: ProcessorGroup[LoginClientTypeData]) -> None:
-        self.get = group.public_get_ops(GetLoginClientTypeAction)
-        self.search = group.public_search_ops(SearchLoginClientTypesAction)
-
-
-class LoginClientTypeAdminProcessors:
-    """The catalog's writes, behind the SUPERADMIN gate."""
-
     create: GlobalActionProcessor[
         CreateLoginClientTypeAction, CreatedEntityOpsResult[LoginClientTypeData]
     ]
@@ -49,6 +45,8 @@ class LoginClientTypeAdminProcessors:
     purge: GlobalActionProcessor[PurgeLoginClientTypeAction, EntityOpsResult[LoginClientTypeData]]
 
     def __init__(self, group: ProcessorGroup[LoginClientTypeData]) -> None:
+        self.get = group.public_get_ops(GetLoginClientTypeAction)
+        self.search = group.public_search_ops(SearchLoginClientTypesAction)
         self.create = group.global_create_ops(CreateLoginClientTypeAction)
         self.update = group.global_update_ops(UpdateLoginClientTypeAction)
         self.purge = group.global_purge_ops(PurgeLoginClientTypeAction)

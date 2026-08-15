@@ -48,9 +48,7 @@ class VFSStorageProcessors:
     update: GlobalActionProcessor[UpdateVFSStorageAction, EntityOpsResult[VFSStorageData]]
     purge: GlobalActionProcessor[PurgeVFSStorageAction, EntityOpsResult[VFSStorageData]]
     get: GlobalActionProcessor[GetVFSStorageAction, EntityOpsResult[VFSStorageData]]
-    resolve_by_name: LookupActionProcessor[
-        ResolveVFSStorageByNameAction, LookupOpsResult[VFSStorageData]
-    ]
+    lookup: LookupActionProcessor[ResolveVFSStorageByNameAction, LookupOpsResult[VFSStorageData]]
     list_storages: GlobalActionProcessor[ListVFSStorageAction, BatchOpsResult[VFSStorageData]]
     search_vfs_storages: GlobalActionProcessor[
         SearchVFSStoragesAction, BatchOpsResult[VFSStorageData]
@@ -74,7 +72,7 @@ class VFSStorageProcessors:
         self.update = group.global_update_ops(UpdateVFSStorageAction)
         self.purge = group.global_purge_ops(PurgeVFSStorageAction)
         self.get = group.global_get_ops(GetVFSStorageAction)
-        self.resolve_by_name = group.lookup_ops(ResolveVFSStorageByNameAction)
+        self.lookup = group.lookup_ops(ResolveVFSStorageByNameAction)
         self.list_storages = group.global_search_ops(ListVFSStorageAction)
         self.search_vfs_storages = group.global_search_ops(SearchVFSStoragesAction)
         self.get_quota_scope = group.global_scope(GetQuotaScopeAction, service.get_quota_scope)

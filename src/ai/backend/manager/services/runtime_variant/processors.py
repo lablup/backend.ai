@@ -39,7 +39,7 @@ class RuntimeVariantProcessors:
     update: GlobalActionProcessor[UpdateRuntimeVariantAction, EntityOpsResult[RuntimeVariantData]]
     purge: GlobalActionProcessor[PurgeRuntimeVariantAction, EntityOpsResult[RuntimeVariantData]]
     search: PublicActionProcessor[SearchRuntimeVariantsAction, BatchOpsResult[RuntimeVariantData]]
-    resolve_by_name: LookupActionProcessor[
+    lookup: LookupActionProcessor[
         ResolveRuntimeVariantByNameAction, LookupOpsResult[RuntimeVariantData]
     ]
 
@@ -48,4 +48,4 @@ class RuntimeVariantProcessors:
         self.update = group.global_update_ops(UpdateRuntimeVariantAction)
         self.purge = group.global_purge_ops(PurgeRuntimeVariantAction)
         self.search = group.public_search_ops(SearchRuntimeVariantsAction)
-        self.resolve_by_name = group.lookup_ops(ResolveRuntimeVariantByNameAction)
+        self.lookup = group.lookup_ops(ResolveRuntimeVariantByNameAction)
