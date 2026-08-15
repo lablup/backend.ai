@@ -126,31 +126,6 @@ class TestAgentResources:
             )
         return agent_id, cpu_capacity, cpu_used, mem_capacity, mem_used
 
-    async def test_get_agent_resources(
-        self,
-        db_with_agent_tables: ExtendedAsyncSAEngine,
-    ) -> None:
-        agent_id, cpu_capacity, cpu_used, mem_capacity, _ = await self._seed_agent(
-            db_with_agent_tables
-        )
-        db_source = ResourceSlotDBSource(db_with_agent_tables)
-
-        rows = await db_source.get_agent_resources(agent_id)
-
-        assert len(rows) == 2
-        by_slot = {r.slot_name: r for r in rows}
-        assert by_slot["cpu"].capacity == cpu_capacity
-        assert by_slot["cpu"].used == cpu_used
-        assert by_slot["mem"].capacity == mem_capacity
-
-    async def test_get_agent_resources_empty(
-        self,
-        db_with_agent_tables: ExtendedAsyncSAEngine,
-    ) -> None:
-        db_source = ResourceSlotDBSource(db_with_agent_tables)
-        rows = await db_source.get_agent_resources("nonexistent-agent")
-        assert rows == []
-
     async def test_search_agent_resources(
         self,
         db_with_agent_tables: ExtendedAsyncSAEngine,
@@ -210,14 +185,6 @@ class TestResourceAllocations:
             ],
         ):
             yield database_connection
-
-    async def test_get_kernel_allocations_empty(
-        self,
-        db_with_allocation_tables: ExtendedAsyncSAEngine,
-    ) -> None:
-        db_source = ResourceSlotDBSource(db_with_allocation_tables)
-        rows = await db_source.get_kernel_allocations(uuid4())
-        assert rows == []
 
     async def test_search_resource_allocations_empty(
         self,

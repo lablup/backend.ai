@@ -11,7 +11,6 @@ from .actions.get_agent_resource_by_slot import (
     GetAgentResourceBySlotAction,
     GetAgentResourceBySlotResult,
 )
-from .actions.get_agent_resources import GetAgentResourcesAction, GetAgentResourcesResult
 from .actions.get_domain_resource_overview import (
     GetDomainResourceOverviewAction,
     GetDomainResourceOverviewResult,
@@ -20,7 +19,6 @@ from .actions.get_kernel_allocation_by_slot import (
     GetKernelAllocationBySlotAction,
     GetKernelAllocationBySlotResult,
 )
-from .actions.get_kernel_allocations import GetKernelAllocationsAction, GetKernelAllocationsResult
 from .actions.get_project_resource_overview import (
     GetProjectResourceOverviewAction,
     GetProjectResourceOverviewResult,
@@ -52,20 +50,6 @@ class ResourceSlotService:
             )
         )
 
-    async def get_agent_resources(self, action: GetAgentResourcesAction) -> GetAgentResourcesResult:
-        rows = await self._repository.get_agent_resources(action.agent_id)
-        items = [
-            AgentResourceData(
-                agent_id=row.agent_id,
-                slot_name=row.slot_name,
-                capacity=row.capacity,
-                reserved=row.reserved,
-                used=row.used,
-            )
-            for row in rows
-        ]
-        return GetAgentResourcesResult(items=items)
-
     async def search_agent_resources(
         self, action: SearchAgentResourcesAction
     ) -> SearchAgentResourcesResult:
@@ -91,21 +75,6 @@ class ResourceSlotService:
                 used=row.used,
             )
         )
-
-    async def get_kernel_allocations(
-        self, action: GetKernelAllocationsAction
-    ) -> GetKernelAllocationsResult:
-        rows = await self._repository.get_kernel_allocations(action.kernel_id)
-        items = [
-            ResourceAllocationData(
-                kernel_id=row.kernel_id,
-                slot_name=row.slot_name,
-                requested=row.requested,
-                used=row.used,
-            )
-            for row in rows
-        ]
-        return GetKernelAllocationsResult(items=items)
 
     async def search_resource_allocations(
         self, action: SearchResourceAllocationsAction
