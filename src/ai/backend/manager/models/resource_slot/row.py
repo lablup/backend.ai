@@ -13,7 +13,7 @@ from datetime import datetime
 from decimal import Decimal
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.identifier.resource_slot import ResourceSlotTypeUUID
 from ai.backend.manager.data.resource_slot.types import (
@@ -151,10 +151,6 @@ class AgentResourceRow(LifecycleTimestampsMixin, Base):
     )
     used: Mapped[Decimal] = mapped_column(
         "used", sa.Numeric(precision=24, scale=6), nullable=False, server_default=sa.text("0")
-    )
-
-    slot_type_row: Mapped[ResourceSlotTypeRow] = relationship(
-        "ResourceSlotTypeRow", foreign_keys=[slot_name], lazy="raise"
     )
 
     __table_args__ = (

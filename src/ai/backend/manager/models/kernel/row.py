@@ -4,10 +4,7 @@ import logging
 import uuid
 from collections.abc import Sequence
 from datetime import datetime, tzinfo
-from typing import (
-    TYPE_CHECKING,
-    Any,
-)
+from typing import Any
 
 import sqlalchemy as sa
 import yarl
@@ -17,7 +14,6 @@ from sqlalchemy.orm import (
     Mapped,
     mapped_column,
     noload,
-    relationship,
 )
 
 from ai.backend.common.identifier.image import ImageID
@@ -48,10 +44,6 @@ from ai.backend.manager.data.kernel.types import (
     RuntimeConfig,
     UserPermission,
 )
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.session import SessionRow
-
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.base import (
@@ -416,8 +408,6 @@ class KernelRow(CreatedAtMixin, Base):
             postgresql_where=sa.text("terminated_at IS NOT NULL AND starts_at IS NOT NULL"),
         ),
     )
-
-    session: Mapped[SessionRow] = relationship("SessionRow", back_populates="kernels")
 
     @property
     def used_time(self) -> str | None:

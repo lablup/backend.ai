@@ -432,7 +432,7 @@ class SessionRow(CreatedAtMixin, Base):
         nullable=True,
         default=None,
     )
-    kernels: Mapped[list[KernelRow]] = relationship("KernelRow", back_populates="session")
+    kernels: Mapped[list[KernelRow]] = relationship("KernelRow")
 
     # Resource ownership
     resource_group_id: Mapped[ResourceGroupID] = mapped_column(
