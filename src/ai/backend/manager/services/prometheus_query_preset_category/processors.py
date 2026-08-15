@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 from ai.backend.manager.actions.registry import ProcessorGroup
-from ai.backend.manager.actions.v2.global_scope.processor import (
-    GlobalActionProcessor,
-    PublicActionProcessor,
-)
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     CreatedEntityOpsResult,
@@ -34,11 +31,11 @@ class PrometheusQueryPresetCategoryProcessors:
         CreateCategoryAction,
         CreatedEntityOpsResult[PrometheusQueryPresetCategoryData],
     ]
-    get_category: PublicActionProcessor[
+    get_category: GlobalActionProcessor[
         GetCategoryAction,
         EntityOpsResult[PrometheusQueryPresetCategoryData],
     ]
-    search_categories: PublicActionProcessor[
+    search_categories: GlobalActionProcessor[
         SearchCategoriesAction,
         BatchOpsResult[PrometheusQueryPresetCategoryData],
     ]
@@ -49,6 +46,6 @@ class PrometheusQueryPresetCategoryProcessors:
 
     def __init__(self, group: ProcessorGroup[PrometheusQueryPresetCategoryData]) -> None:
         self.create_category = group.global_create_ops(CreateCategoryAction)
-        self.get_category = group.public_get_ops(GetCategoryAction)
-        self.search_categories = group.public_search_ops(SearchCategoriesAction)
+        self.get_category = group.global_get_ops(GetCategoryAction)
+        self.search_categories = group.global_search_ops(SearchCategoriesAction)
         self.purge_category = group.global_purge_ops(PurgeCategoryAction)

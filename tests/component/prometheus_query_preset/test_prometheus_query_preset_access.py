@@ -1,10 +1,9 @@
-"""Who may read the query-preset catalog.
+"""Who may reach the query-preset catalog.
 
-The catalog's routes declare ``auth_required`` for the reads and
-``superadmin_required`` for the writes. The action layer carries its own gate, so a
-read wired behind the super-admin gate turns those routes into 403s for every
-regular user while the route declaration still says otherwise — a break no filter
-or preview test notices, because both authenticate as an admin.
+Every route in this domain is a super-admin operation: the presets describe
+cluster-wide PromQL, and executing one runs that query against the metrics
+backend. The filter and preview suites all authenticate as an admin, so nothing
+there would notice the gate coming off.
 """
 
 from __future__ import annotations
@@ -21,14 +20,14 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
 
 
 class TestQueryPresetCatalogAccess:
-    async def test_user_searches_presets(
+    async def test_user_cannot_search_presets(
         self,
         user_v2_registry: V2ClientRegistry,
     ) -> None:
-        result = await user_v2_registry.prometheus_query_preset.search(
-            SearchQueryDefinitionsInput(limit=10),
-        )
-        assert isinstance(result.items, list)
+        with pytest.raises(PermissionDeniedError):
+            await user_v2_registry.prometheus_query_preset.search(
+                SearchQueryDefinitionsInput(limit=10),
+            )
 
     async def test_user_cannot_create_preset(
         self,
@@ -46,3 +45,12 @@ class TestQueryPresetCatalogAccess:
                     ),
                 ),
             )
+
+    async def test_admin_searches_presets(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+    ) -> None:
+        result = await admin_v2_registry.prometheus_query_preset.search(
+            SearchQueryDefinitionsInput(limit=10),
+        )
+        assert isinstance(result.items, list)

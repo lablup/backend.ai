@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 from ai.backend.manager.actions.registry import ProcessorGroup
-from ai.backend.manager.actions.v2.global_scope.processor import (
-    GlobalActionProcessor,
-    PublicActionProcessor,
-)
+from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     CreatedEntityOpsResult,
@@ -36,8 +33,8 @@ class PrometheusQueryPresetProcessors:
     """The catalog CRUD runs against ops; what reads before writing or calls Prometheus stays."""
 
     create_preset: GlobalActionProcessor[CreatePresetAction, CreatePresetActionResult]
-    get_preset: PublicActionProcessor[GetPresetAction, EntityOpsResult[PrometheusQueryPresetData]]
-    search_presets: PublicActionProcessor[
+    get_preset: GlobalActionProcessor[GetPresetAction, EntityOpsResult[PrometheusQueryPresetData]]
+    search_presets: GlobalActionProcessor[
         SearchPresetsAction, BatchOpsResult[PrometheusQueryPresetData]
     ]
     purge_preset: GlobalActionProcessor[
@@ -54,8 +51,8 @@ class PrometheusQueryPresetProcessors:
     ) -> None:
         # The create validates its query template, so it keeps a service method.
         self.create_preset = group.global_scope(CreatePresetAction, service.create_preset)
-        self.get_preset = group.public_get_ops(GetPresetAction)
-        self.search_presets = group.public_search_ops(SearchPresetsAction)
+        self.get_preset = group.global_get_ops(GetPresetAction)
+        self.search_presets = group.global_search_ops(SearchPresetsAction)
         self.purge_preset = group.global_purge_ops(PurgePresetAction)
         self.update_preset = group.global_scope(UpdatePresetAction, service.update_preset)
         self.preview_preset = group.global_scope(PreviewPresetAction, service.preview_preset)
