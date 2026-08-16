@@ -11,10 +11,38 @@ type EntityID = uuid.UUID
 # EntityID: the subset relation is visible in the type.
 type ScopeID = EntityID
 
-EntityType = NewType("EntityType", str)
+
+class EntityType(str):
+    """The type of an entity.
+
+    A class rather than a `NewType` so a `FieldType` cannot be passed where this is
+    expected: two `NewType`s over `str` are mutually assignable.
+    """
+
+
 # Every entity doubles as a scope, so a scope type IS an entity type; the
 # reverse direction stays an explicit declaration (`ScopeType(<entity type>)`).
 ScopeType = NewType("ScopeType", EntityType)
+
+
+class FieldType(str):
+    """The type of a field row, which knows the entity that owns it."""
+
+    @classmethod
+    def owner_entity_type(cls) -> EntityType:
+        raise NotImplementedError
+
+
+class NaturalKey(str):
+    """A column value that forms part of a key drawn from the data itself.
+
+    Names only itself: one column does not always identify a row, so which entity a
+    key resolves is the lookup's declaration, not this value's.
+    """
+
+    @classmethod
+    def key_name(cls) -> str:
+        raise NotImplementedError
 
 
 @dataclass(frozen=True, slots=True)

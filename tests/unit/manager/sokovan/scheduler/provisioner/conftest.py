@@ -13,12 +13,12 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.data.entity.architecture import ArchName
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.value.architecture import ArchName
 from ai.backend.common.types import (
     AccessKey,
     AgentId,

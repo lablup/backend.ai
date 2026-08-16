@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import UUID
 
-from ai.backend.common.data.entity.architecture import ArchName
+from ai.backend.common.data.value.architecture import ArchName
 from ai.backend.common.types import AutoPullBehavior, ImageConfig
 
 

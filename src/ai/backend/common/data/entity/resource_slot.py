@@ -1,6 +1,6 @@
-from typing import NewType, override
+from typing import override
 
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, NaturalKey
 
 __all__ = (
     "RESOURCE_SLOT_TYPE_ENTITY_TYPE",
@@ -12,7 +12,12 @@ __all__ = (
 # Raw string mirroring the RBAC-managed EntityType.RESOURCE_SLOT_TYPE value.
 RESOURCE_SLOT_TYPE_ENTITY_TYPE = EntityType("resource_slot_type")
 
-ResourceSlotName = NewType("ResourceSlotName", str)
+
+class ResourceSlotName(NaturalKey):
+    @override
+    @classmethod
+    def key_name(cls) -> str:
+        return "slot_name"
 
 
 class ResourceSlotTypeUUID(EntityIdentifier):

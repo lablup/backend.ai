@@ -40,6 +40,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import (
     RBACElementType,
 )
+from ai.backend.common.data.value.architecture import ArchName
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
     AccessKey,
