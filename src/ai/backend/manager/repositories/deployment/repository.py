@@ -1230,7 +1230,7 @@ class DeploymentRepository:
         """Batched read for the legacy model-serving create path.
 
         Now takes a ``RuntimeVariantID`` — the legacy service layer is
-        responsible for resolving name→id via the ResolveRuntimeVariantByName
+        responsible for resolving name→id via the LookupRuntimeVariantLookup
         action before invoking this flow.
         """
         return await self._db_source.load_legacy_model_service_deployment_read_bundle(

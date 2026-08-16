@@ -63,9 +63,7 @@ from ai.backend.common.dto.manager.v2.resource_policy.types import (
     UserResourcePolicyOrderField,
 )
 from ai.backend.common.exception import (
-    KeypairResourcePolicyNotFound,
     UnreachableError,
-    UserResourcePolicyNotFound,
 )
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import BinarySize, ResourceSlot, VFolderHostPermission
@@ -103,7 +101,6 @@ from ai.backend.manager.models.resource_policy.updaters import (
     ProjectResourcePolicyUpdater,
     UserResourcePolicyUpdater,
 )
-from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
@@ -111,17 +108,11 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.repositories.keypair_resource_policy.searchers import (
     KeyPairResourcePolicySearcher,
 )
-from ai.backend.manager.repositories.keypair_resource_policy.types import (
-    UserKeypairResourcePolicyOperationScope,
-)
 from ai.backend.manager.repositories.project_resource_policy.searchers import (
     ProjectResourcePolicySearcher,
 )
 from ai.backend.manager.repositories.user_resource_policy.searchers import (
     UserResourcePolicySearcher,
-)
-from ai.backend.manager.repositories.user_resource_policy.types import (
-    UserResourcePolicyOperationScope,
 )
 from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
     CreateKeyPairResourcePolicyAction,
@@ -132,11 +123,11 @@ from ai.backend.manager.services.keypair_resource_policy.actions.get_keypair_res
 from ai.backend.manager.services.keypair_resource_policy.actions.global_search_keypair_resource_policies import (
     GlobalSearchKeypairResourcePoliciesAction,
 )
+from ai.backend.manager.services.keypair_resource_policy.actions.lookup import (
+    LookupKeypairResourcePolicyAction,
+)
 from ai.backend.manager.services.keypair_resource_policy.actions.purge_keypair_resource_policy import (
     PurgeKeyPairResourcePolicyAction,
-)
-from ai.backend.manager.services.keypair_resource_policy.actions.search_keypair_resource_policies import (
-    SearchKeypairResourcePoliciesAction,
 )
 from ai.backend.manager.services.keypair_resource_policy.actions.update_keypair_resource_policy import (
     UpdateKeyPairResourcePolicyAction,
@@ -165,11 +156,11 @@ from ai.backend.manager.services.user_resource_policy.actions.get_user_resource_
 from ai.backend.manager.services.user_resource_policy.actions.global_search_user_resource_policies import (
     GlobalSearchUserResourcePoliciesAction,
 )
+from ai.backend.manager.services.user_resource_policy.actions.lookup import (
+    LookupUserResourcePolicyAction,
+)
 from ai.backend.manager.services.user_resource_policy.actions.purge_user_resource_policy import (
     PurgeUserResourcePolicyAction,
-)
-from ai.backend.manager.services.user_resource_policy.actions.search_user_resource_policies import (
-    SearchUserResourcePoliciesAction,
 )
 from ai.backend.manager.services.user_resource_policy.actions.update_user_resource_policy import (
     UpdateUserResourcePolicyAction,
@@ -360,17 +351,10 @@ class ResourcePolicyAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available.")
-        result = await self._processors.keypair_resource_policy.search.run(
-            SearchKeypairResourcePoliciesAction(
-                scopes=(UserKeypairResourcePolicyOperationScope(user_id=UserID(me.user_id)),),
-                searcher=KeyPairResourcePolicySearcher(pagination=NoPagination()),
-            )
+        result = await self._processors.keypair_resource_policy.lookup.run(
+            LookupKeypairResourcePolicyAction(user_id=UserID(me.user_id))
         )
-        if not result.items:
-            raise KeypairResourcePolicyNotFound(
-                f"Keypair resource policy for user {me.user_id!s} not found."
-            )
-        return self._keypair_policy_data_to_node(result.items[0])
+        return self._keypair_policy_data_to_node(result.data)
 
     # ── User Resource Policy ──
 
@@ -478,17 +462,10 @@ class ResourcePolicyAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available.")
-        result = await self._processors.user_resource_policy.search.run(
-            SearchUserResourcePoliciesAction(
-                scopes=(UserResourcePolicyOperationScope(user_id=UserID(me.user_id)),),
-                searcher=UserResourcePolicySearcher(pagination=NoPagination()),
-            )
+        result = await self._processors.user_resource_policy.lookup.run(
+            LookupUserResourcePolicyAction(user_id=UserID(me.user_id))
         )
-        if not result.items:
-            raise UserResourcePolicyNotFound(
-                f"User resource policy for user {me.user_id!s} not found."
-            )
-        return self._user_policy_data_to_node(result.items[0])
+        return self._user_policy_data_to_node(result.data)
 
     # ── Project Resource Policy ──
 

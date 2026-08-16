@@ -47,12 +47,15 @@
 
 ## Gates
 
-- `global` runs behind the SUPERADMIN gate. Global reads open to all
-  authenticated users are wired via the `public_*` factories — read operations
-  only; the constructor rejects writes.
+- `global` extends `scope` to the whole installation and runs behind the SUPERADMIN
+  gate. Global reads open to all authenticated users are wired via the `public_*`
+  factories — read operations only; the constructor rejects writes.
 - `lookup` verifies authentication only. Adapters must return the same response
   for a lookup miss and for a permission denial on the follow-up action
   (no existence leakage).
+- An operation that designates entities by id is `single_entity` (one) or `bulk`
+  (several).
+- `BaseGlobalAction` declares no `entity_id()`.
 
 ## Monitors
 

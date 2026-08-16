@@ -14,7 +14,7 @@ from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 
 
 @dataclass
-class StorageNamespaceByStorageAndName(DataLookup[StorageNamespaceRow, StorageNamespaceData]):
+class StorageNamespaceLookup(DataLookup[StorageNamespaceRow, StorageNamespaceData]):
     """Resolves the storage a namespace sits in, plus the namespace, into that row.
 
     The pair is the table's unique constraint, so it names one row; the id is a

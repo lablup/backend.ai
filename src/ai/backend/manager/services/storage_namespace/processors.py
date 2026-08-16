@@ -11,10 +11,10 @@ from ai.backend.manager.actions.v2.ops.result import (
 )
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.services.storage_namespace.actions.get_multi import GetNamespacesAction
-from ai.backend.manager.services.storage_namespace.actions.register import RegisterNamespaceAction
-from ai.backend.manager.services.storage_namespace.actions.resolve_by_namespace import (
-    ResolveStorageNamespaceAction,
+from ai.backend.manager.services.storage_namespace.actions.lookup import (
+    LookupStorageNamespaceAction,
 )
+from ai.backend.manager.services.storage_namespace.actions.register import RegisterNamespaceAction
 from ai.backend.manager.services.storage_namespace.actions.search import (
     SearchStorageNamespacesAction,
 )
@@ -40,7 +40,7 @@ class StorageNamespaceProcessors:
         GetNamespacesAction, BatchOpsResult[StorageNamespaceData]
     ]
     lookup: LookupActionProcessor[
-        ResolveStorageNamespaceAction, LookupOpsResult[StorageNamespaceData]
+        LookupStorageNamespaceAction, LookupOpsResult[StorageNamespaceData]
     ]
     global_unregister: GlobalActionProcessor[
         UnregisterNamespaceAction, EntityOpsResult[StorageNamespaceData]
@@ -50,5 +50,5 @@ class StorageNamespaceProcessors:
         self.global_register = group.global_create_ops(RegisterNamespaceAction)
         self.global_search = group.global_search_ops(SearchStorageNamespacesAction)
         self.global_get_namespaces = group.global_search_ops(GetNamespacesAction)
-        self.lookup = group.lookup_ops(ResolveStorageNamespaceAction)
+        self.lookup = group.lookup_ops(LookupStorageNamespaceAction)
         self.global_unregister = group.global_purge_ops(UnregisterNamespaceAction)

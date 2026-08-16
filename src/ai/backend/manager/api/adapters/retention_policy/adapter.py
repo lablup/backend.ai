@@ -22,7 +22,6 @@ from ai.backend.common.identifier.retention_policy import RetentionPolicyID
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.retention.types import RetentionPolicyData
-from ai.backend.manager.errors.retention import RetentionPolicyNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.retention.conditions import RetentionPolicyConditions
 from ai.backend.manager.models.retention.creators import RetentionPolicyCreator
@@ -37,6 +36,7 @@ from ai.backend.manager.services.retention_policy.actions.create import (
 from ai.backend.manager.services.retention_policy.actions.delete import (
     DeleteRetentionPolicyAction,
 )
+from ai.backend.manager.services.retention_policy.actions.get import GetRetentionPolicyAction
 from ai.backend.manager.services.retention_policy.actions.purge import (
     PurgeRetentionPolicyAction,
 )
@@ -89,20 +89,10 @@ class RetentionPolicyAdapter(BaseAdapter):
         )
 
     async def get(self, policy_id: RetentionPolicyID) -> RetentionPolicyNode:
-        conditions: list[QueryCondition] = [lambda: RetentionPolicyRow.id == policy_id]
-        searcher = self._build_searcher(
-            RetentionPolicySearcher,
-            conditions=conditions,
-            orders=[],
-            pagination_spec=_retention_policy_pagination_spec(),
-            limit=1,
+        result = await self._processors.retention_policy.get.run(
+            GetRetentionPolicyAction(policy_id=policy_id)
         )
-        result = await self._processors.retention_policy.global_search.run(
-            SearchRetentionPoliciesAction(searcher=searcher)
-        )
-        if not result.items:
-            raise RetentionPolicyNotFound()
-        return self._data_to_node(result.items[0])
+        return self._data_to_node(result.data)
 
     async def create(
         self,

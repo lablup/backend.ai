@@ -31,6 +31,15 @@ which is why handlers call processors, not services.
 - The required permission is derived from `operation_type()` — actions do not declare permissions, so the two cannot diverge.
 - `RESTORE` is the only deliberate split: the behavior/audit label is restore, the checked permission is soft-delete — no new permission bit.
 
+## An entity with no scope of its own is still designated by id
+
+- A super-admin passes the entity gate, so the admin path stays open whether the
+  operation is `single_entity` or `bulk`.
+- No flow grants a permission on one entity yet, but a super-admin may still issue
+  one. Raising the operation to `global` removes that path.
+- `global` designates nothing, so it carries no `entity_id()`. Adding one for the
+  audit trail invites reading it as an authorization input.
+
 ## Backing is orthogonal to shape
 
 - The `OpsBackendAction` mixin (`actions/v2/ops/`) is a second independent axis: "how it executes".

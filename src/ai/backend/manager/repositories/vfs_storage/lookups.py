@@ -13,7 +13,7 @@ from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
 
 
 @dataclass
-class VFSStorageByName(DataLookup[VFSStorageRow, VFSStorageData]):
+class VFSStorageLookup(DataLookup[VFSStorageRow, VFSStorageData]):
     """Resolves a VFS storage's name into the row it names."""
 
     name: str

@@ -36,7 +36,10 @@ from ai.backend.manager.actions.v2.global_scope.processor import (
 from ai.backend.manager.actions.v2.global_scope.validator import GlobalActionValidator
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction, BaseLookupActionResult
 from ai.backend.manager.actions.v2.lookup.monitor import LookupActionMonitor
-from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
+from ai.backend.manager.actions.v2.lookup.processor import (
+    LookupActionProcessor,
+    PublicLookupActionProcessor,
+)
 from ai.backend.manager.actions.v2.lookup.validator import LookupActionValidator
 from ai.backend.manager.actions.v2.ops.base import (
     AtomicCreateEntityOpsAction,
@@ -92,7 +95,10 @@ from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.actions.v2.scope.validator import ScopeActionValidator
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.actions.v2.single_entity.monitor import SingleEntityActionMonitor
-from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
+from ai.backend.manager.actions.v2.single_entity.processor import (
+    PublicSingleEntityActionProcessor,
+    SingleEntityActionProcessor,
+)
 from ai.backend.manager.actions.v2.single_entity.validator import SingleEntityActionValidator
 from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.repositories.ops.repository import OpsRepository
@@ -246,6 +252,20 @@ class ProcessorGroup[TData: EntityData]:
             validators=(*self._deps.validators.lookup, *validators),
         )
 
+    def public_lookup_ops[TAction: LookupEntityOpsAction[Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[LookupActionValidator] = (),
+        monitors: Sequence[LookupActionMonitor] = (),
+    ) -> PublicLookupActionProcessor[TAction, LookupOpsResult[TData]]:
+        self._record(action_cls.spec())
+        return PublicLookupActionProcessor(
+            LookupService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.lookup, *monitors),
+            validators=(*self._deps.validators.lookup, *validators),
+        )
+
     def single_get_ops[TAction: GetSingleEntityOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
@@ -302,19 +322,19 @@ class ProcessorGroup[TData: EntityData]:
             validators=(*self._deps.validators.global_scope, *validators),
         )
 
-    def public_get_ops[TAction: GetGlobalOpsAction[Any, Any]](
+    def public_get_ops[TAction: GetSingleEntityOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
         *,
-        validators: Sequence[GlobalActionValidator] = (),
-        monitors: Sequence[GlobalActionMonitor] = (),
-    ) -> PublicActionProcessor[TAction, EntityOpsResult[TData]]:
+        validators: Sequence[SingleEntityActionValidator] = (),
+        monitors: Sequence[SingleEntityActionMonitor] = (),
+    ) -> PublicSingleEntityActionProcessor[TAction, EntityOpsResult[TData]]:
         self._record(action_cls.spec())
-        return PublicActionProcessor(
+        return PublicSingleEntityActionProcessor(
             action_cls,
             GetService(self._deps.repository).execute,
-            monitors=(*self._deps.monitors.global_scope, *monitors),
-            validators=(*self._deps.validators.global_scope, *validators),
+            monitors=(*self._deps.monitors.single_entity, *monitors),
+            validators=validators,
         )
 
     def public_search_ops[TAction: SearchGlobalOpsAction[Any, Any]](

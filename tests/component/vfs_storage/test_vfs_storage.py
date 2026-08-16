@@ -40,8 +40,8 @@ from ai.backend.manager.services.vfs_storage.actions import (
 from ai.backend.manager.services.vfs_storage.actions.get_quota_scope import (
     GetQuotaScopeAction,
 )
-from ai.backend.manager.services.vfs_storage.actions.resolve_by_name import (
-    ResolveVFSStorageByNameAction,
+from ai.backend.manager.services.vfs_storage.actions.lookup import (
+    LookupVFSStorageAction,
 )
 from ai.backend.manager.services.vfs_storage.actions.set_quota_scope import (
     SetQuotaScopeAction,
@@ -261,7 +261,7 @@ class TestVFSStorageCRUD:
         target_vfs_storage: VFSStorageFixtureData,
     ) -> None:
         """Resolve a VFS storage name into the storage it names."""
-        action = ResolveVFSStorageByNameAction(name=target_vfs_storage["name"])
+        action = LookupVFSStorageAction(name=target_vfs_storage["name"])
         result = await vfs_storage_processors.lookup.run(action)
         assert result.data.id == target_vfs_storage["id"]
         assert result.data.name == target_vfs_storage["name"]

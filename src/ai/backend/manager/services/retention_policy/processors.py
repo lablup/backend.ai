@@ -7,6 +7,7 @@ from ai.backend.manager.actions.v2.ops.result import (
     CreatedEntityOpsResult,
     EntityOpsResult,
 )
+from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.retention.types import RetentionPolicyData
 from ai.backend.manager.services.retention_policy.actions.create import (
     CreateRetentionPolicyAction,
@@ -14,6 +15,7 @@ from ai.backend.manager.services.retention_policy.actions.create import (
 from ai.backend.manager.services.retention_policy.actions.delete import (
     DeleteRetentionPolicyAction,
 )
+from ai.backend.manager.services.retention_policy.actions.get import GetRetentionPolicyAction
 from ai.backend.manager.services.retention_policy.actions.purge import (
     PurgeRetentionPolicyAction,
 )
@@ -28,6 +30,7 @@ from ai.backend.manager.services.retention_policy.actions.update import (
 class RetentionPolicyProcessors:
     """Every operation runs straight against ops, so this domain has no service."""
 
+    get: SingleEntityActionProcessor[GetRetentionPolicyAction, EntityOpsResult[RetentionPolicyData]]
     global_create: GlobalActionProcessor[
         CreateRetentionPolicyAction,
         CreatedEntityOpsResult[RetentionPolicyData],
@@ -50,6 +53,7 @@ class RetentionPolicyProcessors:
     ]
 
     def __init__(self, group: ProcessorGroup[RetentionPolicyData]) -> None:
+        self.get = group.single_get_ops(GetRetentionPolicyAction)
         self.global_create = group.global_create_ops(CreateRetentionPolicyAction)
         self.global_update = group.global_update_ops(UpdateRetentionPolicyAction)
         self.global_delete = group.global_purge_ops(DeleteRetentionPolicyAction)

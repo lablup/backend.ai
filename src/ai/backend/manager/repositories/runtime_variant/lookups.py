@@ -13,7 +13,7 @@ from ai.backend.manager.models.specs.lookup import DataLookup
 
 
 @dataclass
-class RuntimeVariantByName(DataLookup[RuntimeVariantRow, RuntimeVariantData]):
+class RuntimeVariantLookup(DataLookup[RuntimeVariantRow, RuntimeVariantData]):
     """Resolves a runtime variant's name into the row it names.
 
     The name is unique, which is what separates this from a search: two matches

@@ -10,6 +10,9 @@ from ai.backend.manager.actions.v2.ops.result import (
     CreatedEntityOpsResult,
     EntityOpsResult,
 )
+from ai.backend.manager.actions.v2.single_entity.processor import (
+    PublicSingleEntityActionProcessor,
+)
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 from ai.backend.manager.services.login_client_type.actions.create import (
     CreateLoginClientTypeAction,
@@ -36,7 +39,7 @@ class LoginClientTypeProcessors:
     once in the class name and once in the factory that wires it.
     """
 
-    public_get: PublicActionProcessor[
+    public_get: PublicSingleEntityActionProcessor[
         GetLoginClientTypeAction, EntityOpsResult[LoginClientTypeData]
     ]
     public_search: PublicActionProcessor[

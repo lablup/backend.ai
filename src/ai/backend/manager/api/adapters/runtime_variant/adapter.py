@@ -26,7 +26,6 @@ from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
-from ai.backend.manager.errors.resource import RuntimeVariantNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.runtime_variant.conditions import RuntimeVariantConditions
 from ai.backend.manager.models.runtime_variant.creators import RuntimeVariantCreator
@@ -40,10 +39,11 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.runtime_variant.searchers import RuntimeVariantSearcher
 from ai.backend.manager.services.runtime_variant.actions.create import CreateRuntimeVariantAction
-from ai.backend.manager.services.runtime_variant.actions.purge import PurgeRuntimeVariantAction
-from ai.backend.manager.services.runtime_variant.actions.resolve_by_name import (
-    ResolveRuntimeVariantByNameAction,
+from ai.backend.manager.services.runtime_variant.actions.get import GetRuntimeVariantAction
+from ai.backend.manager.services.runtime_variant.actions.lookup import (
+    LookupRuntimeVariantAction,
 )
+from ai.backend.manager.services.runtime_variant.actions.purge import PurgeRuntimeVariantAction
 from ai.backend.manager.services.runtime_variant.actions.search import SearchRuntimeVariantsAction
 from ai.backend.manager.services.runtime_variant.actions.update import UpdateRuntimeVariantAction
 from ai.backend.manager.types import OptionalState, TriState
@@ -102,20 +102,10 @@ class RuntimeVariantAdapter(BaseAdapter):
         )
 
     async def get(self, variant_id: UUID) -> RuntimeVariantNode:
-        conditions: list[QueryCondition] = [lambda: RuntimeVariantRow.id == variant_id]
-        searcher = self._build_searcher(
-            RuntimeVariantSearcher,
-            conditions=conditions,
-            orders=[],
-            pagination_spec=_runtime_variant_pagination_spec(),
-            limit=1,
+        result = await self._processors.runtime_variant.public_get.run(
+            GetRuntimeVariantAction(variant_id=RuntimeVariantID(variant_id))
         )
-        result = await self._processors.runtime_variant.public_search.run(
-            SearchRuntimeVariantsAction(searcher=searcher)
-        )
-        if not result.items:
-            raise RuntimeVariantNotFound()
-        return self._data_to_node(result.items[0])
+        return self._data_to_node(result.data)
 
     async def create(
         self,
@@ -178,8 +168,8 @@ class RuntimeVariantAdapter(BaseAdapter):
         not form part of the v2 surface — v2 clients pass the id
         directly.
         """
-        result = await self._processors.runtime_variant.lookup.run(
-            ResolveRuntimeVariantByNameAction(name=name)
+        result = await self._processors.runtime_variant.public_lookup.run(
+            LookupRuntimeVariantAction(name=name)
         )
         return result.data.id
 

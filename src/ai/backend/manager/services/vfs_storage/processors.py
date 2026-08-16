@@ -20,10 +20,10 @@ from ai.backend.manager.services.vfs_storage.actions.get_quota_scope import (
     GetQuotaScopeActionResult,
 )
 from ai.backend.manager.services.vfs_storage.actions.list import ListVFSStorageAction
-from ai.backend.manager.services.vfs_storage.actions.purge import PurgeVFSStorageAction
-from ai.backend.manager.services.vfs_storage.actions.resolve_by_name import (
-    ResolveVFSStorageByNameAction,
+from ai.backend.manager.services.vfs_storage.actions.lookup import (
+    LookupVFSStorageAction,
 )
+from ai.backend.manager.services.vfs_storage.actions.purge import PurgeVFSStorageAction
 from ai.backend.manager.services.vfs_storage.actions.search import SearchVFSStoragesAction
 from ai.backend.manager.services.vfs_storage.actions.search_quota_scopes import (
     SearchQuotaScopesAction,
@@ -50,7 +50,7 @@ class VFSStorageProcessors:
     global_update: GlobalActionProcessor[UpdateVFSStorageAction, EntityOpsResult[VFSStorageData]]
     global_purge: GlobalActionProcessor[PurgeVFSStorageAction, EntityOpsResult[VFSStorageData]]
     global_get: GlobalActionProcessor[GetVFSStorageAction, EntityOpsResult[VFSStorageData]]
-    lookup: LookupActionProcessor[ResolveVFSStorageByNameAction, LookupOpsResult[VFSStorageData]]
+    lookup: LookupActionProcessor[LookupVFSStorageAction, LookupOpsResult[VFSStorageData]]
     global_list_storages: GlobalActionProcessor[
         ListVFSStorageAction, BatchOpsResult[VFSStorageData]
     ]
@@ -78,7 +78,7 @@ class VFSStorageProcessors:
         self.global_update = group.global_update_ops(UpdateVFSStorageAction)
         self.global_purge = group.global_purge_ops(PurgeVFSStorageAction)
         self.global_get = group.global_get_ops(GetVFSStorageAction)
-        self.lookup = group.lookup_ops(ResolveVFSStorageByNameAction)
+        self.lookup = group.lookup_ops(LookupVFSStorageAction)
         self.global_list_storages = group.global_search_ops(ListVFSStorageAction)
         self.global_search_vfs_storages = group.global_search_ops(SearchVFSStoragesAction)
         self.global_get_quota_scope = group.global_scope(

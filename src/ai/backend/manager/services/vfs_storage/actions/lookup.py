@@ -9,7 +9,7 @@ from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.vfs_storage.row import VFSStorageRow
-from ai.backend.manager.repositories.vfs_storage.lookups import VFSStorageByName
+from ai.backend.manager.repositories.vfs_storage.lookups import VFSStorageLookup
 
 
 @dataclass(frozen=True)
@@ -28,7 +28,7 @@ class VFSStorageNameKey(LookupKey):
 
 
 @dataclass
-class ResolveVFSStorageByNameAction(LookupEntityOpsAction[VFSStorageRow, VFSStorageData]):
+class LookupVFSStorageAction(LookupEntityOpsAction[VFSStorageRow, VFSStorageData]):
     """Resolve a VFS storage name into the storage it names.
 
     Split out of the read: the old ``get`` branched on which key the caller
@@ -45,12 +45,12 @@ class ResolveVFSStorageByNameAction(LookupEntityOpsAction[VFSStorageRow, VFSStor
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "resolve_vfs_storage_by_name"
+        return "lookup_vfs_storage"
 
     @override
     def lookup_key(self) -> VFSStorageNameKey:
         return VFSStorageNameKey(name=self.name)
 
     @override
-    def to_lookup(self) -> VFSStorageByName:
-        return VFSStorageByName(name=self.name)
+    def to_lookup(self) -> VFSStorageLookup:
+        return VFSStorageLookup(name=self.name)

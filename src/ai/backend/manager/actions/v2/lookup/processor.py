@@ -17,7 +17,7 @@ from ai.backend.manager.actions.v2.lookup.validator import (
     LookupActionValidator,
 )
 
-__all__ = ("LookupActionProcessor",)
+__all__ = ("LookupActionProcessor", "PublicLookupActionProcessor")
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -95,3 +95,14 @@ class LookupActionProcessor[TAction: BaseLookupAction, TResult: BaseLookupAction
                 error_code=run_status.error_code,
             )
             await self._finalize_monitors(action, meta)
+
+
+class PublicLookupActionProcessor[TAction: BaseLookupAction, TResult: BaseLookupActionResult](
+    LookupActionProcessor[TAction, TResult]
+):
+    """Resolve a key that every authenticated caller may resolve.
+
+    Separated from :class:`LookupActionProcessor` before the permission check on the
+    resolved entity exists, so that check lands on one processor rather than on a
+    re-audit of every lookup in the repository.
+    """

@@ -130,8 +130,8 @@ from ai.backend.manager.services.model_serving.processors.auto_scaling import (
 from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
 )
-from ai.backend.manager.services.runtime_variant.actions.resolve_by_name import (
-    ResolveRuntimeVariantByNameAction,
+from ai.backend.manager.services.runtime_variant.actions.lookup import (
+    LookupRuntimeVariantAction,
 )
 from ai.backend.manager.services.runtime_variant.actions.search import (
     SearchRuntimeVariantsAction,
@@ -743,8 +743,8 @@ class ServiceHandler:
         Uses the dedicated ``resolve_by_name`` processor added for the
         legacy → id migration; v2 surface callers skip this step.
         """
-        result = await self._runtime_variant.lookup.run(
-            ResolveRuntimeVariantByNameAction(name=str(name))
+        result = await self._runtime_variant.public_lookup.run(
+            LookupRuntimeVariantAction(name=str(name))
         )
         return result.data.id
 

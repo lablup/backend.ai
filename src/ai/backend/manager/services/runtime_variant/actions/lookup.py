@@ -9,7 +9,7 @@ from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-from ai.backend.manager.repositories.runtime_variant.lookups import RuntimeVariantByName
+from ai.backend.manager.repositories.runtime_variant.lookups import RuntimeVariantLookup
 
 
 @dataclass(frozen=True)
@@ -28,9 +28,7 @@ class RuntimeVariantNameKey(LookupKey):
 
 
 @dataclass
-class ResolveRuntimeVariantByNameAction(
-    LookupEntityOpsAction[RuntimeVariantRow, RuntimeVariantData]
-):
+class LookupRuntimeVariantAction(LookupEntityOpsAction[RuntimeVariantRow, RuntimeVariantData]):
     """Resolve a runtime variant name into the variant it names.
 
     Legacy API handlers call this before invoking id-typed internal adapters, so
@@ -47,12 +45,12 @@ class ResolveRuntimeVariantByNameAction(
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "resolve_runtime_variant_by_name"
+        return "lookup_runtime_variant"
 
     @override
     def lookup_key(self) -> RuntimeVariantNameKey:
         return RuntimeVariantNameKey(name=self.name)
 
     @override
-    def to_lookup(self) -> RuntimeVariantByName:
-        return RuntimeVariantByName(name=self.name)
+    def to_lookup(self) -> RuntimeVariantLookup:
+        return RuntimeVariantLookup(name=self.name)

@@ -11,7 +11,7 @@ from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 from ai.backend.manager.repositories.storage_namespace.lookups import (
-    StorageNamespaceByStorageAndName,
+    StorageNamespaceLookup,
 )
 
 
@@ -32,7 +32,7 @@ class StorageNamespaceKey(LookupKey):
 
 
 @dataclass
-class ResolveStorageNamespaceAction(
+class LookupStorageNamespaceAction(
     LookupEntityOpsAction[StorageNamespaceRow, StorageNamespaceData]
 ):
     """Resolve a (storage, namespace) pair into the row it names.
@@ -53,14 +53,12 @@ class ResolveStorageNamespaceAction(
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "resolve_storage_namespace"
+        return "lookup_storage_namespace"
 
     @override
     def lookup_key(self) -> StorageNamespaceKey:
         return StorageNamespaceKey(storage_id=self.storage_id, namespace=self.namespace)
 
     @override
-    def to_lookup(self) -> StorageNamespaceByStorageAndName:
-        return StorageNamespaceByStorageAndName(
-            storage_id=self.storage_id, namespace=self.namespace
-        )
+    def to_lookup(self) -> StorageNamespaceLookup:
+        return StorageNamespaceLookup(storage_id=self.storage_id, namespace=self.namespace)

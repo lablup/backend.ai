@@ -36,7 +36,6 @@ from ai.backend.manager.data.runtime_variant_preset.types import (
     RuntimeVariantPresetData,
     UIOptionData,
 )
-from ai.backend.manager.errors.resource import RuntimeVariantPresetNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.runtime_variant_preset.conditions import (
     RuntimeVariantPresetConditions,
@@ -61,6 +60,9 @@ from ai.backend.manager.repositories.runtime_variant_preset.updaters import (
 )
 from ai.backend.manager.services.runtime_variant_preset.actions.create import (
     CreateRuntimeVariantPresetAction,
+)
+from ai.backend.manager.services.runtime_variant_preset.actions.get import (
+    GetRuntimeVariantPresetAction,
 )
 from ai.backend.manager.services.runtime_variant_preset.actions.purge import (
     PurgeRuntimeVariantPresetAction,
@@ -132,20 +134,10 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
         )
 
     async def get(self, preset_id: UUID) -> RuntimeVariantPresetNode:
-        conditions: list[QueryCondition] = [lambda: RuntimeVariantPresetRow.id == preset_id]
-        searcher = self._build_searcher(
-            RuntimeVariantPresetSearcher,
-            conditions=conditions,
-            orders=[],
-            pagination_spec=_preset_pagination_spec(),
-            limit=1,
+        result = await self._processors.runtime_variant_preset.public_get.run(
+            GetRuntimeVariantPresetAction(preset_id=preset_id)
         )
-        result = await self._processors.runtime_variant_preset.public_search.run(
-            SearchRuntimeVariantPresetsAction(searcher=searcher)
-        )
-        if not result.items:
-            raise RuntimeVariantPresetNotFound()
-        return self._data_to_node(result.items[0])
+        return self._data_to_node(result.data)
 
     async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[RuntimeVariantPresetNode | None]:
         """Batch-load presets by id, aligned to ``ids`` order (``None`` for missing)."""

@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.run_status import ActionRunStatus
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.actions.v2.single_entity.monitor import SingleEntityActionMonitor
 from ai.backend.manager.actions.v2.single_entity.result import (
@@ -13,8 +14,12 @@ from ai.backend.manager.actions.v2.single_entity.result import (
     SingleEntityActionResultMeta,
 )
 from ai.backend.manager.actions.v2.single_entity.validator import SingleEntityActionValidator
+from ai.backend.manager.actions.v2.single_entity.validator.authenticated import (
+    AuthenticatedActionValidator,
+)
+from ai.backend.manager.errors.common import ServerMisconfiguredError
 
-__all__ = ("SingleEntityActionProcessor",)
+__all__ = ("SingleEntityActionProcessor", "PublicSingleEntityActionProcessor")
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -96,3 +101,35 @@ class SingleEntityActionProcessor[TAction: BaseSingleEntityAction, TResult]:
                 error_code=run_status.error_code,
             )
             await self._finalize_monitors(action, meta)
+
+
+class PublicSingleEntityActionProcessor[TAction: BaseSingleEntityAction, TResult](
+    SingleEntityActionProcessor[TAction, TResult]
+):
+    """Validate authentication only, then execute a single-entity read.
+
+    The counterpart of :class:`SingleEntityActionProcessor` for an entity every
+    authenticated user may read. The shape stays single-entity, so the audit row
+    still names the id that was read; only the RBAC validators are left off.
+
+    Only reads may run without the gate, and the constructor enforces it.
+    """
+
+    def __init__(
+        self,
+        action_cls: type[TAction],
+        func: Callable[[TAction], Awaitable[TResult]],
+        monitors: Sequence[SingleEntityActionMonitor] | None = None,
+        validators: Sequence[SingleEntityActionValidator] | None = None,
+    ) -> None:
+        operation_type = action_cls.operation_type()
+        if operation_type not in ActionOperationType.read_operations():
+            raise ServerMisconfiguredError(
+                f"{action_cls.__name__} declares operation_type()={operation_type}, "
+                "but the public path only accepts read actions."
+            )
+        super().__init__(
+            func,
+            monitors=monitors,
+            validators=[AuthenticatedActionValidator(), *(validators or [])],
+        )

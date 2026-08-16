@@ -24,10 +24,10 @@ from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagin
 from ai.backend.manager.models.storage_namespace.creators import StorageNamespaceCreator
 from ai.backend.manager.repositories.storage_namespace.searchers import StorageNamespaceSearcher
 from ai.backend.manager.services.storage_namespace.actions.get_multi import GetNamespacesAction
-from ai.backend.manager.services.storage_namespace.actions.register import RegisterNamespaceAction
-from ai.backend.manager.services.storage_namespace.actions.resolve_by_namespace import (
-    ResolveStorageNamespaceAction,
+from ai.backend.manager.services.storage_namespace.actions.lookup import (
+    LookupStorageNamespaceAction,
 )
+from ai.backend.manager.services.storage_namespace.actions.register import RegisterNamespaceAction
 from ai.backend.manager.services.storage_namespace.actions.search import (
     SearchStorageNamespacesAction,
 )
@@ -147,7 +147,7 @@ class TestStorageNamespace:
 
         # Unregister: the pair resolves to an id, and the purge takes the id
         resolved = await storage_namespace_processors.lookup.run(
-            ResolveStorageNamespaceAction(storage_id=storage["id"], namespace="to-unregister")
+            LookupStorageNamespaceAction(storage_id=storage["id"], namespace="to-unregister")
         )
         assert resolved.data.id == ns["id"]
         unregister_result = await storage_namespace_processors.global_unregister.run(
@@ -241,7 +241,7 @@ class TestStorageNamespace:
 
         # Unregister: the pair resolves to an id, and the purge takes the id
         resolved = await storage_namespace_processors.lookup.run(
-            ResolveStorageNamespaceAction(storage_id=storage["id"], namespace="lifecycle-ns")
+            LookupStorageNamespaceAction(storage_id=storage["id"], namespace="lifecycle-ns")
         )
         await storage_namespace_processors.global_unregister.run(
             UnregisterNamespaceAction(id=resolved.data.id)

@@ -29,8 +29,8 @@ from ai.backend.manager.dto.response import (
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.vfs_storage.searchers import VFSStorageSearcher
 from ai.backend.manager.services.vfs_storage.actions.list import ListVFSStorageAction
-from ai.backend.manager.services.vfs_storage.actions.resolve_by_name import (
-    ResolveVFSStorageByNameAction,
+from ai.backend.manager.services.vfs_storage.actions.lookup import (
+    LookupVFSStorageAction,
 )
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 
@@ -99,7 +99,7 @@ class VFSStorageHandler:
         log.info("Download request for file: {} from storage: {}", filepath, storage_name)
 
         action_result = await self._vfs_storage.lookup.run(
-            ResolveVFSStorageByNameAction(name=storage_name)
+            LookupVFSStorageAction(name=storage_name)
         )
 
         manager_client = self._vfs_storage.get_manager_facing_client(action_result.data.host)
@@ -135,7 +135,7 @@ class VFSStorageHandler:
         log.info("Get storage request for storage: {}", storage_name)
 
         action_result = await self._vfs_storage.lookup.run(
-            ResolveVFSStorageByNameAction(name=storage_name)
+            LookupVFSStorageAction(name=storage_name)
         )
 
         storage_data = action_result.data
@@ -186,7 +186,7 @@ class VFSStorageHandler:
         log.info("List files request for directory: {} from storage: {}", directory, storage_name)
 
         action_result = await self._vfs_storage.lookup.run(
-            ResolveVFSStorageByNameAction(name=storage_name)
+            LookupVFSStorageAction(name=storage_name)
         )
 
         manager_client = self._vfs_storage.get_manager_facing_client(action_result.data.host)

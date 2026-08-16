@@ -30,12 +30,13 @@ grows a branch; the generic services take no hook or callback to hide one in.
 
 ## Naming
 
-- `global` spans the whole table instead of narrowing by scope. The widest it opens
-  to is `public`.
 - The `global` and `public` shapes carry that name as a prefix on the action class,
   the `action_name()` and the processor field —
   `GlobalSearchErrorLogsAction` / `global_search_error_logs` / `global_search`.
 - Every other operation takes no prefix.
+- A lookup does not carry its key in its own name, because one lookup may come to
+  accept several — `LookupRuntimeVariantAction` / `lookup_runtime_variant`, never
+  `by_name`. The `LookupKey` subclass and its `kind()` name the key instead.
 
 ## Service method rules
 

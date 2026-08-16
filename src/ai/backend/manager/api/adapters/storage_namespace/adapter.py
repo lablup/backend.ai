@@ -24,10 +24,10 @@ from ai.backend.manager.models.storage_namespace.conditions import StorageNamesp
 from ai.backend.manager.models.storage_namespace.creators import StorageNamespaceCreator
 from ai.backend.manager.repositories.storage_namespace.searchers import StorageNamespaceSearcher
 from ai.backend.manager.services.storage_namespace.actions.get_multi import GetNamespacesAction
-from ai.backend.manager.services.storage_namespace.actions.register import RegisterNamespaceAction
-from ai.backend.manager.services.storage_namespace.actions.resolve_by_namespace import (
-    ResolveStorageNamespaceAction,
+from ai.backend.manager.services.storage_namespace.actions.lookup import (
+    LookupStorageNamespaceAction,
 )
+from ai.backend.manager.services.storage_namespace.actions.register import RegisterNamespaceAction
 from ai.backend.manager.services.storage_namespace.actions.search import (
     SearchStorageNamespacesAction,
 )
@@ -64,7 +64,7 @@ class StorageNamespaceAdapter(BaseAdapter):
         # The API names a namespace by the pair it was registered under, so the id the
         # purge needs is resolved first rather than taught to the purge itself.
         resolved = await self._processors.storage_namespace.lookup.run(
-            ResolveStorageNamespaceAction(
+            LookupStorageNamespaceAction(
                 storage_id=input.storage_id,
                 namespace=input.namespace,
             )

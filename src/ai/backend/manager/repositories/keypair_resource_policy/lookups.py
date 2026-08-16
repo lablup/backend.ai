@@ -1,43 +1,42 @@
-"""Types for keypair resource policy repository operations."""
+"""DataLookup implementations for the keypair resource policy repository."""
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, override
+from typing import override
 
 import sqlalchemy as sa
 
 from ai.backend.common.identifier.user import UserID
+from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
-
-__all__ = ("UserKeypairResourcePolicyOperationScope",)
+from ai.backend.manager.models.specs.lookup import DataLookup
 
 
-@dataclass(frozen=True)
-class UserKeypairResourcePolicyOperationScope(OperationScope):
-    """The policy the named user's default keypair is subject to.
+@dataclass
+class KeypairResourcePolicyLookup(DataLookup[KeyPairResourcePolicyRow, KeyPairResourcePolicyData]):
+    """Resolves a user into the policy their default keypair is subject to.
 
     Picks the keypair marked default, else the earliest active one: the marker is
     backfilled only from the former ``main_access_key`` and can be absent.
-
-    ``existence_checks`` is empty by convention -- RBAC validation already gates
-    reachability.
     """
 
     user_id: UserID
 
     @override
-    def to_condition(self) -> QueryCondition:
-        user_id = self.user_id
+    def row_class(self) -> type[KeyPairResourcePolicyRow]:
+        return KeyPairResourcePolicyRow
 
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return KeyPairResourcePolicyRow.name.in_(
+    @override
+    def conditions(self) -> Sequence[QueryCondition]:
+        return [
+            lambda: KeyPairResourcePolicyRow.name
+            == (
                 sa.select(KeyPairRow.resource_policy)
-                .where(KeyPairRow.user == user_id)
+                .where(KeyPairRow.user == self.user_id)
                 .where(KeyPairRow.is_active.is_(True))
                 .order_by(
                     KeyPairRow.is_default.desc(),
@@ -45,11 +44,10 @@ class UserKeypairResourcePolicyOperationScope(OperationScope):
                     KeyPairRow.access_key.asc(),
                 )
                 .limit(1)
+                .scalar_subquery()
             )
+        ]
 
-        return inner
-
-    @property
     @override
-    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
-        return ()
+    def to_data(self, row: KeyPairResourcePolicyRow) -> KeyPairResourcePolicyData:
+        return row.to_dataclass()

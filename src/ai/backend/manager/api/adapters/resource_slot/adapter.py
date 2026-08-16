@@ -82,8 +82,8 @@ from ai.backend.manager.services.resource_slot.actions.get_kernel_allocation_by_
 from ai.backend.manager.services.resource_slot.actions.get_project_resource_overview import (
     GetProjectResourceOverviewAction,
 )
-from ai.backend.manager.services.resource_slot.actions.get_resource_slot_type import (
-    GetResourceSlotTypeAction,
+from ai.backend.manager.services.resource_slot.actions.lookup import (
+    LookupResourceSlotTypeAction,
 )
 from ai.backend.manager.services.resource_slot.actions.purge import PurgeResourceSlotTypeAction
 from ai.backend.manager.services.resource_slot.actions.search_agent_resources import (
@@ -476,8 +476,8 @@ class ResourceSlotAdapter(BaseAdapter):
 
     async def get_slot_type(self, slot_name: str) -> ResourceSlotTypeNode:
         """Retrieve a single resource slot type by slot name."""
-        action_result = await self._processors.resource_slot.public_get_resource_slot_type.run(
-            GetResourceSlotTypeAction(slot_name=slot_name)
+        action_result = await self._processors.resource_slot.public_lookup_resource_slot_type.run(
+            LookupResourceSlotTypeAction(slot_name=slot_name)
         )
         return self._slot_type_data_to_node(action_result.data)
 
