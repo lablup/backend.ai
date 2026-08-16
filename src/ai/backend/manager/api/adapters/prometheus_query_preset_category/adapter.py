@@ -70,7 +70,7 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
             conditions=[PrometheusQueryPresetCategoryConditions.by_ids(ids)],
         )
         action_result = (
-            await self._processors.prometheus_query_preset_category.search_categories.run(
+            await self._processors.prometheus_query_preset_category.global_search_categories.run(
                 SearchCategoriesAction(searcher=searcher)
             )
         )
@@ -86,8 +86,10 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
             description=input.description,
         )
 
-        action_result = await self._processors.prometheus_query_preset_category.create_category.run(
-            CreateCategoryAction(creator=creator)
+        action_result = (
+            await self._processors.prometheus_query_preset_category.global_create_category.run(
+                CreateCategoryAction(creator=creator)
+            )
         )
 
         return CreateCategoryPayload(item=self._data_to_dto(action_result.data))
@@ -101,7 +103,7 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
         searcher = self.build_searcher(input)
 
         action_result = (
-            await self._processors.prometheus_query_preset_category.search_categories.run(
+            await self._processors.prometheus_query_preset_category.global_search_categories.run(
                 SearchCategoriesAction(searcher=searcher)
             )
         )
@@ -115,16 +117,20 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
 
     async def get(self, category_id: UUID) -> GetCategoryPayload:
         """Get a single category by ID."""
-        action_result = await self._processors.prometheus_query_preset_category.get_category.run(
-            GetCategoryAction(category_id=PrometheusQueryPresetCategoryID(category_id))
+        action_result = (
+            await self._processors.prometheus_query_preset_category.global_get_category.run(
+                GetCategoryAction(category_id=PrometheusQueryPresetCategoryID(category_id))
+            )
         )
 
         return GetCategoryPayload(item=self._data_to_dto(action_result.data))
 
     async def delete(self, input: DeleteCategoryInput) -> DeleteCategoryPayload:
         """Remove a category by ID."""
-        action_result = await self._processors.prometheus_query_preset_category.purge_category.run(
-            PurgeCategoryAction(category_id=PrometheusQueryPresetCategoryID(input.id))
+        action_result = (
+            await self._processors.prometheus_query_preset_category.global_purge_category.run(
+                PurgeCategoryAction(category_id=PrometheusQueryPresetCategoryID(input.id))
+            )
         )
 
         return DeleteCategoryPayload(id=action_result.data.id)

@@ -12,7 +12,7 @@ from ai.backend.manager.repositories.error_log.searchers import ErrorLogSearcher
 
 
 @dataclass
-class AdminSearchErrorLogsAction(SearchGlobalOpsAction[ErrorLogRow, ErrorLogData]):
+class GlobalSearchErrorLogsAction(SearchGlobalOpsAction[ErrorLogRow, ErrorLogData]):
     """Page through every recorded error — the super-admin read."""
 
     searcher: ErrorLogSearcher
@@ -25,7 +25,7 @@ class AdminSearchErrorLogsAction(SearchGlobalOpsAction[ErrorLogRow, ErrorLogData
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "admin_search_error_logs"
+        return "global_search_error_logs"
 
     @override
     def to_searcher(self) -> ErrorLogSearcher:

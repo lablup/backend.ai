@@ -97,7 +97,7 @@ class AppConfigAllowListAdapter(BaseAdapter):
             scope_type=AppConfigScopeType(input.scope_type.value),
             rank=input.rank,
         )
-        action_result = await self._processors.app_config_allow_list.create.run(
+        action_result = await self._processors.app_config_allow_list.global_create.run(
             CreateAppConfigAllowListAction(creator=creator)
         )
         return CreateAppConfigAllowListPayload(
@@ -128,7 +128,7 @@ class AppConfigAllowListAdapter(BaseAdapter):
             orders=[],
             limit=len(ids),
         )
-        action_result = await self._processors.app_config_allow_list.admin_search.run(
+        action_result = await self._processors.app_config_allow_list.global_search.run(
             AdminSearchAppConfigAllowListAction(searcher=searcher)
         )
         node_map = {node.id: node for node in map(self._data_to_node, action_result.items)}
@@ -151,7 +151,7 @@ class AppConfigAllowListAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.app_config_allow_list.admin_search.run(
+        action_result = await self._processors.app_config_allow_list.global_search.run(
             AdminSearchAppConfigAllowListAction(searcher=searcher)
         )
         return SearchAppConfigAllowListPayload(
@@ -181,7 +181,7 @@ class AppConfigAllowListAdapter(BaseAdapter):
         self, input: PurgeAppConfigAllowListInput
     ) -> PurgeAppConfigAllowListPayload:
         purger = AppConfigAllowListPurger(allow_list_id=AppConfigAllowListID(input.id))
-        action_result = await self._processors.app_config_allow_list.purge.run(
+        action_result = await self._processors.app_config_allow_list.global_purge.run(
             PurgeAppConfigAllowListAction(purger=purger)
         )
         return PurgeAppConfigAllowListPayload(id=action_result.data.id)

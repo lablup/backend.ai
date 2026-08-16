@@ -48,11 +48,11 @@ class ResourceSlotProcessors:
     search_resource_allocations: ActionProcessor[
         SearchResourceAllocationsAction, SearchResourceAllocationsResult
     ]
-    get_resource_slot_type: PublicActionProcessor[
+    public_get_resource_slot_type: PublicActionProcessor[
         GetResourceSlotTypeAction,
         EntityOpsResult[ResourceSlotTypeData],
     ]
-    search_resource_slot_types: PublicActionProcessor[
+    public_search_resource_slot_types: PublicActionProcessor[
         SearchResourceSlotTypesAction,
         BatchOpsResult[ResourceSlotTypeData],
     ]
@@ -62,15 +62,15 @@ class ResourceSlotProcessors:
     get_project_resource_overview: ActionProcessor[
         GetProjectResourceOverviewAction, GetProjectResourceOverviewResult
     ]
-    create_resource_slot_type: GlobalActionProcessor[
+    global_create_resource_slot_type: GlobalActionProcessor[
         CreateResourceSlotTypeAction,
         CreatedEntityOpsResult[ResourceSlotTypeData],
     ]
-    update_resource_slot_type: GlobalActionProcessor[
+    global_update_resource_slot_type: GlobalActionProcessor[
         UpdateResourceSlotTypeAction,
         EntityOpsResult[ResourceSlotTypeData],
     ]
-    purge_resource_slot_type: GlobalActionProcessor[
+    global_purge_resource_slot_type: GlobalActionProcessor[
         PurgeResourceSlotTypeAction,
         EntityOpsResult[ResourceSlotTypeData],
     ]
@@ -94,14 +94,20 @@ class ResourceSlotProcessors:
         self.search_resource_allocations = ActionProcessor(
             service.search_resource_allocations, action_monitors
         )
-        self.get_resource_slot_type = group.public_get_ops(GetResourceSlotTypeAction)
-        self.search_resource_slot_types = group.public_search_ops(SearchResourceSlotTypesAction)
+        self.public_get_resource_slot_type = group.public_get_ops(GetResourceSlotTypeAction)
+        self.public_search_resource_slot_types = group.public_search_ops(
+            SearchResourceSlotTypesAction
+        )
         self.get_domain_resource_overview = ActionProcessor(
             service.get_domain_resource_overview, action_monitors
         )
         self.get_project_resource_overview = ActionProcessor(
             service.get_project_resource_overview, action_monitors
         )
-        self.create_resource_slot_type = group.global_create_ops(CreateResourceSlotTypeAction)
-        self.update_resource_slot_type = group.global_update_ops(UpdateResourceSlotTypeAction)
-        self.purge_resource_slot_type = group.global_purge_ops(PurgeResourceSlotTypeAction)
+        self.global_create_resource_slot_type = group.global_create_ops(
+            CreateResourceSlotTypeAction
+        )
+        self.global_update_resource_slot_type = group.global_update_ops(
+            UpdateResourceSlotTypeAction
+        )
+        self.global_purge_resource_slot_type = group.global_purge_ops(PurgeResourceSlotTypeAction)

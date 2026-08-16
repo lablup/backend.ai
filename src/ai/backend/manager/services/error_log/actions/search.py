@@ -18,12 +18,7 @@ from ai.backend.manager.repositories.error_log.types import UserErrorLogOperatio
 
 @dataclass
 class SearchErrorLogsAction(OperationScopeOpsAction[ErrorLogRow, ErrorLogData]):
-    """Page through the errors recorded against one user.
-
-    The super-admin read is a different action against the whole table; this one
-    never widens past the user it names, so a caller cannot reach another user's
-    errors by asking nicely.
-    """
+    """Page through the errors recorded against one user."""
 
     user_id: UserID
     searcher: ErrorLogSearcher

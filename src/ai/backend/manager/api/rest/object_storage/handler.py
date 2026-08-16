@@ -64,7 +64,7 @@ class ObjectStorageHandler:
         body: BodyParam[GetPresignedDownloadURLReq],
     ) -> APIResponse:
         """Generate a presigned URL for safely downloading artifact files."""
-        action_result = await self._object_storage.get_presigned_download_url.run(
+        action_result = await self._object_storage.global_get_presigned_download_url.run(
             GetDownloadPresignedURLAction(
                 artifact_revision_id=body.parsed.artifact_revision_id,
                 key=body.parsed.key,
@@ -80,7 +80,7 @@ class ObjectStorageHandler:
         body: BodyParam[GetPresignedUploadURLReq],
     ) -> APIResponse:
         """Generate a presigned URL for uploading artifact files."""
-        action_result = await self._object_storage.get_presigned_upload_url.run(
+        action_result = await self._object_storage.global_get_presigned_upload_url.run(
             GetUploadPresignedURLAction(
                 artifact_revision_id=body.parsed.artifact_revision_id,
                 key=body.parsed.key,
@@ -102,7 +102,7 @@ class ObjectStorageHandler:
         """
         # Grouping is the caller's job: the search reads the table, and this
         # deprecated shape is the only one that wants it keyed by storage.
-        action_result = await self._storage_namespace.search.run(
+        action_result = await self._storage_namespace.global_search.run(
             SearchStorageNamespacesAction(
                 searcher=StorageNamespaceSearcher(pagination=NoPagination()),
             )
@@ -124,7 +124,7 @@ class ObjectStorageHandler:
         """
         storage_id: uuid.UUID = path.parsed.storage_id
 
-        action_result = await self._storage_namespace.get_namespaces.run(
+        action_result = await self._storage_namespace.global_get_namespaces.run(
             GetNamespacesAction(storage_id=storage_id)
         )
 
@@ -136,7 +136,7 @@ class ObjectStorageHandler:
         self,
     ) -> APIResponse:
         """List all configured object storage systems."""
-        action_result = await self._object_storage.list_storages.run(
+        action_result = await self._object_storage.global_list_storages.run(
             ListObjectStorageAction(searcher=ObjectStorageSearcher(pagination=NoPagination()))
         )
 

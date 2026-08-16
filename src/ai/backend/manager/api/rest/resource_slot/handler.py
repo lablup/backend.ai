@@ -48,7 +48,7 @@ class ResourceSlotHandler:
 
         searcher = self._adapter.build_searcher(body.parsed)
 
-        action_result = await self._resource_slot.search_resource_slot_types.run(
+        action_result = await self._resource_slot.public_search_resource_slot_types.run(
             SearchResourceSlotTypesAction(searcher=searcher)
         )
 
@@ -70,7 +70,7 @@ class ResourceSlotHandler:
         slot_name = path.parsed.slot_name
         log.info("GET_RESOURCE_SLOT_TYPE (slot_name:{})", slot_name)
 
-        action_result = await self._resource_slot.get_resource_slot_type.run(
+        action_result = await self._resource_slot.public_get_resource_slot_type.run(
             GetResourceSlotTypeAction(slot_name=slot_name)
         )
 

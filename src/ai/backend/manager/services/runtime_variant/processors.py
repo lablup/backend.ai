@@ -33,19 +33,25 @@ from ai.backend.manager.services.runtime_variant.actions.update import (
 class RuntimeVariantProcessors:
     """Every operation runs straight against ops, so this domain has no service."""
 
-    create: GlobalActionProcessor[
+    global_create: GlobalActionProcessor[
         CreateRuntimeVariantAction, CreatedEntityOpsResult[RuntimeVariantData]
     ]
-    update: GlobalActionProcessor[UpdateRuntimeVariantAction, EntityOpsResult[RuntimeVariantData]]
-    purge: GlobalActionProcessor[PurgeRuntimeVariantAction, EntityOpsResult[RuntimeVariantData]]
-    search: PublicActionProcessor[SearchRuntimeVariantsAction, BatchOpsResult[RuntimeVariantData]]
+    global_update: GlobalActionProcessor[
+        UpdateRuntimeVariantAction, EntityOpsResult[RuntimeVariantData]
+    ]
+    global_purge: GlobalActionProcessor[
+        PurgeRuntimeVariantAction, EntityOpsResult[RuntimeVariantData]
+    ]
+    public_search: PublicActionProcessor[
+        SearchRuntimeVariantsAction, BatchOpsResult[RuntimeVariantData]
+    ]
     lookup: LookupActionProcessor[
         ResolveRuntimeVariantByNameAction, LookupOpsResult[RuntimeVariantData]
     ]
 
     def __init__(self, group: ProcessorGroup[RuntimeVariantData]) -> None:
-        self.create = group.global_create_ops(CreateRuntimeVariantAction)
-        self.update = group.global_update_ops(UpdateRuntimeVariantAction)
-        self.purge = group.global_purge_ops(PurgeRuntimeVariantAction)
-        self.search = group.public_search_ops(SearchRuntimeVariantsAction)
+        self.global_create = group.global_create_ops(CreateRuntimeVariantAction)
+        self.global_update = group.global_update_ops(UpdateRuntimeVariantAction)
+        self.global_purge = group.global_purge_ops(PurgeRuntimeVariantAction)
+        self.public_search = group.public_search_ops(SearchRuntimeVariantsAction)
         self.lookup = group.lookup_ops(ResolveRuntimeVariantByNameAction)

@@ -76,7 +76,9 @@ class PrometheusQueryPresetHandler:
             filter_labels=body.parsed.options.filter_labels,
             group_labels=body.parsed.options.group_labels,
         )
-        action_result = await self._processor.create_preset.run(CreatePresetAction(creator=creator))
+        action_result = await self._processor.global_create_preset.run(
+            CreatePresetAction(creator=creator)
+        )
         resp = CreateQueryDefinitionResponse(item=self._adapter.convert_to_dto(action_result.data))
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=resp)
 
@@ -86,7 +88,7 @@ class PrometheusQueryPresetHandler:
     ) -> APIResponse:
         """Search presets with filters, orders, and pagination."""
         searcher = self._adapter.build_searcher(body.parsed)
-        action_result = await self._processor.search_presets.run(
+        action_result = await self._processor.global_search_presets.run(
             SearchPresetsAction(searcher=searcher)
         )
         resp = SearchQueryDefinitionsResponse(
@@ -106,7 +108,7 @@ class PrometheusQueryPresetHandler:
         path: PathParam[QueryDefinitionIdPathParam],
     ) -> APIResponse:
         """Get a preset by ID."""
-        action_result = await self._processor.get_preset.run(
+        action_result = await self._processor.global_get_preset.run(
             GetPresetAction(preset_id=PrometheusQueryPresetID(path.parsed.id))
         )
         resp = GetQueryDefinitionResponse(item=self._adapter.convert_to_dto(action_result.data))
@@ -119,7 +121,7 @@ class PrometheusQueryPresetHandler:
     ) -> APIResponse:
         """Modify a preset."""
         updater = self._adapter.build_updater(body.parsed, path.parsed.id)
-        action_result = await self._processor.update_preset.run(
+        action_result = await self._processor.global_update_preset.run(
             UpdatePresetAction(preset_id=PrometheusQueryPresetID(path.parsed.id), updater=updater)
         )
         resp = ModifyQueryDefinitionResponse(
@@ -132,7 +134,7 @@ class PrometheusQueryPresetHandler:
         path: PathParam[QueryDefinitionIdPathParam],
     ) -> APIResponse:
         """Delete a preset."""
-        action_result = await self._processor.purge_preset.run(
+        action_result = await self._processor.global_purge_preset.run(
             PurgePresetAction(preset_id=PrometheusQueryPresetID(path.parsed.id))
         )
         resp = DeleteQueryDefinitionResponse(id=action_result.data.id)
@@ -150,7 +152,7 @@ class PrometheusQueryPresetHandler:
             group_labels=body.parsed.options.group_labels,
         )
 
-        action_result = await self._processor.execute_preset.run(
+        action_result = await self._processor.global_execute_preset.run(
             ExecutePresetAction(
                 preset_id=path.parsed.id,
                 options=options,

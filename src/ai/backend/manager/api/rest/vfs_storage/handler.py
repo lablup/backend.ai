@@ -155,7 +155,7 @@ class VFSStorageHandler:
         """List all VFS storages."""
         log.info("List all VFS storages.")
 
-        action_result = await self._vfs_storage.list_storages.run(
+        action_result = await self._vfs_storage.global_list_storages.run(
             ListVFSStorageAction(searcher=VFSStorageSearcher(pagination=NoPagination()))
         )
 

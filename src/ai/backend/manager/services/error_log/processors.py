@@ -11,9 +11,9 @@ from ai.backend.manager.actions.v2.ops.result import (
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.error_log.types import ErrorLogData
-from ai.backend.manager.services.error_log.actions.admin_search import AdminSearchErrorLogsAction
 from ai.backend.manager.services.error_log.actions.create import CreateErrorLogAction
 from ai.backend.manager.services.error_log.actions.delete import DeleteErrorLogAction
+from ai.backend.manager.services.error_log.actions.global_search import GlobalSearchErrorLogsAction
 from ai.backend.manager.services.error_log.actions.search import SearchErrorLogsAction
 
 
@@ -26,12 +26,12 @@ class ErrorLogProcessors:
     """
 
     create: ScopeActionProcessor[CreateErrorLogAction, CreatedEntityOpsResult[ErrorLogData]]
-    search: GlobalActionProcessor[AdminSearchErrorLogsAction, BatchOpsResult[ErrorLogData]]
+    global_search: GlobalActionProcessor[GlobalSearchErrorLogsAction, BatchOpsResult[ErrorLogData]]
     scoped_search: ScopeActionProcessor[SearchErrorLogsAction, ScopedBatchOpsResult[ErrorLogData]]
     delete: SingleEntityActionProcessor[DeleteErrorLogAction, EntityOpsResult[ErrorLogData]]
 
     def __init__(self, group: ProcessorGroup[ErrorLogData]) -> None:
         self.create = group.entity_create_ops(CreateErrorLogAction)
-        self.search = group.global_search_ops(AdminSearchErrorLogsAction)
+        self.global_search = group.global_search_ops(GlobalSearchErrorLogsAction)
         self.scoped_search = group.scope_search_ops(SearchErrorLogsAction)
         self.delete = group.single_delete_ops(DeleteErrorLogAction)

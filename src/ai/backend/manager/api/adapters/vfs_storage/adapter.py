@@ -41,7 +41,7 @@ class VFSStorageAdapter(BaseAdapter):
 
     async def create(self, input: CreateVFSStorageInput) -> CreateVFSStoragePayload:
         """Create a new VFS storage."""
-        action_result = await self._processors.vfs_storage.create.run(
+        action_result = await self._processors.vfs_storage.global_create.run(
             CreateVFSStorageAction(
                 creator=VFSStorageCreator(
                     name=input.name,
@@ -61,7 +61,7 @@ class VFSStorageAdapter(BaseAdapter):
             offset=input.offset if input.offset is not None else 0,
         )
         searcher = VFSStorageSearcher(pagination=pagination, conditions=[], orders=[])
-        action_result = await self._processors.vfs_storage.search_vfs_storages.run(
+        action_result = await self._processors.vfs_storage.global_search_vfs_storages.run(
             SearchVFSStoragesAction(searcher=searcher)
         )
         return AdminSearchVFSStoragesPayload(
@@ -82,7 +82,7 @@ class VFSStorageAdapter(BaseAdapter):
             pagination=OffsetPagination(limit=len(ids)),
             conditions=[VFSStorageConditions.by_ids(ids)],
         )
-        action_result = await self._processors.vfs_storage.search_vfs_storages.run(
+        action_result = await self._processors.vfs_storage.global_search_vfs_storages.run(
             SearchVFSStoragesAction(searcher=searcher)
         )
         storage_map = {item.id: self._vfs_storage_data_to_dto(item) for item in action_result.items}
@@ -90,14 +90,14 @@ class VFSStorageAdapter(BaseAdapter):
 
     async def get(self, storage_id: UUID) -> VFSStorageNode:
         """Retrieve a single VFS storage by ID."""
-        action_result = await self._processors.vfs_storage.get.run(
+        action_result = await self._processors.vfs_storage.global_get.run(
             GetVFSStorageAction(storage_id=storage_id)
         )
         return self._vfs_storage_data_to_dto(action_result.data)
 
     async def list_all(self) -> list[VFSStorageNode]:
         """List all VFS storages without pagination."""
-        action_result = await self._processors.vfs_storage.list_storages.run(
+        action_result = await self._processors.vfs_storage.global_list_storages.run(
             ListVFSStorageAction(searcher=VFSStorageSearcher(pagination=NoPagination()))
         )
         return [self._vfs_storage_data_to_dto(item) for item in action_result.items]
@@ -118,7 +118,7 @@ class VFSStorageAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
         )
-        action_result = await self._processors.vfs_storage.update.run(
+        action_result = await self._processors.vfs_storage.global_update.run(
             UpdateVFSStorageAction(updater=updater)
         )
         return UpdateVFSStoragePayload(
@@ -127,7 +127,7 @@ class VFSStorageAdapter(BaseAdapter):
 
     async def delete(self, input: DeleteVFSStorageInput) -> DeleteVFSStoragePayload:
         """Delete a VFS storage."""
-        action_result = await self._processors.vfs_storage.purge.run(
+        action_result = await self._processors.vfs_storage.global_purge.run(
             PurgeVFSStorageAction(storage_id=input.id)
         )
         return DeleteVFSStoragePayload(id=action_result.data.id)

@@ -73,7 +73,7 @@ class AppConfigDefinitionAdapter(BaseAdapter):
         self, input: CreateAppConfigDefinitionInput
     ) -> CreateAppConfigDefinitionPayload:
         creator = AppConfigDefinitionCreator(config_name=input.config_name)
-        action_result = await self._processors.app_config_definition.create.run(
+        action_result = await self._processors.app_config_definition.global_create.run(
             CreateAppConfigDefinitionAction(creator=creator)
         )
         return CreateAppConfigDefinitionPayload(
@@ -102,7 +102,7 @@ class AppConfigDefinitionAdapter(BaseAdapter):
             pagination_spec=_get_app_config_definition_pagination_spec(),
             limit=len(ids),
         )
-        action_result = await self._processors.app_config_definition.admin_search.run(
+        action_result = await self._processors.app_config_definition.global_search.run(
             AdminSearchAppConfigDefinitionsAction(searcher=searcher)
         )
         node_map = {node.id: node for node in map(self._data_to_node, action_result.items)}
@@ -125,7 +125,7 @@ class AppConfigDefinitionAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.app_config_definition.admin_search.run(
+        action_result = await self._processors.app_config_definition.global_search.run(
             AdminSearchAppConfigDefinitionsAction(searcher=searcher)
         )
         return SearchAppConfigDefinitionsPayload(
@@ -138,7 +138,7 @@ class AppConfigDefinitionAdapter(BaseAdapter):
     async def admin_purge(
         self, input: PurgeAppConfigDefinitionInput
     ) -> PurgeAppConfigDefinitionPayload:
-        action_result = await self._processors.app_config_definition.purge.run(
+        action_result = await self._processors.app_config_definition.global_purge.run(
             PurgeAppConfigDefinitionAction(definition_id=AppConfigDefinitionID(input.id))
         )
         return PurgeAppConfigDefinitionPayload(id=action_result.data.id)

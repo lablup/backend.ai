@@ -36,17 +36,25 @@ class LoginClientTypeProcessors:
     once in the class name and once in the factory that wires it.
     """
 
-    get: PublicActionProcessor[GetLoginClientTypeAction, EntityOpsResult[LoginClientTypeData]]
-    search: PublicActionProcessor[SearchLoginClientTypesAction, BatchOpsResult[LoginClientTypeData]]
-    create: GlobalActionProcessor[
+    public_get: PublicActionProcessor[
+        GetLoginClientTypeAction, EntityOpsResult[LoginClientTypeData]
+    ]
+    public_search: PublicActionProcessor[
+        SearchLoginClientTypesAction, BatchOpsResult[LoginClientTypeData]
+    ]
+    global_create: GlobalActionProcessor[
         CreateLoginClientTypeAction, CreatedEntityOpsResult[LoginClientTypeData]
     ]
-    update: GlobalActionProcessor[UpdateLoginClientTypeAction, EntityOpsResult[LoginClientTypeData]]
-    purge: GlobalActionProcessor[PurgeLoginClientTypeAction, EntityOpsResult[LoginClientTypeData]]
+    global_update: GlobalActionProcessor[
+        UpdateLoginClientTypeAction, EntityOpsResult[LoginClientTypeData]
+    ]
+    global_purge: GlobalActionProcessor[
+        PurgeLoginClientTypeAction, EntityOpsResult[LoginClientTypeData]
+    ]
 
     def __init__(self, group: ProcessorGroup[LoginClientTypeData]) -> None:
-        self.get = group.public_get_ops(GetLoginClientTypeAction)
-        self.search = group.public_search_ops(SearchLoginClientTypesAction)
-        self.create = group.global_create_ops(CreateLoginClientTypeAction)
-        self.update = group.global_update_ops(UpdateLoginClientTypeAction)
-        self.purge = group.global_purge_ops(PurgeLoginClientTypeAction)
+        self.public_get = group.public_get_ops(GetLoginClientTypeAction)
+        self.public_search = group.public_search_ops(SearchLoginClientTypesAction)
+        self.global_create = group.global_create_ops(CreateLoginClientTypeAction)
+        self.global_update = group.global_update_ops(UpdateLoginClientTypeAction)
+        self.global_purge = group.global_purge_ops(PurgeLoginClientTypeAction)

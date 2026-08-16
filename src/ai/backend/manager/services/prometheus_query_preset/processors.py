@@ -32,17 +32,19 @@ from ai.backend.manager.services.prometheus_query_preset.service import (
 class PrometheusQueryPresetProcessors:
     """The catalog CRUD runs against ops; what reads before writing or calls Prometheus stays."""
 
-    create_preset: GlobalActionProcessor[CreatePresetAction, CreatePresetActionResult]
-    get_preset: GlobalActionProcessor[GetPresetAction, EntityOpsResult[PrometheusQueryPresetData]]
-    search_presets: GlobalActionProcessor[
+    global_create_preset: GlobalActionProcessor[CreatePresetAction, CreatePresetActionResult]
+    global_get_preset: GlobalActionProcessor[
+        GetPresetAction, EntityOpsResult[PrometheusQueryPresetData]
+    ]
+    global_search_presets: GlobalActionProcessor[
         SearchPresetsAction, BatchOpsResult[PrometheusQueryPresetData]
     ]
-    purge_preset: GlobalActionProcessor[
+    global_purge_preset: GlobalActionProcessor[
         PurgePresetAction, EntityOpsResult[PrometheusQueryPresetData]
     ]
-    update_preset: GlobalActionProcessor[UpdatePresetAction, UpdatePresetActionResult]
-    preview_preset: GlobalActionProcessor[PreviewPresetAction, PreviewPresetActionResult]
-    execute_preset: GlobalActionProcessor[ExecutePresetAction, ExecutePresetActionResult]
+    global_update_preset: GlobalActionProcessor[UpdatePresetAction, UpdatePresetActionResult]
+    global_preview_preset: GlobalActionProcessor[PreviewPresetAction, PreviewPresetActionResult]
+    global_execute_preset: GlobalActionProcessor[ExecutePresetAction, ExecutePresetActionResult]
 
     def __init__(
         self,
@@ -50,10 +52,12 @@ class PrometheusQueryPresetProcessors:
         group: ProcessorGroup[PrometheusQueryPresetData],
     ) -> None:
         # The create validates its query template, so it keeps a service method.
-        self.create_preset = group.global_scope(CreatePresetAction, service.create_preset)
-        self.get_preset = group.global_get_ops(GetPresetAction)
-        self.search_presets = group.global_search_ops(SearchPresetsAction)
-        self.purge_preset = group.global_purge_ops(PurgePresetAction)
-        self.update_preset = group.global_scope(UpdatePresetAction, service.update_preset)
-        self.preview_preset = group.global_scope(PreviewPresetAction, service.preview_preset)
-        self.execute_preset = group.global_scope(ExecutePresetAction, service.execute_preset)
+        self.global_create_preset = group.global_scope(
+            CreatePresetAction, service.create_preset
+        )
+        self.global_get_preset = group.global_get_ops(GetPresetAction)
+        self.global_search_presets = group.global_search_ops(SearchPresetsAction)
+        self.global_purge_preset = group.global_purge_ops(PurgePresetAction)
+        self.global_update_preset = group.global_scope(UpdatePresetAction, service.update_preset)
+        self.global_preview_preset = group.global_scope(PreviewPresetAction, service.preview_preset)
+        self.global_execute_preset = group.global_scope(ExecutePresetAction, service.execute_preset)

@@ -28,33 +28,25 @@ from ai.backend.manager.services.project_resource_policy.actions.update_project_
 class ProjectResourcePolicyProcessors:
     """Every operation runs straight against ops, so this domain has no service."""
 
-    get_project_resource_policy: GlobalActionProcessor[
+    global_get: GlobalActionProcessor[
         GetProjectResourcePolicyAction, EntityOpsResult[ProjectResourcePolicyData]
     ]
-    search_project_resource_policies: GlobalActionProcessor[
+    global_search: GlobalActionProcessor[
         SearchProjectResourcePoliciesAction, BatchOpsResult[ProjectResourcePolicyData]
     ]
-    create_project_resource_policy: GlobalActionProcessor[
+    global_create: GlobalActionProcessor[
         CreateProjectResourcePolicyAction, CreatedEntityOpsResult[ProjectResourcePolicyData]
     ]
-    update_project_resource_policy: GlobalActionProcessor[
+    global_update: GlobalActionProcessor[
         UpdateProjectResourcePolicyAction, EntityOpsResult[ProjectResourcePolicyData]
     ]
-    purge_project_resource_policy: GlobalActionProcessor[
+    global_purge: GlobalActionProcessor[
         PurgeProjectResourcePolicyAction, EntityOpsResult[ProjectResourcePolicyData]
     ]
 
     def __init__(self, group: ProcessorGroup[ProjectResourcePolicyData]) -> None:
-        self.get_project_resource_policy = group.global_get_ops(GetProjectResourcePolicyAction)
-        self.search_project_resource_policies = group.global_search_ops(
-            SearchProjectResourcePoliciesAction
-        )
-        self.create_project_resource_policy = group.global_create_ops(
-            CreateProjectResourcePolicyAction
-        )
-        self.update_project_resource_policy = group.global_update_ops(
-            UpdateProjectResourcePolicyAction
-        )
-        self.purge_project_resource_policy = group.global_purge_ops(
-            PurgeProjectResourcePolicyAction
-        )
+        self.global_get = group.global_get_ops(GetProjectResourcePolicyAction)
+        self.global_search = group.global_search_ops(SearchProjectResourcePoliciesAction)
+        self.global_create = group.global_create_ops(CreateProjectResourcePolicyAction)
+        self.global_update = group.global_update_ops(UpdateProjectResourcePolicyAction)
+        self.global_purge = group.global_purge_ops(PurgeProjectResourcePolicyAction)

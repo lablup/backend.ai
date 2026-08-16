@@ -30,9 +30,9 @@ from ai.backend.manager.models.error_log.creators import ErrorLogCreator
 from ai.backend.manager.models.error_logs import ErrorLogRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.error_log.searchers import ErrorLogSearcher
-from ai.backend.manager.services.error_log.actions import CreateErrorLogAction
-from ai.backend.manager.services.error_log.actions.admin_search import AdminSearchErrorLogsAction
+from ai.backend.manager.services.error_log.actions.create import CreateErrorLogAction
 from ai.backend.manager.services.error_log.actions.delete import DeleteErrorLogAction
+from ai.backend.manager.services.error_log.actions.global_search import GlobalSearchErrorLogsAction
 from ai.backend.manager.services.error_log.actions.search import SearchErrorLogsAction
 from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
 
@@ -89,7 +89,9 @@ class ErrorLogHandler:
         # reads within their own scope. The branch lives here because the two are
         # separate actions with separate gates, not one action that widens itself.
         if ctx.is_superadmin:
-            result = await self._error_log.search.run(AdminSearchErrorLogsAction(searcher=searcher))
+            result = await self._error_log.global_search.run(
+                GlobalSearchErrorLogsAction(searcher=searcher)
+            )
         else:
             result = await self._error_log.scoped_search.run(
                 SearchErrorLogsAction(user_id=UserID(ctx.user_uuid), searcher=searcher)

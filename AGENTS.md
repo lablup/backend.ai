@@ -19,6 +19,9 @@ Applies to every generated artifact — docs, code comments, BEPs, PR descriptio
 - Prefer tables and lists over prose.
 - Code examples show the interface/contract only, not internal implementation.
 - State a rule once at its highest scope (see above); link instead of repeating.
+- No asides. Write the rule and the fact, nothing around them.
+- Never restate the previous sentence in different words.
+- Leave out how an individual value is composed and why a choice reads as natural.
 
 ## Document index
 

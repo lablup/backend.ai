@@ -121,7 +121,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.runtime_variant_preset.search.run(
+        result = await self._processors.runtime_variant_preset.public_search.run(
             SearchRuntimeVariantPresetsAction(searcher=searcher)
         )
         return SearchRuntimeVariantPresetsPayload(
@@ -140,7 +140,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
             pagination_spec=_preset_pagination_spec(),
             limit=1,
         )
-        result = await self._processors.runtime_variant_preset.search.run(
+        result = await self._processors.runtime_variant_preset.public_search.run(
             SearchRuntimeVariantPresetsAction(searcher=searcher)
         )
         if not result.items:
@@ -155,7 +155,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
             pagination=OffsetPagination(limit=len(ids)),
             conditions=[RuntimeVariantPresetConditions.by_ids(ids)],
         )
-        result = await self._processors.runtime_variant_preset.search.run(
+        result = await self._processors.runtime_variant_preset.public_search.run(
             SearchRuntimeVariantPresetsAction(searcher=searcher)
         )
         node_map = {item.id: self._data_to_node(item) for item in result.items}
@@ -181,7 +181,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
                 ui_option=input.ui_option,
             )
         )
-        result = await self._processors.runtime_variant_preset.create.run(
+        result = await self._processors.runtime_variant_preset.global_create.run(
             CreateRuntimeVariantPresetAction(creator=creator)
         )
         return CreateRuntimeVariantPresetPayload(preset=self._data_to_node(result.preset))
@@ -250,13 +250,13 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
             ),
         )
         updater: Updater[RuntimeVariantPresetRow] = Updater(spec=spec, pk_value=input.id)
-        result = await self._processors.runtime_variant_preset.update.run(
+        result = await self._processors.runtime_variant_preset.global_update.run(
             UpdateRuntimeVariantPresetAction(id=RuntimeVariantPresetID(input.id), updater=updater)
         )
         return UpdateRuntimeVariantPresetPayload(preset=self._data_to_node(result.preset))
 
     async def delete(self, preset_id: UUID) -> DeleteRuntimeVariantPresetPayload:
-        result = await self._processors.runtime_variant_preset.purge.run(
+        result = await self._processors.runtime_variant_preset.global_purge.run(
             PurgeRuntimeVariantPresetAction(id=RuntimeVariantPresetID(preset_id))
         )
         return DeleteRuntimeVariantPresetPayload(id=result.data.id)

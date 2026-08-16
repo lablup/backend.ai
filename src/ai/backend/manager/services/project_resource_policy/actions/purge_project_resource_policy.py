@@ -34,7 +34,7 @@ class PurgeProjectResourcePolicyAction(
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "admin_purge_project_resource_policy"
+        return "global_purge_project_resource_policy"
 
     @override
     def to_purger(self) -> ProjectResourcePolicyPurger:

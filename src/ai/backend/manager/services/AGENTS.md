@@ -22,11 +22,20 @@ grows a branch; the generic services take no hook or callback to hide one in.
 - Exactly one `Action` + `ActionResult` pair per action file.
 - Every concrete Action MUST override `entity_id()` and `operation_type()`.
 - v2 actions declare `action_name()`, recorded on audit rows: `<verb>_<entity>` in
-  lowercase snake_case (plural entity for searches, e.g. `search_resource_slot_types`;
-  qualifier prefix where the path differs, e.g. `admin_search_...`). Never derive it
+  lowercase snake_case (plural entity for searches, e.g. `search_resource_slot_types`),
+  prefixed by the shape where one applies (see Naming). Never derive it
   from the class name — a rename must not split the audit history. The
   `(entity_type, operation_type, action_name)` triple must be unique
   (`tests/unit/manager/actions/test_registry_catalog.py`).
+
+## Naming
+
+- `global` spans the whole table instead of narrowing by scope. The widest it opens
+  to is `public`.
+- The `global` and `public` shapes carry that name as a prefix on the action class,
+  the `action_name()` and the processor field —
+  `GlobalSearchErrorLogsAction` / `global_search_error_logs` / `global_search`.
+- Every other operation takes no prefix.
 
 ## Service method rules
 

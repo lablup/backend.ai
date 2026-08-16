@@ -67,7 +67,7 @@ class RuntimeVariantAdapter(BaseAdapter):
             pagination=OffsetPagination(limit=len(ids)),
             conditions=[RuntimeVariantConditions.by_ids(ids)],
         )
-        result = await self._processors.runtime_variant.search.run(
+        result = await self._processors.runtime_variant.public_search.run(
             SearchRuntimeVariantsAction(searcher=searcher)
         )
         variant_map = {item.id: self._data_to_node(item) for item in result.items}
@@ -91,7 +91,7 @@ class RuntimeVariantAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.runtime_variant.search.run(
+        result = await self._processors.runtime_variant.public_search.run(
             SearchRuntimeVariantsAction(searcher=searcher)
         )
         return SearchRuntimeVariantsPayload(
@@ -110,7 +110,7 @@ class RuntimeVariantAdapter(BaseAdapter):
             pagination_spec=_runtime_variant_pagination_spec(),
             limit=1,
         )
-        result = await self._processors.runtime_variant.search.run(
+        result = await self._processors.runtime_variant.public_search.run(
             SearchRuntimeVariantsAction(searcher=searcher)
         )
         if not result.items:
@@ -125,7 +125,7 @@ class RuntimeVariantAdapter(BaseAdapter):
             name=input.name,
             description=input.description,
         )
-        result = await self._processors.runtime_variant.create.run(
+        result = await self._processors.runtime_variant.global_create.run(
             CreateRuntimeVariantAction(creator=creator)
         )
         return CreateRuntimeVariantPayload(
@@ -149,7 +149,7 @@ class RuntimeVariantAdapter(BaseAdapter):
                 else TriState.update(input.description)
             ),
         )
-        result = await self._processors.runtime_variant.update.run(
+        result = await self._processors.runtime_variant.global_update.run(
             UpdateRuntimeVariantAction(updater=updater)
         )
         return UpdateRuntimeVariantPayload(
@@ -157,7 +157,7 @@ class RuntimeVariantAdapter(BaseAdapter):
         )
 
     async def delete(self, variant_id: UUID) -> DeleteRuntimeVariantPayload:
-        result = await self._processors.runtime_variant.purge.run(
+        result = await self._processors.runtime_variant.global_purge.run(
             PurgeRuntimeVariantAction(id=RuntimeVariantID(variant_id))
         )
         return DeleteRuntimeVariantPayload(id=result.data.id)
@@ -165,7 +165,7 @@ class RuntimeVariantAdapter(BaseAdapter):
     async def bulk_delete(self, input: DeleteRuntimeVariantsInput) -> DeleteRuntimeVariantsPayload:
         """Delete multiple runtime variants by ID."""
         for variant_id in input.ids:
-            await self._processors.runtime_variant.purge.run(
+            await self._processors.runtime_variant.global_purge.run(
                 PurgeRuntimeVariantAction(id=RuntimeVariantID(variant_id))
             )
         return DeleteRuntimeVariantsPayload(deleted_count=len(input.ids))

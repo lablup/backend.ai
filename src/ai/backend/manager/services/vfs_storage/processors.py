@@ -44,21 +44,27 @@ from ai.backend.manager.services.vfs_storage.service import VFSStorageService
 class VFSStorageProcessors:
     """The registry CRUD runs against ops; the quota-scope paths keep a service."""
 
-    create: GlobalActionProcessor[CreateVFSStorageAction, CreatedEntityOpsResult[VFSStorageData]]
-    update: GlobalActionProcessor[UpdateVFSStorageAction, EntityOpsResult[VFSStorageData]]
-    purge: GlobalActionProcessor[PurgeVFSStorageAction, EntityOpsResult[VFSStorageData]]
-    get: GlobalActionProcessor[GetVFSStorageAction, EntityOpsResult[VFSStorageData]]
+    global_create: GlobalActionProcessor[
+        CreateVFSStorageAction, CreatedEntityOpsResult[VFSStorageData]
+    ]
+    global_update: GlobalActionProcessor[UpdateVFSStorageAction, EntityOpsResult[VFSStorageData]]
+    global_purge: GlobalActionProcessor[PurgeVFSStorageAction, EntityOpsResult[VFSStorageData]]
+    global_get: GlobalActionProcessor[GetVFSStorageAction, EntityOpsResult[VFSStorageData]]
     lookup: LookupActionProcessor[ResolveVFSStorageByNameAction, LookupOpsResult[VFSStorageData]]
-    list_storages: GlobalActionProcessor[ListVFSStorageAction, BatchOpsResult[VFSStorageData]]
-    search_vfs_storages: GlobalActionProcessor[
+    global_list_storages: GlobalActionProcessor[
+        ListVFSStorageAction, BatchOpsResult[VFSStorageData]
+    ]
+    global_search_vfs_storages: GlobalActionProcessor[
         SearchVFSStoragesAction, BatchOpsResult[VFSStorageData]
     ]
-    get_quota_scope: GlobalActionProcessor[GetQuotaScopeAction, GetQuotaScopeActionResult]
-    search_quota_scopes: GlobalActionProcessor[
+    global_get_quota_scope: GlobalActionProcessor[GetQuotaScopeAction, GetQuotaScopeActionResult]
+    global_search_quota_scopes: GlobalActionProcessor[
         SearchQuotaScopesAction, SearchQuotaScopesActionResult
     ]
-    set_quota_scope: GlobalActionProcessor[SetQuotaScopeAction, SetQuotaScopeActionResult]
-    unset_quota_scope: GlobalActionProcessor[UnsetQuotaScopeAction, UnsetQuotaScopeActionResult]
+    global_set_quota_scope: GlobalActionProcessor[SetQuotaScopeAction, SetQuotaScopeActionResult]
+    global_unset_quota_scope: GlobalActionProcessor[
+        UnsetQuotaScopeAction, UnsetQuotaScopeActionResult
+    ]
 
     _service: VFSStorageService
 
@@ -68,19 +74,23 @@ class VFSStorageProcessors:
         group: ProcessorGroup[VFSStorageData],
     ) -> None:
         self._service = service
-        self.create = group.global_create_ops(CreateVFSStorageAction)
-        self.update = group.global_update_ops(UpdateVFSStorageAction)
-        self.purge = group.global_purge_ops(PurgeVFSStorageAction)
-        self.get = group.global_get_ops(GetVFSStorageAction)
+        self.global_create = group.global_create_ops(CreateVFSStorageAction)
+        self.global_update = group.global_update_ops(UpdateVFSStorageAction)
+        self.global_purge = group.global_purge_ops(PurgeVFSStorageAction)
+        self.global_get = group.global_get_ops(GetVFSStorageAction)
         self.lookup = group.lookup_ops(ResolveVFSStorageByNameAction)
-        self.list_storages = group.global_search_ops(ListVFSStorageAction)
-        self.search_vfs_storages = group.global_search_ops(SearchVFSStoragesAction)
-        self.get_quota_scope = group.global_scope(GetQuotaScopeAction, service.get_quota_scope)
-        self.search_quota_scopes = group.global_scope(
+        self.global_list_storages = group.global_search_ops(ListVFSStorageAction)
+        self.global_search_vfs_storages = group.global_search_ops(SearchVFSStoragesAction)
+        self.global_get_quota_scope = group.global_scope(
+            GetQuotaScopeAction, service.get_quota_scope
+        )
+        self.global_search_quota_scopes = group.global_scope(
             SearchQuotaScopesAction, service.search_quota_scopes
         )
-        self.set_quota_scope = group.global_scope(SetQuotaScopeAction, service.set_quota_scope)
-        self.unset_quota_scope = group.global_scope(
+        self.global_set_quota_scope = group.global_scope(
+            SetQuotaScopeAction, service.set_quota_scope
+        )
+        self.global_unset_quota_scope = group.global_scope(
             UnsetQuotaScopeAction, service.unset_quota_scope
         )
 

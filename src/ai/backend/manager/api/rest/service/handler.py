@@ -240,7 +240,7 @@ class ServiceHandler:
             pagination=OffsetPagination(limit=1),
             conditions=[RuntimeVariantConditions.by_ids([runtime_variant_id])],
         )
-        result = await self._runtime_variant.search.run(
+        result = await self._runtime_variant.public_search.run(
             SearchRuntimeVariantsAction(searcher=searcher)
         )
         if not result.items:

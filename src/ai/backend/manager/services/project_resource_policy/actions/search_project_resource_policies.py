@@ -31,7 +31,7 @@ class SearchProjectResourcePoliciesAction(
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "admin_search_project_resource_policies"
+        return "global_search_project_resource_policies"
 
     @override
     def to_searcher(self) -> ProjectResourcePolicySearcher:

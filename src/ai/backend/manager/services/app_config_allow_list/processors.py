@@ -29,7 +29,7 @@ from ai.backend.manager.services.app_config_allow_list.actions.update import (
 class AppConfigAllowListProcessors:
     """Every operation runs straight against ops, so this domain has no service."""
 
-    create: GlobalActionProcessor[
+    global_create: GlobalActionProcessor[
         CreateAppConfigAllowListAction,
         CreatedEntityOpsResult[AppConfigAllowListData],
     ]
@@ -41,18 +41,18 @@ class AppConfigAllowListProcessors:
         UpdateAppConfigAllowListAction,
         EntityOpsResult[AppConfigAllowListData],
     ]
-    purge: GlobalActionProcessor[
+    global_purge: GlobalActionProcessor[
         PurgeAppConfigAllowListAction,
         EntityOpsResult[AppConfigAllowListData],
     ]
-    admin_search: GlobalActionProcessor[
+    global_search: GlobalActionProcessor[
         AdminSearchAppConfigAllowListAction,
         BatchOpsResult[AppConfigAllowListData],
     ]
 
     def __init__(self, group: ProcessorGroup[AppConfigAllowListData]) -> None:
-        self.create = group.global_create_ops(CreateAppConfigAllowListAction)
+        self.global_create = group.global_create_ops(CreateAppConfigAllowListAction)
         self.get = group.single_get_ops(GetAppConfigAllowListAction)
         self.update = group.single_update_ops(UpdateAppConfigAllowListAction)
-        self.purge = group.global_purge_ops(PurgeAppConfigAllowListAction)
-        self.admin_search = group.global_search_ops(AdminSearchAppConfigAllowListAction)
+        self.global_purge = group.global_purge_ops(PurgeAppConfigAllowListAction)
+        self.global_search = group.global_search_ops(AdminSearchAppConfigAllowListAction)

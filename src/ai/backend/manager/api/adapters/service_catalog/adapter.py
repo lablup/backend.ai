@@ -57,7 +57,7 @@ class ServiceCatalogAdapter(BaseAdapter):
         """
         searcher = self.build_searcher(input)
 
-        action_result = await self._processors.service_catalog.search_service_catalogs.run(
+        action_result = await self._processors.service_catalog.global_search_service_catalogs.run(
             SearchServiceCatalogsAction(searcher=searcher)
         )
 

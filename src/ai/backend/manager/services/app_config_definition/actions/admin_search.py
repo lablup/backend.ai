@@ -31,7 +31,7 @@ class AdminSearchAppConfigDefinitionsAction(
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "admin_search_app_config_definitions"
+        return "global_search_app_config_definitions"
 
     @override
     def to_searcher(self) -> AppConfigDefinitionSearcher:

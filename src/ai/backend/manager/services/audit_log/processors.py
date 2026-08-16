@@ -21,7 +21,7 @@ class AuditLogProcessors:
     have no caller identity to gate or to record.
     """
 
-    search: GlobalActionProcessor[SearchAuditLogsAction, BatchOpsResult[AuditLogData]]
+    global_search: GlobalActionProcessor[SearchAuditLogsAction, BatchOpsResult[AuditLogData]]
     scoped_search: BulkActionProcessor[
         ScopedSearchAuditLogsAction, ScopedSearchAuditLogsActionResult
     ]
@@ -32,7 +32,7 @@ class AuditLogProcessors:
         validators: ActionValidators,
         group: ProcessorGroup[AuditLogData],
     ) -> None:
-        self.search = group.global_search_ops(SearchAuditLogsAction)
+        self.global_search = group.global_search_ops(SearchAuditLogsAction)
         self.scoped_search = BulkActionProcessor(
             service.scoped_search,
             monitors=[],

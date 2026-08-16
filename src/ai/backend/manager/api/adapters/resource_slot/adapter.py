@@ -122,7 +122,7 @@ class ResourceSlotAdapter(BaseAdapter):
         """
         searcher = self._build_slot_type_searcher(input)
 
-        action_result = await self._processors.resource_slot.search_resource_slot_types.run(
+        action_result = await self._processors.resource_slot.public_search_resource_slot_types.run(
             SearchResourceSlotTypesAction(searcher=searcher)
         )
 
@@ -198,7 +198,7 @@ class ResourceSlotAdapter(BaseAdapter):
             number_format=self._to_number_format(input.number_format),
             rank=input.rank,
         )
-        action_result = await self._processors.resource_slot.create_resource_slot_type.run(
+        action_result = await self._processors.resource_slot.global_create_resource_slot_type.run(
             CreateResourceSlotTypeAction(creator=creator)
         )
         return CreateResourceSlotTypePayload(
@@ -224,7 +224,7 @@ class ResourceSlotAdapter(BaseAdapter):
             ),
             rank=OptionalState.from_nullable(input.rank),
         )
-        action_result = await self._processors.resource_slot.update_resource_slot_type.run(
+        action_result = await self._processors.resource_slot.global_update_resource_slot_type.run(
             UpdateResourceSlotTypeAction(updater=updater)
         )
         return UpdateResourceSlotTypePayload(
@@ -235,7 +235,7 @@ class ResourceSlotAdapter(BaseAdapter):
         self, input: PurgeResourceSlotTypeInput
     ) -> PurgeResourceSlotTypePayload:
         """Remove a resource slot type, refusing while anything still references it."""
-        action_result = await self._processors.resource_slot.purge_resource_slot_type.run(
+        action_result = await self._processors.resource_slot.global_purge_resource_slot_type.run(
             PurgeResourceSlotTypeAction(purger=ResourceSlotTypePurger(slot_name=input.slot_name))
         )
         return PurgeResourceSlotTypePayload(slot_name=action_result.data.slot_name)
@@ -476,7 +476,7 @@ class ResourceSlotAdapter(BaseAdapter):
 
     async def get_slot_type(self, slot_name: str) -> ResourceSlotTypeNode:
         """Retrieve a single resource slot type by slot name."""
-        action_result = await self._processors.resource_slot.get_resource_slot_type.run(
+        action_result = await self._processors.resource_slot.public_get_resource_slot_type.run(
             GetResourceSlotTypeAction(slot_name=slot_name)
         )
         return self._slot_type_data_to_node(action_result.data)

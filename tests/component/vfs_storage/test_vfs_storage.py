@@ -237,7 +237,7 @@ class TestVFSStorageCRUD:
                 base_path="/mnt/vfs/create-test",
             )
         )
-        result = await vfs_storage_processors.create.run(action)
+        result = await vfs_storage_processors.global_create.run(action)
         assert result.data.name == "crud-create-test"
         assert result.data.host == "local:volume1"
         assert result.data.base_path == Path("/mnt/vfs/create-test")
@@ -250,7 +250,7 @@ class TestVFSStorageCRUD:
     ) -> None:
         """Get VFS storage by ID returns correct data."""
         action = GetVFSStorageAction(storage_id=target_vfs_storage["id"])
-        result = await vfs_storage_processors.get.run(action)
+        result = await vfs_storage_processors.global_get.run(action)
         assert result.data.id == target_vfs_storage["id"]
         assert result.data.name == target_vfs_storage["name"]
         assert result.data.host == target_vfs_storage["host"]
@@ -279,7 +279,7 @@ class TestVFSStorageCRUD:
                 base_path="/mnt/vfs/http-test",
             )
         )
-        await vfs_storage_processors.create.run(create_action)
+        await vfs_storage_processors.global_create.run(create_action)
 
         result = await admin_registry.storage.get_vfs_storage("http-get-test")
         assert result.storage.name == "http-get-test"
@@ -303,7 +303,7 @@ class TestVFSStorageCRUD:
                 orders=[],
             )
         )
-        result = await vfs_storage_processors.search_vfs_storages.run(action)
+        result = await vfs_storage_processors.global_search_vfs_storages.run(action)
         assert result.total_count >= 3
         storage_names = [s.name for s in result.items]
         assert "search-alpha" in storage_names
@@ -323,13 +323,13 @@ class TestVFSStorageCRUD:
                 host=OptionalState.update("nfs:updated-host"),
             )
         )
-        update_result = await vfs_storage_processors.update.run(update_action)
+        update_result = await vfs_storage_processors.global_update.run(update_action)
         assert update_result.data.name == "updated-name"
         assert update_result.data.host == "nfs:updated-host"
 
         # Verify via get by ID
         get_action = GetVFSStorageAction(storage_id=target_vfs_storage["id"])
-        get_result = await vfs_storage_processors.get.run(get_action)
+        get_result = await vfs_storage_processors.global_get.run(get_action)
         assert get_result.data.name == "updated-name"
         assert get_result.data.host == "nfs:updated-host"
 
@@ -342,12 +342,12 @@ class TestVFSStorageCRUD:
         storage = await vfs_storage_factory(name="to-delete")
 
         delete_action = PurgeVFSStorageAction(storage_id=storage["id"])
-        delete_result = await vfs_storage_processors.purge.run(delete_action)
+        delete_result = await vfs_storage_processors.global_purge.run(delete_action)
         assert delete_result.data.id == storage["id"]
 
         # Verify no longer in list
         list_action = ListVFSStorageAction(searcher=VFSStorageSearcher(pagination=NoPagination()))
-        list_result = await vfs_storage_processors.list_storages.run(list_action)
+        list_result = await vfs_storage_processors.global_list_storages.run(list_action)
         storage_names = [s.name for s in list_result.items]
         assert "to-delete" not in storage_names
 
@@ -358,7 +358,7 @@ class TestVFSStorageCRUD:
     ) -> None:
         """Full lifecycle: create -> get by ID -> get by name -> update -> delete -> verify."""
         # Create
-        create_result = await vfs_storage_processors.create.run(
+        create_result = await vfs_storage_processors.global_create.run(
             CreateVFSStorageAction(
                 creator=VFSStorageCreator(
                     name="lifecycle-test",
@@ -370,7 +370,7 @@ class TestVFSStorageCRUD:
         storage_id = create_result.data.id
 
         # Get by ID
-        get_result = await vfs_storage_processors.get.run(
+        get_result = await vfs_storage_processors.global_get.run(
             GetVFSStorageAction(storage_id=storage_id)
         )
         assert get_result.data.name == "lifecycle-test"
@@ -380,7 +380,7 @@ class TestVFSStorageCRUD:
         assert http_result.storage.host == "local:lifecycle"
 
         # Update
-        await vfs_storage_processors.update.run(
+        await vfs_storage_processors.global_update.run(
             UpdateVFSStorageAction(
                 updater=VFSStorageUpdater(
                     storage_id=storage_id,
@@ -394,7 +394,7 @@ class TestVFSStorageCRUD:
         assert updated.storage.host == "nfs:updated-lifecycle"
 
         # Delete
-        await vfs_storage_processors.purge.run(PurgeVFSStorageAction(storage_id=storage_id))
+        await vfs_storage_processors.global_purge.run(PurgeVFSStorageAction(storage_id=storage_id))
 
         # Verify deleted via list
         list_after = await admin_registry.storage.list_vfs_storages()
@@ -441,7 +441,7 @@ class TestVFSStorageQuota:
             storage_host_name="proxy1:volume1",
             quota_scope_id="scope-1",
         )
-        result = await vfs_storage_processors.get_quota_scope.run(action)
+        result = await vfs_storage_processors.global_get_quota_scope.run(action)
 
         assert result.quota_scope_id == "scope-1"
         assert result.storage_host_name == "proxy1:volume1"
@@ -465,7 +465,7 @@ class TestVFSStorageQuota:
             quota_scope_id="scope-1",
             hard_limit_bytes=8192,
         )
-        result = await vfs_storage_processors.set_quota_scope.run(action)
+        result = await vfs_storage_processors.global_set_quota_scope.run(action)
 
         assert result.quota_scope_id == "scope-1"
         assert result.usage_bytes == 512
@@ -484,7 +484,7 @@ class TestVFSStorageQuota:
             storage_host_name="proxy1:volume1",
             quota_scope_id="scope-1",
         )
-        result = await vfs_storage_processors.unset_quota_scope.run(action)
+        result = await vfs_storage_processors.global_unset_quota_scope.run(action)
 
         assert result.quota_scope_id == "scope-1"
         assert result.storage_host_name == "proxy1:volume1"

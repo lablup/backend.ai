@@ -66,7 +66,7 @@ class ObjectStorageAdapter(BaseAdapter):
         """
         searcher = self.build_searcher(input)
 
-        action_result = await self._processors.object_storage.search_object_storages.run(
+        action_result = await self._processors.object_storage.global_search_object_storages.run(
             SearchObjectStoragesAction(searcher=searcher)
         )
 
@@ -146,7 +146,7 @@ class ObjectStorageAdapter(BaseAdapter):
             pagination=OffsetPagination(limit=len(ids)),
             conditions=[ObjectStorageConditions.by_ids(ids)],
         )
-        action_result = await self._processors.object_storage.search_object_storages.run(
+        action_result = await self._processors.object_storage.global_search_object_storages.run(
             SearchObjectStoragesAction(searcher=searcher)
         )
         storage_map = {item.id: self._data_to_dto(item) for item in action_result.items}
@@ -154,14 +154,14 @@ class ObjectStorageAdapter(BaseAdapter):
 
     async def get(self, storage_id: UUID) -> ObjectStorageNode:
         """Retrieve a single object storage by ID."""
-        action_result = await self._processors.object_storage.get.run(
+        action_result = await self._processors.object_storage.global_get.run(
             GetObjectStorageAction(storage_id=storage_id)
         )
         return self._data_to_dto(action_result.data)
 
     async def create(self, input: CreateObjectStorageInput) -> CreateObjectStoragePayload:
         """Create a new object storage."""
-        action_result = await self._processors.object_storage.create.run(
+        action_result = await self._processors.object_storage.global_create.run(
             CreateObjectStorageAction(
                 creator=ObjectStorageCreator(
                     name=input.name,
@@ -202,14 +202,14 @@ class ObjectStorageAdapter(BaseAdapter):
                 else TriState.update(input.region)
             ),
         )
-        action_result = await self._processors.object_storage.update.run(
+        action_result = await self._processors.object_storage.global_update.run(
             UpdateObjectStorageAction(updater=updater)
         )
         return UpdateObjectStoragePayload(object_storage=self._data_to_dto(action_result.data))
 
     async def delete(self, input: DeleteObjectStorageInput) -> DeleteObjectStoragePayload:
         """Delete an object storage."""
-        action_result = await self._processors.object_storage.purge.run(
+        action_result = await self._processors.object_storage.global_purge.run(
             PurgeObjectStorageAction(storage_id=input.id)
         )
         return DeleteObjectStoragePayload(id=action_result.data.id)
@@ -221,7 +221,7 @@ class ObjectStorageAdapter(BaseAdapter):
         expiration: int | None = None,
     ) -> PresignedDownloadURLPayload:
         """Generate a presigned download URL for an artifact revision."""
-        action_result = await self._processors.object_storage.get_presigned_download_url.run(
+        action_result = await self._processors.object_storage.global_get_presigned_download_url.run(
             GetDownloadPresignedURLAction(
                 artifact_revision_id=artifact_revision_id,
                 key=key,
@@ -236,7 +236,7 @@ class ObjectStorageAdapter(BaseAdapter):
         key: str,
     ) -> PresignedUploadURLPayload:
         """Generate a presigned upload URL for an artifact revision."""
-        action_result = await self._processors.object_storage.get_presigned_upload_url.run(
+        action_result = await self._processors.object_storage.global_get_presigned_upload_url.run(
             GetUploadPresignedURLAction(
                 artifact_revision_id=artifact_revision_id,
                 key=key,

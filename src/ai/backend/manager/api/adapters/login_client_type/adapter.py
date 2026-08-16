@@ -88,7 +88,7 @@ class LoginClientTypeAdapter(BaseAdapter):
     # --- Non-admin methods ---
 
     async def get(self, type_id: UUID) -> LoginClientTypeNode:
-        action_result = await self._processors.login_client_type.get.run(
+        action_result = await self._processors.login_client_type.public_get.run(
             GetLoginClientTypeAction(id=type_id)
         )
         return self._data_to_node(action_result.data)
@@ -97,7 +97,7 @@ class LoginClientTypeAdapter(BaseAdapter):
         """Search login client types with filter/order/pagination."""
         searcher = self._build_search_searcher(input)
 
-        action_result = await self._processors.login_client_type.search.run(
+        action_result = await self._processors.login_client_type.public_search.run(
             SearchLoginClientTypesAction(searcher=searcher)
         )
 
@@ -115,7 +115,7 @@ class LoginClientTypeAdapter(BaseAdapter):
             name=input.name,
             description=input.description,
         )
-        action_result = await self._processors.login_client_type.create.run(
+        action_result = await self._processors.login_client_type.global_create.run(
             CreateLoginClientTypeAction(creator=creator)
         )
         return CreateLoginClientTypePayload(
@@ -138,7 +138,7 @@ class LoginClientTypeAdapter(BaseAdapter):
                 else TriState.update(input.description)
             ),
         )
-        action_result = await self._processors.login_client_type.update.run(
+        action_result = await self._processors.login_client_type.global_update.run(
             UpdateLoginClientTypeAction(updater=updater)
         )
         return UpdateLoginClientTypePayload(
@@ -146,7 +146,7 @@ class LoginClientTypeAdapter(BaseAdapter):
         )
 
     async def admin_delete(self, type_id: UUID) -> DeleteLoginClientTypePayload:
-        action_result = await self._processors.login_client_type.purge.run(
+        action_result = await self._processors.login_client_type.global_purge.run(
             PurgeLoginClientTypeAction(id=type_id)
         )
         return DeleteLoginClientTypePayload(id=action_result.data.id)

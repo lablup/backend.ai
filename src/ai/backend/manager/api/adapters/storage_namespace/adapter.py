@@ -45,7 +45,7 @@ class StorageNamespaceAdapter(BaseAdapter):
         self, input: RegisterStorageNamespaceInput
     ) -> RegisterStorageNamespacePayload:
         """Register a new namespace within a storage."""
-        action_result = await self._processors.storage_namespace.register.run(
+        action_result = await self._processors.storage_namespace.global_register.run(
             RegisterNamespaceAction(
                 creator=StorageNamespaceCreator(
                     storage_id=input.storage_id,
@@ -69,14 +69,14 @@ class StorageNamespaceAdapter(BaseAdapter):
                 namespace=input.namespace,
             )
         )
-        action_result = await self._processors.storage_namespace.unregister.run(
+        action_result = await self._processors.storage_namespace.global_unregister.run(
             UnregisterNamespaceAction(id=resolved.data.id)
         )
         return UnregisterStorageNamespacePayload(id=action_result.data.storage_id)
 
     async def get_namespaces(self, storage_id: uuid.UUID) -> list[StorageNamespaceNode]:
         """Retrieve all namespaces for a given storage."""
-        action_result = await self._processors.storage_namespace.get_namespaces.run(
+        action_result = await self._processors.storage_namespace.global_get_namespaces.run(
             GetNamespacesAction(storage_id)
         )
         return [self._storage_namespace_data_to_dto(item) for item in action_result.items]
@@ -94,7 +94,7 @@ class StorageNamespaceAdapter(BaseAdapter):
             pagination=OffsetPagination(limit=len(ids)),
             conditions=[StorageNamespaceConditions.by_ids(ids)],
         )
-        action_result = await self._processors.storage_namespace.search.run(
+        action_result = await self._processors.storage_namespace.global_search.run(
             SearchStorageNamespacesAction(searcher=searcher)
         )
         namespace_map = {
@@ -111,7 +111,7 @@ class StorageNamespaceAdapter(BaseAdapter):
             offset=input.offset if input.offset is not None else 0,
         )
         searcher = StorageNamespaceSearcher(conditions=[], orders=[], pagination=pagination)
-        action_result = await self._processors.storage_namespace.search.run(
+        action_result = await self._processors.storage_namespace.global_search.run(
             SearchStorageNamespacesAction(searcher=searcher)
         )
         return AdminSearchStorageNamespacesPayload(

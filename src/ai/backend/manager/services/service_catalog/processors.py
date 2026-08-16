@@ -12,10 +12,10 @@ from ai.backend.manager.services.service_catalog.actions.search import (
 class ServiceCatalogProcessors:
     """The search runs straight against ops, so this domain has no service."""
 
-    search_service_catalogs: GlobalActionProcessor[
+    global_search_service_catalogs: GlobalActionProcessor[
         SearchServiceCatalogsAction,
         BatchOpsResult[ServiceCatalogData],
     ]
 
     def __init__(self, group: ProcessorGroup[ServiceCatalogData]) -> None:
-        self.search_service_catalogs = group.global_search_ops(SearchServiceCatalogsAction)
+        self.global_search_service_catalogs = group.global_search_ops(SearchServiceCatalogsAction)

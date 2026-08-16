@@ -34,20 +34,26 @@ from ai.backend.manager.services.object_storage.service import ObjectStorageServ
 class ObjectStorageProcessors:
     """The registry CRUD runs against ops; only the presigned-URL paths keep a service."""
 
-    create: GlobalActionProcessor[
+    global_create: GlobalActionProcessor[
         CreateObjectStorageAction, CreatedEntityOpsResult[ObjectStorageData]
     ]
-    update: GlobalActionProcessor[UpdateObjectStorageAction, EntityOpsResult[ObjectStorageData]]
-    purge: GlobalActionProcessor[PurgeObjectStorageAction, EntityOpsResult[ObjectStorageData]]
-    get: GlobalActionProcessor[GetObjectStorageAction, EntityOpsResult[ObjectStorageData]]
-    list_storages: GlobalActionProcessor[ListObjectStorageAction, BatchOpsResult[ObjectStorageData]]
-    search_object_storages: GlobalActionProcessor[
+    global_update: GlobalActionProcessor[
+        UpdateObjectStorageAction, EntityOpsResult[ObjectStorageData]
+    ]
+    global_purge: GlobalActionProcessor[
+        PurgeObjectStorageAction, EntityOpsResult[ObjectStorageData]
+    ]
+    global_get: GlobalActionProcessor[GetObjectStorageAction, EntityOpsResult[ObjectStorageData]]
+    global_list_storages: GlobalActionProcessor[
+        ListObjectStorageAction, BatchOpsResult[ObjectStorageData]
+    ]
+    global_search_object_storages: GlobalActionProcessor[
         SearchObjectStoragesAction, BatchOpsResult[ObjectStorageData]
     ]
-    get_presigned_download_url: GlobalActionProcessor[
+    global_get_presigned_download_url: GlobalActionProcessor[
         GetDownloadPresignedURLAction, GetDownloadPresignedURLActionResult
     ]
-    get_presigned_upload_url: GlobalActionProcessor[
+    global_get_presigned_upload_url: GlobalActionProcessor[
         GetUploadPresignedURLAction, GetUploadPresignedURLActionResult
     ]
 
@@ -56,15 +62,15 @@ class ObjectStorageProcessors:
         service: ObjectStorageService,
         group: ProcessorGroup[ObjectStorageData],
     ) -> None:
-        self.create = group.global_create_ops(CreateObjectStorageAction)
-        self.update = group.global_update_ops(UpdateObjectStorageAction)
-        self.purge = group.global_purge_ops(PurgeObjectStorageAction)
-        self.get = group.global_get_ops(GetObjectStorageAction)
-        self.list_storages = group.global_search_ops(ListObjectStorageAction)
-        self.search_object_storages = group.global_search_ops(SearchObjectStoragesAction)
-        self.get_presigned_download_url = group.global_scope(
+        self.global_create = group.global_create_ops(CreateObjectStorageAction)
+        self.global_update = group.global_update_ops(UpdateObjectStorageAction)
+        self.global_purge = group.global_purge_ops(PurgeObjectStorageAction)
+        self.global_get = group.global_get_ops(GetObjectStorageAction)
+        self.global_list_storages = group.global_search_ops(ListObjectStorageAction)
+        self.global_search_object_storages = group.global_search_ops(SearchObjectStoragesAction)
+        self.global_get_presigned_download_url = group.global_scope(
             GetDownloadPresignedURLAction, service.get_presigned_download_url
         )
-        self.get_presigned_upload_url = group.global_scope(
+        self.global_get_presigned_upload_url = group.global_scope(
             GetUploadPresignedURLAction, service.get_presigned_upload_url
         )

@@ -29,16 +29,16 @@ from ai.backend.manager.services.runtime_variant_preset.service import (
 class RuntimeVariantPresetProcessors:
     """Reads and the removal run against ops; the two writes keep their service."""
 
-    create: GlobalActionProcessor[
+    global_create: GlobalActionProcessor[
         CreateRuntimeVariantPresetAction, CreateRuntimeVariantPresetActionResult
     ]
-    update: GlobalActionProcessor[
+    global_update: GlobalActionProcessor[
         UpdateRuntimeVariantPresetAction, UpdateRuntimeVariantPresetActionResult
     ]
-    purge: GlobalActionProcessor[
+    global_purge: GlobalActionProcessor[
         PurgeRuntimeVariantPresetAction, EntityOpsResult[RuntimeVariantPresetData]
     ]
-    search: PublicActionProcessor[
+    public_search: PublicActionProcessor[
         SearchRuntimeVariantPresetsAction, BatchOpsResult[RuntimeVariantPresetData]
     ]
 
@@ -47,7 +47,7 @@ class RuntimeVariantPresetProcessors:
         service: RuntimeVariantPresetService,
         group: ProcessorGroup[RuntimeVariantPresetData],
     ) -> None:
-        self.create = group.global_scope(CreateRuntimeVariantPresetAction, service.create)
-        self.update = group.global_scope(UpdateRuntimeVariantPresetAction, service.update)
-        self.purge = group.global_purge_ops(PurgeRuntimeVariantPresetAction)
-        self.search = group.public_search_ops(SearchRuntimeVariantPresetsAction)
+        self.global_create = group.global_scope(CreateRuntimeVariantPresetAction, service.create)
+        self.global_update = group.global_scope(UpdateRuntimeVariantPresetAction, service.update)
+        self.global_purge = group.global_purge_ops(PurgeRuntimeVariantPresetAction)
+        self.public_search = group.public_search_ops(SearchRuntimeVariantPresetsAction)

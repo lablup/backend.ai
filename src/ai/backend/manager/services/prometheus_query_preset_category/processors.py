@@ -27,25 +27,25 @@ from ai.backend.manager.services.prometheus_query_preset_category.actions.search
 class PrometheusQueryPresetCategoryProcessors:
     """Every operation runs straight against ops, so this domain has no service."""
 
-    create_category: GlobalActionProcessor[
+    global_create_category: GlobalActionProcessor[
         CreateCategoryAction,
         CreatedEntityOpsResult[PrometheusQueryPresetCategoryData],
     ]
-    get_category: GlobalActionProcessor[
+    global_get_category: GlobalActionProcessor[
         GetCategoryAction,
         EntityOpsResult[PrometheusQueryPresetCategoryData],
     ]
-    search_categories: GlobalActionProcessor[
+    global_search_categories: GlobalActionProcessor[
         SearchCategoriesAction,
         BatchOpsResult[PrometheusQueryPresetCategoryData],
     ]
-    purge_category: GlobalActionProcessor[
+    global_purge_category: GlobalActionProcessor[
         PurgeCategoryAction,
         EntityOpsResult[PrometheusQueryPresetCategoryData],
     ]
 
     def __init__(self, group: ProcessorGroup[PrometheusQueryPresetCategoryData]) -> None:
-        self.create_category = group.global_create_ops(CreateCategoryAction)
-        self.get_category = group.global_get_ops(GetCategoryAction)
-        self.search_categories = group.global_search_ops(SearchCategoriesAction)
-        self.purge_category = group.global_purge_ops(PurgeCategoryAction)
+        self.global_create_category = group.global_create_ops(CreateCategoryAction)
+        self.global_get_category = group.global_get_ops(GetCategoryAction)
+        self.global_search_categories = group.global_search_ops(SearchCategoriesAction)
+        self.global_purge_category = group.global_purge_ops(PurgeCategoryAction)

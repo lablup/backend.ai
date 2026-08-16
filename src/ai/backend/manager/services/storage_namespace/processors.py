@@ -30,23 +30,25 @@ class StorageNamespaceProcessors:
     pair the registration API exposes reaches it through the lookup.
     """
 
-    register: GlobalActionProcessor[
+    global_register: GlobalActionProcessor[
         RegisterNamespaceAction, CreatedEntityOpsResult[StorageNamespaceData]
     ]
-    search: GlobalActionProcessor[
+    global_search: GlobalActionProcessor[
         SearchStorageNamespacesAction, BatchOpsResult[StorageNamespaceData]
     ]
-    get_namespaces: GlobalActionProcessor[GetNamespacesAction, BatchOpsResult[StorageNamespaceData]]
+    global_get_namespaces: GlobalActionProcessor[
+        GetNamespacesAction, BatchOpsResult[StorageNamespaceData]
+    ]
     lookup: LookupActionProcessor[
         ResolveStorageNamespaceAction, LookupOpsResult[StorageNamespaceData]
     ]
-    unregister: GlobalActionProcessor[
+    global_unregister: GlobalActionProcessor[
         UnregisterNamespaceAction, EntityOpsResult[StorageNamespaceData]
     ]
 
     def __init__(self, group: ProcessorGroup[StorageNamespaceData]) -> None:
-        self.register = group.global_create_ops(RegisterNamespaceAction)
-        self.search = group.global_search_ops(SearchStorageNamespacesAction)
-        self.get_namespaces = group.global_search_ops(GetNamespacesAction)
+        self.global_register = group.global_create_ops(RegisterNamespaceAction)
+        self.global_search = group.global_search_ops(SearchStorageNamespacesAction)
+        self.global_get_namespaces = group.global_search_ops(GetNamespacesAction)
         self.lookup = group.lookup_ops(ResolveStorageNamespaceAction)
-        self.unregister = group.global_purge_ops(UnregisterNamespaceAction)
+        self.global_unregister = group.global_purge_ops(UnregisterNamespaceAction)

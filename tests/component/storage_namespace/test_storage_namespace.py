@@ -124,7 +124,7 @@ class TestStorageNamespace:
                 namespace="register-test-ns",
             ),
         )
-        result = await storage_namespace_processors.register.run(action)
+        result = await storage_namespace_processors.global_register.run(action)
         assert result.data.namespace == "register-test-ns"
         assert result.data.storage_id == storage["id"]
         assert result.data.id is not None
@@ -141,7 +141,7 @@ class TestStorageNamespace:
 
         # Verify it exists first
         get_action = GetNamespacesAction(storage_id=storage["id"])
-        before = await storage_namespace_processors.get_namespaces.run(get_action)
+        before = await storage_namespace_processors.global_get_namespaces.run(get_action)
         ns_names = [n.namespace for n in before.items]
         assert "to-unregister" in ns_names
 
@@ -150,13 +150,13 @@ class TestStorageNamespace:
             ResolveStorageNamespaceAction(storage_id=storage["id"], namespace="to-unregister")
         )
         assert resolved.data.id == ns["id"]
-        unregister_result = await storage_namespace_processors.unregister.run(
+        unregister_result = await storage_namespace_processors.global_unregister.run(
             UnregisterNamespaceAction(id=resolved.data.id)
         )
         assert unregister_result.data.storage_id == ns["storage_id"]
 
         # Verify removed
-        after = await storage_namespace_processors.get_namespaces.run(get_action)
+        after = await storage_namespace_processors.global_get_namespaces.run(get_action)
         ns_names_after = [n.namespace for n in after.items]
         assert "to-unregister" not in ns_names_after
 
@@ -175,7 +175,7 @@ class TestStorageNamespace:
 
         # List storage_a namespaces
         action_a = GetNamespacesAction(storage_id=storage_a["id"])
-        result_a = await storage_namespace_processors.get_namespaces.run(action_a)
+        result_a = await storage_namespace_processors.global_get_namespaces.run(action_a)
         names_a = [n.namespace for n in result_a.items]
         assert "ns-alpha" in names_a
         assert "ns-beta" in names_a
@@ -183,7 +183,7 @@ class TestStorageNamespace:
 
         # List storage_b namespaces
         action_b = GetNamespacesAction(storage_id=storage_b["id"])
-        result_b = await storage_namespace_processors.get_namespaces.run(action_b)
+        result_b = await storage_namespace_processors.global_get_namespaces.run(action_b)
         names_b = [n.namespace for n in result_b.items]
         assert "ns-gamma" in names_b
         assert "ns-alpha" not in names_b
@@ -202,7 +202,7 @@ class TestStorageNamespace:
         await storage_namespace_factory(storage_id=storage_x["id"], namespace="grouped-x2")
         await storage_namespace_factory(storage_id=storage_y["id"], namespace="grouped-y1")
 
-        result = await storage_namespace_processors.search.run(
+        result = await storage_namespace_processors.global_search.run(
             SearchStorageNamespacesAction(
                 searcher=StorageNamespaceSearcher(pagination=NoPagination()),
             )
@@ -223,7 +223,7 @@ class TestStorageNamespace:
         storage = await object_storage_factory()
 
         # Register via processor
-        register_result = await storage_namespace_processors.register.run(
+        register_result = await storage_namespace_processors.global_register.run(
             RegisterNamespaceAction(
                 creator=StorageNamespaceCreator(
                     storage_id=storage["id"],
@@ -234,7 +234,7 @@ class TestStorageNamespace:
         assert register_result.data.namespace == "lifecycle-ns"
 
         # Verify listed
-        list_result = await storage_namespace_processors.get_namespaces.run(
+        list_result = await storage_namespace_processors.global_get_namespaces.run(
             GetNamespacesAction(storage_id=storage["id"])
         )
         assert "lifecycle-ns" in [n.namespace for n in list_result.items]
@@ -243,12 +243,12 @@ class TestStorageNamespace:
         resolved = await storage_namespace_processors.lookup.run(
             ResolveStorageNamespaceAction(storage_id=storage["id"], namespace="lifecycle-ns")
         )
-        await storage_namespace_processors.unregister.run(
+        await storage_namespace_processors.global_unregister.run(
             UnregisterNamespaceAction(id=resolved.data.id)
         )
 
         # Verify gone from per-storage listing
-        after = await storage_namespace_processors.get_namespaces.run(
+        after = await storage_namespace_processors.global_get_namespaces.run(
             GetNamespacesAction(storage_id=storage["id"])
         )
         assert "lifecycle-ns" not in [n.namespace for n in after.items]
@@ -276,7 +276,7 @@ class TestStorageNamespaceSearch:
                 orders=[],
             )
         )
-        result = await storage_namespace_processors.search.run(action)
+        result = await storage_namespace_processors.global_search.run(action)
 
         assert result.total_count >= 3
         ns_names = [ns.namespace for ns in result.items]
@@ -296,7 +296,7 @@ class TestStorageNamespaceSearch:
             await storage_namespace_factory(storage_id=storage["id"], namespace=f"page-ns-{i}")
 
         # First page (limit=2)
-        first_page = await storage_namespace_processors.search.run(
+        first_page = await storage_namespace_processors.global_search.run(
             SearchStorageNamespacesAction(
                 searcher=StorageNamespaceSearcher(
                     pagination=OffsetPagination(limit=2, offset=0),
@@ -311,7 +311,7 @@ class TestStorageNamespaceSearch:
         assert first_page.has_previous_page is False
 
         # Second page (limit=2, offset=2)
-        second_page = await storage_namespace_processors.search.run(
+        second_page = await storage_namespace_processors.global_search.run(
             SearchStorageNamespacesAction(
                 searcher=StorageNamespaceSearcher(
                     pagination=OffsetPagination(limit=2, offset=2),
@@ -332,7 +332,7 @@ class TestStorageNamespaceSearch:
         storage = await object_storage_factory()
 
         # Register first time — should succeed
-        await storage_namespace_processors.register.run(
+        await storage_namespace_processors.global_register.run(
             RegisterNamespaceAction(
                 creator=StorageNamespaceCreator(
                     storage_id=storage["id"],
@@ -343,7 +343,7 @@ class TestStorageNamespaceSearch:
 
         # Register same (storage_id, namespace) again — should fail
         with pytest.raises(UniqueConstraintViolationError):
-            await storage_namespace_processors.register.run(
+            await storage_namespace_processors.global_register.run(
                 RegisterNamespaceAction(
                     creator=StorageNamespaceCreator(
                         storage_id=storage["id"],

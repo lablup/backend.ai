@@ -78,7 +78,7 @@ class RetentionPolicyAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.retention_policy.search.run(
+        result = await self._processors.retention_policy.global_search.run(
             SearchRetentionPoliciesAction(searcher=searcher)
         )
         return SearchRetentionPoliciesPayload(
@@ -97,7 +97,7 @@ class RetentionPolicyAdapter(BaseAdapter):
             pagination_spec=_retention_policy_pagination_spec(),
             limit=1,
         )
-        result = await self._processors.retention_policy.search.run(
+        result = await self._processors.retention_policy.global_search.run(
             SearchRetentionPoliciesAction(searcher=searcher)
         )
         if not result.items:
@@ -113,7 +113,7 @@ class RetentionPolicyAdapter(BaseAdapter):
             retention_period=timedelta(days=input.retention_period_days),
             enabled=input.enabled,
         )
-        result = await self._processors.retention_policy.create.run(
+        result = await self._processors.retention_policy.global_create.run(
             CreateRetentionPolicyAction(creator=creator)
         )
         return CreateRetentionPolicyPayload(policy=self._data_to_node(result.data))
@@ -140,20 +140,20 @@ class RetentionPolicyAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
         )
-        result = await self._processors.retention_policy.update.run(
+        result = await self._processors.retention_policy.global_update.run(
             UpdateRetentionPolicyAction(updater=updater)
         )
         return UpdateRetentionPolicyPayload(policy=self._data_to_node(result.data))
 
     async def delete(self, policy_id: RetentionPolicyID) -> DeleteRetentionPolicyPayload:
-        result = await self._processors.retention_policy.delete.run(
+        result = await self._processors.retention_policy.global_delete.run(
             DeleteRetentionPolicyAction(id=policy_id)
         )
         return DeleteRetentionPolicyPayload(id=result.data.id)
 
     async def purge(self, policy_id: RetentionPolicyID) -> PurgeRetentionPolicyPayload:
         purger = RetentionPolicyPurger(policy_id=policy_id)
-        result = await self._processors.retention_policy.purge.run(
+        result = await self._processors.retention_policy.global_purge.run(
             PurgeRetentionPolicyAction(purger=purger)
         )
         return PurgeRetentionPolicyPayload(id=result.data.id)

@@ -66,7 +66,7 @@ class AuditLogAdapter(BaseAdapter):
             pagination=OffsetPagination(limit=len(ids)),
             conditions=[AuditLogConditions.by_ids(ids)],
         )
-        action_result = await self._processors.audit_log.search.run(
+        action_result = await self._processors.audit_log.global_search.run(
             SearchAuditLogsAction(searcher=searcher)
         )
         audit_log_map = {item.id: self._data_to_node(item) for item in action_result.items}
@@ -88,7 +88,7 @@ class AuditLogAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.audit_log.search.run(
+        action_result = await self._processors.audit_log.global_search.run(
             SearchAuditLogsAction(searcher=searcher)
         )
         return SearchAuditLogsPayload(

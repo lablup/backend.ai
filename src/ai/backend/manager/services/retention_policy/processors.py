@@ -28,30 +28,30 @@ from ai.backend.manager.services.retention_policy.actions.update import (
 class RetentionPolicyProcessors:
     """Every operation runs straight against ops, so this domain has no service."""
 
-    create: GlobalActionProcessor[
+    global_create: GlobalActionProcessor[
         CreateRetentionPolicyAction,
         CreatedEntityOpsResult[RetentionPolicyData],
     ]
-    update: GlobalActionProcessor[
+    global_update: GlobalActionProcessor[
         UpdateRetentionPolicyAction,
         EntityOpsResult[RetentionPolicyData],
     ]
-    delete: GlobalActionProcessor[
+    global_delete: GlobalActionProcessor[
         DeleteRetentionPolicyAction,
         EntityOpsResult[RetentionPolicyData],
     ]
-    purge: GlobalActionProcessor[
+    global_purge: GlobalActionProcessor[
         PurgeRetentionPolicyAction,
         EntityOpsResult[RetentionPolicyData],
     ]
-    search: GlobalActionProcessor[
+    global_search: GlobalActionProcessor[
         SearchRetentionPoliciesAction,
         BatchOpsResult[RetentionPolicyData],
     ]
 
     def __init__(self, group: ProcessorGroup[RetentionPolicyData]) -> None:
-        self.create = group.global_create_ops(CreateRetentionPolicyAction)
-        self.update = group.global_update_ops(UpdateRetentionPolicyAction)
-        self.delete = group.global_purge_ops(DeleteRetentionPolicyAction)
-        self.purge = group.global_purge_ops(PurgeRetentionPolicyAction)
-        self.search = group.global_search_ops(SearchRetentionPoliciesAction)
+        self.global_create = group.global_create_ops(CreateRetentionPolicyAction)
+        self.global_update = group.global_update_ops(UpdateRetentionPolicyAction)
+        self.global_delete = group.global_purge_ops(DeleteRetentionPolicyAction)
+        self.global_purge = group.global_purge_ops(PurgeRetentionPolicyAction)
+        self.global_search = group.global_search_ops(SearchRetentionPoliciesAction)
