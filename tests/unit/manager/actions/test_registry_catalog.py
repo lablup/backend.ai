@@ -112,7 +112,7 @@ def _ops_registry() -> ProcessorRegistry[Any]:
 
 def test_every_defined_v2_action_is_wired() -> None:
     # One shared registry, as in the production wiring: every v2 package registers
-    # through it, so its wired_specs() is the complete catalog of registered actions.
+    # through it, so its wired_actions() is the complete catalog of registered actions.
     registry = _ops_registry()
     AppConfigAllowListProcessors(registry.group())
     ResourceSlotProcessors(MagicMock(), [], MagicMock(), registry.group())
@@ -136,8 +136,8 @@ def test_every_defined_v2_action_is_wired() -> None:
     PrometheusQueryPresetProcessors(MagicMock(), registry.group())
     StorageNamespaceProcessors(registry.group())
 
-    wired = sorted(spec.type() for spec in registry.wired_specs())
-    defined = sorted(cls.spec().type() for cls in _concrete_v2_action_classes())
+    wired = sorted(cls.action_name() for cls in registry.wired_actions())
+    defined = sorted(cls.action_name() for cls in _concrete_v2_action_classes())
 
     assert wired == defined
 

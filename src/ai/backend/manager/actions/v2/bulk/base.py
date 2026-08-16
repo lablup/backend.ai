@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
 from ai.backend.common.data.entity.types import EntityID, EntityType
-from ai.backend.manager.actions.types import ActionOperationType, ActionSpec
+from ai.backend.manager.actions.types import ActionOperationType
 
 
 class BaseBulkAction(ABC):
@@ -32,11 +32,3 @@ class BaseBulkAction(ABC):
     def entity_ids(self) -> Sequence[EntityID]:
         """Return the IDs of the entities that this action applies to."""
         raise NotImplementedError
-
-    @classmethod
-    def spec(cls) -> ActionSpec:
-        """Return the "entity:operation" spec keying reporter subscriptions and audit records."""
-        return ActionSpec(
-            entity_type=cls.entity_type(),
-            operation_type=cls.operation_type(),
-        )

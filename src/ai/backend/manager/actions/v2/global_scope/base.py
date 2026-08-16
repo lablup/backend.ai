@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.manager.actions.types import ActionOperationType, ActionSpec
+from ai.backend.manager.actions.types import ActionOperationType
 
 
 class BaseGlobalAction(ABC):
@@ -30,11 +30,3 @@ class BaseGlobalAction(ABC):
         declared rather than derived so a class rename cannot split the recorded
         history. Naming rule: services/AGENTS.md."""
         raise NotImplementedError
-
-    @classmethod
-    def spec(cls) -> ActionSpec:
-        """Return the "entity:operation" spec keying reporter subscriptions and audit records."""
-        return ActionSpec(
-            entity_type=cls.entity_type(),
-            operation_type=cls.operation_type(),
-        )

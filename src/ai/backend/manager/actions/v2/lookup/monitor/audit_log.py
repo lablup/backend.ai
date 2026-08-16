@@ -42,7 +42,7 @@ class LookupActionAuditLogMonitor(LookupActionMonitor):
     @override
     async def done(self, action: BaseLookupAction, result: LookupActionProcessResult) -> None:
         meta = result.meta
-        if not self._policy.should_record(action.spec(), meta.status):
+        if not self._policy.should_record(action.operation_type(), meta.status):
             return
         key = action.lookup_key()
         trigger = triggered_user()

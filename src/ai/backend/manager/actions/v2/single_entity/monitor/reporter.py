@@ -35,7 +35,7 @@ class SingleEntityActionReporterMonitor(SingleEntityActionMonitor):
         acting = current_user()
         message = StartedActionMessage(
             action_id=meta.action_id,
-            action_type=action.spec().type(),
+            action_type=action.action_name(),
             entity_id=action.entity_id(),
             entity_type=action.entity_type(),
             request_id=current_request_id(),
@@ -55,7 +55,7 @@ class SingleEntityActionReporterMonitor(SingleEntityActionMonitor):
         meta = result.meta
         message = FinishedActionMessage(
             action_id=meta.action_id,
-            action_type=action.spec().type(),
+            action_type=action.action_name(),
             entity_id=meta.entity_id,
             request_id=current_request_id() or BLANK_ID,
             triggered_by=str(trigger.user_id) if trigger else None,

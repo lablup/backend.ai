@@ -54,6 +54,6 @@ class AuditLogMonitor(ActionMonitor):
 
     @override
     async def done(self, action: BaseAction, result: ProcessResult) -> None:
-        if not self._policy.should_record(action.spec(), result.meta.status):
+        if not self._policy.should_record(action.operation_type(), result.meta.status):
             return
         await self._generate_log(action, result)

@@ -38,7 +38,7 @@ class BulkActionReporterMonitor(BulkActionMonitor):
         for entity_id in action.entity_ids():
             message = StartedActionMessage(
                 action_id=meta.action_id,
-                action_type=action.spec().type(),
+                action_type=action.action_name(),
                 entity_id=entity_id,
                 entity_type=action.entity_type(),
                 request_id=request_id,
@@ -58,7 +58,7 @@ class BulkActionReporterMonitor(BulkActionMonitor):
         for entity_result in meta.entity_results:
             message = FinishedActionMessage(
                 action_id=meta.action_id,
-                action_type=action.spec().type(),
+                action_type=action.action_name(),
                 entity_id=entity_result.entity_id,
                 request_id=request_id,
                 triggered_by=str(trigger.user_id) if trigger else None,

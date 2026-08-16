@@ -38,7 +38,7 @@ class GlobalActionAuditLogMonitor(GlobalActionMonitor):
     @override
     async def done(self, action: BaseGlobalAction, result: GlobalActionProcessResult) -> None:
         meta = result.meta
-        if not self._policy.should_record(action.spec(), meta.status):
+        if not self._policy.should_record(action.operation_type(), meta.status):
             return
         trigger = triggered_user()
         acting = current_user()

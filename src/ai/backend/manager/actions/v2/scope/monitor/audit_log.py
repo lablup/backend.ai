@@ -43,7 +43,7 @@ class ScopeActionAuditLogMonitor(ScopeActionMonitor):
     @override
     async def done(self, action: BaseScopeAction, result: ScopeActionProcessResult) -> None:
         meta = result.meta
-        if not self._policy.should_record(action.spec(), meta.status):
+        if not self._policy.should_record(action.operation_type(), meta.status):
             return
         specs = [self._build_spec(action, result, entity_id) for entity_id in meta.entity_ids]
         if not specs:

@@ -43,7 +43,6 @@ class BulkActionAuditLogMonitor(BulkActionMonitor):
         acting = current_user()
         meta = result.meta
         request_id = current_request_id() or BLANK_ID
-        spec = action.spec()
         bulk_creator = BulkCreator(
             specs=[
                 BulkAuditLogCreatorSpec(
@@ -61,7 +60,7 @@ class BulkActionAuditLogMonitor(BulkActionMonitor):
                     duration=meta.duration,
                 )
                 for entity_result in meta.entity_results
-                if self._policy.should_record(spec, entity_result.status)
+                if self._policy.should_record(action.operation_type(), entity_result.status)
             ]
         )
         await self._repository.bulk_create(bulk_creator)

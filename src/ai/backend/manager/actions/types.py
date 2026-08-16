@@ -104,7 +104,11 @@ class ActionOperationType(enum.StrEnum):
 
 
 @dataclass
+@dataclass(frozen=True)
 class ActionSpec:
+    """Legacy actions' (entity, operation) pair. The v2 bases carry an action_name
+    instead, which is declared rather than composed."""
+
     entity_type: EntityType
     operation_type: ActionOperationType
 
