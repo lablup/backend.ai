@@ -47620,7 +47620,7 @@
           }
         },
         "parameters": [],
-        "description": "Search prometheus query presets.\n\nAvailable to any authenticated user since presets are a shared\ncatalog of metric query templates.\n\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Search prometheus query presets.\n\nAvailable to any authenticated user since presets are a shared\ncatalog of metric query templates.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/prometheus-query-presets/preview": {
@@ -47678,7 +47678,7 @@
             }
           }
         ],
-        "description": "Get a single query definition by ID.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Get a single query definition by ID.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       },
       "patch": {
         "operationId": "v2/prometheus-query-presets.update",
@@ -47752,7 +47752,7 @@
             }
           }
         ],
-        "description": "Execute a prometheus query definition.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Execute a prometheus query definition.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/prometheus-query-presets/delete": {
@@ -47839,7 +47839,7 @@
           }
         },
         "parameters": [],
-        "description": "Search prometheus query preset categories.\n\nAvailable to any authenticated user since categories are a shared\ncatalog for organizing metric query templates.\n\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Search prometheus query preset categories.\n\nAvailable to any authenticated user since categories are a shared\ncatalog for organizing metric query templates.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/prometheus-query-preset-categories/{category_id}": {
@@ -47868,7 +47868,7 @@
             }
           }
         ],
-        "description": "Get a single category by ID.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Get a single category by ID.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/prometheus-query-preset-categories/delete": {
@@ -62208,7 +62208,7 @@
           }
         },
         "parameters": [],
-        "description": "Generate a presigned URL for uploading artifact files.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Generate a presigned URL for uploading artifact files.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/object-storages/presigned/download": {
@@ -62237,7 +62237,7 @@
           }
         },
         "parameters": [],
-        "description": "Generate a presigned URL for safely downloading artifact files.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Generate a presigned URL for safely downloading artifact files.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/object-storages/buckets": {
@@ -62257,7 +62257,7 @@
           }
         ],
         "parameters": [],
-        "description": "Retrieve all storage namespaces (buckets) across all storage systems.\n\nNote: This API is deprecated. Use /storage-namespaces instead.\n\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Retrieve all storage namespaces (buckets) across all storage systems.\n\nNote: This API is deprecated. Use /storage-namespaces instead.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/object-storages/{storage_id}/buckets": {
@@ -62286,7 +62286,7 @@
             }
           }
         ],
-        "description": "Retrieve storage namespaces (buckets) for a specific storage system.\n\nNote: This API is deprecated. Use /storage-namespaces instead.\n\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Retrieve storage namespaces (buckets) for a specific storage system.\n\nNote: This API is deprecated. Use /storage-namespaces instead.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/object-storages/": {
@@ -62306,7 +62306,7 @@
           }
         ],
         "parameters": [],
-        "description": "List all configured object storage systems.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "List all configured object storage systems.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/vfs-storages/{storage_name}/download": {
@@ -62344,7 +62344,7 @@
             }
           }
         ],
-        "description": "Download artifact directory from VFS storage via storage proxy streaming.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Download artifact directory from VFS storage via storage proxy streaming.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/vfs-storages/{storage_name}/files": {
@@ -62382,7 +62382,7 @@
             }
           }
         ],
-        "description": "List files recursively in a VFS storage directory via storage proxy.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "List files recursively in a VFS storage directory via storage proxy.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/vfs-storages/{storage_name}": {
@@ -62411,7 +62411,7 @@
             }
           }
         ],
-        "description": "Get VFS storage information by storage name.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Get VFS storage information by storage name.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/vfs-storages/": {
@@ -62431,7 +62431,7 @@
           }
         ],
         "parameters": [],
-        "description": "List all VFS storages.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "List all VFS storages.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/notifications/channels": {
