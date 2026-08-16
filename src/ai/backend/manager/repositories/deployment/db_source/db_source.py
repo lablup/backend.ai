@@ -2085,9 +2085,8 @@ class DeploymentDBSource:
         db_sess: SASession,
         user_uuid: uuid.UUID,
     ) -> _DeploymentUserResolution:
-        # Pick a deterministic, currently-active keypair for the given user.
-        # Preference order: the default keypair, then latest created_at,
-        # then access_key lexicographic order as a final stable tie-break.
+        # The default keypair, else the earliest active one. The marker is backfilled
+        # only from the former main_access_key and can be absent.
         active_stmt = (
             sa.select(UserRow, keypairs.c.access_key)
             .select_from(sa.join(UserRow, keypairs, UserRow.uuid == keypairs.c.user))
@@ -2095,7 +2094,7 @@ class DeploymentDBSource:
             .where(keypairs.c.is_active.is_(True))
             .order_by(
                 keypairs.c.is_default.desc(),
-                keypairs.c.created_at.desc(),
+                keypairs.c.created_at.asc(),
                 keypairs.c.access_key.asc(),
             )
             .limit(1)
