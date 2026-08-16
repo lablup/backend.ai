@@ -4,8 +4,8 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityID, EntityType
-from ai.backend.common.data.entity.vfs_storage import VFS_STORAGE_ENTITY_TYPE, VFSStorageID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.vfs_storage import VFSStorageID
 from ai.backend.manager.actions.v2.ops.base import PurgeEntityOpsAction
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.vfs_storage.purgers import VFSStoragePurger
@@ -22,16 +22,11 @@ class PurgeVFSStorageAction(PurgeEntityOpsAction[VFSStorageRow, VFSStorageData])
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return VFS_STORAGE_ENTITY_TYPE
-
-    @override
-    @classmethod
     def action_name(cls) -> str:
         return "purge_vfs_storage"
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.to_purger().entity_id()
 
     @override

@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.role_preset import ROLE_PRESET_ENTITY_TYPE, RolePresetID
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import PurgeEntityOpsAction
 from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.models.rbac_models.role_preset.purgers import RolePresetPurger
@@ -19,16 +19,11 @@ class PurgeRolePresetAction(PurgeEntityOpsAction[RolePresetRow, RolePresetData])
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return ROLE_PRESET_ENTITY_TYPE
-
-    @override
-    @classmethod
     def action_name(cls) -> str:
         return "purge_role_preset"
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.to_purger().entity_id()
 
     @override

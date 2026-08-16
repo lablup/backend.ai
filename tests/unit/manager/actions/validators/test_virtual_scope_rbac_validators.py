@@ -21,7 +21,14 @@ import pytest
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.types import EntityID, EntityType, ScopeID, ScopeRef, ScopeType
+from ai.backend.common.data.entity.types import (
+    EntityID,
+    EntityIdentifier,
+    EntityType,
+    ScopeID,
+    ScopeRef,
+    ScopeType,
+)
 from ai.backend.common.data.entity.virtual_scope import VirtualScopeID
 from ai.backend.common.data.permission.types import (
     EntityType as PermEntityType,
@@ -97,6 +104,13 @@ _BULK_VF_GRANTED: EntityID = uuid.uuid4()
 _BULK_VF_DENIED: EntityID = uuid.uuid4()
 
 
+class _StubEntityID(EntityIdentifier):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType("vfolder")
+
+
 class _ProjectCreateScopeAction(BaseScopeAction):
     """PROJECT:CREATE at domain scopes — subject type differs from the scope type."""
 
@@ -105,14 +119,14 @@ class _ProjectCreateScopeAction(BaseScopeAction):
     def __init__(self, scopes: Sequence[ScopeRef]) -> None:
         self._scopes = scopes
 
-    @override
-    def scope_targets(self) -> Sequence[ScopeRef]:
-        return self._scopes
-
     @classmethod
     @override
     def entity_type(cls) -> EntityType:
         return EntityType("project")
+
+    @override
+    def scope_targets(self) -> Sequence[ScopeRef]:
+        return self._scopes
 
     @classmethod
     @override
@@ -133,11 +147,6 @@ class _VfolderUpdateAction(BaseSingleEntityAction):
 
     @classmethod
     @override
-    def entity_type(cls) -> EntityType:
-        return EntityType("vfolder")
-
-    @classmethod
-    @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
@@ -147,8 +156,8 @@ class _VfolderUpdateAction(BaseSingleEntityAction):
         return "update_vfolder"
 
     @override
-    def entity_id(self) -> EntityID:
-        return self.vfolder_id
+    def entity_id(self) -> EntityIdentifier:
+        return _StubEntityID(self.vfolder_id)
 
 
 @dataclass
@@ -156,11 +165,6 @@ class _VfolderUpsertAction(BaseSingleEntityAction):
     """VFOLDER:UPSERT on a single vfolder — requires the ``CREATE | UPDATE`` mask."""
 
     vfolder_id: EntityID = field(default_factory=lambda: _VFOLDER_ID)
-
-    @classmethod
-    @override
-    def entity_type(cls) -> EntityType:
-        return EntityType("vfolder")
 
     @classmethod
     @override
@@ -173,8 +177,8 @@ class _VfolderUpsertAction(BaseSingleEntityAction):
         return "upsert_vfolder"
 
     @override
-    def entity_id(self) -> EntityID:
-        return self.vfolder_id
+    def entity_id(self) -> EntityIdentifier:
+        return _StubEntityID(self.vfolder_id)
 
 
 @dataclass

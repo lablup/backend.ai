@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
+from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
 from ai.backend.common.dto.manager.v2.login_client_type.request import (
     CreateLoginClientTypeInput,
     LoginClientTypeFilter,
@@ -89,7 +90,7 @@ class LoginClientTypeAdapter(BaseAdapter):
 
     async def get(self, type_id: UUID) -> LoginClientTypeNode:
         action_result = await self._processors.login_client_type.public_get.run(
-            GetLoginClientTypeAction(id=type_id)
+            GetLoginClientTypeAction(id=LoginClientTypeID(type_id))
         )
         return self._data_to_node(action_result.data)
 

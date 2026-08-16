@@ -4,10 +4,9 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.app_config_definition import (
-    APP_CONFIG_DEFINITION_ENTITY_TYPE,
     AppConfigDefinitionID,
 )
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import PurgeEntityOpsAction
 from ai.backend.manager.data.app_config_definition.types import AppConfigDefinitionData
 from ai.backend.manager.models.app_config_definition.purgers import AppConfigDefinitionPurger
@@ -24,16 +23,11 @@ class PurgeAppConfigDefinitionAction(
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return APP_CONFIG_DEFINITION_ENTITY_TYPE
-
-    @override
-    @classmethod
     def action_name(cls) -> str:
         return "purge_app_config_definition"
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.to_purger().entity_id()
 
     @override

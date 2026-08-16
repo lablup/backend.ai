@@ -4,10 +4,9 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.runtime_variant import (
-    RUNTIME_VARIANT_ENTITY_TYPE,
     RuntimeVariantID,
 )
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import GetSingleEntityOpsAction
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
@@ -22,16 +21,11 @@ class GetRuntimeVariantAction(GetSingleEntityOpsAction[RuntimeVariantRow, Runtim
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return RUNTIME_VARIANT_ENTITY_TYPE
-
-    @override
-    @classmethod
     def action_name(cls) -> str:
         return "public_get_runtime_variant"
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.variant_id
 
     @override

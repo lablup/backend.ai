@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.error_log import ERROR_LOG_ENTITY_TYPE
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.error_log import ErrorLogID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import DeleteSingleEntityOpsAction
 from ai.backend.manager.data.error_log.types import ErrorLogData
 from ai.backend.manager.models.error_log.updaters import ErrorLogSoftDeleteUpdater
@@ -20,15 +19,10 @@ class DeleteErrorLogAction(DeleteSingleEntityOpsAction[ErrorLogRow, ErrorLogData
     that row. Who the caller is comes from the request context.
     """
 
-    log_id: uuid.UUID
+    log_id: ErrorLogID
 
     @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return ERROR_LOG_ENTITY_TYPE
-
-    @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.log_id
 
     @override

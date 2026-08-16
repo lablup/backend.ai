@@ -4,10 +4,9 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.prometheus_query_preset import (
-    PROMETHEUS_QUERY_PRESET_ENTITY_TYPE,
     PrometheusQueryPresetID,
 )
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import PurgeEntityOpsAction
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
 from ai.backend.manager.models.prometheus_query_preset.purgers import (
@@ -28,16 +27,11 @@ class PurgePresetAction(PurgeEntityOpsAction[PrometheusQueryPresetRow, Prometheu
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return PROMETHEUS_QUERY_PRESET_ENTITY_TYPE
-
-    @override
-    @classmethod
     def action_name(cls) -> str:
         return "purge_prometheus_query_preset"
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.to_purger().entity_id()
 
     @override

@@ -12,7 +12,7 @@ from typing import override
 
 import pytest
 
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.types import EntityID, EntityIdentifier, EntityType
 from ai.backend.common.exception import PermissionDeniedError
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
@@ -28,16 +28,18 @@ from ai.backend.manager.errors.common import InternalServerError
 _ENTITY_ID: EntityID = uuid.uuid4()
 
 
+class _StubEntityID(EntityIdentifier):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType("vfolder")
+
+
 @dataclass
 class _Action(BaseSingleEntityAction):
     @override
-    def entity_id(self) -> EntityID:
-        return _ENTITY_ID
-
-    @classmethod
-    @override
-    def entity_type(cls) -> EntityType:
-        return EntityType("session")
+    def entity_id(self) -> EntityIdentifier:
+        return _StubEntityID(_ENTITY_ID)
 
     @classmethod
     @override

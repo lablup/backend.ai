@@ -11,6 +11,7 @@ from typing import Final
 import sqlalchemy as sa
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, QueryParam
+from ai.backend.common.data.entity.error_log import ErrorLogID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.error_log.request import (
     AppendErrorLogRequest,
@@ -132,7 +133,7 @@ class ErrorLogHandler:
         log_id = uuid.UUID(path_params.log_id)
         log.info("CLEAR")
 
-        action = DeleteErrorLogAction(log_id=log_id)
+        action = DeleteErrorLogAction(log_id=ErrorLogID(log_id))
         await self._error_log.delete.run(action)
 
         return APIResponse.build(

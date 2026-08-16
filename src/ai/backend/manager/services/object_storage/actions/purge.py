@@ -4,8 +4,8 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.object_storage import OBJECT_STORAGE_ENTITY_TYPE, ObjectStorageID
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.object_storage import ObjectStorageID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import PurgeEntityOpsAction
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.object_storage.purgers import ObjectStoragePurger
@@ -23,16 +23,11 @@ class PurgeObjectStorageAction(PurgeEntityOpsAction[ObjectStorageRow, ObjectStor
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return OBJECT_STORAGE_ENTITY_TYPE
-
-    @override
-    @classmethod
     def action_name(cls) -> str:
         return "purge_object_storage"
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.to_purger().entity_id()
 
     @override

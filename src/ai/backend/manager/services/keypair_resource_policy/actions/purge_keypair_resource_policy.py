@@ -4,10 +4,9 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.resource_policy import (
-    KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE,
     KeyPairResourcePolicyUUID,
 )
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import PurgeEntityOpsAction
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.models.resource_policy.purgers import (
@@ -30,16 +29,11 @@ class PurgeKeyPairResourcePolicyAction(
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE
-
-    @override
-    @classmethod
     def action_name(cls) -> str:
         return "global_purge_keypair_resource_policy"
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.to_purger().entity_id()
 
     @override

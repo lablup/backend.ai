@@ -4,10 +4,9 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.retention_policy import (
-    RETENTION_POLICY_ENTITY_TYPE,
     RetentionPolicyID,
 )
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import GetSingleEntityOpsAction
 from ai.backend.manager.data.retention.types import RetentionPolicyData
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
@@ -22,16 +21,11 @@ class GetRetentionPolicyAction(GetSingleEntityOpsAction[RetentionPolicyRow, Rete
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return RETENTION_POLICY_ENTITY_TYPE
-
-    @override
-    @classmethod
     def action_name(cls) -> str:
         return "get_retention_policy"
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.policy_id
 
     @override

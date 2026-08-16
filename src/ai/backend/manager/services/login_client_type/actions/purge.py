@@ -5,10 +5,9 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.common.data.entity.login_client_type import (
-    LOGIN_CLIENT_TYPE_ENTITY_TYPE,
     LoginClientTypeID,
 )
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import PurgeEntityOpsAction
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 from ai.backend.manager.models.login_client_type.purgers import LoginClientTypePurger
@@ -27,16 +26,11 @@ class PurgeLoginClientTypeAction(PurgeEntityOpsAction[LoginClientTypeRow, LoginC
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return LOGIN_CLIENT_TYPE_ENTITY_TYPE
-
-    @override
-    @classmethod
     def action_name(cls) -> str:
         return "purge_login_client_type"
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.to_purger().entity_id()
 
     @override

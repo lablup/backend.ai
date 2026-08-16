@@ -4,10 +4,9 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.notification import (
-    NOTIFICATION_CHANNEL_ENTITY_TYPE,
     NotificationChannelID,
 )
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import PurgeEntityOpsAction
 from ai.backend.manager.data.notification.types import NotificationChannelData
 from ai.backend.manager.models.notification.purgers import NotificationChannelPurger
@@ -24,16 +23,11 @@ class PurgeChannelAction(PurgeEntityOpsAction[NotificationChannelRow, Notificati
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return NOTIFICATION_CHANNEL_ENTITY_TYPE
-
-    @override
-    @classmethod
     def action_name(cls) -> str:
         return "purge_notification_channel"
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.to_purger().entity_id()
 
     @override

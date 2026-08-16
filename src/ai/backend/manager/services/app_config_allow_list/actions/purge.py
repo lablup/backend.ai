@@ -3,8 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.app_config import APP_CONFIG_ALLOW_LIST_ENTITY_TYPE
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import PurgeEntityOpsAction
 from ai.backend.manager.data.app_config_allow_list.types import AppConfigAllowListData
 from ai.backend.manager.models.app_config_allow_list.purgers import (
@@ -27,16 +26,11 @@ class PurgeAppConfigAllowListAction(
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return APP_CONFIG_ALLOW_LIST_ENTITY_TYPE
-
-    @override
-    @classmethod
     def action_name(cls) -> str:
         return "purge_app_config_allow_list"
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.to_purger().entity_id()
 
     @override

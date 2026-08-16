@@ -4,10 +4,9 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.runtime_variant_preset import (
-    RUNTIME_VARIANT_PRESET_ENTITY_TYPE,
     RuntimeVariantPresetID,
 )
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import PurgeEntityOpsAction
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
 from ai.backend.manager.models.runtime_variant_preset.purgers import RuntimeVariantPresetPurger
@@ -28,16 +27,11 @@ class PurgeRuntimeVariantPresetAction(
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return RUNTIME_VARIANT_PRESET_ENTITY_TYPE
-
-    @override
-    @classmethod
     def action_name(cls) -> str:
         return "purge_runtime_variant_preset"
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.to_purger().entity_id()
 
     @override

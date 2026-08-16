@@ -135,7 +135,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
 
     async def get(self, preset_id: UUID) -> RuntimeVariantPresetNode:
         result = await self._processors.runtime_variant_preset.public_get.run(
-            GetRuntimeVariantPresetAction(preset_id=preset_id)
+            GetRuntimeVariantPresetAction(preset_id=RuntimeVariantPresetID(preset_id))
         )
         return self._data_to_node(result.data)
 

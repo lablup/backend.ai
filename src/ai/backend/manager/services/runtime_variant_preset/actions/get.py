@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.runtime_variant_preset import (
-    RUNTIME_VARIANT_PRESET_ENTITY_TYPE,
-)
-from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import GetSingleEntityOpsAction
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
@@ -22,12 +19,7 @@ class GetRuntimeVariantPresetAction(
 ):
     """Read one runtime variant preset; every authenticated user may."""
 
-    preset_id: uuid.UUID
-
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return RUNTIME_VARIANT_PRESET_ENTITY_TYPE
+    preset_id: RuntimeVariantPresetID
 
     @override
     @classmethod
@@ -35,7 +27,7 @@ class GetRuntimeVariantPresetAction(
         return "public_get_runtime_variant_preset"
 
     @override
-    def entity_id(self) -> EntityID:
+    def entity_id(self) -> EntityIdentifier:
         return self.preset_id
 
     @override

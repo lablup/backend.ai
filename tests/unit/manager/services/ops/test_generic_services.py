@@ -139,6 +139,13 @@ _SCOPE_TYPE = ScopeType(_ENTITY_TYPE)
 # =============================================================================
 
 
+class _StubEntityID(EntityIdentifier):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType("vfolder")
+
+
 @dataclass(frozen=True)
 class _PresetData(EntityData):
     """What the repository returns. Names itself because ``create`` has to report it."""
@@ -554,13 +561,8 @@ class _GetAction(BaseSingleEntityAction, GetOpsAction[RolePresetRow, _PresetData
         return self.querier
 
     @override
-    def entity_id(self) -> EntityID:
-        return self.target
-
-    @classmethod
-    @override
-    def entity_type(cls) -> EntityType:
-        return _ENTITY_TYPE
+    def entity_id(self) -> EntityIdentifier:
+        return _StubEntityID(self.target)
 
     @classmethod
     @override
@@ -585,13 +587,8 @@ class _DeleteAction(BaseSingleEntityAction, UpdateOpsAction[RolePresetRow, _Pres
         return self.updater
 
     @override
-    def entity_id(self) -> EntityID:
-        return self.target
-
-    @classmethod
-    @override
-    def entity_type(cls) -> EntityType:
-        return _ENTITY_TYPE
+    def entity_id(self) -> EntityIdentifier:
+        return _StubEntityID(self.target)
 
     @classmethod
     @override
@@ -643,13 +640,8 @@ class _UpdateAction(BaseSingleEntityAction, UpdateOpsAction[RolePresetRow, _Pres
         return self.updater
 
     @override
-    def entity_id(self) -> EntityID:
-        return self.target
-
-    @classmethod
-    @override
-    def entity_type(cls) -> EntityType:
-        return _ENTITY_TYPE
+    def entity_id(self) -> EntityIdentifier:
+        return _StubEntityID(self.target)
 
     @classmethod
     @override
@@ -672,13 +664,8 @@ class _PurgeAction(BaseSingleEntityAction, EntityPurgeOpsAction[RolePresetRow, _
         return self.purger
 
     @override
-    def entity_id(self) -> EntityID:
-        return self.target
-
-    @classmethod
-    @override
-    def entity_type(cls) -> EntityType:
-        return _ENTITY_TYPE
+    def entity_id(self) -> EntityIdentifier:
+        return _StubEntityID(self.target)
 
     @classmethod
     @override
@@ -703,13 +690,8 @@ class _UpsertAction(BaseSingleEntityAction, EntityUpsertOpsAction[RolePresetRow,
         return self.upserter
 
     @override
-    def entity_id(self) -> EntityID:
-        return self.target
-
-    @classmethod
-    @override
-    def entity_type(cls) -> EntityType:
-        return _ENTITY_TYPE
+    def entity_id(self) -> EntityIdentifier:
+        return _StubEntityID(self.target)
 
     @classmethod
     @override
@@ -944,8 +926,8 @@ class _BulkCreateFieldAction(
         return self.owner
 
     @override
-    def entity_id(self) -> EntityID:
-        return self.owner
+    def entity_id(self) -> EntityIdentifier:
+        return _StubEntityID(self.owner)
 
     @classmethod
     @override
@@ -1009,8 +991,8 @@ class _FieldUpsertAction(
         return self.owner
 
     @override
-    def entity_id(self) -> EntityID:
-        return self.owner
+    def entity_id(self) -> EntityIdentifier:
+        return _StubEntityID(self.owner)
 
     @classmethod
     @override
