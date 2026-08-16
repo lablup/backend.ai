@@ -16,10 +16,8 @@ from ai.backend.manager.models.storage_namespace.purgers import StorageNamespace
 class UnregisterNamespaceAction(PurgeGlobalOpsAction[StorageNamespaceRow, StorageNamespaceData]):
     """Remove one namespace from a storage.
 
-    Addressed by id: callers who hold only the (storage, namespace) pair resolve it
-    through the lookup first, which keeps this keyed on the primary value like every
-    other purge. PURGE because the row leaves the table -- a storage namespace
-    carries no lifecycle column.
+    Addressed by id; callers holding only the (storage, namespace) pair resolve it
+    through the lookup first. PURGE because the row leaves the table.
     """
 
     id: StorageNamespaceID

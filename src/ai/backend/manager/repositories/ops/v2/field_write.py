@@ -1,4 +1,4 @@
-"""Field-family writes of the v2 ops: rows owned by another entity, authorized
+"""Field writes of the v2 ops: rows owned by another entity, authorized
 through the owner. Plain row writes — nothing becomes a scope and nothing is
 joined."""
 
@@ -19,7 +19,7 @@ from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
 
 
 class V2FieldWriteOps(V2WriteOpsBase):
-    """Writes of the field family, bound to a single session."""
+    """Field writes, bound to a single session."""
 
     async def create_field_entity[TOwnerID: EntityID, TRow: Base, TData](
         self, owner_id: TOwnerID, creator: FieldEntityCreator[TOwnerID, TRow, TData]

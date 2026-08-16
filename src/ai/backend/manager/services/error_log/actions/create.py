@@ -18,10 +18,8 @@ from ai.backend.manager.models.error_logs import ErrorLogRow
 class CreateErrorLogAction(CreateEntityOpsAction[ErrorLogRow, ErrorLogData]):
     """Record one error against the user it happened to.
 
-    The scope target is the owning user rather than the installation: an error
-    belongs to whoever hit it, and recording one is a write inside that user's
-    scope. Reporting a global gate here would be wrong -- it would mean only an
-    installation administrator may report that something broke for them.
+    The scope target is the owning user, not the installation: a global gate would
+    mean only an administrator may report that something broke for them.
     """
 
     user_id: UserID

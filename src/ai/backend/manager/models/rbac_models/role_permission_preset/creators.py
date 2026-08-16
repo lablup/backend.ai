@@ -22,9 +22,8 @@ class RolePermissionPresetCreator(
 ):
     """Creator for one permission entry of a role preset.
 
-    A field of its preset: it grants no permission of its own and dies with the
-    preset by FK cascade. The owner id arrives at build time, which is what lets
-    the rows be created alongside a preset that does not exist yet.
+    A field of its preset: it grants nothing of its own and dies with the preset. The
+    owner id arrives at build time, so the rows precede the preset's existence.
     """
 
     entity_type: EntityType

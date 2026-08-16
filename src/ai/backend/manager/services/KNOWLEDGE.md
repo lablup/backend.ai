@@ -1,7 +1,7 @@
 ---
 name: v2-action-spec-adoption
 type: decision-table
-description: entity_type judgment criteria and tables for the v2 action/spec adoption, standard wiring shapes per family, pass-through demotion tool mapping, non-DB target exception list
+description: entity_type judgment criteria and tables for the v2 action/spec adoption, standard wiring shapes per judgment, pass-through demotion tool mapping, non-DB target exception list
 scope: src/ai/backend/manager/services
 keywords: [action, spec, entity, field, global, scope, ops-direct, lookup, public, rbac, migration]
 sources:
@@ -18,13 +18,13 @@ status: draft
 # Manager Services layer — Knowledge
 
 > Rules: `AGENTS.md` in the same directory. Action-framework design background:
-> `../actions/KNOWLEDGE.md`. Spec-family design background: `../models/specs/KNOWLEDGE.md`.
+> `../actions/KNOWLEDGE.md`. Write-spec design background: `../models/specs/KNOWLEDGE.md`.
 
 ## Why this document exists
 
 The services layer is where domain validation and business rules live. This
 document carries the layer's central judgment for the v2 transition — which
-entity_type wires as which family, and when a service method is kept. The bulk
+entity_type wires as which shape, and when a service method is kept. The bulk
 replacement work (BA-7295~7302) is the job of aligning everything that differs
 from these tables.
 
@@ -38,7 +38,7 @@ from these tables.
 
 Judgment results and their wiring/spec mapping:
 
-| Judgment | Condition | Action family | Write spec |
+| Judgment | Condition | Action shape | Write spec |
 |---|---|---|---|
 | Scope-providing | All three yes, and it governs other entities | scope (create) / single etc. | `RoleManagedEntity*` (grants preset roles) |
 | Entity | Has a parent, handled directly | scope (create) / single / bulk | `Entity*` (own VS node + member_of) |
@@ -99,7 +99,7 @@ Targets outside the RBAC scopes — `GlobalEntity*`, no membership registration.
 |---|---|
 | agent, image, container_registry, artifact_registry, object_storage, vfs_storage | administrator-domain infrastructure |
 | resource_slot_type, retention_policy, runtime_variant(+preset), prometheus_query_preset(+category), login_client_type, role_preset, idle_checker(+assignment), notification_channel, notification_rule, the 3 resource policies, service_catalog, app_config_definition | system settings/catalogs; only read publicity differs (public) |
-| audit_log, error_log, the scheduling_history family | system records; only the `*:scoped_history` variants are scoped searches |
+| audit_log, error_log, the scheduling_history records | system records; only the `*:scoped_history` variants are scoped searches |
 | invitation (today `vfolder:invitation`) | direction: split into one global invitation usable by every entity, taking entity_type/entity_id; permission granting flows through the two paths Grant / Invite |
 
 ## entity_types that stay action-only — no target row
@@ -109,7 +109,7 @@ Behaviors or non-DB targets — no spec, service kept.
 | entity_type | Notes |
 |---|---|
 | vfolder:file | vfolder behavior, subtypes kept |
-| auth family | behaviors on user/keypair |
+| auth | behaviors on user/keypair |
 | session:file, commit, log and other subtypes | session behaviors; subtypes not split off |
 | stream | target is the session — wiring axis confirmed during migration |
 | etcd_config, manager_admin, metric | non-DB — see the exception list below |

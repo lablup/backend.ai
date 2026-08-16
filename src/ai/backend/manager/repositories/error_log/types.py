@@ -20,9 +20,8 @@ __all__ = ("UserErrorLogOperationScope",)
 class UserErrorLogOperationScope(OperationScope):
     """The errors one user may see.
 
-    Cleared rows drop out here rather than in the searcher: clearing is this
-    domain's soft delete, so a cleared row is gone as far as its owner is
-    concerned, while the admin read spans the whole table and still returns it.
+    Cleared rows drop out here rather than in the searcher: clearing is this domain's
+    soft delete, and the global read still returns them.
 
     ``existence_checks`` is empty by convention -- RBAC validation already gates
     reachability.

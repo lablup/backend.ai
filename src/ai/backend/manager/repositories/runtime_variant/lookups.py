@@ -16,9 +16,8 @@ from ai.backend.manager.models.specs.lookup import DataLookup
 class RuntimeVariantLookup(DataLookup[RuntimeVariantRow, RuntimeVariantData]):
     """Resolves a runtime variant's name into the row it names.
 
-    The name is unique, which is what separates this from a search: two matches
-    would mean the constraint is missing rather than that the caller asked for a
-    page.
+    The name is unique, which separates this from a search: two matches would mean the
+    constraint is missing.
     """
 
     name: str

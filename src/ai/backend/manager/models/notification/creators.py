@@ -1,8 +1,7 @@
 """Insert specs for the notification catalogs.
 
-Both are global: a channel or a rule is system-wide configuration, not something
-a scope owns. The legacy path registered each one under its creator's user scope,
-which narrowed no read and is dropped here.
+Both are global: a channel or a rule is system-wide configuration. The legacy path
+registered each under its creator's user scope, which narrowed no read.
 """
 
 from __future__ import annotations

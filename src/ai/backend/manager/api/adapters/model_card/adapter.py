@@ -675,10 +675,8 @@ class ModelCardAdapter(BaseAdapter):
     ) -> dict[UUID, list[ResourceSlotEntryInfo]]:
         """Read the minimum resource requirements of the named cards.
 
-        A second read rather than a field on the card: the requirements are their own
-        table, so the card's projection does not carry them. REST fills the field with
-        this before answering; GraphQL calls it from the field resolver, which means a
-        query that does not select ``minResource`` never pays for it.
+        A second read because the requirements are their own table. GraphQL calls it
+        from the field resolver, so a query that skips ``minResource`` skips this.
         """
         result = await self._processors.model_card.get_min_resources.wait_for_complete(
             GetModelCardMinResourcesAction(card_ids=list(card_ids))

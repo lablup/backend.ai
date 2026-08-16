@@ -193,7 +193,7 @@ class GlobalSearchOpsAction[TRow: Base, TData](OpsBackendAction):
 
 
 class GlobalEntityCreateOpsAction[TRow: Base, TData](OpsBackendAction):
-    """Carries the global-family insert spec; no scope membership involved."""
+    """Carries the global insert spec; no scope membership involved."""
 
     @abstractmethod
     def to_creator(self) -> GlobalEntityCreator[TRow, TData]:
@@ -206,10 +206,8 @@ class GlobalEntityWithFieldsCreateOpsAction[TRow: Base, TData, TFieldRow: Base, 
 ):
     """Carries a global insert spec together with the field specs it owns.
 
-    The field creators build from the parent's id, which does not exist until the
-    parent row does — the same shape ``FieldEntityCreator.build_row(owner_id)``
-    already has. Declared as one action so the two writes share a transaction:
-    splitting them into two actions would let the parent survive a failed field row.
+    One action so the two writes share a transaction: split apart, the parent could
+    survive a failed field row.
     """
 
     @abstractmethod
@@ -244,7 +242,7 @@ class RoleManagedEntityCreateOpsAction[TRow: Base, TData](OpsBackendAction):
 
 
 class FieldEntityCreateOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData](OpsBackendAction):
-    """Carries the field-family insert spec plus the owner's identifier.
+    """Carries the field insert spec plus the owner's identifier.
 
     The owner id is declared here rather than leaning on the shape's
     ``entity_id()``: the shape names the RBAC target (the owner), while this axis
@@ -308,7 +306,7 @@ class FieldEntityAtomicCreateOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TDat
 
 
 class GlobalEntityPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
-    """Carries the global-family delete spec; no membership to remove."""
+    """Carries the global delete spec; no membership to remove."""
 
     @abstractmethod
     def to_purger(self) -> GlobalEntityPurger[TRow, TData]:
@@ -327,7 +325,7 @@ class EntityPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
 
 
 class FieldEntityPurgeOpsAction[TRow: Base, TData](OpsBackendAction):
-    """Carries the field-family delete spec; authorized through the owner the
+    """Carries the field delete spec; authorized through the owner the
     shape names, like an update to the owning entity."""
 
     @abstractmethod

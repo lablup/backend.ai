@@ -17,9 +17,8 @@ from ai.backend.manager.models.error_logs import ErrorLogRow
 class DeleteErrorLogAction(DeleteSingleEntityOpsAction[ErrorLogRow, ErrorLogData]):
     """Clear one error log.
 
-    The target is the log itself, so the permission question is whether the caller
-    may delete that row. Who the caller is comes from the request context; the
-    action carries no role of its own.
+    The target is the log itself, so the question is whether the caller may delete
+    that row. Who the caller is comes from the request context.
     """
 
     log_id: uuid.UUID

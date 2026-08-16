@@ -16,7 +16,7 @@ status: stable
 
 # Role preset service — Knowledge
 
-> Rules: `../AGENTS.md`. Family selection: `../../models/specs/KNOWLEDGE.md`.
+> Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`.
 
 A role preset declares which roles a scope type provisions when an entity of
 that type is created, and which permissions each of those roles carries. The

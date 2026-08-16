@@ -1,7 +1,6 @@
 """DataUpdater implementations for the role preset repository.
 
-The ``deleted`` column is split off from the general updater: soft delete and
-restore each carry their own spec whose values are constant, so the ordinary edit
+The ``deleted`` column is split off from the general updater, so the ordinary edit
 path has no field to make the transition with (`models/specs/AGENTS.md`).
 """
 

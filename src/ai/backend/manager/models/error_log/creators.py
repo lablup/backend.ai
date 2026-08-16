@@ -27,10 +27,8 @@ _ERROR_LOG_SCOPE = ScopeType(ERROR_LOG_ENTITY_TYPE)
 class ErrorLogCreator(EntityCreator[ErrorLogRow, ErrorLogData]):
     """Creator for one recorded error.
 
-    An error belongs to whoever it happened to, so the row joins that user's scope
-    and is reachable through it. The column is nullable because the manager and the
-    agents record their own failures through the plugin, where there is no user to
-    own the row; those join nothing and stay visible only to the admin read.
+    The row joins the owning user's scope. The column is nullable because the manager
+    and the agents record their own failures with no user to own the row.
     """
 
     severity: ErrorLogSeverity

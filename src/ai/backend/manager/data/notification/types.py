@@ -43,9 +43,8 @@ class NotificationChannelData(EntityData):
 class NotificationRuleData(EntityData):
     """Domain model data for notification rule.
 
-    Names its channel by id rather than carrying the channel itself: a row
-    projection mirrors one table, and composing the two here is what forced the
-    ORM relationship and an eager load on every read.
+    Names its channel by id: a row projection mirrors one table, and composing the two
+    forced an eager load on every read.
     """
 
     id: NotificationRuleID

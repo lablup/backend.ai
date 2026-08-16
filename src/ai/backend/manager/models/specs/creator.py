@@ -1,6 +1,6 @@
 """Insert specs of the v2 lineage.
 
-The family roots below are deliberately unrelated — no common ABC. See AGENTS.md
+The roots below are deliberately unrelated — no common ABC. See AGENTS.md
 in this package before typing anything against more than one of them.
 """
 

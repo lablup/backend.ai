@@ -17,9 +17,8 @@ from ai.backend.manager.models.specs.updater import DataUpdater
 class ErrorLogSoftDeleteUpdater(DataUpdater[ErrorLogRow, ErrorLogData]):
     """Clear one error log.
 
-    ``is_cleared`` is the column this domain deletes by: the owner's read excludes
-    cleared rows while the admin read still returns them. The value is a constant
-    rather than an argument, so the transition cannot be written backwards.
+    ``is_cleared`` is the column this domain deletes by. The value is constant rather
+    than an argument, so the transition cannot be written backwards.
     """
 
     log_id: uuid.UUID

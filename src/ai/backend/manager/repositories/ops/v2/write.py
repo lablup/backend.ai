@@ -21,7 +21,7 @@ class V2WriteOps(
     """Read-write operations over the v2 write specs, bound to a single session.
 
     Composed by inheritance from the per-concern ops — entity writes (the
-    role-managed variants included), global and field writes, family-neutral
+    role-managed variants included), global and field writes, plus the
     updates, batch writes — on top of the read ops; each concern lives in its
     own module and shares the primitives of ``V2WriteOpsBase``.
     """

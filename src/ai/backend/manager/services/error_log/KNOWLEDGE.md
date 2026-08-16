@@ -17,7 +17,7 @@ status: stable
 
 # Error log service — Knowledge
 
-> Rules: `../AGENTS.md`. Family selection: `../../models/specs/KNOWLEDGE.md`.
+> Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`.
 
 This package records the errors users and components hit, and answers who may
 read them back. It exists as its own domain because the table has two kinds of

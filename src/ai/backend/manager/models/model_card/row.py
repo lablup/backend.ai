@@ -77,9 +77,7 @@ class ModelCardRow(LifecycleTimestampsMixin, Base):
         """Project this row.
 
         The minimum resource requirements live in their own table and are not read
-        here: a conversion that reaches into a child table forces a relationship and
-        an eager load on every read, and puts the card out of reach of the
-        single-entity read/write specs. Callers that need them ask for them.
+        here: reaching into a child table would force an eager load on every read.
         """
         return ModelCardData(
             id=self.id,

@@ -74,10 +74,8 @@ class BulkResultWithFailures[TData]:
 class EntityWithFieldsResult[TData, TFieldData]:
     """An entity and the field rows created under it in the same transaction.
 
-    A dataclass rather than a pair, because the two halves are not interchangeable
-    and a caller reading positionally would eventually read them the wrong way
-    round. Named as the halves are named everywhere else — the entity is the
-    ``data``, its owned rows are the ``fields``.
+    A dataclass rather than a pair: the two halves are not interchangeable, and a
+    caller reading positionally would eventually read them the wrong way round.
     """
 
     data: TData

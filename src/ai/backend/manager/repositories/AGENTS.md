@@ -7,7 +7,7 @@
 - `repository.py` (single-entity CRUD), `repositories.py` (multi-entity container / `RepositoryArgs`),
   `types.py` (OperationScope + SearchResult), `options.py` (QueryCondition/QueryOrder),
   `db_source/db_source.py` (queries). Optional: `updaters.py`, for the legacy
-  `UpdaterSpec` family only -- a v2 `DataUpdater` is declared next to its row under
+  `UpdaterSpec` only -- a v2 `DataUpdater` is declared next to its row under
   `models/`, like every other v2 spec.
 - Separate out db_source so it is clear which source a Repository uses.
 - Do NOT write a `repository.py` / `db_source.py` for an operation that only hands a spec to
@@ -24,11 +24,11 @@
 ## Data access
 
 - New write specs use the `models/specs/` lineage only:
-  - write families: `GlobalEntity*` / `Entity*` / `RoleManagedEntity*` / `FieldEntity*` (Creator/Purger/Upserter)
+  - write specs: `GlobalEntity*` / `Entity*` / `RoleManagedEntity*` / `FieldEntity*` (Creator/Purger/Upserter)
   - read/update: `DataQuerier`, `DataLookup`, `Searcher`, `DataUpdater`
 - No new use of the legacy specs — transition-only maintenance of existing code:
   - `repositories/base/`: `CreatorSpec`, `DataCreator`, `UpserterSpec`, `PurgerSpec`
-  - `repositories/base/rbac/`: the `RBACEntityCreator` / `RBACEntityUpserter` / `RBACEntityPurger` family
+  - `repositories/base/rbac/`: the `RBACEntityCreator` / `RBACEntityUpserter` / `RBACEntityPurger` set
   - Judge by import path (`models.specs.*` is v2) — `repositories.base` re-exports some
     v2 types and bridge classes like `DataBatchPurger` share names, so never judge by
     the class name alone.

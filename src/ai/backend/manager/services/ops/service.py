@@ -168,7 +168,7 @@ class GlobalSearchService[TData]:
 
 
 class GlobalCreateService[TData: EntityData]:
-    """Inserts the global-family row the action's creator describes."""
+    """Inserts the global row the action's creator describes."""
 
     _repository: OpsRepository[TData]
 
@@ -316,7 +316,7 @@ class FieldAtomicCreateService[TData: EntityData]:
 
 
 class GlobalPurgeService[TData]:
-    """Hard-deletes the global-family row the action's purger describes."""
+    """Hard-deletes the global row the action's purger describes."""
 
     _repository: OpsRepository[TData]
 
@@ -496,10 +496,9 @@ class DeleteService[TData]:
 class RestoreService[TData]:
     """Restores by applying the action's updater.
 
-    Identical to :class:`DeleteService` under the hood, and to
-    :class:`UpdateService` before it: the restore is the same status transition
-    written backwards. The action declares ``operation_type() == RESTORE``, so the
-    audit trail says restore while the permission checked stays soft-delete.
+    Identical to :class:`DeleteService` under the hood. The action declares
+    ``operation_type() == RESTORE``, so the audit says restore while the permission
+    checked stays soft-delete.
     """
 
     _repository: OpsRepository[TData]

@@ -1,7 +1,7 @@
 ---
 name: action-framework-design
 type: design-rationale
-description: v2 action shape families and derived permissions, audit recording principles (writes always, reads on subscription, failures always, DENIED), per-target rows for bulk, lookup existence-leak handling, public read gate, ops-backed backing axis
+description: v2 action shapes and derived permissions, audit recording principles (writes always, reads on subscription, failures always, DENIED), per-target rows for bulk, lookup existence-leak handling, public read gate, ops-backed backing axis
 scope: src/ai/backend/manager/actions
 keywords: [BaseSingleEntityAction, BaseScopeAction, BaseGlobalAction, BaseLookupAction, PublicActionProcessor, AuditLogPolicy, ProcessorRegistry, wired_specs, OpsBackendAction, RESTORE, soft-delete, atomic, partial]
 sources:
@@ -27,7 +27,7 @@ which is why handlers call processors, not services.
 
 ## Permissions are derived, not declared by actions
 
-- The v2 bases classify actions by the shape of their target — the five families are defined in `AGENTS.md`.
+- The v2 bases classify actions by the shape of their target — the five shapes are defined in `AGENTS.md`.
 - The required permission is derived from `operation_type()` — actions do not declare permissions, so the two cannot diverge.
 - `RESTORE` is the only deliberate split: the behavior/audit label is restore, the checked permission is soft-delete — no new permission bit.
 

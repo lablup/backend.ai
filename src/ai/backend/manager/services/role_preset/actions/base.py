@@ -4,9 +4,8 @@ from abc import ABC, abstractmethod
 class RoleNameTemplateCarrier(ABC):
     """Declares that an action carries a preset's ``role_name_template``.
 
-    The template is rejected at the action layer rather than inside the write, so
-    a malformed one is refused before a transaction opens and the refusal is
-    recorded like any other denial.
+    Rejected at the action layer rather than inside the write, so a malformed template
+    is refused before a transaction opens.
     """
 
     @abstractmethod

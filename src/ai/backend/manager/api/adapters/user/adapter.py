@@ -919,10 +919,8 @@ class UserAdapter(BaseAdapter):
     ) -> SearchResult[KeypairNode]:
         """Admin search across every keypair (GQL, returns SearchResult for connection).
 
-        ``resource_policy_name`` narrows the same admin read to one policy, which is
-        what the resource policy node's ``keypairs`` connection needs. It is a filter,
-        not a second path: the action is the admin one either way, so a non-superadmin
-        is refused by the processor before any row is read.
+        ``resource_policy_name`` narrows the same admin read to one policy for the
+        resource policy node's ``keypairs`` connection. A filter, not a second path.
         """
         conditions = self._convert_keypair_filter(input.filter) if input.filter else []
         if resource_policy_name is not None:

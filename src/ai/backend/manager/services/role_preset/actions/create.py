@@ -31,9 +31,8 @@ class CreateRolePresetAction(
 ):
     """Register a role preset together with the permissions it grants.
 
-    One action rather than two so the preset and its permission rows share a
-    transaction — a preset that survived a failed permission row would grant less
-    than it declares.
+    One action so the preset and its permission rows share a transaction: a preset
+    surviving a failed permission row would grant less than it declares.
     """
 
     creator: RolePresetCreator

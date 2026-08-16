@@ -6,13 +6,13 @@
 
 ## Bases
 
-- New actions inherit only from the v2 bases (`actions/v2/`). There are five families:
+- New actions inherit only from the v2 bases (`actions/v2/`). There are five shapes:
   - `single_entity` — one target id
   - `bulk` — a list of target ids
   - `scope` — the scope is the target (search within a scope, and create)
   - `global` — no RBAC target (system-wide)
   - `lookup` — resolve an external key to an internal id
-- Do not create new subclasses of the legacy `BaseAction` family (`actions/action/`).
+- Do not create new subclasses of the legacy `BaseAction` bases (`actions/action/`).
 
 ## Wiring
 

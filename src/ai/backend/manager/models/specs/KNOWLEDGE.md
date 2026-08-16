@@ -1,7 +1,7 @@
 ---
-name: write-spec-family-design
+name: write-spec-design
 type: design-rationale
-description: write-spec family (Entity/Global/Field) selection criteria, why the three families share no common ABC, why the role-managed root is not an EntityCreator subtype, the distinction between member_of and cap-based sharing, open scope-type strings
+description: write-spec selection criteria (Entity/Global/Field), why the three roots share no common ABC, why the role-managed root is not an EntityCreator subtype, the distinction between member_of and cap-based sharing, open scope-type strings
 scope: src/ai/backend/manager/models/specs
 keywords: [EntityCreator, GlobalEntityCreator, FieldEntityCreator, RoleManagedEntityCreator, RoleTemplateSource, member_of, scope_of, virtual-scope, preset-role, DataUpdater, soft-delete]
 sources:
@@ -26,11 +26,11 @@ It exists so that the RBAC side effects of a write (scope provisioning,
 membership registration) are decided by the **spec's type**, not by the
 execution path.
 
-## Family selection: the only remaining question is "is it an entity"
+## Spec selection: the only remaining question is "is it an entity"
 
 **Every entity doubles as a scope** — it can own memberships and can be shared.
 
-| Family | Criterion | Write behavior |
+| Spec | Criterion | Write behavior |
 |--------|-----------|----------------|
 | Entity | First-class entity (vfolder/session/...) | create provisions the row's virtual scope node (self membership + self binding) and joins each `member_of()` scope; purge tears down symmetrically; upsert stays idempotent |
 | Entity, role-managed | Entities that grant preset roles (domain/project/user) | Entity behavior + preset role creation — must be declared via the combined `RoleManagedEntity*` root (see section below) |
@@ -51,7 +51,7 @@ execution path.
 
 ## Soft delete is guarded by the absence of a field
 
-The same mechanism as the family roots: what stops a write is the shape of the
+The same mechanism as the spec roots: what stops a write is the shape of the
 declaration, not a check at execution time.
 
 A soft delete is an UPDATE at the DB, so ops cannot tell it apart from an edit —

@@ -23,8 +23,7 @@ class RoleNameTemplateValidator(GlobalActionValidator):
     """Renders the template against representative values and refuses a broken one.
 
     The framework hands validators the shape base, so the carrier interface is
-    narrowed here — this reads what the action holds, it does not select a write
-    path, which is where runtime type checks are ruled out.
+    narrowed here. This reads what the action holds; it selects no write path.
     """
 
     # Rendered role names are stored in ``roles.name`` (sa.String(64)).

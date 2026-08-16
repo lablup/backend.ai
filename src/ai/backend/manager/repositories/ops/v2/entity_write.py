@@ -75,7 +75,7 @@ class _PresetRoleSpec:
 
 
 class V2EntityWriteOps(V2WriteOpsBase):
-    """Writes of the entity family, bound to a single session."""
+    """Entity writes, bound to a single session."""
 
     # Rendered role names are stored in ``roles.name`` (sa.String(64)).
     _MAX_ROLE_NAME_LENGTH: ClassVar[int] = 64
@@ -229,7 +229,7 @@ class V2EntityWriteOps(V2WriteOpsBase):
         self, rows: Sequence[TRow], checks: Sequence[IntegrityErrorCheck]
     ) -> None:
         """Flush pre-built rows in one batch. Takes plain values so both entity
-        creator families share it without a common spec supertype."""
+        the creators share it without a common spec supertype."""
         self._sess.add_all(rows)
         try:
             await self._sess.flush()

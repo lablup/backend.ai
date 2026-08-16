@@ -16,14 +16,8 @@ from ai.backend.manager.actions.types import ActionKind, OperationStatus
 class AuditLogData(EntityData):
     """One audit record, mirroring the row.
 
-    ``action_kind`` says which shape wrote it, so only the target columns belonging
-    to that shape are set. Writers use the per-shape creator specs, which is where
-    that invariant is enforced.
-
-    ``id`` is this record's own identity; ``target_entity_id`` is the entity the
-    record is about. The row column keeps the name ``entity_id``, but carrying that
-    name up here would read as the record's identity and collide with the one
-    :class:`EntityData` asks for.
+    ``action_kind`` says which shape wrote it; only that shape's target columns are
+    set. ``id`` is this record; ``target_entity_id`` is what it is about.
     """
 
     id: AuditLogID

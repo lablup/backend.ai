@@ -15,7 +15,7 @@ status: stable
 
 # Notification service — Knowledge
 
-> Rules: `../AGENTS.md`. Family selection: `../../models/specs/KNOWLEDGE.md`.
+> Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`.
 
 A channel is somewhere a message can be sent; a rule says which events go to
 which channel. They live in one package because a rule is meaningless without
@@ -38,7 +38,7 @@ anything a user owns.
 Two `ProcessorGroup`s are wired, one per entity type. All thirteen REST routes
 declare `superadmin_required`, so the global gate matches the surface.
 
-## Global is the right family here
+## Global is the right shape here
 
 - Neither table joins a scope: a channel is an endpoint the installation owns,
   and a rule is a routing entry against it.

@@ -1,9 +1,8 @@
 """Processor wiring for tests that drive ops-direct domains against a real DB.
 
-A domain migrated to ops-generic wiring takes a :class:`ProcessorGroup` instead of a
-repository and a validator bundle, so every test that builds its processors by hand has
-to know how that group is assembled. Keeping that knowledge here means a change to
-:class:`ProcessorDependencies` lands in one place rather than in every conftest.
+An ops-direct domain takes a :class:`ProcessorGroup` instead of a repository and a
+validator bundle. Assembling it here means a change to :class:`ProcessorDependencies`
+lands in one place rather than in every conftest.
 """
 
 from typing import Any

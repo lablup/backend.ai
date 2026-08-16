@@ -15,9 +15,8 @@ from ai.backend.manager.services.model_card.actions.base import ModelCardAction
 class GetModelCardMinResourcesAction(ModelCardAction):
     """Read the minimum resource requirements of the named cards.
 
-    Its own action because the requirements are a table of their own: the card's row
-    projection does not carry them, so whoever renders them asks for them, and asks
-    for every card at once rather than once per card.
+    Its own action because the requirements are a table of their own, asked for every
+    card at once rather than once per card.
     """
 
     card_ids: Sequence[UUID]

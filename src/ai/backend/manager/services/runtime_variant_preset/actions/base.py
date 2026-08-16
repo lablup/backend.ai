@@ -15,7 +15,7 @@ class RuntimeVariantPresetGlobalAction(BaseGlobalAction):
     """Base for the preset operations the service still owns.
 
     Kept on the v2 global base even where the operation is not a pass-through: the
-    gate and the audit shape belong to the family, not to whether ops runs the write.
+    gate and the audit shape belong to the shape, not to whether ops runs the write.
     """
 
     @override

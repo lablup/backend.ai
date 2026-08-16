@@ -19,9 +19,8 @@ class CreateAppConfigDefinitionAction(
 ):
     """Register a config name.
 
-    Global-shaped: the definition catalog belongs to no scope. The action wore a scope
-    shape before, but the scope it named was always the global one with an empty id,
-    which is what the global family says outright.
+    Global-shaped: the definition catalog belongs to no scope. The scope shape it wore
+    before always named the global one with an empty id.
     """
 
     creator: AppConfigDefinitionCreator

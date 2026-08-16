@@ -15,9 +15,8 @@ from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 class RolePresetCreator(GlobalEntityCreator[RolePresetRow, RolePresetData]):
     """Creator for a role preset — the global catalog of roles a scope type provisions.
 
-    Global rather than entity: a preset declares which roles a scope type gets, it
-    governs no entities of its own and lives outside the scope hierarchy. Its
-    permission rows hang off it as fields.
+    Global rather than entity: a preset declares which roles a scope type gets and
+    lives outside the scope hierarchy. Its permission rows hang off it as fields.
     """
 
     name: str

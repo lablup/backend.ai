@@ -1,4 +1,4 @@
-"""Global-family writes of the v2 ops: system-wide state outside the scope
+"""Global writes of the v2 ops: system-wide state outside the scope
 hierarchy. Plain row writes — nothing becomes a scope and nothing is joined."""
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from ai.backend.manager.repositories.ops.v2.write_base import V2WriteOpsBase
 
 
 class V2GlobalWriteOps(V2WriteOpsBase):
-    """Writes of the global family, bound to a single session."""
+    """Global writes, bound to a single session."""
 
     async def create_global_entity[TRow: Base, TData](
         self, creator: GlobalEntityCreator[TRow, TData]

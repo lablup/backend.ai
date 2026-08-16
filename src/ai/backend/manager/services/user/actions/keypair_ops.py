@@ -52,9 +52,8 @@ class IssueMyKeypairActionResult(BaseActionResult):
 class RevokeMyKeypairAction(UserAction):
     """Revoke a keypair owned by the current user.
 
-    ``PURGE``: the row leaves the keypairs table. Deleting a user turns the same
-    table's ``is_active`` off instead, which is the soft delete; this path is the
-    hard one and says so.
+    ``PURGE``: the row leaves the table. Deleting a user turns ``is_active`` off
+    instead.
     """
 
     user_uuid: UUID
@@ -244,11 +243,9 @@ class AdminDeleteKeypairActionResult(BaseActionResult):
 class AdminSearchKeypairsAction(BaseGlobalAction):
     """Read keypairs across every user.
 
-    Global-shaped so the gate travels with the action: the global processor prepends
-    the SUPERADMIN check itself, which no caller can skip and no configuration can
-    turn off. That matters because the callers are not only the admin listing — the
-    resource policy node reaches keypairs through this action too, and a gate that
-    lived in one resolver would not cover the other.
+    Global-shaped so the SUPERADMIN check travels with the action: the resource
+    policy node reaches keypairs through it too, and a gate in one resolver would
+    not cover the other.
     """
 
     querier: BatchQuerier

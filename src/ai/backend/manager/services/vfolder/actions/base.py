@@ -340,10 +340,9 @@ class MoveToTrashVFolderActionResult(VFolderSingleEntityActionResult):
 class RestoreVFolderFromTrashAction(VFolderSingleEntityAction):
     """Bring a folder back out of the trash.
 
-    ``RESTORE`` rather than ``UPDATE``: the write flips the same status flag the delete
-    set, in the opposite direction, and reaches nothing else. Declaring it as an update
-    would have the audit trail record a restore as an ordinary field write, and would
-    gate it on ``UPDATE`` while the delete it undoes needs ``SOFT_DELETE``.
+    ``RESTORE`` rather than ``UPDATE``: an update would record the restore as an
+    ordinary field write and gate it on ``UPDATE`` while the delete needs
+    ``SOFT_DELETE``.
     """
 
     user_uuid: uuid.UUID

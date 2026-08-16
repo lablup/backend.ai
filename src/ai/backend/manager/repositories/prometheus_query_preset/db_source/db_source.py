@@ -101,9 +101,8 @@ class PrometheusQueryPresetDBSource:
     ) -> PrometheusQueryPresetListResult:
         """Read presets for an internal caller.
 
-        The API searches through the action, which runs against ops; this stays for the
-        metric repository, which resolves preset ids while evaluating utilization
-        queries and has no action to run.
+        The API searches through the action. This stays for the metric repository,
+        which resolves preset ids with no action to run.
         """
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(PrometheusQueryPresetRow)

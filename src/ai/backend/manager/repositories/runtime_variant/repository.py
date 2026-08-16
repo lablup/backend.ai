@@ -15,9 +15,8 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class RuntimeVariantRepository:
     """The two reads that live outside the action layer.
 
-    Every action of this domain wires straight to ops; these remain because
-    sokovan's deployment executor and the model-serving service read a variant
-    without going through an action.
+    Every action wires straight to ops; these remain for sokovan's deployment executor
+    and the model-serving service, which read a variant without an action.
     """
 
     _db_source: RuntimeVariantDBSource

@@ -37,9 +37,8 @@ class LookupStorageNamespaceAction(
 ):
     """Resolve a (storage, namespace) pair into the row it names.
 
-    Registration exposes the pair rather than the id, so removal has to translate
-    one into the other before it can address a row. Keeping that as its own read
-    leaves the purge keyed on the primary value like every other purge.
+    Registration exposes the pair rather than the id. Keeping the translation as its
+    own read leaves the purge keyed on the primary value.
     """
 
     storage_id: uuid.UUID

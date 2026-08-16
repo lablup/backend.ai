@@ -81,12 +81,9 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 def format_min_quantity(value: Decimal | str) -> str:
     """Format a Numeric column value as a canonical string.
 
-    ``model_card_resource_requirements.min_quantity`` is ``Numeric(24, 6)``, so a
-    freshly-read row comes back as ``Decimal("2.000000")``. Keeping the trailing
-    zeros would drift from the string the caller supplied on create (``"2"``), so
-    integer-equivalent values collapse to ``"2"`` and fractional ones lose their
-    trailing zeros. Before a flush the attribute may still be the raw string the
-    creator handed in, so normalize into ``Decimal`` first and let both converge.
+    The column is ``Numeric(24, 6)``, so a read returns ``Decimal("2.000000")`` where
+    the caller supplied ``"2"``. Normalize into ``Decimal`` first — before a flush the
+    attribute may still be the raw string — then drop trailing zeros.
     """
     decimal_value = value if isinstance(value, Decimal) else Decimal(value)
     if decimal_value == decimal_value.to_integral_value():
@@ -546,9 +543,8 @@ class ModelCardDBSource:
     ) -> dict[UUID, list[ResourceRequirementEntry]]:
         """Read the minimum resource requirements of the named cards.
 
-        The card's row projection does not carry these — they live in their own
-        table — so whoever renders them asks here, and asks for every card at once.
-        A card with no requirements is absent from the mapping.
+        They live in their own table, so whoever renders them asks here for every card
+        at once. A card with no requirements is absent from the mapping.
         """
         if not card_ids:
             return {}

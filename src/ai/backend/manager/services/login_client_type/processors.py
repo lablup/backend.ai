@@ -34,9 +34,8 @@ from ai.backend.manager.services.login_client_type.actions.update import (
 class LoginClientTypeProcessors:
     """The catalog's reads are open to every authenticated user; its writes are not.
 
-    One class per domain: which gate an operation carries is a property of that
-    operation, and splitting the admin half into its own class states it twice --
-    once in the class name and once in the factory that wires it.
+    One class per domain: the gate belongs to the operation, and a separate admin
+    class would state it twice.
     """
 
     public_get: PublicSingleEntityActionProcessor[

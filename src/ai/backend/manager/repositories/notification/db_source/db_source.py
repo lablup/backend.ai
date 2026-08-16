@@ -69,9 +69,8 @@ class NotificationDBSource:
     ) -> list[tuple[NotificationRuleRow, NotificationChannelRow]]:
         """Fetch the rules of one type together with the channel each dispatches through.
 
-        The channel is reached by an explicit join rather than an ORM
-        relationship: dispatch both filters on the channel's ``enabled`` flag and
-        needs its spec, and a join says so in the statement.
+        An explicit join rather than an ORM relationship: dispatch filters on the
+        channel's ``enabled`` flag and needs its spec.
         """
         query = sa.select(NotificationRuleRow, NotificationChannelRow).join(
             NotificationChannelRow,

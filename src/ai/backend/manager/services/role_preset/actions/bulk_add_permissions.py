@@ -26,10 +26,9 @@ class BulkAddRolePermissionPresetsAction(
 ):
     """Add permission entries to one preset, all or none.
 
-    Single-entity shaped: the target is the preset the entries are written under,
-    not the entries themselves — they have no id until they exist. Atomic for the
-    same reason the create is: a preset granting a subset of what the caller asked
-    for is worse than one that refused.
+    Single-entity shaped: the target is the preset, not the entries, which have no id
+    until they exist. Atomic because a preset granting a subset is worse than one that
+    refused.
     """
 
     preset_id: RolePresetID

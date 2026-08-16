@@ -108,11 +108,8 @@ class PublicSingleEntityActionProcessor[TAction: BaseSingleEntityAction, TResult
 ):
     """Validate authentication only, then execute a single-entity read.
 
-    The counterpart of :class:`SingleEntityActionProcessor` for an entity every
-    authenticated user may read. The shape stays single-entity, so the audit row
-    still names the id that was read; only the RBAC validators are left off.
-
-    Only reads may run without the gate, and the constructor enforces it.
+    The shape stays single-entity, so the audit row still names the id that was read;
+    only the RBAC validators are left off. The constructor rejects writes.
     """
 
     def __init__(

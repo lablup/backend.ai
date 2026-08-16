@@ -1,6 +1,6 @@
-"""Update writes of the v2 ops: family-neutral single-row and bulk updates.
+"""Update writes of the v2 ops: single-row and bulk updates.
 
-Updates never touch scope provisioning, so one update spec serves every family.
+Updates never touch scope provisioning, so one update spec serves every row.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ class V2UpdateWriteOps(V2WriteOpsBase):
     ) -> TData | None:
         """Update a single row by primary key and return it as its ``data/`` type.
 
-        Updates carry no scope work, so one update spec serves all families.
+        Updates carry no scope work, so one update spec serves every row.
         """
         row = await self._update_row_returning(
             updater.row_class,

@@ -20,9 +20,8 @@ from ai.backend.manager.services.error_log.actions.search import SearchErrorLogs
 class ErrorLogProcessors:
     """Every operation runs against ops; the domain keeps no service of its own.
 
-    Recording and reading are scope-shaped -- the caller acts inside the owning
-    user's scope -- while clearing targets the log itself, since by then the row
-    exists to name. The super-admin read spans the table and is its own action.
+    Recording and reading are scope-shaped; clearing targets the log itself. The
+    super-admin read spans the table and is its own action.
     """
 
     create: ScopeActionProcessor[CreateErrorLogAction, CreatedEntityOpsResult[ErrorLogData]]

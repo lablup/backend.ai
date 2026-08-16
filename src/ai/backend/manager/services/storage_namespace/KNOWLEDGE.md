@@ -17,7 +17,7 @@ status: stable
 
 # Storage namespace service — Knowledge
 
-> Rules: `../AGENTS.md`. Family selection: `../../models/specs/KNOWLEDGE.md`.
+> Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`.
 
 A storage namespace is the bucket an object storage exposes or the subpath a VFS
 storage exposes. The package exists because artifacts record where they were
@@ -37,7 +37,7 @@ own rather than living as a column on the storage.
 Every REST route in this domain declares `superadmin_required`, so the global
 gate matches what the surface promises. The same holds for the object and VFS
 storage packages this one hangs off: both of their surfaces, v1 included, are
-super-admin operations, so no read in this family is open to a regular user.
+super-admin operations, so no read here is open to a regular user.
 
 ## Removal takes an id, and the pair reaches it through the lookup
 
@@ -45,7 +45,7 @@ super-admin operations, so no read in this family is open to a regular user.
   constraint but not its primary key, and purge specs key on a single primary
   value.
 - Rather than teach the purge a second addressing mode, the caller resolves the
-  pair through `lookup` and passes the id — the lookup family already rejects a
+  pair through `lookup` and passes the id — a lookup already rejects a
   second match instead of answering with an arbitrary row.
 - The translation lives in the adapter, so the API keeps naming a namespace the
   way it was registered.

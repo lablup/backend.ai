@@ -1,6 +1,6 @@
 """Delete specs of the v2 lineage.
 
-The family roots below are deliberately unrelated — no common ABC. See AGENTS.md
+The roots below are deliberately unrelated — no common ABC. See AGENTS.md
 in this package before typing anything against more than one of them.
 """
 
@@ -94,7 +94,7 @@ class DataBatchPurger[TRow: Base, TData](ABC):
     """Delete spec for every row a subquery selects, converting each deleted row
     to data so the operation can report what it actually removed.
 
-    Carries no scope teardown: reserve it for global- and field-family rows
+    Carries no scope teardown: reserve it for rows that provision no scope
     until a batch purge that tears scopes down exists.
     """
 

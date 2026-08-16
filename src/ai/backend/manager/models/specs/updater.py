@@ -1,6 +1,6 @@
 """Update specs of the v2 lineage.
 
-Updates carry no membership work, so a single root serves all families; the batch
+Updates carry no membership work, so a single root serves every row; the batch
 variant selects by conditions instead of a primary key.
 """
 

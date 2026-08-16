@@ -32,7 +32,7 @@ class LookupVFSStorageAction(LookupEntityOpsAction[VFSStorageRow, VFSStorageData
     """Resolve a VFS storage name into the storage it names.
 
     Split out of the read: the old ``get`` branched on which key the caller
-    supplied, which is the shape the lookup family exists to absorb.
+    supplied, which is what a lookup exists to absorb.
     """
 
     name: str

@@ -1,38 +1,7 @@
 """The standard operations against ``V2DBOpsProvider``, written once.
 
-A pass-through domain repository is the same methods every time — open a transaction,
-hand the spec to ops, turn the row into its ``data/`` type. Two domains' ``search``
-differ only in the class names. This is that layer with no domain code in it: construct
-it with the v2 ops provider and it is ready, because each spec carries everything that
-used to make the methods domain-specific, conversion included.
-
-    | operation | spec                     | what it carries                        |
-    |-----------|--------------------------|----------------------------------------|
-    | get       | ``DataQuerier``          | row class, pk, ``to_data``             |
-    | lookup    | ``DataLookup``           | row class, key conditions, ``to_data`` |
-    | search    | ``Searcher``             | select, options, ``to_data``           |
-    | create    | ``GlobalEntityCreator``  | family-split: the entity variant also  |
-    |           | ``EntityCreator``        | provisions its scope + memberships     |
-    |           | ``RoleManagedEntityCreator`` | entity + preset roles              |
-    | update    | ``DataUpdater``          | row class, pk, values, ``to_data``     |
-    | upsert    | ``EntityUpserter``       | conflict keys, scope kept provisioned  |
-    | purge     | ``GlobalEntityPurger``   | family-split, symmetric with create    |
-    |           | ``EntityPurger``         | entity: scope teardown included        |
-
-The write specs are the v2 lineage (``models/specs/``): the create/purge/upsert
-methods are split by membership family, so a scoped spec cannot flow through a
-registration-free path — which family applies is visible at every call site.
-
-Every method is delegation: the conversion runs inside the v2 ops, so no ORM row
-reaches even this class. What is left here is the repository-layer seam — a missing
-row becomes :class:`EntityNotFoundError` rather than ``None``.
-
-There is no ``delete``: soft delete is a status transition whose column and values are
-domain knowledge. A delete action carries a ``DataUpdater`` and runs through the
-update path.
-
-A domain that outgrows this — a branch, a multi-table write, its own not-found error —
-writes a repository method as before.
+Every method is delegation; each spec carries the conversion, so no ORM row reaches
+this class. Which spec goes with which operation: ``../KNOWLEDGE.md``.
 """
 
 from __future__ import annotations
@@ -141,9 +110,8 @@ class OpsRepository[TData]:
     ) -> EntityWithFieldsResult[TEntityData, TFieldData]:
         """Insert a global row and the field rows it owns, in one transaction.
 
-        The owner id is not known until the parent row exists, which is exactly what
-        ``FieldEntityCreator.build_row(owner_id)`` is shaped for; the two writes share
-        this session so a failed field row takes the parent down with it.
+        The owner id is not known until the parent row exists. The two writes share
+        this session, so a failed field row takes the parent down with it.
         """
         async with self._ops.write_ops() as w:
             data = await w.create_global_entity(creator)

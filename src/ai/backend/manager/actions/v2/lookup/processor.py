@@ -102,7 +102,6 @@ class PublicLookupActionProcessor[TAction: BaseLookupAction, TResult: BaseLookup
 ):
     """Resolve a key that every authenticated caller may resolve.
 
-    Separated from :class:`LookupActionProcessor` before the permission check on the
-    resolved entity exists, so that check lands on one processor rather than on a
-    re-audit of every lookup in the repository.
+    Separated before the permission check on the resolved entity exists, so that check
+    lands on one processor rather than on a re-audit of every lookup.
     """

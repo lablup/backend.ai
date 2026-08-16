@@ -1,6 +1,6 @@
 # Write specs (v2 lineage) — Guardrails
 
-> For the family-choice table and design rationale, see `KNOWLEDGE.md` in the same directory.
+> For the selection table and design rationale, see `KNOWLEDGE.md` in the same directory.
 
 Declarative write specs, colocated with the schema: a spec says *what* to write
 (row, scope, memberships, checks); executing it is the ops layer's job
@@ -9,16 +9,30 @@ Declarative write specs, colocated with the schema: a spec says *what* to write
 ## Every v2-consumed spec lives here
 
 Whatever spec type the v2 actions and ops consume is declared in this package —
-the write families below, plus the read/update declarations (`querier.py`,
+the write specs below, plus the read/update declarations (`querier.py`,
 `lookup.py`, `searcher.py`, `updater.py`, `pagination.py`, and the batch purge
 spec in `purger.py`). `repositories/base/` keeps legacy-compatible views
 (aliases or bridge subclasses) for the transition only; do not declare a new
 spec there.
 
-## Three families, deliberately unrelated
+## What a spec splits on depends on the operation
 
-- Choose the family (`Entity` / `Global` / `Field`) by the table in `KNOWLEDGE.md`.
-- Do NOT extract a common base across the family roots or type any function
+- A row is an entity or a field. There is nothing else.
+- **purger**: `EntityPurger` and `FieldEntityPurger`. `EntityPurger` adds one method
+  returning its own `EntityRef`, and that value removes the RBAC edges left behind.
+  An entity that provisioned no virtual scope node has none to remove.
+- **creator**: three. `Global` joins entity and field, because a create acts on a
+  scope and this is where linking to a virtual scope is decided.
+- **updater**: one. An update never changes what a row belongs to, and soft delete
+  and restore are updates.
+- `DataUpdater` does not expose the soft-delete column; the soft-delete and restore
+  updaters handle that column alone.
+- A domain that offers soft delete offers restore.
+
+## The three roots are deliberately unrelated
+
+- Choose between `Entity` / `Global` / `Field` by the table in `KNOWLEDGE.md`.
+- Do NOT extract a common base across those roots or type any function
   against "any creator/purger" — the absence of a common supertype is the
   enforcement (rationale: `KNOWLEDGE.md`).
 - Reuse execution logic through ops-layer helpers that take plain values
@@ -66,10 +80,9 @@ spec there.
   operation exists to generalize. What records the run as a delete is the
   action's `operation_type()`; see `../../actions/AGENTS.md`.
 
-## Naming: family vs operation scope
+## Naming: what is written vs where a read looks
 
-`…_global_entity` / `…_entity` / `…_field_entity` methods name the **write
-family** (what is written); `…_in_global` / `…_in_scopes` name the **operation
+`…_global_entity` / `…_entity` / `…_field_entity` methods name **what is written**; `…_in_global` / `…_in_scopes` name the **operation
 scope** (where a read looks). Never conflate the two axes.
 
 ## Owner existence for field rows
