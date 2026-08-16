@@ -5,9 +5,9 @@ from typing import override
 
 from ai.backend.common.data.entity.prometheus_query_preset import (
     PROMETHEUS_QUERY_PRESET_ENTITY_TYPE,
+    PrometheusQueryPresetID,
 )
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.manager.actions.v2.ops.base import GetGlobalOpsAction
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
 from ai.backend.manager.models.prometheus_query_preset.row import PrometheusQueryPresetRow

@@ -5,10 +5,9 @@ from typing import override
 
 from ai.backend.common.data.entity.app_config_definition import (
     APP_CONFIG_DEFINITION_ENTITY_TYPE,
+    AppConfigDefinitionID,
 )
-from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
-from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.data.entity.types import EntityID, EntityType
 from ai.backend.manager.actions.v2.ops.base import PurgeEntityOpsAction
 from ai.backend.manager.data.app_config_definition.types import AppConfigDefinitionData
 from ai.backend.manager.models.app_config_definition.purgers import AppConfigDefinitionPurger

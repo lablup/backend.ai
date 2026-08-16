@@ -5,8 +5,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserRole as DataUserRole
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.data.user.types import UserData
 

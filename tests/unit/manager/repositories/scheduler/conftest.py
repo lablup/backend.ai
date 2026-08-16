@@ -18,16 +18,19 @@ import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.events.event_types.kernel.types import (
     KernelCreationInfo,
     UsedDevice,
     UsedDevices,
 )
-from ai.backend.common.identifier.domain import DomainID, DomainName
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
-from ai.backend.common.identifier.session_group import SessionGroupID
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,

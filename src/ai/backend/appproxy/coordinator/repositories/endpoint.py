@@ -43,13 +43,13 @@ from ai.backend.appproxy.coordinator.errors import InvalidURLError
 from ai.backend.appproxy.coordinator.models import Circuit, Endpoint, Worker
 from ai.backend.appproxy.coordinator.models.utils import ExtendedAsyncSAEngine
 from ai.backend.appproxy.coordinator.models.worker import add_circuit
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
     CreateEndpointItem,
     RegisterRoutesItem,
     UnregisterRoutesItem,
     UpdateRoutesItem,
 )
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

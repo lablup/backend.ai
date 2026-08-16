@@ -7,13 +7,13 @@ from datetime import datetime
 from functools import lru_cache
 from typing import Any, override
 
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.field import (
     VFolderOperationStatusField,
     VFolderOwnershipTypeField,
     VFolderPermissionField,
 )
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     CIStrEnum,
     QuotaScopeID,

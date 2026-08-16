@@ -16,8 +16,8 @@ from uuid import UUID, uuid4
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.exception import InvalidAPIParameters, UnknownImageReference
-from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
     AbuseReport,
     AccessKey,

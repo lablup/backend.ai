@@ -5,9 +5,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityData
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.resource_slot import ResourceSlotTypeUUID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
+from ai.backend.common.data.entity.types import EntityData, EntityID
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 
 

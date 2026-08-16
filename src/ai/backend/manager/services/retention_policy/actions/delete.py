@@ -3,10 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.retention_policy import RETENTION_POLICY_ENTITY_TYPE
-from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.retention_policy import RetentionPolicyID
+from ai.backend.common.data.entity.retention_policy import (
+    RETENTION_POLICY_ENTITY_TYPE,
+    RetentionPolicyID,
+)
+from ai.backend.common.data.entity.types import EntityID, EntityType
 from ai.backend.manager.actions.v2.ops.base import PurgeEntityOpsAction
 from ai.backend.manager.data.retention.types import RetentionPolicyData
 from ai.backend.manager.models.retention.purgers import RetentionPolicyPurger

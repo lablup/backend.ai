@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 
+from ai.backend.common.data.entity.audit_log import AuditLogID
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.audit_log.request import (
     AdminSearchAuditLogsInput,
@@ -22,7 +23,6 @@ from ai.backend.common.dto.manager.v2.audit_log.types import (
     AuditLogStatus,
     OrderDirection,
 )
-from ai.backend.common.identifier.audit_log import AuditLogID
 from ai.backend.manager.actions.action.types import SearchableActionTarget
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter

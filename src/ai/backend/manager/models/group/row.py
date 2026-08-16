@@ -32,7 +32,7 @@ from sqlalchemy.orm.strategy_options import _AbstractLoad
 from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common import msgpack
-from ai.backend.common.identifier.scope import ScopeID
+from ai.backend.common.data.entity.types import ScopeID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.group.types import GroupData, ProjectType

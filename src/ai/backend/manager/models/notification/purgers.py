@@ -6,11 +6,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.common.identifier.notification import (
+from ai.backend.common.data.entity.notification import (
     NotificationChannelID,
     NotificationRuleID,
 )
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.notification.types import (
     NotificationChannelData,
     NotificationRuleData,

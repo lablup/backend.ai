@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from graphql import Undefined
 
 from ai.backend.common.container_registry import AllowedGroupsModel
-from ai.backend.common.identifier.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryValidator,

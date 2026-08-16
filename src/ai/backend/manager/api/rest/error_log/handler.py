@@ -11,6 +11,7 @@ from typing import Final
 import sqlalchemy as sa
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, QueryParam
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.error_log.request import (
     AppendErrorLogRequest,
     ListErrorLogsRequest,
@@ -22,7 +23,6 @@ from ai.backend.common.dto.manager.error_log.response import (
     ListErrorLogsResponse,
     MarkClearedResponse,
 )
-from ai.backend.common.identifier.user import UserID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.error_log.types import ErrorLogSeverity
 from ai.backend.manager.dto.context import UserContext

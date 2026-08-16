@@ -22,12 +22,12 @@ from ai.backend.appproxy.coordinator.repositories.endpoint import (
 )
 from ai.backend.appproxy.coordinator.services.endpoint import EndpointService
 from ai.backend.appproxy.coordinator.types import CircuitManager
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
     RegisterRoutesItem,
     RouteEntry,
     UnregisterRoutesItem,
 )
-from ai.backend.common.identifier.deployment import DeploymentID
 
 
 def _route_entry() -> RouteEntry:

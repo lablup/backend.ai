@@ -11,6 +11,10 @@ from uuid import uuid4
 import jinja2
 import pytest
 
+from ai.backend.common.data.entity.notification import (
+    NotificationChannelID,
+    NotificationRuleID,
+)
 from ai.backend.common.data.notification import (
     NotificationChannelType,
     NotificationRuleType,
@@ -19,10 +23,6 @@ from ai.backend.common.data.notification import (
     WebhookSpec,
 )
 from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
-from ai.backend.common.identifier.notification import (
-    NotificationChannelID,
-    NotificationRuleID,
-)
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
     NotificationRuleData,

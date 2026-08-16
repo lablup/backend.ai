@@ -7,8 +7,7 @@ from typing import override
 from ai.backend.common.data.entity.runtime_variant_preset import (
     RUNTIME_VARIANT_PRESET_ENTITY_TYPE,
 )
-from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.data.entity.types import EntityID, EntityType
 from ai.backend.manager.actions.v2.ops.base import GetSingleEntityOpsAction
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow

@@ -14,9 +14,9 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.identifier.architecture import ArchName
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.architecture import ArchName
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.types import AgentId, AgentSelectionStrategy, PreemptionOrder, SessionId
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (

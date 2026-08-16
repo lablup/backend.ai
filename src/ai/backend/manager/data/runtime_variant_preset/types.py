@@ -4,14 +4,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityData
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
+from ai.backend.common.data.entity.types import EntityData, EntityID
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
     PresetValueType,
 )
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-from ai.backend.common.identifier.runtime_variant_preset import RuntimeVariantPresetID
 
 
 @dataclass(frozen=True)

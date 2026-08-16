@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
 
-from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
+from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListID
 from ai.backend.manager.data.app_config_allow_list.types import AppConfigAllowListData
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck

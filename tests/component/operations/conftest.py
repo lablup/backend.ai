@@ -9,8 +9,8 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import HostPortPair, ResourceSlot
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.error_log.handler import ErrorLogHandler

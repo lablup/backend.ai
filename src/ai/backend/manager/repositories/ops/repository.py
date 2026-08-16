@@ -9,8 +9,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from ai.backend.common.data.entity.types import EntityData
-from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.data.entity.types import EntityData, EntityID
 from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.creator import (

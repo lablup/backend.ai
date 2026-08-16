@@ -6,6 +6,7 @@ import uuid
 from collections.abc import Sequence
 
 from ai.backend.common.container_registry import AllowedGroupsModel
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.container_registry.request import (
     AdminSearchContainerRegistriesInput,
@@ -23,7 +24,6 @@ from ai.backend.common.dto.manager.v2.container_registry.response import (
     UpdateContainerRegistryPayload,
 )
 from ai.backend.common.dto.manager.v2.container_registry.types import ContainerRegistryTypeFilter
-from ai.backend.common.identifier.container_registry import ContainerRegistryID
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder

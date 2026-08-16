@@ -12,7 +12,7 @@ from ai.backend.client.v2.auth import HMACAuth, NoAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.identifier.app_config import AppConfigScopeID
+from ai.backend.common.data.entity.app_config import AppConfigScopeID
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry import ProcessorDependencies, ProcessorRegistry
 from ai.backend.manager.actions.v2.validators import ActionValidators

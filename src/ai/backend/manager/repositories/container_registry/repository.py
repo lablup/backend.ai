@@ -9,12 +9,11 @@ from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRe
 from ai.backend.common.data.entity.container_registry import (
     CONTAINER_REGISTRY_ENTITY_TYPE,
     CONTAINER_REGISTRY_SCOPE_TYPE,
+    ContainerRegistryID,
 )
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.types import EntityRef, ScopeRef
 from ai.backend.common.exception import BackendAIError
-from ai.backend.common.identifier.container_registry import ContainerRegistryID
-from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy

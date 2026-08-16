@@ -20,7 +20,9 @@ from unittest.mock import MagicMock
 import pytest
 
 from ai.backend.common.contexts.user import with_user
-from ai.backend.common.data.entity.types import EntityType, ScopeRef, ScopeType
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.types import EntityID, EntityType, ScopeID, ScopeRef, ScopeType
+from ai.backend.common.data.entity.virtual_scope import VirtualScopeID
 from ai.backend.common.data.permission.types import (
     EntityType as PermEntityType,
 )
@@ -33,10 +35,6 @@ from ai.backend.common.data.permission.types import (
 )
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.scope import ScopeID
-from ai.backend.common.identifier.virtual_scope import VirtualScopeID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.action.base import BaseActionTriggerMeta
 from ai.backend.manager.actions.types import ActionOperationType

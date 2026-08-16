@@ -15,7 +15,7 @@ from decimal import Decimal
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ai.backend.common.identifier.resource_slot import ResourceSlotTypeUUID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
 from ai.backend.manager.data.resource_slot.types import (
     NumberFormatData,
     ResourceSlotTypeData,

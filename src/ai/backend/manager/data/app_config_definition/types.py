@@ -4,9 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityData
-from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
-from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionID
+from ai.backend.common.data.entity.types import EntityData, EntityID
 
 
 @dataclass(frozen=True)

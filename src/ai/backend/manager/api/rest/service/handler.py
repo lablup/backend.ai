@@ -22,6 +22,9 @@ from ai.backend.common.api_handlers import (
     PathParam,
     QueryParam,
 )
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.model_serving.request import (
     ListServeRequestModel,
     NewServiceRequestModel,
@@ -48,9 +51,6 @@ from ai.backend.common.dto.manager.model_serving.response import (
     TokenResponseModel,
     TryStartResponseModel,
 )
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,

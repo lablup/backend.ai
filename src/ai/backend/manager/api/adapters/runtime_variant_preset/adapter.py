@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
+from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
     CreateRuntimeVariantPresetInput,
     RuntimeVariantPresetFilter,
@@ -29,7 +30,6 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     UIOption,
     UIType,
 )
-from ai.backend.common.identifier.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.runtime_variant_preset.types import (

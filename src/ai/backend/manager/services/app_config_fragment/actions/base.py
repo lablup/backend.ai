@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.data.permission.types import EntityType, RBACElementType
-from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.manager.actions.action.bulk import BaseBulkAction, BaseBulkActionResult
 from ai.backend.manager.actions.action.global_action import BaseGlobalAction
 from ai.backend.manager.actions.action.scope import BaseScopeAction, BaseScopeActionResult

@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 
+from ai.backend.common.data.entity.storage_namespace import StorageNamespaceID
 from ai.backend.common.dto.manager.v2.storage_namespace.request import (
     AdminSearchStorageNamespacesInput,
     RegisterStorageNamespaceInput,
@@ -16,7 +17,6 @@ from ai.backend.common.dto.manager.v2.storage_namespace.response import (
     StorageNamespaceNode,
     UnregisterStorageNamespacePayload,
 )
-from ai.backend.common.identifier.storage_namespace import StorageNamespaceID
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.models.specs.pagination import OffsetPagination

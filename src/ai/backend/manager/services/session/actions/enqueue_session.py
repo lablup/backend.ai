@@ -5,9 +5,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import override
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, ClusterMode, MountInfoEntry, SessionTypes
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType

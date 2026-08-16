@@ -17,11 +17,11 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.types import EntityRef, EntityType, ScopeRef, ScopeType
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.types import EntityID, EntityRef, EntityType, ScopeType
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.virtual_scope import VirtualScopeID
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.user import UserID
-from ai.backend.common.identifier.virtual_scope import VirtualScopeID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (

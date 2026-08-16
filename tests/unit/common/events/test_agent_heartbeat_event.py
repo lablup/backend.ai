@@ -5,8 +5,8 @@ from typing import Any
 import pytest
 
 from ai.backend.common.data.agent.types import AgentInfo
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.events.event_types.agent.anycast import AgentHeartbeatEvent
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.types import DeviceName, ResourceSlotEntry, SlotName, SlotTypes
 
 

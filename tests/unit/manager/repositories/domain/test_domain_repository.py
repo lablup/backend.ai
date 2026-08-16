@@ -10,9 +10,9 @@ from datetime import UTC, datetime
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
-from ai.backend.common.identifier.domain import DomainID, DomainName
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     DefaultForUnspecified,
     ResourceSlot,

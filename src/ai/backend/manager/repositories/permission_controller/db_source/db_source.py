@@ -9,12 +9,11 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.types import EntityID, EntityType
 from ai.backend.common.data.permission.types import (
     RBACElementType,
     RelationType,
 )
-from ai.backend.common.identifier.entity import EntityID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action.rbac_role_invitation import (
     CreateRoleInvitationResult,

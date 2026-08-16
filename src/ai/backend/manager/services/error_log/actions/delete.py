@@ -5,8 +5,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.error_log import ERROR_LOG_ENTITY_TYPE
-from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.data.entity.types import EntityID, EntityType
 from ai.backend.manager.actions.v2.ops.base import DeleteSingleEntityOpsAction
 from ai.backend.manager.data.error_log.types import ErrorLogData
 from ai.backend.manager.models.error_log.updaters import ErrorLogSoftDeleteUpdater

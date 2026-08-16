@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.identifier.notification import (
+from ai.backend.common.data.entity.notification import (
     NotificationChannelID,
     NotificationRuleID,
 )

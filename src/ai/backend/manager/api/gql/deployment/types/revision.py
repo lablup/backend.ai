@@ -19,6 +19,7 @@ from ai.backend.common.config import (
 from ai.backend.common.config import (
     PreStartAction as PreStartActionDTO,
 )
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateRevisionInput as ActivateRevisionInputDTO,
 )
@@ -107,7 +108,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     ResourceConfigInfoDTO,
     RuntimeVariantPresetValueInfoDTO,
 )
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.types import MountPermission as CommonMountPermission
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,

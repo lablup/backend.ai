@@ -7,7 +7,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.identifier.error_log import ErrorLogID
+from ai.backend.common.data.entity.error_log import ErrorLogID
 from ai.backend.manager.data.error_log.types import (
     ErrorLogContent,
     ErrorLogData,

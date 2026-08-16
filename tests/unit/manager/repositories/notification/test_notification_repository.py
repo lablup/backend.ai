@@ -11,12 +11,12 @@ from datetime import UTC, datetime
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.notification import (
     NotificationChannelType,
     NotificationRuleType,
     WebhookSpec,
 )
-from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow

@@ -21,6 +21,7 @@ from ai.backend.common.api_handlers import (
     PathParam,
     QueryParam,
 )
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.template.request import (
     CreateSessionTemplateRequest,
     DeleteSessionTemplateRequest,
@@ -38,7 +39,6 @@ from ai.backend.common.dto.manager.template.response import (
     SessionTemplateListItemDTO,
     UpdateSessionTemplateResponse,
 )
-from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.json import load_json
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import RequestCtx, UserContext

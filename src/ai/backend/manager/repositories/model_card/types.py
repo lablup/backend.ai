@@ -10,7 +10,7 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
 from ai.backend.manager.data.model_card.types import ModelCardData
 from ai.backend.manager.errors.resource import ProjectNotFound

@@ -12,6 +12,7 @@ import pytest
 
 from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
     IdleCheckerAssignmentScopeDTO,
     IdleCheckerScopeRefDTO,
@@ -19,7 +20,6 @@ from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
     UpdateIdleCheckerAssignmentInput,
 )
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.types import IdleCheckerScopeTypeDTO
-from ai.backend.common.identifier.idle_checker import IdleCheckerAssignmentID
 
 from .conftest import AssignmentSeedData
 

@@ -7,7 +7,7 @@ from ai.backend.common.data.entity.resource_policy import (
     USER_RESOURCE_POLICY_ENTITY_TYPE,
 )
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.identifier.user import UserID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
 from ai.backend.manager.data.resource.types import UserResourcePolicyData

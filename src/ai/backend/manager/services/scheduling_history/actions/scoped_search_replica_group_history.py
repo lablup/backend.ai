@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.manager.actions.action.scope import BaseScopeAction, BaseScopeActionResult
 from ai.backend.manager.actions.action.types import SearchableActionTarget
 from ai.backend.manager.actions.types import ActionOperationType

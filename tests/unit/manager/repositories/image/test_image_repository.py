@@ -15,9 +15,9 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.types import BinarySize, KernelId, ResourceSlot, SessionId
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow

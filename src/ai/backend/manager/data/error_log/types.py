@@ -6,9 +6,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, override
 
-from ai.backend.common.data.entity.types import EntityData
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.error_log import ErrorLogID
+from ai.backend.common.data.entity.error_log import ErrorLogID
+from ai.backend.common.data.entity.types import EntityData, EntityID
 
 
 class ErrorLogSeverity(enum.StrEnum):

@@ -5,12 +5,11 @@ from dataclasses import dataclass, field
 from typing import Any, override
 from uuid import UUID
 
-from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_SCOPE_TYPE
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_SCOPE_TYPE, ResourceGroupID
 from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import ScalingGroupConflict
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError

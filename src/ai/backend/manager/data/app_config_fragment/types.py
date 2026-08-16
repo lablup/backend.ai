@@ -5,8 +5,8 @@ from datetime import datetime
 from typing import Any
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.identifier.app_config import AppConfigScopeID
-from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.data.entity.app_config import AppConfigScopeID
+from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
 
 
 @dataclass(frozen=True)

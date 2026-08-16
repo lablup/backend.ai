@@ -4,14 +4,13 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, override
 
-from ai.backend.common.data.entity.types import EntityData
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.resource_policy import (
+from ai.backend.common.data.entity.resource_policy import (
     KeyPairResourcePolicyUUID,
     ProjectResourcePolicyUUID,
     UserResourcePolicyUUID,
 )
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.types import EntityData, EntityID
 from ai.backend.common.types import (
     DefaultForUnspecified,
     ResourceSlot,

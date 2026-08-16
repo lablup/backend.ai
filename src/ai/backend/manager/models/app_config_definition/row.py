@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
+from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionID
 from ai.backend.manager.data.app_config_definition.types import AppConfigDefinitionData
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin

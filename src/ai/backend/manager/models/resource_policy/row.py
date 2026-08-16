@@ -6,12 +6,12 @@ from typing import Self
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.defs.session import SESSION_PRIORITY_MAX, SESSION_PRIORITY_MIN
-from ai.backend.common.identifier.resource_policy import (
+from ai.backend.common.data.entity.resource_policy import (
     KeyPairResourcePolicyUUID,
     ProjectResourcePolicyUUID,
     UserResourcePolicyUUID,
 )
+from ai.backend.common.defs.session import SESSION_PRIORITY_MAX, SESSION_PRIORITY_MIN
 from ai.backend.common.types import (
     DefaultForUnspecified,
     ResourceSlot,

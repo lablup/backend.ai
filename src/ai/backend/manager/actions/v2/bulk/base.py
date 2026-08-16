@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
-from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.data.entity.types import EntityID, EntityType
 from ai.backend.manager.actions.types import ActionOperationType, ActionSpec
 
 

@@ -15,7 +15,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_SCOPE_TYPE
+from ai.backend.common.data.entity.resource_group import RESOURCE_GROUP_SCOPE_TYPE, ResourceGroupID
 from ai.backend.common.data.entity.types import (
     EntityRef,
     ScopeRef,
@@ -24,7 +24,7 @@ from ai.backend.common.data.entity.types import (
 from ai.backend.common.data.entity.types import (
     EntityType as VirtualScopeEntityType,
 )
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
 from ai.backend.common.data.permission.types import (
     EntityType,
     Permission,
@@ -39,8 +39,6 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.permission import VirtualScopeNotFound

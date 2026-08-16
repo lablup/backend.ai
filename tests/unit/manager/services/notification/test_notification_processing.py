@@ -16,6 +16,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.notification import (
+    NotificationChannelID,
+    NotificationRuleID,
+)
 from ai.backend.common.data.notification import SessionStartedMessage
 from ai.backend.common.data.notification.types import (
     NotificationChannelType,
@@ -23,11 +28,6 @@ from ai.backend.common.data.notification.types import (
     WebhookSpec,
 )
 from ai.backend.common.data.user.types import UserData, UserRole
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.notification import (
-    NotificationChannelID,
-    NotificationRuleID,
-)
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
     NotificationRuleData,

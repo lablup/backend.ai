@@ -4,8 +4,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.types import (
     VFolderMount,
 )

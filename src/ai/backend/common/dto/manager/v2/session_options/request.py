@@ -21,6 +21,7 @@ from datetime import datetime
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.dto.manager.v2.common import (
     BinarySizeInput,
     MountItemInput,
@@ -31,7 +32,6 @@ from ai.backend.common.dto.manager.v2.session_options.types import (
     AgentSelectionPolicyEnum,
     FailurePolicyEnum,
 )
-from ai.backend.common.identifier.image import ImageID
 
 
 class HandlerOptionsInput(BaseRequestModel):

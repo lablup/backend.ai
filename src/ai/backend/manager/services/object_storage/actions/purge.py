@@ -4,10 +4,8 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.object_storage import OBJECT_STORAGE_ENTITY_TYPE
-from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.object_storage import ObjectStorageID
+from ai.backend.common.data.entity.object_storage import OBJECT_STORAGE_ENTITY_TYPE, ObjectStorageID
+from ai.backend.common.data.entity.types import EntityID, EntityType
 from ai.backend.manager.actions.v2.ops.base import PurgeEntityOpsAction
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.object_storage.purgers import ObjectStoragePurger

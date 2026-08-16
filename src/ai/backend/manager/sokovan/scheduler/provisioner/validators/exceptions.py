@@ -10,6 +10,7 @@ from typing import override
 
 from aiohttp import web
 
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.exception import (
     ErrorCode,
     ErrorDetail,

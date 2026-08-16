@@ -7,8 +7,8 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.repositories.base.upserter import UpserterSpec

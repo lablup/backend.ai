@@ -13,10 +13,9 @@ from typing import Any, override
 import pytest
 
 from ai.backend.common.contexts.user import with_user
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.types import EntityID, EntityType
 from ai.backend.common.data.user.types import UserData, UserRole
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.lookup.base import (

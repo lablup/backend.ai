@@ -4,6 +4,7 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from uuid import UUID
 
+from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.data.idle_checker.types import SESSION_ID_LABEL
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.exception import (
@@ -12,7 +13,6 @@ from ai.backend.common.exception import (
     InvalidMetricPresetTemplate,
     PrometheusConnectionError,
 )
-from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy

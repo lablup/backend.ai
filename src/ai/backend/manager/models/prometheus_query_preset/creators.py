@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.identifier.prometheus_query_preset_category import (
+from ai.backend.common.data.entity.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryID,
 )
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData

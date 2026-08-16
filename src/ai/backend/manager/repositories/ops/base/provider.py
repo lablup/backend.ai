@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.data.entity.types import EntityID
 from ai.backend.manager.errors.repository import (
     AmbiguousEntityKeyError,
     EmptyOperationScopeError,

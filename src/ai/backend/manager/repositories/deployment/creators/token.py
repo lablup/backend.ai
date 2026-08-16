@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import override
 
-from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.manager.models.endpoint import EndpointTokenRow
 from ai.backend.manager.repositories.base import CreatorSpec
 

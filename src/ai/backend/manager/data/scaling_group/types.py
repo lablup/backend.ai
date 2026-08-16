@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import ConfigDict, Field, field_serializer, field_validator
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AgentSelectionStrategy,
     BackendAISchema,

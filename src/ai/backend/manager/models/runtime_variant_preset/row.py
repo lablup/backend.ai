@@ -5,13 +5,13 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
     PresetValueType,
     UIOption,
 )
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-from ai.backend.common.identifier.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.manager.data.runtime_variant_preset.types import (
     ChoiceItemData,
     ChoiceOptionData,

@@ -3,10 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.notification import NOTIFICATION_CHANNEL_ENTITY_TYPE
-from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.notification import NotificationChannelID
+from ai.backend.common.data.entity.notification import (
+    NOTIFICATION_CHANNEL_ENTITY_TYPE,
+    NotificationChannelID,
+)
+from ai.backend.common.data.entity.types import EntityID, EntityType
 from ai.backend.manager.actions.v2.ops.base import PurgeEntityOpsAction
 from ai.backend.manager.data.notification.types import NotificationChannelData
 from ai.backend.manager.models.notification.purgers import NotificationChannelPurger

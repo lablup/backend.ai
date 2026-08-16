@@ -9,13 +9,13 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.dto.clients.prometheus.response import PrometheusResponse
 from ai.backend.common.exception import (
     FailedToGetMetric,
     InvalidMetricPresetTemplate,
     PrometheusConnectionError,
 )
-from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset

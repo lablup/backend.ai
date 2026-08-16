@@ -8,7 +8,7 @@ from typing import override
 
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.user import UserID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.keypair.row import KeyPairRow

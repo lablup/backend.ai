@@ -11,11 +11,11 @@ from dataclasses import dataclass, field
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.permission.types import (
     RBACElementType,
     RelationType,
 )
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.permission.role import PermissionResolutionKey
 from ai.backend.manager.data.permission.status import RoleStatus

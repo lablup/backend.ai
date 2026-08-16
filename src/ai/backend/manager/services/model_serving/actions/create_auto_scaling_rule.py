@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.permission.types import EntityType
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_serving.creator import EndpointAutoScalingRuleCreator

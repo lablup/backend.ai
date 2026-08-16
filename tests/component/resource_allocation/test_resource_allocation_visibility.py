@@ -18,13 +18,13 @@ import yarl
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.dto.manager.v2.resource_allocation.request import (
     EffectiveResourceAllocationInput,
 )
 from ai.backend.common.dto.manager.v2.resource_allocation.response import (
     EffectiveResourceAllocationPayload,
 )
-from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.adapters.resource_allocation.adapter import ResourceAllocationAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry

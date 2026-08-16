@@ -7,8 +7,8 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
-from ai.backend.common.identifier.project import ProjectID
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.resource import ProjectHasActiveKernelsError
 from ai.backend.manager.models.endpoint import EndpointRow

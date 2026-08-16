@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Final
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AdminSearchAppConfigFragmentInput,
     BulkPurgeAppConfigFragmentInput,
@@ -21,7 +22,6 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     SearchAppConfigFragmentPayload,
     UpsertAppConfigFragmentsPayload,
 )
-from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 
 _PATH: Final = "/v2/app-config-fragments"
 

@@ -4,7 +4,7 @@ import logging
 
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.domain import DomainID, DomainName
+from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.errors.resource import DomainNotFound

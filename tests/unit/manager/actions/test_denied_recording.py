@@ -12,9 +12,8 @@ from typing import override
 
 import pytest
 
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.types import EntityID, EntityType
 from ai.backend.common.exception import PermissionDeniedError
-from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction

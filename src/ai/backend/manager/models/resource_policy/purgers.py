@@ -6,12 +6,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.common.identifier.resource_policy import (
+from ai.backend.common.data.entity.resource_policy import (
     KeyPairResourcePolicyUUID,
     ProjectResourcePolicyUUID,
     UserResourcePolicyUUID,
 )
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.resource.types import (
     KeyPairResourcePolicyData,
     ProjectResourcePolicyData,

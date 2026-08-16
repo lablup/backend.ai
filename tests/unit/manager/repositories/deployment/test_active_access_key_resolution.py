@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.errors.deployment import (

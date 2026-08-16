@@ -5,17 +5,16 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
-from ai.backend.common.data.entity.types import EntityData
+from ai.backend.common.data.entity.notification import (
+    NotificationChannelID,
+    NotificationRuleID,
+)
+from ai.backend.common.data.entity.types import EntityData, EntityID
 from ai.backend.common.data.notification import (
     EmailSpec,
     NotificationChannelType,
     NotificationRuleType,
     WebhookSpec,
-)
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.notification import (
-    NotificationChannelID,
-    NotificationRuleID,
 )
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 

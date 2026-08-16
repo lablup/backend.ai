@@ -6,7 +6,7 @@ from uuid import UUID
 
 import pytest
 
-from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.types import AccessKey, SessionTypes
 from ai.backend.manager.errors.resource import (
     ScalingGroupNotFound,

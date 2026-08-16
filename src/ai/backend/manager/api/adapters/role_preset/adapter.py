@@ -6,6 +6,8 @@ into Processor actions and converts the action results back into v2 DTOs.
 
 from __future__ import annotations
 
+from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.permission.types import (
     OperationType,
     RBACElementType,
@@ -51,8 +53,6 @@ from ai.backend.common.dto.manager.v2.role_preset.response import (
     UpdateRolePresetPayload,
 )
 from ai.backend.common.dto.manager.v2.role_preset.types import RolePresetOrderField
-from ai.backend.common.identifier.role_permission_preset import RolePermissionPresetID
-from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.role_preset.types import (

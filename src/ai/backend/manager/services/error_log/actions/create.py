@@ -6,8 +6,7 @@ from typing import override
 
 from ai.backend.common.data.entity.error_log import ERROR_LOG_ENTITY_TYPE
 from ai.backend.common.data.entity.types import EntityType, ScopeRef
-from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
-from ai.backend.common.identifier.user import UserID
+from ai.backend.common.data.entity.user import USER_SCOPE_TYPE, UserID
 from ai.backend.manager.actions.v2.ops.base import CreateEntityOpsAction
 from ai.backend.manager.data.error_log.types import ErrorLogData
 from ai.backend.manager.models.error_log.creators import ErrorLogCreator

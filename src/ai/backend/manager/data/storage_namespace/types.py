@@ -4,9 +4,8 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityData
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.storage_namespace import StorageNamespaceID
+from ai.backend.common.data.entity.storage_namespace import StorageNamespaceID
+from ai.backend.common.data.entity.types import EntityData, EntityID
 
 
 @dataclass

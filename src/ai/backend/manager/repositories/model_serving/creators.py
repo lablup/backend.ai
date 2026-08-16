@@ -9,7 +9,7 @@ from typing import Any, override
 
 import yarl
 
-from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.types import (
     ClusterMode,
     VFolderMount,

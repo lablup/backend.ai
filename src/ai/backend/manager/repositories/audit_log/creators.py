@@ -6,9 +6,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import override
 
-from ai.backend.common.identifier.action import ActionID
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.scope import ScopeID
+from ai.backend.common.data.entity.action import ActionID
+from ai.backend.common.data.entity.types import EntityID, ScopeID
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
 from ai.backend.manager.models.audit_log import AuditLogRow, AuditLogScopeRow
 from ai.backend.manager.repositories.base import CreatorSpec, DependentCreatorSpec

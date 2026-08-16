@@ -20,10 +20,15 @@ from typing import Any, override
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.types import EntityData, EntityType, ScopeRef, ScopeType
+from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.types import (
+    EntityData,
+    EntityID,
+    EntityType,
+    ScopeRef,
+    ScopeType,
+)
 from ai.backend.common.data.permission.types import ScopeType as RBACScopeType
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.ops.base import SearchOpsAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction

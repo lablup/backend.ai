@@ -8,6 +8,7 @@ import pytest
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.dto.manager.v2.resource_allocation.request import (
     CheckPresetAvailabilityInput,
     EffectiveResourceAllocationInput,
@@ -19,7 +20,6 @@ from ai.backend.common.dto.manager.v2.resource_allocation.response import (
     ProjectResourceAllocationPayload,
     ResourceGroupResourceAllocationPayload,
 )
-from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 

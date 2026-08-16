@@ -7,9 +7,8 @@ from uuid import UUID
 
 from ai.backend.common.data.entity.model_card import MODEL_CARD_ENTITY_TYPE
 from ai.backend.common.data.entity.project import PROJECT_ENTITY_TYPE
-from ai.backend.common.data.entity.types import ScopeRef, ScopeType
-from ai.backend.common.identifier.scope import ScopeID
-from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.data.entity.types import ScopeID, ScopeRef, ScopeType
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.manager.data.model_card.types import ModelCardData, ResourceRequirementEntry
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import ModelCardConflict

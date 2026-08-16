@@ -4,8 +4,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.common.identifier.resource_slot import ResourceSlotTypeUUID
 from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
 from ai.backend.manager.errors.resource_slot import ResourceSlotTypeInUse
 from ai.backend.manager.models.resource_slot.row import (

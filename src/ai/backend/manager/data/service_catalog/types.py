@@ -5,8 +5,7 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
-from ai.backend.common.data.entity.types import EntityData
-from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.data.entity.types import EntityData, EntityID
 from ai.backend.common.types import ServiceCatalogStatus
 
 

@@ -32,8 +32,13 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, ScopeRef, ScopeType
-from ai.backend.common.identifier.scope import ScopeID
+from ai.backend.common.data.entity.types import (
+    EntityIdentifier,
+    EntityType,
+    ScopeID,
+    ScopeRef,
+    ScopeType,
+)
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (

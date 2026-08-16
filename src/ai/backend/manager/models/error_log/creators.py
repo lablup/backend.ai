@@ -12,9 +12,8 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.entity.error_log import ERROR_LOG_ENTITY_TYPE
-from ai.backend.common.data.entity.types import ScopeRef, ScopeType
+from ai.backend.common.data.entity.types import ScopeID, ScopeRef, ScopeType
 from ai.backend.common.data.entity.user import USER_SCOPE_TYPE
-from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.manager.data.error_log.types import ErrorLogData, ErrorLogSeverity
 from ai.backend.manager.models.error_logs import ErrorLogRow
 from ai.backend.manager.models.specs.creator import EntityCreator

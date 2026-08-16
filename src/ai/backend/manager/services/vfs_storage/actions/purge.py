@@ -4,10 +4,8 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.entity.vfs_storage import VFS_STORAGE_ENTITY_TYPE
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.vfs_storage import VFSStorageID
+from ai.backend.common.data.entity.types import EntityID, EntityType
+from ai.backend.common.data.entity.vfs_storage import VFS_STORAGE_ENTITY_TYPE, VFSStorageID
 from ai.backend.manager.actions.v2.ops.base import PurgeEntityOpsAction
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.vfs_storage.purgers import VFSStoragePurger

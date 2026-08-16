@@ -14,13 +14,13 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.exceptions import NotFoundError, ServerError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.dto.manager.session.request import (
     RestartSessionRequest,
 )
 from ai.backend.common.dto.manager.session.response import (
     GetStatusHistoryResponse,
 )
-from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus

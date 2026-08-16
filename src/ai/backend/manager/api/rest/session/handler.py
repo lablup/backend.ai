@@ -24,6 +24,7 @@ from pydantic import BaseModel
 
 from ai.backend.common.api_handlers import APIResponse, BaseResponseModel, BodyParam, QueryParam
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.session.request import (
     CommitSessionRequest,
     CompleteRequest,
@@ -81,7 +82,6 @@ from ai.backend.common.dto.manager.session.types import (
     CreationConfigV7,
 )
 from ai.backend.common.exception import BackendAIError, UnreachableError
-from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
     AgentId,
     KernelId,

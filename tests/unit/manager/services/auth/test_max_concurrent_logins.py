@@ -8,11 +8,11 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
-from ai.backend.common.dto.manager.auth.types import AuthTokenType
-from ai.backend.common.exception import UserResourcePolicyNotFound
-from ai.backend.common.identifier.resource_policy import (
+from ai.backend.common.data.entity.resource_policy import (
     UserResourcePolicyUUID,
 )
+from ai.backend.common.dto.manager.auth.types import AuthTokenType
+from ai.backend.common.exception import UserResourcePolicyNotFound
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult

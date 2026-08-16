@@ -10,6 +10,8 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
@@ -18,8 +20,6 @@ from ai.backend.common.data.idle_checker.types import (
     UtilizationSpec,
     UtilizationThresholdEntry,
 )
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
-from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession, SessionUtilizationQuery
 from ai.backend.manager.repositories.idle_checker.types import IdleCheckerDefinitionData

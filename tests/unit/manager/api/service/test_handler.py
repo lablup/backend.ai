@@ -13,10 +13,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.model_serving.request import (
     NewServiceRequestModel,
 )
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.api.rest.service.handler import ServiceHandler
 from ai.backend.manager.models.user import UserRole

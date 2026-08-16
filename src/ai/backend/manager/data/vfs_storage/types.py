@@ -5,8 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityData
-from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.data.entity.types import EntityData, EntityID
 
 
 @dataclass

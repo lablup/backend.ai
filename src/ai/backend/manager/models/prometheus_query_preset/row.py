@@ -6,8 +6,8 @@ import sqlalchemy as sa
 from pydantic import ConfigDict
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
-from ai.backend.common.identifier.prometheus_query_preset_category import (
+from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
+from ai.backend.common.data.entity.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryID,
 )
 from ai.backend.common.types import BackendAISchema

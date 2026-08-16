@@ -10,8 +10,8 @@ from uuid import uuid4
 import pytest
 from dateutil.tz import tzutc
 
-from ai.backend.common.identifier.architecture import ArchName
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.architecture import ArchName
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,

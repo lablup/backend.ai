@@ -5,8 +5,8 @@ from dataclasses import dataclass, field
 from typing import Any, override
 
 from ai.backend.common.config import PresetModelDefinition
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.manager.models.base import ResourceOptsEntry
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.runtime_variant_preset.types import (

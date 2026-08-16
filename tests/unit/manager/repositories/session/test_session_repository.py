@@ -16,9 +16,9 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.orm import selectinload
 
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.session import SessionID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,

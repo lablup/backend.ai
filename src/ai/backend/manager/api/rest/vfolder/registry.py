@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from aiohttp import web
 
-from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.manager.api.rest.middleware.auth import (
     admin_required,
     auth_required,

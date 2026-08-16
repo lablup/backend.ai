@@ -4,7 +4,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.config import DefaultModelDefinition
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.models.base import GUID, Base, PydanticColumn
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin

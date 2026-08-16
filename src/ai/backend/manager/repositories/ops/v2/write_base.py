@@ -16,7 +16,7 @@ from asyncpg.exceptions import PostgresError
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ai.backend.common.data.entity.types import EntityRef, EntityType, ScopeRef, ScopeType
-from ai.backend.common.identifier.virtual_scope import VirtualScopeID
+from ai.backend.common.data.entity.virtual_scope import VirtualScopeID
 from ai.backend.manager.errors.permission import VirtualScopeNotFound
 from ai.backend.manager.errors.repository import (
     CheckConstraintViolationError,

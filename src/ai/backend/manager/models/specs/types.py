@@ -6,8 +6,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from ai.backend.common.data.entity.types import EntityID
 from ai.backend.common.exception import BackendAIError
-from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.models.clauses import QueryCondition
 
 if TYPE_CHECKING:

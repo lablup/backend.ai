@@ -8,6 +8,10 @@ from datetime import UTC, datetime
 from typing import Any
 
 from ai.backend.common.data.endpoint.types import ScalingState
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
     DeploymentStrategy,
@@ -53,10 +57,6 @@ from ai.backend.common.dto.manager.v2.deployment_options.response import (
 from ai.backend.common.dto.manager.v2.session_options.response import (
     HandlerOptionsInfo,
 )
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.schema.deployment import IntOrPercent
 from ai.backend.common.types import MountPermission
 

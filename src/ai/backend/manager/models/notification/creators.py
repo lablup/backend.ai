@@ -11,13 +11,13 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
+from ai.backend.common.data.entity.notification import NotificationChannelID
 from ai.backend.common.data.notification import (
     NotificationChannelType,
     NotificationRuleType,
     WebhookSpec,
 )
 from ai.backend.common.data.notification.types import EmailSpec
-from ai.backend.common.identifier.notification import NotificationChannelID
 from ai.backend.manager.data.notification.types import (
     NotificationChannelData,
     NotificationRuleData,

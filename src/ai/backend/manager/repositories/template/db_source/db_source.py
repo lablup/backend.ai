@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.resource import DBOperationFailed

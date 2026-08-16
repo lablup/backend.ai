@@ -5,6 +5,7 @@ from __future__ import annotations
 from http import HTTPStatus
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.dto.manager.prometheus_query_preset import (
     CreateQueryDefinitionRequest,
     CreateQueryDefinitionResponse,
@@ -20,7 +21,6 @@ from ai.backend.common.dto.manager.prometheus_query_preset import (
     SearchQueryDefinitionsRequest,
     SearchQueryDefinitionsResponse,
 )
-from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.manager.data.prometheus_query_preset import (
     ExecutePresetOptions,
 )

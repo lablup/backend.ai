@@ -27,9 +27,9 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dependencies import DependencyBuilderStack
-from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import LocalLogger, LogLevel

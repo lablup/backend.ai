@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from ai.backend.common.api_handlers import Sentinel
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
@@ -26,7 +27,6 @@ from ai.backend.common.dto.manager.v2.domain.response import (
     PurgeDomainPayload,
 )
 from ai.backend.common.dto.manager.v2.domain.types import DomainOrderField, OrderDirection
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.domain.types import DomainData, UserInfo

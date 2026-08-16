@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.domain import DomainID, DomainName
+from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.types import BinarySize, QuotaScopeID, ResourceSlot
 from ai.backend.manager.data.permission.types import (
     EntityType as PermissionEntityType,

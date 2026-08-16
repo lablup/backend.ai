@@ -9,6 +9,7 @@ from __future__ import annotations
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.agent.types import (
@@ -17,7 +18,6 @@ from ai.backend.common.dto.manager.v2.agent.types import (
     ConflictingSessionCleanupPolicyEnum,
     OrderDirection,
 )
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId
 
 __all__ = (

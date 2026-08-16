@@ -6,7 +6,7 @@ from typing import Final, Self
 
 from pydantic import Field, model_validator
 
-from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
+from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.types import BackendAISchema
 
 # Metric label carrying the session UUID; grouping by it enables per-session mapping.

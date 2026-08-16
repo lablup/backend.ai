@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from typing import Any, override
 
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.identifier.session import SessionID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.session.types import SessionData

@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.identifier.retention_policy import RetentionPolicyID
+from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
 from ai.backend.manager.data.retention.types import RetentionCategory, RetentionPolicyData
 from ai.backend.manager.models.base import GUID, Base, StrEnumType
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin

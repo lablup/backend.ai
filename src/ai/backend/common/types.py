@@ -54,6 +54,13 @@ from pydantic import (
 from pydantic_core import ErrorDetails, core_schema
 from redis.asyncio import Redis
 
+# Deprecated re-export: new code should import ``ImageID`` from
+# ``ai.backend.common.data.entity.image``. This line lets existing
+# ``from ai.backend.common.types import ImageID`` sites keep working and
+# will be removed once call sites are migrated.
+from .data.entity.image import ImageID
+from .data.entity.resource_slot import ResourceSlotName
+from .data.entity.vfolder import VFolderUUID
 from .defs import UNKNOWN_CONTAINER_ID, RedisRole
 from .exception import (
     BackendAIError,
@@ -63,14 +70,6 @@ from .exception import (
     InvalidResourceSlotQuantity,
     UnknownResourceSlotType,
 )
-
-# Deprecated re-export: new code should import ``ImageID`` from
-# ``ai.backend.common.identifier.image``. This line lets existing
-# ``from ai.backend.common.types import ImageID`` sites keep working and
-# will be removed once call sites are migrated.
-from .identifier.image import ImageID
-from .identifier.resource_slot import ResourceSlotName
-from .identifier.vfolder import VFolderUUID
 from .models.minilang.mount import MountPointParser
 
 __all__ = (

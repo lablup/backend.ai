@@ -12,6 +12,7 @@ from dataclasses import dataclass
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import (
     EntityType,
     OperationType,
@@ -19,7 +20,6 @@ from ai.backend.common.data.permission.types import (
     RoleSource,
     ScopeType,
 )
-from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import ReadableCIDR, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserData

@@ -17,9 +17,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ai.backend.common.config import ModelConfigDraft, ModelDefinitionDraft
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.types import ClusterMode
 from ai.backend.manager.data.deployment.types import (
     ExecutionSpec,

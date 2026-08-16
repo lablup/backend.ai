@@ -26,17 +26,20 @@ from ai.backend.common.data.permission.types import (
     RBACElementType,
 )
 from ai.backend.common.events.event_types.kernel.types import KernelCreationInfo
-from ai.backend.common.identifier.architecture import ArchName
-from ai.backend.common.identifier.domain import DomainID, DomainName
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import (
+from ai.backend.common.data.entity.architecture import ArchName
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import (
     ResourceGroupID,
     ResourceGroupName,
 )
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
-from ai.backend.common.identifier.session_group import SessionGroupID
-from ai.backend.common.identifier.user import UserID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.permission.types import (
+    RBACElementType,
+)
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
     AccessKey,

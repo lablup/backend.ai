@@ -12,10 +12,8 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
 
-from ai.backend.common.data.entity.types import ScopeType
+from ai.backend.common.data.entity.types import EntityID, ScopeID, ScopeType
 from ai.backend.common.data.entity.user import USER_ENTITY_TYPE
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 

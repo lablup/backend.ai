@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
+from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.group.request import (
@@ -42,7 +43,6 @@ from ai.backend.common.dto.manager.v2.group.types import (
     ProjectUserFilter,
 )
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter

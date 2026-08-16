@@ -3,7 +3,7 @@ import uuid
 from datetime import UTC, datetime
 
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
 from ai.backend.testutils.mock import mock_aioresponses_sequential_payloads

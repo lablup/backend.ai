@@ -21,8 +21,8 @@ from sqlalchemy.orm import Mapped, load_only, mapped_column, relationship
 from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common import msgpack
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.scope import ScopeID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.types import ScopeID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.domain.types import DomainData

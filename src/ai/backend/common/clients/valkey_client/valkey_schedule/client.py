@@ -17,8 +17,8 @@ from ai.backend.common.clients.valkey_client.valkey_schedule.types import (
     ReplicaHealthStatus,
     ReplicaProbeTarget,
 )
+from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.exception import BackendAIError
-from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (

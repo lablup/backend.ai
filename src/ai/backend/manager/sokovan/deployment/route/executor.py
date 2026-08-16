@@ -10,6 +10,10 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import (
     ReplicaProbeTarget,
     ValkeyScheduleClient,
 )
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
     BulkRegisterRoutesRequest,
     BulkUnregisterRoutesRequest,
@@ -23,10 +27,6 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
 )
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.exception import BackendAIError
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.replica import ReplicaID
-from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.service_discovery import ServiceDiscovery
 from ai.backend.common.service_discovery.service_discovery import ModelServiceMetadata
 from ai.backend.common.types import SessionId

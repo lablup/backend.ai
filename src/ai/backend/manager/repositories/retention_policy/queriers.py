@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.identifier.retention_policy import RetentionPolicyID
+from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
 from ai.backend.manager.data.retention.types import RetentionPolicyData
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
 from ai.backend.manager.models.specs.querier import DataQuerier

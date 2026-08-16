@@ -5,6 +5,7 @@ from uuid import UUID
 from strawberry import Info
 from strawberry.relay import PageInfo
 
+from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.retention_policy.request import (
     RetentionPolicyFilter,
@@ -12,7 +13,6 @@ from ai.backend.common.dto.manager.v2.retention_policy.request import (
     SearchRetentionPoliciesInput,
 )
 from ai.backend.common.dto.manager.v2.retention_policy.types import RetentionPolicyOrderField
-from ai.backend.common.identifier.retention_policy import RetentionPolicyID
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.retention_policy.types import (
     CreateRetentionPolicyInputGQL,

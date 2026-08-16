@@ -5,8 +5,8 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any, override
 
+from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
 from ai.backend.common.data.retention.types import RetentionCategory
-from ai.backend.common.identifier.retention_policy import RetentionPolicyID
 from ai.backend.manager.data.retention.types import RetentionPolicyData
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck

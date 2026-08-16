@@ -5,9 +5,8 @@ from datetime import datetime
 from typing import override
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.data.entity.types import EntityData
-from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
-from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListID
+from ai.backend.common.data.entity.types import EntityData, EntityID
 
 
 @dataclass(frozen=True)

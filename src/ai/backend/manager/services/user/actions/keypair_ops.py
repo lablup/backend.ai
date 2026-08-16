@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import EntityType
-from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.action.global_action import BaseGlobalAction

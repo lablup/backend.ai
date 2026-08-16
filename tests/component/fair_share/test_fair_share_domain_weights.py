@@ -6,6 +6,7 @@ import pytest
 
 from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.dto.manager.fair_share import (
     BulkUpsertDomainFairShareWeightRequest,
     BulkUpsertDomainFairShareWeightResponse,
@@ -16,7 +17,6 @@ from ai.backend.common.dto.manager.fair_share import (
     UpsertDomainFairShareWeightRequest,
     UpsertDomainFairShareWeightResponse,
 )
-from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 

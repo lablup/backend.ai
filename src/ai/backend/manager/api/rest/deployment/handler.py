@@ -10,6 +10,9 @@ from __future__ import annotations
 from http import HTTPStatus
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.dto.manager.deployment import (
     ActivateRevisionResponse,
     AddRevisionRequest,
@@ -43,9 +46,6 @@ from ai.backend.common.dto.manager.deployment import (
     UpsertDeploymentPolicyResponse,
 )
 from ai.backend.common.dto.manager.deployment.response import DeploymentDTO, RevisionDTO
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
 from ai.backend.manager.data.deployment.types import LegacyDeploymentData, ModelRevisionData

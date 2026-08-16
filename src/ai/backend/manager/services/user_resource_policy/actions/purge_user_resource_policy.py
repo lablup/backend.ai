@@ -5,10 +5,9 @@ from typing import override
 
 from ai.backend.common.data.entity.resource_policy import (
     USER_RESOURCE_POLICY_ENTITY_TYPE,
+    UserResourcePolicyUUID,
 )
-from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.resource_policy import UserResourcePolicyUUID
+from ai.backend.common.data.entity.types import EntityID, EntityType
 from ai.backend.manager.actions.v2.ops.base import PurgeEntityOpsAction
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.models.resource_policy.purgers import (

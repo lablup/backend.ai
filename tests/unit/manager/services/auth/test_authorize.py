@@ -6,11 +6,11 @@ import pytest
 from aiohttp import web
 
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
-from ai.backend.common.dto.manager.auth.types import AuthTokenType
-from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.identifier.resource_policy import (
+from ai.backend.common.data.entity.resource_policy import (
     UserResourcePolicyUUID,
 )
+from ai.backend.common.dto.manager.auth.types import AuthTokenType
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.plugin.hook import HookPluginContext, HookResult, HookResults
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig, ManagerConfig

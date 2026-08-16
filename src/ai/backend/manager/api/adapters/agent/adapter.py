@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping, Sequence
 
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.agent.request import (
     AdminSearchAgentsInput,
@@ -28,7 +29,6 @@ from ai.backend.common.dto.manager.v2.agent.types import (
     AgentStatusFilter,
     ConflictingSessionCleanupPolicyEnum,
 )
-from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec

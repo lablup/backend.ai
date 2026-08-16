@@ -4,12 +4,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
 
-from ai.backend.common.data.notification import WebhookSpec
-from ai.backend.common.data.notification.types import EmailSpec
-from ai.backend.common.identifier.notification import (
+from ai.backend.common.data.entity.notification import (
     NotificationChannelID,
     NotificationRuleID,
 )
+from ai.backend.common.data.notification import WebhookSpec
+from ai.backend.common.data.notification.types import EmailSpec
 from ai.backend.manager.data.notification.types import (
     NotificationChannelData,
     NotificationRuleData,

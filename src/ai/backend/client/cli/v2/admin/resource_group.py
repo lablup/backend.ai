@@ -434,7 +434,7 @@ def default_options() -> None:
 @click.argument("name", type=str)
 def default_options_get(name: str) -> None:
     """Show the current ``default_deployment_options`` surface."""
-    from ai.backend.common.identifier.resource_group import ResourceGroupName
+    from ai.backend.common.data.entity.resource_group import ResourceGroupName
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -551,7 +551,7 @@ def default_options_replace(
             ),
         )
 
-    from ai.backend.common.identifier.resource_group import ResourceGroupName
+    from ai.backend.common.data.entity.resource_group import ResourceGroupName
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -580,7 +580,7 @@ def default_session_options() -> None:
 @click.argument("name", type=str)
 def default_session_options_get(name: str) -> None:
     """Show the current ``default_session_options`` surface."""
-    from ai.backend.common.identifier.resource_group import ResourceGroupName
+    from ai.backend.common.data.entity.resource_group import ResourceGroupName
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -646,7 +646,7 @@ def default_session_options_replace(
             options=DefaultSessionOptionsInput.model_validate(raw),
         )
 
-    from ai.backend.common.identifier.resource_group import ResourceGroupName
+    from ai.backend.common.data.entity.resource_group import ResourceGroupName
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())

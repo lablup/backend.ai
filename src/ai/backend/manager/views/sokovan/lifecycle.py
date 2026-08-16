@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from ai.backend.common.identifier.architecture import ArchName
+from ai.backend.common.data.entity.architecture import ArchName
 from ai.backend.common.types import (
     AccessKey,
     AgentId,

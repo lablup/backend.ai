@@ -5,6 +5,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
+from ai.backend.common.data.entity.prometheus_query_preset_category import (
+    PrometheusQueryPresetCategoryID,
+)
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.request import (
     CategoryFilter,
     CategoryOrder,
@@ -21,9 +24,6 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.response 
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.types import (
     OrderDirection,
-)
-from ai.backend.common.identifier.prometheus_query_preset_category import (
-    PrometheusQueryPresetCategoryID,
 )
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter

@@ -11,6 +11,7 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInput
 from ai.backend.common.dto.manager.v2.resource_group.types import (
@@ -18,7 +19,6 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     ResourceGroupOrderField,
 )
 from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInput
-from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.types import PreemptionVictimScope
 
 __all__ = (

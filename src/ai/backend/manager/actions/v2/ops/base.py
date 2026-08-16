@@ -2,8 +2,8 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from typing import Any, override
 
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.entity import EntityID as OwnerEntityID
+from ai.backend.common.data.entity.types import EntityID
+from ai.backend.common.data.entity.types import EntityID as OwnerEntityID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction

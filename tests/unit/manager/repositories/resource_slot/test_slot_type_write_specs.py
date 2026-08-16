@@ -9,9 +9,9 @@ from decimal import Decimal
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.resource_slot import ResourceSlotTypeUUID
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
 from ai.backend.common.types import ResourceSlot, SlotTypes
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.errors.resource_slot import (

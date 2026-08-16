@@ -12,6 +12,7 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import NodeID
 
+from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     DeploymentHistoryFilter as DeploymentHistoryFilterDTO,
 )
@@ -60,7 +61,6 @@ from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     SessionHistoryScopeDTO,
     SubStepResultInfo,
 )
-from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,

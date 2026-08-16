@@ -16,8 +16,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityData
-from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.data.entity.types import EntityData, EntityID
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.v2.bulk.result import BaseBulkActionResult, BulkEntityResult
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupActionResult

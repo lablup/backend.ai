@@ -19,8 +19,8 @@ from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common.data.endpoint.types import EndpointStatus
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.exception import DeprecatedAPI, InvalidAPIParameters
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AutoScalingMetricComparator,

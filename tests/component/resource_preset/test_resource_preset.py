@@ -10,13 +10,13 @@ from collections.abc import Callable, Coroutine
 from typing import Any
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.dto.manager.infra import (
     CheckPresetsRequest,
     CheckPresetsResponse,
     ListPresetsRequest,
     ListPresetsResponse,
 )
-from ai.backend.common.identifier.resource_group import ResourceGroupName
 
 PresetFixtureData = dict[str, Any]
 PresetFactory = Callable[..., Coroutine[Any, Any, PresetFixtureData]]

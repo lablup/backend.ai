@@ -12,13 +12,13 @@ from datetime import UTC, datetime, timedelta
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.notification import (
     NotificationChannelType,
     NotificationRuleType,
     WebhookSpec,
 )
-from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.notification.types import (
     NotificationChannelData,

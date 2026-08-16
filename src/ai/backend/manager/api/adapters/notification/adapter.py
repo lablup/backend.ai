@@ -6,6 +6,10 @@ from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
+from ai.backend.common.data.entity.notification import (
+    NotificationChannelID,
+    NotificationRuleID,
+)
 from ai.backend.common.data.notification import (
     NotificationChannelType,
     NotificationRuleType,
@@ -61,10 +65,6 @@ from ai.backend.common.dto.manager.v2.notification.types import (
     SMTPAuthInfo,
     SMTPConnectionInfo,
     WebhookSpecInfo,
-)
-from ai.backend.common.identifier.notification import (
-    NotificationChannelID,
-    NotificationRuleID,
 )
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter

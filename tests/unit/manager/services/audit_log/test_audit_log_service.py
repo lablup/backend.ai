@@ -11,8 +11,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.entity.audit_log import AuditLogID
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.identifier.audit_log import AuditLogID
 from ai.backend.manager.actions.action.types import SearchableActionTarget
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
 from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogListResult

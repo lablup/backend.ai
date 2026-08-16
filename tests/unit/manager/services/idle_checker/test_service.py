@@ -7,6 +7,9 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
@@ -16,9 +19,6 @@ from ai.backend.common.data.idle_checker.types import (
     UtilizationThresholdEntry,
 )
 from ai.backend.common.exception import PrometheusQueryPresetInvalidLabel
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
-from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
-from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
 from ai.backend.manager.repositories.base import Creator, Updater

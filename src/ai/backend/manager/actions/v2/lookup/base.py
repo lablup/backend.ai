@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.data.entity.types import EntityID, EntityType
 from ai.backend.manager.actions.types import ActionOperationType, ActionSpec
 
 __all__ = ("LookupKey", "BaseLookupAction", "BaseLookupActionResult")

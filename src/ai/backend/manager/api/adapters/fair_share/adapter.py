@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.dto.manager.v2.fair_share.request import (
     BulkUpsertDomainFairShareWeightInput,
     BulkUpsertProjectFairShareWeightInput,
@@ -53,7 +54,6 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceWeightEntryInfo,
     UserFairShareOrderField,
 )
-from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter

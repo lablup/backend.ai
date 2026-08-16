@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
 
-from ai.backend.common.identifier.role_preset import RolePresetID
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.manager.data.permission.types import ScopeType
 from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow

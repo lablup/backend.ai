@@ -6,12 +6,12 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import APIResponse, BaseRequestModel, BodyParam, PathParam
+from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
 from ai.backend.common.dto.manager.v2.retention_policy.request import (
     CreateRetentionPolicyInput,
     SearchRetentionPoliciesInput,
     UpdateRetentionPolicyInput,
 )
-from ai.backend.common.identifier.retention_policy import RetentionPolicyID
 from ai.backend.manager.api.adapters.retention_policy.adapter import RetentionPolicyAdapter
 
 

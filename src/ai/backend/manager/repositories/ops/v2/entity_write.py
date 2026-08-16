@@ -21,17 +21,17 @@ import jinja2.sandbox
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import (
+    EntityID,
     EntityRef,
     EntityType,
     ScopeRef,
     ScopeType,
 )
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import RBACTypeConversionError
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.role_preset import RolePresetID
-from ai.backend.common.identifier.user import UserID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.scope_template import ScopeTemplateValue
 from ai.backend.manager.data.permission.status import RoleStatus

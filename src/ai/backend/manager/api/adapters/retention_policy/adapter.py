@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
 from ai.backend.common.dto.manager.v2.retention_policy.request import (
     CreateRetentionPolicyInput,
     RetentionPolicyFilter,
@@ -18,7 +19,6 @@ from ai.backend.common.dto.manager.v2.retention_policy.response import (
     UpdateRetentionPolicyPayload,
 )
 from ai.backend.common.dto.manager.v2.retention_policy.types import RetentionPolicyOrderField
-from ai.backend.common.identifier.retention_policy import RetentionPolicyID
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.retention.types import RetentionPolicyData

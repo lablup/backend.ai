@@ -5,12 +5,11 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
-from ai.backend.common.data.entity.types import EntityData
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
-from ai.backend.common.identifier.prometheus_query_preset_category import (
+from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQueryPresetID
+from ai.backend.common.data.entity.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryID,
 )
+from ai.backend.common.data.entity.types import EntityData, EntityID
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
 

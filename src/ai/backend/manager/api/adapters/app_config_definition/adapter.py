@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from functools import lru_cache
 
+from ai.backend.common.data.entity.app_config_definition import AppConfigDefinitionID
 from ai.backend.common.dto.manager.v2.app_config_definition.request import (
     AppConfigDefinitionFilter,
     AppConfigDefinitionOrder,
@@ -22,7 +23,6 @@ from ai.backend.common.dto.manager.v2.app_config_definition.types import (
     AppConfigDefinitionOrderField,
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
-from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.app_config_definition.types import AppConfigDefinitionData

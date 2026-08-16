@@ -8,8 +8,8 @@ from typing import override
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.identifier.action import ActionID
-from ai.backend.common.identifier.audit_log import AuditLogID
+from ai.backend.common.data.entity.action import ActionID
+from ai.backend.common.data.entity.audit_log import AuditLogID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
 from ai.backend.manager.data.audit_log.types import AuditLogData

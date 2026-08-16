@@ -16,8 +16,8 @@ from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationsh
 from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.types import ScopeID
 from ai.backend.common.exception import UnknownImageRegistry
-from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.container_registry import (

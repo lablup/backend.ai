@@ -1,10 +1,15 @@
+import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import NewType
 from uuid import UUID
 
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.scope import ScopeID
+# An entity's identifier. Polymorphic across entity kinds; the concrete kind is
+# discriminated by the accompanying entity_type.
+type EntityID = uuid.UUID
+# A scope's identifier. Every scope doubles as an entity, so this is an alias of
+# EntityID: the subset relation is visible in the type.
+type ScopeID = EntityID
 
 EntityType = NewType("EntityType", str)
 # Every entity doubles as a scope, so a scope type IS an entity type; the

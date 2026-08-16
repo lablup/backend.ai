@@ -5,11 +5,9 @@ from typing import override
 
 from ai.backend.common.data.entity.prometheus_query_preset_category import (
     PROMETHEUS_QUERY_PRESET_CATEGORY_ENTITY_TYPE,
-)
-from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.identifier.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryID,
 )
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.ops.base import GetGlobalOpsAction
 from ai.backend.manager.data.prometheus_query_preset_category.types import (
     PrometheusQueryPresetCategoryData,

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.exceptions import InvalidRequestError, NotFoundError, ServerError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.dto.manager.session.request import (
     CompleteRequest,
     ExecuteRequest,
@@ -20,7 +21,6 @@ from ai.backend.common.dto.manager.session.response import (
     ExecuteResponse,
     StartServiceResponse,
 )
-from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.scaling_group import scaling_groups
 

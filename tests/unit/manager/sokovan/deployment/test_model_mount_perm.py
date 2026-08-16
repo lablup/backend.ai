@@ -2,7 +2,7 @@ import uuid
 
 import pytest
 
-from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import MountPermission
 from ai.backend.manager.errors.storage import VFolderPermissionError
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController

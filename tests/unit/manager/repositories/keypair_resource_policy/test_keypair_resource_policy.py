@@ -9,7 +9,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 
-from ai.backend.common.identifier.resource_policy import KeyPairResourcePolicyUUID
+from ai.backend.common.data.entity.resource_policy import KeyPairResourcePolicyUUID
 from ai.backend.common.types import (
     DefaultForUnspecified,
     ResourceSlot,

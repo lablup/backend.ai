@@ -16,6 +16,8 @@ import sqlalchemy as sa
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
 from ai.backend.common.dto.manager.v2.scheduler.request import (
     ComputeScheduleInput,
@@ -23,8 +25,6 @@ from ai.backend.common.dto.manager.v2.scheduler.request import (
 )
 from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum
 from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps

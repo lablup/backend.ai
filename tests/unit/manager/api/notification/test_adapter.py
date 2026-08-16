@@ -8,6 +8,10 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
+from ai.backend.common.data.entity.notification import (
+    NotificationChannelID,
+    NotificationRuleID,
+)
 from ai.backend.common.data.notification import (
     NotificationChannelType,
     NotificationRuleType,
@@ -31,10 +35,6 @@ from ai.backend.common.dto.manager.notification import (
 from ai.backend.common.dto.manager.notification.request import (
     SearchNotificationChannelsRequest,
     SearchNotificationRulesRequest,
-)
-from ai.backend.common.identifier.notification import (
-    NotificationChannelID,
-    NotificationRuleID,
 )
 from ai.backend.manager.api.rest.notification.adapter import (
     NotificationChannelAdapter,

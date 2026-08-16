@@ -13,8 +13,8 @@ from typing import TYPE_CHECKING
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.audit_log import AuditLogID
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
-from ai.backend.common.identifier.audit_log import AuditLogID
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.models.audit_log import AuditLogRow

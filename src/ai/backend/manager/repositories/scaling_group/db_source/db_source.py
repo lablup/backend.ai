@@ -7,17 +7,16 @@ from typing import TYPE_CHECKING, cast
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE
-from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
+from ai.backend.common.data.entity.domain import DOMAIN_SCOPE_TYPE, DomainID
+from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE, ProjectID
 from ai.backend.common.data.entity.resource_group import (
     RESOURCE_GROUP_ENTITY_TYPE,
     RESOURCE_GROUP_SCOPE_TYPE,
+    ResourceGroupID,
+    ResourceGroupName,
 )
 from ai.backend.common.data.entity.types import EntityRef, EntityType, ScopeRef, ScopeType
 from ai.backend.common.exception import DomainNotFound
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.deployment.types import DeploymentOptions

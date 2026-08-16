@@ -19,6 +19,7 @@ from ai.backend.client.v2.exceptions import (
     PermissionDeniedError,
 )
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.dto.manager.compute_session import (
     SearchComputeSessionsRequest,
     SearchComputeSessionsResponse,
@@ -32,7 +33,6 @@ from ai.backend.common.dto.manager.session.response import (
     GetStatusHistoryResponse,
     MatchSessionsResponse,
 )
-from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
 from ai.backend.manager.api.rest.compute_sessions.handler import ComputeSessionsHandler
 from ai.backend.manager.api.rest.compute_sessions.registry import (

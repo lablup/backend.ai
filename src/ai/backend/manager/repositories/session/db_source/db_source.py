@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only, noload, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,

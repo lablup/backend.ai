@@ -8,8 +8,8 @@ from typing import Protocol, cast
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.object_permission import ObjectPermissionData

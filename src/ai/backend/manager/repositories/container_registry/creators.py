@@ -8,12 +8,14 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
-from ai.backend.common.data.entity.container_registry import CONTAINER_REGISTRY_SCOPE_TYPE
+from ai.backend.common.data.entity.container_registry import (
+    CONTAINER_REGISTRY_SCOPE_TYPE,
+    ContainerRegistryID,
+)
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import ContainerRegistryGroupsAlreadyAssociated
-from ai.backend.common.identifier.container_registry import ContainerRegistryID
-from ai.backend.common.identifier.project import ProjectID
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,

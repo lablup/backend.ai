@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import enum
 
+from ai.backend.common.data.entity.app_config import AppConfigScopeID
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
-from ai.backend.common.identifier.app_config import AppConfigScopeID
 
 __all__ = ("AppConfigScopeType",)
 

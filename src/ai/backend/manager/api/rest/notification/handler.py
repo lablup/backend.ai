@@ -7,6 +7,10 @@ from http import HTTPStatus
 from typing import Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.notification import (
+    NotificationChannelID,
+    NotificationRuleID,
+)
 from ai.backend.common.data.notification import NotifiableMessage
 from ai.backend.common.data.notification.types import NotificationRuleType
 from ai.backend.common.dto.manager.notification import (
@@ -33,10 +37,6 @@ from ai.backend.common.dto.manager.notification import (
     ValidateNotificationChannelResponse,
     ValidateNotificationRuleRequest,
     ValidateNotificationRuleResponse,
-)
-from ai.backend.common.identifier.notification import (
-    NotificationChannelID,
-    NotificationRuleID,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import UserContext

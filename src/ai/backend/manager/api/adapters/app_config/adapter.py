@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.app_config.request import (
     MyGetAppConfigsInput,
     PublicGetAppConfigsInput,
@@ -12,7 +13,6 @@ from ai.backend.common.dto.manager.v2.app_config.response import (
     GetAppConfigsPayload,
 )
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.app_config.types import AppConfigData
 from ai.backend.manager.services.app_config.actions.get import GetAppConfigsAction

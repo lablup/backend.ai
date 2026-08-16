@@ -5,8 +5,7 @@ from datetime import datetime
 from typing import override
 from uuid import UUID
 
-from ai.backend.common.data.entity.types import EntityData
-from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.data.entity.types import EntityData, EntityID
 
 __all__ = ("LoginClientTypeData",)
 

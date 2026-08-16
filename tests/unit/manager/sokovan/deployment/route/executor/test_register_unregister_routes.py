@@ -24,6 +24,9 @@ from uuid import UUID, uuid4
 
 from dateutil.tz import tzutc
 
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
     BulkRegisterRoutesResponse,
     BulkUnregisterRoutesResponse,
@@ -32,9 +35,6 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
     RegisteredRoutesItem,
     UnregisteredRoutesItem,
 )
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,

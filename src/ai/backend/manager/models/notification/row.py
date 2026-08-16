@@ -7,15 +7,15 @@ from typing import Any
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.notification import (
+    NotificationChannelID,
+    NotificationRuleID,
+)
 from ai.backend.common.data.notification import (
     EmailSpec,
     NotificationChannelType,
     NotificationRuleType,
     WebhookSpec,
-)
-from ai.backend.common.identifier.notification import (
-    NotificationChannelID,
-    NotificationRuleID,
 )
 from ai.backend.manager.data.notification import (
     NotificationChannelData,

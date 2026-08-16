@@ -4,8 +4,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.storage_namespace import StorageNamespaceID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.common.identifier.storage_namespace import StorageNamespaceID
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck

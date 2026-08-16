@@ -3,9 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.entity.notification import NOTIFICATION_RULE_ENTITY_TYPE
+from ai.backend.common.data.entity.notification import (
+    NOTIFICATION_RULE_ENTITY_TYPE,
+    NotificationRuleID,
+)
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.identifier.notification import NotificationRuleID
 from ai.backend.manager.actions.v2.ops.base import GetGlobalOpsAction
 from ai.backend.manager.data.notification.types import NotificationRuleData
 from ai.backend.manager.models.notification.row import NotificationRuleRow

@@ -14,6 +14,7 @@ import pytest
 
 from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.v2.group.request import (
     AssignUsersToProjectInput,
     UnassignUsersFromProjectInput,
@@ -22,7 +23,6 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
     CreateModelCardInput,
     SearchModelCardsInput,
 )
-from ai.backend.common.identifier.vfolder import VFolderUUID
 
 if TYPE_CHECKING:
     from tests.component.conftest import UserFixtureData

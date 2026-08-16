@@ -6,6 +6,10 @@ Also provides data-to-DTO conversion functions.
 
 from __future__ import annotations
 
+from ai.backend.common.data.entity.notification import (
+    NotificationChannelID,
+    NotificationRuleID,
+)
 from ai.backend.common.data.notification.types import (
     EmailSpec,
     NotificationChannelType,
@@ -28,10 +32,6 @@ from ai.backend.common.dto.manager.notification import (
     WebhookSpecResponse,
 )
 from ai.backend.common.dto.manager.notification.response import EmailSpecResponse
-from ai.backend.common.identifier.notification import (
-    NotificationChannelID,
-    NotificationRuleID,
-)
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
     NotificationRuleData,

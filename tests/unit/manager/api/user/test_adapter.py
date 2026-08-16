@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from typing import cast
 from uuid import UUID, uuid4
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserRole as DataUserRole
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.user import (
@@ -23,7 +24,6 @@ from ai.backend.common.dto.manager.user import (
 )
 from ai.backend.common.dto.manager.user.types import UserRole as UserRoleDTO
 from ai.backend.common.dto.manager.user.types import UserStatus as UserStatusDTO
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.api.rest.user.adapter import UserAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserData, UserStatus

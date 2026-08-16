@@ -20,7 +20,7 @@ from typing import Any, Protocol
 
 from pydantic import ConfigDict, Field
 
-from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.types import (
     AgentId,
     BackendAISchema,

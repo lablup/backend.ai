@@ -4,8 +4,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.common.identifier.login_client_type import LoginClientTypeID
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 from ai.backend.manager.models.specs.purger import EntityPurger

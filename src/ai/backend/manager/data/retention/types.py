@@ -4,10 +4,9 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityData
+from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
+from ai.backend.common.data.entity.types import EntityData, EntityID
 from ai.backend.common.data.retention.types import RetentionCategory
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.retention_policy import RetentionPolicyID
 
 __all__ = (
     "RetentionCategory",

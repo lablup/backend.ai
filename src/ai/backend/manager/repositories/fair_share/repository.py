@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from datetime import date
 from typing import TYPE_CHECKING
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
     MetricArgs,

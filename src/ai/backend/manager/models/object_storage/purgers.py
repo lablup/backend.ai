@@ -4,8 +4,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.common.identifier.object_storage import ObjectStorageID
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.object_storage.row import ObjectStorageRow
 from ai.backend.manager.models.specs.purger import EntityPurger

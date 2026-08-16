@@ -12,12 +12,12 @@ from uuid import UUID, uuid4
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
+from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.replica_group_history import ReplicaGroupHistoryID
 from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
-from ai.backend.common.identifier.replica import ReplicaID
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
-from ai.backend.common.identifier.replica_group_history import ReplicaGroupHistoryID
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,

@@ -8,6 +8,11 @@ from datetime import UTC, datetime
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
@@ -15,11 +20,6 @@ from ai.backend.common.data.idle_checker.types import (
     SessionLifetimeSpec,
 )
 from ai.backend.common.data.permission.types import ScopeType
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.identifier.session import SessionID
-from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import (
     ClusterMode,
     ResourceSlot,

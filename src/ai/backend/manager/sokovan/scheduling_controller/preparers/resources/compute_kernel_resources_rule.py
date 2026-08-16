@@ -26,7 +26,7 @@ from collections.abc import Mapping
 from decimal import Decimal
 from typing import Any, override
 
-from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.types import BinarySize, ResourceSlotEntry
 from ai.backend.manager.data.session.creation import ImageInfo
 from ai.backend.manager.data.session.draft import (

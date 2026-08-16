@@ -8,7 +8,7 @@ from collections.abc import Mapping, Sequence
 
 import sqlalchemy as sa
 
-from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.data.entity.types import EntityID
 from ai.backend.manager.errors.repository import EntityNotFoundError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.creator import FieldCreator

@@ -10,9 +10,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Collection, Sequence
 from typing import final
 
-from ai.backend.common.data.entity.types import ScopeRef, ScopeType
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.scope import ScopeID
+from ai.backend.common.data.entity.types import EntityID, ScopeID, ScopeRef, ScopeType
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.role_template import RoleTemplateSource
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck

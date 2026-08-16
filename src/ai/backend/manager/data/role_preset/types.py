@@ -4,15 +4,14 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import override
 
-from ai.backend.common.data.entity.types import EntityData
+from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
+from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.types import EntityData, EntityID
 from ai.backend.common.data.permission.types import (
     EntityType,
     OperationType,
     RBACElementType,
 )
-from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.role_permission_preset import RolePermissionPresetID
-from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.manager.data.common.bulk import (
     BulkCreateFailure,
     BulkPurgeFailure,

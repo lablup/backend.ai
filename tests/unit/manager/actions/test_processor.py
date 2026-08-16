@@ -8,10 +8,10 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.contexts.user import with_triggered_user, with_user
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import ErrorCode
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.actions.action import (
     BaseAction,
     BaseActionResult,

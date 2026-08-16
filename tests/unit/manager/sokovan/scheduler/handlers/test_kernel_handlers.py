@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import KernelId
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.sokovan.scheduler.handlers.kernel.sweep_stale_kernels import (

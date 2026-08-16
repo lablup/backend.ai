@@ -7,9 +7,9 @@ from datetime import datetime
 from typing import Any, Self, override
 from uuid import UUID
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.permission.id import ScopeId
