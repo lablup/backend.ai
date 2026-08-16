@@ -31,9 +31,6 @@ from ai.backend.manager.repositories.huggingface_registry.repositories import (
 )
 from ai.backend.manager.repositories.idle_checker.repositories import IdleCheckerRepositories
 from ai.backend.manager.repositories.image.repositories import ImageRepositories
-from ai.backend.manager.repositories.keypair_resource_policy.repositories import (
-    KeypairResourcePolicyRepositories,
-)
 from ai.backend.manager.repositories.manager_admin.repositories import ManagerAdminRepositories
 from ai.backend.manager.repositories.metric.repositories import MetricRepositories
 from ai.backend.manager.repositories.model_card.repositories import ModelCardRepositories
@@ -100,7 +97,6 @@ class Repositories:
     group: GroupRepositories
     idle_checker: IdleCheckerRepositories
     image: ImageRepositories
-    keypair_resource_policy: KeypairResourcePolicyRepositories
     manager_admin: ManagerAdminRepositories
     metric: MetricRepositories
     model_serving: ModelServingRepositories
@@ -151,7 +147,6 @@ class Repositories:
         group_repositories = GroupRepositories.create(args)
         idle_checker_repositories = IdleCheckerRepositories.create(args)
         image_repositories = ImageRepositories.create(args)
-        keypair_resource_policy_repositories = KeypairResourcePolicyRepositories.create(args)
         manager_admin_repositories = ManagerAdminRepositories.create(args)
         metric_repositories = MetricRepositories.create(args)
         model_serving_repositories = ModelServingRepositories.create(args)
@@ -203,7 +198,6 @@ class Repositories:
             group=group_repositories,
             idle_checker=idle_checker_repositories,
             image=image_repositories,
-            keypair_resource_policy=keypair_resource_policy_repositories,
             manager_admin=manager_admin_repositories,
             metric=metric_repositories,
             model_serving=model_serving_repositories,

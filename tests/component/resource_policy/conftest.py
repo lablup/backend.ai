@@ -41,17 +41,8 @@ from ai.backend.manager.models.resource_policy.row import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.keypair_resource_policy.repository import (
-    KeypairResourcePolicyRepository,
-)
-from ai.backend.manager.repositories.user_resource_policy.repository import (
-    UserResourcePolicyRepository,
-)
 from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
-)
-from ai.backend.manager.services.keypair_resource_policy.service import (
-    KeypairResourcePolicyService,
 )
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.project_resource_policy.processors import (
@@ -59,9 +50,6 @@ from ai.backend.manager.services.project_resource_policy.processors import (
 )
 from ai.backend.manager.services.user_resource_policy.processors import (
     UserResourcePolicyProcessors,
-)
-from ai.backend.manager.services.user_resource_policy.service import (
-    UserResourcePolicyService,
 )
 from ai.backend.testutils.processors import ops_processor_group
 
@@ -82,19 +70,8 @@ def resource_policy_processors(
     UserResourcePolicyProcessors,
     ProjectResourcePolicyProcessors,
 ]:
-    kp_repo = KeypairResourcePolicyRepository(database_engine)
-    kp_processors = KeypairResourcePolicyProcessors(
-        service=KeypairResourcePolicyService(kp_repo),
-        action_monitors=[],
-        group=ops_processor_group(database_engine),
-    )
-
-    up_repo = UserResourcePolicyRepository(database_engine)
-    up_processors = UserResourcePolicyProcessors(
-        service=UserResourcePolicyService(up_repo),
-        action_monitors=[],
-        group=ops_processor_group(database_engine),
-    )
+    kp_processors = KeypairResourcePolicyProcessors(group=ops_processor_group(database_engine))
+    up_processors = UserResourcePolicyProcessors(group=ops_processor_group(database_engine))
 
     pp_processors = ProjectResourcePolicyProcessors(group=ops_processor_group(database_engine))
 

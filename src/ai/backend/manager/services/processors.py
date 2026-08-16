@@ -150,11 +150,8 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.keypair_resource_policy.processors import (
         KeypairResourcePolicyProcessors,
     )
-    from ai.backend.manager.services.keypair_resource_policy.service import (
-        KeypairResourcePolicyService,
-    )
     from ai.backend.manager.services.login_client_type.processors import (
-            LoginClientTypeProcessors,
+        LoginClientTypeProcessors,
     )
     from ai.backend.manager.services.manager_admin.processors import (
         ManagerAdminProcessors,
@@ -290,9 +287,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.user_resource_policy.processors import (
         UserResourcePolicyProcessors,
     )
-    from ai.backend.manager.services.user_resource_policy.service import (
-        UserResourcePolicyService,
-    )
     from ai.backend.manager.services.vfolder.processors import (
         VFolderFileProcessors,
         VFolderInviteProcessors,
@@ -385,9 +379,7 @@ class Services:
     vfolder_invite: VFolderInviteService
     vfolder_sharing: VFolderSharingService
     session: SessionService
-    keypair_resource_policy: KeypairResourcePolicyService
     manager_admin: ManagerAdminService
-    user_resource_policy: UserResourcePolicyService
     prometheus_query_preset: PrometheusQueryPresetService
     resource_preset: ResourcePresetService
     resource_slot: ResourceSlotService

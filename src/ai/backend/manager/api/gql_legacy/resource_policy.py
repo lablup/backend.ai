@@ -362,7 +362,7 @@ class CreateKeyPairResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.keypair_resource_policy.create_keypair_resource_policy.run(
+        await graph_ctx.processors.keypair_resource_policy.global_create.run(
             CreateKeyPairResourcePolicyAction(props.to_creator(name))
         )
 
@@ -395,7 +395,7 @@ class ModifyKeyPairResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.keypair_resource_policy.update_keypair_resource_policy.run(
+        await graph_ctx.processors.keypair_resource_policy.global_update.run(
             UpdateKeyPairResourcePolicyAction(props.to_updater(name))
         )
 
@@ -426,7 +426,7 @@ class DeleteKeyPairResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.keypair_resource_policy.purge_keypair_resource_policy.run(
+        await graph_ctx.processors.keypair_resource_policy.global_purge.run(
             PurgeKeyPairResourcePolicyAction(name)
         )
         return DeleteKeyPairResourcePolicy(
@@ -612,7 +612,7 @@ class CreateUserResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.user_resource_policy.create_user_resource_policy.run(
+        await graph_ctx.processors.user_resource_policy.global_create.run(
             CreateUserResourcePolicyAction(props.to_creator(name))
         )
 
@@ -645,7 +645,7 @@ class ModifyUserResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.user_resource_policy.update_user_resource_policy.run(
+        await graph_ctx.processors.user_resource_policy.global_update.run(
             UpdateUserResourcePolicyAction(props.to_updater(name))
         )
 
@@ -676,7 +676,7 @@ class DeleteUserResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.user_resource_policy.purge_user_resource_policy.run(
+        await graph_ctx.processors.user_resource_policy.global_purge.run(
             PurgeUserResourcePolicyAction(name)
         )
 
@@ -855,7 +855,7 @@ class CreateProjectResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.project_resource_policy.create_project_resource_policy.run(
+        await graph_ctx.processors.project_resource_policy.global_create.run(
             CreateProjectResourcePolicyAction(props.to_creator(name))
         )
 
@@ -888,7 +888,7 @@ class ModifyProjectResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.project_resource_policy.update_project_resource_policy.run(
+        await graph_ctx.processors.project_resource_policy.global_update.run(
             UpdateProjectResourcePolicyAction(props.to_updater(name))
         )
 
@@ -919,7 +919,7 @@ class DeleteProjectResourcePolicy(graphene.Mutation):  # type: ignore[misc]
         )
 
         graph_ctx: GraphQueryContext = info.context
-        await graph_ctx.processors.project_resource_policy.purge_project_resource_policy.run(
+        await graph_ctx.processors.project_resource_policy.global_purge.run(
             PurgeProjectResourcePolicyAction(name)
         )
 

@@ -52,17 +52,14 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.keypair_resource_policy.repository import (
-    KeypairResourcePolicyRepository,
-)
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
 
 
-class TestKeypairResourcePolicyRepository:
-    """Test cases for KeypairResourcePolicyRepository"""
+class TestKeypairResourcePolicyOps:
+    """Test cases for the keypair resource policy ops"""
 
     @pytest.fixture
     async def db_with_cleanup(
@@ -198,14 +195,6 @@ class TestKeypairResourcePolicyRepository:
             await db_sess.commit()
 
         return policy_names
-
-    @pytest.fixture
-    def repository(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> KeypairResourcePolicyRepository:
-        """Create KeypairResourcePolicyRepository instance with database"""
-        return KeypairResourcePolicyRepository(db=db_with_cleanup)
 
     @pytest.fixture
     def ops(

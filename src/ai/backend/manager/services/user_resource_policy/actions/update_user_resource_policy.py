@@ -31,7 +31,7 @@ class UpdateUserResourcePolicyAction(
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "admin_update_user_resource_policy"
+        return "global_update_user_resource_policy"
 
     @override
     def to_updater(self) -> UserResourcePolicyUpdater:

@@ -7,21 +7,21 @@ from ai.backend.common.data.entity.resource_policy import (
     KEYPAIR_RESOURCE_POLICY_ENTITY_TYPE,
 )
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.manager.actions.v2.ops.base import UpdateGlobalOpsAction
+from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
-from ai.backend.manager.models.resource_policy.updaters import (
-    KeyPairResourcePolicyUpdater,
+from ai.backend.manager.repositories.keypair_resource_policy.searchers import (
+    KeyPairResourcePolicySearcher,
 )
 
 
 @dataclass
-class UpdateKeyPairResourcePolicyAction(
-    UpdateGlobalOpsAction[KeyPairResourcePolicyRow, KeyPairResourcePolicyData]
+class GlobalSearchKeypairResourcePoliciesAction(
+    SearchGlobalOpsAction[KeyPairResourcePolicyRow, KeyPairResourcePolicyData]
 ):
-    """Retune one keypair resource policy; the name stays the key."""
+    """Page through the keypair resource policy catalog."""
 
-    updater: KeyPairResourcePolicyUpdater
+    searcher: KeyPairResourcePolicySearcher
 
     @override
     @classmethod
@@ -31,8 +31,8 @@ class UpdateKeyPairResourcePolicyAction(
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "global_update_keypair_resource_policy"
+        return "global_search_keypair_resource_policies"
 
     @override
-    def to_updater(self) -> KeyPairResourcePolicyUpdater:
-        return self.updater
+    def to_searcher(self) -> KeyPairResourcePolicySearcher:
+        return self.searcher

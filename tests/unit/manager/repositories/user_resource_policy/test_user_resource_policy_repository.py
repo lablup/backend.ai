@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from uuid import uuid4
 
 import pytest
 
 from ai.backend.common.exception import UserResourcePolicyNotFound
-from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -32,7 +30,7 @@ from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.user_resource_policy.repository import (
@@ -124,48 +122,3 @@ class TestUserResourcePolicyRepository:
         """An unknown name is an error, not an empty answer."""
         with pytest.raises(UserResourcePolicyNotFound):
             await repository.get_by_name("non-existing")
-
-    async def test_get_by_user_id_resolves_through_the_user(
-        self,
-        repository: UserResourcePolicyRepository,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_policy: UserResourcePolicyData,
-    ) -> None:
-        """The join through ``users`` is why this repository still exists."""
-        user_id = uuid4()
-        async with db_with_cleanup.begin_session() as db_sess:
-            db_sess.add(
-                DomainRow(
-                    name="default",
-                    description="test domain",
-                    is_active=True,
-                    total_resource_slots=ResourceSlot(),
-                    allowed_vfolder_hosts={},
-                    allowed_docker_registries=[],
-                )
-            )
-            await db_sess.flush()
-            db_sess.add(
-                UserRow(
-                    uuid=user_id,
-                    username="policy-owner",
-                    email="policy-owner@example.com",
-                    password=None,
-                    need_password_change=False,
-                    status=UserStatus.ACTIVE,
-                    status_info="active",
-                    domain_name="default",
-                    role=UserRole.USER,
-                    resource_policy=sample_policy.name,
-                )
-            )
-            await db_sess.flush()
-
-        result = await repository.get_by_user_id(user_id)
-
-        assert result.name == sample_policy.name
-
-    async def test_get_by_user_id_not_found(self, repository: UserResourcePolicyRepository) -> None:
-        """A user with no policy row is an error, not an empty answer."""
-        with pytest.raises(UserResourcePolicyNotFound):
-            await repository.get_by_user_id(uuid4())

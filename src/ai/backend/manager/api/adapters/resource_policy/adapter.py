@@ -62,7 +62,12 @@ from ai.backend.common.dto.manager.v2.resource_policy.types import (
     ProjectResourcePolicyOrderField,
     UserResourcePolicyOrderField,
 )
-from ai.backend.common.exception import UnreachableError
+from ai.backend.common.exception import (
+    KeypairResourcePolicyNotFound,
+    UnreachableError,
+    UserResourcePolicyNotFound,
+)
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import BinarySize, ResourceSlot, VFolderHostPermission
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -98,6 +103,7 @@ from ai.backend.manager.models.resource_policy.updaters import (
     ProjectResourcePolicyUpdater,
     UserResourcePolicyUpdater,
 )
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
@@ -105,11 +111,17 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.repositories.keypair_resource_policy.searchers import (
     KeyPairResourcePolicySearcher,
 )
+from ai.backend.manager.repositories.keypair_resource_policy.types import (
+    UserKeypairResourcePolicyOperationScope,
+)
 from ai.backend.manager.repositories.project_resource_policy.searchers import (
     ProjectResourcePolicySearcher,
 )
 from ai.backend.manager.repositories.user_resource_policy.searchers import (
     UserResourcePolicySearcher,
+)
+from ai.backend.manager.repositories.user_resource_policy.types import (
+    UserResourcePolicyOperationScope,
 )
 from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
     CreateKeyPairResourcePolicyAction,
@@ -117,8 +129,8 @@ from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_
 from ai.backend.manager.services.keypair_resource_policy.actions.get_keypair_resource_policy import (
     GetKeypairResourcePolicyAction,
 )
-from ai.backend.manager.services.keypair_resource_policy.actions.get_my_keypair_resource_policy import (
-    GetMyKeypairResourcePolicyAction,
+from ai.backend.manager.services.keypair_resource_policy.actions.global_search_keypair_resource_policies import (
+    GlobalSearchKeypairResourcePoliciesAction,
 )
 from ai.backend.manager.services.keypair_resource_policy.actions.purge_keypair_resource_policy import (
     PurgeKeyPairResourcePolicyAction,
@@ -147,11 +159,11 @@ from ai.backend.manager.services.project_resource_policy.actions.update_project_
 from ai.backend.manager.services.user_resource_policy.actions.create_user_resource_policy import (
     CreateUserResourcePolicyAction,
 )
-from ai.backend.manager.services.user_resource_policy.actions.get_my_user_resource_policy import (
-    GetMyUserResourcePolicyAction,
-)
 from ai.backend.manager.services.user_resource_policy.actions.get_user_resource_policy import (
     GetUserResourcePolicyAction,
+)
+from ai.backend.manager.services.user_resource_policy.actions.global_search_user_resource_policies import (
+    GlobalSearchUserResourcePoliciesAction,
 )
 from ai.backend.manager.services.user_resource_policy.actions.purge_user_resource_policy import (
     PurgeUserResourcePolicyAction,
@@ -195,7 +207,7 @@ class ResourcePolicyAdapter(BaseAdapter):
     # ── Keypair Resource Policy ──
 
     async def admin_get_keypair_resource_policy(self, name: str) -> KeypairResourcePolicyNode:
-        result = await self._processors.keypair_resource_policy.get_keypair_resource_policy.run(
+        result = await self._processors.keypair_resource_policy.global_get.run(
             GetKeypairResourcePolicyAction(name=name)
         )
         return self._keypair_policy_data_to_node(result.data)
@@ -218,10 +230,8 @@ class ResourcePolicyAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = (
-            await self._processors.keypair_resource_policy.search_keypair_resource_policies.run(
-                SearchKeypairResourcePoliciesAction(searcher=searcher)
-            )
+        result = await self._processors.keypair_resource_policy.global_search.run(
+            GlobalSearchKeypairResourcePoliciesAction(searcher=searcher)
         )
         items = [self._keypair_policy_data_to_node(d) for d in result.items]
         return SearchKeypairResourcePoliciesPayload(items=items, total_count=result.total_count)
@@ -247,7 +257,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             idle_timeout=input.idle_timeout,
             allowed_vfolder_hosts=self._entries_to_vfolder_hosts(input.allowed_vfolder_hosts),
         )
-        result = await self._processors.keypair_resource_policy.create_keypair_resource_policy.run(
+        result = await self._processors.keypair_resource_policy.global_create.run(
             CreateKeyPairResourcePolicyAction(creator=creator)
         )
         return CreateKeypairResourcePolicyPayload(
@@ -331,7 +341,7 @@ class ResourcePolicyAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
         )
-        result = await self._processors.keypair_resource_policy.update_keypair_resource_policy.run(
+        result = await self._processors.keypair_resource_policy.global_update.run(
             UpdateKeyPairResourcePolicyAction(updater=updater)
         )
         return UpdateKeypairResourcePolicyPayload(
@@ -341,7 +351,7 @@ class ResourcePolicyAdapter(BaseAdapter):
     async def admin_delete_keypair_resource_policy(
         self, input: DeleteKeypairResourcePolicyInput
     ) -> DeleteKeypairResourcePolicyPayload:
-        await self._processors.keypair_resource_policy.purge_keypair_resource_policy.run(
+        await self._processors.keypair_resource_policy.global_purge.run(
             PurgeKeyPairResourcePolicyAction(name=input.name)
         )
         return DeleteKeypairResourcePolicyPayload(name=input.name)
@@ -350,15 +360,22 @@ class ResourcePolicyAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available.")
-        result = await self._processors.keypair_resource_policy.get_my_keypair_resource_policy.wait_for_complete(
-            GetMyKeypairResourcePolicyAction(user_id=me.user_id)
+        result = await self._processors.keypair_resource_policy.search.run(
+            SearchKeypairResourcePoliciesAction(
+                scopes=(UserKeypairResourcePolicyOperationScope(user_id=UserID(me.user_id)),),
+                searcher=KeyPairResourcePolicySearcher(pagination=NoPagination()),
+            )
         )
-        return self._keypair_policy_data_to_node(result.data)
+        if not result.items:
+            raise KeypairResourcePolicyNotFound(
+                f"Keypair resource policy for user {me.user_id!s} not found."
+            )
+        return self._keypair_policy_data_to_node(result.items[0])
 
     # ── User Resource Policy ──
 
     async def admin_get_user_resource_policy(self, name: str) -> UserResourcePolicyNode:
-        result = await self._processors.user_resource_policy.get_user_resource_policy.run(
+        result = await self._processors.user_resource_policy.global_get.run(
             GetUserResourcePolicyAction(name=name)
         )
         return self._user_policy_data_to_node(result.data)
@@ -381,8 +398,8 @@ class ResourcePolicyAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._processors.user_resource_policy.search_user_resource_policies.run(
-            SearchUserResourcePoliciesAction(searcher=searcher)
+        result = await self._processors.user_resource_policy.global_search.run(
+            GlobalSearchUserResourcePoliciesAction(searcher=searcher)
         )
         items = [self._user_policy_data_to_node(d) for d in result.items]
         return SearchUserResourcePoliciesPayload(items=items, total_count=result.total_count)
@@ -398,7 +415,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             max_session_count_per_model_session=input.max_session_count_per_model_session,
             max_customized_image_count=input.max_customized_image_count,
         )
-        result = await self._processors.user_resource_policy.create_user_resource_policy.run(
+        result = await self._processors.user_resource_policy.global_create.run(
             CreateUserResourcePolicyAction(creator=creator)
         )
         return CreateUserResourcePolicyPayload(
@@ -442,7 +459,7 @@ class ResourcePolicyAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
         )
-        result = await self._processors.user_resource_policy.update_user_resource_policy.run(
+        result = await self._processors.user_resource_policy.global_update.run(
             UpdateUserResourcePolicyAction(updater=updater)
         )
         return UpdateUserResourcePolicyPayload(
@@ -452,7 +469,7 @@ class ResourcePolicyAdapter(BaseAdapter):
     async def admin_delete_user_resource_policy(
         self, input: DeleteUserResourcePolicyInput
     ) -> DeleteUserResourcePolicyPayload:
-        await self._processors.user_resource_policy.purge_user_resource_policy.run(
+        await self._processors.user_resource_policy.global_purge.run(
             PurgeUserResourcePolicyAction(name=input.name)
         )
         return DeleteUserResourcePolicyPayload(name=input.name)
@@ -461,15 +478,22 @@ class ResourcePolicyAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available.")
-        result = await self._processors.user_resource_policy.get_my_user_resource_policy.wait_for_complete(
-            GetMyUserResourcePolicyAction(user_id=me.user_id)
+        result = await self._processors.user_resource_policy.search.run(
+            SearchUserResourcePoliciesAction(
+                scopes=(UserResourcePolicyOperationScope(user_id=UserID(me.user_id)),),
+                searcher=UserResourcePolicySearcher(pagination=NoPagination()),
+            )
         )
-        return self._user_policy_data_to_node(result.data)
+        if not result.items:
+            raise UserResourcePolicyNotFound(
+                f"User resource policy for user {me.user_id!s} not found."
+            )
+        return self._user_policy_data_to_node(result.items[0])
 
     # ── Project Resource Policy ──
 
     async def admin_get_project_resource_policy(self, name: str) -> ProjectResourcePolicyNode:
-        result = await self._processors.project_resource_policy.get_project_resource_policy.run(
+        result = await self._processors.project_resource_policy.global_get.run(
             GetProjectResourcePolicyAction(name=name)
         )
         return self._project_policy_data_to_node(result.data)
@@ -492,10 +516,8 @@ class ResourcePolicyAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = (
-            await self._processors.project_resource_policy.search_project_resource_policies.run(
-                SearchProjectResourcePoliciesAction(searcher=searcher)
-            )
+        result = await self._processors.project_resource_policy.global_search.run(
+            SearchProjectResourcePoliciesAction(searcher=searcher)
         )
         items = [self._project_policy_data_to_node(d) for d in result.items]
         return SearchProjectResourcePoliciesPayload(items=items, total_count=result.total_count)
@@ -509,7 +531,7 @@ class ResourcePolicyAdapter(BaseAdapter):
             max_quota_scope_size=input.max_quota_scope_size.bytes,
             max_network_count=input.max_network_count,
         )
-        result = await self._processors.project_resource_policy.create_project_resource_policy.run(
+        result = await self._processors.project_resource_policy.global_create.run(
             CreateProjectResourcePolicyAction(creator=creator)
         )
         return CreateProjectResourcePolicyPayload(
@@ -541,7 +563,7 @@ class ResourcePolicyAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
         )
-        result = await self._processors.project_resource_policy.update_project_resource_policy.run(
+        result = await self._processors.project_resource_policy.global_update.run(
             UpdateProjectResourcePolicyAction(updater=updater)
         )
         return UpdateProjectResourcePolicyPayload(
@@ -551,7 +573,7 @@ class ResourcePolicyAdapter(BaseAdapter):
     async def admin_delete_project_resource_policy(
         self, input: DeleteProjectResourcePolicyInput
     ) -> DeleteProjectResourcePolicyPayload:
-        await self._processors.project_resource_policy.purge_project_resource_policy.run(
+        await self._processors.project_resource_policy.global_purge.run(
             PurgeProjectResourcePolicyAction(name=input.name)
         )
         return DeleteProjectResourcePolicyPayload(name=input.name)

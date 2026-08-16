@@ -31,7 +31,7 @@ class CreateUserResourcePolicyAction(
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "admin_create_user_resource_policy"
+        return "global_create_user_resource_policy"
 
     @override
     def to_creator(self) -> UserResourcePolicyCreator:

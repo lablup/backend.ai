@@ -75,7 +75,6 @@ from ai.backend.manager.services.image.service import ImageService
 from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
 )
-from ai.backend.manager.services.keypair_resource_policy.service import KeypairResourcePolicyService
 from ai.backend.manager.services.login_client_type.processors import (
     LoginClientTypeProcessors,
 )
@@ -154,7 +153,6 @@ from ai.backend.manager.services.template.service import TemplateService
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.manager.services.user_resource_policy.processors import UserResourcePolicyProcessors
-from ai.backend.manager.services.user_resource_policy.service import UserResourcePolicyService
 from ai.backend.manager.services.vfolder.processors import (
     VFolderFileProcessors,
     VFolderInviteProcessors,
@@ -275,18 +273,12 @@ def create_services(args: ServiceArgs) -> Services:
                 user_repository=repositories.user.repository,
             )
         ),
-        keypair_resource_policy=KeypairResourcePolicyService(
-            repositories.keypair_resource_policy.repository
-        ),
         manager_admin=ManagerAdminService(
             repository=repositories.manager_admin.repository,
             config_provider=args.config_provider,
             etcd=args.etcd,
             db=args.db,
             valkey_stat=args.valkey_stat_client,
-        ),
-        user_resource_policy=UserResourcePolicyService(
-            repositories.user_resource_policy.repository
         ),
         prometheus_query_preset=PrometheusQueryPresetService(
             repository=repositories.prometheus_query_preset.repository,
@@ -481,13 +473,9 @@ def create_processors(
             services.vfolder_sharing, action_monitors, validators
         ),
         session=SessionProcessors(services.session, action_monitors, validators),
-        keypair_resource_policy=KeypairResourcePolicyProcessors(
-            services.keypair_resource_policy, action_monitors, registry.group()
-        ),
+        keypair_resource_policy=KeypairResourcePolicyProcessors(registry.group()),
         manager_admin=ManagerAdminProcessors(services.manager_admin, action_monitors, validators),
-        user_resource_policy=UserResourcePolicyProcessors(
-            services.user_resource_policy, action_monitors, registry.group()
-        ),
+        user_resource_policy=UserResourcePolicyProcessors(registry.group()),
         project_resource_policy=ProjectResourcePolicyProcessors(registry.group()),
         prometheus_query_preset=PrometheusQueryPresetProcessors(
             services.prometheus_query_preset, registry.group()

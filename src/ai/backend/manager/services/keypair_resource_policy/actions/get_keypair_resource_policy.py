@@ -31,7 +31,7 @@ class GetKeypairResourcePolicyAction(
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "admin_get_keypair_resource_policy"
+        return "global_get_keypair_resource_policy"
 
     @override
     def to_querier(self) -> KeyPairResourcePolicyQuerier:

@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.registry import ProcessorGroup
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     CreatedEntityOpsResult,
     EntityOpsResult,
+    ScopedBatchOpsResult,
 )
+from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_resource_policy import (
     CreateKeyPairResourcePolicyAction,
@@ -16,9 +16,8 @@ from ai.backend.manager.services.keypair_resource_policy.actions.create_keypair_
 from ai.backend.manager.services.keypair_resource_policy.actions.get_keypair_resource_policy import (
     GetKeypairResourcePolicyAction,
 )
-from ai.backend.manager.services.keypair_resource_policy.actions.get_my_keypair_resource_policy import (
-    GetMyKeypairResourcePolicyAction,
-    GetMyKeypairResourcePolicyActionResult,
+from ai.backend.manager.services.keypair_resource_policy.actions.global_search_keypair_resource_policies import (
+    GlobalSearchKeypairResourcePoliciesAction,
 )
 from ai.backend.manager.services.keypair_resource_policy.actions.purge_keypair_resource_policy import (
     PurgeKeyPairResourcePolicyAction,
@@ -29,50 +28,34 @@ from ai.backend.manager.services.keypair_resource_policy.actions.search_keypair_
 from ai.backend.manager.services.keypair_resource_policy.actions.update_keypair_resource_policy import (
     UpdateKeyPairResourcePolicyAction,
 )
-from ai.backend.manager.services.keypair_resource_policy.service import (
-    KeypairResourcePolicyService,
-)
 
 
 class KeypairResourcePolicyProcessors:
-    get_keypair_resource_policy: GlobalActionProcessor[
+    """Every operation runs straight against ops, so this domain has no service."""
+
+    global_get: GlobalActionProcessor[
         GetKeypairResourcePolicyAction, EntityOpsResult[KeyPairResourcePolicyData]
     ]
-    get_my_keypair_resource_policy: ActionProcessor[
-        GetMyKeypairResourcePolicyAction, GetMyKeypairResourcePolicyActionResult
+    search: ScopeActionProcessor[
+        SearchKeypairResourcePoliciesAction, ScopedBatchOpsResult[KeyPairResourcePolicyData]
     ]
-    search_keypair_resource_policies: GlobalActionProcessor[
-        SearchKeypairResourcePoliciesAction, BatchOpsResult[KeyPairResourcePolicyData]
+    global_search: GlobalActionProcessor[
+        GlobalSearchKeypairResourcePoliciesAction, BatchOpsResult[KeyPairResourcePolicyData]
     ]
-    create_keypair_resource_policy: GlobalActionProcessor[
+    global_create: GlobalActionProcessor[
         CreateKeyPairResourcePolicyAction, CreatedEntityOpsResult[KeyPairResourcePolicyData]
     ]
-    update_keypair_resource_policy: GlobalActionProcessor[
+    global_update: GlobalActionProcessor[
         UpdateKeyPairResourcePolicyAction, EntityOpsResult[KeyPairResourcePolicyData]
     ]
-    purge_keypair_resource_policy: GlobalActionProcessor[
+    global_purge: GlobalActionProcessor[
         PurgeKeyPairResourcePolicyAction, EntityOpsResult[KeyPairResourcePolicyData]
     ]
 
-    def __init__(
-        self,
-        service: KeypairResourcePolicyService,
-        action_monitors: list[ActionMonitor],
-        group: ProcessorGroup[KeyPairResourcePolicyData],
-    ) -> None:
-        self.get_keypair_resource_policy = group.global_get_ops(GetKeypairResourcePolicyAction)
-        self.get_my_keypair_resource_policy = ActionProcessor(
-            service.get_my_keypair_resource_policy, action_monitors
-        )
-        self.search_keypair_resource_policies = group.global_search_ops(
-            SearchKeypairResourcePoliciesAction
-        )
-        self.create_keypair_resource_policy = group.global_create_ops(
-            CreateKeyPairResourcePolicyAction
-        )
-        self.update_keypair_resource_policy = group.global_update_ops(
-            UpdateKeyPairResourcePolicyAction
-        )
-        self.purge_keypair_resource_policy = group.global_purge_ops(
-            PurgeKeyPairResourcePolicyAction
-        )
+    def __init__(self, group: ProcessorGroup[KeyPairResourcePolicyData]) -> None:
+        self.global_get = group.global_get_ops(GetKeypairResourcePolicyAction)
+        self.search = group.scope_search_ops(SearchKeypairResourcePoliciesAction)
+        self.global_search = group.global_search_ops(GlobalSearchKeypairResourcePoliciesAction)
+        self.global_create = group.global_create_ops(CreateKeyPairResourcePolicyAction)
+        self.global_update = group.global_update_ops(UpdateKeyPairResourcePolicyAction)
+        self.global_purge = group.global_purge_ops(PurgeKeyPairResourcePolicyAction)
